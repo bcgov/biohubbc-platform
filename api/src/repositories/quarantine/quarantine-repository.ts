@@ -1,6 +1,8 @@
 import { SQL } from 'sql-template-strings';
+import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { IInsertQuarantine, IUpdateQuarantine, QuarantineRecord } from '../../models/quarantine';
+import { SubmissionRecordWithQuarantine } from '../../models/submission';
 import { BaseRepository } from '../base-repository';
 
 export class QuarantineRepository extends BaseRepository {
@@ -34,6 +36,57 @@ export class QuarantineRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+  /**
+   * Get a quarantine record with all associated scans.
+   *
+   * @return {*}  {Promise<SubmissionRecordWithQuarantine[]>}
+   * @memberof QuarantineRepository
+   */
+  async getQuarantineRecordsWithScans(): Promise<SubmissionRecordWithQuarantine[]> {
+    const knex = getKnex();
+    const queryBuilder = knex
+      .with('scan_data', (qb) => {
+        qb.select(
+          'qs.quarantine_id',
+          knex.raw(
+            `jsonb_agg(
+            jsonb_build_object(
+              'quarantine_scan_id', qs.quarantine_scan_id,
+              'quarantine_id', qs.quarantine_id,
+              'scan_status', qs.scan_status,
+              'scanned_at', qs.scanned_at,
+              'scanner_version', qs.scanner_version,
+              'results', qs.results
+            )
+          ) FILTER (WHERE qs.quarantine_scan_id IS NOT NULL) as scans`
+          )
+        )
+          .from('biohub.quarantine_scan as qs')
+          .groupBy('qs.quarantine_id');
+      })
+      .with('quarantine_data', (qb) => {
+        qb.select(
+          'q.quarantine_id',
+          knex.raw(
+            `jsonb_build_object(
+              'quarantine_id', q.quarantine_id,
+              'status', q.status,
+              'scans', COALESCE(sd.scans, '[]'::jsonb)
+            ) as quarantine
+             `
+          )
+        )
+          .from('biohub.quarantine as q')
+          .leftJoin('scan_data as sd', 'q.quarantine_id', 'sd.quarantine_id');
+      })
+      .select('s.submission_id', 's.name', 's.description', 's.submitted_timestamp', 'qd.quarantine')
+      .from('submission as s')
+      .join('quarantine_data as qd', 's.quarantine_id', 'qd.quarantine_id');
+
+    const response = await this.connection.knex(queryBuilder, SubmissionRecordWithQuarantine);
+
+    return response.rows;
   }
 
   /**
@@ -80,15 +133,15 @@ export class QuarantineRepository extends BaseRepository {
     quarantine: IUpdateQuarantine
   ): Promise<{ quarantine_id: string }> {
     const sqlStatement = SQL`
-    UPDATE biohub.quarantine
-    SET
-      uri = COALESCE(${quarantine.uri}, uri),
-      status = COALESCE(${quarantine.status}, status),
-      upload_id = COALESCE(${quarantine.upload_id}, upload_id)
-    WHERE
-      quarantine_id = ${quarantineId}
-    RETURNING quarantine_id;
-  `;
+      UPDATE biohub.quarantine
+      SET
+        uri = COALESCE(${quarantine.uri}, uri),
+        status = COALESCE(${quarantine.status}, status),
+        upload_id = COALESCE(${quarantine.upload_id}, upload_id)
+      WHERE
+        quarantine_id = ${quarantineId}
+      RETURNING quarantine_id;
+    `;
 
     const response = await this.connection.sql(sqlStatement);
 

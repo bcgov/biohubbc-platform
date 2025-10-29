@@ -1,5 +1,4 @@
 import { useConfigContext } from 'hooks/useContext';
-
 import useAdminApi from './api/useAdminApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
@@ -8,6 +7,7 @@ import useSecurityApi from './api/useSecurityApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
 import useUserApi from './api/useUserApi';
+import { useQuarantineApi } from './api/useQuarantineApi';
 
 /**
  * Returns a set of supported api methods.
@@ -33,6 +33,8 @@ export const useApi = () => {
 
   const codes = useCodesApi(apiAxios);
 
+  const quarantine = useQuarantineApi(apiAxios);
+
   return {
     user,
     admin,
@@ -40,6 +42,7 @@ export const useApi = () => {
     taxonomy,
     security,
     artifact,
-    codes
+    codes,
+    quarantine
   };
 };

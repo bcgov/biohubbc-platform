@@ -20,7 +20,9 @@ export async function up(knex: Knex): Promise<void> {
       -- used when malware scan completed and threats were found
       'rejected',
       -- used when malware scan failed due to error
-      'failed'
+      'failed',
+      -- used when scanning is skipped by an admin
+      'skipped'
     );
 
     CREATE TYPE scan_status AS ENUM (
@@ -147,15 +149,30 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN quarantine_scan_file.revision_count IS 'Revision count used for concurrency control.';
 
     --------------------------------------------------------------------------------
-    -- Update submission table to reference quarantine
+    -- Update submission table to reference quarantine and add URI
     --------------------------------------------------------------------------------
-    
-    ALTER TABLE submission ADD COLUMN quarantine_id uuid;
-    ALTER TABLE submission ADD CONSTRAINT submission_quarantine_fk FOREIGN KEY (quarantine_id) REFERENCES quarantine(quarantine_id);
+
+    -- Add quarantine_id column and foreign key
+    ALTER TABLE submission
+    ADD COLUMN quarantine_id uuid;
+
+    ALTER TABLE submission
+    ADD CONSTRAINT submission_quarantine_fk
+    FOREIGN KEY (quarantine_id) REFERENCES quarantine(quarantine_id);
 
     CREATE INDEX submission_quarantine_id_idx ON submission(quarantine_id);
-    
+
     COMMENT ON COLUMN submission.quarantine_id IS 'Foreign key to the quarantine table if this submission required security scanning.';
+
+    -- Add URI column for S3/storage location
+    ALTER TABLE submission
+    ADD COLUMN uri varchar(200);
+
+    COMMENT ON COLUMN submission.uri IS 'S3 URI or storage location for the submission tarball or resource.';
+
+    -- Optional: create an index on URI if queries will filter by it frequently
+    CREATE INDEX submission_uri_idx ON submission(uri);
+
 
     --------------------------------------------------------------------------------
     -- Add audit triggers for each of the new tables

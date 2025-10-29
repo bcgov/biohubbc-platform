@@ -12,9 +12,10 @@ import UnreviewedSubmissionsTable from 'features/admin/dashboard/components/Unre
 import { useState } from 'react';
 import { NavLink } from 'react-router';
 import PublishedSubmissionsTable from './components/PublishedSubmissionsTable';
+import QuarantinedSubmissionsTable from './quarantine/QuarantinedSubmissionsTable';
 
 const DashboardPage = () => {
-  const [activeTab, setActiveTab] = useState<'pending' | 'complete' | 'published'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'complete' | 'published' | 'quarantined'>('pending');
 
   return (
     <>
@@ -42,6 +43,12 @@ const DashboardPage = () => {
               mt: 1.5,
               mx: -2
             }}>
+            <Tab
+              value="quarantined"
+              label="Quarantined"
+              id="submission-quarantined-tab"
+              aria-controls="submission-quarantined-tabpanel"
+            />
             <Tab
               value="pending"
               label="Pending Review"
@@ -89,6 +96,15 @@ const DashboardPage = () => {
             id="submission-published-tabpanel"
             aria-labelledby="submission-published-tab">
             <PublishedSubmissionsTable />
+          </Box>
+        )}
+
+        {activeTab === 'quarantined' && (
+          <Box
+            hidden={activeTab !== 'quarantined'}
+            id="submission-quarantined-tabpanel"
+            aria-labelledby="submission-quarantined-tab">
+            <QuarantinedSubmissionsTable />
           </Box>
         )}
       </Container>

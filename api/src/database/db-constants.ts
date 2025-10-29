@@ -62,13 +62,13 @@ export const getDBConstants = function (): DBConstants {
 
 const selectServiceAccountsSqlStatement = SQL`
   SELECT
-    *
+    su.*
   FROM
-    "system_user"
+    "system_user" su
   INNER JOIN
     user_identity_source
   ON
-    "system_user".user_identity_source_id = user_identity_source.user_identity_source_id
+    su.user_identity_source_id = user_identity_source.user_identity_source_id
   WHERE
     user_identity_source.name = ${SYSTEM_IDENTITY_SOURCE.SYSTEM};
 `;

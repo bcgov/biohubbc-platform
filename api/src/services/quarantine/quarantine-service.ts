@@ -3,12 +3,15 @@ import dayjs from 'dayjs';
 import { pipeline, Readable } from 'stream';
 import * as tar from 'tar-stream';
 import { IDBConnection } from '../../database/db';
+import { ApiGeneralError } from '../../errors/api-error';
 import { IInsertQuarantine, IUpdateQuarantine, QuarantineRecord, QuarantineStatusEnum } from '../../models/quarantine';
 import { ScanStatusEnum } from '../../models/quarantine-scan';
 import { FileScanResultEnum } from '../../models/quarantine-scan-file';
+import { SubmissionRecordWithQuarantine } from '../../models/submission';
 import { QuarantineRepository } from '../../repositories/quarantine/quarantine-repository';
 import { _getClamAvScanner } from '../../utils/file-utils';
 import { DBService } from '../db-service';
+import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { QuarantineScanFileService } from './quarantine-scan-file-service';
 import { QuarantineScanService } from './quarantine-scan-service';
 import { IFinalizeScanParams, IScanSummary } from './quarantine-service.interface';
@@ -17,6 +20,7 @@ export class QuarantineService extends DBService {
   quarantineRepository: QuarantineRepository;
   quarantineScanService: QuarantineScanService;
   quarantineScanFileService: QuarantineScanFileService;
+  objectStorageService: ObjectStorageService;
   quarantineBucketName: string;
 
   constructor(connection: IDBConnection) {
@@ -24,6 +28,7 @@ export class QuarantineService extends DBService {
     this.quarantineRepository = new QuarantineRepository(connection);
     this.quarantineScanService = new QuarantineScanService(connection);
     this.quarantineScanFileService = new QuarantineScanFileService(connection);
+    this.objectStorageService = new ObjectStorageService();
     this.quarantineBucketName = process.env.QUARANTINE_OBJECT_STORE_BUCKET_NAME!;
   }
 
@@ -36,6 +41,16 @@ export class QuarantineService extends DBService {
    */
   async getQuarantineRecord(quarantineId: string): Promise<QuarantineRecord> {
     return this.quarantineRepository.getQuarantineRecord(quarantineId);
+  }
+
+  /**
+   * Get a quarantine record by its ID
+   *
+   * @return {*}  {Promise<SubmissionRecordWithQuarantine[]>}
+   * @memberof QuarantineService
+   */
+  async getQuarantineRecordsWithScans(): Promise<SubmissionRecordWithQuarantine[]> {
+    return this.quarantineRepository.getQuarantineRecordsWithScans();
   }
 
   /**
@@ -248,5 +263,33 @@ export class QuarantineService extends DBService {
       await this._markScanAsFailed(scan.quarantine_scan_id, error);
       throw error;
     }
+
+    // 7. Copy the submission from the quarantined bucket to the main bucket
+    await this.objectStorageService.promoteFromQuarantine(record.uri);
+  }
+
+  /**
+   * Promotes a quarantined file to the main bucket without scanning.
+   *
+   * - Copies the S3 object from the quarantine bucket to the main bucket
+   * - Updates the record status to APPROVED or ACTIVE
+   *
+   * @param {string} quarantineId - The quarantine record ID to promote
+   * @throws {ApiGeneralError} If the record or URI is invalid
+   * @memberof QuarantineService
+   */
+  async promoteQuarantineRecord(quarantineId: string): Promise<void> {
+    // 1. Validate and get quarantine record
+    const record = await this.getQuarantineRecord(quarantineId);
+
+    if (!record.uri) {
+      throw new ApiGeneralError('Quarantine record URI does not exist.');
+    }
+
+    // 2. Copy the file from quarantine to main bucket
+    await this.objectStorageService.promoteFromQuarantine(record.uri);
+
+    // 3. Update the record status to indicate it is now active/approved
+    await this.updateQuarantineRecord(quarantineId, { status: QuarantineStatusEnum.SKIPPED });
   }
 }

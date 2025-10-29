@@ -103,6 +103,7 @@ export interface ISubmissionRecordWithSpatial {
 export interface ISubmissionModel {
   submission_id?: number;
   uuid: string;
+  uri: string | null;
   security_review_timestamp?: string | null;
   create_date?: string;
   create_user?: number;
@@ -185,7 +186,6 @@ export interface ISubmissionJobQueueRecord {
   update_user: number | null;
   revision_count: number;
 }
-
 export interface ISubmissionObservationRecord {
   submission_observation_id?: number;
   submission_id: number;
@@ -205,6 +205,7 @@ export interface ISubmissionObservationRecord {
 export const SubmissionRecord = z.object({
   submission_id: z.number(),
   uuid: z.string(),
+  uri: z.string().nullable(),
   quarantine_id: z.string().nullable(),
   security_review_timestamp: z.string().nullable(),
   submitted_timestamp: z.string(),
@@ -461,10 +462,10 @@ export class SubmissionRepository extends BaseRepository {
    * Fetch a submission record by primary id.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<ISubmissionModel>}
+   * @return {*}  {Promise<SubmissionRecord>}
    * @memberof SubmissionRepository
    */
-  async getSubmissionRecordBySubmissionId(submissionId: number): Promise<ISubmissionModel> {
+  async getSubmissionRecordBySubmissionId(submissionId: number): Promise<SubmissionRecord> {
     const sqlStatement = SQL`
       SELECT
         *
@@ -474,7 +475,7 @@ export class SubmissionRepository extends BaseRepository {
         submission_id = ${submissionId};
     `;
 
-    const response = await this.connection.sql<ISubmissionModel>(sqlStatement);
+    const response = await this.connection.sql<SubmissionRecord>(sqlStatement);
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission record', [

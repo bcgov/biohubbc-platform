@@ -58,18 +58,6 @@ export interface IPostSubmissionFeature {
   children: IPostSubmissionFeature[];
 }
 
-export interface ISubmissionUploadPart {
-  partNumber: number;
-  etag: string;
-}
-
-export interface ICompleteSubmissionUploadMetadata {
-  name: string;
-  description: string;
-  comment: string;
-  uid: string;
-}
-
 export type SubmissionFeatureRecordWithTypeAndSecurity = {
   submission_feature_id: number;
   uuid: string;
@@ -110,16 +98,3 @@ export type SubmissionFeatureSignedUrlPayload = {
   submissionFeatureKey: string;
   submissionFeatureValue: string;
 };
-
-export interface PresignedUrl {
-  partNumber: number;
-  url: string;
-}
-export interface PresignedUploadUrlResponse {
-  quarantineId: string;
-  uploadId: string;
-  key: string;
-  partSizeBytes: number;
-  partCount: number;
-  presignedUrls: PresignedUrl[];
-}

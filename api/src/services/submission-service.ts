@@ -6,7 +6,6 @@ import {
   ICreateSubmissionRecord,
   ISubmissionFeature,
   ISubmissionJobQueueRecord,
-  ISubmissionModel,
   ISubmissionRecord,
   PatchSubmissionRecord,
   SubmissionFeatureDownloadRecord,
@@ -126,10 +125,10 @@ export class SubmissionService extends DBService {
    * Get submission record by id.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<ISubmissionModel>}
+   * @return {*}  {Promise<SubmissionRecord>}
    * @memberof SubmissionService
    */
-  async getSubmissionRecordBySubmissionId(submissionId: number): Promise<ISubmissionModel> {
+  async getSubmissionRecordBySubmissionId(submissionId: number): Promise<SubmissionRecord> {
     return this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId);
   }
 

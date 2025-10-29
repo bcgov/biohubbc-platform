@@ -1,10 +1,7 @@
 import { AxiosInstance } from 'axios';
 import {
-  ICompleteSubmissionUploadMetadata,
   IGetDownloadSubmissionResponse,
   IGetSubmissionGroupedFeatureResponse,
-  ISubmissionUploadPart,
-  PresignedUploadUrlResponse,
   SubmissionFeatureSignedUrlPayload,
   SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
@@ -147,35 +144,13 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Get presigned URLs to upload submission files
+   * Validate a submission
    *
-   * @param {number} expectedSizeBytes
-   * @returns {Promise<PresignedUploadUrlResponse>}
-   */
-  const getSubmissionUploadUrls = async (expectedSizeBytes: number): Promise<PresignedUploadUrlResponse> => {
-    const { data } = await axios.post(`api/submission/quarantine`, { expectedSizeBytes });
-
-    return data;
-  };
-
-  /**
-   * Update the submission upload as completed
-   *
-   * @param {string} quarantineId
-   * @param {string} uploadId
-   * @param {string} key
-   * @param {ISubmissionUploadPart[]} parts
-   * @param {ICompleteSubmissionUploadMetadata} metadata
+   * @param {string} submissionId
    * @returns {Promise<void>}
    */
-  const completeSubmissionUpload = async (
-    quarantineId: string,
-    uploadId: string,
-    key: string,
-    parts: ISubmissionUploadPart[],
-    metadata: ICompleteSubmissionUploadMetadata
-  ): Promise<void> => {
-    await axios.put(`api/submission/quarantine/${quarantineId}`, { uploadId, key, parts, metadata });
+  const validateSubmission = async (submissionId: string): Promise<void> => {
+    await axios.post(`api/submission/submission/${submissionId}/validate`);
   };
 
   return {
@@ -189,8 +164,7 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     updateSubmissionRecord,
     getPublishedSubmissions,
     getSubmissionFeatureSignedUrl,
-    getSubmissionUploadUrls,
-    completeSubmissionUpload
+    validateSubmission
   };
 };
 

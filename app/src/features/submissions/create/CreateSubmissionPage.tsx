@@ -64,7 +64,7 @@ export const CreateSubmissionPage = () => {
       ];
 
       // Request pre-signed upload URLs for multipart upload
-      const uploadResponse = await bioHubApi.submissions.getSubmissionUploadUrls(
+      const uploadResponse = await bioHubApi.quarantine.getSubmissionUploadUrls(
         // Estimate total size: sum of file sizes + headers + padding
         filesToTar.reduce(
           (sum, f) => sum + Math.ceil(f.content.length / TAR_BLOCK_SIZE) * TAR_BLOCK_SIZE + TAR_HEADER_SIZE,
@@ -86,7 +86,7 @@ export const CreateSubmissionPage = () => {
       const parsedParts = parts.map((part) => ({ partNumber: part.partNumber, etag: part.etag }));
 
       // Mark upload as complete
-      await bioHubApi.submissions.completeSubmissionUpload(
+      await bioHubApi.quarantine.completeQuarantineUpload(
         uploadResponse.quarantineId,
         uploadResponse.uploadId,
         uploadResponse.key,

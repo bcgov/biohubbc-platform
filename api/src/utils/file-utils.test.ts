@@ -6,12 +6,12 @@ import {
   deleteFileFromS3,
   generateDatasetS3FileKey,
   generateQueueS3FileKey,
+  getObjectStoreUrl,
   getS3HostUrl,
   getS3KeyPrefix,
   getS3SignedURL,
   _getClamAvScanner,
   _getObjectStoreBucketName,
-  _getObjectStoreUrl,
   _getS3Client
 } from './file-utils';
 
@@ -134,7 +134,7 @@ describe('_getObjectStoreBucketName', () => {
   });
 });
 
-describe('_getObjectStoreUrl', () => {
+describe('getObjectStoreUrl', () => {
   const OBJECT_STORE_URL = process.env.OBJECT_STORE_URL;
 
   afterEach(() => {
@@ -144,28 +144,28 @@ describe('_getObjectStoreUrl', () => {
   it('should return an object store bucket name that http protocol', () => {
     process.env.OBJECT_STORE_URL = 'http://s3.host.example.com';
 
-    const result = _getObjectStoreUrl();
+    const result = getObjectStoreUrl();
     expect(result).to.equal('http://s3.host.example.com');
   });
 
   it('should return an object store bucket name that https protocol', () => {
     process.env.OBJECT_STORE_URL = 'https://s3.host.example.com';
 
-    const result = _getObjectStoreUrl();
+    const result = getObjectStoreUrl();
     expect(result).to.equal('https://s3.host.example.com');
   });
 
   it('should return an object store bucket name that had no protocol', () => {
     process.env.OBJECT_STORE_URL = 's3.host.example.com';
 
-    const result = _getObjectStoreUrl();
+    const result = getObjectStoreUrl();
     expect(result).to.equal('https://s3.host.example.com');
   });
 
   it('should return its default value', () => {
     Object.assign(process.env, { OBJECT_STORE_URL: undefined });
 
-    const result = _getObjectStoreUrl();
+    const result = getObjectStoreUrl();
     expect(result).to.equal('https://nrs.objectstore.gov.bc.ca');
   });
 });

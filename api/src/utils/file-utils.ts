@@ -63,7 +63,7 @@ export const _getClamAvScanner = async (): Promise<NodeClam> => {
  */
 export const _getS3Client = (): S3Client => {
   return new S3Client({
-    endpoint: _getObjectStoreUrl(),
+    endpoint: getObjectStoreUrl(),
     credentials: {
       accessKeyId: process.env.OBJECT_STORE_ACCESS_KEY_ID!,
       secretAccessKey: process.env.OBJECT_STORE_SECRET_KEY_ID!
@@ -80,7 +80,7 @@ export const _getS3Client = (): S3Client => {
  */
 export const _getQuarantineS3Client = (): S3Client => {
   return new S3Client({
-    endpoint: _getObjectStoreUrl(),
+    endpoint: getObjectStoreUrl(),
     credentials: {
       accessKeyId: process.env.QUARANTINE_OBJECT_STORE_ACCESS_KEY_ID!,
       secretAccessKey: process.env.QUARANTINE_OBJECT_STORE_SECRET_KEY_ID!
@@ -95,7 +95,7 @@ export const _getQuarantineS3Client = (): S3Client => {
  *
  * @returns {*} {string} The object store URL
  */
-export const _getObjectStoreUrl = (): string => {
+export const getObjectStoreUrl = (): string => {
   const url = process.env.OBJECT_STORE_URL || 'https://nrs.objectstore.gov.bc.ca';
 
   if (!['https://', 'http://'].some((protocol) => url.toLowerCase().startsWith(protocol))) {
@@ -133,7 +133,7 @@ export const _getQuarantineObjectStoreBucketName = (): string => {
  */
 export const getS3HostUrl = (key?: string): string => {
   // Appends the given S3 object key, trimming between 0 and 2 trailing '/' characters
-  return `${_getObjectStoreUrl()}/${_getObjectStoreBucketName()}/${key || ''}`.replace(/\/{0,2}$/, '');
+  return `${getObjectStoreUrl()}/${_getObjectStoreBucketName()}/${key || ''}`.replace(/\/{0,2}$/, '');
 };
 
 /**

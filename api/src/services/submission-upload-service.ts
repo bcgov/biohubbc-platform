@@ -69,19 +69,6 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
-   * Builds a full S3 URI from bucket and key.
-   *
-   * @private
-   * @param {string} bucket - S3 bucket name
-   * @param {string} key - S3 object key
-   * @returns {string} Full S3 URI in format: s3://bucket/key
-   * @memberof SubmissionUploadService
-   */
-  private _buildS3Uri(bucket: string, key: string): string {
-    return `s3://${bucket}/${key}`;
-  }
-
-  /**
    * Initializes a new multipart upload for a .tar file associated with a submission.
    *
    * @param {number} expectedSizeBytes - Expected size of the tarball in bytes
@@ -90,12 +77,11 @@ export class SubmissionUploadService extends DBService {
    */
   async getTarUploadPresignedUrls(expectedSizeBytes: number): Promise<PresignedUploadUrlResponse> {
     const key = this._generateTarballKey();
-    const s3Uri = this._buildS3Uri(this.quarantineBucketName, key);
 
     // Generate the quarantine record with status 'draft' (waiting for upload)
     const { quarantine_id: quarantineId } = await this.quarantineService.insertQuarantineRecord({
       status: QuarantineStatusEnum.DRAFT,
-      uri: s3Uri
+      uri: key
     });
 
     const contentType = 'application/x-tar';
@@ -151,15 +137,12 @@ export class SubmissionUploadService extends DBService {
     await s3Client.send(completeCommand);
 
     // Update quarantine status to PENDING to trigger malware scan
-    // URI was already set during initialization, no need to update it
     await this.quarantineService.updateQuarantineRecord(quarantineId, {
       status: QuarantineStatusEnum.PENDING,
       upload_id: uploadId
     });
 
-    console.log('HERE WE ARE!!!', QuarantineStatusEnum.PENDING);
-
-    // Insert the submission record (linked to quarantine)
+    // Insert the submission record
     const submission = await this.submissionService.insertSubmissionRecordWithPotentialConflict({
       uuid: metadata.uid ?? v4(),
       quarantine_id: quarantineId,
@@ -169,8 +152,6 @@ export class SubmissionUploadService extends DBService {
       system_user_id: systemUserId,
       system_user_identifier: systemUserIdentifier
     });
-
-    console.log(submission);
 
     return {
       submissionId: submission.submission_id
