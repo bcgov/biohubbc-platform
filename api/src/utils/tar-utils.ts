@@ -1,43 +1,51 @@
-import { Buffer } from 'buffer';
-import * as tar from 'tar-stream';
+import { Readable } from 'stream';
+import tar from 'tar-stream';
 
 /**
- * Read `features.json` into memory from a Buffer
+ * Extracts a single file from a TAR/PAX archive stream.
+ * Stops reading once the file is found.
  *
- * @param buffer
- * @returns
+ * @param inputStream - Readable stream of the TAR archive
+ * @param fileName - File inside the TAR to extract, e.g., "features.json"
+ * @returns Parsed JSON content if fileName is "features.json", or raw Buffer otherwise
  */
-export async function extractFeaturesJson(buffer: Buffer): Promise<any> {
+export async function extractFileFromTarStream(inputStream: Readable, fileName: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const extract = tar.extract();
-
-    let features: any;
+    let found = false;
 
     extract.on('entry', (header, stream, next) => {
-      if (header.name === 'features.json') {
+      if (header.name === fileName) {
+        found = true;
         const chunks: Buffer[] = [];
-        stream.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+        stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
         stream.on('end', () => {
-          try {
-            features = JSON.parse(Buffer.concat(chunks).toString('utf-8'));
-            resolve(features);
-          } catch (err) {
-            reject(err);
-          }
-          next();
+          resolve(Buffer.concat(chunks));
+          extract.destroy(); // Stop parsing further entries
         });
+        stream.on('error', reject);
       } else {
+        stream.resume(); // Skip other entries
         stream.on('end', next);
-        stream.resume();
       }
     });
 
     extract.on('finish', () => {
-      if (!features) {
-        reject(new Error('features.json not found in tarball'));
-      }
+      if (!found) reject(new Error(`${fileName} not found in tarball`));
     });
 
-    extract.end(buffer);
+    inputStream.pipe(extract);
   });
+}
+
+/**
+ * Convenience function specifically for features.json
+ *
+ * NOTE: Return type is any because the content of the features.json file is unknown when initially read.
+ */
+export async function extractFeaturesJsonFromStream(inputStream: Readable): Promise<any> {
+  const fileBuffer = await extractFileFromTarStream(inputStream, 'features.json');
+  const parsed = JSON.parse(fileBuffer.toString('utf-8'));
+
+  return parsed;
 }

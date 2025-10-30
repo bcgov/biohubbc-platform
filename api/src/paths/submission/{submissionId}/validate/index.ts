@@ -51,10 +51,6 @@ export function validateSubmission(): RequestHandler {
   return async (req, res) => {
     const token = req['keycloak_token'];
 
-    if (!token) {
-      return res.sendStatus(401);
-    }
-
     const serviceClientSystemUser = getServiceClientSystemUser(token);
 
     const connection = serviceClientSystemUser

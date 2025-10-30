@@ -1,13 +1,15 @@
 import { AxiosResponse } from 'axios';
 
 /**
- * Represents a single file to include in a TAR archive.
+ * Represents a single file to include in a PAX (or TAR) archive.
  */
 export interface TarFileData {
-  /** The name of the file in the TAR archive */
+  /** The name of the file in the archive */
   name: string;
   /** The binary content of the file */
   content: Uint8Array;
+  /** Optional PAX headers for extended metadata (e.g., long filenames, custom fields) */
+  pax?: Record<string, string>;
 }
 
 /**
@@ -26,18 +28,16 @@ export interface UploadResult {
  * Options for multipart upload operations.
  */
 export interface UploadOptions {
-  /** Maximum number of simultaneous uploads (default: 4) */
-  concurrencyLimit?: number;
   /** Callback called after each part or batch upload to track progress */
   onProgress?: (completedParts: number, totalParts: number) => void;
 }
 
 /**
- * Options for streaming TAR upload operations.
+ * Options for streaming archive upload operations.
  */
 export interface StreamUploadOptions extends UploadOptions {
-  /** Optional chunk size when streaming files (default: 1 MB) */
-  chunkSize?: number;
+  /** Chunk size when streaming files (default: 10 MB) */
+  chunkSize: number;
 }
 
 /**
@@ -51,8 +51,3 @@ export interface SubmissionMetadata {
   /** Any other metadata fields for the submission */
   [key: string]: any;
 }
-
-/**
- * Represents a TAR chunk generator function.
- */
-export type TarChunkGenerator = AsyncGenerator<Uint8Array, void, unknown>;

@@ -276,9 +276,10 @@ export class QuarantineService extends DBService {
    *
    * @param {string} quarantineId - The quarantine record ID to promote
    * @throws {ApiGeneralError} If the record or URI is invalid
+   * @returns {Promise<QuarantineRecord>}
    * @memberof QuarantineService
    */
-  async promoteQuarantineRecord(quarantineId: string): Promise<void> {
+  async promoteQuarantineRecord(quarantineId: string): Promise<QuarantineRecord> {
     // 1. Validate and get quarantine record
     const record = await this.getQuarantineRecord(quarantineId);
 
@@ -291,5 +292,7 @@ export class QuarantineService extends DBService {
 
     // 3. Update the record status to indicate it is now active/approved
     await this.updateQuarantineRecord(quarantineId, { status: QuarantineStatusEnum.SKIPPED });
+
+    return record;
   }
 }

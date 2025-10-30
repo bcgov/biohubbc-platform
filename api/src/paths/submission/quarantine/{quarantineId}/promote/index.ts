@@ -4,7 +4,7 @@ import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection, getServiceAccountDBConnection } from '../../../../../database/db';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
-import { QuarantineService } from '../../../../../services/quarantine/quarantine-service';
+import { SubmissionProcessService } from '../../../../../services/submission-process-service';
 import { getServiceClientSystemUser } from '../../../../../utils/keycloak-utils';
 import { getLogger } from '../../../../../utils/logger';
 
@@ -51,10 +51,6 @@ export function promoteQuarantinedSubmission(): RequestHandler {
   return async (req, res) => {
     const token = req['keycloak_token'];
 
-    if (!token) {
-      return res.sendStatus(401);
-    }
-
     const serviceClientSystemUser = getServiceClientSystemUser(token);
 
     const connection = serviceClientSystemUser
@@ -66,9 +62,9 @@ export function promoteQuarantinedSubmission(): RequestHandler {
 
       const quarantineId = req.params.quarantineId;
 
-      const quarantineService = new QuarantineService(connection);
+      const submissionProcessService = new SubmissionProcessService(connection);
 
-      await quarantineService.promoteQuarantineRecord(quarantineId);
+      await submissionProcessService.processQuarantinedSubmission(quarantineId);
 
       await connection.commit();
 

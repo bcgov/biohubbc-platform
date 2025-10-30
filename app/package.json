@@ -79,6 +79,7 @@
     "@types/react-window": "^1.8.8",
     "@types/shapefile": "^0.6.4",
     "@types/shpjs": "^3.4.7",
+    "@types/tar-stream": "^3.1.4",
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "~8.43.0",
     "@typescript-eslint/parser": "~8.43.0",

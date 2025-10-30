@@ -1,5 +1,5 @@
-import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
+import { PostSubmissionFeature, PostSubmissionFeatureArraySchema } from '../models/submission-feature';
 import { ISubmissionFeature } from '../repositories/submission-repository';
 import {
   FeatureProperties,
@@ -25,46 +25,38 @@ export class ValidationService extends DBService {
   }
 
   /**
-   * Validate submission features.
+   * Recursively normalize submission features: lowercases the `type` of each feature.
    *
-   * @param {ISubmissionFeature[]} submissionFeatures
-   * @return {*}  {Promise<boolean>} `true` if all submission features are valid, `false` otherwise.
+   * @param {unknown} submissionFeatures
+   * @return {*}  {Promise<PostSubmissionFeature[]>} Returns the parsed and normalized array.
    * @memberof ValidationService
    */
-  async validateSubmissionFeatures(submissionFeatures: ISubmissionFeature[]): Promise<boolean> {
-    try {
-      // Generate paths to all non-null nodes which contain a 'child_features' property
-      const submissionFeatureJsonPaths: string[] = JSONPath({
-        path: '$..[?(@ && @.child_features)]',
-        flatten: true,
-        resultType: 'path',
-        json: submissionFeatures
-      });
+  async normalizeSubmissionFeature(submissionFeatures: unknown): Promise<PostSubmissionFeature[]> {
+    // Parse and validate first
+    const parsedFeatures = PostSubmissionFeatureArraySchema.parse(submissionFeatures);
 
-      for (const jsonPath of submissionFeatureJsonPaths) {
-        // Fetch a submissionFeature object
-        const node: ISubmissionFeature[] = JSONPath({ path: jsonPath, resultType: 'value', json: submissionFeatures });
+    // Helper to recursively lowercase `type`
+    const normalizeFeature = (feature: PostSubmissionFeature): PostSubmissionFeature => {
+      const normalized: PostSubmissionFeature = {
+        ...feature,
+        type: feature.type.toLowerCase(),
+        child_features: feature.child_features?.map(normalizeFeature)
+      };
+      return normalized;
+    };
 
-        if (!node?.length) {
-          continue;
-        }
+    return parsedFeatures.map(normalizeFeature);
+  }
 
-        // We expect the 'path' to resolve an array of 1 item
-        const featureNode = node[0];
-
-        // Validate the submissioNFeature object
-        await this.validateSubmissionFeature(featureNode);
-      }
-
-      defaultLog.debug({ label: 'validateSubmissionFeatures', message: 'success' });
-    } catch (error) {
-      defaultLog.error({ label: 'validateSubmissionFeatures', message: 'error', error });
-      // Not all submission features are valid
-      return false;
-    }
-
-    // All submission features are valid
-    return true;
+  /**
+   * Validate submission features array using the Zod model.
+   *
+   * @param {unknown} submissionFeatures
+   * @return {*}  {Promise<PostSubmissionFeature[]>} Returns the parsed array if valid, throws otherwise.
+   * @memberof ValidationService
+   */
+  async validateSubmissionFeatureShape(submissionFeatures: unknown): Promise<PostSubmissionFeature[]> {
+    return PostSubmissionFeatureArraySchema.parse(submissionFeatures); // throws if invalid
   }
 
   /**

@@ -45,12 +45,14 @@ export class QuarantineRepository extends BaseRepository {
    */
   async getQuarantineRecordsWithScans(): Promise<SubmissionRecordWithQuarantine[]> {
     const knex = getKnex();
+
     const queryBuilder = knex
+      // Step 1: Build scan data per quarantine
       .with('scan_data', (qb) => {
         qb.select(
           'qs.quarantine_id',
-          knex.raw(
-            `jsonb_agg(
+          knex.raw(`
+          jsonb_agg(
             jsonb_build_object(
               'quarantine_scan_id', qs.quarantine_scan_id,
               'quarantine_id', qs.quarantine_id,
@@ -59,31 +61,34 @@ export class QuarantineRepository extends BaseRepository {
               'scanner_version', qs.scanner_version,
               'results', qs.results
             )
-          ) FILTER (WHERE qs.quarantine_scan_id IS NOT NULL) as scans`
-          )
+          ) FILTER (WHERE qs.quarantine_scan_id IS NOT NULL) AS scans
+        `)
         )
           .from('biohub.quarantine_scan as qs')
           .groupBy('qs.quarantine_id');
       })
+      // Step 2: Build quarantine + scans JSON object
       .with('quarantine_data', (qb) => {
         qb.select(
           'q.quarantine_id',
-          knex.raw(
-            `jsonb_build_object(
-              'quarantine_id', q.quarantine_id,
-              'status', q.status,
-              'scans', COALESCE(sd.scans, '[]'::jsonb)
-            ) as quarantine
-             `
-          )
+          knex.raw(`
+          jsonb_build_object(
+            'quarantine_id', q.quarantine_id,
+            'status', q.status,
+            'scans', COALESCE(sd.scans, '[]'::jsonb)
+          ) AS quarantine
+        `)
         )
           .from('biohub.quarantine as q')
           .leftJoin('scan_data as sd', 'q.quarantine_id', 'sd.quarantine_id');
       })
+      // Step 3: Select from quarantine, join submission, and filter where submission has no URI
       .select('s.submission_id', 's.name', 's.description', 's.submitted_timestamp', 'qd.quarantine')
-      .from('submission as s')
-      .join('quarantine_data as qd', 's.quarantine_id', 'qd.quarantine_id');
+      .from('biohub.quarantine as q')
+      .join('quarantine_data as qd', 'q.quarantine_id', 'qd.quarantine_id')
+      .join('submission as s', 's.quarantine_id', 'q.quarantine_id');
 
+    // Execute query
     const response = await this.connection.knex(queryBuilder, SubmissionRecordWithQuarantine);
 
     return response.rows;

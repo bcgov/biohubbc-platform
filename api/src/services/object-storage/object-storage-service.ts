@@ -188,30 +188,24 @@ export class ObjectStorageService {
   }
 
   /**
-   * Get a file from the specified bucket and return it fully in memory as a Buffer.
+   * Get a file from the specified bucket and return it as a readable stream.
    *
    * @param {BucketType} bucketType - The bucket to fetch the file from ('main' or 'quarantine').
    * @param {string} key - The S3 object key.
    * @param {string} [versionId] - Optional S3 object version ID.
-   * @return {Promise<Buffer>} Resolves to a Buffer containing the file data.
-   * @throws {Error} Throws if the object has no body or on stream errors.
+   * @return {Promise<Readable>} Resolves to a Node.js Readable stream for the file content.
+   * @throws {Error} Throws if the object has no body.
    * @memberof ObjectStorageService
    */
-  async getFileAsBuffer(bucketType: BucketType, key: string, versionId?: string): Promise<Buffer> {
+  async getFileStream(bucketType: BucketType, key: string, versionId?: string): Promise<NodeJS.ReadableStream> {
     const s3Object = await this.getFile(bucketType, key, versionId);
 
     if (!s3Object.Body) {
       throw new Error('S3 object has no body');
     }
 
-    const stream = s3Object.Body as Readable;
-    const chunks: Buffer[] = [];
-
-    return new Promise<Buffer>((resolve, reject) => {
-      stream.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
-      stream.on('error', reject);
-      stream.on('end', () => resolve(Buffer.concat(chunks)));
-    });
+    // S3 Body can already be a stream (Node.js Readable)
+    return s3Object.Body as NodeJS.ReadableStream;
   }
 
   /**
@@ -354,10 +348,12 @@ export class ObjectStorageService {
    * Copy a file from quarantine bucket to main bucket
    *
    * @param {string} key
-   * @return {*}  {Promise<void>}
+   * @return {*}  {Promise<{key: string}>}
    * @memberof ObjectStorageService
    */
-  async promoteFromQuarantine(key: string): Promise<void> {
-    return this.copyBetweenBuckets(BucketType.QUARANTINE, BucketType.MAIN, key);
+  async promoteFromQuarantine(key: string): Promise<{ key: string }> {
+    await this.copyBetweenBuckets(BucketType.QUARANTINE, BucketType.MAIN, key);
+
+    return { key };
   }
 }

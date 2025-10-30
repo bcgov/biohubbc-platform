@@ -6,7 +6,7 @@ import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { ISubmissionFeature } from '../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { RegionService } from '../../services/region-service';
-import { SearchIndexService } from '../../services/search-index-service';
+import { SubmissionProcessService } from '../../services/submission-process-service';
 import { SubmissionService } from '../../services/submission-service';
 import { ValidationService } from '../../services/validation-service';
 import { getServiceClientSystemUser } from '../../utils/keycloak-utils';
@@ -143,16 +143,14 @@ export function submissionIntake(): RequestHandler {
       await connection.open();
 
       const submissionService = new SubmissionService(connection);
+      const submissionProcessService = new SubmissionProcessService(connection);
       const validationService = new ValidationService(connection);
-      const searchIndexService = new SearchIndexService(connection);
       const regionService = new RegionService(connection);
 
-      // validate the submission
-      if (!(await validationService.validateSubmissionFeatures([submissionFeature]))) {
-        throw new HTTP400('Invalid submission'); // TODO return details on why the submission is invalid
-      }
+      // Validate the submission features directly from the request body
+      await validationService.validateSubmissionFeatureShape(submissionFeature);
 
-      // insert the submission record
+      // Insert the submission record
       const submissionRecord = await submissionService.insertSubmissionRecordWithPotentialConflict({
         quarantine_id: null,
         uuid: submissionUuid,
@@ -163,13 +161,10 @@ export function submissionIntake(): RequestHandler {
         system_user_identifier: serviceClientSystemUser.user_identifier
       });
 
-      // insert each submission feature record
-      await submissionService.insertSubmissionFeatureRecords(submissionRecord.submission_id, [submissionFeature]);
+      // Process submission features (insert into DB and index search keys)
+      await submissionProcessService._processSubmissionFeatures(submissionRecord.submission_id, [submissionFeature]);
 
-      // Index the submission feature record properties
-      await searchIndexService.indexFeaturesBySubmissionId(submissionRecord.submission_id);
-
-      // Fetch all artifact submission features, if any
+      // Optionally fetch artifact features if needed
       const submissionArtifactFeatures = await submissionService.findSubmissionFeatures({
         submissionId: submissionRecord.submission_id,
         featureTypeNames: ['artifact']

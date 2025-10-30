@@ -1,4 +1,4 @@
-import { mdiBug, mdiDotsVertical, mdiSkipNext } from '@mdi/js';
+import { mdiDotsVertical, mdiLadybug, mdiSkipNext } from '@mdi/js';
 import Icon from '@mdi/react';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -20,7 +20,7 @@ export const QuarantinedSubmissionsCard = ({ record, onScan, onSkipScan }: Quara
   if (onScan) {
     menuItems.push({
       label: 'Scan for Malware',
-      icon: <Icon path={mdiBug} size={0.8} />,
+      icon: <Icon path={mdiLadybug} size={0.8} />,
       onClick: onScan
     });
   }

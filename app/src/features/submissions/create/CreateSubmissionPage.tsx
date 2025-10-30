@@ -1,13 +1,12 @@
 import { Box, Button, Container, Paper, Stack } from '@mui/material';
 import BaseHeader from 'components/layout/header/BaseHeader';
-import { TAR_BLOCK_SIZE, TAR_HEADER_SIZE } from 'constants/submission';
 import { Formik, FormikProps } from 'formik';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fileToUint8Array, uploadMultipartTarStreamed } from 'utils/submission-upload-utils';
+import { estimateTarballSize, fileToUint8Array, uploadMultipartPaxStreamed } from 'utils/submission-upload-utils';
 import { TarFileData } from 'utils/submission-upload-utils.interface';
 import yup from 'utils/YupSchema';
 import { v4 } from 'uuid';
@@ -42,48 +41,45 @@ export const CreateSubmissionPage = () => {
 
   const formikRef = useRef<FormikProps<ICreateSubmissionForm>>(null);
 
-  /**
-   * NOTE: The logic in creating the .tar file should be improved, where possible
-   */
   const handleSubmit = async (values: ICreateSubmissionForm) => {
     const { file, ...metadata } = values;
-
     setIsSubmitting(true);
 
     try {
       // Convert the JSON file to Uint8Array
       const fileBytes = await fileToUint8Array(file);
 
-      // Prepare files for TAR - just the JSON file
-      const filesToTar: TarFileData[] = [
+      // Prepare files for PAX archive
+      const filesToPax: TarFileData[] = [
         {
           name: 'features.json',
           content: fileBytes
         }
-        // Add more files here if needed
       ];
 
+      // Calculate total archive size
+      const estimatedSize = estimateTarballSize(filesToPax);
+
       // Request pre-signed upload URLs for multipart upload
-      const uploadResponse = await bioHubApi.quarantine.getSubmissionUploadUrls(
-        // Estimate total size: sum of file sizes + headers + padding
-        filesToTar.reduce(
-          (sum, f) => sum + Math.ceil(f.content.length / TAR_BLOCK_SIZE) * TAR_BLOCK_SIZE + TAR_HEADER_SIZE,
-          0
-        ) +
-          TAR_BLOCK_SIZE * 2
+      const uploadResponse = await bioHubApi.quarantine.getSubmissionUploadUrls(estimatedSize);
+
+      // Upload PAX archive using streaming approach
+      const parts = await uploadMultipartPaxStreamed(
+        uploadResponse.presignedUrls.map((p) => p.url),
+        filesToPax,
+        {
+          chunkSize: uploadResponse.partSizeBytes,
+          onProgress: (completed, total) => {
+            console.log(`Uploaded ${completed}/${total} parts`);
+          }
+        }
       );
 
-      const uploadUrls = uploadResponse.presignedUrls.map((p) => p.url);
-
-      // Upload TAR file using streaming/memory-efficient approach
-      const parts = await uploadMultipartTarStreamed(uploadUrls, filesToTar, {
-        concurrencyLimit: 4,
-        onProgress: (completed, total) => {
-          console.log(`Uploaded ${completed}/${total} parts`);
-        }
-      });
-
-      const parsedParts = parts.map((part) => ({ partNumber: part.partNumber, etag: part.etag }));
+      // Extract part numbers and ETags for completion
+      const parsedParts = parts.map((part) => ({
+        partNumber: part.partNumber,
+        etag: part.etag
+      }));
 
       // Mark upload as complete
       await bioHubApi.quarantine.completeQuarantineUpload(

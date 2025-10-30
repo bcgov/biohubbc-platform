@@ -51,10 +51,6 @@ export function malwareScanQuarantineRecord(): RequestHandler {
   return async (req, res) => {
     const token = req['keycloak_token'];
 
-    if (!token) {
-      return res.sendStatus(401);
-    }
-
     const serviceClientSystemUser = getServiceClientSystemUser(token);
 
     const connection = serviceClientSystemUser
@@ -64,7 +60,7 @@ export function malwareScanQuarantineRecord(): RequestHandler {
     try {
       await connection.open();
 
-      const { quarantineId } = req.params;
+      const quarantineId = req.params.quarantineId;
 
       const quarantineService = new QuarantineService(connection);
 

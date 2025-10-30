@@ -3,6 +3,7 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import { IUpdateSubmission, SubmissionRecord } from '../models/submission';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
 
@@ -201,28 +202,6 @@ export interface ISubmissionObservationRecord {
   update_user?: string;
   revision_count?: string;
 }
-
-export const SubmissionRecord = z.object({
-  submission_id: z.number(),
-  uuid: z.string(),
-  uri: z.string().nullable(),
-  quarantine_id: z.string().nullable(),
-  security_review_timestamp: z.string().nullable(),
-  submitted_timestamp: z.string(),
-  system_user_id: z.number(),
-  source_system: z.string(),
-  name: z.string(),
-  description: z.string().nullable(),
-  comment: z.string().nullable(),
-  publish_timestamp: z.string().nullable(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number()
-});
-
-export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
 
 /**
  * Interface for creating a new submission record with potential conflict handling
@@ -428,6 +407,50 @@ export class SubmissionRepository extends BaseRepository {
 
     return response.rows[0];
   }
+  /**
+   * Update an existing submission record.
+   *
+   * Uses COALESCE to avoid overwriting existing fields with NULL values.
+   *
+   * @param {string} quarantineId - The quarantine ID associated with the submission.
+   * @param {IUpdateSubmission} submission - The submission fields to update (uri, name, description).
+   * @returns {Promise<SubmissionRecord>} A promise that resolves to the full, updated submission record.
+   * @memberof SubmissionRepository
+   * @throws {ApiExecuteSQLError} If the update fails or no row is affected.
+   */
+  async updateSubmissionRecord(quarantineId: string, submission: IUpdateSubmission): Promise<SubmissionRecord> {
+    const sqlStatement = SQL`
+      UPDATE biohub.submission
+      SET
+        uri = COALESCE(${submission.uri}, uri),
+        name = COALESCE(${submission.name}, name),
+        description = COALESCE(${submission.description}, description)
+      WHERE
+        quarantine_id = ${quarantineId}
+      RETURNING
+        submission_id,
+        uuid,
+        uri,
+        quarantine_id,
+        security_review_timestamp,
+        submitted_timestamp,
+        name,
+        description,
+        comment,
+        publish_timestamp;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionRecord);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update submission record', [
+        'SubmissionRepository->updateSubmissionRecord',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
 
   /**
    * Get feature type id by name.
@@ -480,6 +503,35 @@ export class SubmissionRepository extends BaseRepository {
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission record', [
         'SubmissionRepository->getSubmissionRecordBySubmissionId',
+        'rowCount was null or undefined, expected rowCount != 0'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Fetch a submission record by quarantine id.
+   *
+   * @param {string} quarantineId
+   * @return {*}  {Promise<SubmissionRecord>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionRecordByQuarantineId(quarantineId: string): Promise<SubmissionRecord> {
+    const sqlStatement = SQL`
+      SELECT
+        *
+      FROM
+        submission
+      WHERE
+        quarantine_id = ${quarantineId};
+    `;
+
+    const response = await this.connection.sql<SubmissionRecord>(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to get submission record', [
+        'SubmissionRepository->getSubmissionRecordByQuarantineId',
         'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }

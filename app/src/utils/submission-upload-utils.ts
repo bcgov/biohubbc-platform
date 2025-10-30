@@ -1,70 +1,43 @@
 import axios from 'axios';
-import { StreamUploadOptions, TarFileData, UploadOptions, UploadResult } from './submission-upload-utils.interface';
-import {
-  TAR_HEADER_SIZE,
-  DEFAULT_FILE_MODE,
-  DEFAULT_OWNER_ID,
-  DEFAULT_GROUP_ID,
-  REGULAR_FILE_TYPE,
-  TAR_BLOCK_SIZE
-} from 'constants/submission';
+import { TAR_BLOCK_SIZE, TAR_END_BLOCKS, TAR_HEADER_SIZE } from 'constants/submission';
+import { StreamUploadOptions, TarFileData, UploadResult } from './submission-upload-utils.interface';
 
 /**
- * Creates a standard TAR header for a file according to POSIX TAR format.
+ * Estimates the total size of a TAR/PAX archive for the given files.
+ * Includes file content, headers, padding, and end-of-archive markers.
  *
- * @param {string} filename - The name of the file (max 100 characters)
- * @param {number} fileSize - The size of the file in bytes
- * @returns {Uint8Array} A 512-byte TAR header
- * @throws {Error} If filename is too long or file size is invalid
+ * @param files - Array of files to include in the archive
+ * @returns Estimated archive size in bytes
  */
-const createTarHeader = (filename: string, fileSize: number): Uint8Array => {
-  if (filename.length > 100) {
-    throw new Error(`Filename too long: ${filename}`);
+export const estimateTarballSize = (files: TarFileData[]): number => {
+  let totalSize = 0;
+
+  for (const file of files) {
+    // PAX extended header size (if name > 100 chars, add extra header block)
+    if (file.name.length > 100) {
+      const paxRecords =
+        `path=${file.name}\n` + `size=${file.content.length}\n` + `mtime=${Math.floor(Date.now() / 1000)}.000000000\n`;
+      const paxRecordsSize = paxRecords.length + 50; // Add buffer for length prefixes
+      const paxHeaderSize = TAR_HEADER_SIZE + Math.ceil(paxRecordsSize / TAR_BLOCK_SIZE) * TAR_BLOCK_SIZE;
+      totalSize += paxHeaderSize;
+    }
+
+    // Regular file header
+    totalSize += TAR_HEADER_SIZE;
+
+    // File content (padded to 512-byte boundary)
+    const paddedContentSize = Math.ceil(file.content.length / TAR_BLOCK_SIZE) * TAR_BLOCK_SIZE;
+    totalSize += paddedContentSize;
   }
-  if (fileSize < 0) {
-    throw new Error(`Invalid file size: ${fileSize}`);
-  }
 
-  const header = new Uint8Array(TAR_HEADER_SIZE);
-  const encoder = new TextEncoder();
+  // Two 512-byte zero blocks mark end of archive
+  totalSize += TAR_BLOCK_SIZE * TAR_END_BLOCKS;
 
-  // Filename (100 bytes)
-  header.set(encoder.encode(filename).slice(0, 100), 0);
-
-  // File mode, UID, GID (8 bytes each)
-  header.set(encoder.encode(DEFAULT_FILE_MODE), 100);
-  header.set(encoder.encode(DEFAULT_OWNER_ID), 108);
-  header.set(encoder.encode(DEFAULT_GROUP_ID), 116);
-
-  // File size (12 bytes, octal)
-  const sizeOctal = fileSize.toString(8).padStart(11, '0') + '\0';
-  header.set(encoder.encode(sizeOctal), 124);
-
-  // Modification time (12 bytes, octal)
-  const currentTime = Math.floor(Date.now() / 1000);
-  const mtime = currentTime.toString(8).padStart(11, '0') + '\0';
-  header.set(encoder.encode(mtime), 136);
-
-  // Checksum placeholder (8 spaces)
-  header.set(encoder.encode('        '), 148);
-
-  // Type flag (1 byte)
-  header.set(encoder.encode(REGULAR_FILE_TYPE), 156);
-
-  // Calculate checksum
-  const checksum = Array.from(header).reduce((sum, byte) => sum + byte, 0);
-  const checksumStr = checksum.toString(8).padStart(6, '0') + '\0 ';
-  header.set(new TextEncoder().encode(checksumStr), 148);
-
-  return header;
+  return totalSize;
 };
 
 /**
  * Converts a File object to a Uint8Array.
- *
- * @param {File} file - The file to convert
- * @returns {Promise<Uint8Array>} A promise that resolves to the file contents as a Uint8Array
- * @throws {Error} If file is not provided or reading fails
  */
 export const fileToUint8Array = (file: File): Promise<Uint8Array> =>
   new Promise((resolve, reject) => {
@@ -85,15 +58,9 @@ export const fileToUint8Array = (file: File): Promise<Uint8Array> =>
     reader.readAsArrayBuffer(file);
   });
 
-/**
- * Concatenates multiple Uint8Array chunks into a single Uint8Array.
- *
- * @param {Uint8Array[]} chunks - Array of Uint8Array chunks to concatenate
- * @returns {Uint8Array} A single Uint8Array containing all chunks
- */
-const concatenateChunks = (chunks: Uint8Array[]): Uint8Array => {
+const concatenateChunks = (chunks: Uint8Array[]): Uint8Array<ArrayBuffer> => {
   const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-  const result = new Uint8Array(totalLength);
+  const result = new Uint8Array(totalLength) as Uint8Array<ArrayBuffer>;
   let offset = 0;
   for (const chunk of chunks) {
     result.set(chunk, offset);
@@ -103,14 +70,136 @@ const concatenateChunks = (chunks: Uint8Array[]): Uint8Array => {
 };
 
 /**
- * Creates a complete TAR archive from multiple files.
- *
- * @param {TarFileData[]} files - Array of files to include in the TAR archive
- * @returns {Uint8Array} Complete TAR archive data
- * @throws {Error} If no files provided or files are invalid
+ * Writes a string to a buffer at the specified offset
  */
-export const createTarData = (files: TarFileData[]): Uint8Array => {
-  if (!files || files.length === 0) {
+const writeString = (buffer: Uint8Array, str: string, offset: number, length: number): void => {
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(str);
+  const len = Math.min(bytes.length, length);
+  buffer.set(bytes.slice(0, len), offset);
+};
+
+/**
+ * Writes an octal number to a buffer
+ */
+const writeOctal = (buffer: Uint8Array, value: number, offset: number, length: number): void => {
+  const octal = value.toString(8).padStart(length - 1, '0');
+  writeString(buffer, octal, offset, length - 1);
+  buffer[offset + length - 1] = 0x20; // space terminator
+};
+
+/**
+ * Calculates the checksum for a TAR header
+ */
+const calculateChecksum = (header: Uint8Array): number => {
+  let sum = 0;
+  for (let i = 0; i < 512; i++) {
+    sum += i >= 148 && i < 156 ? 32 : header[i];
+  }
+  return sum;
+};
+
+/**
+ * Creates PAX extended header records
+ */
+const createPaxExtendedHeader = (
+  name: string,
+  size: number,
+  paxHeaders?: Record<string, string>
+): Uint8Array | null => {
+  const records: string[] = [];
+
+  // Add path if name is too long
+  if (name.length > 100) {
+    records.push(`path=${name}\n`);
+  }
+
+  // Add size
+  records.push(`size=${size}\n`);
+
+  // Add modification time
+  records.push(`mtime=${Math.floor(Date.now() / 1000)}.000000000\n`);
+
+  // Add custom PAX headers
+  if (paxHeaders) {
+    for (const [key, value] of Object.entries(paxHeaders)) {
+      records.push(`${key}=${value}\n`);
+    }
+  }
+
+  // If no extended headers needed, return null
+  if (records.length === 2 && name.length <= 100) {
+    return null;
+  }
+
+  // Format records with length prefix
+  const formattedRecords = records
+    .map((record) => {
+      const base = record.length;
+      let lengthStr = String(base + 3);
+      const totalLen = base + lengthStr.length + 1;
+      if (totalLen !== base + 3) {
+        lengthStr = String(totalLen);
+      }
+      return `${lengthStr} ${record}`;
+    })
+    .join('');
+
+  const encoder = new TextEncoder();
+  const recordBytes = encoder.encode(formattedRecords);
+  const paddedSize = Math.ceil(recordBytes.length / 512) * 512;
+  const paddedData = new Uint8Array(paddedSize);
+  paddedData.set(recordBytes);
+
+  // Create header for PAX extended header entry
+  const header = new Uint8Array(512);
+  const paxHeaderName = `PaxHeaders.0/${name.substring(0, 90)}`;
+  writeString(header, paxHeaderName, 0, 100);
+  writeOctal(header, 0o644, 100, 8); // mode
+  writeOctal(header, 0, 108, 8); // uid
+  writeOctal(header, 0, 116, 8); // gid
+  writeOctal(header, paddedData.length, 124, 12); // size
+  writeOctal(header, Math.floor(Date.now() / 1000), 136, 12); // mtime
+  writeString(header, 'x', 156, 1); // type (PAX extended header)
+  writeString(header, 'ustar', 257, 6); // magic
+  writeString(header, '00', 263, 2); // version
+
+  const checksum = calculateChecksum(header);
+  writeOctal(header, checksum, 148, 8);
+
+  return concatenateChunks([header, paddedData]);
+};
+
+/**
+ * Creates a USTAR file header
+ */
+const createFileHeader = (name: string, size: number): Uint8Array => {
+  const header = new Uint8Array(512);
+
+  // Truncate name if too long (PAX header will have full name)
+  const truncatedName = name.substring(0, 100);
+  writeString(header, truncatedName, 0, 100);
+
+  writeOctal(header, 0o644, 100, 8); // mode
+  writeOctal(header, 0, 108, 8); // uid
+  writeOctal(header, 0, 116, 8); // gid
+  writeOctal(header, size, 124, 12); // size
+  writeOctal(header, Math.floor(Date.now() / 1000), 136, 12); // mtime
+  writeString(header, '0', 156, 1); // type (regular file)
+  writeString(header, 'ustar', 257, 6); // magic
+  writeString(header, '00', 263, 2); // version
+
+  const checksum = calculateChecksum(header);
+  writeOctal(header, checksum, 148, 8);
+
+  return header;
+};
+
+/**
+ * Creates a complete PAX archive with optional extended headers.
+ */
+export const createPaxData = async (files: TarFileData[]): Promise<Uint8Array> => {
+  if (!files?.length) {
     throw new Error('At least one file is required');
   }
 
@@ -121,58 +210,29 @@ export const createTarData = (files: TarFileData[]): Uint8Array => {
       throw new Error('Each file must have a name and content');
     }
 
-    chunks.push(createTarHeader(file.name, file.content.length));
-    chunks.push(file.content);
-
-    // Padding to 512-byte boundary
-    const paddingSize = (TAR_BLOCK_SIZE - (file.content.length % TAR_BLOCK_SIZE)) % TAR_BLOCK_SIZE;
-    if (paddingSize > 0) {
-      chunks.push(new Uint8Array(paddingSize));
+    // Create PAX extended header if needed
+    const paxHeader = createPaxExtendedHeader(file.name, file.content.length, file.pax);
+    if (paxHeader) {
+      chunks.push(paxHeader);
     }
+
+    // Create file header
+    const fileHeader = createFileHeader(file.name, file.content.length);
+    chunks.push(fileHeader);
+
+    // Pad content to 512-byte boundary
+    const paddedSize = Math.ceil(file.content.length / 512) * 512;
+    const paddedContent = new Uint8Array(paddedSize);
+    paddedContent.set(file.content);
+    chunks.push(paddedContent);
   }
 
-  // End-of-archive two zero blocks
-  chunks.push(new Uint8Array(TAR_BLOCK_SIZE));
-  chunks.push(new Uint8Array(TAR_BLOCK_SIZE));
+  // Add two 512-byte zero blocks to mark end of archive
+  chunks.push(new Uint8Array(1024));
 
   return concatenateChunks(chunks);
 };
 
-/**
- * Splits TAR data into N chunks of approximately equal size.
- *
- * @param {Uint8Array} tarData - The TAR data to split
- * @param {number} numChunks - Number of chunks to create
- * @returns {Uint8Array[]} Array of TAR data chunks
- * @throws {Error} If number of chunks is invalid
- */
-const splitTarDataIntoChunks = (tarData: Uint8Array, numChunks: number): Uint8Array[] => {
-  if (numChunks <= 0) {
-    throw new Error('Number of chunks must be positive');
-  }
-  if (numChunks === 1) {
-    return [tarData];
-  }
-
-  const chunkSize = Math.ceil(tarData.length / numChunks);
-  const chunks: Uint8Array[] = [];
-  for (let i = 0; i < numChunks; i++) {
-    const start = i * chunkSize;
-    const end = Math.min(start + chunkSize, tarData.length);
-    chunks.push(tarData.slice(start, end));
-  }
-  return chunks;
-};
-
-/**
- * Uploads a single chunk to a presigned URL.
- *
- * @param {string} url - The presigned URL to upload to
- * @param {Uint8Array} chunk - The data chunk to upload
- * @param {number} partNumber - The part number for multipart upload
- * @returns {Promise<UploadResult>} Upload result containing part number and ETag
- * @throws {Error} If upload fails or no ETag is returned
- */
 const uploadChunk = async (url: string, chunk: Uint8Array, partNumber: number): Promise<UploadResult> => {
   const response = await axios.put(url, chunk, {
     headers: { 'Content-Type': 'application/x-tar' },
@@ -192,110 +252,92 @@ const uploadChunk = async (url: string, chunk: Uint8Array, partNumber: number): 
 };
 
 /**
- * Uploads TAR data to S3 using multipart upload with presigned URLs.
- *
- * @param {string[]} presignedUrls - Array of presigned URLs for each part
- * @param {Uint8Array} tarData - The complete TAR data to upload
- * @param {UploadOptions} [options={}] - Upload options including concurrency limit and progress callback
- * @returns {Promise<UploadResult[]>} Array of upload results sorted by part number
- * @throws {Error} If required parameters are missing or invalid
+ * Streams TAR creation and upload in chunks for memory efficiency.
+ * Builds and uploads the archive incrementally without loading everything into memory.
  */
-export const uploadMultipartTar = async (
+export const uploadMultipartPaxStreamed = async (
   presignedUrls: string[],
-  tarData: Uint8Array,
-  options: UploadOptions = {}
+  files: TarFileData[],
+  options: StreamUploadOptions
 ): Promise<UploadResult[]> => {
-  const { concurrencyLimit = 4, onProgress } = options;
   if (!presignedUrls?.length) {
     throw new Error('Presigned URLs are required');
   }
-  if (!tarData?.length) {
-    throw new Error('TAR data is required');
-  }
-  if (concurrencyLimit <= 0) {
-    throw new Error('Concurrency limit must be positive');
-  }
 
-  const chunks = splitTarDataIntoChunks(tarData, presignedUrls.length);
+  const { onProgress, chunkSize = 10 * 1024 * 1024 } = options; // 10MB default
   const results: UploadResult[] = [];
+  let buffer: Uint8Array<ArrayBuffer> = new Uint8Array(0) as Uint8Array<ArrayBuffer>;
+  let currentPartIndex = 0;
 
-  for (let i = 0; i < presignedUrls.length; i += concurrencyLimit) {
-    const urlBatch = presignedUrls.slice(i, i + concurrencyLimit);
-    const dataBatch = chunks.slice(i, i + concurrencyLimit);
+  const flushBuffer = async () => {
+    if (!buffer.length || currentPartIndex >= presignedUrls.length) {
+      return;
+    }
 
-    const batchResults = await Promise.all(urlBatch.map((url, idx) => uploadChunk(url, dataBatch[idx], i + idx + 1)));
-    results.push(...batchResults);
+    const url = presignedUrls[currentPartIndex];
+    const partNumber = currentPartIndex + 1;
+    const result = await uploadChunk(url, buffer, partNumber);
+    results.push(result);
+
+    buffer = new Uint8Array(0) as Uint8Array<ArrayBuffer>;
+    currentPartIndex++;
 
     if (onProgress) {
       onProgress(results.length, presignedUrls.length);
     }
-  }
-
-  return results.sort((a, b) => a.partNumber - b.partNumber);
-};
-
-/**
- * Async generator to stream TAR data from files in chunks.
- *
- * @param {TarFileData[]} files - Array of files to stream
- * @param {number} [chunkSize=1024*1024] - Size of each chunk in bytes (default 1MB)
- * @yields {Uint8Array} Chunks of TAR data
- * @throws {Error} If no files provided or files are invalid
- */
-async function* streamTar(files: TarFileData[], chunkSize = 1024 * 1024): AsyncGenerator<Uint8Array> {
-  if (!files?.length) {
-    throw new Error('At least one file is required');
-  }
+  };
 
   for (const file of files) {
     if (!file.name || !file.content) {
       throw new Error('Each file must have a name and content');
     }
 
-    yield createTarHeader(file.name, file.content.length);
+    // Add PAX extended header if needed
+    const paxHeader = createPaxExtendedHeader(file.name, file.content.length, file.pax);
+    if (paxHeader) {
+      buffer = concatenateChunks([buffer, paxHeader]);
+      if (buffer.length >= chunkSize) {
+        await flushBuffer();
+      }
+    }
 
+    // Add file header
+    const fileHeader = createFileHeader(file.name, file.content.length);
+    buffer = concatenateChunks([buffer, fileHeader]);
+    if (buffer.length >= chunkSize) {
+      await flushBuffer();
+    }
+
+    // Stream file content in chunks
     let offset = 0;
     while (offset < file.content.length) {
-      const end = Math.min(offset + chunkSize, file.content.length);
-      yield file.content.subarray(offset, end);
-      offset = end;
+      const remainingSpace = chunkSize - buffer.length;
+      const slice = file.content.slice(offset, offset + remainingSpace);
+      buffer = concatenateChunks([buffer, slice]);
+      offset += slice.length;
+
+      if (buffer.length >= chunkSize) {
+        await flushBuffer();
+      }
     }
 
-    const paddingSize = (TAR_BLOCK_SIZE - (file.content.length % TAR_BLOCK_SIZE)) % TAR_BLOCK_SIZE;
+    // Add padding for 512-byte block alignment
+    const paddingSize = Math.ceil(file.content.length / 512) * 512 - file.content.length;
     if (paddingSize > 0) {
-      yield new Uint8Array(paddingSize);
+      buffer = concatenateChunks([buffer, new Uint8Array(paddingSize)]);
+      if (buffer.length >= chunkSize) {
+        await flushBuffer();
+      }
     }
   }
 
-  yield new Uint8Array(TAR_BLOCK_SIZE);
-  yield new Uint8Array(TAR_BLOCK_SIZE);
-}
+  // Add two 512-byte zero blocks to mark end of archive
+  buffer = concatenateChunks([buffer, new Uint8Array(1024)]);
 
-/**
- * Uploads TAR archive using streaming multipart upload (memory-efficient).
- * Streams file data in chunks rather than loading entire TAR into memory.
- *
- * @param {string[]} presignedUrls - Array of presigned URLs for each part
- * @param {TarFileData[]} files - Array of files to include in the TAR archive
- * @param {StreamUploadOptions} [options={}] - Upload options including concurrency, progress callback, and chunk size
- * @returns {Promise<UploadResult[]>} Array of upload results sorted by part number
- * @throws {Error} If required parameters are missing or invalid
- */
-export const uploadMultipartTarStreamed = async (
-  presignedUrls: string[],
-  files: TarFileData[],
-  options: StreamUploadOptions = {}
-): Promise<UploadResult[]> => {
-  const { concurrencyLimit = 4, onProgress, chunkSize } = options;
-  if (!presignedUrls?.length) {
-    throw new Error('Presigned URLs are required');
+  // Flush remaining buffer
+  if (buffer.length > 0) {
+    await flushBuffer();
   }
 
-  const chunks: Uint8Array[] = [];
-  for await (const chunk of streamTar(files, chunkSize)) {
-    chunks.push(chunk);
-  }
-
-  const tarData = concatenateChunks(chunks);
-  return uploadMultipartTar(presignedUrls, tarData, { concurrencyLimit, onProgress });
+  return results.sort((a, b) => a.partNumber - b.partNumber);
 };
