@@ -1,9 +1,11 @@
-import { SYSTEM_ROLE } from '../constants/roles';
-import { IDBConnection } from '../database/db';
-import { SystemUserExtended } from '../repositories/user-repository';
-import { getServiceClientSystemUser, getUserGuid } from '../utils/keycloak-utils';
-import { DBService } from './db-service';
-import { UserService } from './user-service';
+import { SYSTEM_ROLE } from '../../constants/roles';
+import { IDBConnection } from '../../database/db';
+import { SystemUserExtended } from '../../repositories/user-repository';
+import { getServiceClientSystemUser, getUserGuid } from '../../utils/keycloak-utils';
+import { PolicyService } from '../access-policy/policy-service';
+import { DBService } from '../db-service';
+import { SubmissionService } from '../submission-service';
+import { UserService } from '../user-service';
 
 export enum AuthorizeOperator {
   AND = 'and',
@@ -32,6 +34,17 @@ export interface AuthorizeBySystemUser {
 }
 
 /**
+ * Authorization rule that checks if the user can access the resource through an access policy
+ *
+ * @export
+ * @interface AuthorizeByAccessPolicy
+ */
+export interface AuthorizeByAccessPolicy {
+  submissionFeatureId: number;
+  discriminator: 'AccessPolicy';
+}
+
+/**
  * Authorization rule that checks if a jwt token's client id matches at least one of the required client ids.
  *
  * Note: This is specifically for system-to-system communication.
@@ -43,7 +56,11 @@ export interface AuthorizeByServiceClient {
   discriminator: 'ServiceClient';
 }
 
-export type AuthorizeRule = AuthorizeBySystemRoles | AuthorizeBySystemUser | AuthorizeByServiceClient;
+export type AuthorizeRule =
+  | AuthorizeBySystemRoles
+  | AuthorizeBySystemUser
+  | AuthorizeByServiceClient
+  | AuthorizeByAccessPolicy;
 
 export type AuthorizeConfigOr = {
   [AuthorizeOperator.AND]?: never;
@@ -106,6 +123,9 @@ export class AuthorizationService extends DBService {
           break;
         case 'ServiceClient':
           authorizeResults.push(await this.authorizeByServiceClient());
+          break;
+        case 'AccessPolicy':
+          authorizeResults.push(await this.authorizeByAccessPolicy(authorizeRule));
           break;
       }
     }
@@ -185,6 +205,45 @@ export class AuthorizationService extends DBService {
 
     // User is a valid system user
     return true;
+  }
+
+  /**
+   * Check if the user is a known service client system user.
+   *
+   * @param {AuthorizeByAccessPolicy} authorizeRule
+   * @return {*}  {Promise<boolean>} `Promise<true>` if the user is a known service client system user,
+   * `Promise<false>` otherwise.
+   */
+  async authorizeByAccessPolicy(authorizeRule: AuthorizeByAccessPolicy): Promise<boolean> {
+    const submissionService = new SubmissionService(this.connection);
+
+    // Check whether the feature is unsecured and immediately return if so, before getting the system user, in case there was no bearer token
+    const feature = await submissionService.getSubmissionFeatureById(authorizeRule.submissionFeatureId);
+
+    // If the feature is not secured, then authorize access
+    if (!feature.secured) {
+      return true;
+    }
+
+    const systemUserObject = this._systemUser || (await this.getSystemUserObject());
+
+    if (!systemUserObject) {
+      // Cannot verify user roles
+      return false;
+    }
+
+    // Cache the _systemUser for future use, if needed
+    this._systemUser = systemUserObject;
+
+    const policyService = new PolicyService(this.connection);
+
+    // Check if the user has access to the urn
+    const policiesThatGrantAccess = await policyService.getPoliciesThatAuthorizeFeatureAccessByUrn(
+      feature.urn,
+      systemUserObject.system_user_id
+    );
+
+    return policiesThatGrantAccess.length > 0;
   }
 
   /**

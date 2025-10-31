@@ -1,14 +1,27 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection, getDBConnection } from '../../../../../database/db';
+import { getDBConnection } from '../../../../../database/db';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
+import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
 import { SubmissionService } from '../../../../../services/submission-service';
-import { UserService } from '../../../../../services/user-service';
 import { getLogger } from '../../../../../utils/logger';
+import { getReviewedSubmissionsForAdmins } from '../../../../administrative/submission/reviewed';
 
-const defaultLog = getLogger('paths/submission/{submissionId}/features/{submissionFeatureId}/signed-url');
+const defaultLog = getLogger('paths/submission/{submissionId}/features/{submissionFeatureId}');
 
-export const GET: Operation = [getSubmissionFeatureSignedUrl()];
+export const GET: Operation = [
+  authorizeRequestHandler((req) => {
+    return {
+      and: [
+        {
+          submissionFeatureId: Number(req.params.submissionFeatureId),
+          discriminator: 'AccessPolicy'
+        }
+      ]
+    };
+  }),
+  getReviewedSubmissionsForAdmins()
+];
 
 GET.apiDoc = {
   description: 'Retrieves a signed url of a submission feature',
@@ -38,24 +51,6 @@ GET.apiDoc = {
         minimum: 1
       },
       required: true
-    },
-    {
-      description: 'submission feature property key search query',
-      in: 'query',
-      name: 'key',
-      required: true,
-      schema: {
-        type: 'string'
-      }
-    },
-    {
-      description: 'submission feature property value search query',
-      in: 'query',
-      name: 'value',
-      required: true,
-      schema: {
-        type: 'string'
-      }
     }
   ],
   responses: {
@@ -74,39 +69,28 @@ GET.apiDoc = {
 };
 
 /**
- * Retrieves signed url of a submission feature key
+ * Retrieves a submission feature by its ID
  *
  * @returns {RequestHandler}
  */
-export function getSubmissionFeatureSignedUrl(): RequestHandler {
+export function getSubmissionFeatureById(): RequestHandler {
   return async (req, res) => {
-    const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
+    const connection = getDBConnection(req['keycloak_token']);
 
     const submissionFeatureId = Number(req.params.submissionFeatureId);
-
-    const submissionFeatureDataKey = String(req.query.key);
-
-    const submissionFeatureDataValue = String(req.query.value);
 
     try {
       await connection.open();
 
-      const userService = new UserService(connection);
       const submissionService = new SubmissionService(connection);
 
-      const isAdmin = await userService.isSystemUserAdmin();
-
-      const signedUrl = await submissionService.getSubmissionFeatureSignedUrl({
-        submissionFeatureId,
-        submissionFeatureObj: { key: submissionFeatureDataKey, value: submissionFeatureDataValue },
-        isAdmin
-      });
+      const feature = await submissionService.getSubmissionFeatureById(submissionFeatureId);
 
       await connection.commit();
 
-      res.status(200).json(signedUrl);
+      res.status(200).json(feature);
     } catch (error) {
-      defaultLog.error({ label: 'getSubmissionFeatureSignedUrl', message: 'error', error });
+      defaultLog.error({ label: 'getSubmissionFeatureById', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

@@ -2,7 +2,7 @@ import { Request } from 'express';
 import { RequestHandler } from 'express-serve-static-core';
 import { getAPIUserDBConnection } from '../../database/db';
 import { HTTP403 } from '../../errors/http-error';
-import { AuthorizationScheme, AuthorizationService } from '../../services/authorization-service';
+import { AuthorizationScheme, AuthorizationService } from '../../services/authorization/authorization-service';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('request-handlers/security/authorization');
@@ -63,8 +63,8 @@ export const authorizeRequest = async (req: Request): Promise<boolean> => {
     });
 
     const isAuthorized =
-      (await authorizationService.authorizeSystemAdministrator()) ||
-      (await authorizationService.executeAuthorizationScheme(authorizationScheme));
+      // (await authorizationService.authorizeSystemAdministrator()) ||
+      await authorizationService.executeAuthorizationScheme(authorizationScheme);
 
     // Add the system_user to the request for future use, if needed
     req['system_user'] = authorizationService.systemUser;
