@@ -1,15 +1,14 @@
-import { Readable } from 'stream';
 import tar from 'tar-stream';
 
 /**
- * Extracts a single file from a TAR/PAX archive stream.
+ * Extracts a single file from a TAR/PAX archive stream into memory.
  * Stops reading once the file is found.
  *
  * @param inputStream - Readable stream of the TAR archive
  * @param fileName - File inside the TAR to extract, e.g., "features.json"
- * @returns Parsed JSON content if fileName is "features.json", or raw Buffer otherwise
+ * @returns Buffer of the file contents
  */
-export async function extractFileFromTarStream(inputStream: Readable, fileName: string): Promise<Buffer> {
+export async function extractFileFromTarStream(inputStream: NodeJS.ReadableStream, fileName: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const extract = tar.extract();
     let found = false;
@@ -21,11 +20,11 @@ export async function extractFileFromTarStream(inputStream: Readable, fileName: 
         stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
         stream.on('end', () => {
           resolve(Buffer.concat(chunks));
-          extract.destroy(); // Stop parsing further entries
+          extract.destroy(); // stop reading the tar further
         });
         stream.on('error', reject);
       } else {
-        stream.resume(); // Skip other entries
+        stream.resume();
         stream.on('end', next);
       }
     });
@@ -39,13 +38,9 @@ export async function extractFileFromTarStream(inputStream: Readable, fileName: 
 }
 
 /**
- * Convenience function specifically for features.json
- *
- * NOTE: Return type is any because the content of the features.json file is unknown when initially read.
+ * Convenience function for features.json
  */
-export async function extractFeaturesJsonFromStream(inputStream: Readable): Promise<any> {
+export async function extractFeaturesJsonFromStream(inputStream: NodeJS.ReadableStream): Promise<any[]> {
   const fileBuffer = await extractFileFromTarStream(inputStream, 'features.json');
-  const parsed = JSON.parse(fileBuffer.toString('utf-8'));
-
-  return parsed;
+  return JSON.parse(fileBuffer.toString('utf-8'));
 }

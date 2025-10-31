@@ -1,4 +1,4 @@
-import { Readable } from 'stream';
+import { FEATURES_BATCH_SIZE } from '../constants/submission';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
 import { SubmissionRecord } from '../models/submission';
@@ -75,19 +75,21 @@ export class SubmissionProcessService extends DBService {
    * @throws {HTTP400} If the submission has no features or they are invalid.
    */
   private async _processSubmission(submissionRecord: SubmissionRecord): Promise<void> {
-    // Validate that the submission record has a URI, indicating that the object was copied from quarantine to the main bucket
     const submission = this._validateUri(submissionRecord);
 
     // 1. Get a stream for the tarball in object storage
-    const tarballStream = (await this.objectStorageService.getFileStream(BucketType.MAIN, submission.uri)) as Readable;
+    const tarballStream = await this.objectStorageService.getFileStream(BucketType.MAIN, submission.uri);
 
-    // 2. Extract the features.json from the tarball stream
+    // 2. Load entire features.json into memory
     const submissionFeatures = await extractFeaturesJsonFromStream(tarballStream);
 
-    // 3. Process submission features, handling validation and inserting all features and search keys
-    await this._processSubmissionFeatures(submission.submission_id, submissionFeatures);
+    // 3. Process features in batches
+    for (let i = 0; i < submissionFeatures.length; i += FEATURES_BATCH_SIZE) {
+      const batch = submissionFeatures.slice(i, i + FEATURES_BATCH_SIZE);
+      await this._processSubmissionFeatures(submission.submission_id, batch);
+    }
 
-    // 5. Calculate the region for the submission
+    // 4. Calculate and add geographic regions
     await this.regionService.calculateAndAddRegionsForSubmission(submission.submission_id, 0.3);
   }
 
