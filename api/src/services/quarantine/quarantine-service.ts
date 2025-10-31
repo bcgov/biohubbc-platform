@@ -1,6 +1,5 @@
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import dayjs from 'dayjs';
-import { pipeline, Readable } from 'stream';
+import { Readable } from 'stream';
 import * as tar from 'tar-stream';
 import { IDBConnection } from '../../database/db';
 import { ApiGeneralError } from '../../errors/api-error';
@@ -11,7 +10,7 @@ import { SubmissionRecordWithQuarantine } from '../../models/submission';
 import { QuarantineRepository } from '../../repositories/quarantine/quarantine-repository';
 import { _getClamAvScanner } from '../../utils/file-utils';
 import { DBService } from '../db-service';
-import { ObjectStorageService } from '../object-storage/object-storage-service';
+import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { QuarantineScanFileService } from './quarantine-scan-file-service';
 import { QuarantineScanService } from './quarantine-scan-service';
 import { IFinalizeScanParams, IScanSummary } from './quarantine-service.interface';
@@ -80,34 +79,15 @@ export class QuarantineService extends DBService {
   }
 
   /**
-   * Downloads file from S3 and converts to Node.js Readable stream.
-   *
-   * @private
-   * @param {string} bucket - S3 bucket name
-   * @param {string} key - S3 object key
-   * @returns {Promise<Readable>} Node.js readable stream
-   * @memberof QuarantineService
-   */
-  private async _downloadS3FileAsStream(bucket: string, key: string): Promise<Readable> {
-    const s3Client = new S3Client({ region: process.env.AWS_REGION });
-    const getObject = new GetObjectCommand({ Bucket: bucket, Key: key });
-    const response = await s3Client.send(getObject);
-
-    // Convert AWS SDK v3 ReadableStream to Node.js Readable stream
-    const fileStream = response.Body as any;
-    return fileStream instanceof Readable ? fileStream : Readable.from(fileStream);
-  }
-
-  /**
    * Scans individual files within a tar stream for malware.
    *
    * @private
-   * @param {Readable} nodeStream - The tar stream to scan
+   * @param {NodeJS.ReadableStream} nodeStream - The tar stream to scan
    * @param {string} quarantineScanId - The quarantine scan ID for tracking results
-   * @returns {Promise<ScanSummary>} Summary of scan results
+   * @returns {Promise<IScanSummary>} Summary of scan results
    * @memberof QuarantineService
    */
-  private async _scanTarStream(nodeStream: Readable, quarantineScanId: string): Promise<IScanSummary> {
+  private async _scanTarStream(nodeStream: NodeJS.ReadableStream, quarantineScanId: string): Promise<IScanSummary> {
     const clam = await _getClamAvScanner();
     const extract = tar.extract();
 
@@ -116,23 +96,22 @@ export class QuarantineService extends DBService {
     let totalFiles = 0;
     let infectedCount = 0;
 
-    // Accumulate file records for batch insert
     const fileRecords: Array<{
       quarantine_scan_id: string;
       file_path: string;
       scan_result: FileScanResultEnum;
     }> = [];
 
-    // Process entries sequentially with proper backpressure handling
+    // Handle each file entry
     extract.on('entry', (header, stream, next) => {
       (async () => {
         try {
           totalFiles++;
-          const { isInfected, viruses } = await clam.scanStream(stream);
 
+          const realStream = Readable.from(stream);
+          const { isInfected, viruses } = await clam.scanStream(realStream);
           const scanResult = isInfected ? FileScanResultEnum.INFECTED : FileScanResultEnum.CLEAN;
 
-          // Accumulate record in memory
           fileRecords.push({
             quarantine_scan_id: quarantineScanId,
             file_path: header.name,
@@ -142,25 +121,29 @@ export class QuarantineService extends DBService {
           if (isInfected) {
             hasInfection = true;
             infectedCount++;
-            if (viruses) {
-              allViruses.push(...viruses);
-            }
+            if (viruses) allViruses.push(...viruses);
           }
         } catch (err) {
-          // Handle scan error
           fileRecords.push({
             quarantine_scan_id: quarantineScanId,
             file_path: header.name,
             scan_result: FileScanResultEnum.ERROR
           });
         } finally {
-          next(); // Process next entry only after this one completes
+          // Always drain the tar entry stream and continue
+          stream.resume();
+          next();
         }
       })();
     });
 
-    // Wait for extraction to complete
-    await pipeline(nodeStream, extract);
+    // Wrap piping in a Promise instead of pipeline()
+    await new Promise<void>((resolve, reject) => {
+      nodeStream.pipe(extract);
+      extract.on('finish', resolve);
+      extract.on('error', reject);
+      nodeStream.on('error', reject);
+    });
 
     return {
       hasInfection,
@@ -169,21 +152,6 @@ export class QuarantineService extends DBService {
       viruses: [...new Set(allViruses)],
       fileRecords
     };
-  }
-
-  /**
-   * Marks a scan as failed and updates the quarantine scan record.
-   *
-   * @private
-   * @param {string} quarantineScanId - The scan ID to mark as failed
-   * @param {unknown} error - The error that caused the failure
-   * @memberof QuarantineService
-   */
-  private async _markScanAsFailed(quarantineScanId: string, error: unknown): Promise<void> {
-    await this.quarantineScanService.updateQuarantineScanRecord(quarantineScanId, {
-      scan_status: ScanStatusEnum.FAILED,
-      results: { error: error instanceof Error ? error.message : String(error) }
-    });
   }
 
   /**
@@ -237,32 +205,27 @@ export class QuarantineService extends DBService {
     // 2. Create scan record
     const scan = await this.quarantineScanService.insertQuarantineScanRecord({
       quarantine_id: quarantineId,
-      scan_status: ScanStatusEnum.SCANNING
+      scan_status: ScanStatusEnum.SCANNING,
+      scanned_at: dayjs().toISOString()
     });
 
-    try {
-      // 3. Download file from S3
-      const nodeStream = await this._downloadS3FileAsStream(this.quarantineBucketName, record.uri);
+    // 3. Download file from S3
+    const nodeStream = await this.objectStorageService.getFileStream(BucketType.QUARANTINE, record.uri);
 
-      // 4. Get scanner version
-      const clam = await _getClamAvScanner();
-      const scannerVersion = await clam.getVersion();
+    // 4. Get scanner version
+    const clam = await _getClamAvScanner();
+    const scannerVersion = await clam.getVersion();
 
-      // 5. Scan the tar stream
-      const scanSummary = await this._scanTarStream(nodeStream, scan.quarantine_scan_id);
+    // 5. Scan the tar stream
+    const scanSummary = await this._scanTarStream(nodeStream, scan.quarantine_scan_id);
 
-      // 6. Finalize results
-      await this._finalizeScanResults({
-        quarantineScanId: scan.quarantine_scan_id,
-        quarantineId,
-        scanSummary,
-        scannerVersion
-      });
-    } catch (error) {
-      // Mark scan as failed and re-throw
-      await this._markScanAsFailed(scan.quarantine_scan_id, error);
-      throw error;
-    }
+    // 6. Finalize results
+    await this._finalizeScanResults({
+      quarantineScanId: scan.quarantine_scan_id,
+      quarantineId,
+      scanSummary,
+      scannerVersion
+    });
 
     // 7. Copy the submission from the quarantined bucket to the main bucket
     await this.objectStorageService.promoteFromQuarantine(record.uri);

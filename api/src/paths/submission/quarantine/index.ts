@@ -28,7 +28,7 @@ export const POST: Operation = [
 ];
 
 POST.apiDoc = {
-  description: 'Get a presigned upload URL',
+  description: 'Get a presigned upload URL for uploading objects to the quarantine bucket',
   tags: ['submission'],
   security: [
     {

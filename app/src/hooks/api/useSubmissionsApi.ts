@@ -144,13 +144,13 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Validate a submission
+   * Process a submission. If the submission has already been processed, this will fail.
    *
    * @param {string} submissionId
    * @returns {Promise<void>}
    */
-  const validateSubmission = async (submissionId: string): Promise<void> => {
-    await axios.post(`api/submission/submission/${submissionId}/validate`);
+  const processSubmission = async (submissionId: string): Promise<void> => {
+    await axios.post(`api/submission/submission/${submissionId}/process`);
   };
 
   return {
@@ -164,7 +164,7 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     updateSubmissionRecord,
     getPublishedSubmissions,
     getSubmissionFeatureSignedUrl,
-    validateSubmission
+    processSubmission
   };
 };
 

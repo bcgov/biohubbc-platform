@@ -23,7 +23,7 @@ export const POST: Operation = [
 ];
 
 POST.apiDoc = {
-  description: 'Trigger a malware scan for a specific quarantine record',
+  description: 'Trigger a malware scan for a specific quarantined submission',
   tags: ['submission'],
   security: [
     {

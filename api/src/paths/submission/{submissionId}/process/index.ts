@@ -19,7 +19,7 @@ export const POST: Operation = [
       }
     ]
   })),
-  validateSubmission()
+  processSubmission()
 ];
 
 POST.apiDoc = {
@@ -32,7 +32,7 @@ POST.apiDoc = {
   ],
   parameters: [
     {
-      description: 'The submission ID of the record to scan',
+      description: 'The submission ID of the record to process',
       in: 'path',
       name: 'submissionId',
       schema: { type: 'string' },
@@ -41,13 +41,18 @@ POST.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'Submission validated successfully'
+      description: 'Submission processed successfully'
     },
     ...defaultErrorResponses
   }
 };
 
-export function validateSubmission(): RequestHandler {
+/**
+ * NOTE: If the submission has already been processed, reprocessing will fail.
+ *
+ * @returns
+ */
+export function processSubmission(): RequestHandler {
   return async (req, res) => {
     const token = req['keycloak_token'];
 
@@ -70,7 +75,7 @@ export function validateSubmission(): RequestHandler {
 
       return res.sendStatus(200);
     } catch (error) {
-      defaultLog.error({ label: 'validateSubmission', message: 'error', error });
+      defaultLog.error({ label: 'processSubmission', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

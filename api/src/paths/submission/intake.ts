@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getServiceAccountDBConnection } from '../../database/db';
-import { HTTP400 } from '../../errors/http-error';
+import { SYSTEM_ROLE } from '../../constants/roles';
+import { getDBConnection, getServiceAccountDBConnection } from '../../database/db';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { ISubmissionFeature } from '../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
@@ -17,9 +17,13 @@ const defaultLog = getLogger('paths/submission/intake');
 export const POST: Operation = [
   authorizeRequestHandler(() => {
     return {
-      and: [
+      or: [
         {
           discriminator: 'ServiceClient'
+        },
+        {
+          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+          discriminator: 'SystemRole'
         }
       ]
     };
@@ -119,16 +123,19 @@ POST.apiDoc = {
   }
 };
 
+/**
+ * NOTE: This endpoint will be deprecated in favour of the quarantine workflow in the POST api/submission/quarantine endpoint
+ *
+ */
 export function submissionIntake(): RequestHandler {
   return async (req, res) => {
-    // TODO Allow system admins
-    const serviceClientSystemUser = getServiceClientSystemUser(req['keycloak_token']);
+    const token = req['keycloak_token'];
 
-    if (!serviceClientSystemUser) {
-      throw new HTTP400('Failed to identify known submission source system', [
-        'token did not contain a sub or sub value is unknown'
-      ]);
-    }
+    const serviceClientSystemUser = getServiceClientSystemUser(token);
+
+    const connection = serviceClientSystemUser
+      ? getServiceAccountDBConnection(serviceClientSystemUser)
+      : getDBConnection(token);
 
     const submissionUuid = req.body.id;
     const submissionName = req.body.name;
@@ -136,8 +143,6 @@ export function submissionIntake(): RequestHandler {
     const submissionComment = req.body.comment;
 
     const submissionFeature: ISubmissionFeature = req.body.content;
-
-    const connection = getServiceAccountDBConnection(serviceClientSystemUser);
 
     try {
       await connection.open();
@@ -157,14 +162,15 @@ export function submissionIntake(): RequestHandler {
         name: submissionName,
         comment: submissionComment,
         description: submissionDescription,
-        system_user_id: serviceClientSystemUser.system_user_id,
-        system_user_identifier: serviceClientSystemUser.user_identifier
+        system_user_id: req['system_user'].system_user_id,
+        // TODO: Replace source_system string with a FK to the `contributor` table added in SIMSBIOHUB-782, which uses the JWTs client_id to identify SIMS
+        source_system: 'SIMS'
       });
 
       // Process submission features (insert into DB and index search keys)
       await submissionProcessService._processSubmissionFeatures(submissionRecord.submission_id, [submissionFeature]);
 
-      // Optionally fetch artifact features if needed
+      // Fetch all artifact submission features, if any
       const submissionArtifactFeatures = await submissionService.findSubmissionFeatures({
         submissionId: submissionRecord.submission_id,
         featureTypeNames: ['artifact']

@@ -13,7 +13,7 @@ export enum FileScanResultEnum {
   INFECTED = 'infected',
   /** Used when file scan encountered an error */
   ERROR = 'error',
-  /** Used when file was not scanned (too large, excluded type, etc.) */
+  /** Used when file was intentionally not scanned */
   SKIPPED = 'skipped'
 }
 
@@ -23,7 +23,7 @@ export enum FileScanResultEnum {
 export interface IInsertQuarantineScanFile {
   quarantine_scan_id: string;
   file_path: string;
-  scan_result?: FileScanResultEnum;
+  scan_result: FileScanResultEnum;
 }
 
 /**
@@ -31,17 +31,6 @@ export interface IInsertQuarantineScanFile {
  */
 export interface IUpdateQuarantineScanFile {
   scan_result?: FileScanResultEnum;
-}
-
-/**
- * Interface for batch inserting quarantine scan file records
- */
-export interface IInsertQuarantineScanFiles {
-  quarantine_scan_id: string;
-  files: Array<{
-    file_path: string;
-    scan_result?: FileScanResultEnum;
-  }>;
 }
 
 /**

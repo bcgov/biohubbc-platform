@@ -23,7 +23,8 @@ export const POST: Operation = [
 ];
 
 POST.apiDoc = {
-  description: 'Skip the malware scan for a record',
+  description:
+    'Promote a quarantined submission to the main submission bucket, skipping the malware scan if incomplete.',
   tags: ['submission'],
   security: [
     {
@@ -32,7 +33,7 @@ POST.apiDoc = {
   ],
   parameters: [
     {
-      description: 'The quarantine ID of the record to skip',
+      description: 'The quarantine ID of the record to promote',
       in: 'path',
       name: 'quarantineId',
       schema: { type: 'string' },
@@ -41,7 +42,7 @@ POST.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'Scan skipped successfully'
+      description: 'Promoted successfully'
     },
     ...defaultErrorResponses
   }

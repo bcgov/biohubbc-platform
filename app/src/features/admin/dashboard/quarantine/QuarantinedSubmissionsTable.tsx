@@ -36,7 +36,7 @@ export const QuarantinedSubmissionsTable = () => {
    */
   const handleScan = async (record: SubmissionRecordWithQuarantine) => {
     try {
-      await biohubApi.quarantine.scanQuarantineForMalware(record.submission_id);
+      await biohubApi.quarantine.scanQuarantineForMalware(record.quarantine.quarantine_id);
       // Reload after scan initiation to refresh scan status
       quarantinedSubmissionsDataLoader.refresh();
     } catch (error) {

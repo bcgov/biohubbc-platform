@@ -12,7 +12,7 @@ export enum ScanStatusEnum {
   /** Used when scan has finished successfully */
   COMPLETED = 'completed',
   /** Used when scan encountered an error */
-  FAILED = 'failed'
+  ERROR = 'error'
 }
 
 /**
@@ -20,8 +20,8 @@ export enum ScanStatusEnum {
  */
 export interface IInsertQuarantineScan {
   quarantine_id: string;
-  scan_status?: ScanStatusEnum;
-  scanned_at?: string;
+  scan_status: ScanStatusEnum;
+  scanned_at: string;
   scanner_version?: string;
   results?: Record<string, any>;
 }

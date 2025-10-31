@@ -37,7 +37,7 @@ PUT.apiDoc = {
   ],
   parameters: [
     {
-      description: 'The quarantine ID that was returned from the /submission/quarantine endpoint',
+      description: 'The quarantine ID that was returned when upload URLs were requested',
       in: 'path',
       name: 'quarantineId',
       schema: {
@@ -57,7 +57,7 @@ PUT.apiDoc = {
           properties: {
             uploadId: {
               type: 'string',
-              description: 'Upload ID that was returned by the /submission/quarantine/ endpoint'
+              description: 'Upload ID that was returned when upload URLs were requested'
             },
             key: {
               type: 'string',
@@ -85,6 +85,8 @@ PUT.apiDoc = {
             },
             metadata: {
               type: 'object',
+              description:
+                'Metadata about the submissions, such as its display name and description, and comments for administrators',
               additionalProperties: false,
               required: ['name', 'description', 'comment', 'uid'],
               properties: {

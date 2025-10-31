@@ -150,7 +150,7 @@ export class SubmissionUploadService extends DBService {
       description: metadata.description,
       comment: metadata.comment,
       system_user_id: systemUserId,
-      system_user_identifier: systemUserIdentifier
+      source_system: systemUserIdentifier
     });
 
     return {

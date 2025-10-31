@@ -2,15 +2,6 @@ import { z } from 'zod';
 import { QuarantineRecord } from './quarantine';
 
 /**
- * Interface for updating a quarantine scan file record
- */
-export interface IUpdateSubmission {
-  uri?: string;
-  name?: string;
-  description?: string;
-}
-
-/**
  * Submission record schema
  */
 export const SubmissionRecord = z.object({
@@ -42,19 +33,10 @@ export const SubmissionRecordWithQuarantine = z.object({
 export type SubmissionRecordWithQuarantine = z.infer<typeof SubmissionRecordWithQuarantine>;
 
 /**
- * Submission table model.
- *
- * @export
- * @interface ISubmissionModel
+ * Interface for updating a quarantine scan file record
  */
-export interface ISubmissionModel {
-  submission_id?: number;
-  uuid: string;
-  uri: string | null;
-  security_review_timestamp?: string | null;
-  create_date?: string;
-  create_user?: number;
-  update_date?: string | null;
-  update_user?: number | null;
-  revision_count?: number;
+export interface IUpdateSubmission {
+  uri?: string;
+  name?: string;
+  description?: string;
 }

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Submission record schema for a single feature
+ * Model for a single submission feature
  */
 export const PostSubmissionFeatureSchema: z.ZodType<any> = z.object({
   id: z.string().min(1, 'Feature id is required'),

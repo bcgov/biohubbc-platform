@@ -213,7 +213,7 @@ export interface ICreateSubmissionRecord {
   description: string;
   comment: string | null;
   system_user_id: number;
-  system_user_identifier: string;
+  source_system: string;
 }
 
 export const SubmissionRecordWithSecurity = SubmissionRecord.extend({
@@ -340,7 +340,7 @@ export class SubmissionRepository extends BaseRepository {
       ${submission.description},
       ${submission.comment},
       ${submission.system_user_id},
-      ${submission.system_user_identifier}
+      ${submission.source_system}
     )
     RETURNING
       *;

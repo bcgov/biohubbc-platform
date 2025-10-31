@@ -18,31 +18,16 @@ export enum QuarantineStatusEnum {
   /** Used when malware scan completed and threats were found */
   INFECTED = 'infected',
   /** Used when malware scan failed due to error */
-  FAILED = 'failed',
+  ERROR = 'error',
   /** Used when scan is skipped by an admin */
   SKIPPED = 'skipped'
-}
-
-/**
- * Scan status enum
- * Tracks the status of an individual scan attempt
- */
-export enum ScanStatusEnum {
-  /** Used when scan has not started */
-  PENDING = 'pending',
-  /** Used when scan is in progress */
-  SCANNING = 'scanning',
-  /** Used when scan has finished successfully */
-  COMPLETED = 'completed',
-  /** Used when scan encountered an error */
-  FAILED = 'failed'
 }
 
 /**
  * Interface for creating a new quarantine record
  */
 export interface IInsertQuarantine {
-  uri?: string;
+  uri: string;
   status: QuarantineStatusEnum;
 }
 
@@ -89,16 +74,3 @@ export const QuarantineScanRecordWithFiles = QuarantineScanRecord.extend({
 });
 
 export type QuarantineScanRecordWithFiles = z.infer<typeof QuarantineScanRecordWithFiles>;
-
-/**
- * Summary of quarantine scan results
- */
-export interface IQuarantineScanSummary {
-  quarantine_id: string;
-  total_scans: number;
-  latest_scan_status: QuarantineStatusEnum;
-  latest_scan_date: string | null;
-  total_files_scanned: number;
-  infected_files_found: number;
-  has_active_threats: boolean;
-}

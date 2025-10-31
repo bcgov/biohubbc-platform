@@ -16,11 +16,11 @@ export async function up(knex: Knex): Promise<void> {
       -- used when malware scan is in progress
       'scanning',
       -- used when malware scan completed and no threats were found
-      'passed',
+      'clean',
       -- used when malware scan completed and threats were found
-      'rejected',
+      'infected',
       -- used when malware scan failed due to error
-      'failed',
+      'error',
       -- used when scanning is skipped by an admin
       'skipped'
     );
@@ -33,7 +33,7 @@ export async function up(knex: Knex): Promise<void> {
       -- used when scan has finished successfully
       'completed',
       -- used when scan encountered an error
-      'failed'
+      'error'
     );
 
     CREATE TYPE file_scan_result AS ENUM (
@@ -71,7 +71,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON TABLE quarantine IS 'Tracks quarantined tarball uploads awaiting or having completed security scanning.';
     COMMENT ON COLUMN quarantine.quarantine_id IS 'System-generated primary key.';
     COMMENT ON COLUMN quarantine.uri IS 'S3 URI or storage location for the quarantined tarball.';
-    COMMENT ON COLUMN quarantine.status IS 'Overall status of the quarantine: pending (awaiting scan), scanning (in progress), passed (safe), rejected (threats found), failed (scan error).';
+    COMMENT ON COLUMN quarantine.status IS 'Overall status of the quarantine: pending (awaiting scan), scanning (in progress), clean (safe), infected (threats found), failed (scan error).';
     COMMENT ON COLUMN quarantine.upload_id IS 'The upload ID used to completed the upload to the URI.';
     COMMENT ON COLUMN quarantine.create_date IS 'The datetime the record was created.';
     COMMENT ON COLUMN quarantine.create_user IS 'The id of the user who created the record.';
