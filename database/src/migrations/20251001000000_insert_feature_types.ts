@@ -23,6 +23,11 @@ export async function up(knex: Knex): Promise<void> {
             'An individual animal.'
         ),
         (
+            'block',
+            'Block',
+            'A block.'
+        ),
+        (
             'capture',
             'Capture',
             'Information about an animal capture event.'
@@ -46,11 +51,6 @@ export async function up(knex: Knex): Promise<void> {
             'habitat_feature',
             'Habitat feature',
             'Information about a habitat feature.'
-        ),
-        (
-            'image',
-            'Image',
-            'An image file'
         ),
         (
             'marking',
@@ -78,6 +78,11 @@ export async function up(knex: Knex): Promise<void> {
             'Information about an observation environmental condition.'
         ),
         (
+            'observation_subcount_measurement',
+            'Observation subcount measurement',
+            'Information about an observation subcount measurement.'
+        ),
+        (
             'release',
             'Release',
             'Information about an animal release event.'
@@ -103,6 +108,16 @@ export async function up(knex: Knex): Promise<void> {
             'A technique by which species observations or other ecological data are collected.'
         ),
         (
+            'sample_technique_detail',
+            'Sampling technique detail',
+            'Detailed attributes of a sampling technique used to collect species observations or other ecological data.'
+        ),
+        (
+            'sample_technique_vantage',
+            'Sampling technique vantage',
+            'A vantage point or method used to observe or collect data on species.'
+        ),
+        (
             'species_observation',
             'Species observation',
             'Information about an encounter with a species or evidence of a species, such as hair or tracks.'
@@ -126,6 +141,11 @@ export async function up(knex: Knex): Promise<void> {
             'telemetry_deployment',
             'Telemetry deployment',
             'Metadata describing the deployment of a telemetry device.'
+        ),
+        (
+            'telemetry_frequency',
+            'Telemetry frequency',
+            'The frequency at which telemetry data is collected.'
         ),
         (
             'telemetry_device',
@@ -304,7 +324,7 @@ export async function up(knex: Knex): Promise<void> {
             false
         ),
         (
-            (SELECT feature_property_type_id from feature_property_type where name = 'string'),
+            (SELECT feature_property_type_id from feature_property_type where name = 'array'),
             'site_select_strategy',
             'Site selection strategy',
             'The tactic employed when determining site locations.',
@@ -318,15 +338,38 @@ export async function up(knex: Knex): Promise<void> {
             false
         ),
         (
-            (SELECT feature_property_type_id from feature_property_type where name = 'string'),
+            (SELECT feature_property_type_id from feature_property_type where name = 'array'),
             'collected_data',
             'Collected Data',
             'The data collected from the study.',
             false
         ),
-        -- TECHNIQUE-RELATED PROPERTIES 
+        -- SURVEY METADATA PROPERTIES 
         (
             (SELECT feature_property_type_id from feature_property_type where name = 'string'),
+            'objectives',
+            'Objectives',
+            'The objectives of the survey.',
+            false
+        ),
+        (
+            (SELECT feature_property_type_id from feature_property_type where name = 'array'),
+            'focal_species',
+            'Focal Species',
+            'The species that are the focus of the survey objectives.',
+            false
+        ),
+        -- HABITAT FEATURE-RELATED PROPERTIES
+        (
+            (SELECT feature_property_type_id from feature_property_type where name = 'array'),
+            'associated_species',
+            'Associated Species',
+            'The species that are associated with the habitat feature.',
+            false
+        ),
+        -- TECHNIQUE-RELATED PROPERTIES 
+        (
+            (SELECT feature_property_type_id from feature_property_type where name = 'array'),
             'attractant',
             'Attractants',
             'Attractants employed under your sampling technique that entice or encourage observations.',
@@ -335,9 +378,16 @@ export async function up(knex: Knex): Promise<void> {
         (
             (SELECT feature_property_type_id from feature_property_type where name = 'string'),
             'method_attribute',
-            'Method Attributes',
+            'Method Attribute',
             'Key characteristics or details of the method used in this data collection.',
-            false
+            true
+        ),
+        (
+            (SELECT feature_property_type_id from feature_property_type where name = 'string'),
+            'method_value',
+            'Method Value',
+            'Key characteristics or details of the method used in this data collection.',
+            true
         ),
         (
             (SELECT feature_property_type_id from feature_property_type where name = 'string'),
@@ -392,9 +442,9 @@ export async function up(knex: Knex): Promise<void> {
         -- DEVICE DEPLOYMENT-RELATED PROPERTIES
         (
             (SELECT feature_property_type_id from feature_property_type where name = 'string'),
-            'device',
-            'Device',
-            'The device associated with the telemetry deployment.',
+            'device_key',
+            'Device Key',
+            'The key of the device associated with the telemetry deployment.',
             false
         ),
         (
@@ -426,24 +476,10 @@ export async function up(knex: Knex): Promise<void> {
             false
         ),
         (
-            (SELECT feature_property_type_id from feature_property_type where name = 'number'),
-            'fix_rate',
-            'Fix rate',
-            'Rate at which the device records a location.',
-            false
-        ),
-        (
             (SELECT feature_property_type_id from feature_property_type where name = 'string'),
             'frequency_unit',
             'Frequency Unit',
             'Unit of frequency of the device.',
-            false
-        ),
-        (
-            (SELECT feature_property_type_id from feature_property_type where name = 'number'),
-            'fix_rate_unit',
-            'Fix rate unit',
-            'Unit of the rate at which the device records a location.',
             false
         ),
     -- CAPTURE-RELATED PROPERTIES
@@ -479,9 +515,16 @@ export async function up(knex: Knex): Promise<void> {
     -- MARKING-RELATED PROPERTIES
         (
             (SELECT feature_property_type_id from feature_property_type where name = 'string'),
-            'colour',
-            'Colour',
-            'The colour of a marking on an animal.',
+            'primary_colour',
+            'Primary Colour',
+            'The primary colour of a marking on an animal.',
+            false
+        ),
+        (
+            (SELECT feature_property_type_id from feature_property_type where name = 'string'),
+            'secondary_colour',
+            'Secondary Colour',
+            'The secondary colour of a marking on an animal.',
             false
         ),
         (
@@ -498,7 +541,35 @@ export async function up(knex: Knex): Promise<void> {
             'The nature of the marking on the animal.',
             false
         ),
-    -- REPORT-RELATED PROPERTIES 
+    -- FILE AND REPORT-RELATED PROPERTIES 
+        (
+            (SELECT feature_property_type_id from feature_property_type where name = 'string'),
+            'filename',
+            'Filename',
+            'The name of the file.',
+            true
+        ),
+        (
+            (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
+            'file_type',
+            'File Type',
+            'The type of file.',
+            true
+        ),
+        (
+            (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'number'),
+            'file_size',
+            'File Size',
+            'The size of the file in bytes.',
+            true
+        ),
+        (
+            (SELECT feature_property_type_id from feature_property_type where name = 'string'),
+            'title',
+            'Title',
+            'The title of the file.',
+            false
+        ),
         (
             (SELECT feature_property_type_id from feature_property_type where name = 'number'),
             'year',
@@ -513,27 +584,20 @@ export async function up(knex: Knex): Promise<void> {
             'The author(s) of the report.',
             false
         ),
-        (
-            (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'file_type',
-            'File Type',
-            'The type of file.',
-            true
-        ),
     -- ECOLOGICAL UNIT-RELATED PROPERTIES
         (
             (SELECT feature_property_type_id from feature_property_type where name = 'string'),
             'ecological_unit_type',
             'Ecological unit',
             'The ecological unit type or category, such as population unit, herd, or pack.',
-            false
+            true
         ),
         (
             (SELECT feature_property_type_id from feature_property_type where name = 'string'),
             'ecological_unit_value',
             'Ecological unit value',
             'The value of the ecological unit type, like the name of a specific population unit if the type is population unit.',
-            false
+            true
         ),
     -- MORTALITY-RELATED PROPERTIES
         (
@@ -593,8 +657,18 @@ VALUES
         false
     ),
     (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'capture'),
+        (SELECT feature_type_id FROM feature_type WHERE name = 'block'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'name'),
+        true
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'block'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'description'),
+        false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'capture'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'comment'),
         false
     ),
     (
@@ -616,6 +690,16 @@ VALUES
         (SELECT feature_type_id FROM feature_type WHERE name = 'dataset'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'description'),
         false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'dataset'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'objectives'),
+        false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'dataset'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'focal_species'),
+        true
     ),
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'dataset'),
@@ -648,16 +732,6 @@ VALUES
         false
     ),
     (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'dataset'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'taxon_id'),
-        false
-    ),
-    (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'dataset'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'guid'),
-        false
-    ),
-    (
         (SELECT feature_type_id FROM feature_type WHERE name = 'ecological_unit'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'ecological_unit_type'),
         false
@@ -674,17 +748,27 @@ VALUES
     ),
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'file'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'name'),
-        false
-    ),
-    (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'file'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'description'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'filename'),
         false
     ),
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'file'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'file_type'),
+        true
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'file'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'file_size'),
+        false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'file'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'title'),
+        false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'file'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'description'),
         false
     ),
     (
@@ -704,32 +788,12 @@ VALUES
     ),
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'habitat_feature'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'taxon_id'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'associated_species'),
         false
     ),
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'habitat_feature'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'geometry'),
-        false
-    ),
-    (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'image'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'artifact_key'),
-        true
-    ),
-    (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'image'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'name'),
-        false
-    ),
-    (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'image'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'description'),
-        false
-    ),
-    (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'image'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'file_type'),
         false
     ),
     (
@@ -749,17 +813,17 @@ VALUES
     ),
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'marking'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'colour'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'primary_colour'),
         false
     ),
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'marking'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'description'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'secondary_colour'),
         false
     ),
     (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'measurement'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'description'),
+        (SELECT feature_type_id FROM feature_type WHERE name = 'marking'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'comment'),
         false
     ),
     (
@@ -774,7 +838,7 @@ VALUES
     ),
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'mortality'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'description'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'comment'),
         false
     ),
     (
@@ -804,16 +868,6 @@ VALUES
     ),
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'observation_subcount'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'measurement_type'),
-        true
-    ),
-    (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'observation_subcount'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'measurement_value'),
-        true
-    ),
-    (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'observation_subcount'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'comment'),
         false
     ),
@@ -823,8 +877,18 @@ VALUES
         true
     ),
     (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'observation_subcount_measurement'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'measurement_type'),
+        true
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'observation_subcount_measurement'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'measurement_value'),
+        true
+    ),
+    (
         (SELECT feature_type_id FROM feature_type WHERE name = 'release'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'description'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'comment'),
         false
     ),
     (
@@ -914,18 +978,8 @@ VALUES
     ),
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'method_attribute'),
-        false
-    ),
-    (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'response_metric'),
         true
-    ),
-    (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'method_vantage'),
-        false
     ),
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
@@ -935,6 +989,26 @@ VALUES
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'detect_distance'),
+        false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_detail'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'method_attribute'),
+        false
+    ),
+        (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_detail'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'method_value'),
+        false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_vantage'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'method_vantage'),
+        false
+    ),
+        (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_vantage'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'method_value'),
         false
     ),
     (
@@ -980,7 +1054,7 @@ VALUES
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'stratum'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'name'),
-        false
+        true
     ),
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'stratum'),
@@ -1014,7 +1088,7 @@ VALUES
     ),
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_deployment'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'device'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'device_key'),
         true
     ),
     (
@@ -1027,24 +1101,13 @@ VALUES
         (SELECT feature_property_id FROM feature_property WHERE name = 'end_date'),
         false
     ),
-   
     (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_deployment'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'fix_rate'),
-        false
-    ),
-    (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_deployment'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'fix_rate_unit'),
-        false
-    ),
-        (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_deployment'),
+        (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_frequency'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'frequency'),
         false
     ),
     (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_deployment'),
+        (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_frequency'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'frequency_unit'),
         false
     ),
