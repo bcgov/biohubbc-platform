@@ -34,6 +34,17 @@ export class PolicyStatementService extends DBService {
   }
 
   /**
+   * Retrieve multiple policy statement records for a policy
+   *
+   * @param {string} policyId - The ID of the policy to fetch statements for.
+   * @return {Promise<PolicyStatement[]>} - The policy statement records.
+   * @memberof PolicyStatementService
+   */
+  getPolicyStatements(policyId: string): Promise<PolicyStatement[]> {
+    return this.policyStatementRepository.getPolicyStatements(policyId);
+  }
+
+  /**
    * Update an existing policy statement record.
    *
    * @param {string} policyStatementId - The ID of the policy statement to update.

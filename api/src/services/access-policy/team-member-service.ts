@@ -34,6 +34,17 @@ export class TeamMemberService extends DBService {
   }
 
   /**
+   * Retrieve all team members for a given team
+   *
+   * @param {string} teamId - The ID of the team to fetch members for.
+   * @return {Promise<TeamMember[]>} - The list of team members for the team.
+   * @memberof TeamMemberService
+   */
+  getTeamMembers(teamId: string): Promise<TeamMember[]> {
+    return this.teamMemberRepository.getTeamMembersByTeamId(teamId);
+  }
+
+  /**
    * Update an existing team member record.
    *
    * @param {string} teamMemberId - The ID of the team member to update.

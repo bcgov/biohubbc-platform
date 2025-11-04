@@ -32,10 +32,3 @@ export interface CreatePolicyStatementCondition {
   key: string;
   value: any;
 }
-export interface UpdatePolicyStatementCondition {
-  policy_statement_id?: string;
-  operator?: PolicyConditionOperator;
-  key?: string;
-  value?: any;
-  record_end_date?: string;
-}

@@ -38,9 +38,10 @@ const NUM_MOCK_FEATURE_SUBMISSIONS = Number(process.env.NUM_MOCK_FEATURE_SUBMISS
  */
 export async function seed(knex: Knex): Promise<void> {
   if (!ENABLE_MOCK_FEATURE_SEEDING) {
-    return knex.raw(`SELECT null;`);
+    return knex.raw(`SELECT null;`); // dummy query to appease knex
   }
 
+  // Transaction so that the schema and search path is set for the SQL statements in insertRecord()
   await knex.transaction(async (trx) => {
     await trx.raw(`
       SET SCHEMA 'biohub';
@@ -59,27 +60,27 @@ export async function seed(knex: Knex): Promise<void> {
  * @param {Knex} knex
  */
 const insertRecord = async (knex: Knex) => {
-  // Submission (1)
+  // Submission
   const isReviewed = Math.random() > 0.5;
   const isPublished = isReviewed && Math.random() > 0.5;
   const submission_id = await insertSubmissionRecord(knex, isReviewed, isPublished);
 
-  // Dataset (1)
+  // Dataset
   const parent_submission_feature_id1 = await insertDatasetRecord(knex, { submission_id });
 
-  // Sample Sites (10) and their children
+  // Sample Sites and their children
   const sampleSitePromises = Array.from({ length: 10 }).map(async () => {
     const parent_submission_feature_id2 = await insertSampleSiteRecord(knex, {
       submission_id,
       parent_submission_feature_id: parent_submission_feature_id1
     });
 
-    // Animals (2 per sample site)
+    // Animals
     const animalPromises = Array.from({ length: 2 }).map(() =>
       insertAnimalRecord(knex, { submission_id, parent_submission_feature_id: parent_submission_feature_id2 })
     );
 
-    // Observations (20 per sample site)
+    // Observations
     const observationPromises = Array.from({ length: 20 }).map(() =>
       insertObservationRecord(knex, { submission_id, parent_submission_feature_id: parent_submission_feature_id2 })
     );
@@ -88,7 +89,7 @@ const insertRecord = async (knex: Knex) => {
     await Promise.all([...animalPromises, ...observationPromises]);
   });
 
-  // Telemetry (100)
+  // Telemetry
   const telemetryPromises = Array.from({ length: 100 }).map(() =>
     insertTelemetryRecord(knex, { submission_id, parent_submission_feature_id: parent_submission_feature_id1 })
   );

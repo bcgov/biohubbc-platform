@@ -1136,6 +1136,7 @@ export class SubmissionRepository extends BaseRepository {
       SELECT
         sf.submission_feature_id,
         sf.uuid,
+        sf.urn,
         sf.submission_id,
         sf.feature_type_id,
         sf.source_id,

@@ -34,6 +34,16 @@ export class TeamService extends DBService {
   }
 
   /**
+   * Retrieve multiple team records
+   *
+   * @return {Promise<Team[]>} - The team records.
+   * @memberof TeamService
+   */
+  getTeams(): Promise<Team[]> {
+    return this.teamRepository.getTeams();
+  }
+
+  /**
    * Update an existing team record.
    *
    * @param {string} teamId - The ID of the team to update.

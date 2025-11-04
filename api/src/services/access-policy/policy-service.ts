@@ -1,4 +1,5 @@
 import { IDBConnection } from '../../database/db';
+import { parseFeatureUrn } from '../../database/urn-utils';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
 import { DBService } from '../db-service';
@@ -26,7 +27,7 @@ export class PolicyService extends DBService {
    * Retrieve a policy record
    *
    * @param {string} policyId - The ID of the policy to fetch.
-   * @return {Promise<Policy>} - The policy record if found, otherwise null.
+   * @return {Promise<Policy>}
    * @memberof PolicyService
    */
   getPolicy(policyId: string): Promise<Policy> {
@@ -34,15 +35,26 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Retrieve a policy record
+   * Retrieve policies
    *
-   * @param {string} policyId - The ID of the policy to fetch.
-   * @param {number} systemUserId
-   * @return {Promise<Policy[]>} - The policy record if found, otherwise null.
+   * @return {Promise<Policy[]>}
    * @memberof PolicyService
    */
-  getPoliciesThatAuthorizeFeatureAccessByUrn(policyId: string, systemUserId: number): Promise<Policy[]> {
-    return this.policyRepository.getPoliciesThatAuthorizeFeatureAccessByUrn(policyId, systemUserId);
+  getPolicies(): Promise<Policy[]> {
+    return this.policyRepository.getPolicies();
+  }
+
+  /**
+   * Retrieve a policy record
+   *
+   * @param {string} urn
+   * @param {number} systemUserId
+   * @return {Promise<Policy[]>}
+   * @memberof PolicyService
+   */
+  getPoliciesThatAuthorizeFeatureAccessByUrn(urn: string, systemUserId: number): Promise<Policy[]> {
+    const urnParts = parseFeatureUrn(urn);
+    return this.policyRepository.getPoliciesThatAuthorizeFeatureAccessByUrn(urnParts, systemUserId);
   }
 
   /**

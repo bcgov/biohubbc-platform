@@ -1,5 +1,6 @@
 import SQL from 'sql-template-strings';
 import { getKnex } from '../../database/db';
+import { FeatureUrn } from '../../database/urn-utils.interface';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyEffect } from '../../models/policy-statement';
@@ -67,29 +68,59 @@ export class PolicyRepository extends BaseRepository {
   }
 
   /**
-   * Returns all policies that authorize access to the given feature URN and user
+   * Get all policy records.
    *
-   * @param {string} urn
-   * @param {number} systemUserId
-   * @return {Promise<Policy[]>} - The policy record.
+   * @return {Promise<Policy[]>} - A list of all policy records.
    * @memberof PolicyRepository
    */
-  async getPoliciesThatAuthorizeFeatureAccessByUrn(urn: string, systemUserId: number): Promise<Policy[]> {
+  async getPolicies(): Promise<Policy[]> {
+    const knex = getKnex();
+    const query = knex.table('policy').select(['policy_id', 'name', 'description']);
+
+    const response = await this.connection.knex(query, Policy);
+
+    return response.rows;
+  }
+
+  /**
+   * Returns all policies that authorize access to the given feature URN for the given user.
+   *
+   * NOTE: We can optimize queries that use URNs by storing the URN components individually and indexing each. Currently
+   * repeating split_part as a temporary implementation, but this should be optimized using DB indexes.
+   *
+   * @param {FeatureUrn} urnParts
+   * @param {number} systemUserId
+   * @return {Promise<Policy[]>} - The policy records.
+   * @memberof PolicyRepository
+   */
+  async getPoliciesThatAuthorizeFeatureAccessByUrn(urnParts: FeatureUrn, systemUserId: number): Promise<Policy[]> {
     const sql = SQL`
-      SELECT DISTINCT p.*
-      FROM policy p
-      INNER JOIN team_policy tp ON tp.policy_id = p.policy_id AND tp.record_end_date IS NULL
-      INNER JOIN team_member tm ON tm.team_id = tp.team_id AND tm.record_end_date IS NULL
-      INNER JOIN policy_statement ps ON ps.policy_id = p.policy_id AND ps.record_end_date IS NULL
-      WHERE tm.system_user_id = ${systemUserId}
-        AND p.record_end_date IS NULL
+    WITH policy_urn_parts AS (
+      SELECT
+        ps.*,
+        split_part(ps.submission_feature_urn, ':', 1) AS part1,
+        split_part(ps.submission_feature_urn, ':', 2) AS part2,
+        split_part(ps.submission_feature_urn, ':', 3) AS part3
+      FROM policy_statement ps
+      WHERE ps.record_end_date IS NULL
         AND ps.effect = ${PolicyEffect.ALLOW}
-        AND (
-          (split_part(ps.submission_feature_urn, ':', 1) = split_part(${urn}, ':', 1) OR split_part(ps.submission_feature_urn, ':', 1) = '*')
-          AND (split_part(ps.submission_feature_urn, ':', 2) = split_part(${urn}, ':', 2) OR split_part(ps.submission_feature_urn, ':', 2) = '*')
-          AND (split_part(ps.submission_feature_urn, ':', 3) = split_part(${urn}, ':', 3) OR split_part(ps.submission_feature_urn, ':', 3) = '*')
-        )
-    `;
+    )
+    SELECT DISTINCT p.*
+    FROM policy p
+    INNER JOIN team_policy tp 
+      ON tp.policy_id = p.policy_id 
+      AND tp.record_end_date IS NULL
+    INNER JOIN team_member tm 
+      ON tm.team_id = tp.team_id 
+      AND tm.record_end_date IS NULL
+    INNER JOIN policy_urn_parts ps 
+      ON ps.policy_id = p.policy_id
+    WHERE tm.system_user_id = ${systemUserId}
+      AND p.record_end_date IS NULL
+      AND (ps.part1 = ${urnParts.submissionId} OR ps.part1 = '*')
+      AND (ps.part2 = ${urnParts.featureTypeName} OR ps.part2 = '*')
+      AND (ps.part3 = ${urnParts.submissionFeatureId} OR ps.part3 = '*')
+  `;
 
     const response = await this.connection.sql(sql, Policy);
 

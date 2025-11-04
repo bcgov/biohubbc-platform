@@ -45,7 +45,7 @@ export async function seed(knex: Knex): Promise<void> {
 
   await knex('policy_statement_condition').insert({
     policy_statement_id: telemetryStatement.policy_statement_id,
-    operator: 'DateAfter',
+    operator: 'DateBefore',
     key: 'start_date',
     value: JSON.stringify(new Date().toISOString())
   });
@@ -92,15 +92,5 @@ export async function seed(knex: Knex): Promise<void> {
     })
     .returning('*');
 
-  // Add IDIR users to the secret sampling site policy team
-  await knex.raw(`
-    INSERT INTO team_member (system_user_id, team_id)
-    SELECT su.system_user_id, '${adminTeam.team_id}'
-    FROM "system_user" su
-    WHERE su.user_identity_source_id IN (
-      SELECT user_identity_source_id
-      FROM user_identity_source
-      WHERE LOWER(name) = 'IDIR'
-    );
-  `);
+  // Do not add users to the sampling sites policy team, for confirming that only team members can access features covered by the policy
 }

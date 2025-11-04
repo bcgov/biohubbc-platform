@@ -64,6 +64,21 @@ export class TeamRepository extends BaseRepository {
   }
 
   /**
+   * Get all team records.
+   *
+   * @return {Promise<Team[]>} - A list of all team records.
+   * @memberof TeamRepository
+   */
+  async getTeams(): Promise<Team[]> {
+    const knex = getKnex();
+    const query = knex.table('team').select(['team_id', 'name', 'description']);
+
+    const response = await this.connection.knex(query, Team);
+
+    return response.rows;
+  }
+
+  /**
    * Update an existing team record.
    *
    * @param {string} teamId - The ID of the team to update.

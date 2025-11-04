@@ -34,6 +34,17 @@ export class TeamPolicyService extends DBService {
   }
 
   /**
+   * Retrieve all team policy records for a specific team.
+   *
+   * @param {string} teamId - The ID of the team whose policies to fetch.
+   * @return {Promise<TeamPolicy[]>} - The list of team policy records.
+   * @memberof TeamPolicyService
+   */
+  getTeamPolicies(teamId: string): Promise<TeamPolicy[]> {
+    return this.teamPolicyRepository.getTeamPolicies(teamId);
+  }
+
+  /**
    * Update an existing team policy record.
    *
    * @param {string} teamPolicyId - The ID of the team policy to update.

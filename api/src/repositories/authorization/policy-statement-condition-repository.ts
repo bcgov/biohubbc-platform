@@ -1,10 +1,6 @@
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import {
-  CreatePolicyStatementCondition,
-  PolicyStatementCondition,
-  UpdatePolicyStatementCondition
-} from '../../models/policy-statement-condition';
+import { CreatePolicyStatementCondition, PolicyStatementCondition } from '../../models/policy-statement-condition';
 import { BaseRepository } from '../base-repository';
 
 /**
@@ -75,40 +71,22 @@ export class PolicyStatementConditionRepository extends BaseRepository {
   }
 
   /**
-   * Update an existing policy statement condition record.
+   * Get all policy statement condition records for a given policy statement.
    *
-   * @param {string} policyStatementConditionId - The ID of the policy statement condition to update.
-   * @param {UpdatePolicyStatementCondition} policyStatementConditionData - The data to update.
-   * @return {Promise<PolicyStatementCondition>} - The updated policy statement condition record.
+   * @param {string} policyStatementId - The ID of the policy statement to fetch conditions for.
+   * @return {Promise<PolicyStatementCondition[]>}
    * @memberof PolicyStatementConditionRepository
    */
-  async updatePolicyStatementCondition(
-    policyStatementConditionId: string,
-    policyStatementConditionData: UpdatePolicyStatementCondition
-  ): Promise<PolicyStatementCondition> {
+  async getPolicyStatementConditions(policyStatementId: string): Promise<PolicyStatementCondition[]> {
     const knex = getKnex();
     const query = knex
       .table('policy_statement_condition')
-      .update({
-        policy_statement_id: policyStatementConditionData.policy_statement_id,
-        operator: policyStatementConditionData.operator,
-        key: policyStatementConditionData.key,
-        value: policyStatementConditionData.value,
-        record_end_date: policyStatementConditionData.record_end_date
-      })
-      .where('policy_statement_condition_id', policyStatementConditionId)
-      .returning(['policy_statement_condition_id', 'policy_statement_id', 'operator', 'key', 'value']);
+      .select(['policy_statement_condition_id', 'policy_statement_id', 'operator', 'key', 'value'])
+      .where({ policy_statement_id: policyStatementId });
 
     const response = await this.connection.knex(query, PolicyStatementCondition);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update policy statement condition', [
-        'PolicyStatementConditionRepository->updatePolicyStatementCondition',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0];
+    return response.rows;
   }
 
   /**

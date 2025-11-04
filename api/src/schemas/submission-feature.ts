@@ -11,6 +11,7 @@ export const GetSubmissionFeatureSchema: OpenAPIV3.SchemaObject = {
       required: [
         'submission_feature_id',
         'uuid',
+        'urn',
         'submission_id',
         'feature_type_id',
         'source_id',
@@ -27,6 +28,10 @@ export const GetSubmissionFeatureSchema: OpenAPIV3.SchemaObject = {
           type: 'string',
           format: 'uuid',
           description: 'Universally unique identifier for the feature.'
+        },
+        urn: {
+          type: 'string',
+          description: 'Uniform Resource Name of the feature'
         },
         submission_id: {
           type: 'integer',

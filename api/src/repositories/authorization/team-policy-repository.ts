@@ -67,6 +67,22 @@ export class TeamPolicyRepository extends BaseRepository {
   }
 
   /**
+   * Get all team policy records for a specific team.
+   *
+   * @param {string} teamId - The ID of the team whose policies to fetch.
+   * @return {Promise<TeamPolicy[]>} - A list of team policy records for the team.
+   * @memberof TeamPolicyRepository
+   */
+  async getTeamPolicies(teamId: string): Promise<TeamPolicy[]> {
+    const knex = getKnex();
+    const query = knex.table('team_policy').select(['team_policy_id', 'team_id', 'policy_id']).where('team_id', teamId);
+
+    const response = await this.connection.knex(query, TeamPolicy);
+
+    return response.rows;
+  }
+
+  /**
    * Update an existing team policy record.
    *
    * @param {string} teamPolicyId - The ID of the team policy to update.

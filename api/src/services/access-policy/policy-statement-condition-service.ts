@@ -1,9 +1,5 @@
 import { IDBConnection } from '../../database/db';
-import {
-  CreatePolicyStatementCondition,
-  PolicyStatementCondition,
-  UpdatePolicyStatementCondition
-} from '../../models/policy-statement-condition';
+import { CreatePolicyStatementCondition, PolicyStatementCondition } from '../../models/policy-statement-condition';
 import { PolicyStatementConditionRepository } from '../../repositories/authorization/policy-statement-condition-repository';
 import { DBService } from '../db-service';
 
@@ -40,21 +36,14 @@ export class PolicyStatementConditionService extends DBService {
   }
 
   /**
-   * Update an existing policy statement condition record.
+   * Retrieve all policy statement condition records for a given policy statement.
    *
-   * @param {string} policyStatementConditionId - The ID of the policy statement condition to update.
-   * @param {UpdatePolicyStatementCondition} policyStatementConditionData - Partial data to update the policy statement condition record.
-   * @return {Promise<PolicyStatementCondition>} - The updated policy statement condition record.
+   * @param {string} policyStatementId - The ID of the policy statement to fetch conditions for.
+   * @return {Promise<PolicyStatementCondition[]>} - The policy statement condition records.
    * @memberof PolicyStatementConditionService
    */
-  updatePolicyStatementCondition(
-    policyStatementConditionId: string,
-    policyStatementConditionData: UpdatePolicyStatementCondition
-  ): Promise<PolicyStatementCondition> {
-    return this.policyStatementConditionRepository.updatePolicyStatementCondition(
-      policyStatementConditionId,
-      policyStatementConditionData
-    );
+  getPolicyStatementConditions(policyStatementId: string): Promise<PolicyStatementCondition[]> {
+    return this.policyStatementConditionRepository.getPolicyStatementConditions(policyStatementId);
   }
 
   /**

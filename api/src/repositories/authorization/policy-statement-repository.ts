@@ -68,6 +68,25 @@ export class PolicyStatementRepository extends BaseRepository {
   }
 
   /**
+   * Get all policy statement records for a given policy.
+   *
+   * @param {string} policyId - The ID of the policy to fetch statements for.
+   * @return {Promise<PolicyStatement[]>} - A list of policy statement records for the given policy.
+   * @memberof PolicyStatementRepository
+   */
+  async getPolicyStatements(policyId: string): Promise<PolicyStatement[]> {
+    const knex = getKnex();
+    const query = knex
+      .table('policy_statement')
+      .select(['policy_statement_id', 'policy_id', 'effect', 'submission_feature_urn'])
+      .where('policy_id', policyId);
+
+    const response = await this.connection.knex(query, PolicyStatement);
+
+    return response.rows;
+  }
+
+  /**
    * Update an existing policy statement record.
    *
    * @param {string} policyStatementId - The ID of the policy statement to update.
