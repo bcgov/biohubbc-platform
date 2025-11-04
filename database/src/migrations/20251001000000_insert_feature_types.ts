@@ -590,14 +590,14 @@ export async function up(knex: Knex): Promise<void> {
             'ecological_unit_type',
             'Ecological unit',
             'The ecological unit type or category, such as population unit, herd, or pack.',
-            true
+            false
         ),
         (
             (SELECT feature_property_type_id from feature_property_type where name = 'string'),
             'ecological_unit_value',
             'Ecological unit value',
             'The value of the ecological unit type, like the name of a specific population unit if the type is population unit.',
-            true
+            false
         ),
     -- MORTALITY-RELATED PROPERTIES
         (
