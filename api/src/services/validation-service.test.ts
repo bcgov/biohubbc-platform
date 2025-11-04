@@ -458,6 +458,66 @@ describe('ValidationService', () => {
       }
     });
 
+    it('should throw an error if an array property is the wrong type', () => {
+      const mockDBConnection = getMockDBConnection();
+
+      const properties = [
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
+        { name: 'tags', display_name: '', description: '', type_name: 'array', required_value: true },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
+      ];
+
+      const dataProperties = {
+        name: 'project name',
+        count: 1,
+        published: true,
+        tags: 'not an array',
+        geometry: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
+        },
+        start_date: '2023-11-22'
+      };
+
+      const validationService = new ValidationService(mockDBConnection);
+
+      try {
+        validationService.validateProperties(properties, dataProperties);
+      } catch (error) {
+        expect((error as Error).message).to.equal('Property tags is not of type array');
+      }
+    });
+
+    it('should validate arrays correctly and accept valid arrays', () => {
+      const mockDBConnection = getMockDBConnection();
+
+      const properties = [
+        { name: 'tags', display_name: '', description: '', type_name: 'array', required_value: true }
+      ];
+
+      const dataProperties = {
+        tags: ['tag1', 'tag2', 'tag3']
+      };
+
+      const validationService = new ValidationService(mockDBConnection);
+
+      const response = validationService.validateProperties(properties, dataProperties);
+
+      expect(response).to.be.true;
+    });
+
     it('should throw an error if a spatial property is the wrong type', () => {
       const mockDBConnection = getMockDBConnection();
 
@@ -580,6 +640,7 @@ describe('ValidationService', () => {
         { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
         { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
         { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
+        { name: 'tags', display_name: '', description: '', type_name: 'array', required_value: true },
         { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
         { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
       ];
@@ -589,6 +650,7 @@ describe('ValidationService', () => {
         count: 1,
         published: true,
         permit: {},
+        tags: ['tag1', 'tag2'],
         geometry: {
           type: 'FeatureCollection',
           features: [
