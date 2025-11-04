@@ -161,6 +161,7 @@ describe('intakeArtifact', () => {
     const uploadArtifactResponse: SubmissionFeatureRecord = {
       submission_feature_id: 1,
       uuid: '456-234-345',
+      urn: 'urn:2:artifact:1',
       submission_id: 2,
       feature_type_id: 3,
       source_id: 'source-id',

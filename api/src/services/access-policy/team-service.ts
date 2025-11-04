@@ -12,7 +12,7 @@ export class TeamService extends DBService {
   }
 
   /**
-   * Create a new team record in the database.
+   * Create a new team record.
    *
    * @param {CreateTeam} teamData - Data required to create a new team.
    * @return {Promise<Team>} - The created team record.

@@ -480,7 +480,7 @@ export class SubmissionService extends DBService {
    * Get a submission feature record by its id
    *
    * @param {number} submissionFeatureId
-   * @return {*}  {Promise<SubmissionFeature>}
+   * @return {Promise<SubmissionFeature>}
    * @memberof SubmissionService
    */
   async getSubmissionFeatureById(submissionFeatureId: number): Promise<SubmissionFeature> {

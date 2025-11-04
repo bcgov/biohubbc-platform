@@ -4,20 +4,22 @@ import Paper from '@mui/material/Paper';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { useEffect } from 'react';
-import { useParams } from 'react-router-dom'; // make sure it's react-router-dom
+import { useParams } from 'react-router-dom';
 
 /**
  * Get details about a specific submission feature
+ *
+ * @returns
  */
-const SubmissionFeaturePage = () => {
+export const SubmissionFeaturePage = () => {
   const biohubApi = useApi();
 
-  // Correctly destructure both submissionId and submissionFeatureId from the URL
+  // Get submission ID and submission feature ID from the URL
   const { submissionId, submissionFeatureId } = useParams<{ submissionId: string; submissionFeatureId: string }>();
 
-  const featureDataLoader = useDataLoader(() => {
-    return biohubApi.features.getSubmissionFeatureById(Number(submissionId), Number(submissionFeatureId));
-  });
+  const featureDataLoader = useDataLoader(() =>
+    biohubApi.features.getSubmissionFeatureById(Number(submissionId), Number(submissionFeatureId))
+  );
 
   useEffect(() => {
     featureDataLoader.load();
@@ -39,5 +41,3 @@ const SubmissionFeaturePage = () => {
     </Container>
   );
 };
-
-export default SubmissionFeaturePage;

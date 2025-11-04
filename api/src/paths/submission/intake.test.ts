@@ -149,6 +149,7 @@ describe('intake', () => {
         {
           submission_feature_id: 2,
           submission_id: submissionId,
+          urn: `urn:${submissionId}:artifact:2`,
           feature_type_id: 3,
           uuid: '321-645-978',
           source_id: '4',

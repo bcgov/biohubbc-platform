@@ -96,7 +96,7 @@ export class TeamRepository extends BaseRepository {
   }
 
   /**
-   * Delete a team record by ID.
+   * Soft delete a team record by ID.
    *
    * @param {string} teamId - The ID of the team to delete.
    * @return {Promise<void>}

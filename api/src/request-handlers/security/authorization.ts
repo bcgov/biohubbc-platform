@@ -63,8 +63,8 @@ export const authorizeRequest = async (req: Request): Promise<boolean> => {
     });
 
     const isAuthorized =
-      // (await authorizationService.authorizeSystemAdministrator()) ||
-      await authorizationService.executeAuthorizationScheme(authorizationScheme);
+      (await authorizationService.authorizeSystemAdministrator()) ||
+      (await authorizationService.executeAuthorizationScheme(authorizationScheme));
 
     // Add the system_user to the request for future use, if needed
     req['system_user'] = authorizationService.systemUser;

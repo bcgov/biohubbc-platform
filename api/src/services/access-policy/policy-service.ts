@@ -12,7 +12,7 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Create a new policy record in the database.
+   * Create a new policy record.
    *
    * @param {CreatePolicy} policyData - Data required to create a new policy.
    * @return {Promise<Policy>} - The created policy record.

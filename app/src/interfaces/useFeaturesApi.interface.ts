@@ -1,7 +1,14 @@
 export interface ISubmissionFeatureResponse {
-  submission_id: number;
+  feature: ISubmissionFeature;
+}
+
+interface ISubmissionFeature {
+  submission_feature_id: number;
   uuid: string;
-  security_review_timestamp: string;
-  create_date: string;
-  create_user: string;
+  submission_id: number;
+  feature_type_id: number;
+  source_id: string;
+  data: ISubmissionFeature;
+  feature_type_name: string;
+  secured: boolean;
 }

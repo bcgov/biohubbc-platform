@@ -2,18 +2,23 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { SYSTEM_ROLE } from '../constants/roles';
-import * as db from '../database/db';
-import { SystemUser, SystemUserExtended } from '../repositories/user-repository';
+import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
+import { SYSTEM_ROLE } from '../../constants/roles';
+import * as db from '../../database/db';
+import { Policy } from '../../models/policy';
+import { SubmissionFeature } from '../../repositories/submission-repository';
+import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
+import * as keycloakUtils from '../../utils/keycloak-utils';
+import { getMockDBConnection } from '../../__mocks__/db';
+import { PolicyService } from '../access-policy/policy-service';
+import { SubmissionService } from '../submission-service';
+import { UserService } from '../user-service';
 import {
   AuthorizationScheme,
   AuthorizationService,
   AuthorizeBySystemRoles,
   AuthorizeRule
-} from '../services/authorization-service';
-import { UserService } from '../services/user-service';
-import * as keycloakUtils from '../utils/keycloak-utils';
-import { getMockDBConnection } from '../__mocks__/db';
+} from './authorization-service';
 
 chai.use(sinonChai);
 
@@ -342,6 +347,191 @@ describe('authorizeByServiceClient', function () {
 
     expect(isAuthorizedBySystemRole).to.equal(true);
     expect(getServiceClientSystemUserStub).to.have.been.calledOnceWith(keycloakToken);
+  });
+});
+
+describe('getCachedSystemUser', function () {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('returns the cached user if already set', async function () {
+    const mockDBConnection = getMockDBConnection();
+    const systemUser: SystemUserExtended = {
+      system_user_id: 1,
+      user_identity_source_id: 2,
+      identity_source: SYSTEM_IDENTITY_SOURCE.IDIR,
+      role_ids: [],
+      role_names: [],
+      user_identifier: 'test-user',
+      user_guid: 'guid-123',
+      record_effective_date: '',
+      record_end_date: '',
+      create_date: '2023-01-01',
+      create_user: 1,
+      update_date: null,
+      update_user: null,
+      revision_count: 0
+    };
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+    authorizationService['_systemUser'] = systemUser;
+
+    const result = await authorizationService.getCachedSystemUser();
+    expect(result).to.equal(systemUser);
+  });
+
+  it('fetches and caches the user if not already cached', async function () {
+    const mockDBConnection = getMockDBConnection();
+    const systemUser: SystemUserExtended = {
+      system_user_id: 1,
+      identity_source: SYSTEM_IDENTITY_SOURCE.IDIR,
+      role_ids: [],
+      role_names: [],
+      user_identity_source_id: 2,
+      user_identifier: 'test-user',
+      user_guid: 'guid-123',
+      record_effective_date: '',
+      record_end_date: '',
+      create_date: '2023-01-01',
+      create_user: 1,
+      update_date: null,
+      update_user: null,
+      revision_count: 0
+    };
+
+    sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(systemUser);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.getCachedSystemUser();
+    expect(result).to.equal(systemUser);
+    expect(authorizationService['_systemUser']).to.equal(systemUser);
+  });
+
+  it('returns null if no user is found', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(null);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.getCachedSystemUser();
+    expect(result).to.be.null;
+    expect(authorizationService['_systemUser']).to.be.undefined;
+  });
+});
+
+describe('authorizeByAccessPolicy', function () {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  const fakeFeature: SubmissionFeature = {
+    submission_feature_id: 1,
+    uuid: 'uuid-1',
+    urn: 'urn:1:Feature:1',
+    submission_id: 1,
+    feature_type_id: 10,
+    source_id: null,
+    data: {},
+    feature_type_name: 'Feature',
+    secured: true
+  };
+
+  const mockPolicies: Policy[] = [{ policy_id: 'policy', description: 'policy description', name: 'Policy Name' }];
+
+  const systemUser: SystemUser = {
+    system_user_id: 1,
+    user_identity_source_id: 2,
+    user_identifier: 'test-user',
+    user_guid: 'guid-123',
+    record_effective_date: '',
+    record_end_date: '',
+    create_date: '2023-01-01',
+    create_user: 1,
+    update_date: null,
+    update_user: null,
+    revision_count: 0
+  };
+
+  it('returns true immediately if feature is not secured', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(SubmissionService.prototype, 'getSubmissionFeatureById').resolves({ ...fakeFeature, secured: false });
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByAccessPolicy({
+      submissionFeatureId: 1,
+      submissionId: 1,
+      discriminator: 'AccessPolicy'
+    });
+
+    expect(result).to.be.true;
+  });
+
+  it('returns false if submission ID does not match', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(SubmissionService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByAccessPolicy({
+      submissionFeatureId: 1,
+      submissionId: 999,
+      discriminator: 'AccessPolicy'
+    });
+
+    expect(result).to.be.false;
+  });
+
+  it('returns false if no system user is found', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(SubmissionService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(null);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByAccessPolicy({
+      submissionFeatureId: 1,
+      submissionId: 1,
+      discriminator: 'AccessPolicy'
+    });
+
+    expect(result).to.be.false;
+  });
+
+  it('returns true if policies grant access', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(SubmissionService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
+    sinon.stub(PolicyService.prototype, 'getPoliciesThatAuthorizeFeatureAccessByUrn').resolves(mockPolicies);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByAccessPolicy({
+      submissionFeatureId: 1,
+      submissionId: 1,
+      discriminator: 'AccessPolicy'
+    });
+
+    expect(result).to.be.true;
+  });
+
+  it('returns false if no policies grant access', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(SubmissionService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
+    sinon.stub(PolicyService.prototype, 'getPoliciesThatAuthorizeFeatureAccessByUrn').resolves([]);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByAccessPolicy({
+      submissionFeatureId: 1,
+      submissionId: 1,
+      discriminator: 'AccessPolicy'
+    });
+
+    expect(result).to.be.false;
   });
 });
 

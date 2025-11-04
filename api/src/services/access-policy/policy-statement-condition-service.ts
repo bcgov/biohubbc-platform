@@ -16,7 +16,7 @@ export class PolicyStatementConditionService extends DBService {
   }
 
   /**
-   * Create a new policy statement condition record in the database.
+   * Create a new policy statement condition record.
    *
    * @param {CreatePolicyStatementCondition} policyStatementConditionData - Data required to create a new policy statement condition.
    * @return {Promise<PolicyStatementCondition>} - The created policy statement condition record.

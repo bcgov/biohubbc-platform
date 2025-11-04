@@ -2,6 +2,7 @@ import SQL from 'sql-template-strings';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
+import { PolicyEffect } from '../../models/policy-statement';
 import { BaseRepository } from '../base-repository';
 
 /**
@@ -66,7 +67,7 @@ export class PolicyRepository extends BaseRepository {
   }
 
   /**
-   * Check whether a user can access a feature urn
+   * Returns all policies that authorize access to the given feature URN and user
    *
    * @param {string} urn
    * @param {number} systemUserId
@@ -82,7 +83,7 @@ export class PolicyRepository extends BaseRepository {
       INNER JOIN policy_statement ps ON ps.policy_id = p.policy_id AND ps.record_end_date IS NULL
       WHERE tm.system_user_id = ${systemUserId}
         AND p.record_end_date IS NULL
-        AND ps.effect = 'allow'
+        AND ps.effect = ${PolicyEffect.ALLOW}
         AND (
           (split_part(ps.submission_feature_urn, ':', 1) = split_part(${urn}, ':', 1) OR split_part(ps.submission_feature_urn, ':', 1) = '*')
           AND (split_part(ps.submission_feature_urn, ':', 2) = split_part(${urn}, ':', 2) OR split_part(ps.submission_feature_urn, ':', 2) = '*')
@@ -128,7 +129,7 @@ export class PolicyRepository extends BaseRepository {
   }
 
   /**
-   * Delete a policy record by ID.
+   * Soft delete a policy record by ID.
    *
    * @param {string} policyId - The ID of the policy to delete.
    * @return {Promise<void>} - The deleted policy record.

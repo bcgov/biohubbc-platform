@@ -28,6 +28,7 @@ describe('SearchIndexService', () => {
             submission_feature_id: 11111,
             submission_id: 777,
             feature_type_id: 1,
+            urn: `urn:777:dataset:11111`,
             data: {
               name: 'Dataset1',
               description: 'Desc1'
@@ -49,6 +50,7 @@ describe('SearchIndexService', () => {
           {
             submission_feature_id: 22222,
             submission_id: 777,
+            urn: `urn:777:dataset:22222`,
             feature_type_id: 2,
             data: {
               count: 70,
@@ -75,6 +77,7 @@ describe('SearchIndexService', () => {
           {
             submission_feature_id: 33333,
             submission_id: 777,
+            urn: `urn:777:dataset:33333`,
             feature_type_id: 3,
             data: {
               filename: 'myText.txt',

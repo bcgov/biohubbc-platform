@@ -1,24 +1,10 @@
-import { SubmissionFeature } from '../repositories/submission-repository';
-
-/**
- * Build a URN for a submission feature.
- *
- * Format: "urn:<submissionId>:<featureTypeName>:<submissionFeatureId>"
- *
- * @param {SubmissionFeature} feature - The submission feature record
- * @return {string} - The generated URN
- */
-export const buildFeatureUrnFromFeatureRecord = (feature: SubmissionFeature): string => {
-  return `urn:${feature.submission_id}:${feature.feature_type_name}:${feature.submission_feature_id}`;
-};
-
 /**
  * Get the submission, feature type name, and submission feature ID from an urn
  *
  * Format: "urn:<submissionId>:<featureTypeName>:<submissionFeatureId>"
  *
- * @param {string} urn - The submission feature record
- * @return { submissionId: number; featureTypeName: string; submissionFeatureId: number }  - The generated URN
+ * @param {string} urn - The urn of the submission feature record to parse
+ * @return { submissionId: number; featureTypeName: string; submissionFeatureId: number }  - The keys in the URN
  */
 export const parseFeatureUrn = (
   urn: string
@@ -29,11 +15,11 @@ export const parseFeatureUrn = (
     throw new Error(`Invalid URN format: ${urn}`);
   }
 
-  const [, submissionIdStr, featureTypeName, submissionFeatureIdStr] = parts;
+  const [, submissionId, featureTypeName, submissionFeatureId] = parts;
 
   return {
-    submissionId: Number(submissionIdStr),
+    submissionId: Number(submissionId),
     featureTypeName,
-    submissionFeatureId: Number(submissionFeatureIdStr)
+    submissionFeatureId: Number(submissionFeatureId)
   };
 };

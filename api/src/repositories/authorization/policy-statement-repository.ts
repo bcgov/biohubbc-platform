@@ -104,7 +104,7 @@ export class PolicyStatementRepository extends BaseRepository {
   }
 
   /**
-   * Delete a policy statement record by ID.
+   * Soft delete a policy statement record by ID.
    *
    * @param {string} policyStatementId - The ID of the policy statement to delete.
    * @return {Promise<void>}

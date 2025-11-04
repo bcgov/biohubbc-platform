@@ -112,7 +112,7 @@ export class PolicyStatementConditionRepository extends BaseRepository {
   }
 
   /**
-   * Delete a policy statement condition record by ID.
+   * Soft delete a policy statement condition record by ID.
    *
    * @param {string} policyStatementConditionId - The ID of the policy statement condition to delete.
    * @return {Promise<void>}

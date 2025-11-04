@@ -1128,7 +1128,7 @@ export class SubmissionRepository extends BaseRepository {
    * Get a submission feature record by Id.
    *
    * @param {number} submissionFeatureId
-   * @return {*}  {Promise<SubmissionFeature>}
+   * @return {Promise<SubmissionFeature>}
    * @memberof SubmissionRepository
    */
   async getSubmissionFeatureById(submissionFeatureId: number): Promise<SubmissionFeature> {

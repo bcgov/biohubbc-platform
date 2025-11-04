@@ -1,6 +1,6 @@
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { IDBConnection } from '../../database/db';
-import { SystemUserExtended } from '../../repositories/user-repository';
+import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
 import { getServiceClientSystemUser, getUserGuid } from '../../utils/keycloak-utils';
 import { PolicyService } from '../access-policy/policy-service';
 import { DBService } from '../db-service';
@@ -40,6 +40,7 @@ export interface AuthorizeBySystemUser {
  * @interface AuthorizeByAccessPolicy
  */
 export interface AuthorizeByAccessPolicy {
+  submissionId: number;
   submissionFeatureId: number;
   discriminator: 'AccessPolicy';
 }
@@ -190,60 +191,66 @@ export class AuthorizationService extends DBService {
   /**
    * Check if the user is a valid system user.
    *
-   * @return {*}  {Promise<boolean>} `Promise<true>` if the user is a valid system user, `Promise<false>` otherwise.
+   * @returns {Promise<boolean>} Resolves with `true` if the user is a valid system user, otherwise `false`.
    */
   async authorizeBySystemUser(): Promise<boolean> {
-    const systemUserObject = this._systemUser || (await this.getSystemUserObject());
+    const user = await this.getCachedSystemUser();
 
-    if (!systemUserObject) {
-      // Cannot verify user roles
-      return false;
-    }
-
-    // Cache the _systemUser for future use, if needed
-    this._systemUser = systemUserObject;
-
-    // User is a valid system user
-    return true;
+    return !!user; // true if user exists, false otherwise
   }
 
   /**
-   * Check if the user is a known service client system user.
+   * Check whether the user is authorized to access the requested resource through an access policy
    *
-   * @param {AuthorizeByAccessPolicy} authorizeRule
-   * @return {*}  {Promise<boolean>} `Promise<true>` if the user is a known service client system user,
-   * `Promise<false>` otherwise.
+   * @param {AuthorizeByAccessPolicy} authorizeRule - The access rule containing submissionFeatureId and submissionId
+   * @returns {Promise<boolean>} Resolves with `true` if the user is authorized, otherwise `false`.
    */
   async authorizeByAccessPolicy(authorizeRule: AuthorizeByAccessPolicy): Promise<boolean> {
     const submissionService = new SubmissionService(this.connection);
 
-    // Check whether the feature is unsecured and immediately return if so, before getting the system user, in case there was no bearer token
+    // Step 1: Fetch the feature by ID to get URN and security status
     const feature = await submissionService.getSubmissionFeatureById(authorizeRule.submissionFeatureId);
 
-    // If the feature is not secured, then authorize access
+    // Step 2: If the feature is not secured (open-access), grant access immediately
     if (!feature.secured) {
       return true;
     }
 
-    const systemUserObject = this._systemUser || (await this.getSystemUserObject());
-
-    if (!systemUserObject) {
-      // Cannot verify user roles
-      return false;
+    // Step 3: Ensure the feature belongs to the requested submission
+    if (feature.submission_id !== authorizeRule.submissionId) {
+      return false; // Deny access if submission IDs do not match
     }
 
-    // Cache the _systemUser for future use, if needed
-    this._systemUser = systemUserObject;
+    // Step 4: Fetch and cache the system user
+    const user = await this.getCachedSystemUser();
+    if (!user) {
+      return false; // Deny access if we cannot verify the user's identity
+    }
 
+    // Step 5: Use the PolicyService to check if any policies grant access to this feature
     const policyService = new PolicyService(this.connection);
-
-    // Check if the user has access to the urn
     const policiesThatGrantAccess = await policyService.getPoliciesThatAuthorizeFeatureAccessByUrn(
       feature.urn,
-      systemUserObject.system_user_id
+      user.system_user_id
     );
 
+    // Step 6: Grant access if at least one policy authorizes it
     return policiesThatGrantAccess.length > 0;
+  }
+
+  /**
+   * Private helper method to fetch and cache the system user object.
+   *
+   * @returns {Promise<SystemUser | null>} Resolves with the system user object, or `null` if not found.
+   */
+  async getCachedSystemUser(): Promise<SystemUser | null> {
+    if (this._systemUser) {
+      return this._systemUser;
+    }
+
+    const user = await this.getSystemUserObject(); // fetch from DB or service
+    this._systemUser = user ?? undefined;
+    return this._systemUser ?? null;
   }
 
   /**

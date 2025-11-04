@@ -12,7 +12,7 @@ export const useFeaturesApi = (axios: AxiosInstance) => {
    * Get a submission feature by its ID
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<ISubmissionFeatureResponse>}
+   * @return {Promise<ISubmissionFeatureResponse>}
    */
   const getSubmissionFeatureById = async (
     submissionId: number,

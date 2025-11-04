@@ -3,9 +3,9 @@ import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../../../database/db';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
+import { GetSubmissionFeatureSchema } from '../../../../../schemas/submission-feature';
 import { SubmissionService } from '../../../../../services/submission-service';
 import { getLogger } from '../../../../../utils/logger';
-import { getReviewedSubmissionsForAdmins } from '../../../../administrative/submission/reviewed';
 
 const defaultLog = getLogger('paths/submission/{submissionId}/features/{submissionFeatureId}');
 
@@ -14,17 +14,18 @@ export const GET: Operation = [
     return {
       and: [
         {
+          submissionId: Number(req.params.submissionId),
           submissionFeatureId: Number(req.params.submissionFeatureId),
           discriminator: 'AccessPolicy'
         }
       ]
     };
   }),
-  getReviewedSubmissionsForAdmins()
+  getSubmissionFeatureById()
 ];
 
 GET.apiDoc = {
-  description: 'Retrieves a signed url of a submission feature',
+  description: 'Retrieves a specific submission feature',
   tags: ['submission'],
   security: [
     {
@@ -55,12 +56,10 @@ GET.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'The signed url for a key of a submission feature',
+      description: 'The requested submission feature',
       content: {
         'application/json': {
-          schema: {
-            type: 'string'
-          }
+          schema: GetSubmissionFeatureSchema
         }
       }
     },
@@ -88,7 +87,7 @@ export function getSubmissionFeatureById(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json(feature);
+      res.status(200).json({ feature });
     } catch (error) {
       defaultLog.error({ label: 'getSubmissionFeatureById', message: 'error', error });
       await connection.rollback();

@@ -1133,6 +1133,7 @@ describe('SubmissionRepository', () => {
       const submissionFeatureRecord: SubmissionFeatureRecord = {
         submission_feature_id: 2,
         uuid: '234-456-234',
+        urn: 'urn:3:dataset:2',
         submission_id: 3,
         feature_type_id: 1,
         source_id: 'source-id',
@@ -1172,6 +1173,7 @@ describe('SubmissionRepository', () => {
           submission_feature_id: 2,
           uuid: '234-456-234',
           submission_id: 3,
+          urn: 'urn:3:dataset:2',
           feature_type_id: 1,
           source_id: 'source-id',
           data: {},

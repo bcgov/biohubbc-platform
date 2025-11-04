@@ -1,6 +1,5 @@
 import SubmissionsListPage from 'features/submissions/list/SubmissionsListPage';
-import SubmissionFeaturePage from 'features/submissions/page/features/SubmissionFeaturePage';
-import SubmissionPage from 'features/submissions/page/SubmissionPage';
+import { SubmissionFeaturePage } from 'features/submissions/page/features/SubmissionFeaturePage';
 import BaseLayout from 'layouts/BaseLayout';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
@@ -18,17 +17,6 @@ export const SearchRouter = () => {
           <BaseLayout>
             <PageTitle title="Search" description="Browse submitted search" />
             <SubmissionsListPage />
-          </BaseLayout>
-        }
-      />
-
-      {/* Route for submission details with meta */}
-      <Route
-        path="/:submissionId/details"
-        element={
-          <BaseLayout>
-            <PageTitle title="Submission Details" description="Details of a specific submission" />
-            <SubmissionPage />
           </BaseLayout>
         }
       />

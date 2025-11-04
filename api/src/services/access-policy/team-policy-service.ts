@@ -12,7 +12,7 @@ export class TeamPolicyService extends DBService {
   }
 
   /**
-   * Create a new team policy record in the database.
+   * Create a new team policy record.
    *
    * @param {CreateTeamPolicy} teamPolicyData - Data required to create a new team policy.
    * @return {Promise<TeamPolicy>} - The created team policy record.

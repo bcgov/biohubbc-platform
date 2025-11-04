@@ -79,8 +79,6 @@ export class TeamMemberRepository extends BaseRepository {
     const query = knex
       .table('team_member')
       .update({
-        system_user_id: teamMemberData.system_user_id,
-        team_id: teamMemberData.team_id,
         record_end_date: teamMemberData.record_end_date
       })
       .where('team_member_id', teamMemberId)
@@ -99,7 +97,7 @@ export class TeamMemberRepository extends BaseRepository {
   }
 
   /**
-   * Delete a team member record by ID.
+   * Soft delete a team member record by ID.
    *
    * @param {string} teamMemberId - The ID of the team member to delete.
    * @return {Promise<void>}
