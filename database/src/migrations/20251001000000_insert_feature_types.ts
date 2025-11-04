@@ -506,7 +506,7 @@ export async function up(knex: Knex): Promise<void> {
             false
         ),
         (
-            (SELECT feature_property_type_id from feature_property_type where name = 'string'),
+            (SELECT feature_property_type_id from feature_property_type where name = 'number'),
             'measurement_value',
             'Measurement value',
             'The value of the measurement.',
