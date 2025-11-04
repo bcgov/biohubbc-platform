@@ -5,6 +5,7 @@ import sinonChai from 'sinon-chai';
 import * as index from '.';
 import * as db from '../../../../../database/db';
 import { HTTP400, HTTPError } from '../../../../../errors/http-error';
+import { SubmissionFeature } from '../../../../../repositories/submission-repository';
 import { SubmissionService } from '../../../../../services/submission-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 
@@ -45,7 +46,18 @@ describe('index', () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const mockFeature = { id: 1, name: 'Feature 1' };
+      const mockFeature: SubmissionFeature = {
+        submission_feature_id: 1,
+        uuid: '123e4567-e89b-12d3-a456-426614174000',
+        urn: 'urn:1:feature:1',
+        submission_id: 1,
+        feature_type_id: 1,
+        source_id: null,
+        data: { key: 'value' },
+        feature_type_name: 'Sample Site',
+        secured: true
+      };
+
       const getSubmissionFeatureByIdStub = sinon
         .stub(SubmissionService.prototype, 'getSubmissionFeatureById')
         .resolves(mockFeature);

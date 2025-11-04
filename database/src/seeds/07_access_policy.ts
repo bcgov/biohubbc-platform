@@ -1,9 +1,7 @@
 import { Knex } from 'knex';
 
 /**
- * Inserts default access policies:
- *  - "Telemetry Access" (restricted to telemetry features)
- *  - "Administrator Access" (full access to all features)
+ * Inserts default access policies for accessing secured data
  *
  * @export
  * @param {Knex} knex
@@ -52,7 +50,7 @@ export async function seed(knex: Knex): Promise<void> {
     value: JSON.stringify(new Date().toISOString())
   });
 
-  // Add all non-system users (IDIR/BCEID etc.) to Telemetry Team
+  // Add all non-system users (IDIR/BCEID) to Telemetry Team
   await knex.raw(`
     INSERT INTO team_member (system_user_id, team_id)
     SELECT su.system_user_id, '${telemetryTeam.team_id}'
@@ -65,7 +63,7 @@ export async function seed(knex: Knex): Promise<void> {
   `);
 
   /** ------------------------------------------------------------------
-   * 2. ADMINISTRATOR POLICY + TEAM
+   * 2. SAMPLING SITES TEAM
    * ------------------------------------------------------------------ */
   const [adminPolicy] = await knex('policy')
     .insert({
@@ -94,7 +92,7 @@ export async function seed(knex: Knex): Promise<void> {
     })
     .returning('*');
 
-  // Add all non-system users to the Secret Sampling Sites Team as well
+  // Add IDIR users to the secret sampling site policy team
   await knex.raw(`
     INSERT INTO team_member (system_user_id, team_id)
     SELECT su.system_user_id, '${adminTeam.team_id}'
@@ -102,7 +100,7 @@ export async function seed(knex: Knex): Promise<void> {
     WHERE su.user_identity_source_id IN (
       SELECT user_identity_source_id
       FROM user_identity_source
-      WHERE LOWER(name) NOT IN ('system', 'database')
+      WHERE LOWER(name) = 'IDIR'
     );
   `);
 }
