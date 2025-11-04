@@ -18,8 +18,8 @@ export const parseFeatureUrn = (urn: string): FeatureUrn => {
   const [, submissionId, featureTypeName, submissionFeatureId] = parts;
 
   return {
-    submissionId: Number(submissionId),
+    submissionId: submissionId,
     featureTypeName,
-    submissionFeatureId: Number(submissionFeatureId)
+    submissionFeatureId: submissionFeatureId
   };
 };

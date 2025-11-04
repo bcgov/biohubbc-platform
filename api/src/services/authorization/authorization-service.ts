@@ -234,6 +234,8 @@ export class AuthorizationService extends DBService {
       user.system_user_id
     );
 
+    console.log(policiesThatGrantAccess, 'POLICIES@');
+
     // Step 6: Grant access if at least one policy authorizes it
     return policiesThatGrantAccess.length > 0;
   }

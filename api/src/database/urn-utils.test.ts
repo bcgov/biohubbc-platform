@@ -22,16 +22,6 @@ describe('parseFeatureUrn', () => {
         submissionFeatureId: 456
       });
     });
-
-    it('handles numeric strings properly by converting them to numbers', () => {
-      const urn = 'urn:42:dataset:9001';
-
-      const result = parseFeatureUrn(urn);
-
-      expect(result.submissionId).to.be.a('number').and.equal(42);
-      expect(result.submissionFeatureId).to.be.a('number').and.equal(9001);
-      expect(result.featureTypeName).to.equal('dataset');
-    });
   });
 
   describe('when called with an invalid URN', () => {

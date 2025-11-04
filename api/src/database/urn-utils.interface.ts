@@ -1,5 +1,8 @@
+/**
+ * Submission ID and Submission Feature ID are strings to enable wildcards
+ */
 export interface FeatureUrn {
-  submissionId: number;
+  submissionId: string;
   featureTypeName: string;
-  submissionFeatureId: number;
+  submissionFeatureId: string;
 }
