@@ -137,6 +137,7 @@ export function submissionIntake(): RequestHandler {
       ? getServiceAccountDBConnection(serviceClientSystemUser)
       : getDBConnection(token);
 
+    const systemUserId = connection.systemUserId();
     const submissionUuid = req.body.id;
     const submissionName = req.body.name;
     const submissionDescription = req.body.description;
@@ -162,15 +163,15 @@ export function submissionIntake(): RequestHandler {
         name: submissionName,
         comment: submissionComment,
         description: submissionDescription,
-        system_user_id: req['system_user'].system_user_id,
+        system_user_id: systemUserId,
         // TODO: Replace source_system string with a FK to the `contributor` table added in SIMSBIOHUB-782, which uses the JWTs client_id to identify SIMS
         source_system: 'SIMS'
       });
 
-      // Process submission features (insert into DB and index search keys)
+      // Process submission features
       await submissionProcessService._processSubmissionFeatures(submissionRecord.submission_id, [submissionFeature]);
 
-      // Fetch all artifact submission features, if any
+      // Fetch all artifact submission features
       const submissionArtifactFeatures = await submissionService.findSubmissionFeatures({
         submissionId: submissionRecord.submission_id,
         featureTypeNames: ['artifact']
@@ -183,14 +184,11 @@ export function submissionIntake(): RequestHandler {
 
       const response = {
         submission_uuid: submissionRecord.uuid,
-        // Include artifact upload keys in response, if any
-        ...(submissionArtifactFeatures.length && {
-          artifact_upload_keys: submissionArtifactFeatures.map((item) => {
-            return {
-              artifact_filename: item.data['filename'],
-              artifact_upload_key: item.uuid
-            };
-          })
+        artifact_upload_keys: submissionArtifactFeatures.map((item) => {
+          return {
+            artifact_filename: item.data['filename'],
+            artifact_upload_key: item.uuid
+          };
         })
       };
 

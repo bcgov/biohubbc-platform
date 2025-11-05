@@ -1,7 +1,7 @@
 import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
-import { IUpdateSubmission, SubmissionRecord } from '../models/submission';
+import { IUpdateSubmission, SubmissionRecord2 } from '../models/submission';
 import { SubmissionFeatureSearchKeyValues } from '../repositories/search-index-respository';
 import {
   ICreateSubmissionRecord,
@@ -14,6 +14,7 @@ import {
   SubmissionFeatureRecordWithTypeAndSecurity,
   SubmissionFeatureSignedUrlPayload,
   SubmissionMessageRecord,
+  SubmissionRecord,
   SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
   SubmissionRecordWithSecurityAndRootFeatureType,
@@ -125,10 +126,10 @@ export class SubmissionService extends DBService {
    * Get submission record by id.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<SubmissionRecord>}
+   * @return {Promise<SubmissionRecord2>}
    * @memberof SubmissionService
    */
-  async getSubmissionRecordBySubmissionId(submissionId: number): Promise<SubmissionRecord> {
+  async getSubmissionRecordBySubmissionId(submissionId: number): Promise<SubmissionRecord2> {
     return this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId);
   }
 
@@ -159,13 +160,13 @@ export class SubmissionService extends DBService {
    *
    * @param {string} quarantineId
    * @param {IUpdateSubmission} submission
-   * @return {*}  {Promise<SubmissionRecord>}
+   * @return {*}  {Promise<SubmissionRecord2>}
    * @memberof SubmissionService
    */
   async updateSubmissionRecordByQuarantineId(
     quarantineId: string,
     submission: IUpdateSubmission
-  ): Promise<SubmissionRecord> {
+  ): Promise<SubmissionRecord2> {
     return this.submissionRepository.updateSubmissionRecord(quarantineId, submission);
   }
 

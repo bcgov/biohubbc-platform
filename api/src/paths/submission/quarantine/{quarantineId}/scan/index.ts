@@ -8,7 +8,7 @@ import { QuarantineService } from '../../../../../services/quarantine/quarantine
 import { getServiceClientSystemUser } from '../../../../../utils/keycloak-utils';
 import { getLogger } from '../../../../../utils/logger';
 
-const defaultLog = getLogger('paths/submission/quarantine/{quarantineId}');
+const defaultLog = getLogger('paths/submission/quarantine/{quarantineId}/scan');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({

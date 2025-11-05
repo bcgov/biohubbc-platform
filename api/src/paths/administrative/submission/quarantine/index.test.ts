@@ -2,17 +2,17 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getQuarantinedSubmissionsForAdmins } from '.';
+import { getQuarantinedSubmissions } from '.';
 import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
-import { SECURITY_APPLIED_STATUS } from '../../../../repositories/security-repository';
-import { SubmissionRecordWithSecurityAndRootFeatureType } from '../../../../repositories/submission-repository';
-import { SubmissionService } from '../../../../services/submission-service';
+import { QuarantineStatusEnum } from '../../../../models/quarantine';
+import { SubmissionRecordWithQuarantine } from '../../../../models/submission';
+import { QuarantineService } from '../../../../services/quarantine/quarantine-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 
 chai.use(sinonChai);
 
-describe('getQuarantinedSubmissionsForAdmins', () => {
+describe('getQuarantinedSubmissions', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -28,7 +28,7 @@ describe('getQuarantinedSubmissionsForAdmins', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const requestHandler = getQuarantinedSubmissionsForAdmins();
+    const requestHandler = getQuarantinedSubmissions();
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
@@ -40,6 +40,7 @@ describe('getQuarantinedSubmissionsForAdmins', () => {
 
   it('should return an array of quarantined submission objects', async () => {
     const dbConnectionObj = getMockDBConnection({
+      open: sinon.stub(),
       commit: sinon.stub(),
       rollback: sinon.stub(),
       release: sinon.stub()
@@ -47,63 +48,45 @@ describe('getQuarantinedSubmissionsForAdmins', () => {
 
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-    const mockResponse: SubmissionRecordWithSecurityAndRootFeatureType[] = [
+    const mockSubmissionRecords: SubmissionRecordWithQuarantine[] = [
       {
         submission_id: 1,
-        uuid: '123-456-789',
-        security_review_timestamp: null,
+        name: 'Test Submission 1',
+        description: 'Test description 1',
         submitted_timestamp: '2023-12-12',
-        publish_timestamp: '2023-12-12',
-        system_user_id: 3,
-        source_system: 'SIMS',
-        name: 'name',
-        description: 'description',
-        comment: 'comment',
-        create_date: '2023-12-12',
-        create_user: 1,
-        update_date: null,
-        update_user: null,
-        revision_count: 0,
-        security: SECURITY_APPLIED_STATUS.PENDING,
-        root_feature_type_id: 1,
-        root_feature_type_name: 'dataset',
-        regions: []
+        quarantine: {
+          quarantine_id: 'uuid-1',
+          uri: 'http://example.com/file1',
+          status: QuarantineStatusEnum.PENDING,
+          upload_id: 'upload-1'
+        }
       },
       {
         submission_id: 2,
-        uuid: '789-456-123',
-        security_review_timestamp: null,
+        name: 'Test Submission 2',
+        description: 'Test description 2',
         submitted_timestamp: '2023-12-12',
-        publish_timestamp: '2023-12-12',
-        system_user_id: 3,
-        source_system: 'SIMS',
-        name: 'name',
-        description: 'description',
-        comment: 'comment',
-        create_date: '2023-12-12',
-        create_user: 1,
-        update_date: '2023-12-12',
-        update_user: 1,
-        revision_count: 1,
-        security: SECURITY_APPLIED_STATUS.PENDING,
-        root_feature_type_id: 1,
-        root_feature_type_name: 'dataset',
-        regions: []
+        quarantine: {
+          quarantine_id: 'uuid-2',
+          uri: 'http://example.com/file2',
+          status: QuarantineStatusEnum.CLEAN,
+          upload_id: 'upload-2'
+        }
       }
     ];
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const getQuarantinedSubmissionsStub = sinon
-      .stub(SubmissionService.prototype, 'getQuarantinedSubmissionsForAdmins')
-      .resolves(mockResponse);
+    const getQuarantineRecordsWithScansStub = sinon
+      .stub(QuarantineService.prototype, 'getQuarantineRecordsWithScans')
+      .resolves(mockSubmissionRecords);
 
-    const requestHandler = getQuarantinedSubmissionsForAdmins();
+    const requestHandler = getQuarantinedSubmissions();
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(getQuarantinedSubmissionsStub).to.have.been.calledOnce;
+    expect(getQuarantineRecordsWithScansStub).to.have.been.calledOnce;
     expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql(mockResponse);
+    expect(mockRes.jsonValue).to.eql({ submissions: mockSubmissionRecords });
   });
 });

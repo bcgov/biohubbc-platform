@@ -3,7 +3,7 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { IUpdateSubmission, SubmissionRecord } from '../models/submission';
+import { IUpdateSubmission, SubmissionRecord2 } from '../models/submission';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
 
@@ -202,6 +202,26 @@ export interface ISubmissionObservationRecord {
   update_user?: string;
   revision_count?: string;
 }
+
+export const SubmissionRecord = z.object({
+  submission_id: z.number(),
+  uuid: z.string(),
+  security_review_timestamp: z.string().nullable(),
+  submitted_timestamp: z.string(),
+  system_user_id: z.number(),
+  source_system: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  comment: z.string().nullable(),
+  publish_timestamp: z.string().nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
+
+export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
 
 /**
  * Interface for creating a new submission record with potential conflict handling
@@ -414,11 +434,11 @@ export class SubmissionRepository extends BaseRepository {
    *
    * @param {string} quarantineId - The quarantine ID associated with the submission.
    * @param {IUpdateSubmission} submission - The submission fields to update (uri, name, description).
-   * @returns {Promise<SubmissionRecord>} A promise that resolves to the full, updated submission record.
+   * @returns {Promise<SubmissionRecord2>} A promise that resolves to the full, updated submission record.
    * @memberof SubmissionRepository
    * @throws {ApiExecuteSQLError} If the update fails or no row is affected.
    */
-  async updateSubmissionRecord(quarantineId: string, submission: IUpdateSubmission): Promise<SubmissionRecord> {
+  async updateSubmissionRecord(quarantineId: string, submission: IUpdateSubmission): Promise<SubmissionRecord2> {
     const sqlStatement = SQL`
       UPDATE biohub.submission
       SET
@@ -440,7 +460,7 @@ export class SubmissionRepository extends BaseRepository {
         publish_timestamp;
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionRecord);
+    const response = await this.connection.sql(sqlStatement, SubmissionRecord2);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to update submission record', [
@@ -485,10 +505,10 @@ export class SubmissionRepository extends BaseRepository {
    * Fetch a submission record by primary id.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<SubmissionRecord>}
+   * @return {Promise<SubmissionRecord2>}
    * @memberof SubmissionRepository
    */
-  async getSubmissionRecordBySubmissionId(submissionId: number): Promise<SubmissionRecord> {
+  async getSubmissionRecordBySubmissionId(submissionId: number): Promise<SubmissionRecord2> {
     const sqlStatement = SQL`
       SELECT
         *
@@ -498,7 +518,7 @@ export class SubmissionRepository extends BaseRepository {
         submission_id = ${submissionId};
     `;
 
-    const response = await this.connection.sql<SubmissionRecord>(sqlStatement);
+    const response = await this.connection.sql<SubmissionRecord2>(sqlStatement);
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission record', [

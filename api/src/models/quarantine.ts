@@ -47,12 +47,7 @@ export const QuarantineRecord = z.object({
   quarantine_id: z.string().uuid(),
   uri: z.string(),
   status: z.nativeEnum(QuarantineStatusEnum),
-  upload_id: z.string(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number()
+  upload_id: z.string()
 });
 
 export type QuarantineRecord = z.infer<typeof QuarantineRecord>;

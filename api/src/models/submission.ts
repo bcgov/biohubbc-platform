@@ -4,7 +4,7 @@ import { QuarantineRecord } from './quarantine';
 /**
  * Submission record schema
  */
-export const SubmissionRecord = z.object({
+export const SubmissionRecord2 = z.object({
   submission_id: z.number(),
   uuid: z.string(),
   uri: z.string().nullable(),
@@ -17,7 +17,7 @@ export const SubmissionRecord = z.object({
   publish_timestamp: z.string().nullable()
 });
 
-export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
+export type SubmissionRecord2 = z.infer<typeof SubmissionRecord2>;
 
 /**
  * Quarantine record schema

@@ -1,7 +1,7 @@
-import { FEATURES_BATCH_SIZE } from '../constants/submission';
+import { DEFAULT_NUM_FEATURES_BATCH_SIZE } from '../constants/submission';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
-import { SubmissionRecord } from '../models/submission';
+import { SubmissionRecord2 } from '../models/submission';
 import { ISubmissionFeature } from '../repositories/submission-repository';
 import { extractFeaturesJsonFromStream } from '../utils/tar-utils';
 import { DBService } from './db-service';
@@ -19,6 +19,7 @@ export class SubmissionProcessService extends DBService {
   private quarantineService: QuarantineService;
   private regionService: RegionService;
   private objectStorageService: ObjectStorageService;
+  private numFeaturesBatchSize: number;
 
   constructor(connection: IDBConnection) {
     super(connection);
@@ -28,19 +29,23 @@ export class SubmissionProcessService extends DBService {
     this.quarantineService = new QuarantineService(connection);
     this.regionService = new RegionService(connection);
     this.objectStorageService = new ObjectStorageService();
+
+    const envBatchSize = Number(process.env.NUM_FEATURES_BATCH_SIZE);
+    this.numFeaturesBatchSize =
+      !isNaN(envBatchSize) && envBatchSize > 0 ? envBatchSize : DEFAULT_NUM_FEATURES_BATCH_SIZE;
   }
 
   /**
    * Validate that the submission record has a URI. Throw an error if the URI is missing
    *
-   * @param {SubmissionRecord} submission
-   * @returns {SubmissionRecord & { uri: string }}
+   * @param {SubmissionRecord2} submission
+   * @returns {SubmissionRecord2 & { uri: string }}
    */
-  private _validateUri(submission: SubmissionRecord): SubmissionRecord & { uri: string } {
+  private _validateUri(submission: SubmissionRecord2): SubmissionRecord2 & { uri: string } {
     if (!submission.uri) {
       throw new ApiGeneralError('Submission URI does not exist.');
     }
-    return submission as SubmissionRecord & { uri: string };
+    return submission as SubmissionRecord2 & { uri: string };
   }
 
   /**
@@ -69,12 +74,12 @@ export class SubmissionProcessService extends DBService {
    * 4. Index the features for search.
    * 5. Calculate and assign geographic regions for the quarantined submission.
    *
-   * @param {SubmissionRecord} submissionRecord
+   * @param {SubmissionRecord2} submissionRecord
    * @returns {Promise<void>}
    * @throws {ApiGeneralError} If the submission record has no URI.
    * @throws {HTTP400} If the submission has no features or they are invalid.
    */
-  private async _processSubmission(submissionRecord: SubmissionRecord): Promise<void> {
+  private async _processSubmission(submissionRecord: SubmissionRecord2): Promise<void> {
     const submission = this._validateUri(submissionRecord);
 
     // 1. Get a stream for the tarball in object storage
@@ -84,8 +89,8 @@ export class SubmissionProcessService extends DBService {
     const submissionFeatures = await extractFeaturesJsonFromStream(tarballStream);
 
     // 3. Process features in batches
-    for (let i = 0; i < submissionFeatures.length; i += FEATURES_BATCH_SIZE) {
-      const batch = submissionFeatures.slice(i, i + FEATURES_BATCH_SIZE);
+    for (let i = 0; i < submissionFeatures.length; i += this.numFeaturesBatchSize) {
+      const batch = submissionFeatures.slice(i, i + this.numFeaturesBatchSize);
       await this._processSubmissionFeatures(submission.submission_id, batch);
     }
 
@@ -94,7 +99,8 @@ export class SubmissionProcessService extends DBService {
   }
 
   /**
-   * Processes features of a submission
+   * Processes features of a submission. Note that properties are not explicitly validated; the insert request will instead fail with invalid
+   * properties for a feature.
    *
    * @param {number} submissionId
    * @param {ISubmissionFeature[]} features

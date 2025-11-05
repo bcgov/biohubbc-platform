@@ -45,25 +45,7 @@ export const QuarantineScanRecord = z.object({
   scan_status: z.nativeEnum(ScanStatusEnum),
   scanned_at: z.string().nullable(),
   scanner_version: z.string().nullable(),
-  results: z.record(z.any()).nullable(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number()
+  results: z.record(z.any()).nullable()
 });
 
 export type QuarantineScanRecord = z.infer<typeof QuarantineScanRecord>;
-
-/**
- * Quarantine scan record with file counts
- */
-export const QuarantineScanRecordWithCounts = QuarantineScanRecord.extend({
-  total_files: z.number(),
-  clean_files: z.number(),
-  infected_files: z.number(),
-  error_files: z.number(),
-  pending_files: z.number()
-});
-
-export type QuarantineScanRecordWithCounts = z.infer<typeof QuarantineScanRecordWithCounts>;

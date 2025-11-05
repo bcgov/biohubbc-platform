@@ -170,9 +170,6 @@ export async function up(knex: Knex): Promise<void> {
 
     COMMENT ON COLUMN submission.uri IS 'S3 URI or storage location for the submission tarball or resource.';
 
-    -- Optional: create an index on URI if queries will filter by it frequently
-    CREATE INDEX submission_uri_idx ON submission(uri);
-
 
     --------------------------------------------------------------------------------
     -- Add audit triggers for each of the new tables

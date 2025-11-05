@@ -8,7 +8,6 @@ import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
   ISubmissionFeature,
   ISubmissionJobQueueRecord,
-  ISubmissionModel,
   PatchSubmissionRecord,
   SubmissionFeatureDownloadRecord,
   SubmissionFeatureRecord,
@@ -75,14 +74,15 @@ describe('SubmissionService', () => {
         .stub(SubmissionRepository.prototype, 'insertSubmissionRecordWithPotentialConflict')
         .resolves(mockSubmissionRecord);
 
-      const response = await submissionService.insertSubmissionRecordWithPotentialConflict(
-        '123-456-789',
-        'submission name',
-        'submission desc',
-        'submission comment',
-        3,
-        'source system'
-      );
+      const response = await submissionService.insertSubmissionRecordWithPotentialConflict({
+        uuid: '123-456-789',
+        quarantine_id: null,
+        name: 'submission name',
+        description: 'submission desc',
+        comment: 'submission comment',
+        system_user_id: 3,
+        source_system: 'source system'
+      });
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql(mockSubmissionRecord);
@@ -292,14 +292,34 @@ describe('SubmissionService', () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
 
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ test: 'test' } as unknown as ISubmissionModel);
+      const repo = sinon.stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+        submission_id: 1,
+        uuid: '123-456-789',
+        uri: null,
+        quarantine_id: null,
+        security_review_timestamp: null,
+        submitted_timestamp: '2024-01-01T00:00:00Z',
+        name: 'Test Submission',
+        description: 'A mock submission record',
+        comment: 'Test comment',
+        publish_timestamp: null
+      });
 
       const response = await submissionService.getSubmissionRecordBySubmissionId(1);
 
       expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ test: 'test' });
+      expect(response).to.be.eql({
+        submission_id: 1,
+        uuid: '123-456-789',
+        uri: null,
+        quarantine_id: null,
+        security_review_timestamp: null,
+        submitted_timestamp: '2024-01-01T00:00:00Z',
+        name: 'Test Submission',
+        description: 'A mock submission record',
+        comment: 'Test comment',
+        publish_timestamp: null
+      });
     });
   });
 

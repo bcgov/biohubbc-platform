@@ -88,8 +88,17 @@ describe('SubmissionRepository', () => {
 
     it('should succeed with valid data', async () => {
       const mockResponse: ISubmissionModel = {
-        uuid: '123-456-789'
+        submission_id: 1,
+        uuid: '123-456-789',
+        uri: null,
+        security_review_timestamp: null,
+        create_date: '2024-01-01',
+        create_user: 1,
+        update_date: null,
+        update_user: null,
+        revision_count: 0
       };
+
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
@@ -344,14 +353,15 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.insertSubmissionRecordWithPotentialConflict(
-        '123-456-789',
-        'submission name',
-        'submission desc',
-        'submission comment',
-        3,
-        'source system'
-      );
+      const response = await submissionRepository.insertSubmissionRecordWithPotentialConflict({
+        uuid: '123-456-789',
+        quarantine_id: null,
+        name: 'submission name',
+        description: 'submission desc',
+        comment: 'submission comment',
+        system_user_id: 3,
+        source_system: 'source system'
+      });
 
       expect(response).to.eql({ submission_id: 20 });
     });
@@ -364,14 +374,15 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.insertSubmissionRecordWithPotentialConflict(
-          '123-456-789',
-          'submission name',
-          'submission desc',
-          'submission comment',
-          3,
-          'source system'
-        );
+        await submissionRepository.insertSubmissionRecordWithPotentialConflict({
+          uuid: '123-456-789',
+          quarantine_id: null,
+          name: 'submission name',
+          description: 'submission desc',
+          comment: 'submission comment',
+          system_user_id: 3,
+          source_system: 'source system'
+        });
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiExecuteSQLError).message).to.equal('Failed to get or insert submission record');

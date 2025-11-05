@@ -6,7 +6,7 @@ import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
 import { SystemUser } from '../../repositories/user-repository';
 import { RegionService } from '../../services/region-service';
-import { SearchIndexService } from '../../services/search-index-service';
+import { SubmissionProcessService } from '../../services/submission-process-service';
 import { SubmissionService } from '../../services/submission-service';
 import { ValidationService } from '../../services/validation-service';
 import * as keycloakUtils from '../../utils/keycloak-utils';
@@ -21,43 +21,6 @@ describe('intake', () => {
       sinon.restore();
     });
 
-    it('throws a 400 error when source system keycloak is not in req', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(null);
-
-      const requestHandler = intake.submissionIntake();
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      const feature1 = {
-        id: '2',
-        type: 'dataset',
-        properties: {
-          name: 'dataset two'
-        },
-        child_features: []
-      };
-
-      mockReq.body = {
-        id: '564-987-789',
-        name: 'test submission',
-        description: 'a test submission',
-        comment: 'a comment',
-        content: feature1
-      };
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-
-        expect.fail();
-      } catch (error) {
-        expect((error as HTTPError).status).to.equal(400);
-        expect((error as HTTPError).message).to.equal('Failed to identify known submission source system');
-      }
-    });
-
     it('throws error if validationService returns false', async () => {
       const dbConnectionObj = getMockDBConnection();
 
@@ -65,8 +28,8 @@ describe('intake', () => {
       sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
 
       const validateSubmissionFeaturesStub = sinon
-        .stub(ValidationService.prototype, 'validateSubmissionFeatures')
-        .resolves(false);
+        .stub(ValidationService.prototype, 'validateSubmissionFeatureShape')
+        .rejects(new Error('a test error'));
 
       const requestHandler = intake.submissionIntake();
 
@@ -85,13 +48,12 @@ describe('intake', () => {
         expect.fail();
       } catch (error) {
         expect(validateSubmissionFeaturesStub).to.have.been.calledOnce;
-        expect((error as HTTPError).status).to.equal(400);
-        expect((error as HTTPError).message).to.equal('Invalid submission');
+        expect((error as HTTPError).message).to.equal('a test error');
       }
     });
 
     it('should return 200 on success', async () => {
-      const dbConnectionObj = getMockDBConnection();
+      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 1 });
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
@@ -111,9 +73,9 @@ describe('intake', () => {
 
       sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(serviceClientSystemUser);
 
-      const validateSubmissionFeaturesStub = sinon
-        .stub(ValidationService.prototype, 'validateSubmissionFeatures')
-        .resolves(true);
+      const validateSubmissionFeatureStub = sinon
+        .stub(ValidationService.prototype, 'validateSubmissionFeatureShape')
+        .resolves();
 
       const submissionId = 1;
 
@@ -137,12 +99,8 @@ describe('intake', () => {
           revision_count: 0
         });
 
-      const insertSubmissionFeatureRecordsStub = sinon
-        .stub(SubmissionService.prototype, 'insertSubmissionFeatureRecords')
-        .resolves();
-
-      const indexFeaturesBySubmissionIdStub = sinon
-        .stub(SearchIndexService.prototype, 'indexFeaturesBySubmissionId')
+      const processSubmissionFeaturesStub = sinon
+        .stub(SubmissionProcessService.prototype, '_processSubmissionFeatures')
         .resolves();
 
       const findSubmissionFeaturesStub = sinon.stub(SubmissionService.prototype, 'findSubmissionFeatures').resolves([
@@ -152,9 +110,7 @@ describe('intake', () => {
           feature_type_id: 3,
           uuid: '321-645-978',
           source_id: '4',
-          data: {
-            filename: 'test-file.txt'
-          },
+          data: { filename: 'test-file.txt' },
           parent_submission_feature_id: null,
           record_effective_date: '',
           record_end_date: null,
@@ -177,14 +133,12 @@ describe('intake', () => {
       const feature1 = {
         id: '2',
         type: 'dataset',
-        properties: {
-          name: 'dataset two'
-        },
+        properties: { name: 'dataset two' },
         child_features: []
       };
 
       mockReq.body = {
-        id: '564-987-789',
+        id: 'uuid-1',
         name: 'test submission',
         description: 'a test submission',
         comment: 'a comment',
@@ -193,19 +147,19 @@ describe('intake', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(validateSubmissionFeaturesStub).to.have.been.calledOnceWith([feature1]);
-      expect(insertSubmissionRecordWithPotentialConflictStub).to.have.been.calledOnceWith(
-        '564-987-789',
-        'test submission',
-        'a test submission',
-        'a comment',
-        serviceClientSystemUser.system_user_id,
-        serviceClientSystemUser.user_identifier
-      );
-      expect(insertSubmissionFeatureRecordsStub).to.have.been.calledOnceWith(submissionId, [feature1]);
-      expect(indexFeaturesBySubmissionIdStub).to.have.been.calledOnceWith(submissionId);
+      expect(insertSubmissionRecordWithPotentialConflictStub).to.have.been.calledOnceWith({
+        quarantine_id: null,
+        uuid: 'uuid-1',
+        name: 'test submission',
+        comment: 'a comment',
+        description: 'a test submission',
+        system_user_id: 1,
+        source_system: 'SIMS'
+      });
+
+      expect(processSubmissionFeaturesStub).to.have.been.calledOnceWith(submissionId, [feature1]);
       expect(findSubmissionFeaturesStub).to.have.been.calledOnceWith({
-        submissionId: submissionId,
+        submissionId,
         featureTypeNames: ['artifact']
       });
 
@@ -220,6 +174,8 @@ describe('intake', () => {
           }
         ]
       });
+
+      expect(validateSubmissionFeatureStub).to.have.been.calledOnceWith(feature1);
     });
   });
 });

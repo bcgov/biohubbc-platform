@@ -10,7 +10,7 @@ export class QuarantineRepository extends BaseRepository {
    * Get a quarantine record by ID.
    *
    * @param {string} quarantineId
-   * @return {*}  {Promise<QuarantineRecord>}
+   * @return {Promise<QuarantineRecord>}
    * @memberof QuarantineRepository
    */
   async getQuarantineRecord(quarantineId: string): Promise<QuarantineRecord> {
@@ -40,7 +40,7 @@ export class QuarantineRepository extends BaseRepository {
   /**
    * Get a quarantine record with all associated scans.
    *
-   * @return {*}  {Promise<SubmissionRecordWithQuarantine[]>}
+   * @return {Promise<SubmissionRecordWithQuarantine[]>}
    * @memberof QuarantineRepository
    */
   async getQuarantineRecordsWithScans(): Promise<SubmissionRecordWithQuarantine[]> {
@@ -98,7 +98,7 @@ export class QuarantineRepository extends BaseRepository {
    * Insert a new quarantine record.
    *
    * @param {IInsertQuarantine} quarantine
-   * @return {*}  {Promise<{ quarantine_id: string }>}
+   * @return {Promise<{ quarantine_id: string }>}
    * @memberof QuarantineRepository
    */
   async insertQuarantineRecord(quarantine: IInsertQuarantine): Promise<{ quarantine_id: string }> {
@@ -130,7 +130,7 @@ export class QuarantineRepository extends BaseRepository {
    *
    * @param {string} quarantineId
    * @param {IUpdateQuarantine} quarantine
-   * @return {*}  {Promise<{ quarantine_id: string }>}
+   * @return {Promise<{ quarantine_id: string }>}
    * @memberof QuarantineRepository
    */
   async updateQuarantineRecord(

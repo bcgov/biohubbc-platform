@@ -5,7 +5,12 @@ import { BaseRepository } from '../base-repository';
 
 export class QuarantineScanRepository extends BaseRepository {
   /**
-   * Get a quarantine scan record by ID.
+   * Get a quarantine scan record by its ID.
+   *
+   * @param {string} quarantineScanId - The ID of the quarantine scan record to retrieve.
+   * @returns {Promise<QuarantineScanRecord>} The matching quarantine scan record.
+   * @throws {ApiExecuteSQLError} If the query fails or does not return exactly one record.
+   * @memberof QuarantineScanRepository
    */
   async getQuarantineScanRecord(quarantineScanId: string): Promise<QuarantineScanRecord> {
     const sqlStatement = SQL`
@@ -36,6 +41,11 @@ export class QuarantineScanRepository extends BaseRepository {
 
   /**
    * Insert a new quarantine scan record.
+   *
+   * @param {IInsertQuarantineScan} quarantineScan - The data for the new quarantine scan record.
+   * @returns {Promise<{ quarantine_scan_id: string }>} The ID of the newly inserted record.
+   * @throws {ApiExecuteSQLError} If the insert fails or does not affect exactly one row.
+   * @memberof QuarantineScanRepository
    */
   async insertQuarantineScanRecord(quarantineScan: IInsertQuarantineScan): Promise<{ quarantine_scan_id: string }> {
     const sqlStatement = SQL`
@@ -67,6 +77,15 @@ export class QuarantineScanRepository extends BaseRepository {
     return response.rows[0];
   }
 
+  /**
+   * Update an existing quarantine scan record by ID.
+   *
+   * @param {string} quarantineScanId - The ID of the quarantine scan record to update.
+   * @param {IUpdateQuarantineScan} quarantineScan - The data fields to update on the record.
+   * @returns {Promise<{ quarantine_scan_id: string }>} The ID of the updated record.
+   * @throws {ApiExecuteSQLError} If the update fails or does not affect exactly one row.
+   * @memberof QuarantineScanRepository
+   */
   async updateQuarantineScanRecord(
     quarantineScanId: string,
     quarantineScan: IUpdateQuarantineScan

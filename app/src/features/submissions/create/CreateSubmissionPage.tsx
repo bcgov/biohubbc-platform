@@ -68,10 +68,7 @@ export const CreateSubmissionPage = () => {
         uploadResponse.presignedUrls.map((p) => p.url),
         filesToPax,
         {
-          chunkSize: uploadResponse.partSizeBytes,
-          onProgress: (completed, total) => {
-            console.log(`Uploaded ${completed}/${total} parts`);
-          }
+          chunkSize: uploadResponse.partSizeBytes
         }
       );
 

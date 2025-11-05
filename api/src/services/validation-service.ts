@@ -60,18 +60,6 @@ export class ValidationService extends DBService {
   }
 
   /**
-   * Validate a submission feature (not including its child features).
-   *
-   * @param {ISubmissionFeature} submissionFeature
-   * @return {*}  {Promise<boolean>}
-   * @memberof ValidationService
-   */
-  async validateSubmissionFeature(submissionFeature: ISubmissionFeature): Promise<boolean> {
-    const validationProperties = await this.getFeatureValidationProperties(submissionFeature.type);
-    return this.validateProperties(validationProperties, submissionFeature.properties);
-  }
-
-  /**
    * Validate the properties of a submission feature.
    *
    * @param {FeatureProperties[]} properties The known/recognized properties of a feature type.
