@@ -36,7 +36,6 @@ export interface UploadOptions {
  * Options for streaming archive upload operations.
  */
 export interface StreamUploadOptions extends UploadOptions {
-  /** Chunk size when streaming files (default: 10 MB) */
   chunkSize: number;
 }
 
@@ -44,10 +43,6 @@ export interface StreamUploadOptions extends UploadOptions {
  * Metadata used to create a submission.
  */
 export interface SubmissionMetadata {
-  /** The name of the submission */
   name: string;
-  /** Optional description */
-  description?: string;
-  /** Any other metadata fields for the submission */
-  [key: string]: any;
+  description: string | null;
 }
