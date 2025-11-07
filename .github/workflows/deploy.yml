@@ -130,7 +130,7 @@ jobs:
       # Install Node - for `node` and `npm` commands
       # Note: This already uses actions/cache internally, so repeat calls in subsequent jobs are not a performance hit
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: 20
 
@@ -212,7 +212,7 @@ jobs:
           limit-severities-for-sarif: true
 
       - name: Upload Trivy scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: trivy-${{ env.APP_NAME }}-results
           path: trivy-${{ env.APP_NAME }}-results.sarif
@@ -295,7 +295,7 @@ jobs:
           limit-severities-for-sarif: true
 
       - name: Upload Trivy scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: trivy-${{ env.APP_NAME }}-results
           path: trivy-${{ env.APP_NAME }}-results.sarif
@@ -372,7 +372,7 @@ jobs:
           limit-severities-for-sarif: true
           
       - name: Upload Trivy scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: trivy-${{ env.APP_NAME }}-results
           path: trivy-${{ env.APP_NAME }}-results.sarif
@@ -455,7 +455,7 @@ jobs:
           limit-severities-for-sarif: true
 
       - name: Upload Trivy scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: trivy-${{ env.APP_NAME }}-results
           path: trivy-${{ env.APP_NAME }}-results.sarif
@@ -570,7 +570,7 @@ jobs:
       - buildAndPushAPI
     steps:
       - name: Download all Trivy scan results
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           path: trivy-results
 
