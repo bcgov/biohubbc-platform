@@ -233,7 +233,7 @@ export class AuthorizationService extends DBService {
       feature.urn,
       user.system_user_id
     );
-    
+
     //
     //console.log(policiesThatGrantAccess, 'POLICIES@');
 

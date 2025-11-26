@@ -70,10 +70,7 @@ describe('PolicyService', () => {
 
       const result = await policyService.getPoliciesThatAuthorizeFeatureAccessByUrn('urn:123:*:*', 42);
 
-      expect(stub).to.have.been.calledWith(
-        { submissionId: '123', featureTypeName: '*', submissionFeatureId: '*' },
-        42
-      );
+      expect(stub).to.have.been.calledWith({ submissionId: '123', featureTypeName: '*', submissionFeatureId: '*' }, 42);
       expect(result).to.eql(mockPolicies);
     });
   });
