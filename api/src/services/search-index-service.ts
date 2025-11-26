@@ -72,14 +72,14 @@ export class SearchIndexService extends DBService {
           continue;
         }
 
+        if (!currentFeaturePropertyValue) {
+          // Skip null values
+          continue;
+        }
+
         // Matching property code found, add query data to matching array
         switch (matchingFeatureProperty.feature_property_type_name) {
           case 'datetime':
-            if (!currentFeaturePropertyValue) {
-              // Datetime value is null or undefined, since the submission system accepts null dates (e.g. `{ end_date: null }`)
-              break;
-            }
-
             datetimeRecords.push({
               submission_feature_id: currentFeature.submission_feature_id,
               feature_property_id: matchingFeatureProperty.feature_property_id,

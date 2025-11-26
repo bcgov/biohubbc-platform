@@ -171,7 +171,7 @@ export function submissionIntake(): RequestHandler {
       // Fetch all artifact submission features, if any
       const submissionArtifactFeatures = await submissionService.findSubmissionFeatures({
         submissionId: submissionRecord.submission_id,
-        featureTypeNames: ['artifact']
+        featureTypeNames: ['artifact', 'file', 'report']
       });
 
       // Calculate and add submission regions
