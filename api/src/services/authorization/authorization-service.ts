@@ -234,7 +234,6 @@ export class AuthorizationService extends DBService {
       user.system_user_id
     );
 
-
     // Step 6: Grant access if at least one policy authorizes it
     return policiesThatGrantAccess.length > 0;
   }
