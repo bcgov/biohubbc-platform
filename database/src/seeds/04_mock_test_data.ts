@@ -299,7 +299,7 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
 export const insertSubmissionFeature = (options: {
   submission_id: number;
   parent_submission_feature_id: number | null;
-  feature_type: 'dataset' | 'sample_site' | 'species_observation' | 'animal' | | 'artifact' | 'telemetry';
+  feature_type: 'dataset' | 'sample_site' | 'species_observation' | 'animal' | 'artifact' | 'telemetry';
   data: { [key: string]: any };
 }) => `
     INSERT INTO submission_feature
