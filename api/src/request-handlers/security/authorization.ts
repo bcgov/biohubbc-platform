@@ -2,7 +2,7 @@ import { Request } from 'express';
 import { RequestHandler } from 'express-serve-static-core';
 import { getAPIUserDBConnection } from '../../database/db';
 import { HTTP403 } from '../../errors/http-error';
-import { AuthorizationScheme, AuthorizationService } from '../../services/authorization-service';
+import { AuthorizationScheme, AuthorizationService } from '../../services/authorization/authorization-service';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('request-handlers/security/authorization');

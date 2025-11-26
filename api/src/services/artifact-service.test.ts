@@ -45,6 +45,7 @@ describe('ArtifactService', () => {
       const artifactSubmissionFeature: SubmissionFeatureRecord = {
         submission_feature_id: 2,
         uuid: '234-456-234',
+        urn: 'urn:3:dataset:2',
         submission_id: 3,
         feature_type_id: 4,
         source_id: 'source-id',

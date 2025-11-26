@@ -1,9 +1,11 @@
-import { SYSTEM_ROLE } from '../constants/roles';
-import { IDBConnection } from '../database/db';
-import { SystemUserExtended } from '../repositories/user-repository';
-import { getServiceClientSystemUser, getUserGuid } from '../utils/keycloak-utils';
-import { DBService } from './db-service';
-import { UserService } from './user-service';
+import { SYSTEM_ROLE } from '../../constants/roles';
+import { IDBConnection } from '../../database/db';
+import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
+import { getServiceClientSystemUser, getUserGuid } from '../../utils/keycloak-utils';
+import { PolicyService } from '../access-policy/policy-service';
+import { DBService } from '../db-service';
+import { SubmissionService } from '../submission-service';
+import { UserService } from '../user-service';
 
 export enum AuthorizeOperator {
   AND = 'and',
@@ -32,6 +34,18 @@ export interface AuthorizeBySystemUser {
 }
 
 /**
+ * Authorization rule that checks if the user can access the resource through an access policy
+ *
+ * @export
+ * @interface AuthorizeByAccessPolicy
+ */
+export interface AuthorizeByAccessPolicy {
+  submissionId: number;
+  submissionFeatureId: number;
+  discriminator: 'AccessPolicy';
+}
+
+/**
  * Authorization rule that checks if a jwt token's client id matches at least one of the required client ids.
  *
  * Note: This is specifically for system-to-system communication.
@@ -43,7 +57,11 @@ export interface AuthorizeByServiceClient {
   discriminator: 'ServiceClient';
 }
 
-export type AuthorizeRule = AuthorizeBySystemRoles | AuthorizeBySystemUser | AuthorizeByServiceClient;
+export type AuthorizeRule =
+  | AuthorizeBySystemRoles
+  | AuthorizeBySystemUser
+  | AuthorizeByServiceClient
+  | AuthorizeByAccessPolicy;
 
 export type AuthorizeConfigOr = {
   [AuthorizeOperator.AND]?: never;
@@ -106,6 +124,9 @@ export class AuthorizationService extends DBService {
           break;
         case 'ServiceClient':
           authorizeResults.push(await this.authorizeByServiceClient());
+          break;
+        case 'AccessPolicy':
+          authorizeResults.push(await this.authorizeByAccessPolicy(authorizeRule));
           break;
       }
     }
@@ -170,21 +191,66 @@ export class AuthorizationService extends DBService {
   /**
    * Check if the user is a valid system user.
    *
-   * @return {*}  {Promise<boolean>} `Promise<true>` if the user is a valid system user, `Promise<false>` otherwise.
+   * @returns {Promise<boolean>} Resolves with `true` if the user is a valid system user, otherwise `false`.
    */
   async authorizeBySystemUser(): Promise<boolean> {
-    const systemUserObject = this._systemUser || (await this.getSystemUserObject());
+    const user = await this.getCachedSystemUser();
 
-    if (!systemUserObject) {
-      // Cannot verify user roles
-      return false;
+    return !!user; // true if user exists, false otherwise
+  }
+
+  /**
+   * Check whether the user is authorized to access the requested resource through an access policy
+   *
+   * @param {AuthorizeByAccessPolicy} authorizeRule - The access rule containing submissionFeatureId and submissionId
+   * @returns {Promise<boolean>} Resolves with `true` if the user is authorized, otherwise `false`.
+   */
+  async authorizeByAccessPolicy(authorizeRule: AuthorizeByAccessPolicy): Promise<boolean> {
+    const submissionService = new SubmissionService(this.connection);
+
+    // Step 1: Fetch the feature by ID to get URN and security status
+    const feature = await submissionService.getSubmissionFeatureById(authorizeRule.submissionFeatureId);
+
+    // Step 2: If the feature is not secured (open-access), grant access immediately
+    if (!feature.secured) {
+      return true;
     }
 
-    // Cache the _systemUser for future use, if needed
-    this._systemUser = systemUserObject;
+    // Step 3: Ensure the feature belongs to the requested submission
+    if (feature.submission_id !== authorizeRule.submissionId) {
+      return false; // Deny access if submission IDs do not match
+    }
 
-    // User is a valid system user
-    return true;
+    // Step 4: Fetch and cache the system user
+    const user = await this.getCachedSystemUser();
+    if (!user) {
+      return false; // Deny access if we cannot verify the user's identity
+    }
+
+    // Step 5: Use the PolicyService to check if any policies grant access to this feature
+    const policyService = new PolicyService(this.connection);
+    const policiesThatGrantAccess = await policyService.getPoliciesThatAuthorizeFeatureAccessByUrn(
+      feature.urn,
+      user.system_user_id
+    );
+
+    // Step 6: Grant access if at least one policy authorizes it
+    return policiesThatGrantAccess.length > 0;
+  }
+
+  /**
+   * Private helper method to fetch and cache the system user object.
+   *
+   * @returns {Promise<SystemUser | null>} Resolves with the system user object, or `null` if not found.
+   */
+  async getCachedSystemUser(): Promise<SystemUser | null> {
+    if (this._systemUser) {
+      return this._systemUser;
+    }
+
+    const user = await this.getSystemUserObject(); // fetch from DB or service
+    this._systemUser = user ?? undefined;
+    return this._systemUser ?? null;
   }
 
   /**

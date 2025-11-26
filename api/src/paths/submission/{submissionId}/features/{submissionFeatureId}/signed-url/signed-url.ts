@@ -1,10 +1,10 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection, getDBConnection } from '../../../../../database/db';
-import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
-import { SubmissionService } from '../../../../../services/submission-service';
-import { UserService } from '../../../../../services/user-service';
-import { getLogger } from '../../../../../utils/logger';
+import { getAPIUserDBConnection, getDBConnection } from '../../../../../../database/db';
+import { defaultErrorResponses } from '../../../../../../openapi/schemas/http-responses';
+import { SubmissionService } from '../../../../../../services/submission-service';
+import { UserService } from '../../../../../../services/user-service';
+import { getLogger } from '../../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/submission/{submissionId}/features/{submissionFeatureId}/signed-url');
 

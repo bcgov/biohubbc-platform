@@ -200,7 +200,7 @@ describe('generateQueueS3FileKey', () => {
       fileName: 'testFileName'
     });
 
-    expect(result).to.equal('biohub/queue/1/datasets/123-456-789/dwca/testFileName');
+    expect(result).to.equal(`${process.env.S3_KEY_PREFIX || 'biohub'}/queue/1/datasets/123-456-789/dwca/testFileName`);
   });
 });
 
@@ -211,6 +211,6 @@ describe('generateDatasetS3FileKey', () => {
       fileName: 'testFileName'
     });
 
-    expect(result).to.equal('biohub/datasets/123-456-789/dwca/testFileName');
+    expect(result).to.equal(`${process.env.S3_KEY_PREFIX || 'biohub'}/datasets/123-456-789/dwca/testFileName`);
   });
 });

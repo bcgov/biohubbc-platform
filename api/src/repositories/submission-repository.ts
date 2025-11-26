@@ -37,6 +37,7 @@ export interface ISubmissionRecord {
 export const SubmissionFeatureRecord = z.object({
   submission_feature_id: z.number(),
   uuid: z.string(),
+  urn: z.string(),
   submission_id: z.number(),
   feature_type_id: z.number(),
   source_id: z.string().nullable(),
@@ -52,6 +53,20 @@ export const SubmissionFeatureRecord = z.object({
 });
 
 export type SubmissionFeatureRecord = z.infer<typeof SubmissionFeatureRecord>;
+
+export const SubmissionFeature = z.object({
+  submission_feature_id: z.number(),
+  uuid: z.string(),
+  urn: z.string(),
+  submission_id: z.number(),
+  feature_type_id: z.number(),
+  source_id: z.string().nullable(),
+  data: z.record(z.any()),
+  feature_type_name: z.string(),
+  secured: z.boolean()
+});
+
+export type SubmissionFeature = z.infer<typeof SubmissionFeature>;
 
 export const SubmissionFeatureRecordWithTypeAndSecurity = SubmissionFeatureRecord.extend({
   feature_type_name: z.string(),
@@ -1102,6 +1117,50 @@ export class SubmissionRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get submission feature record', [
         'SubmissionRepository->getSubmissionFeatureByUuid',
+        `rowCount was ${response.rowCount}, expected rowCount === 1`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get a submission feature record by Id.
+   *
+   * @param {number} submissionFeatureId
+   * @return {Promise<SubmissionFeature>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionFeatureById(submissionFeatureId: number): Promise<SubmissionFeature> {
+    const sqlStatement = SQL`
+      SELECT
+        sf.submission_feature_id,
+        sf.uuid,
+        sf.urn,
+        sf.submission_id,
+        sf.feature_type_id,
+        sf.source_id,
+        sf.data,
+        ft.name as feature_type_name,
+        EXISTS (
+          SELECT 1
+          FROM submission_feature_security sfs
+          WHERE sfs.submission_feature_id = sf.submission_feature_id
+            AND sfs.record_end_date IS NULL
+        ) AS secured
+      FROM
+        submission_feature sf
+      JOIN
+        feature_type ft ON ft.feature_type_id = sf.feature_type_id
+      WHERE
+        sf.submission_feature_id = ${submissionFeatureId};
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionFeature);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get submission feature record', [
+        'SubmissionRepository->getSubmissionFeatureById',
         `rowCount was ${response.rowCount}, expected rowCount === 1`
       ]);
     }
