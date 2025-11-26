@@ -151,12 +151,15 @@ describe('PolicyStatementConditionRepository', () => {
         rows: mockRows
       } as unknown as Promise<QueryResult<any>>;
 
+      const knexStub = sinon.stub().resolves(mockResponse);
       const mockDBConnection = getMockDBConnection({
-        knex: async () => mockResponse
+        knex: knexStub
       });
 
       const repository = new PolicyStatementConditionRepository(mockDBConnection);
       await repository.deletePolicyStatementCondition('1');
+
+      expect(knexStub).to.have.been.calledOnce;
     });
 
     it('throws error if delete fails', async () => {

@@ -187,12 +187,15 @@ describe('PolicyStatementRepository', () => {
     it('successfully soft deletes a policy statement', async () => {
       const mockResponse = { rowCount: 1, rows: [{ policy_statement_id: 1 }] } as unknown as Promise<QueryResult<any>>;
 
+      const knexStub = sinon.stub().resolves(mockResponse);
       const mockDBConnection = getMockDBConnection({
-        knex: async () => mockResponse
+        knex: knexStub
       });
 
       const repository = new PolicyStatementRepository(mockDBConnection);
       await repository.deletePolicyStatement('1');
+
+      expect(knexStub).to.have.been.calledOnce;
     });
 
     it('throws error if delete fails', async () => {

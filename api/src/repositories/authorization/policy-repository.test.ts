@@ -164,12 +164,15 @@ describe('PolicyRepository', () => {
     it('successfully soft deletes a policy', async () => {
       const mockResponse = { rowCount: 1, rows: [{ policy_id: 1 }] } as unknown as Promise<QueryResult<any>>;
 
+      const knexStub = sinon.stub().resolves(mockResponse);
       const mockDBConnection = getMockDBConnection({
-        knex: async () => mockResponse
+        knex: knexStub
       });
 
       const repository = new PolicyRepository(mockDBConnection);
       await repository.deletePolicy('1');
+
+      expect(knexStub).to.have.been.calledOnce;
     });
 
     it('throws error if delete fails', async () => {

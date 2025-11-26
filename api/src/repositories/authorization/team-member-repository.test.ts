@@ -145,12 +145,15 @@ describe('TeamMemberRepository', () => {
         rows: [{ team_member_id: 1 }]
       } as unknown as Promise<QueryResult<any>>;
 
+      const knexStub = sinon.stub().resolves(mockResponse);
       const mockConnection = getMockDBConnection({
-        knex: async () => mockResponse
+        knex: knexStub
       });
 
       const repository = new TeamMemberRepository(mockConnection);
       await repository.deleteTeamMember('1');
+
+      expect(knexStub).to.have.been.calledOnce;
     });
 
     it('throws error if delete fails', async () => {
