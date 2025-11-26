@@ -123,7 +123,12 @@ export class ValidationService extends DBService {
           }
           break;
         case 'object':
-          if (typeof dataProperty !== 'object') {
+          if (typeof dataProperty !== 'object' || Array.isArray(dataProperty)) {
+            throwPropertyError(property);
+          }
+          break;
+        case 'array':
+          if (!Array.isArray(dataProperty)) {
             throwPropertyError(property);
           }
           break;

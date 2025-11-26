@@ -207,7 +207,7 @@ describe('intake', () => {
       expect(indexFeaturesBySubmissionIdStub).to.have.been.calledOnceWith(submissionId);
       expect(findSubmissionFeaturesStub).to.have.been.calledOnceWith({
         submissionId: submissionId,
-        featureTypeNames: ['artifact']
+        featureTypeNames: ['artifact', 'file', 'report']
       });
 
       expect(calculateAndAddRegionsForSubmissionStub).to.have.been.calledOnce;
