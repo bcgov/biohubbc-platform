@@ -17,9 +17,9 @@ describe('parseFeatureUrn', () => {
       const result = parseFeatureUrn(urn);
 
       expect(result).to.deep.equal({
-        submissionId: 123,
+        submissionId: '123',
         featureTypeName: 'observation',
-        submissionFeatureId: 456
+        submissionFeatureId: '456'
       });
     });
   });

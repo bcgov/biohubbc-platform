@@ -114,7 +114,10 @@ describe('PolicyRepository', () => {
       });
 
       const repository = new PolicyRepository(mockDBConnection);
-      const result = await repository.getPoliciesThatAuthorizeFeatureAccessByUrn('urn:biohub:telemetry:1', 10);
+      const result = await repository.getPoliciesThatAuthorizeFeatureAccessByUrn(
+        { submissionId: '1', featureTypeName: 'telemetry', submissionFeatureId: '1' },
+        10
+      );
 
       expect(result).to.eql(mockRows);
     });
