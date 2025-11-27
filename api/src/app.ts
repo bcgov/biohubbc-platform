@@ -194,7 +194,7 @@ function getAdditionalMiddleware(): express.RequestHandler[] {
  * @param {NextFunction} next
  */
 function validateAllResponses(req: Request, res: Response, next: NextFunction) {
-  const isStrictValidation = !!req.apiDoc?.['x-express-openapi-validation-strict'] || false;
+  const isStrictValidation = !!req.apiDoc?.['x-express-openapi-validation-strict'];
 
   if (typeof res.validateResponse === 'function') {
     const originalJson = res.json.bind(res);
