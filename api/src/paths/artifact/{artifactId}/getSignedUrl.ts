@@ -51,7 +51,7 @@ GET.apiDoc = {
  */
 export function getArtifactSignedUrl(): RequestHandler {
   return async (req, res) => {
-    const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
+    const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     const artifactId = Number(req.params.artifactId);
 

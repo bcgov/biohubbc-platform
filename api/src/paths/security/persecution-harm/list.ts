@@ -75,7 +75,7 @@ GET.apiDoc = {
 export function getPersecutionAndHarmRules(): RequestHandler {
   return async (req, res) => {
     defaultLog.debug({ label: 'getPersecutionAndHarmRules', message: 'request body', req_body: req.query });
-    const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
+    const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     try {
       await connection.open();

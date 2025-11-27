@@ -113,7 +113,7 @@ GET.apiDoc = {
 
 export function getActiveSecurityRules(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req['keycloak_token']);
+    const connection = getDBConnection(req.keycloak_token);
     const service = new SecurityService(connection);
 
     try {
