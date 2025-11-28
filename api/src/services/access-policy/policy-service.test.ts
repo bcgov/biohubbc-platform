@@ -6,8 +6,8 @@ import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyEffect, PolicyStatement } from '../../models/policy-statement';
 import { PolicyConditionOperator, PolicyStatementCondition } from '../../models/policy-statement-condition';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
-import { PolicyStatementRepository } from '../../repositories/authorization/policy-statement-repository';
 import { PolicyStatementConditionRepository } from '../../repositories/authorization/policy-statement-condition-repository';
+import { PolicyStatementRepository } from '../../repositories/authorization/policy-statement-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { PolicyService } from './policy-service';
 

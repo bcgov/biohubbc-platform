@@ -159,7 +159,11 @@ export function updatePolicy(): RequestHandler {
       await connection.open();
 
       const policyService = new PolicyService(connection);
-      const response = await policyService.updatePolicyWithStatements(policyId, { name, description }, statements || []);
+      const response = await policyService.updatePolicyWithStatements(
+        policyId,
+        { name, description },
+        statements || []
+      );
 
       await connection.commit();
 
