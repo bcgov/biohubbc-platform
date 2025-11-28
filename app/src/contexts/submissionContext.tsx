@@ -1,141 +1,131 @@
+import { GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import { ISecurityRuleAndCategory, ISubmissionFeatureSecurityRecord } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import useDataLoader, { DataLoader } from 'hooks/useDataLoader';
 import {
-  IGetSubmissionGroupedFeatureResponse,
+  ISubmissionFeatureForReviewResponse,
   SubmissionRecordWithSecurity
 } from 'interfaces/useSubmissionsApi.interface';
-import React, { useEffect, useMemo } from 'react';
+import React, { PropsWithChildren, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router';
+import { ApiPaginationRequestOptions } from 'types/misc';
+import { firstOrNull } from 'utils/Utils';
 
 export interface ISubmissionContext {
-  /**
-   * The Data Loader used to load submission data.
-   *
-   * @type {DataLoader<[submissionId: number], SubmissionRecordWithSecurity, unknown>}
-   * @memberof ISubmissionContext
-   */
-  submissionRecordDataLoader: DataLoader<[submissionId: number], SubmissionRecordWithSecurity, unknown>;
-  /**
-   * The Data Loader used to load submission features data.
-   *
-   * @type {DataLoader<[submissionId: number], IGetSubmissionGroupedFeatureResponse[], unknown>}
-   * @memberof ISubmissionContext
-   */
-  submissionFeatureGroupsDataLoader: DataLoader<
-    [submissionId: number],
-    IGetSubmissionGroupedFeatureResponse[],
+  submissionRecordDataLoader: DataLoader<[number], SubmissionRecordWithSecurity, unknown>;
+  submissionFeaturesDataLoader: DataLoader<
+    [ApiPaginationRequestOptions, number],
+    ISubmissionFeatureForReviewResponse,
     unknown
   >;
-  /**
-   * The Data Loader used to load the list of all security rules that may be applied
-   * to a given submission.
-   *
-   * @type {DataLoader<[], ISecurityRule[], unknown>}
-   * @memberof ISubmissionContext
-   */
   allSecurityRulesStaticListDataLoader: DataLoader<[], ISecurityRuleAndCategory[], unknown>;
-  /**
-   * The Data Loader used to load the list of all security rules applied to the set of
-   * given submission features.
-   *
-   * @type {DataLoader<[], ISubmissionFeatureSecurityRecord[], unknown>}
-   * @memberof ISubmissionContext
-   */
   submissionFeaturesAppliedRulesDataLoader: DataLoader<[], ISubmissionFeatureSecurityRecord[], unknown>;
-  /**
-   * The submission id.
-   *
-   * @type {number}
-   * @memberof ISubmissionContext
-   */
+  paginationModel: GridPaginationModel;
+  setPaginationModel: React.Dispatch<React.SetStateAction<GridPaginationModel>>;
+  sortModel: GridSortModel;
+  setSortModel: React.Dispatch<React.SetStateAction<GridSortModel>>;
+  featuresPagination: ApiPaginationRequestOptions;
   submissionId: number;
 }
 
 export const SubmissionContext = React.createContext<ISubmissionContext | undefined>(undefined);
 
-export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (props) => {
+export const SubmissionContextProvider = (props: PropsWithChildren) => {
   const api = useApi();
 
-  // Retrieves the static list of all security rules that could be applied to a submission feature
-  const allSecurityRulesStaticListDataLoader = useDataLoader(api.security.getActiveSecurityRulesWithCategories);
-
-  // Retrieves the submission record, including security metadata
-  const submissionRecordDataLoader = useDataLoader(api.submissions.getSubmissionRecordWithSecurity);
-
-  // Retrieves the list of all features for the given submission
-  const submissionFeatureGroupsDataLoader = useDataLoader(api.submissions.getSubmissionFeatureGroups);
-
-  // The collection of all feature IDs belonging to this submission
-  const allSubmissionFeatureIds: number[] = useMemo(() => {
-    if (!submissionFeatureGroupsDataLoader.data) {
-      return [];
-    }
-
-    return submissionFeatureGroupsDataLoader.data.reduce(
-      (acc: number[], submissionFeatureGroup: IGetSubmissionGroupedFeatureResponse) => {
-        return acc.concat(submissionFeatureGroup.features.map((feature) => feature.submission_feature_id));
-      },
-      []
-    );
-  }, [submissionFeatureGroupsDataLoader.data]);
-
-  /**
-   * Stores the list of pivot values representing all security rules that apply to all the feaures belonging
-   * to the current submission.
-   */
-  const submissionFeaturesAppliedRulesDataLoader = useDataLoader(() => {
-    return api.security.getAllSecurityRulesForSubmission(submissionId);
-  });
-
+  /** Extract submission ID */
   const urlParams = useParams<{ submission_id: string }>();
-  const submissionId = Number(urlParams['submission_id']);
+  const submissionId = Number(urlParams.submission_id);
 
   if (!submissionId) {
-    throw new Error(
-      "The submission ID found in SubmissionContextProvider was invalid. Does your current React route provide a 'submission_id' parameter?"
-    );
+    throw new Error('Missing submission_id route param');
   }
 
-  allSecurityRulesStaticListDataLoader.load();
+  /** ========== Pagination + Sorting State ========== */
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
+    page: 0,
+    pageSize: 25
+  });
+
+  const [sortModel, setSortModel] = useState<GridSortModel>([]);
+
+  /** Convert MUI pagination/sorting → API format */
+  const featuresPagination: ApiPaginationRequestOptions = useMemo(() => {
+    const sort = firstOrNull(sortModel);
+
+    return {
+      limit: paginationModel.pageSize,
+      page: paginationModel.page + 1, // API is 1-indexed
+      sort: sort?.field || undefined,
+      order: sort?.sort || undefined
+    };
+  }, [paginationModel, sortModel]);
+
+  /** ========== Data Loaders ========== */
+
+  // Load submission record (unchanged)
+  const submissionRecordDataLoader = useDataLoader(api.submissions.getSubmissionRecordWithSecurity);
+
+  // NEW: paginated feature loader
+  const submissionFeaturesDataLoader = useDataLoader((pagination: ApiPaginationRequestOptions, submissionId: number) =>
+    api.submissions.getSubmissionFeatures(submissionId, pagination)
+  );
+
+  const allSecurityRulesStaticListDataLoader = useDataLoader(api.security.getActiveSecurityRulesWithCategories);
+
+  const submissionFeaturesAppliedRulesDataLoader = useDataLoader(() =>
+    api.security.getAllSecurityRulesForSubmission(submissionId)
+  );
+
+  /** ========== Initial Loads ========== */
   submissionRecordDataLoader.load(submissionId);
-  submissionFeatureGroupsDataLoader.load(submissionId);
+  submissionFeaturesDataLoader.load(featuresPagination, submissionId);
+  allSecurityRulesStaticListDataLoader.load();
 
-  /**
-   * Refreshes the current submission object whenever the current submission id changes from the currently loaded submission.
-   */
+  /** Refresh features on pagination/sorting change */
   useEffect(() => {
-    if (submissionId && submissionId !== submissionRecordDataLoader.data?.submission_id) {
-      submissionRecordDataLoader.refresh(submissionId);
-      submissionFeatureGroupsDataLoader.refresh(submissionId);
-    }
+    submissionFeaturesDataLoader.refresh(featuresPagination, submissionId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [featuresPagination]);
 
+  /** Refresh when submission ID changes */
+  useEffect(() => {
+    submissionRecordDataLoader.refresh(submissionId);
+    submissionFeaturesDataLoader.refresh(featuresPagination, submissionId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionId]);
 
-  /**
-   * Refreshes the list of all applied security rules, whenever the list of submission features changes
-   */
+  /** Refresh security rules when features change */
   useEffect(() => {
     submissionFeaturesAppliedRulesDataLoader.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allSubmissionFeatureIds]);
+  }, [submissionFeaturesDataLoader.data]);
 
-  const submissionContext: ISubmissionContext = useMemo(() => {
-    return {
+  /** ========== Memoized Context Value ========== */
+  const submissionContext: ISubmissionContext = useMemo(
+    () => ({
       submissionRecordDataLoader,
-      submissionFeatureGroupsDataLoader,
+      submissionFeaturesDataLoader,
       allSecurityRulesStaticListDataLoader,
       submissionFeaturesAppliedRulesDataLoader,
+      paginationModel,
+      setPaginationModel,
+      sortModel,
+      setSortModel,
+      featuresPagination,
       submissionId
-    };
-  }, [
-    submissionRecordDataLoader,
-    submissionFeatureGroupsDataLoader,
-    allSecurityRulesStaticListDataLoader,
-    submissionFeaturesAppliedRulesDataLoader,
-    submissionId
-  ]);
+    }),
+    [
+      submissionRecordDataLoader,
+      submissionFeaturesDataLoader,
+      allSecurityRulesStaticListDataLoader,
+      submissionFeaturesAppliedRulesDataLoader,
+      paginationModel,
+      sortModel,
+      featuresPagination,
+      submissionId
+    ]
+  );
 
   return <SubmissionContext.Provider value={submissionContext}>{props.children}</SubmissionContext.Provider>;
 };

@@ -3,6 +3,8 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import { SubmissionFeatureForReview } from '../models/submission';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
 
@@ -1729,5 +1731,111 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0].value;
+  }
+
+  /**
+   * Build the base query for submission features.
+   *
+   * @param {number} submissionId
+   * @param {Knex} knex
+   * @return {Knex.QueryBuilder}
+   * @memberof SubmissionRepository
+   */
+  private _getSubmissionFeaturesBaseQuery(submissionId: number, knex: Knex) {
+    return knex('submission_feature')
+      .select(
+        'submission_feature.*',
+        'feature_type.name as feature_type_name',
+        'feature_type.display_name as feature_type_display_name'
+      )
+      .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id')
+      .leftJoin(
+        'submission_feature_security',
+        'submission_feature_security.submission_feature_id',
+        'submission_feature.submission_feature_id'
+      )
+      .where('submission_id', submissionId)
+      .groupBy(
+        'submission_feature.submission_feature_id',
+        'feature_type.name',
+        'feature_type.display_name',
+        'feature_type.sort'
+      );
+  }
+
+  /**
+   * Get all submission features by submission id, paginated.
+   *
+   * @param {number} submissionId
+   * @param {ApiPaginationOptions} pagination
+   * @return {Promise<SubmissionFeatureForReview[]>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionFeatures(
+    submissionId: number,
+    pagination?: ApiPaginationOptions
+  ): Promise<SubmissionFeatureForReview[]> {
+    const knex = getKnex();
+
+    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex).orderBy('feature_type.sort', 'asc');
+
+    this.applyPagination(baseQuery, pagination);
+
+    const response = await this.connection.knex(baseQuery, SubmissionFeatureForReview);
+
+    return response.rows;
+  }
+
+  /**
+   * Get the total number of submission features for a given submission.
+   *
+   * @param {number} submissionId
+   * @return {Promise<number>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionFeaturesCount(submissionId: number): Promise<number> {
+    const knex = getKnex();
+
+    // Wrap the base query as a subquery
+    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex);
+    const countQuery = knex.from(baseQuery.as('sf_base')).select(knex.raw('count(*)::integer as count'));
+
+    const response = await this.connection.knex(countQuery, z.object({ count: z.number() }));
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to get submission features count', [
+        'SubmissionRepository->getSubmissionFeaturesCount',
+        'rowCount was null or undefined, expected rowCount != 0'
+      ]);
+    }
+
+    return response.rows[0].count;
+  }
+
+  /**
+   * Apply pagination + sorting to a Knex query.
+   *
+   * @param {Knex.QueryBuilder} query
+   * @param {ApiPaginationOptions} pagination
+   * @memberof SubmissionRepository
+   */
+  applyPagination(query: any, pagination?: ApiPaginationOptions) {
+    if (!pagination) {
+      return query;
+    }
+
+    if (pagination.limit) {
+      query.limit(pagination.limit);
+    }
+
+    if (pagination.page && pagination.limit) {
+      query.offset((pagination.page - 1) * pagination.limit);
+    }
+
+    if (pagination.sort && pagination.order) {
+      query.orderBy(pagination.sort, pagination.order);
+    }
+
+    return query;
   }
 }

@@ -29,7 +29,7 @@ const SecurityRuleForm = () => {
   const {
     allSecurityRulesStaticListDataLoader,
     submissionFeaturesAppliedRulesDataLoader,
-    submissionFeatureGroupsDataLoader
+    submissionFeaturesDataLoader
   } = submissionContext;
 
   // List all potential security rules
@@ -62,11 +62,9 @@ const SecurityRuleForm = () => {
           );
 
           const featureGroupDisplayName =
-            (submissionFeatureGroupsDataLoader.data ?? []).find((featureGroup) => {
-              return featureGroup.features.some(
-                (feature) => feature.submission_feature_id === securityRecord.submission_feature_id
-              );
-            })?.feature_type_display_name ?? 'Other';
+            (submissionFeaturesDataLoader.data?.features ?? []).find((feature) => {
+              return feature.submission_feature_id === securityRecord.submission_feature_id;
+            })?.feature_type_name ?? 'Other';
 
           if (ruleGroupIndex === -1) {
             const securityRule = allSecurityRules.find(
@@ -103,7 +101,7 @@ const SecurityRuleForm = () => {
     allSecurityRules,
     formikProps.initialValues.submissionFeatureIds,
     initialAppliedSecurityRules,
-    submissionFeatureGroupsDataLoader.data
+    submissionFeaturesDataLoader.data
   ]);
 
   const toggleStageApply = (securityRule: ISecurityRuleAndCategory) => {

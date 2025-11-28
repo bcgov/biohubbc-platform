@@ -1502,4 +1502,107 @@ describe('SubmissionRepository', () => {
       expect(response).to.eql('KEY');
     });
   });
+
+  describe('getSubmissionFeaturesBySubmissionId', () => {
+    it('should return a list of submission features', async () => {
+      const mockResponse = {
+        rows: [
+          {
+            submission_feature_id: 1,
+            feature_type_name: 'Type A',
+            feature_type_display_name: 'Display A',
+            submission_feature_security_ids: [1, 2]
+          }
+        ],
+        rowCount: 1
+      } as any;
+      const dbConnection = getMockDBConnection({ sql: () => mockResponse });
+
+      const repository = new SubmissionRepository(dbConnection);
+
+      const response = await repository.getSubmissionFeaturesBySubmissionId(123);
+
+      expect(response).to.eql([
+        {
+          submission_feature_id: 1,
+          feature_type_name: 'Type A',
+          feature_type_display_name: 'Display A',
+          submission_feature_security_ids: [1, 2]
+        }
+      ]);
+    });
+
+    it('should throw an error when rowCount is 0', async () => {
+      const mockResponse = { rows: [], rowCount: 0 } as any;
+      const dbConnection = getMockDBConnection({ sql: () => mockResponse });
+
+      const repository = new SubmissionRepository(dbConnection);
+
+      try {
+        await repository.getSubmissionFeaturesBySubmissionId(123);
+        expect.fail();
+      } catch (error) {
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get submission feature record');
+      }
+    });
+  });
+
+  describe('getSubmissionFeaturesCount', () => {
+    it('should return the correct submission feature count', async () => {
+      const mockResponse = { rows: [{ count: 42 }], rowCount: 1 } as any;
+      const dbConnection = getMockDBConnection({ sql: () => mockResponse });
+
+      const repository = new SubmissionRepository(dbConnection);
+
+      const count = await repository.getSubmissionFeaturesCount(123);
+
+      expect(count).to.equal(42);
+    });
+
+    it('should throw an error when count query fails', async () => {
+      const mockResponse = { rows: [], rowCount: 0 } as any;
+      const dbConnection = getMockDBConnection({ sql: () => mockResponse });
+
+      const repository = new SubmissionRepository(dbConnection);
+
+      try {
+        await repository.getSubmissionFeaturesCount(123);
+        expect.fail();
+      } catch (error) {
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get submission feature count');
+      }
+    });
+  });
+
+  describe('_getSubmissionFeaturesBaseQuery', () => {
+    it('should return the correct query for submission features', async () => {
+      const submissionId = 123;
+      const knex = sinon.stub();
+
+      // Mock the SQL query with necessary joins
+      const baseQuery = knex('submission_feature')
+        .select(
+          'submission_feature.*',
+          'feature_type.name as feature_type_name',
+          'feature_type.display_name as feature_type_display_name'
+        )
+        .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id')
+        .leftJoin(
+          'submission_feature_security',
+          'submission_feature_security.submission_feature_id',
+          'submission_feature.submission_feature_id'
+        )
+        .where('submission_id', submissionId)
+        .groupBy(
+          'submission_feature.submission_feature_id',
+          'feature_type.name',
+          'feature_type.display_name',
+          'feature_type.sort'
+        );
+
+      expect(baseQuery.toSQL().sql).to.include('from "submission_feature"');
+      expect(baseQuery.toSQL().sql).to.include('left join "feature_type"');
+      expect(baseQuery.toSQL().sql).to.include('left join "submission_feature_security"');
+    });
+  });
 });

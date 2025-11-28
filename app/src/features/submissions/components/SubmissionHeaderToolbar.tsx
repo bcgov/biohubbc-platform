@@ -5,91 +5,69 @@ import { GridRowSelectionModel } from '@mui/x-data-grid';
 import ManageSecurity from 'components/security/ManageSecurity';
 import CompleteSecurityReviewButton from 'features/submissions/components/PublishSecurityReview/CompleteSecurityReviewButton';
 import { useApi } from 'hooks/useApi';
-import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
+import { SubmissionRecordWithSecurity } from 'interfaces/useSubmissionsApi.interface';
 import PublishSecurityReviewButton from './PublishSecurityReview/PublishSecurityReviewButton';
 
 export interface ISubmissionHeaderToolbarProps {
   submissionFeatureIds: Pick<GridRowSelectionModel, 'ids'>;
+  submissionId: number;
+  submission: SubmissionRecordWithSecurity;
+  handleRefresh: () => void;
 }
 
 /**
  * Submission header toolbar for admin single-submission view.
  *
- * @return {*}
+ * @returns {*}
  */
-const SubmissionHeaderToolbar = (props: ISubmissionHeaderToolbarProps) => {
-  const submissionContext = useSubmissionContext();
-  const dialogContext = useDialogContext();
+export const SubmissionHeaderToolbar = ({
+  submissionFeatureIds,
+  submissionId,
+  submission,
+  handleRefresh
+}: ISubmissionHeaderToolbarProps) => {
   const api = useApi();
 
-  const submissionRecordDataLoader = submissionContext.submissionRecordDataLoader;
-
-  if (!submissionRecordDataLoader.data) {
-    return <></>;
-  }
-
-  const submission = submissionRecordDataLoader.data;
-
   const onSecurityReviewComplete = async () => {
-    await api.submissions.updateSubmissionRecord(submissionContext.submissionId, { security_reviewed: true });
-    dialogContext.setSnackbar({
-      open: true,
-      snackbarMessage: 'Submission Security Reviewed'
-    });
-    submissionRecordDataLoader.refresh(submissionContext.submissionId);
+    await api.submissions.updateSubmissionRecord(submissionId, { security_reviewed: true });
+    handleRefresh?.();
   };
 
   const onSecurityReviewRemove = async () => {
-    await api.submissions.updateSubmissionRecord(submissionContext.submissionId, {
+    await api.submissions.updateSubmissionRecord(submissionId, {
       security_reviewed: false,
       published: false
     });
-    dialogContext.setSnackbar({
-      open: true,
-      snackbarMessage: 'Submission Security Review Reopened'
-    });
-    submissionRecordDataLoader.refresh(submissionContext.submissionId);
+    handleRefresh?.();
   };
 
   const onSecurityReviewPublish = async () => {
-    await api.submissions.updateSubmissionRecord(submissionContext.submissionId, {
+    await api.submissions.updateSubmissionRecord(submissionId, {
       security_reviewed: true,
       published: true
     });
-    dialogContext.setSnackbar({
-      open: true,
-      snackbarMessage: 'Submission Published'
-    });
-    submissionRecordDataLoader.refresh(submissionContext.submissionId);
+    handleRefresh?.();
   };
 
   const onSecurityReviewUnPublish = async () => {
-    await api.submissions.updateSubmissionRecord(submissionContext.submissionId, {
+    await api.submissions.updateSubmissionRecord(submissionId, {
       published: false
     });
-    dialogContext.setSnackbar({
-      open: true,
-      snackbarMessage: 'Submission Unpublished'
-    });
-    submissionRecordDataLoader.refresh(submissionContext.submissionId);
+    handleRefresh?.();
   };
 
   return (
     <Stack flexDirection="row" alignItems="center" gap={1}>
-      <ManageSecurity
-        submissionFeatureIds={props.submissionFeatureIds}
-        onClose={() => {
-          submissionRecordDataLoader.refresh(submissionContext.submissionId);
-          submissionContext.submissionFeatureGroupsDataLoader.refresh(submissionContext.submissionId);
-        }}
-      />
+      <ManageSecurity submissionFeatureIds={submissionFeatureIds} onClose={handleRefresh} />
 
       <CompleteSecurityReviewButton
         submission={submission}
         onComplete={onSecurityReviewComplete}
         onRemove={onSecurityReviewRemove}
       />
+
       {submission.publish_timestamp == null && <Icon path={mdiArrowRight} size={0.75} />}
+
       <PublishSecurityReviewButton
         submission={submission}
         onComplete={onSecurityReviewPublish}
@@ -98,5 +76,3 @@ const SubmissionHeaderToolbar = (props: ISubmissionHeaderToolbarProps) => {
     </Stack>
   );
 };
-
-export default SubmissionHeaderToolbar;

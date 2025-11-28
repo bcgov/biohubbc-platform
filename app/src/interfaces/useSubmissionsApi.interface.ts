@@ -1,3 +1,4 @@
+import { ApiPaginationResponseParams } from 'types/misc';
 import { SECURITY_APPLIED_STATUS } from './useDatasetApi.interface';
 
 /** NET-NEW INTERFACES FOR UPDATED SCHEMA **/
@@ -87,6 +88,21 @@ export interface IGetSubmissionGroupedFeatureResponse {
   feature_type_name: string;
   feature_type_display_name: string;
   features: SubmissionFeatureRecordWithTypeAndSecurity[];
+}
+
+export type ISubmissionFeatureForReview = {
+  submission_feature_id: number;
+  uuid: string;
+  submission_id: number;
+  feature_type_id: number;
+  feature_type_name: string;
+  secured: boolean;
+  submission_feature_security_ids: number[];
+};
+
+export interface ISubmissionFeatureForReviewResponse {
+  features: ISubmissionFeatureForReview[];
+  pagination: ApiPaginationResponseParams;
 }
 
 export interface IGetDownloadSubmissionResponse {
