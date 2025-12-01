@@ -1,29 +1,45 @@
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import { UrnEditorContextProvider } from 'contexts/urnEditorContext';
 import { useFormikContext } from 'formik';
-import { IAddPolicyFormValues } from 'interfaces/usePoliciesApi.interface';
 import yup from 'utils/YupSchema';
-import PolicyStatementsEditor from './PolicyStatementsEditor';
+import PolicyJsonEditor from './PolicyJsonEditor';
+import { defaultPolicyDocument, validatePolicyJson } from '../utils/policyTransform';
+
+/**
+ * Policy form values (for Formik) - JSON-based.
+ */
+export interface IAddPolicyFormValues {
+  name: string;
+  description: string;
+  policy_json: string;
+}
 
 export const AddPolicyFormInitialValues: IAddPolicyFormValues = {
   name: '',
   description: '',
-  statements: []
+  policy_json: JSON.stringify(defaultPolicyDocument, null, 2)
 };
 
 export const AddPolicyFormYupSchema = yup.object().shape({
   name: yup.string().required('Policy name is required'),
   description: yup.string(),
-  statements: yup.array().of(
-    yup.object().shape({
-      effect: yup.string().oneOf(['allow', 'deny']).required('Effect is required'),
-      submission_feature_urn: yup.string().required('Submission feature URN is required')
+  policy_json: yup
+    .string()
+    .required('Policy document is required')
+    .test('valid-policy', function (value) {
+      const error = validatePolicyJson(value || '');
+      if (error) {
+        return this.createError({ message: error });
+      }
+      return true;
     })
-  )
 });
 
 const AddPolicyForm: React.FC = () => {
-  const { values, handleChange, handleSubmit, errors, touched } = useFormikContext<IAddPolicyFormValues>();
+  const { values, handleChange, handleSubmit, errors, touched, setFieldValue } =
+    useFormikContext<IAddPolicyFormValues>();
 
   return (
     <form onSubmit={handleSubmit}>
@@ -51,7 +67,23 @@ const AddPolicyForm: React.FC = () => {
           fullWidth
         />
 
-        <PolicyStatementsEditor />
+        <Box>
+          <Typography variant="h6" mb={1}>
+            Policy Document
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Define policy statements using JSON. Use the format:{' '}
+            <code>urn:&lt;submissionId&gt;:&lt;featureType&gt;:&lt;featureId&gt;</code> for resources. Use{' '}
+            <code>*</code> as a wildcard.
+          </Typography>
+          <UrnEditorContextProvider>
+            <PolicyJsonEditor
+              value={values.policy_json}
+              onChange={(val) => setFieldValue('policy_json', val)}
+              error={touched.policy_json ? (errors.policy_json as string) : undefined}
+            />
+          </UrnEditorContextProvider>
+        </Box>
       </Box>
     </form>
   );

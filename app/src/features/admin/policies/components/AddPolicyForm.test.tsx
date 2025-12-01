@@ -1,8 +1,7 @@
 import { fireEvent, waitFor } from '@testing-library/react';
 import { Formik } from 'formik';
-import { IAddPolicyFormValues } from 'interfaces/usePoliciesApi.interface';
 import { cleanup, render } from 'test-helpers/test-utils';
-import AddPolicyForm, { AddPolicyFormInitialValues } from './AddPolicyForm';
+import AddPolicyForm, { AddPolicyFormInitialValues, IAddPolicyFormValues } from './AddPolicyForm';
 
 const renderContainer = (initialValues: IAddPolicyFormValues = AddPolicyFormInitialValues) => {
   return render(
@@ -33,12 +32,11 @@ describe('AddPolicyForm', () => {
     });
   });
 
-  it('renders the PolicyStatementsEditor', async () => {
+  it('renders the Policy Document section', async () => {
     const { getByText } = renderContainer();
 
     await waitFor(() => {
-      expect(getByText('Policy Statements')).toBeVisible();
-      expect(getByText('Add Statement')).toBeVisible();
+      expect(getByText('Policy Document')).toBeVisible();
     });
   });
 
@@ -46,7 +44,7 @@ describe('AddPolicyForm', () => {
     const { getByDisplayValue } = renderContainer({
       name: 'Test Policy',
       description: 'Test description',
-      statements: []
+      policy_json: JSON.stringify({ Version: '2024-01-01', Statement: [] }, null, 2)
     });
 
     await waitFor(() => {

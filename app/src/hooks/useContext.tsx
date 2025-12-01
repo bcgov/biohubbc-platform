@@ -1,6 +1,7 @@
 import { CodesContext, ICodesContext } from 'contexts/codesContext';
 import { ConfigContext, IConfig } from 'contexts/configContext';
 import { DialogContext, IDialogContext } from 'contexts/dialogContext';
+import { IUrnEditorContext, UrnEditorContext } from 'contexts/urnEditorContext';
 import { useContext } from 'react';
 import { ISubmissionContext, SubmissionContext } from '../contexts/submissionContext';
 
@@ -61,6 +62,23 @@ export const useDialogContext = (): IDialogContext => {
   if (!context) {
     throw Error(
       'DialogContext2 is undefined, please verify you are calling useDialogContext() as child of an <DialogContextProvider2> component.'
+    );
+  }
+
+  return context;
+};
+
+/**
+ * Returns an instance of `IUrnEditorContext` from `UrnEditorContext`.
+ *
+ * @return {*}  {IUrnEditorContext}
+ */
+export const useUrnEditorContext = (): IUrnEditorContext => {
+  const context = useContext(UrnEditorContext);
+
+  if (!context) {
+    throw new Error(
+      'UrnEditorContext is undefined, please verify you are calling useUrnEditorContext() as child of a <UrnEditorContextProvider> component.'
     );
   }
 

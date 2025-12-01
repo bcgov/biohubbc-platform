@@ -36,7 +36,9 @@ describe('ActivePoliciesList', () => {
     const mockRefresh = vi.fn();
     const { getByText } = renderContainer({
       policies: [],
-      refresh: mockRefresh
+      refresh: mockRefresh,
+      searchTerm: '',
+      onSearch: vi.fn()
     });
 
     await waitFor(() => {
@@ -64,7 +66,9 @@ describe('ActivePoliciesList', () => {
           ]
         }
       ],
-      refresh: mockRefresh
+      refresh: mockRefresh,
+      searchTerm: '',
+      onSearch: vi.fn()
     });
 
     await waitFor(() => {
@@ -85,7 +89,9 @@ describe('ActivePoliciesList', () => {
           statements: []
         }
       ],
-      refresh: mockRefresh
+      refresh: mockRefresh,
+      searchTerm: '',
+      onSearch: vi.fn()
     });
 
     await waitFor(() => {
@@ -98,7 +104,9 @@ describe('ActivePoliciesList', () => {
     const mockRefresh = vi.fn();
     const { getByTestId } = renderContainer({
       policies: [],
-      refresh: mockRefresh
+      refresh: mockRefresh,
+      searchTerm: '',
+      onSearch: vi.fn()
     });
 
     await waitFor(() => {

@@ -1,9 +1,10 @@
-import { mdiDotsVertical, mdiPencilOutline, mdiPlus, mdiTrashCanOutline } from '@mdi/js';
+import { mdiDotsVertical, mdiMagnify, mdiPencilOutline, mdiPlus, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Container from '@mui/material/Container';
+import InputAdornment from '@mui/material/InputAdornment';
 import Paper from '@mui/material/Paper';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -12,6 +13,7 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
+import TextField from '@mui/material/TextField';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import EditDialog from 'components/dialog/EditDialog';
@@ -20,11 +22,16 @@ import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import { IAddPolicyFormValues, IPolicy } from 'interfaces/usePoliciesApi.interface';
+import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { useState } from 'react';
 import { handleChangePage, handleChangeRowsPerPage } from 'utils/tablePaginationUtils';
-import { v4 as uuidv4 } from 'uuid';
-import AddPolicyForm, { AddPolicyFormInitialValues, AddPolicyFormYupSchema } from './AddPolicyForm';
+import AddPolicyForm, {
+  AddPolicyFormInitialValues,
+  AddPolicyFormYupSchema,
+  IAddPolicyFormValues
+} from './AddPolicyForm';
+import { parsePolicyError } from '../utils/policyErrorParser';
+import { transformApiToPolicyJson, transformPolicyJsonToApi } from '../utils/policyTransform';
 
 const useStyles = () => {
   return {
@@ -39,6 +46,8 @@ const useStyles = () => {
 export interface IActivePoliciesListProps {
   policies: IPolicy[];
   refresh: () => void;
+  searchTerm: string;
+  onSearch: (term: string) => void;
 }
 
 /**
@@ -136,10 +145,12 @@ const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListPr
     setIsLoading(true);
 
     try {
+      const statements = transformPolicyJsonToApi(values.policy_json);
+
       await biohubApi.policies.createPolicy({
         name: values.name,
         description: values.description || undefined,
-        statements: values.statements
+        statements
       });
 
       setOpenAddPolicyDialog(false);
@@ -154,12 +165,13 @@ const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListPr
       });
     } catch (error) {
       const apiError = error as APIError;
+      const parsedError = parsePolicyError(apiError);
+
       dialogContext.setErrorDialog({
         open: true,
-        dialogTitle: 'Error Creating Policy',
-        dialogText: 'An error occurred while creating the policy.',
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
+        dialogTitle: parsedError.title,
+        dialogText: parsedError.message,
+        dialogError: parsedError.suggestion,
         onClose: () => {
           dialogContext.setErrorDialog({ open: false });
         },
@@ -180,10 +192,12 @@ const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListPr
     setIsLoading(true);
 
     try {
+      const statements = transformPolicyJsonToApi(values.policy_json);
+
       await biohubApi.policies.updatePolicy(editingPolicy.policy_id, {
         name: values.name,
         description: values.description || undefined,
-        statements: values.statements
+        statements
       });
 
       setOpenEditPolicyDialog(false);
@@ -199,12 +213,13 @@ const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListPr
       });
     } catch (error) {
       const apiError = error as APIError;
+      const parsedError = parsePolicyError(apiError);
+
       dialogContext.setErrorDialog({
         open: true,
-        dialogTitle: 'Error Updating Policy',
-        dialogText: 'An error occurred while updating the policy.',
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
+        dialogTitle: parsedError.title,
+        dialogText: parsedError.message,
+        dialogError: parsedError.suggestion,
         onClose: () => {
           dialogContext.setErrorDialog({ open: false });
         },
@@ -224,11 +239,7 @@ const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListPr
     return {
       name: editingPolicy.name,
       description: editingPolicy.description || '',
-      statements: editingPolicy.statements.map((s) => ({
-        _key: uuidv4(),
-        effect: s.effect,
-        submission_feature_urn: s.submission_feature_urn
-      }))
+      policy_json: transformApiToPolicyJson(editingPolicy.statements)
     };
   };
 
@@ -262,7 +273,9 @@ const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListPr
           <Toolbar
             sx={{
               pl: { sm: 2 },
-              pr: { xs: 1, sm: 1 }
+              pr: { xs: 1, sm: 1 },
+              display: 'flex',
+              justifyContent: 'space-between'
             }}>
             <Typography variant="h4" component="h2">
               Active Policies{' '}
@@ -270,6 +283,22 @@ const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListPr
                 ({policies?.length || 0})
               </Typography>
             </Typography>
+            <TextField
+              size="small"
+              placeholder="Search by policy name"
+              value={props.searchTerm}
+              onChange={(e) => props.onSearch(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Icon path={mdiMagnify} size={0.875} />
+                    </InputAdornment>
+                  )
+                }
+              }}
+              sx={{ width: 300 }}
+            />
           </Toolbar>
           <TableContainer>
             <Table sx={classes.table}>
