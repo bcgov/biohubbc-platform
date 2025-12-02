@@ -1,5 +1,5 @@
 # ########################################################################################################
-# This DockerFile is used for Openshift deployments only.
+# This DockerFile is used for Openshift deployments for the BullMQ worker/publisher.
 # ########################################################################################################
 
 #####################################################
@@ -67,7 +67,7 @@ USER 0
 
 ENV HOME=/opt/app-root/src
 
-# Create a src directory for the dist files so that any relative paths that refernce 'src' are preserved
+# Create a src directory for the dist files so that any relative paths that reference 'src' are preserved
 RUN mkdir -p $HOME/src
 
 # See "Support arbitrary user ids"
@@ -89,10 +89,10 @@ ENV PATH ${HOME}/node_modules/.bin/:${HOME}/.npm-global/bin/:${HOME}/bin:/usr/lo
 # Application VOLUME
 VOLUME ${HOME}
 
-# Application PORT
+# Application PORT (not exposed, worker only)
 EXPOSE 6100
 
 USER 1001
 
 # Application Entry point
-CMD ["node", "src/queue.js"]
+CMD ["node", "src/bullmq/index.js"]

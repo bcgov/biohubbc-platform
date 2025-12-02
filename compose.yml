@@ -116,13 +116,25 @@ services:
       db_setup:
         condition: service_completed_successfully
 
-  # Build the api_worker docker image
+  ## Redis for background queue
+  redis:
+    image: redis:7.2-alpine
+    container_name: ${DOCKER_PROJECT_NAME}-redis-${DOCKER_NAMESPACE}-container
+    ports:
+      - ${REDIS_PORT}:6379
+    command: ["redis-server", "--appendonly", "no", "--maxmemory-policy", "noeviction"]
+    networks:
+      - biohubbc-network
+    volumes:
+      - redis-data:/data
+
+  # BullMQ worker + publisher
   queue:
     image: ${DOCKER_PROJECT_NAME}-queue-${DOCKER_NAMESPACE}-img
     container_name: ${DOCKER_PROJECT_NAME}-queue-${DOCKER_NAMESPACE}-container
     build:
       context: ./api
-      dockerfile: ./.docker/queue/Dockerfile
+      dockerfile: ./.docker/bullmq/Dockerfile
     environment:
       - NODE_ENV=${NODE_ENV}
       - S3_KEY_PREFIX=${S3_KEY_PREFIX}
@@ -145,14 +157,28 @@ services:
       - OBJECT_STORE_BUCKET_NAME=${OBJECT_STORE_BUCKET_NAME}
       - LOG_LEVEL=${LOG_LEVEL}
       - APP_HOST=${APP_HOST}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_USE_TLS=${REDIS_USE_TLS}
+      - BULLMQ_QUEUE_NAME=${BULLMQ_QUEUE_NAME}
+      - BULLMQ_SYNC_INTERVAL_MS=${BULLMQ_SYNC_INTERVAL_MS}
+      - BULLMQ_WORKER_CONCURRENCY=${BULLMQ_WORKER_CONCURRENCY}
+      - BULLMQ_JOB_ATTEMPTS=${BULLMQ_JOB_ATTEMPTS}
+      - BULLMQ_JOB_TIMEOUT_MS=${BULLMQ_JOB_TIMEOUT_MS}
+      - BULLMQ_JOB_BACKOFF_MS=${BULLMQ_JOB_BACKOFF_MS}
     volumes:
       - ./api:/opt/app-root/src
       - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
     networks:
       - biohubbc-network
     depends_on:
-      - db
-      - db_setup
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
+      db_setup:
+        condition: service_completed_successfully
 
   # Build the clamav docker image
   clamav:
@@ -227,3 +253,5 @@ networks:
 volumes:
   postgres:
     name: ${DOCKER_PROJECT_NAME}-db-${DOCKER_NAMESPACE}-vol
+  redis-data:
+    name: ${DOCKER_PROJECT_NAME}-redis-${DOCKER_NAMESPACE}-vol
