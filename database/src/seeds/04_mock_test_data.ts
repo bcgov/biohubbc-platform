@@ -456,11 +456,11 @@ export const insertTelemetryRecord = async (
 ): Promise<number> => {
   const telemetryData = {
     device_id: faker.string.alphanumeric({ length: 8 }),
-    latitude: faker.number.float({ min: 48.617424, max: 60.664785, precision: 0.000001 }),
-    longitude: faker.number.float({ min: -135.878906, max: -114.433594, precision: 0.000001 }),
+    latitude: faker.number.float({ min: 48.617424, max: 60.664785, multipleOf: 0.000001 }),
+    longitude: faker.number.float({ min: -135.878906, max: -114.433594, multipleOf: 0.000001 }),
     timestamp: faker.date.recent().toISOString(),
-    temperature: faker.number.float({ min: -20, max: 50, precision: 0.1 }),
-    humidity: faker.number.float({ min: 0, max: 100, precision: 0.1 }),
+    temperature: faker.number.float({ min: -20, max: 50, multipleOf: 0.1 }),
+    humidity: faker.number.float({ min: 0, max: 100, multipleOf: 0.1 }),
     status: faker.helpers.arrayElement(['active', 'idle', 'error'])
   };
 
