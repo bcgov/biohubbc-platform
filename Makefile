@@ -98,13 +98,13 @@ build-backend: ## Builds all backend containers
 	@echo "==============================================="
 	@echo "Make: build-backend - building backend images"
 	@echo "==============================================="
-	@docker compose build db db_setup api
+	@docker compose build db db_setup api redis
 
 run-backend: ## Runs all backend containers
 	@echo "==============================================="
 	@echo "Make: run-backend - running backend images"
 	@echo "==============================================="
-	@docker compose up -d db db_setup api
+	@docker compose up -d db db_setup api redis
 
 ## ------------------------------------------------------------------------------
 ## Build/Run Backend+Web Commands (backend + web frontend)
@@ -115,13 +115,13 @@ build-web: ## Builds all backend+web containers
 	@echo "==============================================="
 	@echo "Make: build-web - building web images"
 	@echo "==============================================="
-	@docker compose build db db_setup api app
+	@docker compose build db db_setup api app redis
 
 run-web: ## Runs all backend+web containers
 	@echo "==============================================="
 	@echo "Make: run-web - running web images"
 	@echo "==============================================="
-	@docker compose up -d db db_setup api app
+	@docker compose up -d db db_setup api app redis
 
 ## ------------------------------------------------------------------------------
 ## Commands to shell into the target container
@@ -150,7 +150,7 @@ queue-container: ## Executes into the queue container.
 	@echo "==============================================="
 	@echo "Shelling into queue container"
 	@echo "==============================================="
-	@docker compose exec queue bash
+	@docker compose exec redis bash
 
 ## ------------------------------------------------------------------------------
 ## Database migration commands
@@ -308,6 +308,13 @@ log-db-setup: ## Runs `docker logs <container> -f` for the database setup contai
 	@echo "Running docker logs for the db-setup container"
 	@echo "==============================================="
 	@docker logs $(DOCKER_PROJECT_NAME)-db-setup-$(DOCKER_NAMESPACE)-container -f $(args)
+
+log-redis:
+## Runs `docker logs <container> -f` for the redis container
+	@echo "==============================================="
+	@echo "Running docker logs for the redis container"
+	@echo "==============================================="
+	@docker logs $(DOCKER_PROJECT_NAME)-redis-$(DOCKER_NAMESPACE)-container -f $(args)
 
 ## ------------------------------------------------------------------------------
 ## Typescript Trace Commands
