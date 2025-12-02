@@ -130,6 +130,7 @@ describe('intake', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: '2023-12-12',
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,

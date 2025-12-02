@@ -32,6 +32,7 @@ GET.apiDoc = {
                 'source_system',
                 'name',
                 'description',
+                'record_end_date',
                 'create_date',
                 'create_user',
                 'update_date',
@@ -76,6 +77,9 @@ GET.apiDoc = {
                 description: {
                   type: 'string',
                   maxLength: 3000
+                },
+                record_end_date: {
+                  type: 'string'
                 },
                 create_date: {
                   type: 'string'

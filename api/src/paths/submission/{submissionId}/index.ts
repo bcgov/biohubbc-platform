@@ -48,6 +48,7 @@ GET.apiDoc = {
               'name',
               'description',
               'comment',
+              'record_end_date',
               'create_date',
               'create_user',
               'update_date',
@@ -93,6 +94,9 @@ GET.apiDoc = {
               comment: {
                 type: 'string',
                 maxLength: 3000
+              },
+              record_end_date: {
+                type: 'string'
               },
               create_date: {
                 type: 'string'
