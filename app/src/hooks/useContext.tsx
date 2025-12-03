@@ -1,7 +1,7 @@
 import { CodesContext, ICodesContext } from 'contexts/codesContext';
 import { ConfigContext, IConfig } from 'contexts/configContext';
 import { DialogContext, IDialogContext } from 'contexts/dialogContext';
-import { IUrnEditorContext, UrnEditorContext } from 'contexts/urnEditorContext';
+import { IPolicyAutocompleteContext, PolicyAutocompleteContext } from 'contexts/policyAutocompleteContext';
 import { useContext } from 'react';
 import { ISubmissionContext, SubmissionContext } from '../contexts/submissionContext';
 
@@ -69,16 +69,16 @@ export const useDialogContext = (): IDialogContext => {
 };
 
 /**
- * Returns an instance of `IUrnEditorContext` from `UrnEditorContext`.
+ * Returns an instance of `IPolicyAutocompleteContext` from `PolicyAutocompleteContext`.
  *
- * @return {*}  {IUrnEditorContext}
+ * @return {*}  {IPolicyAutocompleteContext}
  */
-export const useUrnEditorContext = (): IUrnEditorContext => {
-  const context = useContext(UrnEditorContext);
+export const usePolicyAutocompleteContext = (): IPolicyAutocompleteContext => {
+  const context = useContext(PolicyAutocompleteContext);
 
   if (!context) {
     throw new Error(
-      'UrnEditorContext is undefined, please verify you are calling useUrnEditorContext() as child of a <UrnEditorContextProvider> component.'
+      'PolicyAutocompleteContext is undefined, please verify you are calling usePolicyAutocompleteContext() as child of a <PolicyAutocompleteContextProvider> component.'
     );
   }
 

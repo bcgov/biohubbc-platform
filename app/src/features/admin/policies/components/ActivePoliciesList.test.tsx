@@ -2,7 +2,7 @@ import { useApi } from 'hooks/useApi';
 import { MemoryRouter } from 'react-router';
 import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
-import ActivePoliciesList, { IActivePoliciesListProps } from './ActivePoliciesList';
+import { ActivePoliciesList, IActivePoliciesListProps } from './ActivePoliciesList';
 
 const renderContainer = (props: IActivePoliciesListProps) => {
   return render(

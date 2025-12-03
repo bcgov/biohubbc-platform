@@ -3,7 +3,7 @@ import { useApi } from 'hooks/useApi';
 import { MemoryRouter } from 'react-router';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
-import ManagePoliciesPage from './ManagePoliciesPage';
+import { ManagePoliciesPage } from './ManagePoliciesPage';
 
 const renderContainer = () => {
   return render(

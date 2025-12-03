@@ -105,7 +105,7 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
           aria-labelledby="edit-dialog-title"
           aria-describedby="edit-dialog-description">
           <DialogTitle id="edit-dialog-title">{props.dialogTitle}</DialogTitle>
-          <DialogContent sx={{ overflow: 'visible' }}>{props.component.element}</DialogContent>
+          <DialogContent>{props.component.element}</DialogContent>
           <DialogActions>
             <Button
               loading={props.isLoading}

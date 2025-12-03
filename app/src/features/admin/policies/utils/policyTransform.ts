@@ -41,23 +41,10 @@ export const defaultPolicyDocument: IPolicyDocument = {
 };
 
 /**
- * Condition values are stored in a PostgreSQL jsonb column.
- * When we insert, we use JSON.stringify() to convert the JavaScript value to JSON.
- * PostgreSQL automatically parses jsonb when reading, so the value comes back
- * as the correct JavaScript type - no additional parsing needed.
+ * Transform a JSON policy document string to API format for submission.
  *
- * For example:
- * - JS string "333" → stored as JSON '"333"' → returned as JS string "333"
- * - JS number 333 → stored as JSON '333' → returned as JS number 333
- * - JS object {a:1} → stored as JSON '{"a":1}' → returned as JS object {a:1}
- */
-const parseConditionValue = (value: unknown): unknown => {
-  // PostgreSQL jsonb already parses the value, return as-is
-  return value;
-};
-
-/**
- * Transform JSON policy document to API format for submission.
+ * @param {string} policyJson - JSON string representing the policy document (IPolicyDocument structure)
+ * @returns {ICreatePolicyStatementRequest[]} Array of policy statement requests ready for API submission
  */
 export const transformPolicyJsonToApi = (policyJson: string): ICreatePolicyStatementRequest[] => {
   const policy: IPolicyDocument = JSON.parse(policyJson);
@@ -75,7 +62,10 @@ export const transformPolicyJsonToApi = (policyJson: string): ICreatePolicyState
 };
 
 /**
- * Transform API policy data to JSON document format for editing.
+ * Transform API policy statement data to JSON document format for editing in the Monaco editor.
+ *
+ * @param {IPolicyStatement[]} statements - Array of policy statements from the API
+ * @returns {string} Formatted JSON string representing the policy document
  */
 export const transformApiToPolicyJson = (statements: IPolicyStatement[]): string => {
   const policy: IPolicyDocument = {
@@ -88,8 +78,7 @@ export const transformApiToPolicyJson = (statements: IPolicyStatement[]): string
           Condition: stmt.conditions.map((cond) => ({
             Operator: cond.operator as PolicyConditionOperator,
             Key: cond.key,
-            // Parse the value - try JSON.parse first, fall back to raw value if it fails
-            Value: parseConditionValue(cond.value)
+            Value: cond.value
           }))
         })
     }))
@@ -99,7 +88,10 @@ export const transformApiToPolicyJson = (statements: IPolicyStatement[]): string
 };
 
 /**
- * Transform full policy object to JSON document format for editing.
+ * Transform a full policy object to JSON document format for editing in the Monaco editor.
+ *
+ * @param {IPolicy} policy - The complete policy object from the API (includes metadata and statements)
+ * @returns {string} Formatted JSON string representing the policy document
  */
 export const transformPolicyToJson = (policy: IPolicy): string => {
   return transformApiToPolicyJson(policy.statements);
@@ -108,9 +100,18 @@ export const transformPolicyToJson = (policy: IPolicy): string => {
 const URN_PATTERN = /^urn:(\*|\d+):(\*|[a-z_]+):(\*|\d+)$/;
 
 /**
- * Validate a single condition object.
+ * Validate a single condition object within a policy statement.
+ *
+ * @param {Partial<IPolicyDocumentCondition>} cond - The condition object to validate (expects Operator, Key, Value properties)
+ * @param {number} stmtIndex - Zero-based index of the parent statement in the policy (used for error messages)
+ * @param {number} condIndex - Zero-based index of this condition within the statement's Condition array
+ * @returns {string | null} Error message if validation fails, null if valid
  */
-const validateCondition = (cond: any, stmtIndex: number, condIndex: number): string | null => {
+const validateCondition = (
+  cond: Partial<IPolicyDocumentCondition>,
+  stmtIndex: number,
+  condIndex: number
+): string | null => {
   if (!cond.Operator) {
     return `Statement ${stmtIndex + 1}, Condition ${condIndex + 1}: Operator is required`;
   }
@@ -124,9 +125,16 @@ const validateCondition = (cond: any, stmtIndex: number, condIndex: number): str
 };
 
 /**
- * Validate conditions array for a statement.
+ * Validate the conditions array for a policy statement.
+ *
+ * @param {Partial<IPolicyDocumentCondition>[] | unknown} conditions - The Condition array from a statement (should be an array of condition objects)
+ * @param {number} stmtIndex - Zero-based index of the parent statement in the policy (used for error messages)
+ * @returns {string | null} Error message if validation fails, null if all conditions are valid
  */
-const validateConditions = (conditions: any, stmtIndex: number): string | null => {
+const validateConditions = (
+  conditions: Partial<IPolicyDocumentCondition>[] | unknown,
+  stmtIndex: number
+): string | null => {
   if (!Array.isArray(conditions)) {
     return `Statement ${stmtIndex + 1}: Condition must be an array`;
   }
@@ -140,9 +148,13 @@ const validateConditions = (conditions: any, stmtIndex: number): string | null =
 };
 
 /**
- * Validate a single statement object.
+ * Validate a single policy statement object.
+ *
+ * @param {Partial<IPolicyDocumentStatement>} stmt - The statement object to validate (expects Effect, Resource, and optional Condition properties)
+ * @param {number} index - Zero-based index of this statement in the policy's Statement array (used for error messages)
+ * @returns {string | null} Error message if validation fails, null if valid
  */
-const validateStatement = (stmt: any, index: number): string | null => {
+const validateStatement = (stmt: Partial<IPolicyDocumentStatement>, index: number): string | null => {
   if (!stmt.Effect || !['Allow', 'Deny'].includes(stmt.Effect)) {
     return `Statement ${index + 1}: Effect must be "Allow" or "Deny"`;
   }
@@ -159,12 +171,14 @@ const validateStatement = (stmt: any, index: number): string | null => {
 };
 
 /**
- * Validate policy JSON string.
- * Returns null if valid, error message if invalid.
+ * Validate a policy JSON string for structural correctness.
  *
  * Note: This performs basic structural validation only. Detailed validation
  * (operator/key/value compatibility) is handled by the database trigger
  * tr_validate_policy_condition_key().
+ *
+ * @param {string} policyJson - JSON string representing the policy document to validate
+ * @returns {string | null} Error message if validation fails, null if valid
  */
 export const validatePolicyJson = (policyJson: string): string | null => {
   try {

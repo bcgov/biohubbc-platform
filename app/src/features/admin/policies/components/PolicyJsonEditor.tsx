@@ -1,14 +1,34 @@
-import Editor, { OnMount } from '@monaco-editor/react';
+import Editor, { OnMount, OnValidate } from '@monaco-editor/react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { useUrnEditorContext } from 'hooks/useContext';
+import { usePolicyAutocompleteContext } from 'hooks/useContext';
+import type { editor, languages } from 'monaco-editor';
 import { useRef, useState } from 'react';
 import { operatorMetadata, PolicyConditionOperators, policyJsonSchema } from '../utils/policyJsonSchema';
 import { defaultPolicyDocument } from '../utils/policyTransform';
 
+/**
+ * Monaco editor API type.
+ * Note: We use a permissive type here because the Monaco types from @monaco-editor/react
+ * and monaco-editor have slight incompatibilities. The runtime values are compatible.
+ */
+type MonacoEditor = any;
+
+/** Cursor position in the editor */
+interface EditorPosition {
+  lineNumber: number;
+  column: number;
+}
+
+/**
+ * Props for the PolicyJsonEditor component.
+ */
 interface PolicyJsonEditorProps {
+  /** The JSON policy document string to display/edit */
   value: string;
+  /** Callback when editor content changes */
   onChange: (value: string) => void;
+  /** Optional external error message to display */
   error?: string;
 }
 
@@ -17,11 +37,18 @@ let providerRegistered = false;
 
 /**
  * Handle colon input inside URN values - prefetch features if needed.
- * Returns true if suggestions should be triggered.
+ *
+ * When a user types ":" inside a Resource URN value, this function checks if
+ * we have a submission ID and prefetches the features for autocomplete.
+ *
+ * @param {string} textUntilPosition - All text from document start to cursor position
+ * @param {editor.IStandaloneCodeEditor} editorInstance - Monaco editor instance
+ * @param {typeof sharedContextRef.current} context - Shared context with submissions and cache
+ * @returns {boolean} True if suggestions should be triggered immediately, false if waiting for fetch
  */
 const handleUrnColonInput = (
   textUntilPosition: string,
-  editor: any,
+  editorInstance: editor.IStandaloneCodeEditor,
   context: typeof sharedContextRef.current
 ): boolean => {
   const resourceMatch = /"Resource"\s*:\s*"([^"]*)$/.exec(textUntilPosition);
@@ -37,10 +64,8 @@ const handleUrnColonInput = (
     const submissionId = Number.parseInt(parts[1], 10);
     if (!Number.isNaN(submissionId) && !context.submissionFeaturesCache.has(submissionId)) {
       // Fetch and wait before triggering suggestions
-      context.fetchFeaturesForSubmission(submissionId).then(() => {
-        setTimeout(() => {
-          editor.trigger('keyboard', 'editor.action.triggerSuggest', {});
-        }, 10);
+      context.fetchFeaturesForAutocomplete(submissionId).then(() => {
+        triggerSuggestionsDelayed(editorInstance);
       });
       return false; // Don't trigger suggestions until fetch completes
     }
@@ -51,7 +76,12 @@ const handleUrnColonInput = (
 
 /**
  * Handle quote input for Condition fields (Operator, Key, Value).
- * Returns true if suggestions should be triggered.
+ *
+ * Detects when user opens a quote after Operator, Key, or Value field names
+ * to trigger autocomplete suggestions.
+ *
+ * @param {string} textUntilPosition - All text from document start to cursor position
+ * @returns {boolean} True if cursor is inside a condition field value that supports autocomplete
  */
 const handleConditionQuoteInput = (textUntilPosition: string): boolean => {
   const operatorMatch = /"Operator"\s*:\s*"$/.exec(textUntilPosition);
@@ -62,15 +92,32 @@ const handleConditionQuoteInput = (textUntilPosition: string): boolean => {
 };
 
 /**
- * Trigger Monaco suggestions after a short delay.
+ * Trigger Monaco autocomplete suggestions after a short delay.
+ *
+ * The delay ensures the editor has processed the input before showing suggestions.
+ *
+ * @param {editor.IStandaloneCodeEditor} editorInstance - Monaco editor instance
+ * @returns {void}
  */
-const triggerSuggestionsDelayed = (editor: any) => {
+const triggerSuggestionsDelayed = (editorInstance: editor.IStandaloneCodeEditor) => {
   setTimeout(() => {
-    editor.trigger('keyboard', 'editor.action.triggerSuggest', {});
+    editorInstance.trigger('keyboard', 'editor.action.triggerSuggest', {});
   }, 10);
 };
 
-// Module-level ref to allow Monaco completion provider to access current context data
+/**
+ * Module-level ref to share context data with Monaco's completion provider.
+ *
+ * Monaco completion providers are registered globally per language (only once),
+ * but need access to React component state (submissions, feature types, cache).
+ * This ref bridges that gap by being updated on each render with current data.
+ *
+ * Contains:
+ * - submissions: List of published submissions for ID autocomplete
+ * - featureTypes: Available feature types from codes context
+ * - submissionFeaturesCache: Cached features per submission for feature ID autocomplete
+ * - fetchFeaturesForAutocomplete: Function to fetch and cache features on-demand
+ */
 const sharedContextRef: {
   current: {
     submissions: { submission_id: number; name: string }[];
@@ -85,37 +132,47 @@ const sharedContextRef: {
       number,
       { feature_type_name: string; features: { submission_feature_id: number }[] }[]
     >;
-    fetchFeaturesForSubmission: (submissionId: number) => Promise<void>;
+    fetchFeaturesForAutocomplete: (submissionId: number) => Promise<void>;
   };
 } = {
   current: {
     submissions: [],
     featureTypes: [],
     submissionFeaturesCache: new Map(),
-    fetchFeaturesForSubmission: async () => {}
+    fetchFeaturesForAutocomplete: async () => {}
   }
 };
 
-const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, error }) => {
-  const editorRef = useRef<any>(null);
-  const monacoRef = useRef<any>(null);
-  const urnContext = useUrnEditorContext();
-  const [parseError, setParseError] = useState<string | null>(null);
+/**
+ * Monaco Editor component for editing policy JSON documents with smart autocomplete.
+ *
+ * Features:
+ * - JSON schema validation with real-time error feedback
+ * - URN autocomplete: submission IDs, feature types, feature IDs
+ * - Condition autocomplete: operators, property keys, example values
+ * - Prefetches feature data as user types URN parts
+ *
+ * @param {PolicyJsonEditorProps} props - Component props
+ * @returns {React.ReactElement} The editor component
+ */
+export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, error }) => {
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const policyAutocompleteContext = usePolicyAutocompleteContext();
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   // Update shared ref so Monaco provider can access current data
   sharedContextRef.current = {
-    submissions: (urnContext.submissionsDataLoader.data || []).map((s) => ({
+    submissions: (policyAutocompleteContext.submissionsDataLoader.data || []).map((s) => ({
       submission_id: s.submission_id,
       name: s.name
     })),
-    featureTypes: urnContext.featureTypes as any,
-    submissionFeaturesCache: urnContext.submissionFeaturesCache,
-    fetchFeaturesForSubmission: urnContext.fetchFeaturesForSubmission
+    featureTypes: policyAutocompleteContext.featureTypes as any,
+    submissionFeaturesCache: policyAutocompleteContext.submissionFeaturesCache,
+    fetchFeaturesForAutocomplete: policyAutocompleteContext.fetchFeaturesForAutocomplete
   };
 
-  const handleEditorDidMount: OnMount = (editor, monaco) => {
-    editorRef.current = editor;
-    monacoRef.current = monaco;
+  const handleEditorDidMount: OnMount = (editorInstance, monaco) => {
+    editorRef.current = editorInstance;
 
     // Configure JSON schema validation
     const jsonLanguage = (monaco.languages as any)?.json;
@@ -141,7 +198,7 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
     // Register custom completion provider
     monaco.languages.registerCompletionItemProvider('json', {
       triggerCharacters: ['"', ':'],
-      provideCompletionItems: (model: any, position: any) => {
+      provideCompletionItems: (model: editor.ITextModel, position: EditorPosition) => {
         const textUntilPosition = model.getValueInRange({
           startLineNumber: 1,
           startColumn: 1,
@@ -159,10 +216,10 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
     });
 
     // Listen for content changes to trigger suggestions
-    editor.onDidChangeModelContent((e: any) => {
+    editorInstance.onDidChangeModelContent((e) => {
       for (const change of e.changes) {
-        const position = editor.getPosition();
-        const model = editor.getModel();
+        const position = editorInstance.getPosition();
+        const model = editorInstance.getModel();
         if (!position || !model) {
           continue;
         }
@@ -176,21 +233,38 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
 
         // Handle : inside URN values
         if (change.text === ':') {
-          const shouldTrigger = handleUrnColonInput(textUntilPosition, editor, sharedContextRef.current);
+          const shouldTrigger = handleUrnColonInput(textUntilPosition, editorInstance, sharedContextRef.current);
           if (shouldTrigger) {
-            triggerSuggestionsDelayed(editor);
+            triggerSuggestionsDelayed(editorInstance);
           }
         }
 
         // Handle " for Condition fields
         if (change.text === '"' && handleConditionQuoteInput(textUntilPosition)) {
-          triggerSuggestionsDelayed(editor);
+          triggerSuggestionsDelayed(editorInstance);
         }
       }
     });
   };
 
-  const getSuggestions = (textUntilPosition: string, monaco: any, position: any, textAfterCursor: string) => {
+  /**
+   * Route to the appropriate suggestion provider based on cursor context.
+   *
+   * Analyzes text before cursor to determine which field is being edited
+   * (Resource URN, Operator, Key, or Value) and delegates to the appropriate handler.
+   *
+   * @param {string} textUntilPosition - All text from document start to cursor
+   * @param {MonacoEditor} monaco - Monaco editor API
+   * @param {EditorPosition} position - Cursor position {lineNumber, column}
+   * @param {string} textAfterCursor - Text from cursor to end of line
+   * @returns {languages.CompletionItem[]} Array of Monaco CompletionItem objects
+   */
+  const getSuggestions = (
+    textUntilPosition: string,
+    monaco: MonacoEditor,
+    position: EditorPosition,
+    textAfterCursor: string
+  ): languages.CompletionItem[] => {
     // Calculate end column - if there's text before the closing quote, include it in the range
     const matchToQuote = /^([^"]*)"/.exec(textAfterCursor);
 
@@ -200,7 +274,7 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
     // Check if we're inside a "Resource" value (URN)
     const resourceMatch = /"Resource"\s*:\s*"([^"]*)$/.exec(textUntilPosition);
     if (resourceMatch) {
-      return getUrnSuggestions(resourceMatch[1], monaco, position, endColumn);
+      return getUrnSuggestions(resourceMatch[1], monaco, position);
     }
 
     // Check if we're inside an "Operator" value
@@ -227,10 +301,22 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
     return [];
   };
 
+  /** Suggestion item with display text and insert text */
   type Suggestion = { display: string; insert: string };
 
-  // Get suggestions for each part of the URN
-  // Format: urn:<submissionId>:<featureType>:<featureId>
+  /**
+   * Get autocomplete suggestions for a specific part of a URN.
+   *
+   * URN format: urn:<submissionId>:<featureType>:<featureId>
+   * - Part 0: Fixed "urn" prefix
+   * - Part 1: Submission ID (wildcard * or numeric ID)
+   * - Part 2: Feature type (wildcard * or type name like "telemetry")
+   * - Part 3: Feature ID (wildcard * or numeric ID from cached features)
+   *
+   * @param {number} partIndex - Which URN part is being edited (0-3)
+   * @param {string} currentUrn - The full URN string being built
+   * @returns {Suggestion[]} Array of suggestions with display and insert text
+   */
   const getPartSuggestions = (partIndex: number, currentUrn: string): Suggestion[] => {
     switch (partIndex) {
       case 0:
@@ -294,7 +380,22 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
     }
   };
 
-  const getUrnSuggestions = (urnValue: string, monaco: any, position: any, endColumn: number) => {
+  /**
+   * Generate Monaco autocomplete suggestions for URN Resource values.
+   *
+   * Parses the current URN to determine which part is being edited,
+   * prefetches features when needed, and returns filtered suggestions.
+   *
+   * @param {string} urnValue - The current URN value being typed (e.g., "urn:123:")
+   * @param {MonacoEditor} monaco - Monaco editor API
+   * @param {EditorPosition} position - Cursor position
+   * @returns {languages.CompletionItem[]} Array of Monaco CompletionItem objects
+   */
+  const getUrnSuggestions = (
+    urnValue: string,
+    monaco: MonacoEditor,
+    position: EditorPosition
+  ): languages.CompletionItem[] => {
     // Determine which part we're editing (split by :)
     // Format: urn:submissionId:featureType:featureId
     const parts = urnValue.split(':');
@@ -306,7 +407,7 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
     if (currentPartIndex >= 2 && parts[1]) {
       const submissionId = Number.parseInt(parts[1], 10);
       if (!Number.isNaN(submissionId)) {
-        sharedContextRef.current.fetchFeaturesForSubmission(submissionId);
+        sharedContextRef.current.fetchFeaturesForAutocomplete(submissionId);
       }
     }
 
@@ -336,7 +437,24 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
     }));
   };
 
-  const getOperatorSuggestions = (currentText: string, monaco: any, position: any, endColumn: number) => {
+  /**
+   * Generate autocomplete suggestions for condition Operator values.
+   *
+   * Filters available operators by what the user has typed and includes
+   * documentation about each operator's expected value type and examples.
+   *
+   * @param {string} currentText - Text already typed in the Operator field
+   * @param {MonacoEditor} monaco - Monaco editor API
+   * @param {EditorPosition} position - Cursor position
+   * @param {number} endColumn - Column position where replacement should end
+   * @returns {languages.CompletionItem[]} Array of Monaco CompletionItem objects
+   */
+  const getOperatorSuggestions = (
+    currentText: string,
+    monaco: MonacoEditor,
+    position: EditorPosition,
+    endColumn: number
+  ): languages.CompletionItem[] => {
     const startColumn = position.column - currentText.length;
 
     return PolicyConditionOperators.filter((op) => op.toLowerCase().includes(currentText.toLowerCase())).map(
@@ -357,7 +475,10 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
     );
   };
 
-  // Map operators to compatible property types
+  /**
+   * Maps operators to their compatible feature property types.
+   * Used to filter Key suggestions based on the selected Operator.
+   */
   const operatorPropertyTypes: Record<string, string[]> = {
     StringEquals: ['string'],
     StringNotEquals: ['string'],
@@ -375,7 +496,16 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
   };
 
   /**
-   * Check if a property should be included in key suggestions.
+   * Check if a property should be included in Key autocomplete suggestions.
+   *
+   * Filters based on operator compatibility, deduplication, and text matching.
+   *
+   * @param {string} propType - The property's data type (e.g., "string", "number")
+   * @param {string} propName - The property name
+   * @param {string} currentText - Text already typed in the Key field
+   * @param {string[] | null} compatibleTypes - Types compatible with selected operator, or null for all
+   * @param {Set<string>} seenProperties - Set of property names already added (for deduplication)
+   * @returns {boolean} True if property should be shown in suggestions
    */
   const shouldIncludeProperty = (
     propType: string,
@@ -393,14 +523,27 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
     return propName.toLowerCase().includes(currentText.toLowerCase());
   };
 
+  /**
+   * Generate autocomplete suggestions for condition Key values.
+   *
+   * Collects unique property names from all feature types, filtered by
+   * compatibility with the selected operator (if any).
+   *
+   * @param {string} currentText - Text already typed in the Key field
+   * @param {MonacoEditor} monaco - Monaco editor API
+   * @param {string | null} operator - Selected operator (used to filter by compatible types)
+   * @param {EditorPosition} position - Cursor position
+   * @param {number} endColumn - Column position where replacement should end
+   * @returns {languages.CompletionItem[]} Array of Monaco CompletionItem objects
+   */
   const getKeySuggestions = (
     currentText: string,
-    monaco: any,
+    monaco: MonacoEditor,
     operator: string | null,
-    position: any,
+    position: EditorPosition,
     endColumn: number
-  ) => {
-    const suggestions: any[] = [];
+  ): languages.CompletionItem[] => {
+    const suggestions: languages.CompletionItem[] = [];
     const seenProperties = new Set<string>();
     const startColumn = position.column - currentText.length;
     const compatibleTypes = operator ? operatorPropertyTypes[operator] : null;
@@ -441,6 +584,14 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
     return suggestions;
   };
 
+  /**
+   * Extract the operator and current text for a Value field from document context.
+   *
+   * Looks backwards in the text to find the Operator in the same condition block.
+   *
+   * @param {string} text - All text from document start to cursor
+   * @returns {{ operator: string; currentText: string } | null} Context object, or null if not in a Value field
+   */
   const getValueContext = (text: string): { operator: string; currentText: string } | null => {
     // Look backwards for the operator in the same condition block
     // Match "Value": " with optional content after the opening quote
@@ -451,14 +602,26 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
     return null;
   };
 
+  /**
+   * Generate autocomplete suggestions for condition Value fields.
+   *
+   * Provides example values based on the selected operator's expected value type.
+   *
+   * @param {string} operator - The operator selected in this condition
+   * @param {string} currentText - Text already typed in the Value field
+   * @param {MonacoEditor} monaco - Monaco editor API
+   * @param {EditorPosition} position - Cursor position
+   * @param {number} endColumn - Column position where replacement should end
+   * @returns {languages.CompletionItem[]} Array of Monaco CompletionItem objects with example values
+   */
   const getValueSuggestions = (
     operator: string,
     currentText: string,
-    monaco: any,
-    position: any,
+    monaco: MonacoEditor,
+    position: EditorPosition,
     endColumn: number
-  ) => {
-    const suggestions: any[] = [];
+  ): languages.CompletionItem[] => {
+    const suggestions: languages.CompletionItem[] = [];
     const meta = operatorMetadata[operator as keyof typeof operatorMetadata];
     const startColumn = position.column - currentText.length;
 
@@ -486,14 +649,25 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
     return suggestions;
   };
 
+  /**
+   * Handle editor content changes and propagate to parent component.
+   *
+   * @param {string} newValue - The new editor content (defaults to empty string)
+   */
   const handleChange = (newValue = '') => {
     onChange(newValue);
+  };
 
-    try {
-      JSON.parse(newValue);
-      setParseError(null);
-    } catch {
-      setParseError('Invalid JSON');
+  /**
+   * Handle Monaco validation results and update local validation error state.
+   *
+   * @param {any[]} markers - Array of Monaco diagnostic markers (errors/warnings)
+   */
+  const handleValidate: OnValidate = (markers) => {
+    if (markers.length > 0) {
+      setValidationError(markers[0].message);
+    } else {
+      setValidationError(null);
     }
   };
 
@@ -502,7 +676,7 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
       <Box
         sx={{
           border: 1,
-          borderColor: error || parseError ? 'error.main' : 'divider',
+          borderColor: error || validationError ? 'error.main' : 'divider',
           borderRadius: 1,
           overflow: 'visible'
         }}>
@@ -512,6 +686,7 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
           value={value || JSON.stringify(defaultPolicyDocument, null, 2)}
           onChange={handleChange}
           onMount={handleEditorDidMount}
+          onValidate={handleValidate}
           options={{
             minimap: { enabled: false },
             lineNumbers: 'on',
@@ -531,13 +706,11 @@ const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, er
           }}
         />
       </Box>
-      {(error || parseError) && (
+      {(error || validationError) && (
         <Typography color="error" variant="caption" mt={0.5}>
-          {error || parseError}
+          {error || validationError}
         </Typography>
       )}
     </Box>
   );
 };
-
-export default PolicyJsonEditor;

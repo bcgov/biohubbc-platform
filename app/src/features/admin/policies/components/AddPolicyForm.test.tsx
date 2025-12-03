@@ -1,7 +1,7 @@
 import { fireEvent, waitFor } from '@testing-library/react';
 import { Formik } from 'formik';
 import { cleanup, render } from 'test-helpers/test-utils';
-import AddPolicyForm, { AddPolicyFormInitialValues, IAddPolicyFormValues } from './AddPolicyForm';
+import { AddPolicyForm, AddPolicyFormInitialValues, IAddPolicyFormValues } from './AddPolicyForm';
 
 const renderContainer = (initialValues: IAddPolicyFormValues = AddPolicyFormInitialValues) => {
   return render(

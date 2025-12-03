@@ -1,3 +1,14 @@
+/**
+ * Supported policy condition operators for filtering feature records.
+ *
+ * Operators are grouped by type:
+ * - String: StringEquals, StringNotEquals, StringLike
+ * - Numeric: NumericEquals
+ * - Boolean: Bool, Exists
+ * - Temporal: DateBefore, DateAfter
+ * - Spatial: Within, Intersects, Contains
+ * - Taxonomy: ParentOf, ChildOf
+ */
 export const PolicyConditionOperators = [
   'StringEquals',
   'StringNotEquals',
@@ -14,8 +25,23 @@ export const PolicyConditionOperators = [
   'ChildOf'
 ] as const;
 
+/**
+ * Type representing any valid policy condition operator value.
+ */
 export type PolicyConditionOperator = (typeof PolicyConditionOperators)[number];
 
+/**
+ * JSON Schema (Draft-07) defining the structure of valid policy documents.
+ *
+ * Policy document structure:
+ * - Version: Schema version string (currently "2025-12-01")
+ * - Statement: Array of policy statements, each containing:
+ *   - Effect: "Allow" or "Deny"
+ *   - Resource: URN pattern (urn:<submissionId>:<featureType>:<featureId>)
+ *   - Condition: Optional array of condition objects with Operator, Key, Value
+ *
+ * Used for validation in Monaco editor and provides autocomplete hints.
+ */
 export const policyJsonSchema = {
   $schema: 'http://json-schema.org/draft-07/schema#',
   type: 'object',
@@ -87,7 +113,14 @@ export const policyJsonSchema = {
   additionalProperties: false
 };
 
-// Operator metadata for autocomplete and validation
+/**
+ * Metadata for policy condition operators, used for autocomplete suggestions and validation hints.
+ *
+ * Each operator entry includes:
+ * - description: Human-readable explanation of operator behavior
+ * - valueType: Expected type(s) for the condition Value field
+ * - examples: Example values shown in autocomplete suggestions
+ */
 export const operatorMetadata: Record<
   PolicyConditionOperator,
   {

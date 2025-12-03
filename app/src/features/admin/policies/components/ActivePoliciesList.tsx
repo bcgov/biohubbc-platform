@@ -25,7 +25,8 @@ import { useDialogContext } from 'hooks/useContext';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { useState } from 'react';
 import { handleChangePage, handleChangeRowsPerPage } from 'utils/tablePaginationUtils';
-import AddPolicyForm, {
+import {
+  AddPolicyForm,
   AddPolicyFormInitialValues,
   AddPolicyFormYupSchema,
   IAddPolicyFormValues
@@ -43,20 +44,34 @@ const useStyles = () => {
   };
 };
 
+/**
+ * Props for the ActivePoliciesList component.
+ */
 export interface IActivePoliciesListProps {
+  /** Array of policies to display in the table */
   policies: IPolicy[];
+  /** Callback to refresh the policies list after create/update/delete */
   refresh: () => void;
+  /** Current search term for filtering policies */
   searchTerm: string;
+  /** Callback when search term changes */
   onSearch: (term: string) => void;
 }
 
 /**
- * Table to display a list of policies.
+ * Table component to display and manage a list of policies.
  *
- * @param {*} props
- * @return {*}
+ * Provides functionality to:
+ * - View policies in a paginated table
+ * - Search policies by name
+ * - Create new policies via dialog
+ * - Edit existing policies via dialog
+ * - Delete policies with confirmation
+ *
+ * @param {IActivePoliciesListProps} props - Component props
+ * @returns {React.ReactElement} The policies list component
  */
-const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListProps>> = (props) => {
+export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListProps>> = (props) => {
   const classes = useStyles();
   const biohubApi = useApi();
   const { policies } = props;
@@ -70,10 +85,20 @@ const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListPr
   const [editingPolicy, setEditingPolicy] = useState<IPolicy | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  /**
+   * Display a snackbar notification with the given props.
+   *
+   * @param {Partial<ISnackbarProps>} [textDialogProps] - Optional snackbar configuration
+   */
   const showSnackBar = (textDialogProps?: Partial<ISnackbarProps>) => {
     dialogContext.setSnackbar({ ...textDialogProps, open: true });
   };
 
+  /**
+   * Open a confirmation dialog to delete a policy.
+   *
+   * @param {IPolicy} row - The policy to delete
+   */
   const handleDeletePolicyClick = (row: IPolicy) => {
     dialogContext.setYesNoDialog({
       dialogTitle: 'Delete policy?',
@@ -100,6 +125,12 @@ const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListPr
     });
   };
 
+  /**
+   * Delete a policy via API and show success/error feedback.
+   *
+   * @param {IPolicy} policy - The policy to delete
+   * @returns {Promise<void>}
+   */
   const deletePolicy = async (policy: IPolicy) => {
     if (!policy?.policy_id) {
       return;
@@ -136,11 +167,25 @@ const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListPr
     }
   };
 
+  /**
+   * Open the edit dialog for a policy.
+   *
+   * @param {IPolicy} row - The policy to edit
+   */
   const handleEditPolicyClick = (row: IPolicy) => {
     setEditingPolicy(row);
     setOpenEditPolicyDialog(true);
   };
 
+  /**
+   * Handle saving a new policy from the add dialog.
+   *
+   * Transforms the form values to API format and creates the policy.
+   * Shows success snackbar or error dialog based on result.
+   *
+   * @param {IAddPolicyFormValues} values - Form values from the add policy dialog
+   * @returns {Promise<void>}
+   */
   const handleAddPolicySave = async (values: IAddPolicyFormValues) => {
     setIsLoading(true);
 
@@ -184,6 +229,15 @@ const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListPr
     }
   };
 
+  /**
+   * Handle saving an edited policy from the edit dialog.
+   *
+   * Transforms the form values to API format and updates the policy.
+   * Shows success snackbar or error dialog based on result.
+   *
+   * @param {IAddPolicyFormValues} values - Form values from the edit policy dialog
+   * @returns {Promise<void>}
+   */
   const handleEditPolicySave = async (values: IAddPolicyFormValues) => {
     if (!editingPolicy) {
       return;
@@ -232,6 +286,13 @@ const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListPr
     }
   };
 
+  /**
+   * Get initial form values for the edit policy dialog.
+   *
+   * Transforms the policy's API format to form format for editing.
+   *
+   * @returns {IAddPolicyFormValues} Form values pre-populated with the editing policy's data
+   */
   const getEditPolicyInitialValues = (): IAddPolicyFormValues => {
     if (!editingPolicy) {
       return AddPolicyFormInitialValues;
@@ -413,5 +474,3 @@ const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListPr
     </>
   );
 };
-
-export default ActivePoliciesList;

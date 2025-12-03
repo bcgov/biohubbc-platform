@@ -1,5 +1,5 @@
 import { SYSTEM_ROLE } from 'constants/roles';
-import ManagePoliciesPage from 'features/admin/policies/ManagePoliciesPage';
+import { ManagePoliciesPage } from 'features/admin/policies/ManagePoliciesPage';
 import ManageUsersPage from 'features/admin/users/ManageUsersPage';
 import { SystemRoleGuard } from 'guards/Guards';
 import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
