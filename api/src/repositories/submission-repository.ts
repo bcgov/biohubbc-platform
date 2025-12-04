@@ -228,7 +228,7 @@ export const SubmissionRecord = z.object({
   description: z.string().nullable(),
   comment: z.string().nullable(),
   publish_timestamp: z.string().nullable(),
-  record_end_date: z.string(),
+  record_end_date: z.string().nullable(),
   create_date: z.string(),
   create_user: z.number(),
   update_date: z.string().nullable(),
