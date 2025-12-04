@@ -81,8 +81,13 @@ POST.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['submission_uuid'],
+            required: ['submission_id', 'submission_uuid'],
             properties: {
+              submission_id: {
+                description: 'The unique identifier of the submission record in the database.',
+                type: 'integer',
+                minimum: 1
+              },
               submission_uuid: {
                 description: 'Globally unique id of the submission as assigned by BioHub.',
                 type: 'string',
@@ -180,6 +185,7 @@ export function submissionIntake(): RequestHandler {
       await connection.commit();
 
       const response = {
+        submission_id: submissionRecord.submission_id,
         submission_uuid: submissionRecord.uuid,
         // Include artifact upload keys in response, if any
         ...(submissionArtifactFeatures.length && {

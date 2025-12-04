@@ -214,6 +214,7 @@ describe('intake', () => {
       expect(calculateAndAddRegionsForSubmissionStub).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.eql(200);
       expect(mockRes.jsonValue).to.eql({
+        submission_id: submissionId,
         submission_uuid: '123-456-789',
         artifact_upload_keys: [
           {
