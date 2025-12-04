@@ -37,6 +37,7 @@ export class SubmissionUploadService {
     });
 
     return {
+      submissionId,
       uploadId,
       key,
       partSizeBytes,

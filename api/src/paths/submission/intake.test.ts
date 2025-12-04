@@ -130,6 +130,7 @@ describe('intake', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: '2023-12-12',
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -213,6 +214,7 @@ describe('intake', () => {
       expect(calculateAndAddRegionsForSubmissionStub).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.eql(200);
       expect(mockRes.jsonValue).to.eql({
+        submission_id: submissionId,
         submission_uuid: '123-456-789',
         artifact_upload_keys: [
           {
