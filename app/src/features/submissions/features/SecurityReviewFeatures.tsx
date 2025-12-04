@@ -1,37 +1,40 @@
-import { Box, Stack, Typography } from '@mui/material';
-import { GridRowSelectionModel } from '@mui/x-data-grid';
-import { useSubmissionContext } from 'hooks/useContext';
-import { useMemo, useState } from 'react';
+import { Typography } from '@mui/material';
+import { Box, Stack } from '@mui/system';
 import { SecurityReviewFeaturesTable } from './table/SecurityReviewFeaturesTable';
 
-export const SecurityReviewFeatures = () => {
-  const { submissionFeaturesDataLoader, paginationModel, setPaginationModel, sortModel, setSortModel } =
-    useSubmissionContext();
+interface FeatureRow {
+  id: number;
+  submission_feature_id: number;
+  feature_type_display_name: string;
+  feature_type_name: string;
+  secured: boolean;
+}
 
-  const [selectionModel, setSelectionModel] = useState<GridRowSelectionModel>({
-    type: 'include',
-    ids: new Set()
-  });
+interface SecurityReviewFeaturesProps {
+  rows: FeatureRow[];
+  rowCount: number;
+  selectedFeatureIds: Set<number>;
+  setSelectedFeatureIds: (ids: Set<number>) => void;
+  paginationModel: any;
+  setPaginationModel: (model: any) => void;
+  sortModel: any;
+  setSortModel: (model: any) => void;
+  onRowClick: (params: any) => void;
+  handleSecurityChange: (row: FeatureRow) => void;
+}
 
-  const rows = useMemo(() => {
-    return (
-      submissionFeaturesDataLoader.data?.features.map((feature) => ({
-        id: feature.submission_feature_id,
-        submission_feature_id: feature.submission_feature_id,
-        feature_type_display_name: feature.feature_type_name,
-        feature_type_name: feature.feature_type_name,
-        secured: feature.secured
-      })) ?? []
-    );
-  }, [submissionFeaturesDataLoader.data]);
-
-  const rowCount = submissionFeaturesDataLoader.data?.pagination.total ?? 0;
-
-  const handleSecurityChange = (row: (typeof rows)[number]) => {
-    console.log('Security clicked for row:', row);
-    // TODO: POST request to update security
-  };
-
+export const SecurityReviewFeatures = ({
+  rows,
+  rowCount,
+  selectedFeatureIds,
+  setSelectedFeatureIds,
+  paginationModel,
+  setPaginationModel,
+  sortModel,
+  setSortModel,
+  onRowClick,
+  handleSecurityChange
+}: SecurityReviewFeaturesProps) => {
   return (
     <Stack gap={2} py={2}>
       <Box px={2}>
@@ -42,15 +45,17 @@ export const SecurityReviewFeatures = () => {
           </Typography>
         </Typography>
       </Box>
+
       <SecurityReviewFeaturesTable
         rows={rows}
         rowCount={rowCount}
-        selectionModel={selectionModel}
-        onSelectionChange={setSelectionModel}
+        selectionModel={{ type: 'include', ids: selectedFeatureIds }}
+        onSelectionChange={(newModel) => setSelectedFeatureIds(new Set([...newModel.ids].map((id) => Number(id))))}
         paginationModel={paginationModel}
         setPaginationModel={setPaginationModel}
         sortModel={sortModel}
         setSortModel={setSortModel}
+        onRowClick={onRowClick}
         handleSecurityChange={handleSecurityChange}
       />
     </Stack>

@@ -58,7 +58,7 @@ export const SubmissionHeaderToolbar = ({
 
   return (
     <Stack flexDirection="row" alignItems="center" gap={1}>
-      <ManageSecurity submissionFeatureIds={submissionFeatureIds} onClose={handleRefresh} />
+      <ManageSecurity submissionFeatureIds={submissionFeatureIds} onSubmit={handleRefresh} />
 
       <CompleteSecurityReviewButton
         submission={submission}

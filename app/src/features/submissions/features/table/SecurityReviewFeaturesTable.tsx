@@ -2,7 +2,15 @@ import { mdiLock, mdiLockOpenVariant } from '@mdi/js';
 import Icon from '@mdi/react';
 import { grey } from '@mui/material/colors';
 import IconButton from '@mui/material/IconButton';
-import { DataGrid, GridColDef, GridPaginationModel, GridRowSelectionModel, GridSortModel } from '@mui/x-data-grid';
+import {
+  DataGrid,
+  GridColDef,
+  GridPaginationModel,
+  GridRowParams,
+  GridRowSelectionModel,
+  GridSortModel,
+  MuiEvent
+} from '@mui/x-data-grid';
 import appTheme from 'themes/appTheme';
 
 interface FeatureRow {
@@ -23,6 +31,7 @@ interface SecurityReviewFeaturesTableProps {
   sortModel: GridSortModel;
   setSortModel: (model: GridSortModel) => void;
   handleSecurityChange: (row: FeatureRow) => void;
+  onRowClick?: (params: GridRowParams, event: MuiEvent<React.MouseEvent>) => void;
 }
 
 const pageSizeOptions = [10, 25, 50];
@@ -36,7 +45,8 @@ export const SecurityReviewFeaturesTable = ({
   setPaginationModel,
   sortModel,
   setSortModel,
-  handleSecurityChange
+  handleSecurityChange,
+  onRowClick
 }: SecurityReviewFeaturesTableProps) => {
   const columns: GridColDef[] = [
     { field: 'submission_feature_id', headerName: 'ID', width: 100 },
@@ -44,17 +54,21 @@ export const SecurityReviewFeaturesTable = ({
       field: 'secured',
       headerName: 'Security',
       width: 130,
+      sortable: false,
+      filterable: false,
       renderCell: (params) => (
-        <IconButton onClick={() => handleSecurityChange(params.row)}>
+        <IconButton
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSecurityChange(params.row);
+          }}>
           <Icon
             path={params.row.secured ? mdiLock : mdiLockOpenVariant}
             size={1}
             color={params.row.secured ? appTheme.palette.error.main : grey[500]}
           />
         </IconButton>
-      ),
-      sortable: false,
-      filterable: false
+      )
     },
     { field: 'feature_type_display_name', headerName: 'Feature Type', flex: 1 }
   ];
@@ -74,6 +88,7 @@ export const SecurityReviewFeaturesTable = ({
       sortModel={sortModel}
       onSortModelChange={setSortModel}
       rowCount={rowCount}
+      onRowClick={onRowClick}
     />
   );
 };

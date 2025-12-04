@@ -14,7 +14,7 @@ import { firstOrNull } from 'utils/Utils';
 export interface ISubmissionContext {
   submissionRecordDataLoader: DataLoader<[number], SubmissionRecordWithSecurity, unknown>;
   submissionFeaturesDataLoader: DataLoader<
-    [ApiPaginationRequestOptions, number],
+    [number, ApiPaginationRequestOptions],
     ISubmissionFeatureForReviewResponse,
     unknown
   >;
@@ -66,8 +66,7 @@ export const SubmissionContextProvider = (props: PropsWithChildren) => {
   // Load submission record (unchanged)
   const submissionRecordDataLoader = useDataLoader(api.submissions.getSubmissionRecordWithSecurity);
 
-  // NEW: paginated feature loader
-  const submissionFeaturesDataLoader = useDataLoader((pagination: ApiPaginationRequestOptions, submissionId: number) =>
+  const submissionFeaturesDataLoader = useDataLoader((submissionId: number, pagination: ApiPaginationRequestOptions) =>
     api.submissions.getSubmissionFeatures(submissionId, pagination)
   );
 
@@ -79,19 +78,19 @@ export const SubmissionContextProvider = (props: PropsWithChildren) => {
 
   /** ========== Initial Loads ========== */
   submissionRecordDataLoader.load(submissionId);
-  submissionFeaturesDataLoader.load(featuresPagination, submissionId);
+  submissionFeaturesDataLoader.load(submissionId, featuresPagination);
   allSecurityRulesStaticListDataLoader.load();
 
   /** Refresh features on pagination/sorting change */
   useEffect(() => {
-    submissionFeaturesDataLoader.refresh(featuresPagination, submissionId);
+    submissionFeaturesDataLoader.refresh(submissionId, featuresPagination);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [featuresPagination]);
 
   /** Refresh when submission ID changes */
   useEffect(() => {
     submissionRecordDataLoader.refresh(submissionId);
-    submissionFeaturesDataLoader.refresh(featuresPagination, submissionId);
+    submissionFeaturesDataLoader.refresh(submissionId, featuresPagination);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionId]);
 

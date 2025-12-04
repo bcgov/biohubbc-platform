@@ -12,7 +12,8 @@ import SecurityRuleForm from './SecurityRuleForm';
 interface ISecuritiesDialogProps {
   submissionFeatureIds: Pick<GridRowSelectionModel, 'ids'>;
   open: boolean;
-  onClose: () => void;
+  onSubmit: () => void;
+  onClose?: () => void;
 }
 
 const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
@@ -50,7 +51,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
       });
     } finally {
       setIsLoading(false);
-      props.onClose();
+      props.onSubmit();
     }
   };
 
@@ -60,7 +61,11 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
       dialogTitle={hasSecurity ? 'Edit Security' : ' Add Security'}
       open={props.open}
       dialogSaveButtonLabel="APPLY"
-      onCancel={props.onClose}
+      onCancel={() => {
+        if (props.onClose) {
+          props.onClose();
+        }
+      }}
       onSave={handleSave}
       component={{
         element: <SecurityRuleForm />,

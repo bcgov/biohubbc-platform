@@ -1744,9 +1744,13 @@ export class SubmissionRepository extends BaseRepository {
   private _getSubmissionFeaturesBaseQuery(submissionId: number, knex: Knex) {
     return knex('submission_feature')
       .select(
-        'submission_feature.*',
+        'submission_feature.submission_id',
+        'submission_feature.submission_feature_id',
+        'submission_feature.feature_type_id',
         'feature_type.name as feature_type_name',
-        'feature_type.display_name as feature_type_display_name'
+        knex.raw(
+          'CASE WHEN submission_feature_security.submission_feature_id IS NOT NULL THEN true ELSE false END as secured'
+        )
       )
       .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id')
       .leftJoin(
@@ -1754,12 +1758,12 @@ export class SubmissionRepository extends BaseRepository {
         'submission_feature_security.submission_feature_id',
         'submission_feature.submission_feature_id'
       )
-      .where('submission_id', submissionId)
+      .where('submission_feature.submission_id', submissionId)
       .groupBy(
+        'submission_feature.submission_id',
         'submission_feature.submission_feature_id',
-        'feature_type.name',
-        'feature_type.display_name',
-        'feature_type.sort'
+        'submission_feature.feature_type_id',
+        'feature_type.name'
       );
   }
 
