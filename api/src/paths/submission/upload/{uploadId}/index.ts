@@ -91,7 +91,7 @@ PUT.apiDoc = {
 
 export function completeMultipartUploadHandler(): RequestHandler {
   return async (req, res) => {
-    const token = req['keycloak_token'];
+    const token = req.keycloak_token;
 
     // TODO: Why do service accounts need to be distinct, if they are just user records like system admins?
     const serviceClientSystemUser = getServiceClientSystemUser(token);

@@ -1,0 +1,43 @@
+import { OpenAPIV3 } from 'openapi-types';
+import { SystemUserWithRoles } from '../models/system-user-view';
+import { AuthorizationScheme } from '../services/authorization-service';
+import { KeycloakUserInformation } from '../utils/keycloak-utils';
+
+declare module 'express-serve-static-core' {
+  interface Request {
+    /**
+     * Multer transformed files.
+     */
+    files?: Express.Multer.File[];
+
+    /**
+     * Keycloak user JWT token object.
+     */
+    keycloak_token?: KeycloakUserInformation;
+
+    /**
+     * SIMS system user details object.
+     */
+    system_user?: SystemUserWithRoles;
+
+    /**
+     * Authorization Scheme object.
+     */
+    authorization_scheme?: AuthorizationScheme;
+
+    /**
+     * OpenAPI operation object injected by express-openapi.
+     * Allows `x-express-openapi-validation-strict` to be accessed.
+     */
+    apiDoc?: OpenAPIV3.OperationObject & {
+      'x-express-openapi-validation-strict'?: boolean;
+    };
+  }
+
+  interface Response {
+    /**
+     * OpenAPI Response validation function injected by express-openapi
+     */
+    validateResponse?: (statusCode: number, responseBody: any) => { message: any; errors: any[] } | undefined;
+  }
+}

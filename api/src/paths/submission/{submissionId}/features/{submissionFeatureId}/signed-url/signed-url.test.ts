@@ -31,7 +31,7 @@ describe('getSubmissionFeatureSignedUrl', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    mockReq['keycloak_token'] = 'TOKEN';
+    mockReq.keycloak_token = 'TOKEN';
 
     mockReq.params = {
       submissionId: '1',

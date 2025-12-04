@@ -89,7 +89,7 @@ export function getAddSystemRolesHandler(): RequestHandler {
 
     const userId = Number(req.params.userId);
     const roles: number[] = req.body.roles;
-    const connection = getDBConnection(req['keycloak_token']);
+    const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();

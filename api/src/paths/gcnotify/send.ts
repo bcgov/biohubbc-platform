@@ -135,7 +135,7 @@ POST.apiDoc = {
  */
 export function sendNotification(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req['keycloak_token']);
+    const connection = getDBConnection(req.keycloak_token);
     const gcnotifyService = new GCNotifyService(connection);
 
     const recipient = req.body?.recipient;

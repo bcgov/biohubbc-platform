@@ -152,7 +152,7 @@ export function queueForProcess(): RequestHandler {
     }
 
     const file: Express.Multer.File = req.files[0];
-    const serviceClientSystemUser = getServiceClientSystemUser(req['keycloak_token']);
+    const serviceClientSystemUser = getServiceClientSystemUser(req.keycloak_token);
 
     if (!(await scanFileForVirus(file))) {
       throw new HTTP400('Malicious content detected, upload cancelled');

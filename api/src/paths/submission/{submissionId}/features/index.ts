@@ -164,7 +164,7 @@ GET.apiDoc = {
  */
 export function getSubmissionFeatures(): RequestHandler {
   return async (req, res) => {
-    const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
+    const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     const submissionId = Number(req.params.submissionId);
 

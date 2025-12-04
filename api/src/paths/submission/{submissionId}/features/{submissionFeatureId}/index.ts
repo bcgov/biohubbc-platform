@@ -74,7 +74,7 @@ GET.apiDoc = {
  */
 export function getSubmissionFeatureById(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req['keycloak_token']);
+    const connection = getDBConnection(req.keycloak_token);
 
     const submissionFeatureId = Number(req.params.submissionFeatureId);
 

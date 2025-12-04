@@ -127,7 +127,7 @@ POST.apiDoc = {
 export function submissionIntake(): RequestHandler {
   return async (req, res) => {
     // TODO Allow system admins
-    const serviceClientSystemUser = getServiceClientSystemUser(req['keycloak_token']);
+    const serviceClientSystemUser = getServiceClientSystemUser(req.keycloak_token);
 
     if (!serviceClientSystemUser) {
       throw new HTTP400('Failed to identify known submission source system', [
