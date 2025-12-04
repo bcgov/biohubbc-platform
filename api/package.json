@@ -11,9 +11,9 @@
   "scripts": {
     "start": "ts-node src/app",
     "build": "tsc --project tsconfig.production.json",
-    "start-reload": "./node_modules/.bin/nodemon src/app.ts --exec ts-node",
+    "start-reload": "nodemon --watch src --ext ts --exec ts-node --files src/app.ts",
     "queue": "ts-node src/queue",
-    "queue-reload": "./node_modules/.bin/nodemon src/queue.ts --exec ts-node",
+    "queue-reload": "nodemon --watch src --ext ts --exec ts-node --files src/queue.ts",
     "test": "mocha",
     "test-watch": "mocha --watch",
     "coverage": "nyc mocha",
