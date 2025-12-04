@@ -53,6 +53,7 @@ GET.apiDoc = {
                     required: [
                       'submission_feature_id',
                       'uuid',
+                      'urn',
                       'submission_id',
                       'feature_type_id',
                       'source_id',
@@ -77,6 +78,9 @@ GET.apiDoc = {
                       uuid: {
                         type: 'string',
                         format: 'uuid'
+                      },
+                      urn: {
+                        type: 'string'
                       },
                       submission_id: {
                         type: 'integer',

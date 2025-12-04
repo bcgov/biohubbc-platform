@@ -10,6 +10,7 @@ interface PresignedUrl {
 }
 
 export interface PresignedUploadUrlResponse {
+  submissionId: string;
   uploadId: string;
   key: string;
   partSizeBytes: number;
