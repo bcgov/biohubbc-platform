@@ -72,30 +72,24 @@ export const policyJsonSchema = {
           Condition: {
             type: 'array',
             description: 'Array of conditions that must all be true for the statement to apply',
+            defaultSnippets: [
+              {
+                label: 'Add Condition',
+                bodyText: '[\n  {\n    "Key": $1,\n    "Operator": $2,\n    "Value": $3\n  }\n]'
+              }
+            ],
             items: {
               type: 'object',
               required: ['Operator', 'Key', 'Value'],
               properties: {
                 Operator: {
                   type: 'string',
-                  enum: [
-                    'StringEquals',
-                    'StringNotEquals',
-                    'StringLike',
-                    'NumericEquals',
-                    'Bool',
-                    'Exists',
-                    'DateBefore',
-                    'DateAfter',
-                    'Within',
-                    'Intersects',
-                    'Contains',
-                    'ParentOf',
-                    'ChildOf'
-                  ],
+                  minLength: 1,
                   description: 'The comparison operator to use'
                 },
                 Key: {
+                  type: 'string',
+                  minLength: 1,
                   description: 'The feature property key to evaluate'
                 },
                 Value: {

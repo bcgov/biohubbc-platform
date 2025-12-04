@@ -202,7 +202,8 @@ export const validatePolicyJson = (policyJson: string): string | null => {
     }
 
     return null;
-  } catch {
-    return 'Invalid JSON';
+  } catch (e) {
+    const error = e as SyntaxError;
+    return `Invalid JSON: ${error.message}`;
   }
 };

@@ -3,6 +3,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { PolicyAutocompleteContextProvider } from 'contexts/policyAutocompleteContext';
 import { useFormikContext } from 'formik';
+import { useCallback } from 'react';
 import yup from 'utils/YupSchema';
 import { PolicyJsonEditor } from './PolicyJsonEditor';
 import { defaultPolicyDocument, validatePolicyJson } from '../utils/policyTransform';
@@ -58,8 +59,25 @@ export const AddPolicyFormYupSchema = yup.object().shape({
  * @returns {React.ReactElement} The policy form
  */
 export const AddPolicyForm: React.FC = () => {
-  const { values, handleChange, handleSubmit, errors, touched, setFieldValue } =
+  const { values, handleChange, handleSubmit, errors, touched, setFieldValue, setFieldError } =
     useFormikContext<IAddPolicyFormValues>();
+
+  /**
+   * Handle Monaco validation state changes.
+   * Sets a Formik field error when Monaco has validation errors,
+   * which prevents form submission via Formik's isValid check.
+   */
+  const handleValidationChange = useCallback(
+    (hasErrors: boolean) => {
+      if (hasErrors) {
+        setFieldError('policy_json', 'Policy document has validation errors');
+      } else if (errors.policy_json === 'Policy document has validation errors') {
+        // Clear only our Monaco-set error, not Yup validation errors
+        setFieldError('policy_json', undefined);
+      }
+    },
+    [setFieldError, errors.policy_json]
+  );
 
   return (
     <form onSubmit={handleSubmit}>
@@ -101,6 +119,7 @@ export const AddPolicyForm: React.FC = () => {
               value={values.policy_json}
               onChange={(val) => setFieldValue('policy_json', val)}
               error={touched.policy_json ? (errors.policy_json as string) : undefined}
+              onValidationChange={handleValidationChange}
             />
           </PolicyAutocompleteContextProvider>
         </Box>

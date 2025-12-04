@@ -1,18 +1,13 @@
-import Editor, { OnMount, OnValidate } from '@monaco-editor/react';
+import Editor, { Monaco, OnMount, OnValidate } from '@monaco-editor/react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import { debounce } from 'lodash-es';
 import { usePolicyAutocompleteContext } from 'hooks/useContext';
-import type { editor, languages } from 'monaco-editor';
-import { useRef, useState } from 'react';
+import type { editor, languages, MarkerSeverity } from 'monaco-editor';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { operatorMetadata, PolicyConditionOperators, policyJsonSchema } from '../utils/policyJsonSchema';
 import { defaultPolicyDocument } from '../utils/policyTransform';
-
-/**
- * Monaco editor API type.
- * Note: We use a permissive type here because the Monaco types from @monaco-editor/react
- * and monaco-editor have slight incompatibilities. The runtime values are compatible.
- */
-type MonacoEditor = any;
+import { validatePolicyDocument, IValidationContext, IValidationMarker } from '../utils/policyValidator';
 
 /** Cursor position in the editor */
 interface EditorPosition {
@@ -30,6 +25,8 @@ interface PolicyJsonEditorProps {
   onChange: (value: string) => void;
   /** Optional external error message to display */
   error?: string;
+  /** Callback when validation state changes (true = has errors) */
+  onValidationChange?: (hasErrors: boolean) => void;
 }
 
 // Track Monaco provider registration (providers are global per language)
@@ -155,8 +152,9 @@ const sharedContextRef: {
  * @param {PolicyJsonEditorProps} props - Component props
  * @returns {React.ReactElement} The editor component
  */
-export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, error }) => {
+export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onChange, error, onValidationChange }) => {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<any>(null);
   const policyAutocompleteContext = usePolicyAutocompleteContext();
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -166,13 +164,64 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
       submission_id: s.submission_id,
       name: s.name
     })),
-    featureTypes: policyAutocompleteContext.featureTypes as any,
+    featureTypes: policyAutocompleteContext.featureTypes,
     submissionFeaturesCache: policyAutocompleteContext.submissionFeaturesCache,
     fetchFeaturesForAutocomplete: policyAutocompleteContext.fetchFeaturesForAutocomplete
   };
 
+  // Build validation context from autocomplete context
+  const validationContext: IValidationContext = useMemo(
+    () => ({
+      submissions: policyAutocompleteContext.submissionsDataLoader.data || [],
+      featureTypes: policyAutocompleteContext.featureTypes,
+      submissionFeaturesCache: policyAutocompleteContext.submissionFeaturesCache
+    }),
+    [policyAutocompleteContext]
+  );
+
+  // Run validation and set markers
+  const runValidation = useCallback(() => {
+    const editorInstance = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!editorInstance || !monaco) {
+      return;
+    }
+
+    const model = editorInstance.getModel();
+    if (!model) {
+      return;
+    }
+
+    const markers = validatePolicyDocument(model.getValue(), validationContext);
+
+    // Convert our markers to Monaco markers (cast severity to MarkerSeverity)
+    monaco.editor.setModelMarkers(
+      model,
+      'policyValidator',
+      markers.map((m: IValidationMarker) => ({
+        ...m,
+        severity: m.severity as typeof MarkerSeverity.Error
+      }))
+    );
+
+    // Notify parent of validation state
+    onValidationChange?.(markers.length > 0);
+  }, [validationContext, onValidationChange]);
+
+  // Debounced validation function - uses ref to avoid stale closure
+  const runValidationRef = useRef(runValidation);
+  runValidationRef.current = runValidation;
+
+  const debouncedValidation = useMemo(() => debounce(() => runValidationRef.current(), 500), []);
+
+  // Re-run validation when context data changes (e.g., submissions load)
+  useEffect(() => {
+    runValidation();
+  }, [runValidation]);
+
   const handleEditorDidMount: OnMount = (editorInstance, monaco) => {
     editorRef.current = editorInstance;
+    monacoRef.current = monaco;
 
     // Configure JSON schema validation
     const jsonLanguage = (monaco.languages as any)?.json;
@@ -188,6 +237,9 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
         ]
       });
     }
+
+    // Run initial validation
+    runValidation();
 
     // Only register completion provider once globally
     if (providerRegistered) {
@@ -215,8 +267,11 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
       }
     });
 
-    // Listen for content changes to trigger suggestions
+    // Listen for content changes to trigger suggestions and validation
     editorInstance.onDidChangeModelContent((e) => {
+      // Run debounced validation on every content change
+      debouncedValidation();
+
       for (const change of e.changes) {
         const position = editorInstance.getPosition();
         const model = editorInstance.getModel();
@@ -254,20 +309,19 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
    * (Resource URN, Operator, Key, or Value) and delegates to the appropriate handler.
    *
    * @param {string} textUntilPosition - All text from document start to cursor
-   * @param {MonacoEditor} monaco - Monaco editor API
+   * @param {Monaco} monaco - Monaco editor API
    * @param {EditorPosition} position - Cursor position {lineNumber, column}
    * @param {string} textAfterCursor - Text from cursor to end of line
    * @returns {languages.CompletionItem[]} Array of Monaco CompletionItem objects
    */
   const getSuggestions = (
     textUntilPosition: string,
-    monaco: MonacoEditor,
+    monaco: Monaco,
     position: EditorPosition,
     textAfterCursor: string
   ): languages.CompletionItem[] => {
     // Calculate end column - if there's text before the closing quote, include it in the range
     const matchToQuote = /^([^"]*)"/.exec(textAfterCursor);
-
     const extraCharsToReplace = matchToQuote ? matchToQuote[1].length : 0;
     const endColumn = position.column + extraCharsToReplace;
 
@@ -280,16 +334,18 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
     // Check if we're inside an "Operator" value
     const operatorMatch = /"Operator"\s*:\s*"([^"]*)$/.exec(textUntilPosition);
     if (operatorMatch) {
-      return getOperatorSuggestions(operatorMatch[1], monaco, position, endColumn);
+      const featureType = extractFeatureTypeFromText(textUntilPosition);
+      const key = extractLastKeyFromText(textUntilPosition);
+      return getOperatorSuggestions(operatorMatch[1], monaco, featureType, key, position, endColumn);
     }
 
     // Check if we're inside a "Key" value
     const keyMatch = /"Key"\s*:\s*"([^"]*)$/.exec(textUntilPosition);
     if (keyMatch) {
-      // Try to find the Operator in the same condition block to filter by compatible types
       const operatorInBlock = /"Operator"\s*:\s*"([^"]+)"[^}]*"Key"\s*:\s*"[^"]*$/.exec(textUntilPosition);
       const operator = operatorInBlock ? operatorInBlock[1] : null;
-      return getKeySuggestions(keyMatch[1], monaco, operator, position, endColumn);
+      const featureType = extractFeatureTypeFromText(textUntilPosition);
+      return getKeySuggestions(keyMatch[1], monaco, operator, featureType, position, endColumn);
     }
 
     // Check if we're inside a "Value" and can determine the operator
@@ -299,6 +355,30 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
     }
 
     return [];
+  };
+
+  /**
+   * Extract the feature type from the last Resource URN in the text.
+   *
+   * @param {string} text - Text to search for Resource URNs
+   * @returns {string | null} The feature type or null if not found
+   */
+  const extractFeatureTypeFromText = (text: string): string | null => {
+    const resourceMatches = [...text.matchAll(/"Resource"\s*:\s*"urn:[^:]*:([^:"]*):/g)];
+    const lastMatch = resourceMatches.length > 0 ? resourceMatches[resourceMatches.length - 1] : null;
+    return lastMatch ? lastMatch[1] : null;
+  };
+
+  /**
+   * Extract the last Key value from the text.
+   *
+   * @param {string} text - Text to search for Key values
+   * @returns {string | null} The last Key value or null if not found
+   */
+  const extractLastKeyFromText = (text: string): string | null => {
+    const keyMatches = [...text.matchAll(/"Key"\s*:\s*"([^"]+)"/g)];
+    const lastMatch = keyMatches.length > 0 ? keyMatches[keyMatches.length - 1] : null;
+    return lastMatch ? lastMatch[1] : null;
   };
 
   /** Suggestion item with display text and insert text */
@@ -387,13 +467,13 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
    * prefetches features when needed, and returns filtered suggestions.
    *
    * @param {string} urnValue - The current URN value being typed (e.g., "urn:123:")
-   * @param {MonacoEditor} monaco - Monaco editor API
+   * @param {Monaco} monaco - Monaco editor API
    * @param {EditorPosition} position - Cursor position
    * @returns {languages.CompletionItem[]} Array of Monaco CompletionItem objects
    */
   const getUrnSuggestions = (
     urnValue: string,
-    monaco: MonacoEditor,
+    monaco: Monaco,
     position: EditorPosition
   ): languages.CompletionItem[] => {
     // Determine which part we're editing (split by :)
@@ -438,27 +518,134 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
   };
 
   /**
+   * Maps operators to their compatible feature property types.
+   * Used to filter Operator and Key suggestions.
+   */
+  const operatorPropertyTypes: Record<string, string[]> = {
+    StringEquals: ['string'],
+    StringNotEquals: ['string'],
+    StringLike: ['string'],
+    NumericEquals: ['number'],
+    Bool: ['boolean'],
+    Exists: ['string', 'number', 'boolean', 'datetime', 'spatial'], // works with all types
+    DateBefore: ['datetime'],
+    DateAfter: ['datetime'],
+    Within: ['spatial'],
+    Intersects: ['spatial'],
+    Contains: ['spatial'],
+    ParentOf: ['string'],
+    ChildOf: ['string']
+  };
+
+  /**
+   * Get the set of property types available for a feature type.
+   *
+   * @param {string | null} featureType - Feature type name or null/*
+   * @returns {Set<string>} Set of property type names (e.g., 'string', 'number')
+   */
+  const getFeatureTypePropertyTypes = (featureType: string | null): Set<string> => {
+    const propertyTypes = new Set<string>();
+
+    // If no specific feature type, return all possible types
+    if (!featureType || featureType === '*') {
+      return new Set(['string', 'number', 'datetime', 'spatial', 'boolean', 'array', 'artifact_key']);
+    }
+
+    // Find the feature type and collect its property types
+    const ft = sharedContextRef.current.featureTypes.find((f) => f.feature_type.feature_type_name === featureType);
+    if (ft?.feature_type_properties) {
+      for (const prop of ft.feature_type_properties) {
+        propertyTypes.add(prop.feature_property_type_name);
+      }
+    }
+
+    return propertyTypes;
+  };
+
+  /**
+   * Get the property type for a given key within a feature type.
+   * If feature type is wildcard, searches all feature types for the property.
+   *
+   * @param {string | null} featureType - Feature type name
+   * @param {string | null} key - Property key name
+   * @returns {string | null} Property type name or null if not found
+   */
+  const getPropertyType = (featureType: string | null, key: string | null): string | null => {
+    if (!key) {
+      return null;
+    }
+
+    // If specific feature type, look only in that one
+    if (featureType && featureType !== '*') {
+      const ft = sharedContextRef.current.featureTypes.find((f) => f.feature_type.feature_type_name === featureType);
+      if (!ft?.feature_type_properties) {
+        return null;
+      }
+      const prop = ft.feature_type_properties.find((p) => p.feature_property_name === key);
+      return prop?.feature_property_type_name || null;
+    }
+
+    // If wildcard or no feature type, search all feature types for this property
+    for (const ft of sharedContextRef.current.featureTypes) {
+      if (!ft.feature_type_properties) {
+        continue;
+      }
+      const prop = ft.feature_type_properties.find((p) => p.feature_property_name === key);
+      if (prop) {
+        return prop.feature_property_type_name;
+      }
+    }
+
+    return null;
+  };
+
+  /**
    * Generate autocomplete suggestions for condition Operator values.
    *
-   * Filters available operators by what the user has typed and includes
-   * documentation about each operator's expected value type and examples.
+   * Filters operators based on the selected Key's property type (if Key is set),
+   * otherwise falls back to filtering by feature type's available property types.
    *
    * @param {string} currentText - Text already typed in the Operator field
-   * @param {MonacoEditor} monaco - Monaco editor API
+   * @param {Monaco} monaco - Monaco editor API
+   * @param {string | null} featureType - Feature type from URN (used to filter operators)
+   * @param {string | null} key - Selected Key (used to filter by property type)
    * @param {EditorPosition} position - Cursor position
    * @param {number} endColumn - Column position where replacement should end
    * @returns {languages.CompletionItem[]} Array of Monaco CompletionItem objects
    */
   const getOperatorSuggestions = (
     currentText: string,
-    monaco: MonacoEditor,
+    monaco: Monaco,
+    featureType: string | null,
+    key: string | null,
     position: EditorPosition,
     endColumn: number
   ): languages.CompletionItem[] => {
     const startColumn = position.column - currentText.length;
 
-    return PolicyConditionOperators.filter((op) => op.toLowerCase().includes(currentText.toLowerCase())).map(
-      (op, index) => ({
+    // If Key is set, filter by the Key's specific property type
+    const keyPropertyType = getPropertyType(featureType, key);
+
+    // Filter operators to those compatible with the key's property type (or feature type's available types)
+    const compatibleOperators = PolicyConditionOperators.filter((op) => {
+      const requiredTypes = operatorPropertyTypes[op];
+      if (!requiredTypes) {
+        return true;
+      }
+
+      // If we know the key's property type, filter strictly by that
+      if (keyPropertyType) {
+        return requiredTypes.includes(keyPropertyType);
+      }
+
+      // Otherwise, fall back to filtering by any available property type in the feature type
+      const availablePropertyTypes = getFeatureTypePropertyTypes(featureType);
+      return requiredTypes.some((type) => availablePropertyTypes.has(type));
+    });
+
+    return compatibleOperators
+      .filter((op) => op.toLowerCase().includes(currentText.toLowerCase()))
+      .map((op, index) => ({
         label: op,
         kind: monaco.languages.CompletionItemKind.Enum,
         insertText: op,
@@ -471,28 +658,7 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
           endLineNumber: position.lineNumber,
           endColumn: endColumn
         }
-      })
-    );
-  };
-
-  /**
-   * Maps operators to their compatible feature property types.
-   * Used to filter Key suggestions based on the selected Operator.
-   */
-  const operatorPropertyTypes: Record<string, string[]> = {
-    StringEquals: ['string'],
-    StringNotEquals: ['string'],
-    StringLike: ['string'],
-    NumericEquals: ['number'],
-    Bool: ['string'], // booleans stored as strings
-    Exists: ['string', 'number', 'datetime', 'spatial'], // works with all types
-    DateBefore: ['datetime'],
-    DateAfter: ['datetime'],
-    Within: ['spatial'],
-    Intersects: ['spatial'],
-    Contains: ['spatial'],
-    ParentOf: ['string'],
-    ChildOf: ['string']
+      }));
   };
 
   /**
@@ -526,20 +692,22 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
   /**
    * Generate autocomplete suggestions for condition Key values.
    *
-   * Collects unique property names from all feature types, filtered by
-   * compatibility with the selected operator (if any).
+   * Shows only properties valid for the feature type specified in the URN.
+   * If feature type is '*' or not found, shows properties from all feature types.
    *
    * @param {string} currentText - Text already typed in the Key field
-   * @param {MonacoEditor} monaco - Monaco editor API
+   * @param {Monaco} monaco - Monaco editor API
    * @param {string | null} operator - Selected operator (used to filter by compatible types)
+   * @param {string | null} featureType - Feature type from URN (used to filter properties)
    * @param {EditorPosition} position - Cursor position
    * @param {number} endColumn - Column position where replacement should end
    * @returns {languages.CompletionItem[]} Array of Monaco CompletionItem objects
    */
   const getKeySuggestions = (
     currentText: string,
-    monaco: MonacoEditor,
+    monaco: Monaco,
     operator: string | null,
+    featureType: string | null,
     position: EditorPosition,
     endColumn: number
   ): languages.CompletionItem[] => {
@@ -548,8 +716,14 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
     const startColumn = position.column - currentText.length;
     const compatibleTypes = operator ? operatorPropertyTypes[operator] : null;
 
+    // Filter to specific feature type if provided and not wildcard
+    const featureTypesToSearch =
+      featureType && featureType !== '*'
+        ? sharedContextRef.current.featureTypes.filter((ft) => ft.feature_type.feature_type_name === featureType)
+        : sharedContextRef.current.featureTypes;
+
     let index = 0;
-    for (const ft of sharedContextRef.current.featureTypes) {
+    for (const ft of featureTypesToSearch) {
       const properties = ft.feature_type_properties;
       if (!properties || !Array.isArray(properties)) {
         continue;
@@ -568,7 +742,7 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
           label: propName,
           kind: monaco.languages.CompletionItemKind.Property,
           insertText: propName,
-          detail: `${propType} property from ${ft.feature_type.feature_type_name}`,
+          detail: `${propType} property`,
           sortText: String(index).padStart(5, '0'),
           range: {
             startLineNumber: position.lineNumber,
@@ -609,7 +783,7 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
    *
    * @param {string} operator - The operator selected in this condition
    * @param {string} currentText - Text already typed in the Value field
-   * @param {MonacoEditor} monaco - Monaco editor API
+   * @param {Monaco} monaco - Monaco editor API
    * @param {EditorPosition} position - Cursor position
    * @param {number} endColumn - Column position where replacement should end
    * @returns {languages.CompletionItem[]} Array of Monaco CompletionItem objects with example values
@@ -617,7 +791,7 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
   const getValueSuggestions = (
     operator: string,
     currentText: string,
-    monaco: MonacoEditor,
+    monaco: Monaco,
     position: EditorPosition,
     endColumn: number
   ): languages.CompletionItem[] => {

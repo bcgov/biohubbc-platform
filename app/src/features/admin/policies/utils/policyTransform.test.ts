@@ -366,7 +366,7 @@ describe('policyTransform', () => {
     it('returns error for invalid JSON', () => {
       const result = validatePolicyJson('not valid json');
 
-      expect(result).toBe('Invalid JSON');
+      expect(result).toContain('Invalid JSON');
     });
 
     it('returns error for missing Version', () => {

@@ -31,7 +31,6 @@ import {
   AddPolicyFormYupSchema,
   IAddPolicyFormValues
 } from './AddPolicyForm';
-import { parsePolicyError } from '../utils/policyErrorParser';
 import { transformApiToPolicyJson, transformPolicyJsonToApi } from '../utils/policyTransform';
 
 const useStyles = () => {
@@ -210,13 +209,13 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
       });
     } catch (error) {
       const apiError = error as APIError;
-      const parsedError = parsePolicyError(apiError);
 
       dialogContext.setErrorDialog({
         open: true,
-        dialogTitle: parsedError.title,
-        dialogText: parsedError.message,
-        dialogError: parsedError.suggestion,
+        dialogTitle: 'Failed to Create Policy',
+        dialogText: 'An error occurred while creating the policy.',
+        dialogError: apiError.message,
+        dialogErrorDetails: apiError.errors,
         onClose: () => {
           dialogContext.setErrorDialog({ open: false });
         },
@@ -267,13 +266,13 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
       });
     } catch (error) {
       const apiError = error as APIError;
-      const parsedError = parsePolicyError(apiError);
 
       dialogContext.setErrorDialog({
         open: true,
-        dialogTitle: parsedError.title,
-        dialogText: parsedError.message,
-        dialogError: parsedError.suggestion,
+        dialogTitle: 'Failed to Update Policy',
+        dialogText: 'An error occurred while updating the policy.',
+        dialogError: apiError.message,
+        dialogErrorDetails: apiError.errors,
         onClose: () => {
           dialogContext.setErrorDialog({ open: false });
         },

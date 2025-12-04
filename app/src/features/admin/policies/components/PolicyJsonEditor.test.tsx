@@ -13,7 +13,8 @@ vi.mock('@monaco-editor/react', () => ({
         getPosition: vi.fn(() => ({ lineNumber: 1, column: 1 })),
         getModel: vi.fn(() => ({
           getValueInRange: vi.fn(() => ''),
-          getLineContent: vi.fn(() => '')
+          getLineContent: vi.fn(() => ''),
+          getValue: vi.fn(() => value || '{}')
         })),
         trigger: vi.fn()
       };
@@ -26,6 +27,9 @@ vi.mock('@monaco-editor/react', () => ({
               setDiagnosticsOptions: vi.fn()
             }
           }
+        },
+        editor: {
+          setModelMarkers: vi.fn()
         }
       };
       // Call onMount after render
