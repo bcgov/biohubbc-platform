@@ -1117,6 +1117,82 @@ describe('policyValidator', () => {
         expect(markers).toHaveLength(0);
       });
 
+      it('returns no marker for valid ISO datetime without milliseconds', () => {
+        const policy = JSON.stringify(
+          {
+            Version: '2025-12-01',
+            Statement: [
+              {
+                Effect: 'Allow',
+                Resource: 'urn:1:animal:*',
+                Condition: [{ Operator: 'DateAfter', Key: 'observed_date', Value: '2024-06-15T12:30:00Z' }]
+              }
+            ]
+          },
+          null,
+          2
+        );
+        const markers = validatePolicyDocument(policy, mockContext);
+        expect(markers).toHaveLength(0);
+      });
+
+      it('returns no marker for valid ISO datetime with positive timezone offset', () => {
+        const policy = JSON.stringify(
+          {
+            Version: '2025-12-01',
+            Statement: [
+              {
+                Effect: 'Allow',
+                Resource: 'urn:1:animal:*',
+                Condition: [{ Operator: 'DateAfter', Key: 'observed_date', Value: '2024-06-15T12:30:00+05:30' }]
+              }
+            ]
+          },
+          null,
+          2
+        );
+        const markers = validatePolicyDocument(policy, mockContext);
+        expect(markers).toHaveLength(0);
+      });
+
+      it('returns no marker for valid ISO datetime with negative timezone offset', () => {
+        const policy = JSON.stringify(
+          {
+            Version: '2025-12-01',
+            Statement: [
+              {
+                Effect: 'Allow',
+                Resource: 'urn:1:animal:*',
+                Condition: [{ Operator: 'DateBefore', Key: 'observed_date', Value: '2024-06-15T08:00:00-08:00' }]
+              }
+            ]
+          },
+          null,
+          2
+        );
+        const markers = validatePolicyDocument(policy, mockContext);
+        expect(markers).toHaveLength(0);
+      });
+
+      it('returns marker for invalid time format in datetime', () => {
+        const policy = JSON.stringify(
+          {
+            Version: '2025-12-01',
+            Statement: [
+              {
+                Effect: 'Allow',
+                Resource: 'urn:1:animal:*',
+                Condition: [{ Operator: 'DateAfter', Key: 'observed_date', Value: '2024-06-15T12:30' }]
+              }
+            ]
+          },
+          null,
+          2
+        );
+        const markers = validatePolicyDocument(policy, mockContext);
+        expect(markers.some((m) => m.message.includes('Invalid date format'))).toBe(true);
+      });
+
       // Intersects operator tests
       it('returns no marker for valid GeoJSON with Intersects operator', () => {
         const policy = JSON.stringify(

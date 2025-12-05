@@ -137,10 +137,7 @@ const validateCondition = (
  * @param {number} stmtIndex - Zero-based index of the parent statement in the policy (used for error messages)
  * @returns {string | null} Error message if validation fails, null if all conditions are valid
  */
-const validateConditions = (
-  conditions: Partial<IPolicyDocumentCondition>[] | unknown,
-  stmtIndex: number
-): string | null => {
+const validateConditions = (conditions: unknown, stmtIndex: number): string | null => {
   if (!Array.isArray(conditions)) {
     return `Statement ${stmtIndex + 1}: Condition must be an array`;
   }

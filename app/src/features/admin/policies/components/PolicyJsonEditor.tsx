@@ -1,4 +1,4 @@
-import Editor, { Monaco, OnMount, OnValidate } from '@monaco-editor/react';
+import Editor, { loader, Monaco, OnMount, OnValidate } from '@monaco-editor/react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { debounce } from 'lodash-es';
@@ -31,6 +31,24 @@ interface PolicyJsonEditorProps {
 
 // Track Monaco provider registration (providers are global per language)
 let providerRegistered = false;
+
+// Configure JSON schema validation before Monaco loads
+// The Monaco types mark languages.json as { deprecated: true } but the API works at runtime
+loader.init().then((monacoInstance) => {
+  const jsonDefaults = (
+    monacoInstance.languages.json as { jsonDefaults?: { setDiagnosticsOptions: (options: unknown) => void } }
+  ).jsonDefaults;
+  jsonDefaults?.setDiagnosticsOptions({
+    validate: true,
+    schemas: [
+      {
+        uri: 'https://biohub/policy-schema.json',
+        fileMatch: ['*'],
+        schema: policyJsonSchema
+      }
+    ]
+  });
+});
 
 /**
  * Handle colon input inside URN values - prefetch features if needed.
@@ -223,22 +241,7 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
     editorRef.current = editorInstance;
     monacoRef.current = monaco;
 
-    // Configure JSON schema validation
-    const jsonLanguage = (monaco.languages as any)?.json;
-    if (jsonLanguage?.jsonDefaults) {
-      jsonLanguage.jsonDefaults.setDiagnosticsOptions({
-        validate: true,
-        schemas: [
-          {
-            uri: 'https://biohub/policy-schema.json',
-            fileMatch: ['*'],
-            schema: policyJsonSchema
-          }
-        ]
-      });
-    }
-
-    // Run initial validation
+    // Run initial validation (JSON schema validation is configured via loader.init() at module level)
     runValidation();
 
     // Only register completion provider once globally
@@ -365,7 +368,7 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
    */
   const extractFeatureTypeFromText = (text: string): string | null => {
     const resourceMatches = [...text.matchAll(/"Resource"\s*:\s*"urn:[^:]*:([^:"]*):/g)];
-    const lastMatch = resourceMatches.length > 0 ? resourceMatches[resourceMatches.length - 1] : null;
+    const lastMatch = resourceMatches.at(-1);
     return lastMatch ? lastMatch[1] : null;
   };
 
@@ -377,7 +380,7 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
    */
   const extractLastKeyFromText = (text: string): string | null => {
     const keyMatches = [...text.matchAll(/"Key"\s*:\s*"([^"]+)"/g)];
-    const lastMatch = keyMatches.length > 0 ? keyMatches[keyMatches.length - 1] : null;
+    const lastMatch = keyMatches.at(-1);
     return lastMatch ? lastMatch[1] : null;
   };
 
@@ -871,6 +874,8 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
             tabSize: 2,
             scrollBeyondLastLine: false,
             automaticLayout: true,
+            quickSuggestions: true,
+            hover: { enabled: true },
             suggest: {
               showKeywords: true,
               showSnippets: true,

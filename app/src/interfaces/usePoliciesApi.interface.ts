@@ -77,23 +77,3 @@ export interface IUpdatePolicyRequest {
   description?: string;
   statements: ICreatePolicyStatementRequest[];
 }
-
-/**
- * Policy form values (for Formik) - Legacy form-based.
- * @deprecated Use IAddPolicyFormValues from AddPolicyForm.tsx instead
- */
-export interface IAddPolicyFormValuesLegacy {
-  name: string;
-  description: string;
-  statements: IStatementFormValues[];
-}
-
-/**
- * Statement form values (for Formik) - Legacy.
- * @deprecated Use JSON-based policy editing instead
- */
-export interface IStatementFormValues {
-  _key: string;
-  effect: 'allow' | 'deny';
-  submission_feature_urn: string;
-}

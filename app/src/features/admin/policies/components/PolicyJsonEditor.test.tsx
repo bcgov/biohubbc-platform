@@ -5,6 +5,17 @@ import { PolicyJsonEditor } from './PolicyJsonEditor';
 
 // Mock Monaco Editor - it doesn't work well in jsdom
 vi.mock('@monaco-editor/react', () => ({
+  loader: {
+    init: vi.fn().mockResolvedValue({
+      languages: {
+        json: {
+          jsonDefaults: {
+            setDiagnosticsOptions: vi.fn()
+          }
+        }
+      }
+    })
+  },
   default: vi.fn(({ value, onChange, onValidate, onMount }) => {
     // Simulate onMount callback with mock editor and monaco instances
     if (onMount) {

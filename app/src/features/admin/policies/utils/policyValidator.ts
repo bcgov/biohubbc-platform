@@ -174,7 +174,7 @@ const validateJsonSyntax = (text: string): { document: IPolicyDocument | null; m
     let line = 1;
     let column = 1;
     if (match) {
-      const position = parseInt(match[1], 10);
+      const position = Number.parseInt(match[1], 10);
       const beforeError = text.substring(0, position);
       line = (beforeError.match(/\n/g) || []).length + 1;
       column = position - beforeError.lastIndexOf('\n');
@@ -264,7 +264,7 @@ const validateUrn = (
 
   // Validate submission ID exists
   if (submissionId !== '*') {
-    const id = parseInt(submissionId, 10);
+    const id = Number.parseInt(submissionId, 10);
     const exists = context.submissions.some((s) => s.submission_id === id);
     if (!exists) {
       markers.push(createMarker(`Statement ${statementIndex + 1}: Submission ${id} does not exist`, line, start, end));
@@ -283,10 +283,10 @@ const validateUrn = (
 
   // Validate feature ID exists (if submission features are cached)
   if (featureId !== '*' && submissionId !== '*') {
-    const subId = parseInt(submissionId, 10);
+    const subId = Number.parseInt(submissionId, 10);
     const features = context.submissionFeaturesCache.get(subId);
     if (features) {
-      const fId = parseInt(featureId, 10);
+      const fId = Number.parseInt(featureId, 10);
       const featureExists = features.some((group) => group.features.some((f) => f.submission_feature_id === fId));
       if (!featureExists) {
         markers.push(
@@ -324,6 +324,12 @@ const findPropertyForKey = (
   return featureTypeDef.feature_type_properties.find((p) => p.feature_property_name === key);
 };
 
+/** Pattern for date portion: YYYY-MM-DD */
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}/;
+
+/** Pattern for time portion: THH:MM:SS with optional milliseconds and timezone */
+const TIME_PATTERN = /^T\d{2}:\d{2}:\d{2}(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})?$/;
+
 /**
  * Check if a string is a valid ISO 8601 date.
  *
@@ -336,16 +342,22 @@ const findPropertyForKey = (
  * @returns {boolean} True if valid ISO date
  */
 const isValidIsoDate = (value: string): boolean => {
-  // ISO 8601 date pattern - accepts date only or full datetime
-  const isoDatePattern = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{1,3})?(Z|[+-]\d{2}:\d{2})?)?$/;
-
-  if (!isoDatePattern.test(value)) {
+  // Check date portion exists
+  if (!DATE_PATTERN.test(value)) {
     return false;
+  }
+
+  // If there's more than just the date, validate time portion
+  if (value.length > 10) {
+    const timePart = value.substring(10);
+    if (!TIME_PATTERN.test(timePart)) {
+      return false;
+    }
   }
 
   // Also verify it's a real date (not 2024-13-45)
   const date = new Date(value);
-  return !isNaN(date.getTime());
+  return !Number.isNaN(date.getTime());
 };
 
 /**
