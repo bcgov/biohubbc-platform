@@ -75,7 +75,7 @@ export const policyJsonSchema = {
             defaultSnippets: [
               {
                 label: 'Add Condition',
-                bodyText: '[\n  {\n    "Key": $1,\n    "Operator": $2,\n    "Value": $3\n  }\n]'
+                bodyText: '[\n  {\n    "Key": "$1",\n    "Operator": "$2",\n    "Value": "$3"\n  }\n]'
               }
             ],
             items: {

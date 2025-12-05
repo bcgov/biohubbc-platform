@@ -881,10 +881,13 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
         />
       </Box>
       {(error || validationError) && (
-        <Typography color="error" variant="caption" mt={0.5}>
+        <Typography color="error" variant="caption" display="block" mt={0.5}>
           {error || validationError}
         </Typography>
       )}
+      <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+        Press Ctrl+Space to trigger autocomplete suggestions
+      </Typography>
     </Box>
   );
 };
