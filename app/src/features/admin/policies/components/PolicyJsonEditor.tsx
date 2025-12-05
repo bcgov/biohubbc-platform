@@ -34,23 +34,20 @@ let providerRegistered = false;
 
 // Configure JSON schema validation before Monaco loads
 // The Monaco types mark languages.json as { deprecated: true } but the API works at runtime
-// Using an IIFE with top-level await pattern for ES2022+ compatibility
-(async () => {
-  const monacoInstance = await loader.init();
-  const jsonDefaults = (
-    monacoInstance.languages.json as { jsonDefaults?: { setDiagnosticsOptions: (options: unknown) => void } }
-  ).jsonDefaults;
-  jsonDefaults?.setDiagnosticsOptions({
-    validate: true,
-    schemas: [
-      {
-        uri: 'https://biohub/policy-schema.json',
-        fileMatch: ['*'],
-        schema: policyJsonSchema
-      }
-    ]
-  });
-})();
+const monacoInstance = await loader.init();
+const jsonDefaults = (
+  monacoInstance.languages.json as { jsonDefaults?: { setDiagnosticsOptions: (options: unknown) => void } }
+).jsonDefaults;
+jsonDefaults?.setDiagnosticsOptions({
+  validate: true,
+  schemas: [
+    {
+      uri: 'https://biohub/policy-schema.json',
+      fileMatch: ['*'],
+      schema: policyJsonSchema
+    }
+  ]
+});
 
 /**
  * Handle colon input inside URN values - prefetch features if needed.
