@@ -52,7 +52,7 @@ GET.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'A paginated list of submission features with type and security info.',
+      description: 'A paginated list of submission features with security info.',
       content: {
         'application/json': {
           schema: {
@@ -64,64 +64,21 @@ GET.apiDoc = {
                 type: 'array',
                 items: {
                   type: 'object',
-                  required: ['feature_type_name', 'feature_type_display_name', 'features'],
+                  required: [
+                    'submission_id',
+                    'submission_feature_id',
+                    'feature_type_name',
+                    'feature_type_id',
+                    'secured'
+                  ],
+                  additionalProperties: false,
                   properties: {
+                    submission_id: { type: 'integer', minimum: 1 },
+                    submission_feature_id: { type: 'integer', minimum: 1 },
                     feature_type_name: { type: 'string' },
-                    feature_type_display_name: { type: 'string' },
-                    features: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        required: [
-                          'submission_feature_id',
-                          'uuid',
-                          'urn',
-                          'submission_id',
-                          'feature_type_id',
-                          'source_id',
-                          'data',
-                          'parent_submission_feature_id',
-                          'record_effective_date',
-                          'record_end_date',
-                          'create_date',
-                          'create_user',
-                          'update_date',
-                          'update_user',
-                          'revision_count',
-                          'feature_type_name',
-                          'feature_type_display_name',
-                          'submission_feature_security_ids',
-                          'secured'
-                        ],
-                        properties: {
-                          submission_feature_id: { type: 'integer', minimum: 1 },
-                          uuid: { type: 'string', format: 'uuid' },
-                          urn: { type: 'string' },
-                          submission_id: { type: 'integer', minimum: 1 },
-                          feature_type_id: { type: 'integer', minimum: 1 },
-                          source_id: { type: 'string', maxLength: 200 },
-                          data: { type: 'object', properties: {} },
-                          parent_submission_feature_id: { type: 'integer', minimum: 1, nullable: true },
-                          record_effective_date: { type: 'string' },
-                          record_end_date: { type: 'string', nullable: true },
-                          create_date: { type: 'string' },
-                          create_user: { type: 'integer', minimum: 1 },
-                          update_date: { type: 'string', nullable: true },
-                          update_user: { type: 'integer', minimum: 1, nullable: true },
-                          revision_count: { type: 'integer', minimum: 0 },
-                          feature_type_name: { type: 'string' },
-                          feature_type_display_name: { type: 'string' },
-                          submission_feature_security_ids: {
-                            type: 'array',
-                            items: { type: 'integer', minimum: 1 }
-                          },
-                          secured: { type: 'boolean' }
-                        },
-                        additionalProperties: false
-                      }
-                    }
-                  },
-                  additionalProperties: false
+                    feature_type_id: { type: 'integer', minimum: 1 },
+                    secured: { type: 'boolean' }
+                  }
                 }
               },
               pagination: paginationResponseSchema

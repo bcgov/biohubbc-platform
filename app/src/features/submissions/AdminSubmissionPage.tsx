@@ -1,8 +1,9 @@
 import { Paper } from '@mui/material';
 import Container from '@mui/material/Container';
 import Stack from '@mui/material/Stack';
+import { GridRowParams } from '@mui/x-data-grid';
 import BaseHeader from 'components/layout/header/BaseHeader';
-import ManageSecurity from 'components/security/ManageSecurity';
+import SecuritiesDialog from 'components/security/SecuritiesDialog';
 import { useSubmissionContext } from 'hooks/useContext';
 import { useMemo, useState } from 'react';
 import SubmissionHeaderSecurityStatus from './components/SubmissionHeaderSecurityStatus';
@@ -17,15 +18,22 @@ interface FeatureRow {
   secured: boolean;
 }
 
+/**
+ * Admin page for applying security rules to features in a submission
+ *
+ * @returns {*}
+ */
 export const AdminSubmissionPage = () => {
   const submissionContext = useSubmissionContext();
   const submission = submissionContext.submissionRecordDataLoader.data;
 
+  // Multi-row selection in the table
   const [selectedFeatureIds, setSelectedFeatureIds] = useState<Set<number>>(new Set());
-  const [manageSecurityOpen, setManageSecurityOpen] = useState(false);
-  const [securityFeatureIds, setSecurityFeatureIds] = useState<Set<number>>(new Set());
 
-  // Transform features into table rows
+  // Security dialog target (can be single or multiple rows)
+  const [dialogFeatureIds, setDialogFeatureIds] = useState<Set<number>>(new Set());
+  const [manageSecurityOpen, setManageSecurityOpen] = useState(false);
+
   const rows: FeatureRow[] = useMemo(() => {
     return (
       submissionContext.submissionFeaturesDataLoader.data?.features.map((feature) => ({
@@ -40,8 +48,8 @@ export const AdminSubmissionPage = () => {
 
   const rowCount = submissionContext.submissionFeaturesDataLoader.data?.pagination.total ?? 0;
 
-  // Row click toggles selection
-  const handleRowClick = (params: any) => {
+  // Handle multi-row selection
+  const handleRowClick = (params: GridRowParams<FeatureRow>) => {
     const id = params.id as number;
     const newSet = new Set(selectedFeatureIds);
 
@@ -54,29 +62,27 @@ export const AdminSubmissionPage = () => {
     setSelectedFeatureIds(newSet);
   };
 
-  // Security icon click handler
-  const handleSecurityChange = (row: FeatureRow) => {
-    setSecurityFeatureIds(new Set([row.submission_feature_id]));
+  // Open security dialog for a single row
+  const onRowSecurityClick = (row: FeatureRow) => {
+    setDialogFeatureIds(new Set([row.submission_feature_id]));
     setManageSecurityOpen(true);
   };
 
-  // Close ManageSecurity modal
   const handleCloseManageSecurity = () => {
     setManageSecurityOpen(false);
-    // Refresh features after security change
-    submissionContext.submissionFeaturesDataLoader.refresh(
-      submissionContext.submissionId,
-      submissionContext.featuresPagination
-    );
   };
 
-  // Refresh for toolbar
   const handleRefresh = () => {
     submissionContext.submissionRecordDataLoader.refresh(submissionContext.submissionId);
     submissionContext.submissionFeaturesDataLoader.refresh(
       submissionContext.submissionId,
       submissionContext.featuresPagination
     );
+  };
+
+  const handleSecurityChange = () => {
+    handleRefresh();
+    setManageSecurityOpen(false);
   };
 
   if (!submission) {
@@ -94,10 +100,13 @@ export const AdminSubmissionPage = () => {
         }
         buttonJSX={
           <SubmissionHeaderToolbar
-            submissionFeatureIds={{ ids: selectedFeatureIds }}
             submission={submission}
-            submissionId={submissionContext.submissionId}
-            handleRefresh={handleRefresh}
+            onSecurityClick={() => {
+              // Open dialog for all currently selected rows
+              setDialogFeatureIds(new Set(selectedFeatureIds));
+              setManageSecurityOpen(true);
+            }}
+            onSubmissionStageChange={handleRefresh}
           />
         }
       />
@@ -114,16 +123,19 @@ export const AdminSubmissionPage = () => {
             sortModel={submissionContext.sortModel}
             setSortModel={submissionContext.setSortModel}
             onRowClick={handleRowClick}
-            handleSecurityChange={handleSecurityChange}
+            onRowSecurityClick={onRowSecurityClick}
           />
         </Paper>
       </Container>
 
+      {/* Centralized security dialog */}
       {manageSecurityOpen && (
-        <ManageSecurity
-          submissionFeatureIds={{ ids: securityFeatureIds }}
-          onSubmit={handleRefresh}
+        <SecuritiesDialog
+          submissionId={submission.submission_id}
+          submissionFeatureIds={{ ids: dialogFeatureIds }}
+          open={manageSecurityOpen}
           onClose={handleCloseManageSecurity}
+          onSubmit={handleSecurityChange}
         />
       )}
     </>

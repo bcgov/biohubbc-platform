@@ -1,36 +1,33 @@
-import { mdiArrowRight } from '@mdi/js';
+import { mdiArrowRight, mdiSecurity } from '@mdi/js';
 import Icon from '@mdi/react';
+import { Button } from '@mui/material';
 import Stack from '@mui/material/Stack';
-import { GridRowSelectionModel } from '@mui/x-data-grid';
-import ManageSecurity from 'components/security/ManageSecurity';
 import CompleteSecurityReviewButton from 'features/submissions/components/PublishSecurityReview/CompleteSecurityReviewButton';
 import { useApi } from 'hooks/useApi';
 import { SubmissionRecordWithSecurity } from 'interfaces/useSubmissionsApi.interface';
 import PublishSecurityReviewButton from './PublishSecurityReview/PublishSecurityReviewButton';
 
 export interface ISubmissionHeaderToolbarProps {
-  submissionFeatureIds: Pick<GridRowSelectionModel, 'ids'>;
-  submissionId: number;
   submission: SubmissionRecordWithSecurity;
-  handleRefresh: () => void;
+  onSecurityClick: () => void;
+  onSubmissionStageChange: () => void;
 }
 
 /**
  * Submission header toolbar for admin single-submission view.
  *
+ * @param {ISubmissionHeaderToolbarProps} props
  * @returns {*}
  */
-export const SubmissionHeaderToolbar = ({
-  submissionFeatureIds,
-  submissionId,
-  submission,
-  handleRefresh
-}: ISubmissionHeaderToolbarProps) => {
+export const SubmissionHeaderToolbar = (props: ISubmissionHeaderToolbarProps) => {
+  const { submission, onSecurityClick, onSubmissionStageChange } = props;
+
   const api = useApi();
+  const submissionId = submission.submission_id;
 
   const onSecurityReviewComplete = async () => {
     await api.submissions.updateSubmissionRecord(submissionId, { security_reviewed: true });
-    handleRefresh?.();
+    onSubmissionStageChange?.();
   };
 
   const onSecurityReviewRemove = async () => {
@@ -38,7 +35,7 @@ export const SubmissionHeaderToolbar = ({
       security_reviewed: false,
       published: false
     });
-    handleRefresh?.();
+    onSubmissionStageChange?.();
   };
 
   const onSecurityReviewPublish = async () => {
@@ -46,20 +43,28 @@ export const SubmissionHeaderToolbar = ({
       security_reviewed: true,
       published: true
     });
-    handleRefresh?.();
+    onSubmissionStageChange?.();
   };
 
   const onSecurityReviewUnPublish = async () => {
     await api.submissions.updateSubmissionRecord(submissionId, {
       published: false
     });
-    handleRefresh?.();
+    onSubmissionStageChange?.();
   };
 
   return (
     <Stack flexDirection="row" alignItems="center" gap={1}>
-      <ManageSecurity submissionFeatureIds={submissionFeatureIds} onSubmit={handleRefresh} />
+      {/* Security button delegates to parent dialog */}
+      <Button
+        color="primary"
+        variant="outlined"
+        startIcon={<Icon path={mdiSecurity} size={0.75} />}
+        onClick={onSecurityClick}>
+        Manage Security
+      </Button>
 
+      {/* Complete Security Review buttons */}
       <CompleteSecurityReviewButton
         submission={submission}
         onComplete={onSecurityReviewComplete}

@@ -1743,29 +1743,24 @@ export class SubmissionRepository extends BaseRepository {
    * @memberof SubmissionRepository
    */
   private _getSubmissionFeaturesBaseQuery(submissionId: number, knex: Knex) {
-    return knex('submission_feature')
+    const baseQuery = knex('submission_feature')
       .select(
         'submission_feature.submission_id',
         'submission_feature.submission_feature_id',
         'submission_feature.feature_type_id',
-        'feature_type.name as feature_type_name',
-        knex.raw(
-          'CASE WHEN submission_feature_security.submission_feature_id IS NOT NULL THEN true ELSE false END as secured'
-        )
+        knex.raw('feature_type.name AS feature_type_name'),
+        knex.raw(`
+        EXISTS (
+          SELECT 1 
+          FROM submission_feature_security sfs
+          WHERE sfs.submission_feature_id = submission_feature.submission_feature_id
+        ) AS secured
+      `)
       )
       .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id')
-      .leftJoin(
-        'submission_feature_security',
-        'submission_feature_security.submission_feature_id',
-        'submission_feature.submission_feature_id'
-      )
-      .where('submission_feature.submission_id', submissionId)
-      .groupBy(
-        'submission_feature.submission_id',
-        'submission_feature.submission_feature_id',
-        'submission_feature.feature_type_id',
-        'feature_type.name'
-      );
+      .where('submission_feature.submission_id', submissionId);
+
+    return knex.with('base_features', baseQuery).distinct('*').from('base_features').orderBy('submission_feature_id');
   }
 
   /**
@@ -1782,7 +1777,7 @@ export class SubmissionRepository extends BaseRepository {
   ): Promise<SubmissionFeatureForReview[]> {
     const knex = getKnex();
 
-    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex).orderBy('feature_type.sort', 'asc');
+    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex);
 
     this.applyPagination(baseQuery, pagination);
 

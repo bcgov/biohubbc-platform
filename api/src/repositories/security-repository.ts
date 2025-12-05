@@ -382,6 +382,44 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
+   * Applies all given security rules to all features of a submission.
+   *
+   * @param {number} submissionId
+   * @param {number[]} securityRuleIds
+   * @return {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityRepository
+   */
+  async applySecurityToSubmission(
+    submissionId: number,
+    securityRuleIds: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
+    defaultLog.debug({ label: 'applySecurityToSubmission', submissionId, securityRuleIds });
+
+    if (!securityRuleIds.length) {
+      defaultLog.info({ label: 'applySecurityToSubmission', message: 'No rules to apply.' });
+      return [];
+    }
+
+    // Build SQL to join submission → features and insert all rules
+    const queryValues = securityRuleIds
+      .map((securityRuleId) => `(sf.submission_feature_id, ${securityRuleId}, NOW())`)
+      .join(', ');
+
+    const insertSQL = SQL`
+    INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date)
+    SELECT sf.submission_feature_id, r.security_rule_id, NOW()
+    FROM submission_feature sf
+    CROSS JOIN (VALUES ${queryValues}) AS r(security_rule_id)
+    WHERE sf.submission_id = ${submissionId}
+    ON CONFLICT (submission_feature_id, security_rule_id) DO NOTHING
+    RETURNING *;
+  `;
+
+    const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
+    return response.rows;
+  }
+
+  /**
    * Removes all security rules for a given set of submission features
    *
    * @param {number[]} submissionFeatureIds

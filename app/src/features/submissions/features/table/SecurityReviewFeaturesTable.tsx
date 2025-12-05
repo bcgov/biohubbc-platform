@@ -30,7 +30,7 @@ interface SecurityReviewFeaturesTableProps {
   setPaginationModel: (model: GridPaginationModel) => void;
   sortModel: GridSortModel;
   setSortModel: (model: GridSortModel) => void;
-  handleSecurityChange: (row: FeatureRow) => void;
+  onRowSecurityClick: (row: FeatureRow) => void;
   onRowClick?: (params: GridRowParams, event: MuiEvent<React.MouseEvent>) => void;
 }
 
@@ -45,7 +45,7 @@ export const SecurityReviewFeaturesTable = ({
   setPaginationModel,
   sortModel,
   setSortModel,
-  handleSecurityChange,
+  onRowSecurityClick,
   onRowClick
 }: SecurityReviewFeaturesTableProps) => {
   const columns: GridColDef[] = [
@@ -60,7 +60,7 @@ export const SecurityReviewFeaturesTable = ({
         <IconButton
           onClick={(e) => {
             e.stopPropagation();
-            handleSecurityChange(params.row);
+            onRowSecurityClick(params.row);
           }}>
           <Icon
             path={params.row.secured ? mdiLock : mdiLockOpenVariant}

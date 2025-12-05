@@ -20,7 +20,7 @@ interface SecurityReviewFeaturesProps {
   sortModel: any;
   setSortModel: (model: any) => void;
   onRowClick: (params: any) => void;
-  handleSecurityChange: (row: FeatureRow) => void;
+  onRowSecurityClick: (row: FeatureRow) => void;
 }
 
 export const SecurityReviewFeatures = ({
@@ -33,7 +33,7 @@ export const SecurityReviewFeatures = ({
   sortModel,
   setSortModel,
   onRowClick,
-  handleSecurityChange
+  onRowSecurityClick
 }: SecurityReviewFeaturesProps) => {
   return (
     <Stack gap={2} py={2}>
@@ -56,7 +56,7 @@ export const SecurityReviewFeatures = ({
         sortModel={sortModel}
         setSortModel={setSortModel}
         onRowClick={onRowClick}
-        handleSecurityChange={handleSecurityChange}
+        onRowSecurityClick={onRowSecurityClick}
       />
     </Stack>
   );

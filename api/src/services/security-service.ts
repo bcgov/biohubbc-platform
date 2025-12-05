@@ -361,6 +361,28 @@ export class SecurityService extends DBService {
   }
 
   /**
+   * Applies all active security rules to all features of a submission.
+   *
+   * @param {number} submissionId
+   * @return {Promise<void>}
+   * @memberof SecurityService
+   */
+  async applySecurityToSubmission(submissionId: number): Promise<void> {
+    defaultLog.debug({ label: 'applySecurityToSubmission', submissionId });
+
+    // Get all active security rules
+    const securityRules = await this.securityRepository.getAllActiveSecurityRules();
+    const securityRuleIds = securityRules.map((r) => r.security_rule_id);
+
+    if (!securityRuleIds.length) {
+      defaultLog.info({ label: 'applySecurityToSubmission', message: 'No active rules to apply.' });
+      return;
+    }
+
+    await this.securityRepository.applySecurityToSubmission(submissionId, securityRuleIds);
+  }
+
+  /**
    * Removes the given security rules from the given set of submission feature ids. If
    * no security rules ID is provided, all security rules will be removed for the given set
    * of subission features.

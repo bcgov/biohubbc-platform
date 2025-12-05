@@ -32,38 +32,35 @@ export const SubmissionContext = React.createContext<ISubmissionContext | undefi
 
 export const SubmissionContextProvider = (props: PropsWithChildren) => {
   const api = useApi();
-
-  /** Extract submission ID */
-  const urlParams = useParams<{ submission_id: string }>();
-  const submissionId = Number(urlParams.submission_id);
+  const { submission_id } = useParams<{ submission_id: string }>();
+  const submissionId = Number(submission_id);
 
   if (!submissionId) {
-    throw new Error('Missing submission_id route param');
+    throw new Error('Missing submission_id route parameter');
   }
 
-  /** ========== Pagination + Sorting State ========== */
+  // Pagination and sorting state
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
     page: 0,
     pageSize: 25
   });
 
-  const [sortModel, setSortModel] = useState<GridSortModel>([]);
+  const [sortModel, setSortModel] = useState<GridSortModel>([
+    { field: 'submission_feature_id', sort: 'asc' } // default sort
+  ]);
 
-  /** Convert MUI pagination/sorting → API format */
+  // Convert MUI pagination + sorting to API format
   const featuresPagination: ApiPaginationRequestOptions = useMemo(() => {
     const sort = firstOrNull(sortModel);
-
     return {
       limit: paginationModel.pageSize,
-      page: paginationModel.page + 1, // API is 1-indexed
+      page: paginationModel.page + 1, // API uses 1-based indexing
       sort: sort?.field || undefined,
       order: sort?.sort || undefined
     };
   }, [paginationModel, sortModel]);
 
-  /** ========== Data Loaders ========== */
-
-  // Load submission record (unchanged)
+  // Data loaders
   const submissionRecordDataLoader = useDataLoader(api.submissions.getSubmissionRecordWithSecurity);
 
   const submissionFeaturesDataLoader = useDataLoader((submissionId: number, pagination: ApiPaginationRequestOptions) =>
@@ -76,31 +73,30 @@ export const SubmissionContextProvider = (props: PropsWithChildren) => {
     api.security.getAllSecurityRulesForSubmission(submissionId)
   );
 
-  /** ========== Initial Loads ========== */
+  // Initial data load
   submissionRecordDataLoader.load(submissionId);
   submissionFeaturesDataLoader.load(submissionId, featuresPagination);
   allSecurityRulesStaticListDataLoader.load();
 
-  /** Refresh features on pagination/sorting change */
+  // Reload features when pagination or sorting changes
   useEffect(() => {
     submissionFeaturesDataLoader.refresh(submissionId, featuresPagination);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [featuresPagination]);
 
-  /** Refresh when submission ID changes */
+  // Refresh all data when submissionId changes
   useEffect(() => {
     submissionRecordDataLoader.refresh(submissionId);
     submissionFeaturesDataLoader.refresh(submissionId, featuresPagination);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionId]);
 
-  /** Refresh security rules when features change */
+  // Reload applied security rules whenever features change
   useEffect(() => {
     submissionFeaturesAppliedRulesDataLoader.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionFeaturesDataLoader.data]);
 
-  /** ========== Memoized Context Value ========== */
   const submissionContext: ISubmissionContext = useMemo(
     () => ({
       submissionRecordDataLoader,
