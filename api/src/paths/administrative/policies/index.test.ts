@@ -6,8 +6,8 @@ import { createPolicy, getPolicies } from '.';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
 import { PolicyEffect } from '../../../models/policy-statement';
-import { PolicyWithStatements } from '../../../services/access-policy/policy-service.interface';
 import { PolicyService } from '../../../services/access-policy/policy-service';
+import { PolicyWithStatements } from '../../../services/access-policy/policy-service.interface';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 
 chai.use(sinonChai);

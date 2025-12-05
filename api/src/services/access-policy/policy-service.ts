@@ -3,12 +3,12 @@ import { parseFeatureUrn } from '../../database/urn-utils';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
 import { DBService } from '../db-service';
-import { PolicyStatementConditionService } from './policy-statement-condition-service';
 import {
   CreatePolicyStatementInput,
   PolicyStatementWithConditions,
   PolicyWithStatements
 } from './policy-service.interface';
+import { PolicyStatementConditionService } from './policy-statement-condition-service';
 import { PolicyStatementService } from './policy-statement-service';
 
 export class PolicyService extends DBService {
