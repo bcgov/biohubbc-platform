@@ -28,6 +28,12 @@ export interface IPolicyDocumentCondition {
 }
 
 /**
+ * Result type for policy JSON validation.
+ * Discriminated union that provides the parsed policy on success, or an error message on failure.
+ */
+export type PolicyValidationResult = { valid: true; policy: IPolicyDocument } | { valid: false; error: string };
+
+/**
  * Default empty policy document.
  */
 export const defaultPolicyDocument: IPolicyDocument = {
@@ -178,32 +184,32 @@ const validateStatement = (stmt: Partial<IPolicyDocumentStatement>, index: numbe
  * tr_validate_policy_condition_key().
  *
  * @param {string} policyJson - JSON string representing the policy document to validate
- * @returns {string | null} Error message if validation fails, null if valid
+ * @returns {PolicyValidationResult} Validation result with parsed policy on success, or error message on failure
  */
-export const validatePolicyJson = (policyJson: string): string | null => {
+export const validatePolicyJson = (policyJson: string): PolicyValidationResult => {
   try {
     const policy = JSON.parse(policyJson);
 
     if (!policy.Version) {
-      return 'Policy must have a Version field';
+      return { valid: false, error: 'Policy must have a Version field' };
     }
     if (!policy.Statement || !Array.isArray(policy.Statement)) {
-      return 'Policy must have a Statement array';
+      return { valid: false, error: 'Policy must have a Statement array' };
     }
     if (policy.Statement.length === 0) {
-      return 'Policy must have at least one statement';
+      return { valid: false, error: 'Policy must have at least one statement' };
     }
 
     for (let i = 0; i < policy.Statement.length; i++) {
       const error = validateStatement(policy.Statement[i], i);
       if (error) {
-        return error;
+        return { valid: false, error };
       }
     }
 
-    return null;
+    return { valid: true, policy: policy as IPolicyDocument };
   } catch (e) {
     const error = e as SyntaxError;
-    return `Invalid JSON: ${error.message}`;
+    return { valid: false, error: `Invalid JSON: ${error.message}` };
   }
 };

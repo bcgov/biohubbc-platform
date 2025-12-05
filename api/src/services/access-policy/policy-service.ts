@@ -1,39 +1,15 @@
 import { IDBConnection } from '../../database/db';
 import { parseFeatureUrn } from '../../database/urn-utils';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
-import { PolicyEffect, PolicyStatement } from '../../models/policy-statement';
-import { PolicyConditionOperator, PolicyStatementCondition } from '../../models/policy-statement-condition';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
 import { DBService } from '../db-service';
 import { PolicyStatementConditionService } from './policy-statement-condition-service';
+import {
+  CreatePolicyStatementInput,
+  PolicyStatementWithConditions,
+  PolicyWithStatements
+} from './policy-service.interface';
 import { PolicyStatementService } from './policy-statement-service';
-
-/**
- * A policy statement with its conditions.
- */
-export interface PolicyStatementWithConditions extends PolicyStatement {
-  conditions: PolicyStatementCondition[];
-}
-
-/**
- * A policy with its statements and conditions.
- */
-export interface PolicyWithStatements extends Policy {
-  statements: PolicyStatementWithConditions[];
-}
-
-/**
- * Input for creating a policy statement with conditions.
- */
-export interface CreatePolicyStatementInput {
-  effect: PolicyEffect;
-  submission_feature_urn: string;
-  conditions?: {
-    operator: PolicyConditionOperator;
-    key: string;
-    value: any;
-  }[];
-}
 
 export class PolicyService extends DBService {
   policyRepository: PolicyRepository;

@@ -347,7 +347,7 @@ describe('policyTransform', () => {
   });
 
   describe('validatePolicyJson', () => {
-    it('returns null for valid policy', () => {
+    it('returns valid result with parsed policy for valid policy', () => {
       const policyJson = JSON.stringify({
         Version: '2025-12-01',
         Statement: [
@@ -360,13 +360,20 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBeNull();
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.policy.Version).toBe('2025-12-01');
+        expect(result.policy.Statement).toHaveLength(1);
+      }
     });
 
     it('returns error for invalid JSON', () => {
       const result = validatePolicyJson('not valid json');
 
-      expect(result).toContain('Invalid JSON');
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.error).toContain('Invalid JSON');
+      }
     });
 
     it('returns error for missing Version', () => {
@@ -376,7 +383,10 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBe('Policy must have a Version field');
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.error).toBe('Policy must have a Version field');
+      }
     });
 
     it('returns error for missing Statement', () => {
@@ -386,7 +396,10 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBe('Policy must have a Statement array');
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.error).toBe('Policy must have a Statement array');
+      }
     });
 
     it('returns error for non-array Statement', () => {
@@ -397,7 +410,10 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBe('Policy must have a Statement array');
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.error).toBe('Policy must have a Statement array');
+      }
     });
 
     it('returns error for empty Statement array', () => {
@@ -408,7 +424,10 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBe('Policy must have at least one statement');
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.error).toBe('Policy must have at least one statement');
+      }
     });
 
     it('returns error for invalid Effect', () => {
@@ -424,7 +443,10 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBe('Statement 1: Effect must be "Allow" or "Deny"');
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.error).toBe('Statement 1: Effect must be "Allow" or "Deny"');
+      }
     });
 
     it('returns error for missing Effect', () => {
@@ -439,7 +461,10 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBe('Statement 1: Effect must be "Allow" or "Deny"');
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.error).toBe('Statement 1: Effect must be "Allow" or "Deny"');
+      }
     });
 
     it('returns error for missing Resource', () => {
@@ -454,7 +479,10 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBe('Statement 1: Resource is required');
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.error).toBe('Statement 1: Resource is required');
+      }
     });
 
     it('returns error for invalid URN format', () => {
@@ -470,9 +498,12 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBe(
-        'Statement 1: Invalid Resource URN format. Expected: urn:<submissionId>:<featureType>:<featureId>'
-      );
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.error).toBe(
+          'Statement 1: Invalid Resource URN format. Expected: urn:<submissionId>:<featureType>:<featureId>'
+        );
+      }
     });
 
     it('accepts valid URN with wildcards', () => {
@@ -488,7 +519,7 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBeNull();
+      expect(result.valid).toBe(true);
     });
 
     it('accepts valid URN with specific values', () => {
@@ -504,7 +535,7 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBeNull();
+      expect(result.valid).toBe(true);
     });
 
     it('returns error for non-array Condition', () => {
@@ -521,7 +552,10 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBe('Statement 1: Condition must be an array');
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.error).toBe('Statement 1: Condition must be an array');
+      }
     });
 
     it('returns error for condition missing Operator', () => {
@@ -543,7 +577,10 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBe('Statement 1, Condition 1: Operator is required');
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.error).toBe('Statement 1, Condition 1: Operator is required');
+      }
     });
 
     it('returns error for condition missing Key', () => {
@@ -565,7 +602,10 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBe('Statement 1, Condition 1: Key is required');
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.error).toBe('Statement 1, Condition 1: Key is required');
+      }
     });
 
     it('returns error for condition missing Value', () => {
@@ -587,7 +627,10 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBe('Statement 1, Condition 1: Value is required');
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.error).toBe('Statement 1, Condition 1: Value is required');
+      }
     });
 
     it('accepts valid condition', () => {
@@ -610,7 +653,7 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBeNull();
+      expect(result.valid).toBe(true);
     });
 
     it('validates multiple statements correctly', () => {
@@ -624,7 +667,10 @@ describe('policyTransform', () => {
 
       const result = validatePolicyJson(policyJson);
 
-      expect(result).toBe('Statement 2: Effect must be "Allow" or "Deny"');
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(result.error).toBe('Statement 2: Effect must be "Allow" or "Deny"');
+      }
     });
   });
 });

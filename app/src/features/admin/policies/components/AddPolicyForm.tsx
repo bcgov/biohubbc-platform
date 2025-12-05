@@ -41,9 +41,9 @@ export const AddPolicyFormYupSchema = yup.object().shape({
     .string()
     .required('Policy document is required')
     .test('valid-policy', function (value) {
-      const error = validatePolicyJson(value || '');
-      if (error) {
-        return this.createError({ message: error });
+      const result = validatePolicyJson(value || '');
+      if (!result.valid) {
+        return this.createError({ message: result.error });
       }
       return true;
     })

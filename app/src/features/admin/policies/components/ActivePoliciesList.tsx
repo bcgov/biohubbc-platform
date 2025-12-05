@@ -6,16 +6,10 @@ import Chip from '@mui/material/Chip';
 import Container from '@mui/material/Container';
 import InputAdornment from '@mui/material/InputAdornment';
 import Paper from '@mui/material/Paper';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TablePagination from '@mui/material/TablePagination';
-import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import EditDialog from 'components/dialog/EditDialog';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
@@ -24,7 +18,6 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { useState } from 'react';
-import { handleChangePage, handleChangeRowsPerPage } from 'utils/tablePaginationUtils';
 import {
   AddPolicyForm,
   AddPolicyFormInitialValues,
@@ -32,16 +25,6 @@ import {
   IAddPolicyFormValues
 } from './AddPolicyForm';
 import { transformApiToPolicyJson, transformPolicyJsonToApi } from '../utils/policyTransform';
-
-const useStyles = () => {
-  return {
-    table: {
-      '& td': {
-        verticalAlign: 'middle'
-      }
-    }
-  };
-};
 
 /**
  * Props for the ActivePoliciesList component.
@@ -71,12 +54,9 @@ export interface IActivePoliciesListProps {
  * @returns {React.ReactElement} The policies list component
  */
 export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListProps>> = (props) => {
-  const classes = useStyles();
   const biohubApi = useApi();
   const { policies } = props;
 
-  const [rowsPerPage, setRowsPerPage] = useState(50);
-  const [page, setPage] = useState(0);
   const dialogContext = useDialogContext();
 
   const [openAddPolicyDialog, setOpenAddPolicyDialog] = useState(false);
@@ -303,6 +283,69 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
     };
   };
 
+  const columns: GridColDef<IPolicy>[] = [
+    {
+      field: 'name',
+      headerName: 'Name',
+      flex: 1,
+      minWidth: 150
+    },
+    {
+      field: 'description',
+      headerName: 'Description',
+      flex: 1,
+      minWidth: 200,
+      valueGetter: (value) => value || '-'
+    },
+    {
+      field: 'statements',
+      headerName: 'Statements',
+      flex: 2,
+      minWidth: 300,
+      sortable: false,
+      renderCell: (params) => (
+        <Box display="flex" gap={1} flexWrap="wrap" alignItems="center" height="100%">
+          {params.row.statements.length === 0 && '-'}
+          {params.row.statements.map((statement) => (
+            <Chip
+              key={statement.policy_statement_id}
+              size="small"
+              label={`${statement.effect}: ${statement.submission_feature_urn}`}
+              color={statement.effect === 'allow' ? 'success' : 'error'}
+              variant="outlined"
+            />
+          ))}
+        </Box>
+      )
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 100,
+      sortable: false,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => (
+        <CustomMenuIconButton
+          buttonTitle="Actions"
+          buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
+          menuItems={[
+            {
+              menuIcon: <Icon path={mdiPencilOutline} size={0.875} />,
+              menuLabel: 'Edit policy',
+              menuOnClick: () => handleEditPolicyClick(params.row)
+            },
+            {
+              menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
+              menuLabel: 'Delete policy',
+              menuOnClick: () => handleDeletePolicyClick(params.row)
+            }
+          ]}
+        />
+      )
+    }
+  ];
+
   return (
     <>
       <Container maxWidth="xl">
@@ -360,83 +403,31 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
               sx={{ width: 300 }}
             />
           </Toolbar>
-          <TableContainer>
-            <Table sx={classes.table}>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Description</TableCell>
-                  <TableCell>Statements</TableCell>
-                  <TableCell align="center" width="100">
-                    Actions
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody data-testid="active-policies-table">
-                {!policies?.length && (
-                  <TableRow data-testid={'active-policies-row-0'}>
-                    <TableCell colSpan={4} style={{ textAlign: 'center' }}>
-                      No Policies
-                    </TableCell>
-                  </TableRow>
-                )}
-                {policies.length > 0 &&
-                  policies.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row, index) => (
-                    <TableRow data-testid={`active-policy-row-${index}`} key={row.policy_id}>
-                      <TableCell>{row.name}</TableCell>
-                      <TableCell>{row.description || '-'}</TableCell>
-                      <TableCell>
-                        <Box display="flex" gap={1} flexWrap="wrap">
-                          {row.statements.length === 0 && '-'}
-                          {row.statements.map((statement) => (
-                            <Chip
-                              key={statement.policy_statement_id}
-                              size="small"
-                              label={`${statement.effect}: ${statement.submission_feature_urn}`}
-                              color={statement.effect === 'allow' ? 'success' : 'error'}
-                              variant="outlined"
-                            />
-                          ))}
-                        </Box>
-                      </TableCell>
-                      <TableCell align="center">
-                        <Box>
-                          <CustomMenuIconButton
-                            buttonTitle="Actions"
-                            buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
-                            menuItems={[
-                              {
-                                menuIcon: <Icon path={mdiPencilOutline} size={0.875} />,
-                                menuLabel: 'Edit policy',
-                                menuOnClick: () => handleEditPolicyClick(row)
-                              },
-                              {
-                                menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
-                                menuLabel: 'Delete policy',
-                                menuOnClick: () => handleDeletePolicyClick(row)
-                              }
-                            ]}
-                          />
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          {policies?.length > 0 && (
-            <TablePagination
-              rowsPerPageOptions={[50, 100, 200]}
-              component="div"
-              count={policies.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={(event: unknown, newPage: number) => handleChangePage(event, newPage, setPage)}
-              onRowsPerPageChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                handleChangeRowsPerPage(event, setPage, setRowsPerPage)
+          <DataGrid
+            data-testid="active-policies-table"
+            rows={policies}
+            columns={columns}
+            getRowId={(row) => row.policy_id}
+            pageSizeOptions={[50, 100, 200]}
+            disableRowSelectionOnClick
+            disableColumnSelector
+            disableColumnMenu
+            localeText={{ noRowsLabel: 'No Policies' }}
+            initialState={{
+              pagination: {
+                paginationModel: {
+                  pageSize: 50
+                }
               }
-            />
-          )}
+            }}
+            sx={{
+              border: 'none',
+              '& .MuiDataGrid-columnHeaderTitle': {
+                fontWeight: 700,
+                textTransform: 'uppercase'
+              }
+            }}
+          />
         </Paper>
       </Container>
 
