@@ -82,7 +82,7 @@ POST.apiDoc = {
  */
 export function addSystemRoleUser(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req['keycloak_token']);
+    const connection = getDBConnection(req.keycloak_token);
 
     const userGuid = req.body?.userGuid || null;
     const userIdentifier = req.body?.userIdentifier || null;

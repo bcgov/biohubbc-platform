@@ -101,6 +101,10 @@ GET.apiDoc = {
                   type: 'string',
                   maxLength: 3000
                 },
+                record_end_date: {
+                  type: 'string',
+                  nullable: true
+                },
                 create_date: {
                   type: 'string'
                 },
@@ -156,7 +160,7 @@ GET.apiDoc = {
  */
 export function getUnreviewedSubmissionsForAdmins(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req['keycloak_token']);
+    const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();

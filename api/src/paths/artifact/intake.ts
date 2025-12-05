@@ -111,7 +111,7 @@ export function intakeArtifact(): RequestHandler {
 
     const artifactUploadKey = req.body.artifact_upload_key;
 
-    const serviceClientSystemUser = getServiceClientSystemUser(req['keycloak_token']);
+    const serviceClientSystemUser = getServiceClientSystemUser(req.keycloak_token);
 
     if (!serviceClientSystemUser) {
       throw new HTTP400('Failed to identify known submission source system', [
