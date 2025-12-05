@@ -663,19 +663,7 @@ const validateCondition = (
   if (featureType !== '*') {
     const property = findPropertyForKey(condition.Key, featureType, context.featureTypes);
 
-    if (!property) {
-      const line = findLineNumber(text, `"${condition.Key}"`, searchStartLine);
-      const lineText = text.split('\n')[line - 1] || '';
-      const { start, end } = findColumnRange(lineText, condition.Key);
-      markers.push(
-        createMarker(
-          `${prefix}: Property "${condition.Key}" does not exist on feature type "${featureType}"`,
-          line,
-          start,
-          end
-        )
-      );
-    } else {
+    if (property) {
       propertyType = property.feature_property_type_name;
 
       // Validate operator is valid for property type
@@ -693,6 +681,18 @@ const validateCondition = (
           )
         );
       }
+    } else {
+      const line = findLineNumber(text, `"${condition.Key}"`, searchStartLine);
+      const lineText = text.split('\n')[line - 1] || '';
+      const { start, end } = findColumnRange(lineText, condition.Key);
+      markers.push(
+        createMarker(
+          `${prefix}: Property "${condition.Key}" does not exist on feature type "${featureType}"`,
+          line,
+          start,
+          end
+        )
+      );
     }
   }
 

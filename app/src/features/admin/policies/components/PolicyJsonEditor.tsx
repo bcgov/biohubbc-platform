@@ -34,7 +34,9 @@ let providerRegistered = false;
 
 // Configure JSON schema validation before Monaco loads
 // The Monaco types mark languages.json as { deprecated: true } but the API works at runtime
-loader.init().then((monacoInstance) => {
+// Using an IIFE with top-level await pattern for ES2022+ compatibility
+(async () => {
+  const monacoInstance = await loader.init();
   const jsonDefaults = (
     monacoInstance.languages.json as { jsonDefaults?: { setDiagnosticsOptions: (options: unknown) => void } }
   ).jsonDefaults;
@@ -48,7 +50,7 @@ loader.init().then((monacoInstance) => {
       }
     ]
   });
-});
+})();
 
 /**
  * Handle colon input inside URN values - prefetch features if needed.
