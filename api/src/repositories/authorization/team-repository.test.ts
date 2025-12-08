@@ -101,6 +101,75 @@ describe('TeamRepository', () => {
     });
   });
 
+  describe('getTeamsWithPagination', () => {
+    it('returns paginated teams with total count', async () => {
+      const mockTeams = [
+        { team_id: 'uuid-1', name: 'Team Alpha', description: 'First team' },
+        { team_id: 'uuid-2', name: 'Team Beta', description: 'Second team' }
+      ];
+
+      // First call returns count, second returns teams
+      const knexStub = sinon.stub();
+      knexStub.onFirstCall().resolves({ rows: [{ count: '5' }] });
+      knexStub.onSecondCall().resolves({ rows: mockTeams });
+
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repository = new TeamRepository(mockDBConnection);
+      const result = await repository.getTeamsWithPagination({ page: 0, limit: 2 });
+
+      expect(result.teams).to.eql(mockTeams);
+      expect(result.total).to.equal(5);
+    });
+
+    it('filters by search term', async () => {
+      const mockTeams = [{ team_id: 'uuid-1', name: 'Research Team', description: 'Research group' }];
+
+      const knexStub = sinon.stub();
+      knexStub.onFirstCall().resolves({ rows: [{ count: '1' }] });
+      knexStub.onSecondCall().resolves({ rows: mockTeams });
+
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repository = new TeamRepository(mockDBConnection);
+      const result = await repository.getTeamsWithPagination({ page: 0, limit: 50, search: 'Research' });
+
+      expect(result.teams).to.eql(mockTeams);
+      expect(result.total).to.equal(1);
+    });
+
+    it('returns empty array when no teams exist', async () => {
+      const knexStub = sinon.stub();
+      knexStub.onFirstCall().resolves({ rows: [{ count: '0' }] });
+      knexStub.onSecondCall().resolves({ rows: [] });
+
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repository = new TeamRepository(mockDBConnection);
+      const result = await repository.getTeamsWithPagination({ page: 0, limit: 50 });
+
+      expect(result.teams).to.eql([]);
+      expect(result.total).to.equal(0);
+    });
+
+    it('calculates correct offset for page > 0', async () => {
+      const mockTeams = [{ team_id: 'uuid-3', name: 'Team Gamma', description: 'Third team' }];
+
+      const knexStub = sinon.stub();
+      knexStub.onFirstCall().resolves({ rows: [{ count: '10' }] });
+      knexStub.onSecondCall().resolves({ rows: mockTeams });
+
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repository = new TeamRepository(mockDBConnection);
+      const result = await repository.getTeamsWithPagination({ page: 2, limit: 3 });
+
+      // Page 2 with limit 3 should offset by 6 (2 * 3)
+      expect(result.teams).to.eql(mockTeams);
+      expect(result.total).to.equal(10);
+    });
+  });
+
   describe('updateTeam', () => {
     it('returns updated team record', async () => {
       const mockRows = [{ team_id: 1, name: 'Team A Updated', description: 'Updated Desc' }];

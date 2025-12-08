@@ -49,7 +49,11 @@ export class TeamRepository extends BaseRepository {
    */
   async getTeam(teamId: string): Promise<Team> {
     const knex = getKnex();
-    const query = knex.table('team').select(['team_id', 'name', 'description']).where('team_id', teamId);
+    const query = knex
+      .table('team')
+      .select(['team_id', 'name', 'description'])
+      .where('team_id', teamId)
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, Team);
 
@@ -71,11 +75,52 @@ export class TeamRepository extends BaseRepository {
    */
   async getTeams(): Promise<Team[]> {
     const knex = getKnex();
-    const query = knex.table('team').select(['team_id', 'name', 'description']);
+    const query = knex.table('team').select(['team_id', 'name', 'description']).whereNull('record_end_date');
 
     const response = await this.connection.knex(query, Team);
 
     return response.rows;
+  }
+
+  /**
+   * Get teams with pagination and optional search.
+   *
+   * @param {object} options - Pagination and search options.
+   * @param {number} options.page - Page number (0-indexed).
+   * @param {number} options.limit - Number of items per page.
+   * @param {string} [options.search] - Optional search term to filter by team name.
+   * @return {Promise<{ teams: Team[]; total: number }>}
+   * @memberof TeamRepository
+   */
+  async getTeamsWithPagination(options: {
+    page: number;
+    limit: number;
+    search?: string;
+  }): Promise<{ teams: Team[]; total: number }> {
+    const knex = getKnex();
+
+    let baseQuery = knex.table('team').whereNull('record_end_date');
+
+    if (options.search) {
+      baseQuery = baseQuery.whereILike('name', `%${options.search}%`);
+    }
+
+    // Get total count
+    const countQuery = baseQuery.clone().count('* as count').first();
+    const countResult = await this.connection.knex(countQuery);
+    const total = Number(countResult.rows[0]?.count || 0);
+
+    // Get paginated results
+    const paginatedQuery = baseQuery
+      .clone()
+      .select(['team_id', 'name', 'description'])
+      .orderBy('name', 'asc')
+      .offset(options.page * options.limit)
+      .limit(options.limit);
+
+    const response = await this.connection.knex(paginatedQuery, Team);
+
+    return { teams: response.rows, total };
   }
 
   /**

@@ -3,9 +3,12 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { CreateTeam, Team, UpdateTeam } from '../../models/team';
+import { TeamMember } from '../../models/team-member';
+import { TeamMemberRepository } from '../../repositories/authorization/team-member-repository';
 import { TeamRepository } from '../../repositories/authorization/team-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { TeamService } from './team-service';
+import { TeamMemberWithUser, TeamService } from './team-service';
+
 chai.use(sinonChai);
 
 describe('TeamService', () => {
@@ -113,6 +116,115 @@ describe('TeamService', () => {
       await service.deleteTeam('11111111-1111-1111-1111-111111111111');
 
       expect(stub).to.have.been.calledWith('11111111-1111-1111-1111-111111111111');
+    });
+  });
+
+  describe('getTeamsWithMembers', () => {
+    it('should return paginated teams with members', async () => {
+      const mockTeams: Team[] = [
+        { team_id: 'team-1', name: 'Team Alpha', description: 'First team' },
+        { team_id: 'team-2', name: 'Team Beta', description: 'Second team' }
+      ];
+      const mockMembers: TeamMemberWithUser[] = [
+        { team_member_id: 'tm-1', system_user_id: 1, display_name: 'Alice', email: 'alice@example.com' }
+      ];
+
+      sinon.stub(TeamRepository.prototype, 'getTeamsWithPagination').resolves({ teams: mockTeams, total: 2 });
+      sinon.stub(service.connection, 'knex').resolves({ rows: mockMembers } as any);
+
+      const result = await service.getTeamsWithMembers({ page: 0, limit: 50 });
+
+      expect(result.pagination).to.eql({ total: 2, page: 0, limit: 50 });
+      expect(result.teams).to.have.length(2);
+      expect(result.teams[0].members).to.eql(mockMembers);
+    });
+
+    it('should return empty array when no teams exist', async () => {
+      sinon.stub(TeamRepository.prototype, 'getTeamsWithPagination').resolves({ teams: [], total: 0 });
+
+      const result = await service.getTeamsWithMembers({ page: 0, limit: 50 });
+
+      expect(result.teams).to.eql([]);
+      expect(result.pagination).to.eql({ total: 0, page: 0, limit: 50 });
+    });
+  });
+
+  describe('getTeamWithMembers', () => {
+    it('should return team with its members', async () => {
+      const mockTeam: Team = { team_id: 'team-1', name: 'Test Team', description: 'A test team' };
+      const mockMembers: TeamMemberWithUser[] = [
+        { team_member_id: 'tm-1', system_user_id: 1, display_name: 'Bob', email: 'bob@example.com' }
+      ];
+
+      sinon.stub(TeamRepository.prototype, 'getTeam').resolves(mockTeam);
+      sinon.stub(service.connection, 'knex').resolves({ rows: mockMembers } as any);
+
+      const result = await service.getTeamWithMembers('team-1');
+
+      expect(result).to.eql({ ...mockTeam, members: mockMembers });
+    });
+  });
+
+  describe('createTeamWithMembers', () => {
+    it('should create team and add members', async () => {
+      const mockTeam: Team = { team_id: 'new-team', name: 'New Team', description: 'A new team' };
+      const mockMembers: TeamMemberWithUser[] = [
+        { team_member_id: 'tm-1', system_user_id: 1, display_name: 'Alice', email: 'alice@example.com' },
+        { team_member_id: 'tm-2', system_user_id: 2, display_name: 'Bob', email: 'bob@example.com' }
+      ];
+
+      sinon.stub(TeamRepository.prototype, 'insertTeam').resolves(mockTeam);
+      sinon.stub(TeamMemberRepository.prototype, 'insertTeamMember').resolves({} as TeamMember);
+      sinon.stub(service.connection, 'knex').resolves({ rows: mockMembers } as any);
+
+      const result = await service.createTeamWithMembers({ name: 'New Team', description: 'A new team' }, [1, 2]);
+
+      expect(result.team_id).to.equal('new-team');
+      expect(result.members).to.eql(mockMembers);
+    });
+
+    it('should create team with no members when none provided', async () => {
+      const mockTeam: Team = { team_id: 'empty-team', name: 'Empty Team', description: null };
+
+      sinon.stub(TeamRepository.prototype, 'insertTeam').resolves(mockTeam);
+      sinon.stub(service.connection, 'knex').resolves({ rows: [] } as any);
+
+      const result = await service.createTeamWithMembers({ name: 'Empty Team' }, []);
+
+      expect(result.members).to.eql([]);
+    });
+  });
+
+  describe('updateTeamWithMembers', () => {
+    it('should update team and sync members', async () => {
+      const mockTeam: Team = { team_id: 'team-1', name: 'Updated Team', description: 'Updated' };
+      const existingMembers: TeamMember[] = [
+        { team_member_id: 'tm-1', team_id: 'team-1', system_user_id: 1 },
+        { team_member_id: 'tm-2', team_id: 'team-1', system_user_id: 2 }
+      ];
+      const newMembers: TeamMemberWithUser[] = [
+        { team_member_id: 'tm-1', system_user_id: 1, display_name: 'Alice', email: 'alice@example.com' },
+        { team_member_id: 'tm-3', system_user_id: 3, display_name: 'Charlie', email: 'charlie@example.com' }
+      ];
+
+      sinon.stub(TeamRepository.prototype, 'updateTeam').resolves(mockTeam);
+      sinon.stub(TeamMemberRepository.prototype, 'getTeamMembersByTeamId').resolves(existingMembers);
+      const insertStub = sinon.stub(TeamMemberRepository.prototype, 'insertTeamMember').resolves({} as TeamMember);
+      const deleteStub = sinon.stub(TeamMemberRepository.prototype, 'deleteTeamMember').resolves();
+      sinon.stub(service.connection, 'knex').resolves({ rows: newMembers } as any);
+
+      // Update with users 1 and 3 (remove 2, keep 1, add 3)
+      const result = await service.updateTeamWithMembers(
+        'team-1',
+        { name: 'Updated Team', description: 'Updated' },
+        [1, 3]
+      );
+
+      // Should add user 3 (new)
+      expect(insertStub).to.have.been.calledOnce;
+      // Should remove user 2 (no longer in list)
+      expect(deleteStub).to.have.been.calledOnce;
+      expect(result.members).to.eql(newMembers);
     });
   });
 });
