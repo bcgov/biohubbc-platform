@@ -4,6 +4,24 @@ import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { ActivePoliciesList, IActivePoliciesListProps } from './ActivePoliciesList';
 
+// Mock Monaco Editor - it doesn't work well in jsdom and causes hangs
+vi.mock('@monaco-editor/react', () => ({
+  default: ({ value, onChange }: { value?: string; onChange?: (value?: string) => void }) => (
+    <textarea data-testid="monaco-editor" value={value || ''} onChange={(e) => onChange?.(e.target.value)} />
+  ),
+  loader: {
+    init: vi.fn().mockResolvedValue({
+      languages: {
+        json: {
+          jsonDefaults: {
+            setDiagnosticsOptions: vi.fn()
+          }
+        }
+      }
+    })
+  }
+}));
+
 const renderContainer = (props: IActivePoliciesListProps) => {
   return render(
     <MemoryRouter initialEntries={['/']}>
