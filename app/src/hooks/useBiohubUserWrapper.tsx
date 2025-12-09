@@ -40,8 +40,10 @@ function useBiohubUserWrapper(): IBiohubUserWrapper {
   const biohubUserDataLoader = useDataLoader(() => biohubApi.user.getUser());
 
   useEffect(() => {
-    biohubUserDataLoader.load();
-  }, [biohubUserDataLoader]);
+    if (auth.isAuthenticated) {
+      biohubUserDataLoader.load();
+    }
+  }, [auth.isAuthenticated, biohubUserDataLoader]);
 
   const isLoading = !biohubUserDataLoader.isReady;
 
