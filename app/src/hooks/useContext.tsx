@@ -1,6 +1,7 @@
 import { CodesContext, ICodesContext } from 'contexts/codesContext';
 import { ConfigContext, IConfig } from 'contexts/configContext';
 import { DialogContext, IDialogContext } from 'contexts/dialogContext';
+import { IPolicyAutocompleteContext, PolicyAutocompleteContext } from 'contexts/policyAutocompleteContext';
 import { useContext } from 'react';
 import { ISubmissionContext, SubmissionContext } from '../contexts/submissionContext';
 
@@ -61,6 +62,23 @@ export const useDialogContext = (): IDialogContext => {
   if (!context) {
     throw Error(
       'DialogContext2 is undefined, please verify you are calling useDialogContext() as child of an <DialogContextProvider2> component.'
+    );
+  }
+
+  return context;
+};
+
+/**
+ * Returns an instance of `IPolicyAutocompleteContext` from `PolicyAutocompleteContext`.
+ *
+ * @return {*}  {IPolicyAutocompleteContext}
+ */
+export const usePolicyAutocompleteContext = (): IPolicyAutocompleteContext => {
+  const context = useContext(PolicyAutocompleteContext);
+
+  if (!context) {
+    throw new Error(
+      'PolicyAutocompleteContext is undefined, please verify you are calling usePolicyAutocompleteContext() as child of a <PolicyAutocompleteContextProvider> component.'
     );
   }
 

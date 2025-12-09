@@ -79,7 +79,8 @@ export class PolicyStatementRepository extends BaseRepository {
     const query = knex
       .table('policy_statement')
       .select(['policy_statement_id', 'policy_id', 'effect', 'submission_feature_urn'])
-      .where('policy_id', policyId);
+      .where('policy_id', policyId)
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, PolicyStatement);
 

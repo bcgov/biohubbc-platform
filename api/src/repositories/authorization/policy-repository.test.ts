@@ -101,6 +101,57 @@ describe('PolicyRepository', () => {
     });
   });
 
+  describe('getPoliciesWithPagination', () => {
+    it('returns paginated policies with total count', async () => {
+      const mockPolicies = [
+        { policy_id: '1', name: 'Policy1', description: 'Test1' },
+        { policy_id: '2', name: 'Policy2', description: 'Test2' }
+      ];
+
+      const knexStub = sinon.stub();
+      knexStub.onFirstCall().resolves({ rows: [{ count: '5' }] });
+      knexStub.onSecondCall().resolves({ rows: mockPolicies });
+
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repository = new PolicyRepository(mockDBConnection);
+      const result = await repository.getPoliciesWithPagination({ page: 0, limit: 2 });
+
+      expect(result.policies).to.eql(mockPolicies);
+      expect(result.total).to.equal(5);
+    });
+
+    it('filters by search term', async () => {
+      const mockPolicies = [{ policy_id: '1', name: 'Telemetry Policy', description: 'Test' }];
+
+      const knexStub = sinon.stub();
+      knexStub.onFirstCall().resolves({ rows: [{ count: '1' }] });
+      knexStub.onSecondCall().resolves({ rows: mockPolicies });
+
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repository = new PolicyRepository(mockDBConnection);
+      const result = await repository.getPoliciesWithPagination({ page: 0, limit: 50, search: 'Telemetry' });
+
+      expect(result.policies).to.eql(mockPolicies);
+      expect(result.total).to.equal(1);
+    });
+
+    it('returns empty array when no policies exist', async () => {
+      const knexStub = sinon.stub();
+      knexStub.onFirstCall().resolves({ rows: [{ count: '0' }] });
+      knexStub.onSecondCall().resolves({ rows: [] });
+
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repository = new PolicyRepository(mockDBConnection);
+      const result = await repository.getPoliciesWithPagination({ page: 0, limit: 50 });
+
+      expect(result.policies).to.eql([]);
+      expect(result.total).to.equal(0);
+    });
+  });
+
   describe('getPoliciesThatAuthorizeFeatureAccessByUrn', () => {
     it('returns policies matching URN and user', async () => {
       const mockRows = [{ policy_id: 1, name: 'Telemetry', description: 'Access telemetry features' }];

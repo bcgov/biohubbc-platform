@@ -3,13 +3,24 @@ import { parseFeatureUrn } from '../../database/urn-utils';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
 import { DBService } from '../db-service';
+import {
+  CreatePolicyStatementInput,
+  PolicyStatementWithConditions,
+  PolicyWithStatements
+} from './policy-service.interface';
+import { PolicyStatementConditionService } from './policy-statement-condition-service';
+import { PolicyStatementService } from './policy-statement-service';
 
 export class PolicyService extends DBService {
   policyRepository: PolicyRepository;
+  policyStatementService: PolicyStatementService;
+  policyStatementConditionService: PolicyStatementConditionService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.policyRepository = new PolicyRepository(connection);
+    this.policyStatementService = new PolicyStatementService(connection);
+    this.policyStatementConditionService = new PolicyStatementConditionService(connection);
   }
 
   /**
@@ -78,5 +89,155 @@ export class PolicyService extends DBService {
    */
   deletePolicy(policyId: string): Promise<void> {
     return this.policyRepository.deletePolicy(policyId);
+  }
+
+  /**
+   * Get all policies with their statements, with pagination and search.
+   *
+   * @param {object} options - Pagination and search options.
+   * @param {number} options.page - Page number (0-indexed).
+   * @param {number} options.limit - Number of items per page.
+   * @param {string} [options.search] - Optional search term to filter by policy name.
+   * @return {Promise<{ policies: PolicyWithStatements[]; pagination: { total: number; page: number; limit: number } }>}
+   * @memberof PolicyService
+   */
+  async getPoliciesWithStatements(options: { page: number; limit: number; search?: string }): Promise<{
+    policies: PolicyWithStatements[];
+    pagination: { total: number; page: number; limit: number };
+  }> {
+    const { policies, total } = await this.policyRepository.getPoliciesWithPagination(options);
+
+    const policiesWithStatements = await Promise.all(
+      policies.map(async (policy) => ({
+        ...policy,
+        statements: await this.getStatementsWithConditions(policy.policy_id)
+      }))
+    );
+
+    return {
+      policies: policiesWithStatements,
+      pagination: { total, page: options.page, limit: options.limit }
+    };
+  }
+
+  /**
+   * Get a single policy with its statements and conditions.
+   *
+   * @param {string} policyId - The ID of the policy to fetch.
+   * @return {Promise<PolicyWithStatements>}
+   * @memberof PolicyService
+   */
+  async getPolicyWithStatements(policyId: string): Promise<PolicyWithStatements> {
+    const policy = await this.policyRepository.getPolicy(policyId);
+    const statements = await this.getStatementsWithConditions(policyId);
+    return { ...policy, statements };
+  }
+
+  /**
+   * Get statements for a policy, including conditions.
+   *
+   * @param {string} policyId - The ID of the policy.
+   * @return {Promise<PolicyStatementWithConditions[]>}
+   * @memberof PolicyService
+   */
+  async getStatementsWithConditions(policyId: string): Promise<PolicyStatementWithConditions[]> {
+    const statements = await this.policyStatementService.getPolicyStatements(policyId);
+
+    return Promise.all(
+      statements.map(async (stmt) => ({
+        ...stmt,
+        conditions: await this.policyStatementConditionService.getPolicyStatementConditions(stmt.policy_statement_id)
+      }))
+    );
+  }
+
+  /**
+   * Create a policy with statements and conditions.
+   *
+   * @param {CreatePolicy} policyData - Data required to create a new policy.
+   * @param {CreatePolicyStatementInput[]} statements - Statements to create for the policy.
+   * @return {Promise<PolicyWithStatements>}
+   * @memberof PolicyService
+   */
+  async createPolicyWithStatements(
+    policyData: CreatePolicy,
+    statements: CreatePolicyStatementInput[]
+  ): Promise<PolicyWithStatements> {
+    const policy = await this.createPolicy(policyData);
+
+    const createdStatements = await Promise.all(
+      statements.map(async (stmt) => {
+        const statement = await this.policyStatementService.createPolicyStatement({
+          policy_id: policy.policy_id,
+          effect: stmt.effect,
+          submission_feature_urn: stmt.submission_feature_urn
+        });
+
+        const conditions = await Promise.all(
+          (stmt.conditions || []).map((cond) =>
+            this.policyStatementConditionService.createPolicyStatementCondition({
+              policy_statement_id: statement.policy_statement_id,
+              operator: cond.operator,
+              key: cond.key,
+              value: cond.value
+            })
+          )
+        );
+
+        return { ...statement, conditions };
+      })
+    );
+
+    return { ...policy, statements: createdStatements };
+  }
+
+  /**
+   * Update a policy with statements and conditions.
+   * Strategy: Delete existing statements and recreate (simpler than diffing).
+   *
+   * @param {string} policyId - The ID of the policy to update.
+   * @param {UpdatePolicy} policyData - Partial data to update the policy record.
+   * @param {CreatePolicyStatementInput[]} statements - New statements for the policy.
+   * @return {Promise<PolicyWithStatements>}
+   * @memberof PolicyService
+   */
+  async updatePolicyWithStatements(
+    policyId: string,
+    policyData: UpdatePolicy,
+    statements: CreatePolicyStatementInput[]
+  ): Promise<PolicyWithStatements> {
+    const policy = await this.updatePolicy(policyId, policyData);
+
+    // Delete existing statements (soft delete)
+    const existingStatements = await this.policyStatementService.getPolicyStatements(policyId);
+    await Promise.all(
+      existingStatements.map((stmt) => this.policyStatementService.deletePolicyStatement(stmt.policy_statement_id))
+    );
+
+    // Create new statements
+    const createdStatements = await Promise.all(
+      statements.map(async (stmt) => {
+        const statement = await this.policyStatementService.createPolicyStatement({
+          policy_id: policyId,
+          effect: stmt.effect,
+          submission_feature_urn: stmt.submission_feature_urn
+        });
+
+        const conditions = await Promise.all(
+          (stmt.conditions || []).map((cond) =>
+            this.policyStatementConditionService.createPolicyStatementCondition({
+              policy_statement_id: statement.policy_statement_id,
+              operator: cond.operator,
+              key: cond.key,
+              value: cond.value
+            })
+          )
+        );
+
+        return { ...statement, conditions };
+      })
+    );
+
+    return { ...policy, statements: createdStatements };
   }
 }

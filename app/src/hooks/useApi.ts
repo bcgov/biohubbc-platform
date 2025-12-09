@@ -9,6 +9,7 @@ import useSubmissionsApi from './api/useSubmissionsApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
 import useUserApi from './api/useUserApi';
 import { useFeaturesApi } from './api/useFeaturesApi';
+import usePoliciesApi from './api/usePoliciesApi';
 
 /**
  * Returns a set of supported api methods.
@@ -36,6 +37,8 @@ export const useApi = () => {
 
   const codes = useCodesApi(apiAxios);
 
+  const policies = usePoliciesApi(apiAxios);
+
   return {
     user,
     admin,
@@ -44,6 +47,7 @@ export const useApi = () => {
     taxonomy,
     security,
     artifact,
-    codes
+    codes,
+    policies
   };
 };
