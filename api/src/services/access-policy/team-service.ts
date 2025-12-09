@@ -189,13 +189,14 @@ export class TeamService extends DBService {
 
     // Get current members
     const currentMembers = await this.teamMemberRepository.getTeamMembersByTeamId(teamId);
-    const currentUserIds = currentMembers.map((m) => m.system_user_id);
+    const currentUserIds = new Set(currentMembers.map((m) => m.system_user_id));
+    const newUserIds = new Set(memberUserIds);
 
     // Find members to add (in new list but not current)
-    const toAdd = memberUserIds.filter((id) => !currentUserIds.includes(id));
+    const toAdd = memberUserIds.filter((id) => !currentUserIds.has(id));
 
     // Find members to remove (in current but not new list)
-    const toRemove = currentMembers.filter((m) => !memberUserIds.includes(m.system_user_id));
+    const toRemove = currentMembers.filter((m) => !newUserIds.has(m.system_user_id));
 
     // Add new members
     await Promise.all(
