@@ -1,19 +1,16 @@
-import { Queue } from 'bullmq';
 import { getAPIUserDBConnection } from '../database/db';
 import { ISubmissionJobQueueRecord } from '../repositories/submission-job-queue-repository';
 import { SubmissionJobQueueService } from '../services/submission-job-queue-service';
+import { IJobQueueService } from '../services/job-queue-service.interface';
 import { getLogger } from '../utils/logger';
 import { queueConfig } from './config';
 
 const defaultLog = getLogger('bullmq/publisher');
 
 export class RedisQueuePublisher {
-  private queue: Queue;
   private isRunning = false;
 
-  constructor(queue: Queue) {
-    this.queue = queue;
-  }
+  constructor(private readonly jobQueueService: IJobQueueService, private readonly queueName: string) {}
 
   start(): void {
     const tick = async () => {
@@ -76,7 +73,8 @@ export class RedisQueuePublisher {
     try {
       const jobName = 'submission-job';
 
-      await this.queue.add(
+      await this.jobQueueService.enqueueJob(
+        this.queueName,
         jobName,
         { ...record, jobType: jobName },
         {

@@ -115,13 +115,13 @@ build-web: ## Builds all backend+web containers
 	@echo "==============================================="
 	@echo "Make: build-web - building web images"
 	@echo "==============================================="
-	@docker compose build db db_setup api app redis
+	@docker compose build db db_setup api app redis queue
 
 run-web: ## Runs all backend+web containers
 	@echo "==============================================="
 	@echo "Make: run-web - running web images"
 	@echo "==============================================="
-	@docker compose up -d db db_setup api app redis
+	@docker compose up -d db db_setup api app redis queue
 
 ## ------------------------------------------------------------------------------
 ## Commands to shell into the target container

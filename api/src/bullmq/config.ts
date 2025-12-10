@@ -1,11 +1,35 @@
 import { z } from 'zod';
 
+// for some reason, Z was coercing a "false" string to true, so we have this custom parser
+const booleanFromEnv = z.preprocess((value) => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['true', '1', 'yes', 'y', 'on'].includes(normalized)) {
+      return true;
+    }
+
+    if (['false', '0', 'no', 'n', 'off', ''].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return value;
+}, z.boolean());
+
 const envSchema = z.object({
   queueName: z.string().min(1).default('submission-jobs'),
   redisHost: z.string().min(1).default('redis'),
   redisPort: z.coerce.number().int().positive().default(6379),
   redisPassword: z.string().optional(),
-  redisUseTls: z.coerce.boolean().default(false),
+  redisUseTls: booleanFromEnv.default(false),
   syncIntervalMs: z.coerce.number().positive().default(5000),
   workerConcurrency: z.coerce.number().int().positive().default(2),
   jobAttempts: z.coerce.number().int().positive().default(3),

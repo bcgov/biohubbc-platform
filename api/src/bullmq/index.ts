@@ -1,9 +1,8 @@
-import { Queue } from 'bullmq';
 import { defaultPoolConfig, initDBPool } from '../database/db';
+import { BullMQJobService } from '../services/bull-mq-job-service';
 import { getLogger } from '../utils/logger';
 import { queueConfig } from './config';
 import { RedisQueuePublisher } from './publisher';
-import { redisOptions } from './redis-connection';
 import { startWorker } from './worker';
 
 const defaultLog = getLogger('bullmq/index');
@@ -16,9 +15,8 @@ const bootstrap = async () => {
     process.exit(1);
   }
 
-  const queue = new Queue(queueConfig.queueName, { connection: redisOptions });
-
-  const publisher = new RedisQueuePublisher(queue);
+  const jobQueueService = new BullMQJobService({ knownQueues: [queueConfig.queueName] });
+  const publisher = new RedisQueuePublisher(jobQueueService, queueConfig.queueName);
   publisher.start();
 
   const { worker, events } = startWorker();
@@ -33,7 +31,7 @@ const bootstrap = async () => {
 
   const shutdown = async () => {
     defaultLog.info({ label: 'shutdown', message: 'gracefully shutting down BullMQ components' });
-    await Promise.allSettled([worker.close(), queue.close(), events.close()]);
+    await Promise.allSettled([worker.close(), events.close(), jobQueueService.close()]);
     process.exit(0);
   };
 
