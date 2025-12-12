@@ -107,6 +107,41 @@ describe('TeamPolicyRepository', () => {
     });
   });
 
+  describe('getAllTeamPolicies', () => {
+    it('returns all team-policy associations with names', async () => {
+      const mockRows = [
+        {
+          team_policy_id: '11111111-1111-1111-1111-111111111111',
+          team_id: '22222222-2222-2222-2222-222222222222',
+          policy_id: '33333333-3333-3333-3333-333333333333',
+          team_name: 'Test Team',
+          policy_name: 'Test Policy'
+        }
+      ];
+      const mockResponse = {
+        rowCount: 1,
+        rows: mockRows
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+      const repository = new TeamPolicyRepository(mockConnection);
+      const result = await repository.getAllTeamPolicies();
+
+      expect(result).to.eql(mockRows);
+    });
+
+    it('returns empty array if no team-policy associations exist', async () => {
+      const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
+      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+      const repository = new TeamPolicyRepository(mockConnection);
+      const result = await repository.getAllTeamPolicies();
+
+      expect(result).to.eql([]);
+    });
+  });
+
   describe('updateTeamPolicy', () => {
     it('returns updated team policy record', async () => {
       const mockResponse = {

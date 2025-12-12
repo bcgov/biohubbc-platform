@@ -1,6 +1,6 @@
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { CreateTeamPolicy, TeamPolicy, UpdateTeamPolicy } from '../../models/team-policy';
+import { CreateTeamPolicy, TeamPolicy, TeamPolicyDetails, UpdateTeamPolicy } from '../../models/team-policy';
 import { BaseRepository } from '../base-repository';
 
 /**
@@ -78,6 +78,31 @@ export class TeamPolicyRepository extends BaseRepository {
     const query = knex.table('team_policy').select(['team_policy_id', 'team_id', 'policy_id']).where('team_id', teamId);
 
     const response = await this.connection.knex(query, TeamPolicy);
+
+    return response.rows;
+  }
+
+  /**
+   * Get all active team-policy associations with team and policy names.
+   * Follows SIMS pattern of returning display-ready data.
+   *
+   * @return {Promise<TeamPolicyDetails[]>} - List of team policy records with names.
+   * @memberof TeamPolicyRepository
+   */
+  async getAllTeamPolicies(): Promise<TeamPolicyDetails[]> {
+    const knex = getKnex();
+    const query = knex
+      .select(['tp.team_policy_id', 'tp.team_id', 'tp.policy_id', 't.name as team_name', 'p.name as policy_name'])
+      .from('team_policy as tp')
+      .innerJoin('team as t', 'tp.team_id', 't.team_id')
+      .innerJoin('policy as p', 'tp.policy_id', 'p.policy_id')
+      .whereNull('tp.record_end_date')
+      .whereNull('t.record_end_date')
+      .whereNull('p.record_end_date')
+      .orderBy('t.name')
+      .orderBy('p.name');
+
+    const response = await this.connection.knex(query, TeamPolicyDetails);
 
     return response.rows;
   }
