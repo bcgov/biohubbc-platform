@@ -41,7 +41,7 @@ describe('getTeam', () => {
       team_id: 'team-1',
       name: 'Test Team',
       description: 'A test team',
-      members: [{ team_member_id: 'tm-1', system_user_id: 1, display_name: 'Alice', email: 'alice@example.com' }]
+      members: [{ team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' }]
     };
 
     const mockDBConnection = getMockDBConnection();

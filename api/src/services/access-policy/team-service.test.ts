@@ -126,7 +126,7 @@ describe('TeamService', () => {
         { team_id: 'team-2', name: 'Team Beta', description: 'Second team' }
       ];
       const mockMembers: TeamMemberWithUser[] = [
-        { team_member_id: 'tm-1', system_user_id: 1, display_name: 'Alice', email: 'alice@example.com' }
+        { team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' }
       ];
 
       sinon.stub(TeamRepository.prototype, 'getTeamsWithPagination').resolves({ teams: mockTeams, total: 2 });
@@ -152,9 +152,7 @@ describe('TeamService', () => {
   describe('getTeamWithMembers', () => {
     it('should return team with its members', async () => {
       const mockTeam: Team = { team_id: 'team-1', name: 'Test Team', description: 'A test team' };
-      const mockMembers: TeamMemberWithUser[] = [
-        { team_member_id: 'tm-1', system_user_id: 1, display_name: 'Bob', email: 'bob@example.com' }
-      ];
+      const mockMembers: TeamMemberWithUser[] = [{ team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'bob' }];
 
       sinon.stub(TeamRepository.prototype, 'getTeam').resolves(mockTeam);
       sinon.stub(service.connection, 'knex').resolves({ rows: mockMembers } as any);
@@ -169,8 +167,8 @@ describe('TeamService', () => {
     it('should create team and add members', async () => {
       const mockTeam: Team = { team_id: 'new-team', name: 'New Team', description: 'A new team' };
       const mockMembers: TeamMemberWithUser[] = [
-        { team_member_id: 'tm-1', system_user_id: 1, display_name: 'Alice', email: 'alice@example.com' },
-        { team_member_id: 'tm-2', system_user_id: 2, display_name: 'Bob', email: 'bob@example.com' }
+        { team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' },
+        { team_member_id: 'tm-2', system_user_id: 2, user_identifier: 'bob' }
       ];
 
       sinon.stub(TeamRepository.prototype, 'insertTeam').resolves(mockTeam);
@@ -203,8 +201,8 @@ describe('TeamService', () => {
         { team_member_id: 'tm-2', team_id: 'team-1', system_user_id: 2 }
       ];
       const newMembers: TeamMemberWithUser[] = [
-        { team_member_id: 'tm-1', system_user_id: 1, display_name: 'Alice', email: 'alice@example.com' },
-        { team_member_id: 'tm-3', system_user_id: 3, display_name: 'Charlie', email: 'charlie@example.com' }
+        { team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' },
+        { team_member_id: 'tm-3', system_user_id: 3, user_identifier: 'charlie' }
       ];
 
       sinon.stub(TeamRepository.prototype, 'updateTeam').resolves(mockTeam);

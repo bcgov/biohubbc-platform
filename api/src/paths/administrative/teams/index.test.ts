@@ -145,7 +145,7 @@ describe('createTeam', () => {
       team_id: 'new-team',
       name: 'Team with Members',
       description: null,
-      members: [{ team_member_id: 'tm-1', system_user_id: 1, display_name: 'Alice', email: 'alice@example.com' }]
+      members: [{ team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' }]
     };
 
     const mockDBConnection = getMockDBConnection();

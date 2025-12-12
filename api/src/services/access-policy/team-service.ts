@@ -10,8 +10,7 @@ import { DBService } from '../db-service';
 export interface TeamMemberWithUser {
   team_member_id: string;
   system_user_id: number;
-  display_name: string;
-  email: string | null;
+  user_identifier: string;
 }
 
 /**
@@ -139,11 +138,11 @@ export class TeamService extends DBService {
     const knex = getKnex();
     const query = knex
       .table('team_member as tm')
-      .select(['tm.team_member_id', 'tm.system_user_id', 'su.display_name', 'su.email'])
+      .select(['tm.team_member_id', 'tm.system_user_id', 'su.user_identifier'])
       .innerJoin('system_user as su', 'tm.system_user_id', 'su.system_user_id')
       .where('tm.team_id', teamId)
       .whereNull('tm.record_end_date')
-      .orderBy('su.display_name', 'asc');
+      .orderBy('su.user_identifier', 'asc');
 
     const response = await this.connection.knex(query);
     return response.rows;

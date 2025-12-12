@@ -12,7 +12,7 @@ import { OpenAPIV3 } from 'openapi-types';
 export const TeamMemberWithUserSchema: OpenAPIV3.SchemaObject = {
   title: 'TeamMemberWithUser',
   type: 'object',
-  required: ['team_member_id', 'system_user_id', 'display_name'],
+  required: ['team_member_id', 'system_user_id', 'user_identifier'],
   properties: {
     team_member_id: {
       type: 'string',
@@ -23,14 +23,9 @@ export const TeamMemberWithUserSchema: OpenAPIV3.SchemaObject = {
       type: 'integer',
       description: 'The system user ID of the team member'
     },
-    display_name: {
+    user_identifier: {
       type: 'string',
-      description: 'Display name of the user'
-    },
-    email: {
-      type: 'string',
-      nullable: true,
-      description: 'Email address of the user'
+      description: 'Username or identifier from identity provider'
     }
   }
 };
@@ -185,7 +180,7 @@ export const UpdateTeamRequestSchema: OpenAPIV3.SchemaObject = {
 export const AvailableUserSchema: OpenAPIV3.SchemaObject = {
   title: 'AvailableUser',
   type: 'object',
-  required: ['system_user_id', 'display_name'],
+  required: ['system_user_id', 'user_identifier'],
   properties: {
     system_user_id: {
       type: 'integer',
@@ -194,15 +189,6 @@ export const AvailableUserSchema: OpenAPIV3.SchemaObject = {
     user_identifier: {
       type: 'string',
       description: 'Username or identifier from identity provider'
-    },
-    display_name: {
-      type: 'string',
-      description: 'Display name of the user'
-    },
-    email: {
-      type: 'string',
-      nullable: true,
-      description: 'Email address of the user'
     }
   }
 };

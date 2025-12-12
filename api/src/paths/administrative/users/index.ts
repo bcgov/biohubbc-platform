@@ -45,11 +45,11 @@ export function getAvailableUsers(): RequestHandler {
       const knex = getKnex();
       const query = knex
         .table('system_user as su')
-        .select(['su.system_user_id', 'su.user_identifier', 'su.display_name', 'su.email'])
+        .select(['su.system_user_id', 'su.user_identifier'])
         .innerJoin('user_identity_source as uis', 'su.user_identity_source_id', 'uis.user_identity_source_id')
         .whereNull('su.record_end_date')
         .whereNotIn('uis.name', [SYSTEM_IDENTITY_SOURCE.SYSTEM, SYSTEM_IDENTITY_SOURCE.DATABASE])
-        .orderBy('su.display_name', 'asc');
+        .orderBy('su.user_identifier', 'asc');
 
       const response = await connection.knex(query);
 
