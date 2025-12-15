@@ -76,10 +76,13 @@ export const useTeamsApi = (axios: AxiosInstance) => {
   /**
    * Get available users for team membership.
    *
+   * @param {string} [search] - Optional search term to filter users by user_identifier
    * @return {*} {Promise<IAvailableUsersResponse>}
    */
-  const getAvailableUsers = async (): Promise<IAvailableUsersResponse> => {
-    const { data } = await axios.get('/api/administrative/users');
+  const getAvailableUsers = async (search?: string): Promise<IAvailableUsersResponse> => {
+    const { data } = await axios.get('/api/administrative/users', {
+      params: search ? { search } : undefined
+    });
 
     return data;
   };

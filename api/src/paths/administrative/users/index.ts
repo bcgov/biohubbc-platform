@@ -21,6 +21,14 @@ GET.apiDoc = {
   description: 'Get available users for team membership (excludes SYSTEM and DATABASE users).',
   tags: ['user'],
   security: [{ Bearer: [] }],
+  parameters: [
+    {
+      in: 'query',
+      name: 'search',
+      schema: { type: 'string' },
+      description: 'Search term to filter users by user_identifier (case-insensitive partial match)'
+    }
+  ],
   responses: {
     200: {
       description: 'List of available users',
@@ -31,7 +39,15 @@ GET.apiDoc = {
 };
 
 /**
+ * Maximum number of users to return in a single request.
+ */
+const MAX_USERS_LIMIT = 50;
+
+/**
  * Get available users for team membership (excludes SYSTEM and DATABASE users).
+ *
+ * Supports optional search parameter for server-side filtering.
+ * Returns at most MAX_USERS_LIMIT users to ensure good performance with large user bases.
  *
  * @returns {RequestHandler}
  */
@@ -42,6 +58,8 @@ export function getAvailableUsers(): RequestHandler {
     try {
       await connection.open();
 
+      const search = req.query.search as string | undefined;
+
       const knex = getKnex();
       const query = knex
         .table('system_user as su')
@@ -49,7 +67,13 @@ export function getAvailableUsers(): RequestHandler {
         .innerJoin('user_identity_source as uis', 'su.user_identity_source_id', 'uis.user_identity_source_id')
         .whereNull('su.record_end_date')
         .whereNotIn('uis.name', [SYSTEM_IDENTITY_SOURCE.SYSTEM, SYSTEM_IDENTITY_SOURCE.DATABASE])
-        .orderBy('su.user_identifier', 'asc');
+        .orderBy('su.user_identifier', 'asc')
+        .limit(MAX_USERS_LIMIT);
+
+      // Apply search filter if provided
+      if (search && search.trim()) {
+        query.whereILike('su.user_identifier', `%${search.trim()}%`);
+      }
 
       const response = await connection.knex(query);
 

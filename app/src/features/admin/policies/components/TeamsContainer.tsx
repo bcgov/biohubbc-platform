@@ -403,7 +403,14 @@ export const TeamsContainer = () => {
         open={openEditTeamDialog}
         dialogSaveButtonLabel="Save"
         component={{
-          element: <AddTeamForm />,
+          element: (
+            <AddTeamForm
+              initialUsers={editingTeam?.members.map((m) => ({
+                system_user_id: m.system_user_id,
+                user_identifier: m.user_identifier
+              }))}
+            />
+          ),
           initialValues: getEditTeamInitialValues(),
           validationSchema: AddTeamFormYupSchema
         }}
