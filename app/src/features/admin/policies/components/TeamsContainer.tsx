@@ -8,35 +8,53 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import EditDialog from 'components/dialog/EditDialog';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import useDataLoader from 'hooks/useDataLoader';
 import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
-import { debounce } from 'lodash-es';
-import { useCallback, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { AddTeamForm, AddTeamFormInitialValues, AddTeamFormYupSchema, IAddTeamFormValues } from './AddTeamForm';
+
+/**
+ * Props for the TeamsContainer component.
+ */
+export interface ITeamsContainerProps {
+  /** Array of teams to display in the table */
+  teams: ITeamWithMembers[];
+  /** Callback to refresh the teams list after create/update/delete */
+  refresh: () => void;
+  /** Current search term for filtering teams */
+  searchTerm: string;
+  /** Callback when search term changes */
+  onSearch: (term: string) => void;
+  /** Currently selected team ID for filtering team-policy assignments */
+  selectedTeamId: string | null;
+  /** Callback when a team row is selected/deselected */
+  onSelectTeam: (teamId: string | null) => void;
+}
 
 /**
  * Container component for managing teams.
  *
  * Provides functionality to:
  * - View teams in a searchable, paginated table
+ * - Select a team to filter team-policy assignments
  * - Create new teams via dialog
  * - Edit existing teams via dialog
  * - Delete teams with confirmation
+ *
+ * @param {ITeamsContainerProps} props - Component props
+ * @returns {React.ReactElement} The teams container component
  */
-export const TeamsContainer = () => {
+export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
+  const { teams, refresh, searchTerm, onSearch, selectedTeamId, onSelectTeam } = props;
+
   const biohubApi = useApi();
   const dialogContext = useDialogContext();
-
-  // Search state
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
   // Dialog state
   const [openAddTeamDialog, setOpenAddTeamDialog] = useState(false);
@@ -44,41 +62,28 @@ export const TeamsContainer = () => {
   const [editingTeam, setEditingTeam] = useState<ITeamWithMembers | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Data loader for fetching teams
-  const teamsDataLoader = useDataLoader((search?: string) => biohubApi.teams.getTeams({ search: search || undefined }));
-  teamsDataLoader.load(debouncedSearchTerm);
-
   /**
-   * Debounced function to update search term and refresh teams.
-   * Waits 300ms after last keystroke before triggering API call.
+   * Handle row selection changes in the DataGrid.
+   * Extracts the selected team ID and calls the parent callback.
+   *
+   * @param {GridRowSelectionModel} model - The new selection model from DataGrid
    */
-  const debouncedRefresh = useMemo(
-    () =>
-      debounce((term: string) => {
-        setDebouncedSearchTerm(term);
-        teamsDataLoader.refresh(term);
-      }, 300),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
+  const handleRowSelectionChange = (model: GridRowSelectionModel) => {
+    const ids = model && 'ids' in model ? Array.from(model.ids) : [];
+    const newSelectedId = (ids[0] as string) || null;
+    onSelectTeam(newSelectedId);
+  };
 
-  /**
-   * Handle search input changes.
-   */
-  const handleSearch = useCallback(
-    (term: string) => {
-      setSearchTerm(term);
-      debouncedRefresh(term);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
-
-  const teams = teamsDataLoader.data?.teams ?? [];
-  const teamCount = teamsDataLoader.data?.pagination?.total ?? teams.length;
+  // Convert selectedTeamId to DataGrid selection model format
+  const rowSelectionModel: GridRowSelectionModel = {
+    type: 'include',
+    ids: selectedTeamId ? new Set([selectedTeamId]) : new Set()
+  };
 
   /**
    * Display a snackbar notification.
+   *
+   * @param {Partial<ISnackbarProps>} [textDialogProps] - Optional snackbar configuration
    */
   const showSnackBar = (textDialogProps?: Partial<ISnackbarProps>) => {
     dialogContext.setSnackbar({ ...textDialogProps, open: true });
@@ -86,6 +91,8 @@ export const TeamsContainer = () => {
 
   /**
    * Open confirmation dialog to delete a team.
+   *
+   * @param {ITeamWithMembers} team - The team to delete
    */
   const handleDeleteTeamClick = (team: ITeamWithMembers) => {
     dialogContext.setYesNoDialog({
@@ -115,6 +122,9 @@ export const TeamsContainer = () => {
 
   /**
    * Delete a team via API.
+   *
+   * @param {ITeamWithMembers} team - The team to delete
+   * @returns {Promise<void>}
    */
   const deleteTeam = async (team: ITeamWithMembers) => {
     if (!team?.team_id) {
@@ -132,7 +142,12 @@ export const TeamsContainer = () => {
         open: true
       });
 
-      teamsDataLoader.refresh(debouncedSearchTerm);
+      // Clear selection if deleted team was selected
+      if (selectedTeamId === team.team_id) {
+        onSelectTeam(null);
+      }
+
+      refresh();
     } catch (error) {
       const apiError = error as APIError;
 
@@ -154,6 +169,8 @@ export const TeamsContainer = () => {
 
   /**
    * Open the edit dialog for a team.
+   *
+   * @param {ITeamWithMembers} team - The team to edit
    */
   const handleEditTeamClick = (team: ITeamWithMembers) => {
     setEditingTeam(team);
@@ -162,6 +179,9 @@ export const TeamsContainer = () => {
 
   /**
    * Handle saving a new team from the add dialog.
+   *
+   * @param {IAddTeamFormValues} values - Form values from the add team dialog
+   * @returns {Promise<void>}
    */
   const handleAddTeamSave = async (values: IAddTeamFormValues) => {
     setIsLoading(true);
@@ -174,7 +194,7 @@ export const TeamsContainer = () => {
       });
 
       setOpenAddTeamDialog(false);
-      teamsDataLoader.refresh(debouncedSearchTerm);
+      refresh();
 
       showSnackBar({
         snackbarMessage: (
@@ -206,6 +226,9 @@ export const TeamsContainer = () => {
 
   /**
    * Handle saving an edited team.
+   *
+   * @param {IAddTeamFormValues} values - Form values from the edit team dialog
+   * @returns {Promise<void>}
    */
   const handleEditTeamSave = async (values: IAddTeamFormValues) => {
     if (!editingTeam) {
@@ -223,7 +246,7 @@ export const TeamsContainer = () => {
 
       setOpenEditTeamDialog(false);
       setEditingTeam(null);
-      teamsDataLoader.refresh(debouncedSearchTerm);
+      refresh();
 
       showSnackBar({
         snackbarMessage: (
@@ -255,6 +278,8 @@ export const TeamsContainer = () => {
 
   /**
    * Get initial form values for the edit dialog.
+   *
+   * @returns {IAddTeamFormValues} Form values pre-populated with the editing team's data
    */
   const getEditTeamInitialValues = (): IAddTeamFormValues => {
     if (!editingTeam) {
@@ -324,7 +349,7 @@ export const TeamsContainer = () => {
           <Typography variant="h4" component="h2" flexGrow={1}>
             Teams{' '}
             <Typography sx={{ fontSize: 'inherit' }} component="span" color="textSecondary">
-              ({teamCount})
+              ({teams.length})
             </Typography>
           </Typography>
           <Stack gap={1} direction="row" alignItems="center">
@@ -332,7 +357,7 @@ export const TeamsContainer = () => {
               size="small"
               placeholder="Search by team name"
               value={searchTerm}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={(e) => onSearch(e.target.value)}
               slotProps={{
                 input: {
                   startAdornment: (
@@ -362,7 +387,10 @@ export const TeamsContainer = () => {
           columns={columns}
           getRowId={(row) => row.team_id}
           pageSizeOptions={[10, 25, 50]}
-          disableRowSelectionOnClick
+          rowSelectionModel={rowSelectionModel}
+          onRowSelectionModelChange={handleRowSelectionChange}
+          checkboxSelection
+          disableMultipleRowSelection
           disableColumnSelector
           disableColumnMenu
           localeText={{ noRowsLabel: 'No Teams' }}
@@ -378,6 +406,12 @@ export const TeamsContainer = () => {
             '& .MuiDataGrid-columnHeaderTitle': {
               fontWeight: 700,
               textTransform: 'uppercase'
+            },
+            '& .MuiDataGrid-row.Mui-selected': {
+              backgroundColor: 'action.selected'
+            },
+            '& .MuiDataGrid-row.Mui-selected:hover': {
+              backgroundColor: 'action.selected'
             }
           }}
         />

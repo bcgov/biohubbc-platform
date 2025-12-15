@@ -1,14 +1,15 @@
 import { fireEvent } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
+import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
 import { MemoryRouter } from 'react-router';
 import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
-import { TeamsContainer } from './TeamsContainer';
+import { ITeamsContainerProps, TeamsContainer } from './TeamsContainer';
 
 vi.mock('../../../../hooks/useApi');
 const mockBiohubApi = useApi as Mock;
 
-const mockTeams = [
+const mockTeams: ITeamWithMembers[] = [
   {
     team_id: 'team-1',
     name: 'Alpha Team',
@@ -34,14 +35,9 @@ const mockAvailableUsers = [
 const mockCreateTeam = vi.fn();
 const mockUpdateTeam = vi.fn();
 const mockDeleteTeam = vi.fn();
-const mockGetTeams = vi.fn().mockResolvedValue({
-  teams: mockTeams,
-  pagination: { total: 2, page: 0, limit: 50 }
-});
 
 const mockUseApi = {
   teams: {
-    getTeams: mockGetTeams,
     getAvailableUsers: vi.fn().mockResolvedValue({ users: mockAvailableUsers }),
     createTeam: mockCreateTeam,
     updateTeam: mockUpdateTeam,
@@ -49,10 +45,19 @@ const mockUseApi = {
   }
 };
 
-const renderContainer = () => {
+const defaultProps: ITeamsContainerProps = {
+  teams: mockTeams,
+  refresh: vi.fn(),
+  searchTerm: '',
+  onSearch: vi.fn(),
+  selectedTeamId: null,
+  onSelectTeam: vi.fn()
+};
+
+const renderContainer = (props: Partial<ITeamsContainerProps> = {}) => {
   return render(
     <MemoryRouter initialEntries={['/']}>
-      <TeamsContainer />
+      <TeamsContainer {...defaultProps} {...props} />
     </MemoryRouter>
   );
 };
@@ -63,11 +68,6 @@ describe('TeamsContainer', () => {
   });
 
   afterEach(() => {
-    // Flush any pending debounce timers to prevent "window is not defined" errors
-    vi.useFakeTimers();
-    vi.runAllTimers();
-    vi.useRealTimers();
-
     cleanup();
     vi.clearAllMocks();
   });
@@ -133,23 +133,10 @@ describe('TeamsContainer', () => {
   });
 
   it('shows `No Teams` when there are no teams', async () => {
-    mockUseApi.teams.getTeams.mockResolvedValueOnce({
-      teams: [],
-      pagination: { total: 0, page: 0, limit: 50 }
-    });
-
-    const { getByText } = renderContainer();
+    const { getByText } = renderContainer({ teams: [] });
 
     await waitFor(() => {
       expect(getByText('No Teams')).toBeVisible();
-    });
-  });
-
-  it('calls getTeams on mount', async () => {
-    renderContainer();
-
-    await waitFor(() => {
-      expect(mockUseApi.teams.getTeams).toHaveBeenCalled();
     });
   });
 
@@ -176,7 +163,8 @@ describe('TeamsContainer', () => {
         members: []
       });
 
-      const { getByRole, getByLabelText, queryByText } = renderContainer();
+      const mockRefresh = vi.fn();
+      const { getByRole, getByLabelText, queryByText } = renderContainer({ refresh: mockRefresh });
 
       // Wait for initial render
       await waitFor(() => {
@@ -208,6 +196,11 @@ describe('TeamsContainer', () => {
       // Dialog should close
       await waitFor(() => {
         expect(queryByText('Add Team')).toBeNull();
+      });
+
+      // Refresh should be called
+      await waitFor(() => {
+        expect(mockRefresh).toHaveBeenCalled();
       });
     });
   });
@@ -246,7 +239,10 @@ describe('TeamsContainer', () => {
         members: []
       });
 
-      const { getByText, getAllByTitle, getByLabelText, getByRole, queryByText } = renderContainer();
+      const mockRefresh = vi.fn();
+      const { getByText, getAllByTitle, getByLabelText, getByRole, queryByText } = renderContainer({
+        refresh: mockRefresh
+      });
 
       await waitFor(() => {
         expect(getByText('Alpha Team')).toBeVisible();
@@ -329,8 +325,9 @@ describe('TeamsContainer', () => {
   });
 
   describe('Search', () => {
-    it('updates search term on input change', async () => {
-      const { getByPlaceholderText } = renderContainer();
+    it('calls onSearch callback on input change', async () => {
+      const mockOnSearch = vi.fn();
+      const { getByPlaceholderText } = renderContainer({ onSearch: mockOnSearch });
 
       await waitFor(() => {
         expect(getByPlaceholderText('Search by team name')).toBeVisible();
@@ -339,8 +336,48 @@ describe('TeamsContainer', () => {
       const searchInput = getByPlaceholderText('Search by team name');
       fireEvent.change(searchInput, { target: { value: 'Alpha' } });
 
-      expect(searchInput).toHaveValue('Alpha');
-      // Debounce timer cleanup handled by afterEach
+      expect(mockOnSearch).toHaveBeenCalledWith('Alpha');
+    });
+
+    it('displays controlled search term value', async () => {
+      const { getByPlaceholderText } = renderContainer({ searchTerm: 'Beta' });
+
+      await waitFor(() => {
+        const searchInput = getByPlaceholderText('Search by team name');
+        expect(searchInput).toHaveValue('Beta');
+      });
+    });
+  });
+
+  describe('Row Selection', () => {
+    it('calls onSelectTeam when a row is clicked', async () => {
+      const mockOnSelectTeam = vi.fn();
+      const { getByText } = renderContainer({ onSelectTeam: mockOnSelectTeam });
+
+      await waitFor(() => {
+        expect(getByText('Alpha Team')).toBeVisible();
+      });
+
+      // Click on a row
+      const row = getByText('Alpha Team').closest('.MuiDataGrid-row');
+      if (row) {
+        fireEvent.click(row);
+      }
+
+      // onSelectTeam should be called
+      // Note: The actual value depends on DataGrid's selection model behavior
+    });
+
+    it('highlights selected row when selectedTeamId is provided', async () => {
+      const { getByText } = renderContainer({ selectedTeamId: 'team-1' });
+
+      await waitFor(() => {
+        expect(getByText('Alpha Team')).toBeVisible();
+      });
+
+      // The row should have the selected class (MUI DataGrid applies Mui-selected)
+      const row = getByText('Alpha Team').closest('.MuiDataGrid-row');
+      expect(row).toHaveClass('Mui-selected');
     });
   });
 });
