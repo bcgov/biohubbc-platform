@@ -1,10 +1,9 @@
-import { LoadingButton } from '@mui/lab';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import useTheme from '@mui/material/styles/useTheme';
+import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { Formik, FormikValues } from 'formik';
 
@@ -108,15 +107,16 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
           <DialogTitle id="edit-dialog-title">{props.dialogTitle}</DialogTitle>
           <DialogContent>{props.component.element}</DialogContent>
           <DialogActions>
-            <LoadingButton
+            <Button
               loading={props.isLoading}
+              disabled={!formikProps.isValid}
               onClick={formikProps.submitForm}
               color="primary"
               variant="contained"
               autoFocus
               data-testid="edit-dialog-save-button">
               {props.dialogSaveButtonLabel || 'Save Changes'}
-            </LoadingButton>
+            </Button>
             <Button onClick={props.onCancel} color="primary" variant="outlined" data-testid="edit-dialog-cancel-button">
               Cancel
             </Button>

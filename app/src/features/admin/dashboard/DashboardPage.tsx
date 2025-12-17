@@ -1,4 +1,7 @@
+import { mdiPlus } from '@mdi/js';
+import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 import Tab from '@mui/material/Tab';
@@ -7,6 +10,7 @@ import Typography from '@mui/material/Typography';
 import ReviewedSubmissionsTable from 'features/admin/dashboard/components/ReviewedSubmissionsTable';
 import UnreviewedSubmissionsTable from 'features/admin/dashboard/components/UnreviewedSubmissionsTable';
 import { useState } from 'react';
+import { NavLink } from 'react-router';
 import PublishedSubmissionsTable from './components/PublishedSubmissionsTable';
 
 const DashboardPage = () => {
@@ -21,9 +25,14 @@ const DashboardPage = () => {
             py: 4,
             pb: 0
           }}>
-          <Typography variant="h1" sx={{ ml: '-2px' }}>
-            Submissions
-          </Typography>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h1" sx={{ ml: '-2px' }}>
+              Submissions
+            </Typography>
+            <Button component={NavLink} to="create" variant="contained" startIcon={<Icon path={mdiPlus} size={1} />}>
+              New Submission
+            </Button>
+          </Box>
 
           <Tabs
             value={activeTab}

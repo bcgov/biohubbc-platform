@@ -1,6 +1,6 @@
 import CircularProgress from '@mui/material/CircularProgress';
 import { ThemeProvider } from '@mui/material/styles';
-import AppRouter from 'AppRouter';
+import { AppRouter } from 'router/AppRouter';
 import { AuthStateContext, AuthStateContextProvider } from 'contexts/authStateContext';
 import { ConfigContext, ConfigContextProvider } from 'contexts/configContext';
 import { WebStorageStateStore } from 'oidc-client-ts';
@@ -45,7 +45,7 @@ const App = () => {
                 <AuthStateContextProvider>
                   <AuthStateContext.Consumer>
                     {(authState) => {
-                      if (!authState) {
+                      if (!authState || authState.auth.isLoading) {
                         return <CircularProgress className="pageProgress" size={40} />;
                       }
                       return (

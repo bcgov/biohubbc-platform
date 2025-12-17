@@ -18,7 +18,7 @@ app:
   # Object Store (S3)
   objectStore:
     keyPrefix: biohub
-  
+
   # Logging
   logging:
     level: silent

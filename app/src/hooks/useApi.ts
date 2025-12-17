@@ -1,4 +1,5 @@
 import { useConfigContext } from 'hooks/useContext';
+
 import useAdminApi from './api/useAdminApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
@@ -7,6 +8,8 @@ import useSecurityApi from './api/useSecurityApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
 import useUserApi from './api/useUserApi';
+import { useFeaturesApi } from './api/useFeaturesApi';
+import usePoliciesApi from './api/usePoliciesApi';
 
 /**
  * Returns a set of supported api methods.
@@ -15,6 +18,7 @@ import useUserApi from './api/useUserApi';
  */
 export const useApi = () => {
   const config = useConfigContext();
+
   const apiAxios = useAxios(config?.API_HOST);
 
   const user = useUserApi(apiAxios);
@@ -22,6 +26,8 @@ export const useApi = () => {
   const admin = useAdminApi(apiAxios);
 
   const submissions = useSubmissionsApi(apiAxios);
+
+  const features = useFeaturesApi(apiAxios);
 
   const taxonomy = useTaxonomyApi(apiAxios);
 
@@ -31,13 +37,17 @@ export const useApi = () => {
 
   const codes = useCodesApi(apiAxios);
 
+  const policies = usePoliciesApi(apiAxios);
+
   return {
     user,
     admin,
     submissions,
+    features,
     taxonomy,
     security,
     artifact,
-    codes
+    codes,
+    policies
   };
 };

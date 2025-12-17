@@ -25,46 +25,10 @@ interface SystemUserSeed {
 
 const systemUsers: SystemUserSeed[] = [
   {
-    identifier: 'arosenth',
-    type: SYSTEM_IDENTITY_SOURCE.IDIR,
-    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: 'DFE2CC5E345E4B1E813EC1DC10852064'
-  },
-  {
-    identifier: 'cupshall',
-    type: SYSTEM_IDENTITY_SOURCE.IDIR,
-    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: 'C42DFA74A976490A819BC85FF5E254E4'
-  },
-  {
-    identifier: 'jxdunsdo',
-    type: SYSTEM_IDENTITY_SOURCE.IDIR,
-    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: '82E8D3B4BAD045E8AD3980D426EA781C'
-  },
-  {
-    identifier: 'keinarss',
-    type: SYSTEM_IDENTITY_SOURCE.IDIR,
-    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: 'F4663727DE89489C8B7CFA81E4FA99B3'
-  },
-  {
-    identifier: 'nphura',
-    type: SYSTEM_IDENTITY_SOURCE.IDIR,
-    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: '813B096BC1BC4AAAB2E39DDE58F432E2'
-  },
-  {
     identifier: 'achirico',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
     user_guid: 'E3A279530D164485BF43C6FE7A49E175'
-  },
-  {
-    identifier: 'mdeluca',
-    type: SYSTEM_IDENTITY_SOURCE.IDIR,
-    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: '0054CF4823A744309BE399C34B6B0F43'
   },
   {
     identifier: 'mauberti',
@@ -73,10 +37,34 @@ const systemUsers: SystemUserSeed[] = [
     user_guid: '62EC624E50844486A046DC9709854F8D'
   },
   {
+    identifier: 'anthomps',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
+    user_guid: '543C3CE2F4DE472DB3A569FD0024B244'
+  },
+  {
     identifier: 'ameijer',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
     user_guid: '74231b32026141a7acec6bcc0284f038'
+  },
+  {
+    identifier: 'dylrogow',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
+    user_guid: '473C7CDAC46D402AA79AE980DDDB85C3'
+  },
+  {
+    identifier: 'abushara',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
+    user_guid: '9266B99E3E9C42339D9F951CBB6E3494'
+  },
+  {
+    identifier: 'dahogan',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
+    user_guid: '6936047233B94EA0B8C0698F6349E027'
   }
 ];
 

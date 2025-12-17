@@ -1,11 +1,8 @@
 import { AuthStateContext } from 'contexts/authStateContext';
-import { createMemoryHistory } from 'history';
-import { Router } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { getMockAuthState, SystemAdminAuthState } from 'test-helpers/auth-helpers';
 import { render } from 'test-helpers/test-utils';
 import BaseLayout from './BaseLayout';
-
-const history = createMemoryHistory();
 
 describe.skip('BaseLayout', () => {
   it('renders correctly', () => {
@@ -13,13 +10,13 @@ describe.skip('BaseLayout', () => {
 
     const { getByText } = render(
       <AuthStateContext.Provider value={authState}>
-        <Router history={history}>
+        <MemoryRouter initialEntries={['/']}>
           <BaseLayout>
             <div>
               <p>The public layout content</p>
             </div>
           </BaseLayout>
-        </Router>
+        </MemoryRouter>
       </AuthStateContext.Provider>
     );
 

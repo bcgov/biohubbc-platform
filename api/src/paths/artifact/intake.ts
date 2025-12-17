@@ -53,9 +53,19 @@ POST.apiDoc = {
               type: 'string'
             },
             media: {
-              type: 'string',
-              format: 'binary',
-              description: 'The artifact.'
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  fieldname: { type: 'string' },
+                  originalname: { type: 'string' },
+                  encoding: { type: 'string' },
+                  mimetype: { type: 'string' },
+                  buffer: { type: 'object' },
+                  size: { type: 'number' }
+                }
+              },
+              description: 'The artifact files processed by multer.'
             }
           },
           additionalProperties: false
@@ -101,7 +111,7 @@ export function intakeArtifact(): RequestHandler {
 
     const artifactUploadKey = req.body.artifact_upload_key;
 
-    const serviceClientSystemUser = getServiceClientSystemUser(req['keycloak_token']);
+    const serviceClientSystemUser = getServiceClientSystemUser(req.keycloak_token);
 
     if (!serviceClientSystemUser) {
       throw new HTTP400('Failed to identify known submission source system', [

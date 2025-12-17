@@ -2,24 +2,12 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
-import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { UserService } from '../../services/user-service';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/user/{userId}');
 
-export const GET: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          discriminator: 'SystemUser'
-        }
-      ]
-    };
-  }),
-  getUser()
-];
+export const GET: Operation = [getUser()];
 
 GET.apiDoc = {
   description: 'Get user details for the currently authenticated user.',
@@ -147,7 +135,7 @@ GET.apiDoc = {
  */
 export function getUser(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req['keycloak_token']);
+    const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();

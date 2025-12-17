@@ -124,7 +124,7 @@ biohub-platform-api:
     # Object Store (S3)
     objectStore:
       keyPrefix: biohub
-      
+
     # Logging
     logging:
       level: info

@@ -7,7 +7,7 @@ import { useState } from 'react';
 import SecuritiesDialog from './SecuritiesDialog';
 
 interface IManageSecurityProps {
-  submissionFeatureIds: GridRowSelectionModel;
+  submissionFeatureIds: Pick<GridRowSelectionModel, 'ids'>;
   onClose: () => void;
 }
 

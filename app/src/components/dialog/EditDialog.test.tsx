@@ -25,8 +25,8 @@ const SampleFormikForm = () => {
   );
 };
 
-const handleOnSave = jest.fn();
-const handleOnCancel = jest.fn();
+const handleOnSave = vi.fn();
+const handleOnCancel = vi.fn();
 
 const renderContainer = ({
   testFieldValue,

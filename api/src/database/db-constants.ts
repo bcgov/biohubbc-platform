@@ -62,7 +62,17 @@ export const getDBConstants = function (): DBConstants {
 
 const selectServiceAccountsSqlStatement = SQL`
   SELECT
-    *
+    "system_user".system_user_id,
+    "system_user".user_identity_source_id,
+    "system_user".user_identifier,
+    "system_user".user_guid,
+    "system_user".record_effective_date,
+    "system_user".record_end_date,
+    "system_user".create_date,
+    "system_user".create_user,
+    "system_user".update_date,
+    "system_user".update_user,
+    "system_user".revision_count
   FROM
     "system_user"
   INNER JOIN

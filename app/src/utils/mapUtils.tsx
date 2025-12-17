@@ -1,7 +1,7 @@
 import { kml } from '@tmcw/togeojson';
 import bbox from '@turf/bbox';
 import { FormikContextType } from 'formik';
-import { Feature, FeatureCollection } from 'geojson';
+import { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 import JSZip from 'jszip';
 import get from 'lodash-es/get';
 import { read } from 'shapefile';
@@ -86,26 +86,20 @@ export const handleKMLUpload = async <T,>(file: File, name: string, formikProps:
 
   setFieldValue(name, [...sanitizedGeoJSON, ...get(values, name)]);
 };
+
 /**
  * @param geometries geometry values on map
  */
 export const calculateUpdatedMapBounds = (geometries: Feature[]): any[][] | undefined => {
-  /*
-    If no geometries, we do not need to set bounds
-
-    If there is only one geometry and it is a point, we cannot do the bound setting
-    because leaflet does not know how to handle that and tries to zoom in way too much
-
-    If there are multiple points or a polygon and a point, this is not an issue
-  */
   if (!geometries || !geometries.length || (geometries.length === 1 && geometries[0]?.geometry?.type === 'Point')) {
     return;
   }
 
-  const allGeosFeatureCollection = {
+  const allGeosFeatureCollection: FeatureCollection<Geometry, GeoJsonProperties> = {
     type: 'FeatureCollection',
     features: [...geometries]
   };
+
   const bboxCoords = bbox(allGeosFeatureCollection);
 
   return [

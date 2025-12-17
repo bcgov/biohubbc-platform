@@ -29,26 +29,29 @@ export type AsyncFunction<AFArgs extends any[], AFResponse> = (...args: AFArgs) 
 export const useAsync = <AFArgs extends any[], AFResponse>(
   asyncFunction: AsyncFunction<AFArgs, AFResponse>
 ): AsyncFunction<AFArgs, AFResponse> => {
-  const ref = useRef<Promise<AFResponse>>();
+  // Initialize ref with null, since initially there's no promise
+  const ref = useRef<Promise<AFResponse> | null>(null);
 
   const isPending = useRef(false);
 
   const wrappedAsyncFunction: AsyncFunction<AFArgs, AFResponse> = async (...args) => {
+    // If there's an existing pending promise, return it
     if (ref.current && isPending.current) {
       return ref.current;
     }
 
     isPending.current = true;
 
+    // Call the async function and store the promise in ref
     ref.current = asyncFunction(...args).then(
       (response: AFResponse) => {
         isPending.current = false;
-
+        ref.current = null; // Reset the ref after the promise resolves
         return response;
       },
       (error) => {
         isPending.current = false;
-
+        ref.current = null; // Reset the ref after the promise rejects
         throw error;
       }
     );

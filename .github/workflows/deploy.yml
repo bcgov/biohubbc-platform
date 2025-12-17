@@ -91,7 +91,7 @@ jobs:
       # Get the head commit for this pull request, parse out the commit message, and assign to the `commit_message`
       # output variable, which is then used to determine if the term `ignore-skip` is found in the commit message.
       - name: Checkout head commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Get head commit message
@@ -112,7 +112,7 @@ jobs:
       - skipDuplicateActions
     steps:
       - name: Checkout Target Branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
 
@@ -130,7 +130,7 @@ jobs:
       # Install Node - for `node` and `npm` commands
       # Note: This already uses actions/cache internally, so repeat calls in subsequent jobs are not a performance hit
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
 
@@ -164,7 +164,7 @@ jobs:
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Install oc, which was removed from the ubuntu-latest image in v24.04
       - name: Install OpenShift CLI tools
@@ -172,11 +172,11 @@ jobs:
         with:
           oc: "4.16"
 
-      # Log in to OpenShift with retry logic
+      # Log in to OpenShift
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
       # PR's must originate from a branch off the original repo or else all openshift `oc` commands will fail.
       - name: Log in to OpenShift
-        uses: ./.github/actions/openshift-login-retry
+        uses: redhat-actions/oc-login@v1
         with:
           openshift_server_url: https://api.silver.devops.gov.bc.ca:6443
           openshift_token: ${{ secrets.TOOLS_SA_TOKEN }}
@@ -212,7 +212,7 @@ jobs:
           limit-severities-for-sarif: true
 
       - name: Upload Trivy scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: trivy-${{ env.APP_NAME }}-results
           path: trivy-${{ env.APP_NAME }}-results.sarif
@@ -247,7 +247,7 @@ jobs:
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Install oc, which was removed from the ubuntu-latest image in v24.04
       - name: Install OpenShift CLI tools
@@ -255,11 +255,11 @@ jobs:
         with:
           oc: "4.16"
 
-      # Log in to OpenShift with retry logic
+      # Log in to OpenShift
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
       # PR's must originate from a branch off the original repo or else all openshift `oc` commands will fail.
       - name: Log in to OpenShift
-        uses: ./.github/actions/openshift-login-retry
+        uses: redhat-actions/oc-login@v1
         with:
           openshift_server_url: https://api.silver.devops.gov.bc.ca:6443
           openshift_token: ${{ secrets.TOOLS_SA_TOKEN }}
@@ -295,7 +295,7 @@ jobs:
           limit-severities-for-sarif: true
 
       - name: Upload Trivy scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: trivy-${{ env.APP_NAME }}-results
           path: trivy-${{ env.APP_NAME }}-results.sarif
@@ -330,7 +330,7 @@ jobs:
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Install oc, which was removed from the ubuntu-latest image in v24.04
       - name: Install OpenShift CLI tools
@@ -338,11 +338,11 @@ jobs:
         with:
           oc: "4.16"
 
-      # Log in to OpenShift with retry logic
+      # Log in to OpenShift
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
       # PR's must originate from a branch off the original repo or else all openshift `oc` commands will fail.
       - name: Log in to OpenShift
-        uses: ./.github/actions/openshift-login-retry
+        uses: redhat-actions/oc-login@v1
         with:
           openshift_server_url: https://api.silver.devops.gov.bc.ca:6443
           openshift_token: ${{ secrets.TOOLS_SA_TOKEN }}
@@ -372,7 +372,7 @@ jobs:
           limit-severities-for-sarif: true
           
       - name: Upload Trivy scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: trivy-${{ env.APP_NAME }}-results
           path: trivy-${{ env.APP_NAME }}-results.sarif
@@ -407,7 +407,7 @@ jobs:
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Install oc, which was removed from the ubuntu-latest image in v24.04
       - name: Install OpenShift CLI tools
@@ -415,11 +415,11 @@ jobs:
         with:
           oc: "4.16"
 
-      # Log in to OpenShift with retry logic
+      # Log in to OpenShift
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
       # PR's must originate from a branch off the original repo or else all openshift `oc` commands will fail.
       - name: Log in to OpenShift
-        uses: ./.github/actions/openshift-login-retry
+        uses: redhat-actions/oc-login@v1
         with:
           openshift_server_url: https://api.silver.devops.gov.bc.ca:6443
           openshift_token: ${{ secrets.TOOLS_SA_TOKEN }}
@@ -455,7 +455,7 @@ jobs:
           limit-severities-for-sarif: true
 
       - name: Upload Trivy scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: trivy-${{ env.APP_NAME }}-results
           path: trivy-${{ env.APP_NAME }}-results.sarif
@@ -465,11 +465,13 @@ jobs:
     name: Deploy Helm Chart
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: ${{ github.event.pull_request.merged == false &&
+    if: ${{ always() &&
+      github.event.pull_request.merged == false &&
       github.event.pull_request.draft == false &&
-      ( needs.skipDuplicateActions.outputs.ignore_skip == 'true' ||
-      fromJSON(needs.skipDuplicateActions.outputs.paths_result).app.should_skip == false ||
-      fromJSON(needs.skipDuplicateActions.outputs.paths_result).app.skipped_by.branch != github.head_ref ) }}
+      ( needs.buildAndPushApp.result == 'success' ||
+      needs.buildAndPushDatabase.result == 'success' ||
+      needs.buildAndPushDatabaseSetup.result == 'success' ||
+      needs.buildAndPushAPI.result == 'success' ) }}
     environment: dev
     env:
       PR_NUMBER: ${{ github.event.number }}
@@ -492,7 +494,7 @@ jobs:
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Install oc, which was removed from the ubuntu-latest image in v24.04
       - name: Install OpenShift CLI tools
@@ -500,11 +502,11 @@ jobs:
         with:
           oc: "4.16"
 
-      # Log in to OpenShift with retry logic
+      # Log in to OpenShift
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
       # PR's must originate from a branch off the original repo or else all openshift `oc` commands will fail.
       - name: Log in to OpenShift
-        uses: ./.github/actions/openshift-login-retry
+        uses: redhat-actions/oc-login@v1
         with:
           openshift_server_url: https://api.silver.devops.gov.bc.ca:6443
           openshift_token: ${{ secrets.TOOLS_SA_TOKEN }}
@@ -550,7 +552,7 @@ jobs:
             --set-string biohub-platform-api.environment.ts=$TS \
             --set-string biohub-platform-api.environment.id=$PR_NUMBER \
             --set-string biohub-platform-api.environment.changeId=$PR_NUMBER \
-            --wait --timeout=300s
+            --wait --timeout=600s
           
           echo "Helm chart deployment completed for PR $PR_NUMBER"
 
@@ -568,12 +570,12 @@ jobs:
       - buildAndPushAPI
     steps:
       - name: Download all Trivy scan results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: trivy-results
 
       - name: Check for vulnerabilities and comment on PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');

@@ -174,7 +174,7 @@ export interface IDBConnection {
  *
  * Usage Example:
  *
- * const connection = await getDBConnection(req['keycloak_token']);
+ * const connection = await getDBConnection(req.keycloak_token);
  * try {
  *   await connection.open();
  *   await connection.sql(sqlStatement1);

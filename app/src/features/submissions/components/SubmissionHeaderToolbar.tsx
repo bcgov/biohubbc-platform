@@ -9,7 +9,7 @@ import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
 import PublishSecurityReviewButton from './PublishSecurityReview/PublishSecurityReviewButton';
 
 export interface ISubmissionHeaderToolbarProps {
-  submissionFeatureIds: GridRowSelectionModel;
+  submissionFeatureIds: Pick<GridRowSelectionModel, 'ids'>;
 }
 
 /**

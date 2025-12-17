@@ -1,28 +1,26 @@
 import { cleanup, render, waitFor } from '@testing-library/react';
-import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
-import { Router } from 'react-router';
+import { MemoryRouter } from 'react-router';
+import { Mock, vi } from 'vitest';
 import DashboardPage from './DashboardPage';
 
-const history = createMemoryHistory();
-
-jest.mock('../../../hooks/useApi');
+vi.mock('../../../hooks/useApi');
 
 const mockUseApi = {
   dataset: {
-    getUnreviewedSubmissionsForAdmins: jest.fn()
+    getUnreviewedSubmissionsForAdmins: vi.fn()
   }
 };
 
 const renderContainer = () => {
   return render(
-    <Router history={history}>
+    <MemoryRouter initialEntries={['/']}>
       <DashboardPage />
-    </Router>
+    </MemoryRouter>
   );
 };
 
-const mockBiohubApi = useApi as jest.Mock;
+const mockBiohubApi = useApi as Mock;
 
 describe('DashboardPage', () => {
   beforeEach(() => {

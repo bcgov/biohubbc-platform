@@ -82,7 +82,7 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
     }
 
     // Add the verified token to the request for future use, if needed
-    req['keycloak_token'] = verifiedToken;
+    req.keycloak_token = verifiedToken;
 
     return true;
   } catch (error) {

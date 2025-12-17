@@ -1,29 +1,27 @@
 import { cleanup, fireEvent, waitFor } from '@testing-library/react';
-import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
 import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
-import { Router } from 'react-router';
+import { MemoryRouter } from 'react-router';
 import { render } from 'test-helpers/test-utils';
+import { Mock } from 'vitest';
 import SubmissionsListPage from './SubmissionsListPage';
-
-const history = createMemoryHistory();
 
 const renderPage = () =>
   render(
-    <Router history={history}>
+    <MemoryRouter initialEntries={['/']}>
       <SubmissionsListPage />
-    </Router>
+    </MemoryRouter>
   );
 
-jest.mock('../../../hooks/useApi');
+vi.mock('../../../hooks/useApi');
 
 const mockUseApi = {
   submissions: {
-    getPublishedSubmissions: jest.fn()
+    getPublishedSubmissions: vi.fn()
   }
 };
 
-const mockBiohubApi = useApi as jest.Mock;
+const mockBiohubApi = useApi as Mock;
 
 describe('SubmissionsListPage', () => {
   beforeEach(() => {

@@ -2,6 +2,8 @@ import { AxiosInstance } from 'axios';
 import {
   IGetDownloadSubmissionResponse,
   IGetSubmissionGroupedFeatureResponse,
+  ISubmissionUploadPart,
+  PresignedUploadUrlResponse,
   SubmissionFeatureSignedUrlPayload,
   SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
@@ -143,6 +145,34 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Get presigned URLs to upload submission files
+   *
+   * @param {number} expectedSizeBytes
+   * @returns {Promise<PresignedUploadUrlResponse>}
+   */
+  const getSubmissionUploadUrls = async (expectedSizeBytes: number): Promise<PresignedUploadUrlResponse> => {
+    const { data } = await axios.post(`api/submission/upload`, { expectedSizeBytes });
+
+    return data;
+  };
+
+  /**
+   * Update the submission upload as completed
+   *
+   * @param {string} uploadId
+   * @param {string} key
+   * @param {ISubmissionUploadPart[]} parts
+   * @returns {Promise<void>}
+   */
+  const completeSubmissionUpload = async (
+    uploadId: string,
+    key: string,
+    parts: ISubmissionUploadPart[]
+  ): Promise<void> => {
+    await axios.put(`api/submission/upload/${uploadId}`, { key, parts });
+  };
+
   return {
     getSubmissionDownloadPackage,
     getSubmissionPublishedDownloadPackage,
@@ -153,7 +183,9 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     getPublishedSubmissionsForAdmins,
     updateSubmissionRecord,
     getPublishedSubmissions,
-    getSubmissionFeatureSignedUrl
+    getSubmissionFeatureSignedUrl,
+    getSubmissionUploadUrls,
+    completeSubmissionUpload
   };
 };
 

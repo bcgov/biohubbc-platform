@@ -5,7 +5,7 @@ import FileUploadItemProgressBar from 'components/attachments/FileUploadItemProg
 import FileUploadItemSubtext from 'components/attachments/FileUploadItemSubtext';
 import { APIError } from 'hooks/api/useAxios';
 import useIsMounted from 'hooks/useIsMounted';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { JSX, useCallback, useEffect, useState } from 'react';
 import { v4 } from 'uuid';
 
 export enum UploadFileStatus {

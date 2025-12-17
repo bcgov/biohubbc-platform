@@ -49,7 +49,7 @@ jobs:
       - checkEnv
     steps:
       - name: Checkout Target Branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
 
@@ -90,7 +90,7 @@ jobs:
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Install oc, which was removed from the ubuntu-latest image in v24.04
       - name: Install OpenShift CLI tools
@@ -98,15 +98,15 @@ jobs:
         with:
           oc: "4.16"
 
-      # Log in to OpenShift with retry logic
+      # Log in to OpenShift
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
       # PR's must originate from a branch off the original repo or else all openshift `oc` commands will fail.
       - name: Log in to OpenShift
-        uses: ./.github/actions/openshift-login-retry
+        uses: redhat-actions/oc-login@v1
         with:
           openshift_server_url: https://api.silver.devops.gov.bc.ca:6443
           openshift_token: ${{ secrets.TOOLS_SA_TOKEN }}
-          namespace: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-$BRANCH
+          namespace: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-${{ env.BRANCH }}
 
       # Authenticate Docker with OpenShift registry
       - name: Authenticate Docker with OpenShift registry
@@ -146,7 +146,7 @@ jobs:
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Install oc, which was removed from the ubuntu-latest image in v24.04
       - name: Install OpenShift CLI tools
@@ -154,15 +154,15 @@ jobs:
         with:
           oc: "4.16"
 
-      # Log in to OpenShift with retry logic
+      # Log in to OpenShift
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
       # PR's must originate from a branch off the original repo or else all openshift `oc` commands will fail.
       - name: Log in to OpenShift
-        uses: ./.github/actions/openshift-login-retry
+        uses: redhat-actions/oc-login@v1
         with:
           openshift_server_url: https://api.silver.devops.gov.bc.ca:6443
           openshift_token: ${{ secrets.TOOLS_SA_TOKEN }}
-          namespace: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-$BRANCH
+          namespace: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-${{ env.BRANCH }}
 
       # Authenticate Docker with OpenShift registry
       - name: Authenticate Docker with OpenShift registry
@@ -202,7 +202,7 @@ jobs:
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Install oc, which was removed from the ubuntu-latest image in v24.04
       - name: Install OpenShift CLI tools
@@ -210,15 +210,15 @@ jobs:
         with:
           oc: "4.16"
 
-      # Log in to OpenShift with retry logic
+      # Log in to OpenShift
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
       # PR's must originate from a branch off the original repo or else all openshift `oc` commands will fail.
       - name: Log in to OpenShift
-        uses: ./.github/actions/openshift-login-retry
+        uses: redhat-actions/oc-login@v1
         with:
           openshift_server_url: https://api.silver.devops.gov.bc.ca:6443
           openshift_token: ${{ secrets.TOOLS_SA_TOKEN }}
-          namespace: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-$BRANCH
+          namespace: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-${{ env.BRANCH }}
 
       # Authenticate Docker with OpenShift registry
       - name: Authenticate Docker with OpenShift registry
@@ -258,7 +258,7 @@ jobs:
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Install oc, which was removed from the ubuntu-latest image in v24.04
       - name: Install OpenShift CLI tools
@@ -266,15 +266,15 @@ jobs:
         with:
           oc: "4.16"
 
-      # Log in to OpenShift with retry logic
+      # Log in to OpenShift
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
       # PR's must originate from a branch off the original repo or else all openshift `oc` commands will fail.
       - name: Log in to OpenShift
-        uses: ./.github/actions/openshift-login-retry
+        uses: redhat-actions/oc-login@v1
         with:
           openshift_server_url: https://api.silver.devops.gov.bc.ca:6443
           openshift_token: ${{ secrets.TOOLS_SA_TOKEN }}
-          namespace: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-$BRANCH
+          namespace: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-${{ env.BRANCH }}
 
       # Authenticate Docker with OpenShift registry
       - name: Authenticate Docker with OpenShift registry
@@ -316,7 +316,7 @@ jobs:
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Install oc, which was removed from the ubuntu-latest image in v24.04
       - name: Install OpenShift CLI tools
@@ -324,15 +324,15 @@ jobs:
         with:
           oc: "4.16"
 
-      # Log in to OpenShift with retry logic
+      # Log in to OpenShift
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
       # PR's must originate from a branch off the original repo or else all openshift `oc` commands will fail.
       - name: Log in to OpenShift
-        uses: ./.github/actions/openshift-login-retry
+        uses: redhat-actions/oc-login@v1
         with:
           openshift_server_url: https://api.silver.devops.gov.bc.ca:6443
           openshift_token: ${{ secrets.TOOLS_SA_TOKEN }}
-          namespace: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-$BRANCH
+          namespace: ${{ vars.OPENSHIFT_LICENSE_PLATE }}-${{ env.BRANCH }}
 
       # Deploy the Helm chart
       - name: Deploy Helm Chart
@@ -370,7 +370,7 @@ jobs:
             --set-string biohub-platform-db-setup.environment.changeId=$PR_NUMBER \
             --set-string biohub-platform-api.environment.ts=$TS \
             --set-string biohub-platform-api.environment.changeId=$PR_NUMBER \
-            --wait --timeout=300s
+            --wait --timeout=600s
           
           echo "Helm chart deployment completed for branch $BRANCH"
 
@@ -399,7 +399,7 @@ jobs:
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Install oc, which was removed from the ubuntu-latest image in v24.04
       - name: Install OpenShift CLI tools
@@ -407,11 +407,11 @@ jobs:
         with:
           oc: "4.16"
 
-      # Log in to OpenShift with retry logic
+      # Log in to OpenShift
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
       # PR's must originate from a branch off the original repo or else all openshift `oc` commands will fail.
       - name: Log in to OpenShift
-        uses: ./.github/actions/openshift-login-retry
+        uses: redhat-actions/oc-login@v1
         with:
           openshift_server_url: https://api.silver.devops.gov.bc.ca:6443
           openshift_token: ${{ secrets.TOOLS_SA_TOKEN }}

@@ -96,11 +96,11 @@ export function deleteArtifact(): RequestHandler {
   return async (req, res) => {
     defaultLog.debug({ label: 'deleteArtifact', message: 'request body', req_body: req.query });
 
-    const serviceClientUser = getServiceClientSystemUser(req['keycloak_token']);
+    const serviceClientUser = getServiceClientSystemUser(req.keycloak_token);
 
     const connection = serviceClientUser
       ? getServiceAccountDBConnection(serviceClientUser)
-      : getDBConnection(req['keycloak_token']);
+      : getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();
