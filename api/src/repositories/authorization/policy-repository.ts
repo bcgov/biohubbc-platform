@@ -83,6 +83,47 @@ export class PolicyRepository extends BaseRepository {
   }
 
   /**
+   * Get policies with pagination and optional search.
+   *
+   * @param {object} options - Pagination and search options.
+   * @param {number} options.page - Page number (0-indexed).
+   * @param {number} options.limit - Number of items per page.
+   * @param {string} [options.search] - Optional search term to filter by policy name.
+   * @return {Promise<{ policies: Policy[]; total: number }>} - Paginated policies and total count.
+   * @memberof PolicyRepository
+   */
+  async getPoliciesWithPagination(options: {
+    page: number;
+    limit: number;
+    search?: string;
+  }): Promise<{ policies: Policy[]; total: number }> {
+    const knex = getKnex();
+
+    let baseQuery = knex.table('policy').where('record_end_date', null);
+
+    if (options.search) {
+      baseQuery = baseQuery.whereILike('name', `%${options.search}%`);
+    }
+
+    // Get total count
+    const countQuery = baseQuery.clone().count('* as count').first();
+    const countResult = await this.connection.knex(countQuery);
+    const total = Number(countResult.rows[0]?.count || 0);
+
+    // Get paginated results
+    const paginatedQuery = baseQuery
+      .clone()
+      .select(['policy_id', 'name', 'description'])
+      .orderBy('name', 'asc')
+      .offset(options.page * options.limit)
+      .limit(options.limit);
+
+    const response = await this.connection.knex(paginatedQuery, Policy);
+
+    return { policies: response.rows, total };
+  }
+
+  /**
    * Returns all policies that authorize access to the given feature URN for the given user.
    *
    * NOTE: We can optimize queries that use URNs by storing the URN components individually and indexing each.

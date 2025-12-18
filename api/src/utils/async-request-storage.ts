@@ -39,8 +39,8 @@ export function initRequestStorage(req: Request, _res: Response, next: NextFunct
   // Generate the request id for the current request - unique for each request
   requestStore.set('requestId', uuid());
 
-  if (req['keycloak_token']) {
-    const userIdentifier = getUserIdentifier(req['keycloak_token']);
+  if (req.keycloak_token) {
+    const userIdentifier = getUserIdentifier(req.keycloak_token);
 
     if (!userIdentifier) {
       // Set the username of the user who made the current request

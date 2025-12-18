@@ -98,7 +98,7 @@ GET.apiDoc = {
  */
 export function getSubmissionFeatures(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req['keycloak_token']);
+    const connection = getDBConnection(req.keycloak_token);
 
     const submissionId = Number(req.params.submissionId);
     const paginationOptions = makePaginationOptionsFromRequest(req);

@@ -140,7 +140,7 @@ POST.apiDoc = {
  */
 export function requestAccess(): RequestHandler {
   return async (req, res) => {
-    const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
+    const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     const resubmitData = req.body;
 

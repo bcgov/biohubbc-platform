@@ -80,7 +80,7 @@ GET.apiDoc = {
  */
 export function getSubmissionFeatureSignedUrl(): RequestHandler {
   return async (req, res) => {
-    const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
+    const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     const submissionFeatureId = Number(req.params.submissionFeatureId);
 

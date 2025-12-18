@@ -194,40 +194,27 @@ function getAdditionalMiddleware(): express.RequestHandler[] {
  * @param {NextFunction} next
  */
 function validateAllResponses(req: Request, res: Response, next: NextFunction) {
-  const isStrictValidation = !!req['apiDoc']['x-express-openapi-validation-strict'] || false;
+  const isStrictValidation = !!req.apiDoc?.['x-express-openapi-validation-strict'];
 
-  if (typeof res['validateResponse'] === 'function') {
-    const json = res.json;
+  if (typeof res.validateResponse === 'function') {
+    const originalJson = res.json.bind(res);
 
     res.json = (...args) => {
       if (res.get('x-express-openapi-validation-error-for')) {
-        // Already validated this response once, skip validation and return
-        return json.apply(res, args);
+        return originalJson(...args);
       }
 
-      const reqBody = args[0];
+      const responseBody = args[0];
 
-      // Run openapi response validation function
-      const validationResult: { message: any; errors: any[] } | undefined = res['validateResponse'](
-        res.statusCode,
-        reqBody
-      );
+      const validationResult = res.validateResponse?.(res.statusCode, responseBody);
 
-      let validationMessage = '';
-      let errorList = [];
+      if (isStrictValidation && validationResult?.errors?.length) {
+        const validationMessage = `Invalid response for status code ${res.statusCode}`;
+        const errorList = Array.from(validationResult.errors);
 
-      if (validationResult?.errors) {
-        validationMessage = `Invalid response for status code ${res.statusCode}`;
-
-        errorList = Array.from(validationResult.errors);
-
-        // Set to avoid a loop, and to provide the original status code
+        // Avoid infinite loop
         res.set('x-express-openapi-validation-error-for', res.statusCode.toString());
-      }
 
-      if (!isStrictValidation || !validationResult?.errors) {
-        return json.apply(res, args);
-      } else {
         defaultLog.debug({
           label: 'validateAllResponses',
           message: validationMessage,
@@ -235,11 +222,13 @@ function validateAllResponses(req: Request, res: Response, next: NextFunction) {
           req_url: `${req.method} ${req.url}`,
           req_params: req.params,
           req_body: req.body,
-          res_body: reqBody
+          res_body: responseBody
         });
 
         throw new HTTP500(validationMessage, errorList);
       }
+
+      return originalJson(responseBody);
     };
   }
 

@@ -57,7 +57,7 @@ export function removeSystemUser(): RequestHandler {
 
     const userId = req.params && Number(req.params.userId);
 
-    const connection = getDBConnection(req['keycloak_token']);
+    const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();
