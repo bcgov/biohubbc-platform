@@ -116,7 +116,7 @@ export const insertDatasetRecord = async (knex: Knex, options: { submission_id: 
       parent_submission_feature_id: null,
       feature_type: 'dataset',
       data: {
-        name: `Survey ${faker.animal.type()} ${faker.commerce.department()}}`,
+        name: `Survey ${faker.animal.type()} ${faker.commerce.department()}`,
         start_date: faker.date.past().toISOString(),
         end_date: faker.date.future().toISOString(),
         geometry: random.point(
