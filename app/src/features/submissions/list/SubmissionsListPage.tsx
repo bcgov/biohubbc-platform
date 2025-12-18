@@ -26,7 +26,7 @@ import { pluralize as p } from 'utils/Utils';
 const MIN_SEARCH_CHARS = 3;
 
 /** Property types allowed in filter dropdown (must have a search_* table) */
-const SEARCHABLE_PROPERTY_TYPES = ['string', 'number', 'datetime'];
+const SEARCHABLE_PROPERTY_TYPES = new Set(['string', 'number', 'datetime']);
 
 /**
  * Renders reviewed + published Submissions as cards with download and request access actions.
@@ -156,7 +156,7 @@ const SubmissionsListPage = () => {
         name: featureType.feature_type.feature_type_name,
         displayName: featureType.feature_type.feature_type_display_name,
         properties: featureType.feature_type_properties
-          .filter((prop) => SEARCHABLE_PROPERTY_TYPES.includes(prop.feature_property_type_name))
+          .filter((prop) => SEARCHABLE_PROPERTY_TYPES.has(prop.feature_property_type_name))
           .map((prop) => ({
             name: prop.feature_property_name,
             displayName: prop.feature_property_display_name,
@@ -199,7 +199,7 @@ const SubmissionsListPage = () => {
   const onDownloadFeature = async (result: SearchFeatureResult) => {
     // Download the feature's parent submission package
     const data = await biohubApi.submissions.getSubmissionPublishedDownloadPackage(result.submission_id);
-    const fileName = `${result.submission_name.toLowerCase().replace(/ /g, '-')}-${result.submission_id}`;
+    const fileName = `${result.submission_name.toLowerCase().replaceAll(' ', '-')}-${result.submission_id}`;
     downloadJSON(data, fileName);
   };
 

@@ -37,7 +37,7 @@ export const PropertyFilterList = (props: IPropertyFilterListProps) => {
         <Stack spacing={1}>
           {filters.map((filter, index) => (
             <PropertyFilter
-              key={index}
+              key={`${filter.featureTypeName}-${filter.propertyName}-${index}`}
               filter={filter}
               availableProperties={availableProperties}
               onChange={(updatedFilter) => handleUpdateFilter(index, updatedFilter)}

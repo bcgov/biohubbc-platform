@@ -649,7 +649,7 @@ export class SearchIndexRepository extends BaseRepository {
           WHERE
             ft.name = ${filter.featureTypeName}
             AND fp.name = ${filter.propertyName}
-            AND sn.value = ${parseFloat(filter.value)}
+            AND sn.value = ${Number.parseFloat(filter.value)}
         `);
       } else if (filter.propertyType === 'datetime') {
         // Datetime: date match on search_datetime

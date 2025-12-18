@@ -42,7 +42,7 @@ describe('SubmissionsListPage', () => {
 
       await waitFor(() => {
         expect(actions.getByText(/biohub bc/i)).toBeVisible();
-        expect(actions.getByPlaceholderText(/search/i)).toBeVisible();
+        expect(actions.getByPlaceholderText(/caribou/i)).toBeVisible();
       });
     });
 
@@ -83,7 +83,7 @@ describe('SubmissionsListPage', () => {
       mockUseApi.search.searchFeatures.mockResolvedValue(mockResults);
       const actions = renderPage();
 
-      const searchInput = actions.getByPlaceholderText(/search/i);
+      const searchInput = actions.getByPlaceholderText(/caribou/i);
       fireEvent.change(searchInput, { target: { value: 'test' } });
 
       await waitFor(
@@ -107,10 +107,10 @@ describe('SubmissionsListPage', () => {
       const actions = renderPage();
 
       await waitFor(() => {
-        expect(actions.getByPlaceholderText(/search/i)).toBeVisible();
+        expect(actions.getByPlaceholderText(/caribou/i)).toBeVisible();
       });
 
-      const searchInput = actions.getByPlaceholderText(/search/i);
+      const searchInput = actions.getByPlaceholderText(/caribou/i);
       fireEvent.change(searchInput, { target: { value: 'ab' } });
 
       // Wait a bit longer than debounce delay to ensure it wouldn't trigger
@@ -124,10 +124,10 @@ describe('SubmissionsListPage', () => {
       const actions = renderPage();
 
       await waitFor(() => {
-        expect(actions.getByPlaceholderText(/search/i)).toBeVisible();
+        expect(actions.getByPlaceholderText(/caribou/i)).toBeVisible();
       });
 
-      const searchInput = actions.getByPlaceholderText(/search/i);
+      const searchInput = actions.getByPlaceholderText(/caribou/i);
       fireEvent.change(searchInput, { target: { value: 'moose' } });
 
       // Wait for debounce to complete
@@ -158,10 +158,10 @@ describe('SubmissionsListPage', () => {
       const actions = renderPage();
 
       await waitFor(() => {
-        expect(actions.getByPlaceholderText(/search/i)).toBeVisible();
+        expect(actions.getByPlaceholderText(/caribou/i)).toBeVisible();
       });
 
-      const searchInput = actions.getByPlaceholderText(/search/i);
+      const searchInput = actions.getByPlaceholderText(/caribou/i);
       fireEvent.change(searchInput, { target: { value: 'moose' } });
 
       await waitFor(
@@ -194,10 +194,10 @@ describe('SubmissionsListPage', () => {
       const actions = renderPage();
 
       await waitFor(() => {
-        expect(actions.getByPlaceholderText(/search/i)).toBeVisible();
+        expect(actions.getByPlaceholderText(/caribou/i)).toBeVisible();
       });
 
-      const searchInput = actions.getByPlaceholderText(/search/i);
+      const searchInput = actions.getByPlaceholderText(/caribou/i);
       fireEvent.change(searchInput, { target: { value: 'sensitive' } });
 
       await waitFor(
@@ -213,10 +213,10 @@ describe('SubmissionsListPage', () => {
       const actions = renderPage();
 
       await waitFor(() => {
-        expect(actions.getByPlaceholderText(/search/i)).toBeVisible();
+        expect(actions.getByPlaceholderText(/caribou/i)).toBeVisible();
       });
 
-      const searchInput = actions.getByPlaceholderText(/search/i);
+      const searchInput = actions.getByPlaceholderText(/caribou/i);
       fireEvent.change(searchInput, { target: { value: 'nonexistent' } });
 
       await waitFor(
@@ -239,7 +239,7 @@ describe('SubmissionsListPage', () => {
       });
 
       // Enter search term
-      const searchInput = actions.getByPlaceholderText(/search/i);
+      const searchInput = actions.getByPlaceholderText(/caribou/i);
       fireEvent.change(searchInput, { target: { value: 'test' } });
 
       await waitFor(
