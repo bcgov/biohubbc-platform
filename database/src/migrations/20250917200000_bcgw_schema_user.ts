@@ -13,12 +13,12 @@ const DB_USER_BCGW = process.env.DB_USER_BCGW;
 export async function up(knex: Knex): Promise<void> {
   await knex.raw(`
     -- set up bcgw schema
-    create schema if not exists bcgw;
+    create schema bcgw;
 
     -- setup bcgw user
-    create user ${DB_USER_BCGW} password '${DB_USER_BCGW_PASS}';
+    create role ${DB_USER_BCGW} login password '${DB_USER_BCGW_PASS}';
     GRANT USAGE ON SCHEMA bcgw TO ${DB_USER_BCGW};
-    alter role ${DB_USER_BCGW} set search_path to "$user", bcgw, public;
+    alter role ${DB_USER_BCGW} set search_path to bcgw;
 
     -- alter default privileges for the schema owner so that bcgw user is granted access to all future tables, views, and materialized views
     ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER IN SCHEMA bcgw
