@@ -24,7 +24,6 @@ interface FeatureRow {
 interface SecurityReviewFeaturesTableProps {
   rows: FeatureRow[];
   rowCount: number;
-  selectionModel: GridRowSelectionModel;
   onSelectionChange: (model: GridRowSelectionModel) => void;
   paginationModel: GridPaginationModel;
   setPaginationModel: (model: GridPaginationModel) => void;
@@ -39,7 +38,6 @@ const pageSizeOptions = [10, 25, 50];
 export const SecurityReviewFeaturesTable = ({
   rows,
   rowCount,
-  selectionModel,
   onSelectionChange,
   paginationModel,
   setPaginationModel,
@@ -78,7 +76,6 @@ export const SecurityReviewFeaturesTable = ({
       rows={rows}
       columns={columns}
       checkboxSelection
-      rowSelectionModel={selectionModel}
       onRowSelectionModelChange={onSelectionChange}
       paginationMode="server"
       paginationModel={paginationModel}

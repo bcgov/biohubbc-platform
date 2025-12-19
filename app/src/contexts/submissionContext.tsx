@@ -55,7 +55,7 @@ export const SubmissionContextProvider = ({ children }: PropsWithChildren) => {
 
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
     page: 0,
-    pageSize: 25
+    pageSize: 10
   });
 
   const [sortModel, setSortModel] = useState<GridSortModel>([

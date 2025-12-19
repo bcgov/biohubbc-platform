@@ -1,5 +1,6 @@
 import { Typography } from '@mui/material';
 import { Box, Stack } from '@mui/system';
+import { GridRowSelectionModel } from '@mui/x-data-grid';
 import { SecurityReviewFeaturesTable } from './table/SecurityReviewFeaturesTable';
 
 interface FeatureRow {
@@ -35,6 +36,10 @@ export const SecurityReviewFeatures = ({
   onRowClick,
   onRowSecurityClick
 }: SecurityReviewFeaturesProps) => {
+  const handleSelectionChange = (newSelection: GridRowSelectionModel) => {
+    setSelectedFeatureIds(new Set([...newSelection.ids].map(Number)));
+  };
+
   return (
     <Stack gap={2} py={2}>
       <Box px={2}>
@@ -49,8 +54,7 @@ export const SecurityReviewFeatures = ({
       <SecurityReviewFeaturesTable
         rows={rows}
         rowCount={rowCount}
-        selectionModel={{ type: 'include', ids: selectedFeatureIds }}
-        onSelectionChange={(newModel) => setSelectedFeatureIds(new Set([...newModel.ids].map(Number)))}
+        onSelectionChange={handleSelectionChange}
         paginationModel={paginationModel}
         setPaginationModel={setPaginationModel}
         sortModel={sortModel}

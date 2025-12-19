@@ -64,7 +64,9 @@ export const ensureCompletePaginationOptions = (
   if (pagination.limit !== undefined && pagination.page !== undefined) {
     return {
       limit: pagination.limit,
-      page: pagination.page
+      page: pagination.page,
+      order: pagination.order,
+      sort: pagination.sort
     };
   }
 
