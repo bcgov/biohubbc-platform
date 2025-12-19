@@ -280,7 +280,7 @@ const SubmissionsListPage = () => {
             <Typography mb={1} variant="h1" sx={{ color: '#013366' }}>
               BioHub BC
             </Typography>
-            <Typography variant="body1" color="textSecondary">
+            <Typography color="textSecondary">
               Open access to British Columbia's terrestrial, aquatic species and habitat inventory data.
             </Typography>
           </Box>

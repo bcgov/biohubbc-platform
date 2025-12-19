@@ -6,7 +6,7 @@ import Divider from '@mui/material/Divider';
 import InputAdornment from '@mui/material/InputAdornment';
 import InputBase from '@mui/material/InputBase';
 import Typography from '@mui/material/Typography';
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import FilterCheckbox from './FilterCheckbox';
 import FilterGroup from './FilterGroup';
 import { ActiveFilter, FilterGroup as FilterGroupType, FilterProperty, IFilterSidebarProps } from './types';
@@ -28,7 +28,7 @@ interface PopularFilter extends FilterProperty {
  * @param {IFilterSidebarProps} props
  * @returns {JSX.Element}
  */
-export const FilterSidebar = (props: IFilterSidebarProps) => {
+export const FilterSidebar = memo((props: IFilterSidebarProps) => {
   const { filterGroups, activeFilters, onFiltersChange } = props;
   const styles = useSearchFilterStyles();
 
@@ -212,6 +212,6 @@ export const FilterSidebar = (props: IFilterSidebarProps) => {
       )}
     </Box>
   );
-};
+});
 
 export default FilterSidebar;
