@@ -21,14 +21,30 @@ const useUserApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Get user details for the currently authenticated user.
+   * Upsert the currently authenticated user.
+   *
+   * Creates user with Member role if not found (returns 201),
+   * updates profile fields if user exists and is active (returns 200),
+   * or throws 401 if user is expired/inactive.
    *
    * @return {*}  {Promise<ISystemUser>}
    */
-  const getUser = async (): Promise<ISystemUser> => {
-    const { data } = await axios.get('/api/user/self');
+  const upsertUser = async (): Promise<ISystemUser> => {
+    const { data } = await axios.put('/api/user/self');
 
     return data;
+  };
+
+  /**
+   * Get the current user, registering them if they don't exist.
+   *
+   * Uses PUT endpoint to upsert user - creates if not found, updates if exists.
+   * Throws 401 if user is expired/inactive.
+   *
+   * @return {*}  {Promise<ISystemUser>}
+   */
+  const getOrRegisterUser = async (): Promise<ISystemUser> => {
+    return upsertUser();
   };
 
   /**
@@ -90,7 +106,8 @@ const useUserApi = (axios: AxiosInstance) => {
 
   return {
     getRoles,
-    getUser,
+    upsertUser,
+    getOrRegisterUser,
     getUserById,
     getUsersList,
     deleteSystemUser,

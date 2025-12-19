@@ -43,7 +43,13 @@ describe('updateSystemRolesHandler', () => {
       update_date: null,
       revision_count: 0,
       role_ids: [11, 22],
-      role_names: ['role 11', 'role 22']
+      role_names: ['role 11', 'role 22'],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null
     });
 
     sinon.stub(UserService.prototype, 'deleteUserSystemRoles').rejects(new Error('a delete error'));
@@ -97,7 +103,13 @@ describe('updateSystemRolesHandler', () => {
       update_date: null,
       revision_count: 0,
       role_ids: [11, 22],
-      role_names: ['role 11', 'role 22']
+      role_names: ['role 11', 'role 22'],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null
     });
 
     sinon.stub(UserService.prototype, 'deleteUserSystemRoles').resolves();
@@ -141,7 +153,13 @@ describe('updateSystemRolesHandler', () => {
       update_date: null,
       revision_count: 0,
       role_ids: [11, 22],
-      role_names: ['role 1', 'role 2']
+      role_names: ['role 1', 'role 2'],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null
     });
 
     const deleteUserSystemRolesStub = sinon.stub(UserService.prototype, 'deleteUserSystemRoles').resolves();
@@ -192,7 +210,13 @@ describe('updateSystemRolesHandler', () => {
       update_date: null,
       revision_count: 0,
       role_ids: [],
-      role_names: []
+      role_names: [],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null
     });
 
     const deleteUserSystemRolesStub = sinon.stub(UserService.prototype, 'deleteUserSystemRoles').resolves();

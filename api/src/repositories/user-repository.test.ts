@@ -391,4 +391,98 @@ describe('UserRepository', () => {
       expect(response).to.equal(undefined);
     });
   });
+
+  describe('updateSystemUserProfile', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when update fails', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const userRepository = new UserRepository(mockDBConnection);
+
+      try {
+        await userRepository.updateSystemUserProfile(1, 'Display Name', 'email@test.com', 'Given', 'Family', 'Agency');
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiExecuteSQLError).message).to.equal('Failed to update system user profile');
+      }
+    });
+
+    it('should update user profile', async () => {
+      const mockResponse = [
+        {
+          system_user_id: 1,
+          user_identity_source_id: 1,
+          user_identifier: 'user',
+          user_guid: '123-456-789',
+          record_end_date: null,
+          record_effective_date: 'date',
+          display_name: 'Display Name',
+          email: 'email@test.com',
+          given_name: 'Given',
+          family_name: 'Family',
+          agency: 'Agency'
+        }
+      ];
+      const mockQueryResponse = { rowCount: 1, rows: mockResponse } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const userRepository = new UserRepository(mockDBConnection);
+
+      const response = await userRepository.updateSystemUserProfile(
+        1,
+        'Display Name',
+        'email@test.com',
+        'Given',
+        'Family',
+        'Agency'
+      );
+
+      expect(response).to.equal(undefined);
+    });
+
+    it('should update user profile with null values', async () => {
+      const mockResponse = [
+        {
+          system_user_id: 1,
+          user_identity_source_id: 1,
+          user_identifier: 'user',
+          user_guid: '123-456-789',
+          record_end_date: null,
+          record_effective_date: 'date',
+          display_name: null,
+          email: null,
+          given_name: null,
+          family_name: null,
+          agency: null
+        }
+      ];
+      const mockQueryResponse = { rowCount: 1, rows: mockResponse } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const userRepository = new UserRepository(mockDBConnection);
+
+      const response = await userRepository.updateSystemUserProfile(1, null, null, null, null, null);
+
+      expect(response).to.equal(undefined);
+    });
+  });
 });
