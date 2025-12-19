@@ -13,9 +13,9 @@ interface IManageSecurityProps {
 }
 
 const ManageSecurity = (props: IManageSecurityProps) => {
-  const { submissionFeaturesAppliedRulesDataLoader } = useSubmissionContext();
+  const { securityDataLoader } = useSubmissionContext();
 
-  const hasSecurity = Boolean(submissionFeaturesAppliedRulesDataLoader.data?.length);
+  const hasSecurity = Boolean(securityDataLoader.data?.rules.length);
 
   const [isSecuritiesDialogOpen, setIsSecuritiesDialogOpen] = useState(false);
 

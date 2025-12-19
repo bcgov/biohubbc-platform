@@ -1560,8 +1560,8 @@ describe('SubmissionRepository', () => {
 
   describe('getSubmissionFeaturesCount', () => {
     it('should return the correct submission feature count', async () => {
-      const mockResponse = { rows: [{ count: 42 }], rowCount: 1 } as any;
-      const dbConnection = getMockDBConnection({ sql: () => mockResponse });
+      const mockQueryResponse = { rows: [{ count: 42 }], rowCount: 1 } as any;
+      const dbConnection = getMockDBConnection({ knex: () => mockQueryResponse });
 
       const repository = new SubmissionRepository(dbConnection);
 
@@ -1571,8 +1571,8 @@ describe('SubmissionRepository', () => {
     });
 
     it('should throw an error when count query fails', async () => {
-      const mockResponse = { rows: [], rowCount: 0 } as any;
-      const dbConnection = getMockDBConnection({ sql: () => mockResponse });
+      const mockQueryResponse = { rows: [], rowCount: 0 } as any;
+      const dbConnection = getMockDBConnection({ knex: () => mockQueryResponse });
 
       const repository = new SubmissionRepository(dbConnection);
 
@@ -1582,38 +1582,6 @@ describe('SubmissionRepository', () => {
       } catch (error) {
         expect((error as ApiExecuteSQLError).message).to.equal('Failed to get submission feature count');
       }
-    });
-  });
-
-  describe('_getSubmissionFeaturesBaseQuery', () => {
-    it('should return the correct query for submission features', async () => {
-      const submissionId = 123;
-      const knex = sinon.stub();
-
-      // Mock the SQL query with necessary joins
-      const baseQuery = knex('submission_feature')
-        .select(
-          'submission_feature.*',
-          'feature_type.name as feature_type_name',
-          'feature_type.display_name as feature_type_display_name'
-        )
-        .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id')
-        .leftJoin(
-          'submission_feature_security',
-          'submission_feature_security.submission_feature_id',
-          'submission_feature.submission_feature_id'
-        )
-        .where('submission_id', submissionId)
-        .groupBy(
-          'submission_feature.submission_feature_id',
-          'feature_type.name',
-          'feature_type.display_name',
-          'feature_type.sort'
-        );
-
-      expect(baseQuery.toSQL().sql).to.include('from "submission_feature"');
-      expect(baseQuery.toSQL().sql).to.include('left join "feature_type"');
-      expect(baseQuery.toSQL().sql).to.include('left join "submission_feature_security"');
     });
   });
 });

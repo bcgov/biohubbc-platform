@@ -5,10 +5,14 @@ import { GridRowParams } from '@mui/x-data-grid';
 import BaseHeader from 'components/layout/header/BaseHeader';
 import SecuritiesDialog from 'components/security/SecuritiesDialog';
 import { useSubmissionContext } from 'hooks/useContext';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import SubmissionHeaderSecurityStatus from './components/SubmissionHeaderSecurityStatus';
 import { SubmissionHeaderToolbar } from './components/SubmissionHeaderToolbar';
 import { SecurityReviewFeatures } from './features/SecurityReviewFeatures';
+
+/* ------------------------------------------------------------------ */
+/* Types                                                              */
+/* ------------------------------------------------------------------ */
 
 interface FeatureRow {
   id: number;
@@ -18,25 +22,37 @@ interface FeatureRow {
   secured: boolean;
 }
 
-/**
- * Admin page for applying security rules to features in a submission
- *
- * @returns {*}
- */
-export const AdminSubmissionPage = () => {
-  const submissionContext = useSubmissionContext();
-  const submission = submissionContext.submissionRecordDataLoader.data;
+/* ------------------------------------------------------------------ */
+/* Component                                                          */
+/* ------------------------------------------------------------------ */
 
-  // Multi-row selection in the table
+export const AdminSubmissionPage = () => {
+  const {
+    submissionId,
+    submissionDataLoader,
+    featureDataLoader,
+    paginationModel,
+    setPaginationModel,
+    sortModel,
+    setSortModel,
+    featuresPagination
+  } = useSubmissionContext();
+
+  const submission = submissionDataLoader.data;
+
+  /* ---------------- Selection State ---------------- */
+
   const [selectedFeatureIds, setSelectedFeatureIds] = useState<Set<number>>(new Set());
 
-  // Security dialog target (can be single or multiple rows)
   const [dialogFeatureIds, setDialogFeatureIds] = useState<Set<number>>(new Set());
-  const [manageSecurityOpen, setManageSecurityOpen] = useState(false);
+
+  const [isSecurityDialogOpen, setIsSecurityDialogOpen] = useState(false);
+
+  /* ---------------- Derived Data ---------------- */
 
   const rows: FeatureRow[] = useMemo(() => {
     return (
-      submissionContext.submissionFeaturesDataLoader.data?.features.map((feature) => ({
+      featureDataLoader.data?.features.map((feature) => ({
         id: feature.submission_feature_id,
         submission_feature_id: feature.submission_feature_id,
         feature_type_display_name: feature.feature_type_name,
@@ -44,69 +60,73 @@ export const AdminSubmissionPage = () => {
         secured: feature.secured
       })) ?? []
     );
-  }, [submissionContext.submissionFeaturesDataLoader.data]);
+  }, [featureDataLoader.data]);
 
-  const rowCount = submissionContext.submissionFeaturesDataLoader.data?.pagination.total ?? 0;
+  const rowCount = featureDataLoader.data?.pagination.total ?? 0;
 
-  // Handle multi-row selection
-  const handleRowClick = (params: GridRowParams<FeatureRow>) => {
+  /* ---------------- Handlers ---------------- */
+
+  const toggleRowSelection = useCallback((params: GridRowParams<FeatureRow>) => {
     const id = params.id as number;
-    const newSet = new Set(selectedFeatureIds);
 
-    if (newSet.has(id)) {
-      newSet.delete(id);
-    } else {
-      newSet.add(id);
-    }
+    setSelectedFeatureIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
 
-    setSelectedFeatureIds(newSet);
-  };
+  const openSecurityDialog = useCallback((featureIds: Set<number>) => {
+    setDialogFeatureIds(featureIds);
+    setIsSecurityDialogOpen(true);
+  }, []);
 
-  // Open security dialog for a single row
-  const onRowSecurityClick = (row: FeatureRow) => {
-    setDialogFeatureIds(new Set([row.submission_feature_id]));
-    setManageSecurityOpen(true);
-  };
+  const openSingleRowSecurity = useCallback(
+    (row: FeatureRow) => {
+      openSecurityDialog(new Set([row.submission_feature_id]));
+    },
+    [openSecurityDialog]
+  );
 
-  const handleCloseManageSecurity = () => {
-    setManageSecurityOpen(false);
-  };
+  const openBulkSecurity = useCallback(() => {
+    openSecurityDialog(new Set(selectedFeatureIds));
+  }, [openSecurityDialog, selectedFeatureIds]);
 
-  const handleRefresh = () => {
-    submissionContext.submissionRecordDataLoader.refresh(submissionContext.submissionId);
-    submissionContext.submissionFeaturesDataLoader.refresh(
-      submissionContext.submissionId,
-      submissionContext.featuresPagination
-    );
-  };
+  const closeSecurityDialog = useCallback(() => {
+    setIsSecurityDialogOpen(false);
+  }, []);
 
-  const handleSecurityChange = () => {
-    handleRefresh();
-    setManageSecurityOpen(false);
-  };
+  const refreshFeatures = useCallback(() => {
+    featureDataLoader.refresh(submissionId, featuresPagination);
+  }, [featureDataLoader, submissionId, featuresPagination]);
+
+  const handleSecurityChange = useCallback(() => {
+    refreshFeatures();
+    closeSecurityDialog();
+  }, [refreshFeatures, closeSecurityDialog]);
+
+  /* ---------------- Guard ---------------- */
 
   if (!submission) {
-    return <></>;
+    return null;
   }
+
+  /* ---------------- Render ---------------- */
 
   return (
     <>
       <BaseHeader
         title={submission.name}
         subTitle={
-          <Stack flexDirection="row" alignItems="center" gap={0.25} mt={1} mb={0.25}>
+          <Stack direction="row" alignItems="center" gap={0.25} mt={1} mb={0.25}>
             <SubmissionHeaderSecurityStatus submission={submission} />
           </Stack>
         }
         buttonJSX={
           <SubmissionHeaderToolbar
             submission={submission}
-            onSecurityClick={() => {
-              // Open dialog for all currently selected rows
-              setDialogFeatureIds(new Set(selectedFeatureIds));
-              setManageSecurityOpen(true);
-            }}
-            onSubmissionStageChange={handleRefresh}
+            onSecurityClick={openBulkSecurity}
+            onSubmissionStageChange={refreshFeatures}
           />
         }
       />
@@ -118,22 +138,21 @@ export const AdminSubmissionPage = () => {
             rowCount={rowCount}
             selectedFeatureIds={selectedFeatureIds}
             setSelectedFeatureIds={setSelectedFeatureIds}
-            paginationModel={submissionContext.paginationModel}
-            setPaginationModel={submissionContext.setPaginationModel}
-            sortModel={submissionContext.sortModel}
-            setSortModel={submissionContext.setSortModel}
-            onRowClick={handleRowClick}
-            onRowSecurityClick={onRowSecurityClick}
+            paginationModel={paginationModel}
+            setPaginationModel={setPaginationModel}
+            sortModel={sortModel}
+            setSortModel={setSortModel}
+            onRowClick={toggleRowSelection}
+            onRowSecurityClick={openSingleRowSecurity}
           />
         </Paper>
       </Container>
 
-      {/* Centralized security dialog */}
-      {manageSecurityOpen && (
+      {isSecurityDialogOpen && (
         <SecuritiesDialog
+          open={isSecurityDialogOpen}
           submissionFeatureIds={{ ids: dialogFeatureIds }}
-          open={manageSecurityOpen}
-          onClose={handleCloseManageSecurity}
+          onClose={closeSecurityDialog}
           onSubmit={handleSecurityChange}
         />
       )}

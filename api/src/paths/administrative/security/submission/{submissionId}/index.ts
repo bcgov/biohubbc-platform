@@ -3,6 +3,7 @@ import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
+import { SubmissionFeatureSecuritySummarySchema } from '../../../../../openapi/schemas/security';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
 import { SecurityService } from '../../../../../services/security-service';
 import { getLogger } from '../../../../../utils/logger';
@@ -21,7 +22,7 @@ export const GET: Operation = [
       }
     ]
   })),
-  getAllSecurityRulesForSubmission()
+  getSubmissionFeatureSecuritySummary()
 ];
 
 GET.apiDoc = {
@@ -35,6 +36,12 @@ GET.apiDoc = {
       name: 'submissionId',
       schema: { type: 'integer', minimum: 1 },
       required: true
+    },
+    {
+      description: 'Submission Feature IDs to get rules for',
+      in: 'query',
+      name: 'submissionFeatureIds',
+      schema: { type: 'array', items: { type: 'number' } }
     }
   ],
   responses: {
@@ -42,7 +49,7 @@ GET.apiDoc = {
       description: 'Security rules for all submission features',
       content: {
         'application/json': {
-          schema: { type: 'array', items: { type: 'object' } }
+          schema: SubmissionFeatureSecuritySummarySchema
         }
       }
     },
@@ -50,7 +57,7 @@ GET.apiDoc = {
   }
 };
 
-export function getAllSecurityRulesForSubmission(): RequestHandler {
+export function getSubmissionFeatureSecuritySummary(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
     const securityService = new SecurityService(connection);
@@ -59,12 +66,14 @@ export function getAllSecurityRulesForSubmission(): RequestHandler {
       await connection.open();
 
       const submissionId = Number(req.params.submissionId);
-      const data = await securityService.getAllSecurityRulesForSubmission(submissionId);
+      const submissionFeatureIds = (req.query?.submissionFeatureIds as string[] | undefined)?.map(Number);
+
+      const rules = await securityService.getSubmissionFeatureSecuritySummary(submissionId, submissionFeatureIds);
 
       await connection.commit();
-      return res.status(200).json(data);
+      return res.status(200).json(rules);
     } catch (error) {
-      defaultLog.error({ label: 'getAllSecurityRulesForSubmission', message: 'error', error });
+      defaultLog.error({ label: 'getSubmissionFeatureSecuritySummary', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

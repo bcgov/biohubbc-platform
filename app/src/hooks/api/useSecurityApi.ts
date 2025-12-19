@@ -2,8 +2,10 @@ import { AxiosInstance } from 'axios';
 import {
   IListPersecutionHarmResponse,
   IPatchFeatureSecurityRules,
-  ISecureDataAccessRequestForm
+  ISecureDataAccessRequestForm,
+  ISubmissionFeatureSecurityRulesSummaryResponse
 } from 'interfaces/useSecurityApi.interface';
+import qs from 'qs';
 
 export interface ISecurityRule {
   security_rule_id: number;
@@ -30,12 +32,6 @@ export interface ISecurityRuleAndCategory {
   category_description: string;
   category_record_effective_date: string;
   category_record_end_date: string;
-}
-
-export interface ISubmissionFeatureSecurityRecord {
-  submission_feature_security_id: number;
-  submission_feature_id: number;
-  security_rule_id: number;
 }
 
 /**
@@ -140,13 +136,20 @@ const useSecurityApi = (axios: AxiosInstance) => {
   /**
    * Retrieves the list of all security rule IDs associated with the features belonging to the given submission.
    *
-   * @param {number[]} features
-   * @return {*}  {Promise<ISubmissionFeatureSecurityRecord[]>}
+   * @param {number} submissionId
+   * @param {number[]} submissionFeatureIds
+   * @return {Promise<ISubmissionFeatureSecurityRulesSummaryResponse[]>}
    */
-  const getAllSecurityRulesForSubmission = async (
-    submissionId: number
-  ): Promise<ISubmissionFeatureSecurityRecord[]> => {
-    const { data } = await axios.get(`api/administrative/security/submission/${submissionId}`);
+  const getSubmissionFeatureSecuritySummary = async (
+    submissionId: number,
+    submissionFeatureIds?: number[]
+  ): Promise<ISubmissionFeatureSecurityRulesSummaryResponse> => {
+    const { data } = await axios.get(`api/administrative/security/submission/${submissionId}`, {
+      params: {
+        submissionFeatureIds
+      },
+      paramsSerializer: (params) => qs.stringify(params, { arrayFormat: 'repeat' })
+    });
 
     return data;
   };
@@ -157,7 +160,7 @@ const useSecurityApi = (axios: AxiosInstance) => {
     listPersecutionHarmRules,
     applySecurityReasonsToArtifacts,
     patchSecurityRulesOnSubmissionFeatures,
-    getAllSecurityRulesForSubmission,
+    getSubmissionFeatureSecuritySummary,
     getActiveSecurityRulesWithCategories
   };
 };

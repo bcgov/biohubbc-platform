@@ -1803,7 +1803,7 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.knex(countQuery, z.object({ count: z.number() }));
 
     if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to get submission features count', [
+      throw new ApiExecuteSQLError('Failed to get submission feature count', [
         'SubmissionRepository->getSubmissionFeaturesCount',
         'rowCount was null or undefined, expected rowCount != 0'
       ]);

@@ -8,7 +8,8 @@ import {
   SecurityRuleAndCategory,
   SecurityRuleRecord,
   SECURITY_APPLIED_STATUS,
-  SubmissionFeatureSecurityRecord
+  SubmissionFeatureSecurityRecord,
+  SubmissionFeatureSecurityRulesSummary
 } from '../repositories/security-repository';
 import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
@@ -441,11 +442,15 @@ export class SecurityService extends DBService {
    * Gets all Security Records for all featues belonging to the given submission.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<SecurityRuleRecord[]>}
+   * @param {number[]} submissionFeatureIds
+   * @return {*}  {Promise<SubmissionFeatureSecurityRulesSummary>}
    * @memberof SecurityService
    */
-  async getAllSecurityRulesForSubmission(submissionId: number): Promise<SubmissionFeatureSecurityRecord[]> {
-    return this.securityRepository.getAllSecurityRulesForSubmission(submissionId);
+  async getSubmissionFeatureSecuritySummary(
+    submissionId: number,
+    submissionFeatureIds?: number[]
+  ): Promise<SubmissionFeatureSecurityRulesSummary> {
+    return this.securityRepository.getSubmissionFeatureSecuritySummary(submissionId, submissionFeatureIds);
   }
 
   /**
