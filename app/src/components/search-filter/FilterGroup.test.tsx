@@ -181,7 +181,7 @@ describe('FilterGroup', () => {
   });
 
   it('calls onAddFilter when a filter checkbox value is confirmed', async () => {
-    const { getByText, getAllByRole, getByPlaceholderText, getByLabelText } = render(
+    const { getAllByRole, getByPlaceholderText, getByLabelText } = render(
       <FilterGroup {...defaultProps} defaultExpanded={true} />
     );
 

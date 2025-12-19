@@ -258,7 +258,7 @@ describe('FilterSidebar', () => {
       }
     ];
 
-    const { getByText, getAllByRole, getByPlaceholderText, getByLabelText } = render(
+    const { getAllByRole } = render(
       <FilterSidebar {...defaultProps} filterGroups={groupsWithPopular} activeFilters={activeFilters} />
     );
 
