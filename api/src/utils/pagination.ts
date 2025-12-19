@@ -60,8 +60,12 @@ export const makePaginationResponse = (
 export const ensureCompletePaginationOptions = (
   pagination: Partial<ApiPaginationOptions>
 ): ApiPaginationOptions | undefined => {
+  // Type guard: ensures both properties exist
   if (pagination.limit !== undefined && pagination.page !== undefined) {
-    return pagination as ApiPaginationOptions;
+    return {
+      limit: pagination.limit,
+      page: pagination.page
+    };
   }
 
   return undefined;

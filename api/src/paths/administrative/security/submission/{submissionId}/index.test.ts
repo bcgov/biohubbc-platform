@@ -149,7 +149,7 @@ describe('patchSecurityRulesOnSubmission', () => {
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(patchSecurityStub).to.have.been.calledOnceWith(4, [], []);
+    expect(patchSecurityStub).to.have.been.calledOnceWith(4, []);
     expect(mockRes.statusValue).to.equal(204);
   });
 });

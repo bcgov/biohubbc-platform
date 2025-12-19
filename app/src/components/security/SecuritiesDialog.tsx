@@ -69,6 +69,10 @@ const SecuritiesDialog = ({ submissionFeatureIds, open, onSubmit, onClose }: ISe
     };
   }, [securityDataLoader.data?.rules, allSecurityRulesDataLoader.data]);
 
+  const clearSecurityDataLoader = () => {
+    securityDataLoader.setData({ rules: [] });
+  };
+
   // Save staged changes from Formik values
   const handleSave = async (values: ISecurityFormValues) => {
     try {
@@ -106,6 +110,7 @@ const SecuritiesDialog = ({ submissionFeatureIds, open, onSubmit, onClose }: ISe
       });
     } finally {
       setIsSaving(false);
+      clearSecurityDataLoader();
     }
   };
 
@@ -115,7 +120,10 @@ const SecuritiesDialog = ({ submissionFeatureIds, open, onSubmit, onClose }: ISe
       isLoading={isSaving}
       dialogTitle={hasSecurity ? 'Edit Security' : 'Add Security'}
       dialogSaveButtonLabel="APPLY"
-      onCancel={onClose}
+      onCancel={() => {
+        onClose();
+        clearSecurityDataLoader();
+      }}
       onSave={handleSave}
       component={{
         element: (

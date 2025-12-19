@@ -59,7 +59,7 @@ export const SecurityRuleForm = ({ options, isLoading }: SecurityRuleFormProps) 
             stringify: (option) => option.name + option.category_name
           })(options, state)
         }
-        onInputChange={(_, value, reason) => setSearchText(reason !== 'input' ? '' : value)}
+        onInputChange={(_, value, reason) => setSearchText(reason === 'input' ? value : '')}
         onChange={(_, rule) => rule && handleAddRule(rule)}
         renderInput={(params) => (
           <TextField

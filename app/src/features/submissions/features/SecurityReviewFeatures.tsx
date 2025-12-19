@@ -50,7 +50,7 @@ export const SecurityReviewFeatures = ({
         rows={rows}
         rowCount={rowCount}
         selectionModel={{ type: 'include', ids: selectedFeatureIds }}
-        onSelectionChange={(newModel) => setSelectedFeatureIds(new Set([...newModel.ids].map((id) => Number(id))))}
+        onSelectionChange={(newModel) => setSelectedFeatureIds(new Set([...newModel.ids].map(Number)))}
         paginationModel={paginationModel}
         setPaginationModel={setPaginationModel}
         sortModel={sortModel}
