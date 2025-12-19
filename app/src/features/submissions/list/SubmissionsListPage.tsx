@@ -203,6 +203,59 @@ const SubmissionsListPage = () => {
     downloadJSON(data, fileName);
   };
 
+  /**
+   * Renders the appropriate content based on loading and search state.
+   */
+  const renderSearchContent = () => {
+    if (searchDataLoader.isLoading) {
+      return (
+        <>
+          <RecordsFoundSkeletonLoader />
+          <SubmissionCardSkeletonLoader />
+        </>
+      );
+    }
+
+    if (isSearching) {
+      return (
+        <>
+          <Box pb={4}>
+            <Typography variant="h4" component="h2">
+              {`${searchResults.length} ${p(searchResults.length, 'feature')} found`}
+            </Typography>
+            {searchResults.length > 0 && (
+              <Typography variant="body2" color="textSecondary" mt={1}>
+                Results are sorted by relevancy.
+              </Typography>
+            )}
+          </Box>
+          <SearchResultsList
+            results={searchResults}
+            onDownload={onDownloadFeature}
+            onAccessRequest={() => setOpenRequestAccess(true)}
+          />
+        </>
+      );
+    }
+
+    return (
+      <Box
+        display="flex"
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+        py={8}
+        color="textSecondary">
+        <Typography variant="h5" color="textSecondary" gutterBottom>
+          Search to find data
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          Enter keywords, add filters, or both to discover data
+        </Typography>
+      </Box>
+    );
+  };
+
   return (
     <>
       <SecureDataAccessRequestDialog
@@ -263,48 +316,7 @@ const SubmissionsListPage = () => {
                 </Box>
               )}
             </Box>
-            {searchDataLoader.isLoading ? (
-              // Loading state while searching
-              <>
-                <RecordsFoundSkeletonLoader />
-                <SubmissionCardSkeletonLoader />
-              </>
-            ) : isSearching ? (
-              // Search results view (feature-level)
-              <>
-                <Box pb={4}>
-                  <Typography variant="h4" component="h2">
-                    {`${searchResults.length} ${p(searchResults.length, 'feature')} found`}
-                  </Typography>
-                  {searchResults.length > 0 && (
-                    <Typography variant="body2" color="textSecondary" mt={1}>
-                      Results are sorted by relevancy.
-                    </Typography>
-                  )}
-                </Box>
-                <SearchResultsList
-                  results={searchResults}
-                  onDownload={onDownloadFeature}
-                  onAccessRequest={() => setOpenRequestAccess(true)}
-                />
-              </>
-            ) : (
-              // Initial empty state - prompt to search
-              <Box
-                display="flex"
-                flexDirection="column"
-                alignItems="center"
-                justifyContent="center"
-                py={8}
-                color="textSecondary">
-                <Typography variant="h5" color="textSecondary" gutterBottom>
-                  Search to find data
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  Enter keywords, add filters, or both to discover data
-                </Typography>
-              </Box>
-            )}
+            {renderSearchContent()}
           </Box>
         </Box>
       </Box>
