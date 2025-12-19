@@ -185,14 +185,21 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
   };
 
   // Build validation context from autocomplete context
-  const validationContext: IValidationContext = useMemo(
-    () => ({
-      submissions: policyAutocompleteContext.submissionsDataLoader.data || [],
+  const previousCacheSizeRef = useRef(0);
+  const validationContext: IValidationContext = useMemo(() => {
+    const currentCacheSize = policyAutocompleteContext.submissionFeaturesCache.size;
+    previousCacheSizeRef.current = currentCacheSize;
+
+    return {
+      submissions: policyAutocompleteContext.submissionsDataLoader.data ?? [],
       featureTypes: policyAutocompleteContext.featureTypes,
       submissionFeaturesCache: policyAutocompleteContext.submissionFeaturesCache
-    }),
-    [policyAutocompleteContext]
-  );
+    };
+  }, [
+    policyAutocompleteContext.submissionsDataLoader.data,
+    policyAutocompleteContext.featureTypes,
+    policyAutocompleteContext.submissionFeaturesCache
+  ]);
 
   // Run validation and set markers
   const runValidation = useCallback(() => {
