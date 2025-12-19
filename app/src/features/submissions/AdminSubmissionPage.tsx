@@ -131,7 +131,6 @@ export const AdminSubmissionPage = () => {
       {/* Centralized security dialog */}
       {manageSecurityOpen && (
         <SecuritiesDialog
-          submissionId={submission.submission_id}
           submissionFeatureIds={{ ids: dialogFeatureIds }}
           open={manageSecurityOpen}
           onClose={handleCloseManageSecurity}

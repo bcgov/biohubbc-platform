@@ -361,25 +361,36 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Applies all active security rules to all features of a submission.
+   * Patches security rules applied or removed for all features of a submission.
+   * If a rule exists in both applyRuleIds and removeRuleIds, it will always be applied.
    *
    * @param {number} submissionId
+   * @param {number[]} applyRuleIds IDs of rules to apply
+   * @param {number[]} removeRuleIds IDs of rules to remove
    * @return {Promise<void>}
    * @memberof SecurityService
    */
-  async applySecurityToSubmission(submissionId: number): Promise<void> {
-    defaultLog.debug({ label: 'applySecurityToSubmission', submissionId });
+  async patchSecurityRulesOnSubmission(
+    submissionId: number,
+    applyRuleIds: number[],
+    removeRuleIds: number[]
+  ): Promise<void> {
+    defaultLog.debug({
+      label: 'patchSecurityRulesOnSubmission',
+      submissionId,
+      applyRuleIds,
+      removeRuleIds
+    });
 
-    // Get all active security rules
-    const securityRules = await this.securityRepository.getAllActiveSecurityRules();
-    const securityRuleIds = securityRules.map((r) => r.security_rule_id);
-
-    if (!securityRuleIds.length) {
-      defaultLog.info({ label: 'applySecurityToSubmission', message: 'No active rules to apply.' });
-      return;
+    // Remove rules first
+    if (removeRuleIds?.length) {
+      await this.securityRepository.removeSecurityFromSubmission(submissionId, removeRuleIds);
     }
 
-    await this.securityRepository.applySecurityToSubmission(submissionId, securityRuleIds);
+    // Apply rules last (wins if overlap exists)
+    if (applyRuleIds?.length) {
+      await this.securityRepository.applySecurityToSubmission(submissionId, applyRuleIds);
+    }
   }
 
   /**

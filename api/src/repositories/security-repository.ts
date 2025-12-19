@@ -360,8 +360,6 @@ export class SecurityRepository extends BaseRepository {
     submissionFeatureIds: number[],
     securityRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    defaultLog.debug({ label: 'applySecurityRulesToSubmissionFeatures', submissionFeatureIds, securityRuleIds });
-
     const queryValues = submissionFeatureIds.flatMap((submissionFeatureId) => {
       return securityRuleIds.flatMap((securityRuleId) => `(${submissionFeatureId}, ${securityRuleId}, 'NOW()')`);
     });
@@ -393,29 +391,55 @@ export class SecurityRepository extends BaseRepository {
     submissionId: number,
     securityRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    defaultLog.debug({ label: 'applySecurityToSubmission', submissionId, securityRuleIds });
+    const placeholders = securityRuleIds.map((_, i) => `($${i + 1}::int)`).join(', ');
+    const submissionIdPlaceholder = `$${securityRuleIds.length + 1}`;
 
-    if (!securityRuleIds.length) {
-      defaultLog.info({ label: 'applySecurityToSubmission', message: 'No rules to apply.' });
-      return [];
-    }
+    const sql = `
+      INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date)
+      SELECT sf.submission_feature_id, r.security_rule_id, NOW()
+      FROM submission_feature sf
+      CROSS JOIN (VALUES ${placeholders}) AS r(security_rule_id)
+      WHERE sf.submission_id = ${submissionIdPlaceholder}
+      ON CONFLICT (submission_feature_id, security_rule_id) DO NOTHING
+      RETURNING *;
+    `;
 
-    // Build SQL to join submission → features and insert all rules
-    const queryValues = securityRuleIds
-      .map((securityRuleId) => `(sf.submission_feature_id, ${securityRuleId}, NOW())`)
-      .join(', ');
-
-    const insertSQL = SQL`
-    INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date)
-    SELECT sf.submission_feature_id, r.security_rule_id, NOW()
-    FROM submission_feature sf
-    CROSS JOIN (VALUES ${queryValues}) AS r(security_rule_id)
-    WHERE sf.submission_id = ${submissionId}
-    ON CONFLICT (submission_feature_id, security_rule_id) DO NOTHING
-    RETURNING *;
-  `;
+    const insertSQL = SQL([sql], ...securityRuleIds, submissionId);
 
     const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
+    return response.rows;
+  }
+
+  /**
+   * Removes security rules from all features of a submission.
+   * If no rule IDs are provided, all security rules will be removed.
+   *
+   * @param {number} submissionId
+   * @param {number[]} [removeRuleIds]
+   * @return {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityRepository
+   */
+  async removeSecurityFromSubmission(
+    submissionId: number,
+    removeRuleIds?: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
+    const knex = getKnex();
+
+    const queryBuilder = knex
+      .queryBuilder()
+      .delete()
+      .from('submission_feature_security as sfs')
+      .whereIn(
+        'sfs.submission_feature_id',
+        knex.select('sf.submission_feature_id').from('submission_feature as sf').where('sf.submission_id', submissionId)
+      )
+      .returning('*');
+
+    if (removeRuleIds?.length) {
+      queryBuilder.whereIn('sfs.security_rule_id', removeRuleIds);
+    }
+
+    const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
     return response.rows;
   }
 

@@ -6,16 +6,6 @@ import { ApiPaginationOptions, ApiPaginationResults } from '../zod-schema/pagina
  *
  * Used in conjunction with a request leveraging the `paginationRequestQueryParamSchema` params.
  *
- * @example
- * GET.apiDoc = {
- *   //...
- *   parameters: [
- *     //...
- *     ...paginationRequestQueryParamSchema
- *   ],
- *   //...
- * }
- *
  * @param {Request} request
  * @return {*}  {Partial<ApiPaginationOptions>}
  */

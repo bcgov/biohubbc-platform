@@ -112,7 +112,7 @@ const useSecurityApi = (axios: AxiosInstance) => {
     submissionId: number,
     featureSecurityRulesPatch: IPatchFeatureSecurityRules
   ): Promise<void> => {
-    await axios.patch(`api/administrative/security/submission/${submissionId}/features`, {
+    await axios.patch(`api/administrative/security/submission/${submissionId}/feature`, {
       applyRuleIds: featureSecurityRulesPatch.stagedForApply.map((rule) => rule.security_rule_id),
       removeRuleIds: featureSecurityRulesPatch.stagedForRemove.map((rule) => rule.security_rule_id),
       submissionFeatureIds: featureSecurityRulesPatch.submissionFeatureIds
@@ -120,13 +120,21 @@ const useSecurityApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Applies security to the entire submission.
+   * Patches security rules for all features of a submission.
+   * If a rule exists in both `stagedForApply` and `stagedForRemove`, it will always be applied.
    *
    * @param {number} submissionId
+   * @param {IPatchFeatureSecurityRules} submissionSecurityPatch
    * @return {Promise<void>}
    */
-  const applySecurityToSubmission = async (submissionId: number): Promise<void> => {
-    await axios.patch(`api/administrative/security/submission/${submissionId}`);
+  const patchSecurityRulesOnSubmission = async (
+    submissionId: number,
+    submissionSecurityPatch: IPatchFeatureSecurityRules
+  ): Promise<void> => {
+    await axios.patch(`api/administrative/security/submission/${submissionId}`, {
+      applyRuleIds: submissionSecurityPatch.stagedForApply.map((rule) => rule.security_rule_id),
+      removeRuleIds: submissionSecurityPatch.stagedForRemove.map((rule) => rule.security_rule_id)
+    });
   };
 
   /**
@@ -144,7 +152,7 @@ const useSecurityApi = (axios: AxiosInstance) => {
   };
 
   return {
-    applySecurityToSubmission,
+    patchSecurityRulesOnSubmission,
     sendSecureArtifactAccessRequest,
     listPersecutionHarmRules,
     applySecurityReasonsToArtifacts,

@@ -10,7 +10,6 @@ import yup from 'utils/YupSchema';
 import SecurityRuleForm from './SecurityRuleForm';
 
 interface ISecuritiesDialogProps {
-  submissionId: number;
   submissionFeatureIds: Pick<GridRowSelectionModel, 'ids'>;
   open: boolean;
   onSubmit: () => void;
@@ -33,10 +32,10 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
 
       if (props.submissionFeatureIds.ids.size === 0) {
         // No selected features, apply security to the whole submission
-        await api.security.applySecurityToSubmission(props.submissionId);
+        await api.security.patchSecurityRulesOnSubmission(submissionId, patch);
       } else {
         // Apply security to specific features
-        await api.security.patchSecurityRulesOnSubmissionFeatures(props.submissionId, patch);
+        await api.security.patchSecurityRulesOnSubmissionFeatures(submissionId, patch);
       }
 
       dialogContext.setSnackbar({
