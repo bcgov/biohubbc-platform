@@ -140,7 +140,7 @@ describe('UserRepository', () => {
       const userRepository = new UserRepository(mockDBConnection);
 
       try {
-        await userRepository.addSystemUser('user-guid', 'user', 'idir');
+        await userRepository.addSystemUser({ userGuid: 'user-guid', userIdentifier: 'user', identitySource: 'idir' });
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiExecuteSQLError).message).to.equal('Failed to insert new user');
@@ -168,7 +168,11 @@ describe('UserRepository', () => {
 
       const userRepository = new UserRepository(mockDBConnection);
 
-      const response = await userRepository.addSystemUser('123-456-789', 'user', 'idir');
+      const response = await userRepository.addSystemUser({
+        userGuid: '123-456-789',
+        userIdentifier: 'user',
+        identitySource: 'idir'
+      });
 
       expect(response).to.equal(mockResponse[0]);
     });

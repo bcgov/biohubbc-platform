@@ -41,6 +41,20 @@ const SystemRoles = z.object({
 
 export type SystemRoles = z.infer<typeof SystemRoles>;
 
+/**
+ * Parameters for adding a new system user.
+ */
+export interface IAddSystemUserParams {
+  userGuid: string;
+  userIdentifier: string;
+  identitySource: string;
+  displayName?: string | null;
+  email?: string | null;
+  givenName?: string | null;
+  familyName?: string | null;
+  agency?: string | null;
+}
+
 export class UserRepository extends BaseRepository {
   /**
    * Get all system roles in db
@@ -248,27 +262,11 @@ export class UserRepository extends BaseRepository {
    *
    * Note: Will fail if the system user already exists.
    *
-   * @param {string} userGuid
-   * @param {string} userIdentifier
-   * @param {string} identitySource
-   * @param {string | null} [displayName] - User's display name from Keycloak
-   * @param {string | null} [email] - User's email from Keycloak
-   * @param {string | null} [givenName] - User's first name from Keycloak
-   * @param {string | null} [familyName] - User's last name from Keycloak
-   * @param {string | null} [agency] - User's organization (BCeID Business only)
+   * @param {IAddSystemUserParams} params - The user parameters
    * @return {*}  {Promise<SystemUser>}
    * @memberof UserRepository
    */
-  async addSystemUser(
-    userGuid: string,
-    userIdentifier: string,
-    identitySource: string,
-    displayName?: string | null,
-    email?: string | null,
-    givenName?: string | null,
-    familyName?: string | null,
-    agency?: string | null
-  ): Promise<SystemUser> {
+  async addSystemUser(params: IAddSystemUserParams): Promise<SystemUser> {
     const sqlStatement = SQL`
       INSERT INTO
         "system_user"
@@ -284,22 +282,22 @@ export class UserRepository extends BaseRepository {
         agency
       )
       VALUES (
-        ${userGuid},
+        ${params.userGuid},
         (
           SELECT
             user_identity_source_id
           FROM
             user_identity_source
           WHERE
-            name = ${identitySource.toUpperCase()}
+            name = ${params.identitySource.toUpperCase()}
         ),
-        ${userIdentifier},
+        ${params.userIdentifier},
         now(),
-        ${displayName ?? null},
-        ${email ?? null},
-        ${givenName ?? null},
-        ${familyName ?? null},
-        ${agency ?? null}
+        ${params.displayName ?? null},
+        ${params.email ?? null},
+        ${params.givenName ?? null},
+        ${params.familyName ?? null},
+        ${params.agency ?? null}
       )
       RETURNING
         *;

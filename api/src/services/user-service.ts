@@ -2,7 +2,13 @@ import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { HTTP401 } from '../errors/http-error';
-import { SystemRoles, SystemUser, SystemUserExtended, UserRepository } from '../repositories/user-repository';
+import {
+  IAddSystemUserParams,
+  SystemRoles,
+  SystemUser,
+  SystemUserExtended,
+  UserRepository
+} from '../repositories/user-repository';
 import { DBService } from './db-service';
 
 /**
@@ -98,16 +104,17 @@ export class UserService extends DBService {
     identitySource: string,
     profile?: IUserProfile
   ): Promise<SystemUser> {
-    return this.userRepository.addSystemUser(
+    const params: IAddSystemUserParams = {
       userGuid,
       userIdentifier,
       identitySource,
-      profile?.displayName,
-      profile?.email,
-      profile?.givenName,
-      profile?.familyName,
-      profile?.agency
-    );
+      displayName: profile?.displayName,
+      email: profile?.email,
+      givenName: profile?.givenName,
+      familyName: profile?.familyName,
+      agency: profile?.agency
+    };
+    return this.userRepository.addSystemUser(params);
   }
 
   /**
