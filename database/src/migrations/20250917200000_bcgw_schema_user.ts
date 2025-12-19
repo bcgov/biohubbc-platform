@@ -4,7 +4,7 @@ const DB_USER_BCGW_PASS = process.env.DB_USER_BCGW_PASS;
 const DB_USER_BCGW = process.env.DB_USER_BCGW;
 
 /**
- * Apply biohub-platform release changes.
+ * Create bcgw schema and user.
  *
  * @export
  * @param {Knex} knex
@@ -27,7 +27,7 @@ export async function up(knex: Knex): Promise<void> {
 }
 
 /**
- * Revert biohub-platform release changes for bcgw schema and user.
+ * Revert changes for bcgw schema and user.
  *
  * @export
  * @param {Knex} knex
