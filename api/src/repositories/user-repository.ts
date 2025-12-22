@@ -1,32 +1,28 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
+import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import { SystemUser, SystemUserExtended } from '../models/user';
 import { BaseRepository } from './base-repository';
 
-export const SystemUser = z.object({
+// Re-export for backward compatibility
+export { SystemUser, SystemUserExtended };
+
+/**
+ * Maximum number of users to return in getAvailableUsers.
+ */
+const MAX_AVAILABLE_USERS_LIMIT = 50;
+
+/**
+ * A user available for team membership.
+ */
+export const AvailableUser = z.object({
   system_user_id: z.number(),
-  user_identity_source_id: z.number(),
-  user_identifier: z.string(),
-  user_guid: z.string(),
-  record_effective_date: z.string(),
-  record_end_date: z.string().nullable(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number()
+  user_identifier: z.string()
 });
 
-export type SystemUser = z.infer<typeof SystemUser>;
-
-export const SystemUserExtended = SystemUser.extend({
-  identity_source: z.string(),
-  role_ids: z.array(z.number()),
-  role_names: z.array(z.string())
-});
-
-export type SystemUserExtended = z.infer<typeof SystemUserExtended>;
+export type AvailableUser = z.infer<typeof AvailableUser>;
 
 const SystemRoles = z.object({
   system_role_id: z.number(),
@@ -427,5 +423,31 @@ export class UserRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
+  }
+
+  /**
+   * Get available users for team membership (excludes SYSTEM and DATABASE users).
+   *
+   * @param {string} [search] - Optional search term to filter by user_identifier.
+   * @return {Promise<AvailableUser[]>}
+   * @memberof UserRepository
+   */
+  async getAvailableUsers(search?: string): Promise<AvailableUser[]> {
+    const knex = getKnex();
+    const query = knex
+      .table('system_user as su')
+      .select(['su.system_user_id', 'su.user_identifier'])
+      .innerJoin('user_identity_source as uis', 'su.user_identity_source_id', 'uis.user_identity_source_id')
+      .whereNull('su.record_end_date')
+      .whereNotIn('uis.name', [SYSTEM_IDENTITY_SOURCE.SYSTEM, SYSTEM_IDENTITY_SOURCE.DATABASE])
+      .orderBy('su.user_identifier', 'asc')
+      .limit(MAX_AVAILABLE_USERS_LIMIT);
+
+    if (search && search.trim()) {
+      query.whereILike('su.user_identifier', `%${search.trim()}%`);
+    }
+
+    const response = await this.connection.knex(query, AvailableUser);
+    return response.rows;
   }
 }

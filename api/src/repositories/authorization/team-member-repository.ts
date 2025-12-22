@@ -1,7 +1,19 @@
+import { z } from 'zod';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { CreateTeamMember, TeamMember, UpdateTeamMember } from '../../models/team-member';
 import { BaseRepository } from '../base-repository';
+
+/**
+ * A team member with user details.
+ */
+export const TeamMemberWithUser = z.object({
+  team_member_id: z.string().uuid(),
+  system_user_id: z.number(),
+  user_identifier: z.string()
+});
+
+export type TeamMemberWithUser = z.infer<typeof TeamMemberWithUser>;
 
 /**
  * A repository class for accessing team member data.
@@ -140,5 +152,26 @@ export class TeamMemberRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
+  }
+
+  /**
+   * Get team members with user details for a given team.
+   *
+   * @param {string} teamId - The ID of the team.
+   * @return {Promise<TeamMemberWithUser[]>}
+   * @memberof TeamMemberRepository
+   */
+  async getTeamMembersWithUsers(teamId: string): Promise<TeamMemberWithUser[]> {
+    const knex = getKnex();
+    const query = knex
+      .table('team_member as tm')
+      .select(['tm.team_member_id', 'tm.system_user_id', 'su.user_identifier'])
+      .innerJoin('system_user as su', 'tm.system_user_id', 'su.system_user_id')
+      .where('tm.team_id', teamId)
+      .whereNull('tm.record_end_date')
+      .orderBy('su.user_identifier', 'asc');
+
+    const response = await this.connection.knex(query, TeamMemberWithUser);
+    return response.rows;
   }
 }

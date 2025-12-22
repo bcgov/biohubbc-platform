@@ -36,7 +36,7 @@ const mockUpdateTeam = vi.fn();
 const mockDeleteTeam = vi.fn();
 const mockGetTeams = vi.fn().mockResolvedValue({
   teams: mockTeams,
-  pagination: { total: 2, page: 0, limit: 50 }
+  pagination: { total: 2, current_page: 1, last_page: 1, per_page: 50 }
 });
 
 const mockUseApi = {
@@ -135,7 +135,7 @@ describe('TeamsContainer', () => {
   it('shows `No Teams` when there are no teams', async () => {
     mockUseApi.teams.getTeams.mockResolvedValueOnce({
       teams: [],
-      pagination: { total: 0, page: 0, limit: 50 }
+      pagination: { total: 0, current_page: 1, last_page: 1, per_page: 50 }
     });
 
     const { getByText } = renderContainer();

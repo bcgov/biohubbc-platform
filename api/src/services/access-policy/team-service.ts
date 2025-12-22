@@ -1,17 +1,8 @@
-import { getKnex, IDBConnection } from '../../database/db';
+import { IDBConnection } from '../../database/db';
 import { CreateTeam, Team, UpdateTeam } from '../../models/team';
-import { TeamMemberRepository } from '../../repositories/authorization/team-member-repository';
+import { TeamMemberRepository, TeamMemberWithUser } from '../../repositories/authorization/team-member-repository';
 import { TeamRepository } from '../../repositories/authorization/team-repository';
 import { DBService } from '../db-service';
-
-/**
- * A team member with user details.
- */
-export interface TeamMemberWithUser {
-  team_member_id: string;
-  system_user_id: number;
-  user_identifier: string;
-}
 
 /**
  * A team with its members.
@@ -89,15 +80,30 @@ export class TeamService extends DBService {
    * Get all teams with their members, with pagination and search.
    *
    * @param {object} options - Pagination and search options.
-   * @param {number} options.page - Page number (0-indexed).
+   * @param {number} options.page - Page number (1-indexed).
    * @param {number} options.limit - Number of items per page.
+   * @param {string} [options.sort] - Column to sort by.
+   * @param {('asc' | 'desc')} [options.order] - Sort direction.
    * @param {string} [options.search] - Optional search term to filter by team name.
-   * @return {Promise<{ teams: TeamWithMembers[]; pagination: { total: number; page: number; limit: number } }>}
+   * @return {Promise<{ teams: TeamWithMembers[]; pagination: { total: number; current_page: number; last_page: number; per_page: number; sort?: string; order?: string } }>}
    * @memberof TeamService
    */
-  async getTeamsWithMembers(options: { page: number; limit: number; search?: string }): Promise<{
+  async getTeamsWithMembers(options: {
+    page: number;
+    limit: number;
+    sort?: string;
+    order?: 'asc' | 'desc';
+    search?: string;
+  }): Promise<{
     teams: TeamWithMembers[];
-    pagination: { total: number; page: number; limit: number };
+    pagination: {
+      total: number;
+      current_page: number;
+      last_page: number;
+      per_page: number;
+      sort?: string;
+      order?: string;
+    };
   }> {
     const { teams, total } = await this.teamRepository.getTeamsWithPagination(options);
 
@@ -110,7 +116,14 @@ export class TeamService extends DBService {
 
     return {
       teams: teamsWithMembers,
-      pagination: { total, page: options.page, limit: options.limit }
+      pagination: {
+        total,
+        current_page: options.page,
+        last_page: Math.max(1, Math.ceil(total / options.limit)),
+        per_page: options.limit,
+        sort: options.sort,
+        order: options.order
+      }
     };
   }
 
@@ -122,8 +135,10 @@ export class TeamService extends DBService {
    * @memberof TeamService
    */
   async getTeamWithMembers(teamId: string): Promise<TeamWithMembers> {
-    const team = await this.teamRepository.getTeam(teamId);
-    const members = await this.getTeamMembersWithUsers(teamId);
+    const [team, members] = await Promise.all([
+      this.teamRepository.getTeam(teamId),
+      this.getTeamMembersWithUsers(teamId)
+    ]);
     return { ...team, members };
   }
 
@@ -135,17 +150,7 @@ export class TeamService extends DBService {
    * @memberof TeamService
    */
   async getTeamMembersWithUsers(teamId: string): Promise<TeamMemberWithUser[]> {
-    const knex = getKnex();
-    const query = knex
-      .table('team_member as tm')
-      .select(['tm.team_member_id', 'tm.system_user_id', 'su.user_identifier'])
-      .innerJoin('system_user as su', 'tm.system_user_id', 'su.system_user_id')
-      .where('tm.team_id', teamId)
-      .whereNull('tm.record_end_date')
-      .orderBy('su.user_identifier', 'asc');
-
-    const response = await this.connection.knex(query);
-    return response.rows;
+    return this.teamMemberRepository.getTeamMembersWithUsers(teamId);
   }
 
   /**

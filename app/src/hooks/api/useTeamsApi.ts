@@ -17,10 +17,16 @@ export const useTeamsApi = (axios: AxiosInstance) => {
   /**
    * Get all teams with pagination.
    *
-   * @param {object} [params]
+   * @param {{ page: number; limit: number; sort?: string; order?: 'asc' | 'desc'; search?: string }} params
    * @return {*} {Promise<ITeamsResponse>}
    */
-  const getTeams = async (params?: { page?: number; limit?: number; search?: string }): Promise<ITeamsResponse> => {
+  const getTeams = async (params: {
+    page: number;
+    limit: number;
+    sort?: string;
+    order?: 'asc' | 'desc';
+    search?: string;
+  }): Promise<ITeamsResponse> => {
     const { data } = await axios.get('/api/administrative/teams', { params });
 
     return data;

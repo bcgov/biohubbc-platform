@@ -8,7 +8,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import EditDialog from 'components/dialog/EditDialog';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
@@ -18,14 +18,14 @@ import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
 import { debounce } from 'lodash-es';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AddTeamForm, AddTeamFormInitialValues, AddTeamFormYupSchema, IAddTeamFormValues } from './AddTeamForm';
 
 /**
  * Container component for managing teams.
  *
  * Provides functionality to:
- * - View teams in a searchable, paginated table
+ * - View teams in a searchable, sortable, paginated table
  * - Create new teams via dialog
  * - Edit existing teams via dialog
  * - Delete teams with confirmation
@@ -38,27 +38,58 @@ export const TeamsContainer = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
+  // Pagination state (MUI DataGrid uses 0-indexed pages)
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
+    pageSize: 10,
+    page: 0
+  });
+
+  // Sort state
+  const [sortModel, setSortModel] = useState<GridSortModel>([{ field: 'name', sort: 'asc' }]);
+
   // Dialog state
   const [openAddTeamDialog, setOpenAddTeamDialog] = useState(false);
   const [openEditTeamDialog, setOpenEditTeamDialog] = useState(false);
   const [editingTeam, setEditingTeam] = useState<ITeamWithMembers | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Memoized API params (convert MUI 0-indexed page to API 1-indexed)
+  const apiParams = useMemo(() => {
+    const sort = sortModel[0];
+    return {
+      page: paginationModel.page + 1,
+      limit: paginationModel.pageSize,
+      sort: sort?.field,
+      order: sort?.sort as 'asc' | 'desc' | undefined,
+      search: debouncedSearchTerm || undefined
+    };
+  }, [paginationModel, sortModel, debouncedSearchTerm]);
+
   // Data loader for fetching teams
-  const teamsDataLoader = useDataLoader((search?: string) => biohubApi.teams.getTeams({ search: search || undefined }));
-  teamsDataLoader.load(debouncedSearchTerm);
+  const teamsDataLoader = useDataLoader(
+    (params: { page: number; limit: number; sort?: string; order?: 'asc' | 'desc'; search?: string }) =>
+      biohubApi.teams.getTeams(params)
+  );
+  teamsDataLoader.load(apiParams);
+
+  // Refresh when pagination or search changes
+  useEffect(() => {
+    teamsDataLoader.refresh(apiParams);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiParams]);
 
   /**
-   * Debounced function to update search term and refresh teams.
+   * Debounced function to update search term.
    * Waits 300ms after last keystroke before triggering API call.
+   * Also resets to first page when search changes.
    */
   const debouncedRefresh = useMemo(
     () =>
       debounce((term: string) => {
         setDebouncedSearchTerm(term);
-        teamsDataLoader.refresh(term);
+        setPaginationModel((prev) => ({ ...prev, page: 0 })); // Reset to first page on search
       }, 300),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     []
   );
 
@@ -132,7 +163,7 @@ export const TeamsContainer = () => {
         open: true
       });
 
-      teamsDataLoader.refresh(debouncedSearchTerm);
+      teamsDataLoader.refresh(apiParams);
     } catch (error) {
       const apiError = error as APIError;
 
@@ -174,7 +205,7 @@ export const TeamsContainer = () => {
       });
 
       setOpenAddTeamDialog(false);
-      teamsDataLoader.refresh(debouncedSearchTerm);
+      teamsDataLoader.refresh(apiParams);
 
       showSnackBar({
         snackbarMessage: (
@@ -223,7 +254,7 @@ export const TeamsContainer = () => {
 
       setOpenEditTeamDialog(false);
       setEditingTeam(null);
-      teamsDataLoader.refresh(debouncedSearchTerm);
+      teamsDataLoader.refresh(apiParams);
 
       showSnackBar({
         snackbarMessage: (
@@ -361,18 +392,18 @@ export const TeamsContainer = () => {
           rows={teams}
           columns={columns}
           getRowId={(row) => row.team_id}
+          paginationMode="server"
+          paginationModel={paginationModel}
+          onPaginationModelChange={setPaginationModel}
+          sortingMode="server"
+          sortModel={sortModel}
+          onSortModelChange={setSortModel}
+          rowCount={teamCount}
           pageSizeOptions={[10, 25, 50]}
           disableRowSelectionOnClick
           disableColumnSelector
           disableColumnMenu
           localeText={{ noRowsLabel: 'No Teams' }}
-          initialState={{
-            pagination: {
-              paginationModel: {
-                pageSize: 10
-              }
-            }
-          }}
           sx={{
             border: 'none',
             '& .MuiDataGrid-columnHeaderTitle': {

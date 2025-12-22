@@ -4,10 +4,10 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { CreateTeam, Team, UpdateTeam } from '../../models/team';
 import { TeamMember } from '../../models/team-member';
-import { TeamMemberRepository } from '../../repositories/authorization/team-member-repository';
+import { TeamMemberRepository, TeamMemberWithUser } from '../../repositories/authorization/team-member-repository';
 import { TeamRepository } from '../../repositories/authorization/team-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { TeamMemberWithUser, TeamService } from './team-service';
+import { TeamService } from './team-service';
 
 chai.use(sinonChai);
 
@@ -132,9 +132,16 @@ describe('TeamService', () => {
       sinon.stub(TeamRepository.prototype, 'getTeamsWithPagination').resolves({ teams: mockTeams, total: 2 });
       sinon.stub(service.connection, 'knex').resolves({ rows: mockMembers } as any);
 
-      const result = await service.getTeamsWithMembers({ page: 0, limit: 50 });
+      const result = await service.getTeamsWithMembers({ page: 1, limit: 50 });
 
-      expect(result.pagination).to.eql({ total: 2, page: 0, limit: 50 });
+      expect(result.pagination).to.eql({
+        total: 2,
+        current_page: 1,
+        last_page: 1,
+        per_page: 50,
+        sort: undefined,
+        order: undefined
+      });
       expect(result.teams).to.have.length(2);
       expect(result.teams[0].members).to.eql(mockMembers);
     });
@@ -142,10 +149,17 @@ describe('TeamService', () => {
     it('should return empty array when no teams exist', async () => {
       sinon.stub(TeamRepository.prototype, 'getTeamsWithPagination').resolves({ teams: [], total: 0 });
 
-      const result = await service.getTeamsWithMembers({ page: 0, limit: 50 });
+      const result = await service.getTeamsWithMembers({ page: 1, limit: 50 });
 
       expect(result.teams).to.eql([]);
-      expect(result.pagination).to.eql({ total: 0, page: 0, limit: 50 });
+      expect(result.pagination).to.eql({
+        total: 0,
+        current_page: 1,
+        last_page: 1,
+        per_page: 50,
+        sort: undefined,
+        order: undefined
+      });
     });
   });
 

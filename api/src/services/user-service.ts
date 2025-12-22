@@ -1,7 +1,13 @@
 import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { SystemRoles, SystemUser, SystemUserExtended, UserRepository } from '../repositories/user-repository';
+import {
+  AvailableUser,
+  SystemRoles,
+  SystemUser,
+  SystemUserExtended,
+  UserRepository
+} from '../repositories/user-repository';
 import { DBService } from './db-service';
 
 export class UserService extends DBService {
@@ -192,5 +198,16 @@ export class UserService extends DBService {
     return [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR].some((systemRole) =>
       user.role_names.includes(systemRole)
     );
+  }
+
+  /**
+   * Get available users for team membership (excludes SYSTEM and DATABASE users).
+   *
+   * @param {string} [search] - Optional search term to filter by user_identifier.
+   * @return {Promise<AvailableUser[]>}
+   * @memberof UserService
+   */
+  async getAvailableUsers(search?: string): Promise<AvailableUser[]> {
+    return this.userRepository.getAvailableUsers(search);
   }
 }
