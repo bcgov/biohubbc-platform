@@ -197,18 +197,16 @@ export class TeamService extends DBService {
     // Find members to remove (in current but not new list)
     const toRemove = currentMembers.filter((m) => !newUserIds.has(m.system_user_id));
 
-    // Add new members
-    await Promise.all(
-      toAdd.map((userId) =>
+    // Add new members and soft-delete removed members in parallel
+    await Promise.all([
+      ...toAdd.map((userId) =>
         this.teamMemberRepository.insertTeamMember({
           team_id: teamId,
           system_user_id: userId
         })
-      )
-    );
-
-    // Soft-delete removed members
-    await Promise.all(toRemove.map((member) => this.teamMemberRepository.deleteTeamMember(member.team_member_id)));
+      ),
+      ...toRemove.map((member) => this.teamMemberRepository.deleteTeamMember(member.team_member_id))
+    ]);
 
     const members = await this.getTeamMembersWithUsers(teamId);
     return { ...team, members };
