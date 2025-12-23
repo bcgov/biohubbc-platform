@@ -1,0 +1,6 @@
+apiVersion: v2
+name: biohub-platform-queue
+description: A Helm chart for Biohub Queue Worker component (pg-boss)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

@@ -1,0 +1,49 @@
+# Default values for queue chart
+environment:
+  licensePlate: "a0ec71" # License plate of the project
+  name: "" # Environment name (dev, test, prod)
+  id: "" # Environment id (PR, deploy)
+  changeId: "" # Change id (PR number)
+  ts: "" # Timestamp of the deployment
+
+image:
+  registry: "image-registry.openshift-image-registry.svc:5000" # The base image registry URL
+  image: a0ec71-tools/biohub-platform-api # Uses same image as API
+
+# Queue worker configuration
+app:
+  name: biohub-platform-queue
+  nodeEnv: "" # NODE_ENV specification variable
+  nodeOptions: "" # NODE_OPTIONS specification variable
+  timezone: America/Vancouver # Application timezone
+
+  # Database
+  database:
+    secretName: biohub-platform-db
+    serviceName: "" # Database service name associated with deployment
+    port: 5432 # Database port
+
+  # Object Store (S3)
+  objectStore:
+    keyPrefix: "" # S3 key optional prefix
+    secretName: biohubbc-object-store # Secrets used to read and write to the S3 storage
+
+  # Logging
+  logging:
+    level: "" # Log level for logs written to the console (console transport)
+    levelFile: "" # Log level for logs written to log files (file transport)
+    fileDir: data/logs # Directory where log files are stored
+    fileName: biohub-platform-queue.log # Name of the log file
+    fileDatePattern: YYYY-MM-DD # Date pattern for log the files
+    fileMaxSize: 45m # Maximum size an individual log file can reach before a new file is created
+    fileMaxFiles: "" # Either the maximum number of log files to keep (10) or the maximum number of days to keep log files (10d)
+
+# Openshift Resources - queue workers typically need less resources than API
+replicas: ""
+resources:
+  requests:
+    cpu: ""
+    memory: ""
+  limits:
+    cpu: ""
+    memory: ""

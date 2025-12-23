@@ -116,19 +116,18 @@ services:
       db_setup:
         condition: service_completed_successfully
 
-  # Build the api_worker docker image
+  ## Build the queue worker docker image
   queue:
     image: ${DOCKER_PROJECT_NAME}-queue-${DOCKER_NAMESPACE}-img
     container_name: ${DOCKER_PROJECT_NAME}-queue-${DOCKER_NAMESPACE}-container
     build:
       context: ./api
-      dockerfile: ./.docker/queue/Dockerfile
+      dockerfile: ./.docker/api/Dockerfile
+    command: npm run queue-reload
     environment:
       - NODE_ENV=${NODE_ENV}
-      - S3_KEY_PREFIX=${S3_KEY_PREFIX}
-      - API_HOST=${API_HOST}
-      - API_PORT=${API_PORT}
       - TZ=${API_TZ}
+      # Database
       - DB_HOST=${DB_HOST}
       - DB_USER_API=${DB_USER_API}
       - DB_USER_API_PASS=${DB_USER_API_PASS}
@@ -139,20 +138,24 @@ services:
       - DB_CONNECTION_MAX_USES=${DB_CONNECTION_MAX_USES}
       - DB_CONNECTION_TIMEOUT=${DB_CONNECTION_TIMEOUT}
       - DB_IDLE_TIMEOUT=${DB_IDLE_TIMEOUT}
+      # Object Store (S3)
       - OBJECT_STORE_URL=${OBJECT_STORE_URL}
       - OBJECT_STORE_ACCESS_KEY_ID=${OBJECT_STORE_ACCESS_KEY_ID}
       - OBJECT_STORE_SECRET_KEY_ID=${OBJECT_STORE_SECRET_KEY_ID}
       - OBJECT_STORE_BUCKET_NAME=${OBJECT_STORE_BUCKET_NAME}
+      - S3_KEY_PREFIX=${S3_KEY_PREFIX}
+      # Logging
       - LOG_LEVEL=${LOG_LEVEL}
-      - APP_HOST=${APP_HOST}
     volumes:
       - ./api:/opt/app-root/src
-      - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
+      - /opt/app-root/src/node_modules
     networks:
       - biohubbc-network
     depends_on:
-      - db
-      - db_setup
+      db:
+        condition: service_healthy
+      db_setup:
+        condition: service_completed_successfully
 
   # Build the clamav docker image
   clamav:

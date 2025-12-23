@@ -98,13 +98,13 @@ build-backend: ## Builds all backend containers
 	@echo "==============================================="
 	@echo "Make: build-backend - building backend images"
 	@echo "==============================================="
-	@docker compose build db db_setup api
+	@docker compose build db db_setup api queue
 
 run-backend: ## Runs all backend containers
 	@echo "==============================================="
 	@echo "Make: run-backend - running backend images"
 	@echo "==============================================="
-	@docker compose up -d db db_setup api
+	@docker compose up -d db db_setup api queue
 
 ## ------------------------------------------------------------------------------
 ## Build/Run Backend+Web Commands (backend + web frontend)
@@ -115,13 +115,13 @@ build-web: ## Builds all backend+web containers
 	@echo "==============================================="
 	@echo "Make: build-web - building web images"
 	@echo "==============================================="
-	@docker compose build db db_setup api app
+	@docker compose build db db_setup api queue app
 
 run-web: ## Runs all backend+web containers
 	@echo "==============================================="
 	@echo "Make: run-web - running web images"
 	@echo "==============================================="
-	@docker compose up -d db db_setup api app
+	@docker compose up -d db db_setup api queue app
 
 ## ------------------------------------------------------------------------------
 ## Commands to shell into the target container

@@ -1,0 +1,29 @@
+# Test environment values for Biohub
+environment:
+  name: test
+  id: deploy
+
+# Queue worker configuration
+app:
+  nodeEnv: production
+  nodeOptions: --max_old_space_size=1024
+
+  # Object Store (S3)
+  objectStore:
+    keyPrefix: biohub
+
+  # Logging
+  logging:
+    level: info
+    levelFile: info
+    fileMaxFiles: 10
+
+# Openshift Resources
+replicas: 1
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi

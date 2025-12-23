@@ -1,0 +1,28 @@
+# Pull Request environment values for Biohub
+environment:
+  name: dev
+  # id will be dynamically set: "1234"
+
+# Queue worker configuration
+app:
+  nodeEnv: development
+  nodeOptions: --max_old_space_size=512
+
+  # Object Store (S3)
+  # objectStore.keyPrefix will be dynamically set: "local/1234/biohub"
+
+  # Logging
+  logging:
+    level: debug
+    levelFile: debug
+    fileMaxFiles: 2  # Smaller for PR environments
+
+# Openshift Resources - minimal for PR environments
+replicas: 1
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 512Mi

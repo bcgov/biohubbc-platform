@@ -1,0 +1,29 @@
+# Production environment values for Biohub
+environment:
+  name: prod
+  id: deploy
+
+# Queue worker configuration
+app:
+  nodeEnv: production
+  nodeOptions: --max_old_space_size=2048
+
+  # Object Store (S3)
+  objectStore:
+    keyPrefix: biohub
+
+  # Logging
+  logging:
+    level: info
+    levelFile: info
+    fileMaxFiles: 30
+
+# Openshift Resources - can scale workers horizontally
+replicas: 2
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 2Gi
