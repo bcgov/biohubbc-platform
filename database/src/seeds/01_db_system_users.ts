@@ -59,12 +59,6 @@ const systemUsers: SystemUserSeed[] = [
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
     user_guid: '9266B99E3E9C42339D9F951CBB6E3494'
-  },
-  {
-    identifier: 'dahogan',
-    type: SYSTEM_IDENTITY_SOURCE.IDIR,
-    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
-    user_guid: '6936047233B94EA0B8C0698F6349E027'
   }
 ];
 
