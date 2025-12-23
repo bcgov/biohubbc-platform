@@ -7,7 +7,7 @@ import { DBService } from '../db-service';
 /**
  * A team member with user details.
  */
-export interface TeamMemberWithUser {
+export interface ITeamMemberWithUser {
   team_member_id: string;
   system_user_id: number;
   user_identifier: string;
@@ -16,8 +16,8 @@ export interface TeamMemberWithUser {
 /**
  * A team with its members.
  */
-export interface TeamWithMembers extends Team {
-  members: TeamMemberWithUser[];
+export interface ITeamWithMembers extends Team {
+  members: ITeamMemberWithUser[];
 }
 
 export class TeamService extends DBService {
@@ -92,11 +92,11 @@ export class TeamService extends DBService {
    * @param {number} options.page - Page number (0-indexed).
    * @param {number} options.limit - Number of items per page.
    * @param {string} [options.search] - Optional search term to filter by team name.
-   * @return {Promise<{ teams: TeamWithMembers[]; pagination: { total: number; page: number; limit: number } }>}
+   * @return {Promise<{ teams: ITeamWithMembers[]; pagination: { total: number; page: number; limit: number } }>}
    * @memberof TeamService
    */
   async getTeamsWithMembers(options: { page: number; limit: number; search?: string }): Promise<{
-    teams: TeamWithMembers[];
+    teams: ITeamWithMembers[];
     pagination: { total: number; page: number; limit: number };
   }> {
     const { teams, total } = await this.teamRepository.getTeamsWithPagination(options);
@@ -118,10 +118,10 @@ export class TeamService extends DBService {
    * Get a single team with its members.
    *
    * @param {string} teamId - The ID of the team to fetch.
-   * @return {Promise<TeamWithMembers>}
+   * @return {Promise<ITeamWithMembers>}
    * @memberof TeamService
    */
-  async getTeamWithMembers(teamId: string): Promise<TeamWithMembers> {
+  async getTeamWithMembers(teamId: string): Promise<ITeamWithMembers> {
     const team = await this.teamRepository.getTeam(teamId);
     const members = await this.getTeamMembersWithUsers(teamId);
     return { ...team, members };
@@ -131,10 +131,10 @@ export class TeamService extends DBService {
    * Get team members with user details.
    *
    * @param {string} teamId - The ID of the team.
-   * @return {Promise<TeamMemberWithUser[]>}
+   * @return {Promise<ITeamMemberWithUser[]>}
    * @memberof TeamService
    */
-  async getTeamMembersWithUsers(teamId: string): Promise<TeamMemberWithUser[]> {
+  async getTeamMembersWithUsers(teamId: string): Promise<ITeamMemberWithUser[]> {
     const knex = getKnex();
     const query = knex
       .table('team_member as tm')
@@ -153,10 +153,10 @@ export class TeamService extends DBService {
    *
    * @param {CreateTeam} teamData - Data required to create a new team.
    * @param {number[]} memberUserIds - System user IDs to add as members.
-   * @return {Promise<TeamWithMembers>}
+   * @return {Promise<ITeamWithMembers>}
    * @memberof TeamService
    */
-  async createTeamWithMembers(teamData: CreateTeam, memberUserIds: number[]): Promise<TeamWithMembers> {
+  async createTeamWithMembers(teamData: CreateTeam, memberUserIds: number[]): Promise<ITeamWithMembers> {
     const team = await this.createTeam(teamData);
 
     // Add members
@@ -180,10 +180,10 @@ export class TeamService extends DBService {
    * @param {string} teamId - The ID of the team to update.
    * @param {UpdateTeam} teamData - Partial data to update the team record.
    * @param {number[]} memberUserIds - New complete member list (user IDs).
-   * @return {Promise<TeamWithMembers>}
+   * @return {Promise<ITeamWithMembers>}
    * @memberof TeamService
    */
-  async updateTeamWithMembers(teamId: string, teamData: UpdateTeam, memberUserIds: number[]): Promise<TeamWithMembers> {
+  async updateTeamWithMembers(teamId: string, teamData: UpdateTeam, memberUserIds: number[]): Promise<ITeamWithMembers> {
     const team = await this.updateTeam(teamId, teamData);
 
     // Get current members
