@@ -10,6 +10,7 @@ import useTaxonomyApi from './api/useTaxonomyApi';
 import useUserApi from './api/useUserApi';
 import { useFeaturesApi } from './api/useFeaturesApi';
 import usePoliciesApi from './api/usePoliciesApi';
+import { useSearchApi } from './api/useSearchApi';
 import { useTeamsApi } from './api/useTeamsApi';
 
 /**
@@ -40,6 +41,8 @@ export const useApi = () => {
 
   const policies = usePoliciesApi(apiAxios);
 
+  const search = useSearchApi(apiAxios);
+
   const teams = useTeamsApi(apiAxios);
 
   return {
@@ -52,6 +55,7 @@ export const useApi = () => {
     artifact,
     codes,
     policies,
+    search,
     teams
   };
 };

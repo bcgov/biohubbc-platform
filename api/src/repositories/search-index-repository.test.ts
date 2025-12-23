@@ -3,7 +3,11 @@ import { QueryResult } from 'pg';
 import Sinon from 'sinon';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { getMockDBConnection } from '../__mocks__/db';
-import { FeaturePropertyRecordWithPropertyTypeName, SearchIndexRepository } from './search-index-respository';
+import {
+  FeaturePropertyRecordWithPropertyTypeName,
+  SearchFeatureResult,
+  SearchIndexRepository
+} from './search-index-respository';
 
 describe('SearchIndexRepository', () => {
   afterEach(() => {
@@ -602,6 +606,216 @@ describe('SearchIndexRepository', () => {
       } catch (error) {
         expect((error as ApiExecuteSQLError).message).to.equal('Failed to insert searchable string records');
       }
+    });
+  });
+
+  describe('searchFeaturesByKeywords', () => {
+    it('returns matching features for a single keyword', async () => {
+      const mockRows: SearchFeatureResult[] = [
+        {
+          submission_feature_id: 1,
+          submission_id: 10,
+          uuid: '550e8400-e29b-41d4-a716-446655440001',
+          feature_type_id: 1,
+          feature_type_name: 'dataset',
+          feature_name: 'Moose Study',
+          feature_description: 'A study of moose',
+          submission_name: 'Wildlife Project',
+          is_secured: false,
+          relevancy_score: 0.5
+        }
+      ];
+
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: mockRows
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => mockQueryResponse
+      });
+
+      const searchIndexRepository = new SearchIndexRepository(mockDBConnection);
+
+      const response = await searchIndexRepository.searchFeaturesByKeywords(['moose']);
+
+      expect(response).to.have.lengthOf(1);
+      expect(response[0].submission_feature_id).to.equal(1);
+      expect(response[0].feature_type_name).to.equal('dataset');
+    });
+
+    it('returns matching features for multiple keywords', async () => {
+      const mockRows: SearchFeatureResult[] = [
+        {
+          submission_feature_id: 1,
+          submission_id: 10,
+          uuid: '550e8400-e29b-41d4-a716-446655440001',
+          feature_type_id: 1,
+          feature_type_name: 'dataset',
+          feature_name: 'Moose Habitat Study',
+          feature_description: 'A study of moose habitat',
+          submission_name: 'Wildlife Project',
+          is_secured: false,
+          relevancy_score: 0.8
+        },
+        {
+          submission_feature_id: 2,
+          submission_id: 11,
+          uuid: '550e8400-e29b-41d4-a716-446655440002',
+          feature_type_id: 2,
+          feature_type_name: 'sample_site',
+          feature_name: 'Sample Site A',
+          feature_description: null,
+          submission_name: 'Habitat Survey',
+          is_secured: true,
+          relevancy_score: 0.5
+        }
+      ];
+
+      const mockQueryResponse = {
+        rowCount: 2,
+        rows: mockRows
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => mockQueryResponse
+      });
+
+      const searchIndexRepository = new SearchIndexRepository(mockDBConnection);
+
+      const response = await searchIndexRepository.searchFeaturesByKeywords(['moose', 'habitat']);
+
+      expect(response).to.have.lengthOf(2);
+      expect(response[0].relevancy_score).to.be.greaterThan(response[1].relevancy_score);
+    });
+
+    it('returns empty array when no keywords provided', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      const searchIndexRepository = new SearchIndexRepository(mockDBConnection);
+
+      const response = await searchIndexRepository.searchFeaturesByKeywords([]);
+
+      expect(response).to.eql([]);
+    });
+
+    it('returns empty array when no matches found', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => mockQueryResponse
+      });
+
+      const searchIndexRepository = new SearchIndexRepository(mockDBConnection);
+
+      const response = await searchIndexRepository.searchFeaturesByKeywords(['nonexistent']);
+
+      expect(response).to.eql([]);
+    });
+  });
+
+  describe('searchFeaturesByPropertyFilters', () => {
+    it('returns matching features for a single property filter', async () => {
+      const mockRows: SearchFeatureResult[] = [
+        {
+          submission_feature_id: 1,
+          submission_id: 10,
+          uuid: '550e8400-e29b-41d4-a716-446655440001',
+          feature_type_id: 1,
+          feature_type_name: 'dataset',
+          feature_name: 'Moose Survey',
+          feature_description: 'Survey data',
+          submission_name: 'Wildlife Project',
+          is_secured: false,
+          relevancy_score: 0.6
+        }
+      ];
+
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: mockRows
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => mockQueryResponse
+      });
+
+      const searchIndexRepository = new SearchIndexRepository(mockDBConnection);
+
+      const response = await searchIndexRepository.searchFeaturesByPropertyFilters([
+        { featureTypeName: 'animal', propertyName: 'name', propertyType: 'string', value: 'moose' }
+      ]);
+
+      expect(response).to.have.lengthOf(1);
+      expect(response[0].submission_feature_id).to.equal(1);
+    });
+
+    it('returns matching features for multiple property filters', async () => {
+      const mockRows: SearchFeatureResult[] = [
+        {
+          submission_feature_id: 1,
+          submission_id: 10,
+          uuid: '550e8400-e29b-41d4-a716-446655440001',
+          feature_type_id: 1,
+          feature_type_name: 'dataset',
+          feature_name: 'Moose Habitat Study',
+          feature_description: 'A study of moose habitat',
+          submission_name: 'Wildlife Project',
+          is_secured: false,
+          relevancy_score: 1.2
+        }
+      ];
+
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: mockRows
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => mockQueryResponse
+      });
+
+      const searchIndexRepository = new SearchIndexRepository(mockDBConnection);
+
+      const response = await searchIndexRepository.searchFeaturesByPropertyFilters([
+        { featureTypeName: 'animal', propertyName: 'name', propertyType: 'string', value: 'moose' },
+        { featureTypeName: 'animal', propertyName: 'description', propertyType: 'string', value: 'habitat' }
+      ]);
+
+      expect(response).to.have.lengthOf(1);
+      expect(response[0].relevancy_score).to.equal(1.2);
+    });
+
+    it('returns empty array when no filters provided', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      const searchIndexRepository = new SearchIndexRepository(mockDBConnection);
+
+      const response = await searchIndexRepository.searchFeaturesByPropertyFilters([]);
+
+      expect(response).to.eql([]);
+    });
+
+    it('returns empty array when no matches found', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => mockQueryResponse
+      });
+
+      const searchIndexRepository = new SearchIndexRepository(mockDBConnection);
+
+      const response = await searchIndexRepository.searchFeaturesByPropertyFilters([
+        { featureTypeName: 'animal', propertyName: 'name', propertyType: 'string', value: 'nonexistent' }
+      ]);
+
+      expect(response).to.eql([]);
     });
   });
 });

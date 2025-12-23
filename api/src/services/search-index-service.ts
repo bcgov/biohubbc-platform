@@ -5,6 +5,8 @@ import {
   InsertNumberSearchableRecord,
   InsertSpatialSearchableRecord,
   InsertStringSearchableRecord,
+  IPropertyFilter,
+  SearchFeatureResult,
   SearchIndexRepository,
   SubmissionFeatureCombinedSearchValues,
   SubmissionFeatureSearchKeyValues
@@ -13,6 +15,14 @@ import { SubmissionRepository } from '../repositories/submission-repository';
 import { getLogger } from '../utils/logger';
 import { CodeService } from './code-service';
 import { DBService } from './db-service';
+
+/**
+ * Parameters for searching features.
+ */
+export interface ISearchFeaturesParams {
+  keywords?: string;
+  propertyFilters?: IPropertyFilter[];
+}
 
 const defaultLog = getLogger('services/search-index-service');
 
@@ -157,5 +167,73 @@ export class SearchIndexService extends DBService {
    */
   async getSearchKeyValuesBySubmissionId(submissionId: number): Promise<SubmissionFeatureSearchKeyValues[]> {
     return this.searchIndexRepository.getSearchKeyValuesBySubmissionId(submissionId);
+  }
+
+  /**
+   * Searches for features by keywords and/or property filters.
+   *
+   * Keywords are split by whitespace and searched using OR logic.
+   * Property filters search for specific property name + value combinations.
+   * When both keywords and property filters are provided, results are ANDed (intersection).
+   * Results are sorted by relevancy score.
+   *
+   * @param {ISearchFeaturesParams} params - Search parameters
+   * @return {*}  {Promise<SearchFeatureResult[]>}
+   * @memberof SearchIndexService
+   */
+  async searchFeatures(params: ISearchFeaturesParams): Promise<SearchFeatureResult[]> {
+    defaultLog.debug({ label: 'searchFeatures', params });
+
+    const { keywords, propertyFilters } = params;
+
+    // Split keywords by whitespace and filter out empty strings
+    const keywordArray = keywords
+      ? keywords
+          .trim()
+          .split(/\s+/)
+          .filter((k) => k.length > 0)
+      : [];
+
+    const validFilters = propertyFilters?.filter((f) => f.featureTypeName && f.propertyName && f.value) ?? [];
+
+    // If no search criteria provided, return empty array
+    if (keywordArray.length === 0 && validFilters.length === 0) {
+      return [];
+    }
+
+    // Search by keywords if provided
+    const keywordResults =
+      keywordArray.length > 0 ? await this.searchIndexRepository.searchFeaturesByKeywords(keywordArray) : [];
+
+    // Search by property filters if provided
+    const filterResults =
+      validFilters.length > 0 ? await this.searchIndexRepository.searchFeaturesByPropertyFilters(validFilters) : [];
+
+    // Determine final results based on what criteria were provided
+    let finalResults: SearchFeatureResult[];
+
+    if (keywordArray.length > 0 && validFilters.length > 0) {
+      // AND logic: return only features that appear in BOTH result sets
+      const keywordIds = new Set(keywordResults.map((r) => r.submission_feature_id));
+      const intersectedResults = filterResults.filter((r) => keywordIds.has(r.submission_feature_id));
+
+      // Aggregate relevancy scores from both searches
+      const keywordScoreMap = new Map(keywordResults.map((r) => [r.submission_feature_id, r.relevancy_score]));
+      finalResults = intersectedResults.map((result) => ({
+        ...result,
+        relevancy_score: result.relevancy_score + (keywordScoreMap.get(result.submission_feature_id) ?? 0)
+      }));
+    } else if (keywordArray.length > 0) {
+      // Only keywords provided
+      finalResults = keywordResults;
+    } else {
+      // Only property filters provided
+      finalResults = filterResults;
+    }
+
+    // Sort by relevancy score descending
+    finalResults.sort((a, b) => b.relevancy_score - a.relevancy_score);
+
+    return finalResults;
   }
 }
