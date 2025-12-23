@@ -7,7 +7,7 @@ import { SystemUser, SystemUserExtended } from '../models/user';
 import { BaseRepository } from './base-repository';
 
 // Re-export for backward compatibility
-export { SystemUser, SystemUserExtended };
+export { SystemUser, SystemUserExtended } from '../models/user';
 
 /**
  * Maximum number of users to return in getAvailableUsers.
@@ -443,7 +443,7 @@ export class UserRepository extends BaseRepository {
       .orderBy('su.user_identifier', 'asc')
       .limit(MAX_AVAILABLE_USERS_LIMIT);
 
-    if (search && search.trim()) {
+    if (search?.trim()) {
       query.whereILike('su.user_identifier', `%${search.trim()}%`);
     }
 
