@@ -1760,7 +1760,7 @@ export class SubmissionRepository extends BaseRepository {
       .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id')
       .where('submission_feature.submission_id', submissionId);
 
-    return knex.with('base_features', baseQuery).distinct('*').from('base_features').orderBy('submission_feature_id');
+    return knex.with('base_features', baseQuery).distinct('*').from('base_features');
   }
 
   /**

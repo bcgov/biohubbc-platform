@@ -1,33 +1,23 @@
 import { Typography } from '@mui/material';
 import { Box, Stack } from '@mui/system';
-import { GridRowSelectionModel } from '@mui/x-data-grid';
+import { GridPaginationModel, GridRowParams, GridRowSelectionModel, GridSortModel } from '@mui/x-data-grid';
 import { SecurityReviewFeaturesTable } from './table/SecurityReviewFeaturesTable';
-
-interface FeatureRow {
-  id: number;
-  submission_feature_id: number;
-  feature_type_display_name: string;
-  feature_type_name: string;
-  secured: boolean;
-}
 
 interface SecurityReviewFeaturesProps {
   rows: FeatureRow[];
   rowCount: number;
-  selectedFeatureIds: Set<number>;
   setSelectedFeatureIds: (ids: Set<number>) => void;
-  paginationModel: any;
-  setPaginationModel: (model: any) => void;
-  sortModel: any;
-  setSortModel: (model: any) => void;
-  onRowClick: (params: any) => void;
+  paginationModel: GridPaginationModel;
+  setPaginationModel: (model: GridPaginationModel) => void;
+  sortModel: GridSortModel;
+  setSortModel: (model: GridSortModel) => void;
+  onRowClick: (params: GridRowParams<FeatureRow>) => void;
   onRowSecurityClick: (row: FeatureRow) => void;
 }
 
 export const SecurityReviewFeatures = ({
   rows,
   rowCount,
-  selectedFeatureIds,
   setSelectedFeatureIds,
   paginationModel,
   setPaginationModel,

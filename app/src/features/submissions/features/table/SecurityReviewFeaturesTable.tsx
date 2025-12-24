@@ -13,14 +13,6 @@ import {
 } from '@mui/x-data-grid';
 import appTheme from 'themes/appTheme';
 
-interface FeatureRow {
-  id: number;
-  submission_feature_id: number;
-  feature_type_display_name: string;
-  feature_type_name: string;
-  secured: boolean;
-}
-
 interface SecurityReviewFeaturesTableProps {
   rows: FeatureRow[];
   rowCount: number;
@@ -32,8 +24,6 @@ interface SecurityReviewFeaturesTableProps {
   onRowSecurityClick: (row: FeatureRow) => void;
   onRowClick?: (params: GridRowParams, event: MuiEvent<React.MouseEvent>) => void;
 }
-
-const pageSizeOptions = [10, 25, 50];
 
 export const SecurityReviewFeaturesTable = ({
   rows,
@@ -68,7 +58,7 @@ export const SecurityReviewFeaturesTable = ({
         </IconButton>
       )
     },
-    { field: 'feature_type_display_name', headerName: 'Feature Type', flex: 1 }
+    { field: 'feature_type_name', headerName: 'Feature Type', flex: 1 }
   ];
 
   return (
@@ -76,11 +66,12 @@ export const SecurityReviewFeaturesTable = ({
       rows={rows}
       columns={columns}
       checkboxSelection
+      getRowId={(row) => row.submission_feature_id}
       onRowSelectionModelChange={onSelectionChange}
       paginationMode="server"
       paginationModel={paginationModel}
       onPaginationModelChange={setPaginationModel}
-      pageSizeOptions={pageSizeOptions}
+      pageSizeOptions={[10, 25, 50]}
       sortingMode="server"
       sortModel={sortModel}
       onSortModelChange={setSortModel}

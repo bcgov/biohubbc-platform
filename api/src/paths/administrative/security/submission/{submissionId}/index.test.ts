@@ -62,7 +62,7 @@ describe('patchSecurityRulesOnSubmission', () => {
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(patchSecurityStub).to.have.been.calledOnceWith(1, [4, 5], [6, 7]);
+    expect(patchSecurityStub).to.have.been.calledOnceWithExactly(1, [4, 5], [6, 7]);
     expect(mockRes.statusValue).to.equal(204);
   });
 
@@ -91,7 +91,7 @@ describe('patchSecurityRulesOnSubmission', () => {
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(patchSecurityStub).to.have.been.calledOnceWith(2, [4, 5], []);
+    expect(patchSecurityStub).to.have.been.calledOnceWithExactly(2, [4, 5], []);
     expect(mockRes.statusValue).to.equal(204);
   });
 
@@ -120,7 +120,7 @@ describe('patchSecurityRulesOnSubmission', () => {
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(patchSecurityStub).to.have.been.calledOnceWith(3, [], [6, 7]);
+    expect(patchSecurityStub).to.have.been.calledOnceWithExactly(3, [], [6, 7]);
     expect(mockRes.statusValue).to.equal(204);
   });
 
@@ -149,7 +149,7 @@ describe('patchSecurityRulesOnSubmission', () => {
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(patchSecurityStub).to.have.been.calledOnceWith(4, []);
+    expect(patchSecurityStub).to.have.been.calledOnceWithExactly(4, [], []);
     expect(mockRes.statusValue).to.equal(204);
   });
 });

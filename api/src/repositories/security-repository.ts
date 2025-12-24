@@ -402,6 +402,10 @@ export class SecurityRepository extends BaseRepository {
     submissionId: number,
     securityRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
+    if (!securityRuleIds.length) {
+      return [];
+    }
+
     const placeholders = securityRuleIds.map((_, i) => `($${i + 1}::int)`).join(', ');
     const submissionIdPlaceholder = `$${securityRuleIds.length + 1}`;
 

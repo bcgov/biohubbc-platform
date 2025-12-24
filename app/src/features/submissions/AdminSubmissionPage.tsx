@@ -10,22 +10,11 @@ import SubmissionHeaderSecurityStatus from './components/SubmissionHeaderSecurit
 import { SubmissionHeaderToolbar } from './components/SubmissionHeaderToolbar';
 import { SecurityReviewFeatures } from './features/SecurityReviewFeatures';
 
-/* ------------------------------------------------------------------ */
-/* Types                                                              */
-/* ------------------------------------------------------------------ */
-
-interface FeatureRow {
-  id: number;
-  submission_feature_id: number;
-  feature_type_display_name: string;
-  feature_type_name: string;
-  secured: boolean;
-}
-
-/* ------------------------------------------------------------------ */
-/* Component                                                          */
-/* ------------------------------------------------------------------ */
-
+/**
+ * Page for admins to complete security reviews
+ *
+ * @returns
+ */
 export const AdminSubmissionPage = () => {
   const {
     submissionId,
@@ -40,15 +29,9 @@ export const AdminSubmissionPage = () => {
 
   const submission = submissionDataLoader.data;
 
-  /* ---------------- Selection State ---------------- */
-
   const [selectedFeatureIds, setSelectedFeatureIds] = useState<Set<number>>(new Set());
-
   const [dialogFeatureIds, setDialogFeatureIds] = useState<Set<number>>(new Set());
-
   const [isSecurityDialogOpen, setIsSecurityDialogOpen] = useState(false);
-
-  /* ---------------- Derived Data ---------------- */
 
   const rows: FeatureRow[] = useMemo(() => {
     return (
@@ -98,20 +81,17 @@ export const AdminSubmissionPage = () => {
 
   const refreshFeatures = useCallback(() => {
     featureDataLoader.refresh(submissionId, featuresPagination);
-  }, [featureDataLoader, submissionId, featuresPagination]);
+    submissionDataLoader.refresh(submissionId);
+  }, [featureDataLoader, submissionDataLoader, submissionId, featuresPagination]);
 
   const handleSecurityChange = useCallback(() => {
     refreshFeatures();
     closeSecurityDialog();
   }, [refreshFeatures, closeSecurityDialog]);
 
-  /* ---------------- Guard ---------------- */
-
   if (!submission) {
     return null;
   }
-
-  /* ---------------- Render ---------------- */
 
   return (
     <>
@@ -136,7 +116,6 @@ export const AdminSubmissionPage = () => {
           <SecurityReviewFeatures
             rows={rows}
             rowCount={rowCount}
-            selectedFeatureIds={selectedFeatureIds}
             setSelectedFeatureIds={setSelectedFeatureIds}
             paginationModel={paginationModel}
             setPaginationModel={setPaginationModel}
