@@ -25,6 +25,7 @@ env: | setup-env check-env ## Copies the default ./env_config/env.docker to ./.e
 postgres: | close build-postgres run-postgres ## Performs all commands necessary to run the postgres project (db) in docker
 backend: | close build-backend run-backend ## Performs all commands necessary to run all backend projects (db, api) in docker
 web: | close build-web run-web ## Performs all commands necessary to run all backend+web projects (db, api, app) in docker
+queue: | build-queue run-queue ## Starts the queue worker (run after backend/web is up)
 
 db-setup: | build-db-setup run-db-setup ## Performs all commands necessary to run the database migrations and seeding
 
@@ -92,36 +93,62 @@ run-postgres: ## Runs the postgres db containers
 ## ------------------------------------------------------------------------------
 ## Build/Run Backend Commands
 ## - Builds all of the BioHub backend projects (db, db_setup, api)
+## - Note: Queue worker is separate, use `make queue` to start it
 ## ------------------------------------------------------------------------------
 
 build-backend: ## Builds all backend containers
 	@echo "==============================================="
 	@echo "Make: build-backend - building backend images"
 	@echo "==============================================="
-	@docker compose build db db_setup api queue
+	@docker compose build db db_setup api
 
 run-backend: ## Runs all backend containers
 	@echo "==============================================="
 	@echo "Make: run-backend - running backend images"
 	@echo "==============================================="
-	@docker compose up -d db db_setup api queue
+	@docker compose up -d db db_setup api
 
 ## ------------------------------------------------------------------------------
 ## Build/Run Backend+Web Commands (backend + web frontend)
 ## - Builds all of the BioHub backend+web projects (db, db_setup, api, app)
+## - Note: Queue worker is separate, use `make queue` to start it
 ## ------------------------------------------------------------------------------
 
 build-web: ## Builds all backend+web containers
 	@echo "==============================================="
 	@echo "Make: build-web - building web images"
 	@echo "==============================================="
-	@docker compose build db db_setup api queue app
+	@docker compose build db db_setup api app
 
 run-web: ## Runs all backend+web containers
 	@echo "==============================================="
 	@echo "Make: run-web - running web images"
 	@echo "==============================================="
-	@docker compose up -d db db_setup api queue app
+	@docker compose up -d db db_setup api app
+
+## ------------------------------------------------------------------------------
+## Build/Run Queue Worker Commands
+## - Builds and runs the pg-boss queue worker for async job processing
+## - Run this after backend/web is up when testing async features
+## ------------------------------------------------------------------------------
+
+build-queue: ## Builds the queue worker container
+	@echo "==============================================="
+	@echo "Make: build-queue - building queue worker image"
+	@echo "==============================================="
+	@docker compose build queue
+
+run-queue: ## Runs the queue worker container
+	@echo "==============================================="
+	@echo "Make: run-queue - running queue worker"
+	@echo "==============================================="
+	@docker compose up -d queue
+
+restart-queue: ## Restarts the queue worker container
+	@echo "==============================================="
+	@echo "Make: restart-queue - restarting queue worker"
+	@echo "==============================================="
+	@docker compose restart queue
 
 ## ------------------------------------------------------------------------------
 ## Commands to shell into the target container

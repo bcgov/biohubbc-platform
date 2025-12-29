@@ -154,8 +154,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      db_setup:
-        condition: service_completed_successfully
+      # Note: db_setup dependency removed - queue is meant to run after make web/backend
 
   # Build the clamav docker image
   clamav:

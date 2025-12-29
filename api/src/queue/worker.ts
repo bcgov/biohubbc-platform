@@ -1,6 +1,10 @@
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
-import { exampleJobHandler, IExampleJobData } from './jobs/example-job';
+import {
+  IProcessSubmissionFeaturesJobData,
+  processSubmissionFeaturesJobHandler
+} from './jobs/process-submission-features-job';
+import { ITestJobData, testJobHandler } from './jobs/test-job';
 import { getPgBoss } from './pg-boss-service';
 
 const defaultLog = getLogger('queue/worker');
@@ -20,17 +24,27 @@ const DEFAULT_BATCH_SIZE = 4;
 export const registerWorkers = async (): Promise<void> => {
   const boss = getPgBoss();
 
-  // Register example job handler
-  await boss.work<IExampleJobData>(
-    JobQueues.EXAMPLE,
+  // Create queues (pg-boss v10 requires this before work/send)
+  await boss.createQueue(JobQueues.TEST);
+  await boss.createQueue(JobQueues.PROCESS_SUBMISSION_FEATURES);
+
+  // Register test job handler
+  await boss.work<ITestJobData>(
+    JobQueues.TEST,
     {
       batchSize: DEFAULT_BATCH_SIZE
     },
-    exampleJobHandler
+    testJobHandler
   );
 
-  // Register additional job handlers here:
-  // await boss.work<ISomeJobData>(JobQueues.SOME_JOB, { ... }, someJobHandler);
+  // Register process submission features job handler
+  await boss.work<IProcessSubmissionFeaturesJobData>(
+    JobQueues.PROCESS_SUBMISSION_FEATURES,
+    {
+      batchSize: DEFAULT_BATCH_SIZE
+    },
+    processSubmissionFeaturesJobHandler
+  );
 
   defaultLog.info({
     label: 'registerWorkers',

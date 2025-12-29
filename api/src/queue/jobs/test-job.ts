@@ -2,33 +2,33 @@ import PgBoss from 'pg-boss';
 import { getAPIUserDBConnection } from '../../database/db';
 import { getLogger } from '../../utils/logger';
 
-const defaultLog = getLogger('queue/jobs/example-job');
+const defaultLog = getLogger('queue/jobs/test-job');
 
 /**
- * Example job data interface.
+ * Test job data interface.
  * Define the expected shape of data passed to this job.
  */
-export interface IExampleJobData {
+export interface ITestJobData {
   message: string;
 }
 
 /**
- * Example job handler.
+ * Test job handler.
  *
  * This is a template demonstrating the pattern for pg-boss job handlers.
  * Replace with actual job logic as needed.
  *
  * Note: pg-boss v10 passes an array of jobs to handlers.
  *
- * @param {PgBoss.Job<IExampleJobData>[]} jobs The jobs to process
+ * @param {PgBoss.Job<ITestJobData>[]} jobs The jobs to process
  * @return {*}  {Promise<void>}
  */
-export const exampleJobHandler: PgBoss.WorkHandler<IExampleJobData> = async (jobs) => {
+export const testJobHandler: PgBoss.WorkHandler<ITestJobData> = async (jobs) => {
   for (const job of jobs) {
     const { message } = job.data;
 
     defaultLog.info({
-      label: 'exampleJobHandler',
+      label: 'testJobHandler',
       message: 'Processing job',
       jobId: job.id,
       data: { message }
@@ -41,21 +41,18 @@ export const exampleJobHandler: PgBoss.WorkHandler<IExampleJobData> = async (job
       await connection.open();
 
       // TODO: Add actual job processing logic here
-      // Example:
-      // const service = new SomeService(connection);
-      // await service.doSomething(message);
 
       await connection.commit();
 
       defaultLog.info({
-        label: 'exampleJobHandler',
+        label: 'testJobHandler',
         message: 'Job completed successfully',
         jobId: job.id
       });
     } catch (error) {
       await connection.rollback();
       defaultLog.error({
-        label: 'exampleJobHandler',
+        label: 'testJobHandler',
         message: 'Job failed',
         jobId: job.id,
         error

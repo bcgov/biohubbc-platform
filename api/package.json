@@ -15,6 +15,7 @@
     "queue": "ts-node src/queue",
     "queue-reload": "nodemon --watch src --ext ts --exec ts-node --files src/queue.ts",
     "test": "mocha",
+    "test:integration": "mocha --config .mocharc.integration.json",
     "test-watch": "mocha --watch",
     "coverage": "nyc mocha",
     "lint": "eslint .",

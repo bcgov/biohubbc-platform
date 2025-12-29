@@ -1,7 +1,7 @@
 import { defaultPoolConfig, initDBPool } from './database/db';
 import { initDBConstants } from './database/db-constants';
-import { initPgBoss, stopPgBoss } from './pgboss/pg-boss-service';
-import { registerWorkers } from './pgboss/worker';
+import { initPgBoss, stopPgBoss } from './queue/pg-boss-service';
+import { registerWorkers } from './queue/worker';
 import { getLogger } from './utils/logger';
 
 const defaultLog = getLogger('queue');

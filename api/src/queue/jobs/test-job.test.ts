@@ -4,14 +4,14 @@ import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import * as db from '../../database/db';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { exampleJobHandler, IExampleJobData } from './example-job';
+import { ITestJobData, testJobHandler } from './test-job';
 
-describe('example-job', () => {
+describe('test-job', () => {
   afterEach(() => {
     sinon.restore();
   });
 
-  describe('exampleJobHandler', () => {
+  describe('testJobHandler', () => {
     it('opens a database connection for each job', async () => {
       const mockDBConnection = getMockDBConnection();
       const openStub = sinon.stub().resolves();
@@ -29,9 +29,9 @@ describe('example-job', () => {
           id: 'test-job-id',
           data: { message: 'test message' }
         }
-      ] as PgBoss.Job<IExampleJobData>[];
+      ] as PgBoss.Job<ITestJobData>[];
 
-      await exampleJobHandler(mockJobs);
+      await testJobHandler(mockJobs);
 
       expect(openStub.calledOnce).to.be.true;
     });
@@ -53,9 +53,9 @@ describe('example-job', () => {
           id: 'test-job-id',
           data: { message: 'test message' }
         }
-      ] as PgBoss.Job<IExampleJobData>[];
+      ] as PgBoss.Job<ITestJobData>[];
 
-      await exampleJobHandler(mockJobs);
+      await testJobHandler(mockJobs);
 
       expect(commitStub.calledOnce).to.be.true;
     });
@@ -77,9 +77,9 @@ describe('example-job', () => {
           id: 'test-job-id',
           data: { message: 'test message' }
         }
-      ] as PgBoss.Job<IExampleJobData>[];
+      ] as PgBoss.Job<ITestJobData>[];
 
-      await exampleJobHandler(mockJobs);
+      await testJobHandler(mockJobs);
 
       expect(releaseStub.calledOnce).to.be.true;
     });
@@ -103,10 +103,10 @@ describe('example-job', () => {
           id: 'test-job-id',
           data: { message: 'test message' }
         }
-      ] as PgBoss.Job<IExampleJobData>[];
+      ] as PgBoss.Job<ITestJobData>[];
 
       try {
-        await exampleJobHandler(mockJobs);
+        await testJobHandler(mockJobs);
         expect.fail('Expected an error to be thrown');
       } catch (error) {
         expect(rollbackStub.calledOnce).to.be.true;
@@ -133,10 +133,10 @@ describe('example-job', () => {
           id: 'test-job-id',
           data: { message: 'test message' }
         }
-      ] as PgBoss.Job<IExampleJobData>[];
+      ] as PgBoss.Job<ITestJobData>[];
 
       try {
-        await exampleJobHandler(mockJobs);
+        await testJobHandler(mockJobs);
       } catch {
         // Expected
       }
@@ -160,10 +160,10 @@ describe('example-job', () => {
           id: 'test-job-id',
           data: { message: 'test message' }
         }
-      ] as PgBoss.Job<IExampleJobData>[];
+      ] as PgBoss.Job<ITestJobData>[];
 
       try {
-        await exampleJobHandler(mockJobs);
+        await testJobHandler(mockJobs);
         expect.fail('Expected an error to be thrown');
       } catch (error) {
         expect(error).to.equal(testError);
@@ -187,9 +187,9 @@ describe('example-job', () => {
       const mockJobs = [
         { id: 'job-1', data: { message: 'message 1' } },
         { id: 'job-2', data: { message: 'message 2' } }
-      ] as PgBoss.Job<IExampleJobData>[];
+      ] as PgBoss.Job<ITestJobData>[];
 
-      await exampleJobHandler(mockJobs);
+      await testJobHandler(mockJobs);
 
       expect(openStub.callCount).to.equal(2);
       expect(commitStub.callCount).to.equal(2);
@@ -204,9 +204,9 @@ describe('example-job', () => {
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
-      const mockJobs: PgBoss.Job<IExampleJobData>[] = [];
+      const mockJobs: PgBoss.Job<ITestJobData>[] = [];
 
-      await exampleJobHandler(mockJobs);
+      await testJobHandler(mockJobs);
 
       expect(openStub.called).to.be.false;
     });
