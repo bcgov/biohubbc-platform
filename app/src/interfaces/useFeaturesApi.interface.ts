@@ -1,14 +1,17 @@
+import { ApiPaginationResponseParams } from 'types/misc';
+
 export interface ISubmissionFeatureResponse {
-  feature: ISubmissionFeature;
+  features: ISubmissionFeature[];
+  pagination: ApiPaginationResponseParams;
 }
 
-interface ISubmissionFeature {
+export interface ISubmissionFeature {
   submission_feature_id: number;
   uuid: string;
   submission_id: number;
   feature_type_id: number;
-  source_id: string;
-  data: ISubmissionFeature;
   feature_type_name: string;
+  source_id: string;
+  data: Record<string, any>;
   secured: boolean;
 }

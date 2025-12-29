@@ -1,10 +1,10 @@
 import { cleanup, fireEvent, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
+import { SearchFeatureResultWithRelevance } from 'interfaces/useSearchApi.interface';
 import { MemoryRouter } from 'react-router';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import SubmissionsListPage from './SubmissionsListPage';
-import { SearchFeatureResultWithRelevance } from 'interfaces/useSearchApi.interface';
 
 const renderPage = () =>
   render(

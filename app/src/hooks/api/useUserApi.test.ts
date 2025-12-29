@@ -1,12 +1,14 @@
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import MockAdapter from 'axios-mock-adapter';
 import useUserApi from './useUserApi';
 
 describe('useUserApi', () => {
-  let mock: any;
+  let mock: MockAdapter;
+  let axiosInstance: AxiosInstance;
 
   beforeEach(() => {
-    mock = new MockAdapter(axios);
+    axiosInstance = axios.create();
+    mock = new MockAdapter(axiosInstance);
   });
 
   afterEach(() => {
@@ -15,18 +17,56 @@ describe('useUserApi', () => {
 
   const userId = 123;
 
-  it('getUser works as expected', async () => {
-    mock.onGet('/api/user/self').reply(200, {
-      system_user_id: 1,
-      user_identifier: 'myidirboss',
-      role_names: ['role 1', 'role 2']
+  describe('upsertUser', () => {
+    it('creates new user and returns data', async () => {
+      mock.onPut('/api/user/self').reply(201, {
+        system_user_id: 1,
+        user_identifier: 'newuser',
+        user_guid: '123-456-789',
+        role_names: ['Member'],
+        display_name: 'New User',
+        email: 'new@example.com'
+      });
+
+      const result = await useUserApi(axiosInstance).upsertUser();
+
+      expect(result.system_user_id).toEqual(1);
+      expect(result.user_identifier).toEqual('newuser');
+      expect(result.user_guid).toEqual('123-456-789');
+      expect(result.role_names).toEqual(['Member']);
     });
 
-    const result = await useUserApi(axios).getUser();
+    it('updates existing user and returns data', async () => {
+      mock.onPut('/api/user/self').reply(200, {
+        system_user_id: 1,
+        user_identifier: 'existinguser',
+        user_guid: '123-456-789',
+        role_names: ['Member'],
+        display_name: 'Updated Name',
+        email: 'updated@example.com'
+      });
 
-    expect(result.system_user_id).toEqual(1);
-    expect(result.user_identifier).toEqual('myidirboss');
-    expect(result.role_names).toEqual(['role 1', 'role 2']);
+      const result = await useUserApi(axiosInstance).upsertUser();
+
+      expect(result.system_user_id).toEqual(1);
+      expect(result.display_name).toEqual('Updated Name');
+      expect(result.email).toEqual('updated@example.com');
+    });
+  });
+
+  describe('getOrRegisterUser', () => {
+    it('calls upsertUser and returns the user', async () => {
+      mock.onPut('/api/user/self').reply(200, {
+        system_user_id: 1,
+        user_identifier: 'testuser',
+        role_names: ['Member']
+      });
+
+      const result = await useUserApi(axiosInstance).getOrRegisterUser();
+
+      expect(result.system_user_id).toEqual(1);
+      expect(result.user_identifier).toEqual('testuser');
+    });
   });
 
   it('getUserById works as expected', async () => {
@@ -37,7 +77,7 @@ describe('useUserApi', () => {
       role_names: ['role 1', 'role 2']
     });
 
-    const result = await useUserApi(axios).getUserById(123);
+    const result = await useUserApi(axiosInstance).getUserById(123);
 
     expect(result.system_user_id).toEqual(123);
     expect(result.record_end_date).toEqual('test');
@@ -59,7 +99,7 @@ describe('useUserApi', () => {
       }
     ]);
 
-    const result = await useUserApi(axios).getUsersList();
+    const result = await useUserApi(axiosInstance).getUsersList();
 
     expect(result[0].system_user_id).toEqual(1);
     expect(result[0].user_identifier).toEqual('myidirboss');
@@ -74,7 +114,7 @@ describe('useUserApi', () => {
 
     mock.onPost(`/api/user/${userId}/system-roles/create`).reply(200, 3);
 
-    const result = await useUserApi(axios).addSystemUserRoles(1, [1, 2, 3]);
+    const result = await useUserApi(axiosInstance).addSystemUserRoles(1, [1, 2, 3]);
 
     expect(result).toEqual(3);
   });

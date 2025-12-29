@@ -183,7 +183,9 @@ const SubmissionsListPage = () => {
     return downloadJSON(data, fileName);
   };
 
-  /** Render search content */
+  /**
+   * Renders the appropriate content based on loading and search state.
+   */
   const renderSearchContent = () => {
     if (searchDataLoader.isLoading) {
       return (
@@ -192,7 +194,9 @@ const SubmissionsListPage = () => {
           <SubmissionCardSkeletonLoader />
         </>
       );
-    } else if (isSearching) {
+    }
+
+    if (isSearching) {
       return (
         <>
           <Box pb={4}>
@@ -212,22 +216,24 @@ const SubmissionsListPage = () => {
           />
         </>
       );
-    } else {
-      return (
-        <Box
-          display="flex"
-          flexDirection="column"
-          alignItems="center"
-          justifyContent="center"
-          py={8}
-          color="textSecondary">
-          <Typography variant="h5" gutterBottom>
-            Search to find data
-          </Typography>
-          <Typography variant="body2">Enter keywords, add filters, or both to discover data</Typography>
-        </Box>
-      );
     }
+
+    return (
+      <Box
+        display="flex"
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+        py={8}
+        color="textSecondary">
+        <Typography variant="h5" color="textSecondary" gutterBottom>
+          Search to find data
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          Enter keywords, add filters, or both to discover data
+        </Typography>
+      </Box>
+    );
   };
 
   return (

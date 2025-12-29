@@ -1513,4 +1513,75 @@ describe('SubmissionRepository', () => {
       expect(response).to.eql('KEY');
     });
   });
+
+  describe('getSubmissionFeaturesBySubmissionId', () => {
+    it('should return a list of submission features', async () => {
+      const mockResponse = {
+        rows: [
+          {
+            submission_feature_id: 1,
+            feature_type_name: 'Type A',
+            feature_type_display_name: 'Display A',
+            submission_feature_security_ids: [1, 2]
+          }
+        ],
+        rowCount: 1
+      } as any;
+      const dbConnection = getMockDBConnection({ sql: () => mockResponse });
+
+      const repository = new SubmissionRepository(dbConnection);
+
+      const response = await repository.getSubmissionFeaturesBySubmissionId(123);
+
+      expect(response).to.eql([
+        {
+          submission_feature_id: 1,
+          feature_type_name: 'Type A',
+          feature_type_display_name: 'Display A',
+          submission_feature_security_ids: [1, 2]
+        }
+      ]);
+    });
+
+    it('should throw an error when rowCount is 0', async () => {
+      const mockResponse = { rows: [], rowCount: 0 } as any;
+      const dbConnection = getMockDBConnection({ sql: () => mockResponse });
+
+      const repository = new SubmissionRepository(dbConnection);
+
+      try {
+        await repository.getSubmissionFeaturesBySubmissionId(123);
+        expect.fail();
+      } catch (error) {
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get submission feature record');
+      }
+    });
+  });
+
+  describe('getSubmissionFeaturesCount', () => {
+    it('should return the correct submission feature count', async () => {
+      const mockQueryResponse = { rows: [{ count: 42 }], rowCount: 1 } as any;
+      const dbConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const repository = new SubmissionRepository(dbConnection);
+
+      const count = await repository.getSubmissionFeaturesCount(123);
+
+      expect(count).to.equal(42);
+    });
+
+    it('should throw an error when count query fails', async () => {
+      const mockQueryResponse = { rows: [], rowCount: 0 } as any;
+      const dbConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const repository = new SubmissionRepository(dbConnection);
+
+      try {
+        await repository.getSubmissionFeaturesCount(123);
+        expect.fail();
+      } catch (error) {
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get submission feature count');
+      }
+    });
+  });
 });
