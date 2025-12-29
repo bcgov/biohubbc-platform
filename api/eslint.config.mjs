@@ -17,7 +17,7 @@ export default [
     ]
   },
   {
-    files: ['**/*.js', '**/*.ts', '**/*.jsx', '**/*.tsx'],
+    files: ['**/*.js', '**/*.ts'],
     languageOptions: {
       globals: {
         ...globals.node,
