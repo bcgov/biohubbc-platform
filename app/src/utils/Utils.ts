@@ -367,3 +367,11 @@ export const getFormattedIdentitySource = (identitySource: SYSTEM_IDENTITY_SOURC
 export const objectKeys = <Obj extends Record<any, any>>(obj: Obj): (keyof Obj)[] => {
   return Object.keys(obj) as (keyof Obj)[];
 };
+
+/**
+ * This will grab the first element from an array or return null if nothing is found
+ *
+ * @param arr array to check
+ * @returns T
+ */
+export const firstOrNull = <T>(arr: readonly T[]): T | null => (arr.length ? arr[0] : null);
