@@ -1,13 +1,14 @@
 import Editor, { loader, Monaco, OnMount, OnValidate } from '@monaco-editor/react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { debounce } from 'lodash-es';
 import { usePolicyAutocompleteContext } from 'hooks/useContext';
+import { ISubmissionFeatureForReview } from 'interfaces/useSubmissionsApi.interface';
+import { debounce } from 'lodash-es';
 import type { editor, languages, MarkerSeverity } from 'monaco-editor';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { operatorMetadata, PolicyConditionOperators, policyJsonSchema } from '../utils/policyJsonSchema';
 import { defaultPolicyDocument } from '../utils/policyTransform';
-import { validatePolicyDocument, IValidationContext, IValidationMarker } from '../utils/policyValidator';
+import { IValidationContext, IValidationMarker, validatePolicyDocument } from '../utils/policyValidator';
 
 /** Cursor position in the editor */
 interface EditorPosition {
@@ -142,10 +143,7 @@ const sharedContextRef: {
         feature_property_type_name: string;
       }[];
     }[];
-    submissionFeaturesCache: Map<
-      number,
-      { feature_type_name: string; features: { submission_feature_id: number }[] }[]
-    >;
+    submissionFeaturesCache: Map<number, ISubmissionFeatureForReview[]>;
     fetchFeaturesForAutocomplete: (submissionId: number) => Promise<void>;
   };
 } = {
@@ -187,14 +185,21 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
   };
 
   // Build validation context from autocomplete context
-  const validationContext: IValidationContext = useMemo(
-    () => ({
-      submissions: policyAutocompleteContext.submissionsDataLoader.data || [],
+  const previousCacheSizeRef = useRef(0);
+  const validationContext: IValidationContext = useMemo(() => {
+    const currentCacheSize = policyAutocompleteContext.submissionFeaturesCache.size;
+    previousCacheSizeRef.current = currentCacheSize;
+
+    return {
+      submissions: policyAutocompleteContext.submissionsDataLoader.data ?? [],
       featureTypes: policyAutocompleteContext.featureTypes,
       submissionFeaturesCache: policyAutocompleteContext.submissionFeaturesCache
-    }),
-    [policyAutocompleteContext]
-  );
+    };
+  }, [
+    policyAutocompleteContext.submissionsDataLoader.data,
+    policyAutocompleteContext.featureTypes,
+    policyAutocompleteContext.submissionFeaturesCache
+  ]);
 
   // Run validation and set markers
   const runValidation = useCallback(() => {
@@ -434,24 +439,19 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
         const suggestions: Suggestion[] = [{ display: '*', insert: '*' }];
 
         const submissionId = Number.parseInt(submissionIdStr, 10);
+
         if (!Number.isNaN(submissionId)) {
-          const featureGroups = sharedContextRef.current.submissionFeaturesCache.get(submissionId) || [];
+          const features = sharedContextRef.current.submissionFeaturesCache.get(submissionId) || [];
 
-          // Filter by feature type if specified and not wildcard
-          const relevantGroups =
-            featureType && featureType !== '*'
-              ? featureGroups.filter((g) => g.feature_type_name === featureType)
-              : featureGroups;
+          const relevantFeatures =
+            featureType && featureType !== '*' ? features.filter((f) => f.feature_type_name === featureType) : features;
 
-          // Flatten all features into suggestions
-          for (const group of relevantGroups) {
-            for (const feature of group.features) {
-              suggestions.push({
-                display: `${feature.submission_feature_id} (${group.feature_type_name})`,
-                insert: String(feature.submission_feature_id)
-              });
-            }
-          }
+          suggestions.push(
+            ...relevantFeatures.map((feature) => ({
+              display: `${feature.submission_feature_id} (${feature.feature_type_name})`,
+              insert: String(feature.submission_feature_id)
+            }))
+          );
         }
 
         return suggestions;

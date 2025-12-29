@@ -8,13 +8,14 @@ import SecuritiesDialog from './SecuritiesDialog';
 
 interface IManageSecurityProps {
   submissionFeatureIds: Pick<GridRowSelectionModel, 'ids'>;
-  onClose: () => void;
+  onSubmit: () => void;
+  onClose?: () => void;
 }
 
 const ManageSecurity = (props: IManageSecurityProps) => {
-  const { submissionFeaturesAppliedRulesDataLoader } = useSubmissionContext();
+  const { securityDataLoader } = useSubmissionContext();
 
-  const hasSecurity = Boolean(submissionFeaturesAppliedRulesDataLoader.data?.length);
+  const hasSecurity = Boolean(securityDataLoader.data?.rules.length);
 
   const [isSecuritiesDialogOpen, setIsSecuritiesDialogOpen] = useState(false);
 
@@ -23,8 +24,11 @@ const ManageSecurity = (props: IManageSecurityProps) => {
       <SecuritiesDialog
         submissionFeatureIds={props.submissionFeatureIds}
         open={isSecuritiesDialogOpen}
+        onSubmit={props.onSubmit}
         onClose={() => {
-          props.onClose();
+          if (props.onClose) {
+            props.onClose();
+          }
           setIsSecuritiesDialogOpen(false);
         }}
       />
