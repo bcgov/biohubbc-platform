@@ -103,7 +103,13 @@ describe('getAddSystemRolesHandler', () => {
       update_date: null,
       revision_count: 0,
       role_ids: [11, 22],
-      role_names: ['role 11', 'role 22']
+      role_names: ['role 11', 'role 22'],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null
     });
 
     sinon.stub(UserService.prototype, 'addUserSystemRoles').rejects(new Error('add user error'));
@@ -155,7 +161,13 @@ describe('getAddSystemRolesHandler', () => {
       update_date: null,
       revision_count: 0,
       role_ids: [1, 2],
-      role_names: ['role 1', 'role 2']
+      role_names: ['role 1', 'role 2'],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null
     });
 
     const requestHandler = system_roles.getAddSystemRolesHandler();
@@ -202,7 +214,13 @@ describe('getAddSystemRolesHandler', () => {
       update_date: null,
       revision_count: 0,
       role_ids: [],
-      role_names: ['role 11', 'role 22']
+      role_names: ['role 11', 'role 22'],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null
     });
 
     sinon.stub(UserService.prototype, 'addUserSystemRoles').resolves();

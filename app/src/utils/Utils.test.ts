@@ -4,6 +4,7 @@ import { expect } from 'vitest';
 import {
   downloadFile,
   ensureProtocol,
+  firstOrNull,
   getFormattedAmount,
   getFormattedDate,
   getFormattedDateRangeString,
@@ -350,5 +351,33 @@ describe('getFormattedIdentitySource', () => {
     const result = getFormattedIdentitySource(null as unknown as SYSTEM_IDENTITY_SOURCE);
 
     expect(result).toEqual(null);
+  });
+
+  describe('firstOrNull', () => {
+    it('returns the first element of a non-empty array', () => {
+      const response = firstOrNull(['apple', 'banana', 'cherry']);
+      expect(response).toEqual('apple');
+    });
+
+    it('returns null for an empty array', () => {
+      const response = firstOrNull([]);
+      expect(response).toBeNull();
+    });
+
+    it('works with numbers', () => {
+      const response = firstOrNull([10, 20, 30]);
+      expect(response).toEqual(10);
+    });
+
+    it('works with a single-element array', () => {
+      const response = firstOrNull(['only']);
+      expect(response).toEqual('only');
+    });
+
+    it('works with objects', () => {
+      const arr = [{ id: 1 }, { id: 2 }];
+      const response = firstOrNull(arr);
+      expect(response).toEqual({ id: 1 });
+    });
   });
 });

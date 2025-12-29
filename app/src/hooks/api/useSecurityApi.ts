@@ -2,8 +2,10 @@ import { AxiosInstance } from 'axios';
 import {
   IListPersecutionHarmResponse,
   IPatchFeatureSecurityRules,
-  ISecureDataAccessRequestForm
+  ISecureDataAccessRequestForm,
+  ISubmissionFeatureSecurityRulesSummaryResponse
 } from 'interfaces/useSecurityApi.interface';
+import qs from 'qs';
 
 export interface ISecurityRule {
   security_rule_id: number;
@@ -30,12 +32,6 @@ export interface ISecurityRuleAndCategory {
   category_description: string;
   category_record_effective_date: string;
   category_record_end_date: string;
-}
-
-export interface ISubmissionFeatureSecurityRecord {
-  submission_feature_security_id: number;
-  submission_feature_id: number;
-  security_rule_id: number;
 }
 
 /**
@@ -101,47 +97,70 @@ const useSecurityApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Patches security rules that are applied or removed to the given set of submission features. If
-   * a particular rule happens to belong to both `applyRuleIds` and `removeRuleIds`, it will always
-   * be added.
+   * Patches security rules that are applied or removed to the given set of submission features.
+   * If a particular rule belongs to both `stagedForApply` and `stagedForRemove`, it will always be added.
    *
-   * @param {number[]} submissionFeatureIds
-   * @param {number[]} ruleIds
-   * @return {*}  {Promise<any[]>}
+   * @param {number} submissionId
+   * @param {IPatchFeatureSecurityRules} featureSecurityRulesPatch
+   * @return {Promise<void>}
    */
   const patchSecurityRulesOnSubmissionFeatures = async (
     submissionId: number,
     featureSecurityRulesPatch: IPatchFeatureSecurityRules
   ): Promise<void> => {
-    const { data } = await axios.patch(`api/administrative/security/submission/${submissionId}`, {
+    await axios.patch(`api/administrative/security/submission/${submissionId}/feature`, {
       applyRuleIds: featureSecurityRulesPatch.stagedForApply.map((rule) => rule.security_rule_id),
       removeRuleIds: featureSecurityRulesPatch.stagedForRemove.map((rule) => rule.security_rule_id),
       submissionFeatureIds: featureSecurityRulesPatch.submissionFeatureIds
     });
+  };
 
-    return data;
+  /**
+   * Patches security rules for all features of a submission.
+   * If a rule exists in both `stagedForApply` and `stagedForRemove`, it will always be applied.
+   *
+   * @param {number} submissionId
+   * @param {IPatchFeatureSecurityRules} submissionSecurityPatch
+   * @return {Promise<void>}
+   */
+  const patchSecurityRulesOnSubmission = async (
+    submissionId: number,
+    submissionSecurityPatch: IPatchFeatureSecurityRules
+  ): Promise<void> => {
+    await axios.patch(`api/administrative/security/submission/${submissionId}`, {
+      applyRuleIds: submissionSecurityPatch.stagedForApply.map((rule) => rule.security_rule_id),
+      removeRuleIds: submissionSecurityPatch.stagedForRemove.map((rule) => rule.security_rule_id)
+    });
   };
 
   /**
    * Retrieves the list of all security rule IDs associated with the features belonging to the given submission.
    *
-   * @param {number[]} features
-   * @return {*}  {Promise<ISubmissionFeatureSecurityRecord[]>}
+   * @param {number} submissionId
+   * @param {number[]} submissionFeatureIds
+   * @return {Promise<ISubmissionFeatureSecurityRulesSummaryResponse[]>}
    */
-  const getAllSecurityRulesForSubmission = async (
-    submissionId: number
-  ): Promise<ISubmissionFeatureSecurityRecord[]> => {
-    const { data } = await axios.get(`api/administrative/security/submission/${submissionId}`);
+  const getSubmissionFeatureSecuritySummary = async (
+    submissionId: number,
+    submissionFeatureIds?: number[]
+  ): Promise<ISubmissionFeatureSecurityRulesSummaryResponse> => {
+    const { data } = await axios.get(`api/administrative/security/submission/${submissionId}`, {
+      params: {
+        submissionFeatureIds
+      },
+      paramsSerializer: (params) => qs.stringify(params, { arrayFormat: 'repeat' })
+    });
 
     return data;
   };
 
   return {
+    patchSecurityRulesOnSubmission,
     sendSecureArtifactAccessRequest,
     listPersecutionHarmRules,
     applySecurityReasonsToArtifacts,
     patchSecurityRulesOnSubmissionFeatures,
-    getAllSecurityRulesForSubmission,
+    getSubmissionFeatureSecuritySummary,
     getActiveSecurityRulesWithCategories
   };
 };

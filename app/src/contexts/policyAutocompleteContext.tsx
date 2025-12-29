@@ -3,7 +3,7 @@ import { useCodesContext, useDialogContext } from 'hooks/useContext';
 import useDataLoader, { DataLoader } from 'hooks/useDataLoader';
 import { FeatureTypeWithFeaturePropertiesCode } from 'interfaces/useCodesApi.interface';
 import {
-  IGetSubmissionGroupedFeatureResponse,
+  ISubmissionFeatureForReview,
   SubmissionRecordWithSecurityAndRootFeature
 } from 'interfaces/useSubmissionsApi.interface';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -32,10 +32,10 @@ export interface IPolicyAutocompleteContext {
   /**
    * Cache of submission features for autocomplete, keyed by submission ID.
    *
-   * @type {Map<number, IGetSubmissionGroupedFeatureResponse[]>}
+   * @type {Map<number, ISubmissionFeatureForReview[]>}
    * @memberof IPolicyAutocompleteContext
    */
-  submissionFeaturesCache: Map<number, IGetSubmissionGroupedFeatureResponse[]>;
+  submissionFeaturesCache: Map<number, ISubmissionFeatureForReview[]>;
   /**
    * Fetch features for a specific submission to populate autocomplete options.
    *
@@ -72,9 +72,9 @@ export const PolicyAutocompleteContextProvider: React.FC<React.PropsWithChildren
   const dialogContext = useDialogContext();
 
   // Cache for submission features, keyed by submission ID
-  const [submissionFeaturesCache, setSubmissionFeaturesCache] = useState<
-    Map<number, IGetSubmissionGroupedFeatureResponse[]>
-  >(new Map());
+  const [submissionFeaturesCache, setSubmissionFeaturesCache] = useState<Map<number, ISubmissionFeatureForReview[]>>(
+    new Map()
+  );
 
   // Data loader for published submissions
   const submissionsDataLoader = useDataLoader(biohubApi.submissions.getPublishedSubmissionsForAdmins);
@@ -99,8 +99,8 @@ export const PolicyAutocompleteContextProvider: React.FC<React.PropsWithChildren
       }
 
       try {
-        const featureGroups = await biohubApi.submissions.getSubmissionFeatureGroups(submissionId);
-        setSubmissionFeaturesCache((prev) => new Map(prev).set(submissionId, featureGroups));
+        const featureGroups = await biohubApi.submissions.getSubmissionFeatures(submissionId);
+        setSubmissionFeaturesCache((prev) => new Map(prev).set(submissionId, featureGroups.features));
       } catch {
         dialogContext.setSnackbar({
           snackbarMessage: `Failed to fetch features for submission ${submissionId}`,

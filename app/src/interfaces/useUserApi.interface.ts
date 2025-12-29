@@ -6,4 +6,6 @@ export interface ISystemUser {
   record_end_date: string | null;
   role_ids: number[];
   role_names: string[];
+  display_name: string | null;
+  email: string | null;
 }

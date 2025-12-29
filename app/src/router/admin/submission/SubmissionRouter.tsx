@@ -1,6 +1,6 @@
 import { SubmissionContextProvider } from 'contexts/submissionContext';
 import DashboardPage from 'features/admin/dashboard/DashboardPage';
-import AdminSubmissionPage from 'features/submissions/AdminSubmissionPage';
+import { AdminSubmissionPage } from 'features/submissions/AdminSubmissionPage';
 import { CreateSubmissionPage } from 'features/submissions/create/CreateSubmissionPage';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';

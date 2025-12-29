@@ -133,7 +133,13 @@ describe('authorizeByServiceClient', function () {
     const mockDBConnection = getMockDBConnection();
 
     const mockGetSystemUsersObjectResponse = {
-      role_names: [SYSTEM_ROLE.SYSTEM_ADMIN]
+      role_names: [SYSTEM_ROLE.SYSTEM_ADMIN],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null
     } as unknown as SystemUserExtended;
 
     sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(mockGetSystemUsersObjectResponse);
@@ -220,7 +226,15 @@ describe('authorizeBySystemRole', function () {
     const mockDBConnection = getMockDBConnection();
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
-      systemUser: { role_names: [] } as unknown as SystemUserExtended
+      systemUser: {
+        role_names: [],
+        display_name: null,
+        given_name: null,
+        family_name: null,
+        email: null,
+        agency: null,
+        notes: null
+      } as unknown as SystemUserExtended
     });
 
     const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemRole(mockAuthorizeSystemRoles);
@@ -236,7 +250,15 @@ describe('authorizeBySystemRole', function () {
     const mockDBConnection = getMockDBConnection();
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
-      systemUser: { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as SystemUserExtended
+      systemUser: {
+        role_names: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        display_name: null,
+        given_name: null,
+        family_name: null,
+        email: null,
+        agency: null,
+        notes: null
+      } as unknown as SystemUserExtended
     });
 
     const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemRole(mockAuthorizeSystemRoles);
@@ -331,7 +353,13 @@ describe('authorizeByServiceClient', function () {
       create_user: 1,
       update_date: null,
       update_user: null,
-      revision_count: 0
+      revision_count: 0,
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null
     };
 
     const getServiceClientSystemUserStub = sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(systemUser);
@@ -363,6 +391,12 @@ describe('getCachedSystemUser', function () {
       identity_source: SYSTEM_IDENTITY_SOURCE.IDIR,
       role_ids: [],
       role_names: [],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null,
       user_identifier: 'test-user',
       user_guid: 'guid-123',
       record_effective_date: '',
@@ -388,6 +422,12 @@ describe('getCachedSystemUser', function () {
       identity_source: SYSTEM_IDENTITY_SOURCE.IDIR,
       role_ids: [],
       role_names: [],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null,
       user_identity_source_id: 2,
       user_identifier: 'test-user',
       user_guid: 'guid-123',
@@ -451,7 +491,13 @@ describe('authorizeByAccessPolicy', function () {
     create_user: 1,
     update_date: null,
     update_user: null,
-    revision_count: 0
+    revision_count: 0,
+    display_name: null,
+    given_name: null,
+    family_name: null,
+    email: null,
+    agency: null,
+    notes: null
   };
 
   it('returns true immediately if feature is not secured', async function () {

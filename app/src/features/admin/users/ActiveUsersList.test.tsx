@@ -54,7 +54,9 @@ describe('ActiveUsersList', () => {
           record_end_date: '2020-10-10',
           identity_source: '',
           role_ids: [1, 2],
-          role_names: ['role 1', 'role 2']
+          role_names: ['role 1', 'role 2'],
+          display_name: null,
+          email: null
         }
       ],
       refresh: mockGetUsers
@@ -77,7 +79,9 @@ describe('ActiveUsersList', () => {
           record_end_date: '2020-10-10',
           identity_source: '',
           role_ids: [],
-          role_names: []
+          role_names: [],
+          display_name: null,
+          email: null
         }
       ],
       refresh: mockGetUsers

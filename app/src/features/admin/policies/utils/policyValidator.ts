@@ -1,6 +1,6 @@
-import { FeatureTypeWithFeaturePropertiesCode, FeaturePropertyCode } from 'interfaces/useCodesApi.interface';
+import { FeaturePropertyCode, FeatureTypeWithFeaturePropertiesCode } from 'interfaces/useCodesApi.interface';
 import {
-  IGetSubmissionGroupedFeatureResponse,
+  ISubmissionFeatureForReview,
   SubmissionRecordWithSecurityAndRootFeature
 } from 'interfaces/useSubmissionsApi.interface';
 
@@ -39,7 +39,7 @@ export interface IValidationMarker {
 export interface IValidationContext {
   submissions: SubmissionRecordWithSecurityAndRootFeature[];
   featureTypes: FeatureTypeWithFeaturePropertiesCode[];
-  submissionFeaturesCache: Map<number, IGetSubmissionGroupedFeatureResponse[]>;
+  submissionFeaturesCache: Map<number, ISubmissionFeatureForReview[]>;
 }
 
 /**
@@ -287,7 +287,7 @@ const validateUrn = (
     const features = context.submissionFeaturesCache.get(subId);
     if (features) {
       const fId = Number.parseInt(featureId, 10);
-      const featureExists = features.some((group) => group.features.some((f) => f.submission_feature_id === fId));
+      const featureExists = features.some((feature) => feature.submission_feature_id === fId);
       if (!featureExists) {
         markers.push(
           createMarker(
