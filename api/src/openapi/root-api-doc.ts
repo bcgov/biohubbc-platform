@@ -233,6 +233,36 @@ export const rootAPIDoc = {
             items: {
               type: 'string'
             }
+          },
+          display_name: {
+            description: 'User display name',
+            type: 'string',
+            nullable: true
+          },
+          given_name: {
+            description: 'User given (first) name',
+            type: 'string',
+            nullable: true
+          },
+          family_name: {
+            description: 'User family (last) name',
+            type: 'string',
+            nullable: true
+          },
+          email: {
+            description: 'User email address',
+            type: 'string',
+            nullable: true
+          },
+          agency: {
+            description: 'User organization (BCeID Business only)',
+            type: 'string',
+            nullable: true
+          },
+          notes: {
+            description: 'Admin notes about the user',
+            type: 'string',
+            nullable: true
           }
         },
         additionalProperties: false
