@@ -6,7 +6,9 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import { Formik, FormikProps } from 'formik';
+import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
+import { useDialogContext } from 'hooks/useContext';
 import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import { ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
 import { useRef, useState } from 'react';
@@ -22,15 +24,12 @@ interface ISecureDataAccessRequestDialogProps {
   initialArtifactSelection: number[];
 }
 
-import { DialogContext } from 'contexts/dialogContext';
-import { useContext } from 'react';
-
 const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProps) => {
   const biohubApi = useApi();
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const dialogContext = useContext(DialogContext);
+  const dialogContext = useDialogContext();
   const formikRef = useRef<FormikProps<ISecureDataAccessRequestForm>>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -47,14 +46,10 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
           'Your secure data access request has been submitted. A BioHub Administrator will contact you shortly.',
         open: true
       });
-    } catch (error: unknown) {
-      let message = 'An unknown error occurred';
-      if (error instanceof Error) {
-        message = error.message;
-      }
+    } catch (error) {
       dialogContext.setErrorDialog({
         dialogTitle: 'An Error Occurred',
-        dialogText: message,
+        dialogText: (error as APIError).message,
         open: true
       });
     } finally {
