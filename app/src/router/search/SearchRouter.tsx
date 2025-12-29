@@ -1,3 +1,4 @@
+import { SearchPage } from 'features/search/SearchPage';
 import SubmissionsListPage from 'features/submissions/list/SubmissionsListPage';
 import { SubmissionFeaturePage } from 'features/submissions/page/features/SubmissionFeaturePage';
 import BaseLayout from 'layouts/BaseLayout';
@@ -15,7 +16,17 @@ export const SearchRouter = () => {
         path="/"
         element={
           <BaseLayout>
-            <PageTitle title="Search" description="Browse submitted search" />
+            <PageTitle title="Search Data" description="Search and download data" />
+            <SearchPage />
+          </BaseLayout>
+        }
+      />
+
+      <Route
+        path="/list"
+        element={
+          <BaseLayout>
+            <PageTitle title="List Submissions" description="Browse submissions" />
             <SubmissionsListPage />
           </BaseLayout>
         }

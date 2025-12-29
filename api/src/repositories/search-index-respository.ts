@@ -133,6 +133,34 @@ export const SubmissionFeatureCombinedSearchValues = z.object({
 export type SubmissionFeatureCombinedSearchValues = z.infer<typeof SubmissionFeatureCombinedSearchValues>;
 
 /**
+ * Represents a search result for a feature with full details for display.
+ */
+export const SearchFeatureResultWithRelevancy = z.object({
+  submission_feature_id: z.number(),
+  submission_id: z.number(),
+  uuid: z.string(),
+  feature_type_id: z.number(),
+  feature_type_name: z.string(),
+  feature_name: z.string().nullable(),
+  feature_description: z.string().nullable(),
+  submission_name: z.string(),
+  is_secured: z.boolean(),
+  relevancy_score: z.number()
+});
+
+export type SearchFeatureResultWithRelevancy = z.infer<typeof SearchFeatureResultWithRelevancy>;
+
+/**
+ * Represents a property filter for searching.
+ */
+export interface IPropertyFilter {
+  featureTypeName: string;
+  propertyName: string;
+  propertyType: 'string' | 'number' | 'datetime';
+  value: string;
+}
+
+/**
  * A class for creating searchable records
  */
 export class SearchIndexRepository extends BaseRepository {
@@ -437,6 +465,263 @@ export class SearchIndexRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeatureSearchKeyValues);
+
+    return response.rows;
+  }
+
+  /**
+   * Searches for features by keywords using PostgreSQL full-text search.
+   * Each keyword is searched independently and results are aggregated.
+   *
+   * @param {string[]} keywords - Array of keywords to search for
+   * @return {*}  {Promise<SearchFeatureResultWithRelevancy[]>}
+   * @memberof SearchIndexRepository
+   */
+  async searchFeaturesByKeywords(keywords: string[]): Promise<SearchFeatureResultWithRelevancy[]> {
+    defaultLog.debug({ label: 'searchFeaturesByKeywords', keywords });
+
+    if (!keywords.length) {
+      return [];
+    }
+
+    // Build a combined tsquery with OR for all keywords
+    const combinedKeywords = keywords.join(' | ');
+
+    const sqlStatement = SQL`
+      SELECT DISTINCT
+        sf.submission_feature_id,
+        sf.submission_id,
+        sf.uuid::text as uuid,
+        sf.feature_type_id,
+        ft.name as feature_type_name,
+        sf.data->>'name' as feature_name,
+        sf.data->>'description' as feature_description,
+        s.name as submission_name,
+        security_check.is_secured,
+        ts_rank(to_tsvector('english', ss.value), plainto_tsquery('english', ${combinedKeywords})) as relevancy_score
+      FROM
+        search_string ss
+      INNER JOIN
+        submission_feature sf ON ss.submission_feature_id = sf.submission_feature_id
+      INNER JOIN
+        submission s ON sf.submission_id = s.submission_id
+      INNER JOIN
+        feature_type ft ON sf.feature_type_id = ft.feature_type_id
+      CROSS JOIN LATERAL (
+        -- Check if this feature or any ancestor is secured
+        WITH RECURSIVE ancestors AS (
+          SELECT sf.submission_feature_id as ancestor_id, sf.parent_submission_feature_id
+          UNION ALL
+          SELECT sf2.submission_feature_id, sf2.parent_submission_feature_id
+          FROM submission_feature sf2
+          INNER JOIN ancestors a ON sf2.submission_feature_id = a.parent_submission_feature_id
+        )
+        SELECT EXISTS (
+          SELECT 1
+          FROM ancestors a
+          INNER JOIN submission_feature_security sfs ON a.ancestor_id = sfs.submission_feature_id
+          WHERE sfs.record_end_date IS NULL
+        ) as is_secured
+      ) security_check
+      WHERE
+        to_tsvector('english', ss.value) @@ plainto_tsquery('english', ${combinedKeywords})
+      ORDER BY
+        relevancy_score DESC;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SearchFeatureResultWithRelevancy);
+
+    return response.rows;
+  }
+
+  /**
+   * Searches for features by property filters.
+   * Queries the appropriate search table based on property type.
+   *
+   * @param {IPropertyFilter[]} filters - Array of property filters
+   * @return {*}  {Promise<SearchFeatureResultWithRelevancy[]>}
+   * @memberof SearchIndexRepository
+   */
+  async searchFeaturesByPropertyFilters(filters: IPropertyFilter[]): Promise<SearchFeatureResultWithRelevancy[]> {
+    defaultLog.debug({ label: 'searchFeaturesByPropertyFilters', filters });
+
+    if (!filters.length) {
+      return [];
+    }
+
+    // For multiple filters, we need to find features that match ALL filters
+    // We'll use a CTE approach to intersect results from each filter
+    const query = SQL`
+      WITH filter_results AS (
+    `;
+
+    filters.forEach((filter, index) => {
+      if (index > 0) {
+        query.append(SQL` UNION ALL `);
+      }
+
+      // Generate the appropriate query based on property type
+      if (filter.propertyType === 'string') {
+        // String: use full-text search on search_string
+        query.append(SQL`
+          SELECT
+            sf.submission_feature_id,
+            sf.submission_id,
+            sf.uuid::text as uuid,
+            sf.feature_type_id,
+            ft.name as feature_type_name,
+            sf.data->>'name' as feature_name,
+            sf.data->>'description' as feature_description,
+            s.name as submission_name,
+            security_check.is_secured,
+            ts_rank(to_tsvector('english', ss.value), plainto_tsquery('english', ${filter.value})) as relevancy_score
+          FROM
+            search_string ss
+          INNER JOIN
+            submission_feature sf ON ss.submission_feature_id = sf.submission_feature_id
+          INNER JOIN
+            submission s ON sf.submission_id = s.submission_id
+          INNER JOIN
+            feature_type ft ON sf.feature_type_id = ft.feature_type_id
+          INNER JOIN
+            feature_property fp ON ss.feature_property_id = fp.feature_property_id
+          CROSS JOIN LATERAL (
+            -- Check if this feature or any ancestor is secured
+            WITH RECURSIVE ancestors AS (
+              SELECT sf.submission_feature_id as ancestor_id, sf.parent_submission_feature_id
+              UNION ALL
+              SELECT sf2.submission_feature_id, sf2.parent_submission_feature_id
+              FROM submission_feature sf2
+              INNER JOIN ancestors a ON sf2.submission_feature_id = a.parent_submission_feature_id
+            )
+            SELECT EXISTS (
+              SELECT 1
+              FROM ancestors a
+              INNER JOIN submission_feature_security sfs ON a.ancestor_id = sfs.submission_feature_id
+              WHERE sfs.record_end_date IS NULL
+            ) as is_secured
+          ) security_check
+          WHERE
+            ft.name = ${filter.featureTypeName}
+            AND fp.name = ${filter.propertyName}
+            AND to_tsvector('english', ss.value) @@ plainto_tsquery('english', ${filter.value})
+        `);
+      } else if (filter.propertyType === 'number') {
+        // Number: exact match on search_number
+        query.append(SQL`
+          SELECT
+            sf.submission_feature_id,
+            sf.submission_id,
+            sf.uuid::text as uuid,
+            sf.feature_type_id,
+            ft.name as feature_type_name,
+            sf.data->>'name' as feature_name,
+            sf.data->>'description' as feature_description,
+            s.name as submission_name,
+            security_check.is_secured,
+            1.0 as relevancy_score
+          FROM
+            search_number sn
+          INNER JOIN
+            submission_feature sf ON sn.submission_feature_id = sf.submission_feature_id
+          INNER JOIN
+            submission s ON sf.submission_id = s.submission_id
+          INNER JOIN
+            feature_type ft ON sf.feature_type_id = ft.feature_type_id
+          INNER JOIN
+            feature_property fp ON sn.feature_property_id = fp.feature_property_id
+          CROSS JOIN LATERAL (
+            -- Check if this feature or any ancestor is secured
+            WITH RECURSIVE ancestors AS (
+              SELECT sf.submission_feature_id as ancestor_id, sf.parent_submission_feature_id
+              UNION ALL
+              SELECT sf2.submission_feature_id, sf2.parent_submission_feature_id
+              FROM submission_feature sf2
+              INNER JOIN ancestors a ON sf2.submission_feature_id = a.parent_submission_feature_id
+            )
+            SELECT EXISTS (
+              SELECT 1
+              FROM ancestors a
+              INNER JOIN submission_feature_security sfs ON a.ancestor_id = sfs.submission_feature_id
+              WHERE sfs.record_end_date IS NULL
+            ) as is_secured
+          ) security_check
+          WHERE
+            ft.name = ${filter.featureTypeName}
+            AND fp.name = ${filter.propertyName}
+            AND sn.value = ${Number.parseFloat(filter.value)}
+        `);
+      } else if (filter.propertyType === 'datetime') {
+        // Datetime: date match on search_datetime
+        query.append(SQL`
+          SELECT
+            sf.submission_feature_id,
+            sf.submission_id,
+            sf.uuid::text as uuid,
+            sf.feature_type_id,
+            ft.name as feature_type_name,
+            sf.data->>'name' as feature_name,
+            sf.data->>'description' as feature_description,
+            s.name as submission_name,
+            security_check.is_secured,
+            1.0 as relevancy_score
+          FROM
+            search_datetime sd
+          INNER JOIN
+            submission_feature sf ON sd.submission_feature_id = sf.submission_feature_id
+          INNER JOIN
+            submission s ON sf.submission_id = s.submission_id
+          INNER JOIN
+            feature_type ft ON sf.feature_type_id = ft.feature_type_id
+          INNER JOIN
+            feature_property fp ON sd.feature_property_id = fp.feature_property_id
+          CROSS JOIN LATERAL (
+            -- Check if this feature or any ancestor is secured
+            WITH RECURSIVE ancestors AS (
+              SELECT sf.submission_feature_id as ancestor_id, sf.parent_submission_feature_id
+              UNION ALL
+              SELECT sf2.submission_feature_id, sf2.parent_submission_feature_id
+              FROM submission_feature sf2
+              INNER JOIN ancestors a ON sf2.submission_feature_id = a.parent_submission_feature_id
+            )
+            SELECT EXISTS (
+              SELECT 1
+              FROM ancestors a
+              INNER JOIN submission_feature_security sfs ON a.ancestor_id = sfs.submission_feature_id
+              WHERE sfs.record_end_date IS NULL
+            ) as is_secured
+          ) security_check
+          WHERE
+            ft.name = ${filter.featureTypeName}
+            AND fp.name = ${filter.propertyName}
+            AND sd.value::date = ${filter.value}::date
+        `);
+      }
+    });
+
+    query.append(SQL`
+      )
+      SELECT
+        submission_feature_id,
+        submission_id,
+        uuid,
+        feature_type_id,
+        feature_type_name,
+        feature_name,
+        feature_description,
+        submission_name,
+        is_secured,
+        SUM(relevancy_score) as relevancy_score
+      FROM
+        filter_results
+      GROUP BY
+        submission_feature_id, submission_id, uuid, feature_type_id, feature_type_name,
+        feature_name, feature_description, submission_name, is_secured
+      ORDER BY
+        relevancy_score DESC;
+    `);
+
+    const response = await this.connection.sql(query, SearchFeatureResultWithRelevancy);
 
     return response.rows;
   }

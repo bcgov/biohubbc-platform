@@ -12,22 +12,18 @@ import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/system/Stack';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
-import { FuseResult } from 'fuse.js';
-import useFuzzySearch from 'hooks/useFuzzySearch';
 import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import { SubmissionRecordPublishedForPublic } from 'interfaces/useSubmissionsApi.interface';
 import { getFormattedDate } from 'utils/Utils';
 
 export interface ISubmissionsListProps {
-  submissions: FuseResult<SubmissionRecordPublishedForPublic>[];
-  onDownload: (submission: FuseResult<SubmissionRecordPublishedForPublic>) => void;
+  submissions: SubmissionRecordPublishedForPublic[];
+  onDownload: (submission: SubmissionRecordPublishedForPublic) => void;
   onAccessRequest: () => void;
 }
 
 const SubmissionsList = (props: ISubmissionsListProps) => {
   const { submissions, onDownload, onAccessRequest } = props;
-
-  const { highlight } = useFuzzySearch();
 
   if (submissions.length === 0) {
     return (
@@ -59,7 +55,7 @@ const SubmissionsList = (props: ISubmissionsListProps) => {
   return (
     <Stack gap={2}>
       {submissions?.map((submission) => (
-        <Card elevation={0} key={submission.item.submission_id}>
+        <Card elevation={0} key={submission.submission_id}>
           <CardHeader
             title={
               <Typography
@@ -72,12 +68,12 @@ const SubmissionsList = (props: ISubmissionsListProps) => {
                   overflow: 'hidden',
                   textOverflow: 'ellipsis'
                 }}>
-                {highlight(submission.item.name, submission?.matches?.find((match) => match.key === 'name')?.indices)}
+                {submission.name}
               </Typography>
             }
             action={
               <Chip
-                label={submission.item.root_feature_type_display_name}
+                label={submission.root_feature_type_display_name}
                 size="small"
                 sx={{
                   my: '-2px',
@@ -108,10 +104,7 @@ const SubmissionsList = (props: ISubmissionsListProps) => {
                 overflow: 'hidden',
                 textOverflow: 'ellipsis'
               }}>
-              {highlight(
-                submission.item.description,
-                submission?.matches?.find((match) => match.key === 'description')?.indices
-              )}
+              {submission.description}
             </Typography>
           </CardContent>
           <CardActions
@@ -143,15 +136,15 @@ const SubmissionsList = (props: ISubmissionsListProps) => {
                 <Stack flexDirection="row">
                   <dd>Published:</dd>
                   <dt>
-                    {submission.item.publish_timestamp
-                      ? getFormattedDate(DATE_FORMAT.ShortDateFormat, submission.item.publish_timestamp)
+                    {submission.publish_timestamp
+                      ? getFormattedDate(DATE_FORMAT.ShortDateFormat, submission.publish_timestamp)
                       : 'Unpublished'}
                   </dt>
                 </Stack>
               </Stack>
               <Stack flexDirection="row" alignItems="center" gap={1} flexWrap="nowrap">
-                {(submission.item.security === SECURITY_APPLIED_STATUS.SECURED ||
-                  submission.item.security === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED) && (
+                {(submission.security === SECURITY_APPLIED_STATUS.SECURED ||
+                  submission.security === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED) && (
                   <Button
                     variant={'contained'}
                     disableElevation
@@ -163,8 +156,8 @@ const SubmissionsList = (props: ISubmissionsListProps) => {
                     Request Access
                   </Button>
                 )}
-                {(submission.item.security === SECURITY_APPLIED_STATUS.UNSECURED ||
-                  submission.item.security === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED) && (
+                {(submission.security === SECURITY_APPLIED_STATUS.UNSECURED ||
+                  submission.security === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED) && (
                   <Button
                     variant="contained"
                     startIcon={<Icon path={mdiTrayArrowDown} size={0.75} />}

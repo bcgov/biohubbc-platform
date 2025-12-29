@@ -4,12 +4,13 @@ import useAdminApi from './api/useAdminApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
 import useCodesApi from './api/useCodesApi';
+import { useFeaturesApi } from './api/useFeaturesApi';
+import usePoliciesApi from './api/usePoliciesApi';
+import { useSearchApi } from './api/useSearchApi';
 import useSecurityApi from './api/useSecurityApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
 import useUserApi from './api/useUserApi';
-import { useFeaturesApi } from './api/useFeaturesApi';
-import usePoliciesApi from './api/usePoliciesApi';
 
 /**
  * Returns a set of supported api methods.
@@ -39,6 +40,8 @@ export const useApi = () => {
 
   const policies = usePoliciesApi(apiAxios);
 
+  const search = useSearchApi(apiAxios);
+
   return {
     user,
     admin,
@@ -48,6 +51,7 @@ export const useApi = () => {
     security,
     artifact,
     codes,
-    policies
+    policies,
+    search
   };
 };
