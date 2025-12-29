@@ -16,7 +16,7 @@ vi.mock('@monaco-editor/react', () => ({
       }
     })
   },
-  default: vi.fn(({ value, onChange, onValidate, onMount }) => {
+  default: vi.fn(({ value, onChange, onMount }) => {
     // Simulate onMount callback with mock editor and monaco instances
     if (onMount) {
       const mockEditor = {

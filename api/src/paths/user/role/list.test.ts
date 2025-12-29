@@ -27,7 +27,7 @@ describe('roles', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      sinon.stub(UserService.prototype, 'getRoles').throws('error' as unknown as ApiGeneralError);
+      sinon.stub(UserService.prototype, 'getRoles').throws(new ApiGeneralError('error'));
 
       try {
         const requestHandler = list.getRoleList();
@@ -35,6 +35,8 @@ describe('roles', () => {
         await requestHandler(mockReq, mockRes, mockNext);
         expect.fail();
       } catch (actualError) {
+        expect(actualError).to.be.instanceOf(ApiGeneralError);
+        expect((actualError as ApiGeneralError).message).to.equal('error');
         expect(dbConnectionObj.commit).to.not.be.called;
         expect(dbConnectionObj.rollback).to.be.calledOnce;
         expect(dbConnectionObj.release).to.be.calledOnce;

@@ -12,6 +12,7 @@ import {
   MuiEvent
 } from '@mui/x-data-grid';
 import appTheme from 'themes/appTheme';
+import { FeatureRow } from './SecurityReviewFeaturesTable.interface';
 
 interface SecurityReviewFeaturesTableProps {
   rows: FeatureRow[];

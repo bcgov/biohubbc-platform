@@ -1,43 +1,43 @@
 import eslintJs from '@eslint/js';
+import typescriptEslint from '@typescript-eslint/eslint-plugin';
+import parser from '@typescript-eslint/parser';
 import eslintPluginPrettier from 'eslint-plugin-prettier';
-import eslintPluginReactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
-import typescriptEslint from 'typescript-eslint';
 
 export default [
   {
     ignores: [
-      'src/**/*.d.ts',
-      'coverage/**/*',
-      'build/**/*',
+      'node_modules/**/*',
       'dist/**/*',
-      '.pipeline/**/*',
-      '.docker/**/*',
-      'node_modules/**/*'
+      'coverage/**/*',
+      'openshift/**/*',
+      'sonar-runner/**/*',
+      'uploads/**/*',
+      '.vscode/**/*'
     ]
   },
   {
-    files: ['src/**/*.js', 'src/**/*.ts', 'src/**/*.jsx', 'src/**/*.tsx'],
+    files: ['**/*.js', '**/*.ts'],
     languageOptions: {
-      parser: typescriptEslint.parser,
+      parser: parser,
       parserOptions: {
         ecmaVersion: 'latest',
         sourceType: 'module'
       },
       globals: {
         ...globals.node,
-        ...globals.browser
+        ...globals.mocha,
+        ...globals.jest,
+        ...globals.jasmine
       }
     },
     plugins: {
-      '@typescript-eslint': typescriptEslint.plugin,
-      prettier: eslintPluginPrettier,
-      'react-hooks': eslintPluginReactHooks
+      '@typescript-eslint': typescriptEslint,
+      prettier: eslintPluginPrettier
     },
     rules: {
       ...eslintJs.configs.recommended.rules,
       ...typescriptEslint.configs.recommended.rules,
-      ...eslintPluginReactHooks.configs.recommended.rules,
       'prettier/prettier': ['warn'],
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
@@ -58,19 +58,9 @@ export default [
           caughtErrorsIgnorePattern: '^_'
         }
       ],
-      '@typescript-eslint/no-redeclare': 'error',
-      'no-undef': 'off',
-      'no-redeclare': 'off',
-      'no-unused-vars': 'off',
       'no-var': 'error',
       'no-lonely-if': 'error',
       curly: 'error'
-    }
-  },
-  {
-    files: ['**/*.test.ts', '**/*.test.js', '**/*.spec.ts', '**/*.spec.js'],
-    rules: {
-      '@typescript-eslint/no-unused-expressions': 'off'
     }
   }
 ];

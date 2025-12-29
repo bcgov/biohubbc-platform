@@ -9,6 +9,7 @@ import { useCallback, useMemo, useState } from 'react';
 import SubmissionHeaderSecurityStatus from './components/SubmissionHeaderSecurityStatus';
 import { SubmissionHeaderToolbar } from './components/SubmissionHeaderToolbar';
 import { SecurityReviewFeatures } from './features/SecurityReviewFeatures';
+import { FeatureRow } from './features/table/SecurityReviewFeaturesTable.interface';
 
 /**
  * Page for admins to complete security reviews
