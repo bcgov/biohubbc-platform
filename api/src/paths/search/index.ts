@@ -8,7 +8,7 @@ import { ApiPaginationOptions } from '../../zod-schema/pagination';
 
 const defaultLog = getLogger('paths/search/index');
 
-export const GET: Operation = [searchFeatures()];
+export const GET: Operation = [searchAll()];
 
 GET.apiDoc = {
   description: 'Search features, submissions, and taxonomy.',
@@ -118,7 +118,7 @@ GET.apiDoc = {
 /**
  * Handler for searching features, submissions, and taxonomy.
  */
-export function searchFeatures(): RequestHandler {
+export function searchAll(): RequestHandler {
   return async (req, res) => {
     const connection = getAPIUserDBConnection();
 
@@ -142,7 +142,7 @@ export function searchFeatures(): RequestHandler {
 
       res.status(200).json(result);
     } catch (error) {
-      defaultLog.error({ label: 'searchFeatures', message: 'error', error });
+      defaultLog.error({ label: 'searchAll', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {
