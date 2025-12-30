@@ -11,7 +11,13 @@ export const SystemUser = z.object({
   create_user: z.number(),
   update_date: z.string().nullable(),
   update_user: z.number().nullable(),
-  revision_count: z.number()
+  revision_count: z.number(),
+  display_name: z.string().nullable(),
+  given_name: z.string().nullable(),
+  family_name: z.string().nullable(),
+  email: z.string().nullable(),
+  agency: z.string().nullable(),
+  notes: z.string().nullable()
 });
 
 export type SystemUser = z.infer<typeof SystemUser>;
