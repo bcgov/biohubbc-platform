@@ -17,8 +17,8 @@
     "test": "mocha",
     "test-watch": "mocha --watch",
     "coverage": "nyc mocha",
-    "lint": "eslint . --ignore-pattern 'node_modules' --ext .ts",
-    "lint-fix": "eslint . --fix --ignore-pattern 'node_modules' --ext .ts",
+    "lint": "eslint .",
+    "lint-fix": "eslint . --fix",
     "format": "prettier --loglevel=warn --check \"./src/**/*.{js,jsx,ts,tsx,css,scss}\"",
     "format-fix": "prettier --loglevel=warn --write \"./src/**/*.{js,jsx,ts,tsx,json,css,scss}\"",
     "fix": "npm-run-all -l -s lint-fix format-fix"

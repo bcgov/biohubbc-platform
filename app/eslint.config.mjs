@@ -38,7 +38,8 @@ export default [
       ...eslintJs.configs.recommended.rules,
       ...typescriptEslint.configs.recommended.rules,
       ...eslintPluginReactHooks.configs.recommended.rules,
-      'prettier/prettier': ['warn'],
+      'prettier/prettier': 'warn',
+      indent: 'off',
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
       '@typescript-eslint/ban-ts-comment': [
