@@ -3,66 +3,16 @@ import { AsyncFunction, useAsync } from './useAsync';
 import useIsMounted from './useIsMounted';
 
 export type DataLoader<AFArgs extends any[], AFResponse = unknown, AFError = unknown> = {
-  /**
-   * The response of the `fetchData` call.
-   *
-   * @type {(AFResponse | undefined)}
-   */
   data: AFResponse | undefined;
-  /**
-   * The error caught if the `fetchData` call throws.
-   *
-   * @type {(AFError | unknown)}
-   */
   error: AFError | unknown;
-  /**
-   * `true` if the `fetchData` function is currently executing.
-   *
-   * @type {boolean}
-   */
   isLoading: boolean;
-  /**
-   * `true` if the `fetchData` function has finished executing.
-   *
-   * @type {boolean}
-   */
   isReady: boolean;
-  /**
-   * Executes the `fetchData` function once, only if it has never been called before. Does nothing if called again.
-   */
-  load: (...args: AFArgs) => void;
-  /**
-   * Executes the `fetchData` function again.
-   */
-  refresh: (...args: AFArgs) => void;
-  /**
-   * Clears any errors caught from a failed `fetchData` call.
-   */
+  load: (...args: AFArgs) => Promise<AFResponse | undefined>;
+  refresh: (...args: AFArgs) => Promise<AFResponse | undefined>;
   clear: () => void;
-  /**
-   * Setter for manually handling data. Useful for sorting
-   */
   setData: (data: AFResponse) => void;
 };
 
-/**
- * Hook that wraps an async function.
- *
- * Note: Runs each time `refresh` is called.
- *
- * Note: This hook will prevent additional calls to `fetchData` if an existing call is in progress.
- *
- * @export
- * @template AFArgs `AsyncFunction` argument types.
- * @template AFResponse `AsyncFunction` response type.
- * @template AFError `AsyncFunction` error type.
- * @param {AsyncFunction<AFArgs, AFResponse>} fetchData An async function.
- * @param {((error: AFError | unknown) => void)} [onError] An optional error handler function that will be called if the
- * `fetchData` function throws an error.
- * - If set to `true`, the `fetchData` function will run on initial load, and each time `refresh` is called.
- * - If set to `false` the `fetchData` function will run each time `refresh` is called.
- * @return {*}  {DataLoader<AFArgs, AFResponse, AFError>}
- */
 export default function useDataLoader<AFArgs extends any[], AFResponse = unknown, AFError = unknown>(
   fetchData: AsyncFunction<AFArgs, AFResponse>,
   onError?: (error: AFError | unknown) => void
@@ -74,48 +24,47 @@ export default function useDataLoader<AFArgs extends any[], AFResponse = unknown
   const [isOneTimeLoad, setOneTimeLoad] = useState(false);
 
   const isMounted = useIsMounted();
-
   const getData = useAsync(fetchData);
 
-  const loadData = async (...args: AFArgs) => {
+  const loadData = async (...args: AFArgs): Promise<AFResponse | undefined> => {
     try {
       setIsLoading(true);
 
       const response = await getData(...args);
 
       if (!isMounted) {
-        return;
+        return response;
       }
 
       setData(response);
+      return response;
     } catch (error) {
       if (!isMounted) {
-        return;
+        return undefined;
       }
 
       setError(error);
-
       onError?.(error);
+      return undefined;
     } finally {
       setIsLoading(false);
       setIsReady(true);
     }
   };
 
-  const load = (...args: AFArgs) => {
+  const load = (...args: AFArgs): Promise<AFResponse | undefined> => {
     if (isOneTimeLoad) {
-      return;
+      return Promise.resolve(data);
     }
-
     setOneTimeLoad(true);
-    loadData(...args);
+    return loadData(...args);
   };
 
-  const refresh = (...args: AFArgs) => {
+  const refresh = (...args: AFArgs): Promise<AFResponse | undefined> => {
     setError(undefined);
     setIsLoading(false);
     setIsReady(false);
-    loadData(...args);
+    return loadData(...args);
   };
 
   const clear = () => {

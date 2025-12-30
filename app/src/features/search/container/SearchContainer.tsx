@@ -43,7 +43,7 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
     const loadInitialSummary = async () => {
       try {
         const summaryData = await summaryLoader.load({ search: '' });
-        setSummary(summaryData);
+        summaryData && setSummary(summaryData);
       } catch (error) {
         dialogContext.setSnackbar({ open: true, snackbarMessage: (error as APIError).message });
       }
@@ -60,8 +60,8 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
           recordsLoader.refresh(params, SEARCH_PREVIEW_PAGINATION),
           summaryLoader.refresh(params)
         ]);
-        setRecords(recordsData);
-        setSummary(summaryData);
+        recordsData && setRecords(recordsData);
+        summaryData && setSummary(summaryData);
       }, SEARCH_DEBOUNCE_MS),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [SEARCH_PREVIEW_PAGINATION]
