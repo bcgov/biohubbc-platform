@@ -30,11 +30,11 @@ export type DataLoader<AFArgs extends any[], AFResponse = unknown, AFError = unk
   /**
    * Executes the `fetchData` function once, only if it has never been called before. Does nothing if called again.
    */
-  load: (...args: AFArgs) => Promise<AFResponse>;
+  load: (...args: AFArgs) => void;
   /**
    * Executes the `fetchData` function again.
    */
-  refresh: (...args: AFArgs) => Promise<AFResponse>;
+  refresh: (...args: AFArgs) => void;
   /**
    * Clears any errors caught from a failed `fetchData` call.
    */
@@ -72,44 +72,50 @@ export default function useDataLoader<AFArgs extends any[], AFResponse = unknown
   const [isLoading, setIsLoading] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [isOneTimeLoad, setOneTimeLoad] = useState(false);
+
   const isMounted = useIsMounted();
+
   const getData = useAsync(fetchData);
 
-  const loadData = async (...args: AFArgs): Promise<AFResponse> => {
+  const loadData = async (...args: AFArgs) => {
     try {
       setIsLoading(true);
+
       const response = await getData(...args);
-      if (isMounted()) {
-        setData(response);
+
+      if (!isMounted) {
+        return;
       }
-      return response;
+
+      setData(response);
     } catch (error) {
-      if (isMounted()) {
-        setError(error);
+      if (!isMounted) {
+        return;
       }
+
+      setError(error);
+
       onError?.(error);
-      throw error;
     } finally {
-      if (isMounted()) {
-        setIsLoading(false);
-        setIsReady(true);
-      }
+      setIsLoading(false);
+      setIsReady(true);
     }
   };
 
-  const load = async (...args: AFArgs): Promise<AFResponse> => {
+  const load = (...args: AFArgs) => {
     if (isOneTimeLoad) {
-      return data as AFResponse;
+      return;
     }
+
     setOneTimeLoad(true);
-    return loadData(...args);
+    loadData(...args);
   };
 
-  const refresh = async (...args: AFArgs): Promise<AFResponse> => {
+  const refresh = (...args: AFArgs) => {
     setError(undefined);
     setIsLoading(false);
     setIsReady(false);
-    return loadData(...args);
+    loadData(...args);
   };
 
   const clear = () => {
