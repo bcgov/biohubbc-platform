@@ -1,8 +1,9 @@
 import eslintJs from '@eslint/js';
-import typescriptEslint from '@typescript-eslint/eslint-plugin';
+import tsPlugin from '@typescript-eslint/eslint-plugin';
 import parser from '@typescript-eslint/parser';
 import eslintPluginPrettier from 'eslint-plugin-prettier';
 import globals from 'globals';
+
 
 export default [
   {
@@ -32,12 +33,12 @@ export default [
       }
     },
     plugins: {
-      '@typescript-eslint': typescriptEslint,
+      '@typescript-eslint': tsPlugin,
       prettier: eslintPluginPrettier
     },
     rules: {
       ...eslintJs.configs.recommended.rules,
-      ...typescriptEslint.configs.recommended.rules,
+      ...tsPlugin.configs.recommended.rules,
       'prettier/prettier': ['warn'],
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
