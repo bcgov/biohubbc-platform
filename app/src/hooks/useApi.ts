@@ -11,6 +11,7 @@ import useUserApi from './api/useUserApi';
 import { useFeaturesApi } from './api/useFeaturesApi';
 import usePoliciesApi from './api/usePoliciesApi';
 import { useSearchApi } from './api/useSearchApi';
+import { useTeamsApi } from './api/useTeamsApi';
 
 /**
  * Returns a set of supported api methods.
@@ -42,6 +43,8 @@ export const useApi = () => {
 
   const search = useSearchApi(apiAxios);
 
+  const teams = useTeamsApi(apiAxios);
+
   return {
     user,
     admin,
@@ -52,6 +55,7 @@ export const useApi = () => {
     artifact,
     codes,
     policies,
-    search
+    search,
+    teams
   };
 };
