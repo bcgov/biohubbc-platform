@@ -106,12 +106,6 @@ const SubmissionsListPage = () => {
     [apiFilters, debouncedSearch]
   );
 
-  // /** Clear search input */
-  // const handleClearSearch = useCallback(() => {
-  //   setSearchTerm('');
-  //   setDebouncedSearchTerm('');
-  // }, []);
-
   /** Map property types to filter input types */
   const getFilterType = (propertyType: string): 'text' | 'datetime' => {
     if (propertyType === 'datetime') {

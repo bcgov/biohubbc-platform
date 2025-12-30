@@ -12,7 +12,7 @@ interface IMultipleSkeletonProps extends SkeletonProps {
 
 const SkeletonList = (props: IMultipleSkeletonProps) => (
   <>
-    {Array.from(Array(props.numberOfLines ?? 3).keys()).map((key: number) => (
+    {Array.from(new Array(props.numberOfLines ?? 3).keys()).map((key: number) => (
       <Stack
         key={key}
         flexDirection="row"
@@ -39,7 +39,7 @@ const SkeletonList = (props: IMultipleSkeletonProps) => (
 
 const SkeletonHorizontalStack = (props: IMultipleSkeletonProps) => (
   <Stack direction="row" spacing={1} flex="1 1 auto">
-    {Array.from(Array(props.numberOfLines ?? 3).keys()).map((key: number) => (
+    {Array.from(new Array(props.numberOfLines ?? 3).keys()).map((key: number) => (
       <Skeleton key={key} variant="rounded" sx={{ flex: '0.1 0 auto' }} {...props} />
     ))}
   </Stack>
@@ -48,7 +48,7 @@ const SkeletonHorizontalStack = (props: IMultipleSkeletonProps) => (
 const SkeletonTable = (props: IMultipleSkeletonProps) => (
   <Box>
     <Paper elevation={0}>
-      {Array.from(Array(props.numberOfLines ?? 3).keys()).map((key: number) => (
+      {Array.from(new Array(props.numberOfLines ?? 3).keys()).map((key: number) => (
         <SkeletonRow key={key} {...props} />
       ))}
     </Paper>
@@ -72,7 +72,7 @@ const SkeletonRow = (props: IMultipleSkeletonProps) => (
         fontSize: '0.875rem'
       }
     }}>
-    {Array.from(Array(8).keys()).map((key: number) => (
+    {Array.from(new Array(8).keys()).map((key: number) => (
       <Skeleton key={key} variant="text" {...props} />
     ))}
   </Stack>

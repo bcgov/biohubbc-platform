@@ -7,7 +7,7 @@ export interface SearchTaxonCardProps {
 }
 
 /**
- * TODO: Add image of species to the card
+ * Card showing information about a specific taxon search result
  *
  * @param {SearchTaxonCardProps} props
  * @returns

@@ -45,9 +45,6 @@ export const SearchListbox = ({ records, summary, searchTerm, isLoading = false 
     [navigate]
   );
 
-  /**
-   * TODO: Navigate to specific submission
-   */
   const handleSubmissionSelect = useCallback(
     (submissionId: number | string) => {
       navigate(
@@ -60,9 +57,6 @@ export const SearchListbox = ({ records, summary, searchTerm, isLoading = false 
     [navigate]
   );
 
-  /**
-   * TODO: Navigate to specific taxon
-   */
   const handleTaxonomySelect = useCallback(
     (taxonId: number | string) => {
       navigate(
@@ -75,9 +69,6 @@ export const SearchListbox = ({ records, summary, searchTerm, isLoading = false 
     [navigate]
   );
 
-  /**
-   * TODO: Navigate to specific feature
-   */
   const handleFeatureSelect = useCallback(
     (featureId: number | string) => {
       navigate(
