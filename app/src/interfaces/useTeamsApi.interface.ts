@@ -24,9 +24,9 @@ export interface ITeamsResponse {
   teams: ITeamWithMembers[];
   pagination: {
     total: number;
-    current_page: number;
+    page: number;
+    limit: number;
     last_page: number;
-    per_page: number;
     sort?: string;
     order?: 'asc' | 'desc';
   };

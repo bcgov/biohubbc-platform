@@ -136,9 +136,9 @@ describe('TeamService', () => {
 
       expect(result.pagination).to.eql({
         total: 2,
-        current_page: 1,
+        page: 1,
+        limit: 50,
         last_page: 1,
-        per_page: 50,
         sort: undefined,
         order: undefined
       });
@@ -154,9 +154,9 @@ describe('TeamService', () => {
       expect(result.teams).to.eql([]);
       expect(result.pagination).to.eql({
         total: 0,
-        current_page: 1,
+        page: 1,
+        limit: 50,
         last_page: 1,
-        per_page: 50,
         sort: undefined,
         order: undefined
       });

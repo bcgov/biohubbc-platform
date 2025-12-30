@@ -1,7 +1,7 @@
 import { AxiosInstance } from 'axios';
 import {
   IGetDownloadSubmissionResponse,
-  IGetSubmissionGroupedFeatureResponse,
+  ISubmissionFeatureForReviewResponse,
   ISubmissionUploadPart,
   PresignedUploadUrlResponse,
   SubmissionFeatureSignedUrlPayload,
@@ -9,6 +9,8 @@ import {
   SubmissionRecordWithSecurity,
   SubmissionRecordWithSecurityAndRootFeature
 } from 'interfaces/useSubmissionsApi.interface';
+import qs from 'qs';
+import { ApiPaginationRequestOptions } from 'types/misc';
 
 /**
  * Returns a set of supported CRUD api methods submissions.
@@ -44,14 +46,25 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * For the given submission, fetches all feature groups (e.g., "dataset", "sample_site"), with their
-   * respective features.
+   * For the given submission, fetches all features for a submission (flat),
+   * with server-side pagination + sorting support.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<IGetSubmissionFeatureResponse>}
+   * @param {ApiPaginationRequestOptions} pagination
+   * @return {Promise<ISubmissionFeatureForReviewResponse>}
    */
-  const getSubmissionFeatureGroups = async (submissionId: number): Promise<IGetSubmissionGroupedFeatureResponse[]> => {
-    const { data } = await axios.get(`api/submission/${submissionId}/features`);
+  const getSubmissionFeatures = async (
+    submissionId: number,
+    pagination?: ApiPaginationRequestOptions
+  ): Promise<ISubmissionFeatureForReviewResponse> => {
+    const params = {
+      ...pagination
+    };
+
+    const { data } = await axios.get(`/api/submission/${submissionId}/features`, {
+      params,
+      paramsSerializer: (params) => qs.stringify(params)
+    });
 
     return data;
   };
@@ -176,7 +189,7 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   return {
     getSubmissionDownloadPackage,
     getSubmissionPublishedDownloadPackage,
-    getSubmissionFeatureGroups,
+    getSubmissionFeatures,
     getSubmissionRecordWithSecurity,
     getUnreviewedSubmissionsForAdmins,
     getReviewedSubmissionsForAdmins,

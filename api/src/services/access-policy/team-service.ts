@@ -85,7 +85,7 @@ export class TeamService extends DBService {
    * @param {string} [options.sort] - Column to sort by.
    * @param {('asc' | 'desc')} [options.order] - Sort direction.
    * @param {string} [options.search] - Optional search term to filter by team name.
-   * @return {Promise<{ teams: TeamWithMembers[]; pagination: { total: number; current_page: number; last_page: number; per_page: number; sort?: string; order?: string } }>}
+   * @return {Promise<{ teams: TeamWithMembers[]; pagination: { total: number; page: number; limit: number; last_page: number; sort?: string; order?: string } }>}
    * @memberof TeamService
    */
   async getTeamsWithMembers(options: {
@@ -98,9 +98,9 @@ export class TeamService extends DBService {
     teams: TeamWithMembers[];
     pagination: {
       total: number;
-      current_page: number;
+      page: number;
+      limit: number;
       last_page: number;
-      per_page: number;
       sort?: string;
       order?: string;
     };
@@ -118,9 +118,9 @@ export class TeamService extends DBService {
       teams: teamsWithMembers,
       pagination: {
         total,
-        current_page: options.page,
+        page: options.page,
+        limit: options.limit,
         last_page: Math.max(1, Math.ceil(total / options.limit)),
-        per_page: options.limit,
         sort: options.sort,
         order: options.order
       }

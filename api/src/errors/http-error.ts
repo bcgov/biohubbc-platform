@@ -6,6 +6,7 @@ export enum HTTPErrorType {
   BAD_REQUEST = 'Bad Request',
   UNAUTHORIZE = 'Unauthorized',
   FORBIDDEN = 'Forbidden',
+  NOT_FOUND = 'Not Found',
   CONFLICT = 'Conflict',
   INTERNAL_SERVER_ERROR = 'Internal Server Error'
 }
@@ -78,6 +79,23 @@ export class HTTP403 extends HTTPError {
 
   static fromApiError(apiError: ApiError) {
     return new HTTP403(apiError.message, apiError.errors, apiError.stack);
+  }
+}
+
+/**
+ * HTTP `404 Not Found` error.
+ *
+ * @export
+ * @class HTTP404
+ * @extends {HTTPError}
+ */
+export class HTTP404 extends HTTPError {
+  constructor(message: string, errors?: (string | object)[], stack?: string) {
+    super(HTTPErrorType.NOT_FOUND, 404, message, errors, stack);
+  }
+
+  static fromApiError(apiError: ApiError) {
+    return new HTTP404(apiError.message, apiError.errors, apiError.stack);
   }
 }
 

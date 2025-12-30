@@ -72,7 +72,13 @@ const selectServiceAccountsSqlStatement = SQL`
     "system_user".create_user,
     "system_user".update_date,
     "system_user".update_user,
-    "system_user".revision_count
+    "system_user".revision_count,
+    "system_user".display_name,
+    "system_user".given_name,
+    "system_user".family_name,
+    "system_user".email,
+    "system_user".agency,
+    "system_user".notes
   FROM
     "system_user"
   INNER JOIN

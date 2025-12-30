@@ -39,7 +39,7 @@ describe('getTeams', () => {
   it('should return 200 with paginated teams', async () => {
     const mockTeams = {
       teams: [{ team_id: 'team-1', name: 'Team Alpha', description: 'First', members: [] }],
-      pagination: { total: 1, current_page: 1, last_page: 1, per_page: 50 }
+      pagination: { total: 1, page: 1, limit: 50, last_page: 1 }
     };
 
     const mockDBConnection = getMockDBConnection();
@@ -61,7 +61,7 @@ describe('getTeams', () => {
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
     const getTeamsStub = sinon.stub(TeamService.prototype, 'getTeamsWithMembers').resolves({
       teams: [],
-      pagination: { total: 0, current_page: 1, last_page: 1, per_page: 50 }
+      pagination: { total: 0, page: 1, limit: 50, last_page: 1 }
     });
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -84,7 +84,7 @@ describe('getTeams', () => {
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
     const getTeamsStub = sinon.stub(TeamService.prototype, 'getTeamsWithMembers').resolves({
       teams: [],
-      pagination: { total: 0, current_page: 1, last_page: 1, per_page: 100 }
+      pagination: { total: 0, page: 1, limit: 100, last_page: 1 }
     });
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
