@@ -1,5 +1,5 @@
 import { IDBConnection } from '../database/db';
-import { ApiGeneralError } from '../errors/api-error';
+import { ApiError, ApiGeneralError } from '../errors/api-error';
 import { Artifact, ArtifactRepository } from '../repositories/artifact-repository';
 import { SearchIndexRepository } from '../repositories/search-index-respository';
 import { SecurityRepository } from '../repositories/security-repository';
@@ -142,7 +142,7 @@ export class ArtifactService extends DBService {
         await this.deleteArtifact(uuid);
       }
     } catch (error) {
-      throw new ApiGeneralError(`There was an issue deleting an artifact.`);
+      throw new ApiGeneralError(`There was an issue deleting an artifact.`, [error as ApiError]);
     }
   }
 
@@ -166,7 +166,7 @@ export class ArtifactService extends DBService {
         await deleteFileFromS3(artifact.key);
       }
     } catch (error) {
-      throw new ApiGeneralError(`Issue deleting artifact: ${uuid}`);
+      throw new ApiGeneralError(`Issue deleting artifact: ${uuid}`, [error as ApiError]);
     }
   }
 }

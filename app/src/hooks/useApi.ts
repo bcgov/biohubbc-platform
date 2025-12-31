@@ -10,6 +10,7 @@ import { useSearchApi } from './api/useSearchApi';
 import useSecurityApi from './api/useSecurityApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
+import { useTeamsApi } from './api/useTeamsApi';
 import useUserApi from './api/useUserApi';
 
 /**
@@ -42,6 +43,8 @@ export const useApi = () => {
 
   const search = useSearchApi(apiAxios);
 
+  const teams = useTeamsApi(apiAxios);
+
   return {
     user,
     admin,
@@ -52,6 +55,7 @@ export const useApi = () => {
     artifact,
     codes,
     policies,
-    search
+    search,
+    teams
   };
 };

@@ -10,12 +10,15 @@
 // To learn more about the benefits of this model and instructions on how to
 // opt-in, read https://bit.ly/CRA-PWA
 
+// 127.0.0.0/8 are considered localhost for IPv4.
+// Regex for 127.x.x.x IPv4 localhost addresses
+const localhostRegex = /^127(?:\.(?:25\d|2[0-4]\d|[01]?\d\d?)){3}$/;
+
+// Check if the current host is localhost
 const isLocalhost = Boolean(
-  window.location.hostname === 'localhost' ||
-    // [::1] is the IPv6 localhost address.
-    window.location.hostname === '[::1]' ||
-    // 127.0.0.0/8 are considered localhost for IPv4.
-    window.location.hostname.match(/^127(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/)
+  globalThis.location.hostname === 'localhost' ||
+  globalThis.location.hostname === '[::1]' || // IPv6 localhost
+  localhostRegex.exec(globalThis.location.hostname)
 );
 
 type Config = {

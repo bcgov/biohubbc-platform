@@ -9,6 +9,7 @@ import { useCallback, useMemo, useState } from 'react';
 import SubmissionHeaderSecurityStatus from './components/SubmissionHeaderSecurityStatus';
 import { SubmissionHeaderToolbar } from './components/SubmissionHeaderToolbar';
 import { SecurityReviewFeatures } from './features/SecurityReviewFeatures';
+import { FeatureRow } from './features/table/SecurityReviewFeaturesTable.interface';
 
 /**
  * Page for admins to complete security reviews
@@ -54,7 +55,11 @@ export const AdminSubmissionPage = () => {
 
     setSelectedFeatureIds((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   }, []);

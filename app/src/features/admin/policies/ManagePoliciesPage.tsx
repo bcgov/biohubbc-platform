@@ -1,19 +1,20 @@
 import Box from '@mui/material/Box';
+import Container from '@mui/material/Container';
+import Paper from '@mui/material/Paper';
 import { debounce } from 'lodash-es';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivePoliciesList } from './components/ActivePoliciesList';
+import { TeamsContainer } from './components/TeamsContainer';
 
 /**
- * Admin page for managing policies.
+ * Admin page for managing policies and teams.
  *
  * Displays a searchable list of policies with create, edit, and delete functionality.
  * Search is debounced (300ms) to reduce API calls while typing.
- *
- * @returns {React.ReactElement} The policy management page
  */
-export const ManagePoliciesPage: React.FC<React.PropsWithChildren> = () => {
+export const ManagePoliciesPage = () => {
   const biohubApi = useApi();
   /** Current search input value (updates immediately on keystroke) */
   const [searchTerm, setSearchTerm] = useState('');
@@ -63,6 +64,12 @@ export const ManagePoliciesPage: React.FC<React.PropsWithChildren> = () => {
         searchTerm={searchTerm}
         onSearch={handleSearch}
       />
+
+      <Container maxWidth="xl" sx={{ mt: 4 }}>
+        <Paper>
+          <TeamsContainer />
+        </Paper>
+      </Container>
     </Box>
   );
 };
