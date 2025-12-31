@@ -22,8 +22,8 @@ export async function up(knex: Knex): Promise<void> {
       td.data->>'device_key' as device_key
     FROM biohub.submission_feature sf
     JOIN biohub.feature_type ft ON sf.feature_type_id = ft.feature_type_id
-    LEFT JOIN biohub.submission_feature td ON td.feature_type_id = (SELECT feature_type_id FROM biohub.feature_type WHERE name = 'telemetry_deployment')
-      AND td.data->>'device_key' = sf.data->>'device_id'
+    LEFT JOIN biohub.submission_feature td ON td.feature_type_id = (SELECT feature_type_id FROM biohub.feature_type WHERE name = 'telemetry_device')
+      AND td.data->>'device_id' = sf.data->>'device_id'
     WHERE ft.name = 'telemetry'
       AND sf.record_end_date IS NULL
       AND sf.submission_feature_id NOT IN (SELECT submission_feature_id FROM biohub.submission_feature_security);
