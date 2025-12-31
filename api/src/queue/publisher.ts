@@ -2,6 +2,7 @@ import { IDBConnection } from '../database/db';
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
+import { IMalwareScanJobData } from './jobs/malware-scan-job';
 import { IProcessSubmissionFeaturesJobData } from './jobs/process-submission-features-job';
 import { ITestJobData } from './jobs/test-job';
 import { getPgBoss } from './pg-boss-service';
@@ -36,7 +37,7 @@ const DEFAULT_OPTIONS: IPublishOptions = {
 };
 
 /**
- * Result of publishing a process submission features job.
+ * Result of publishing a job.
  * Discriminated union allows caller to handle different outcomes.
  */
 export type PublishJobResult =
@@ -54,6 +55,17 @@ const PROCESS_SUBMISSION_FEATURES_OPTIONS: IPublishOptions = {
   retryDelay: 60,
   retryBackoff: true,
   expireInSeconds: 60 * 10 // 10 minutes
+};
+
+/**
+ * Options for malware scan jobs.
+ * Scans can take longer for large tarballs.
+ */
+const MALWARE_SCAN_OPTIONS: IPublishOptions = {
+  retryLimit: 3,
+  retryDelay: 60,
+  retryBackoff: true,
+  expireInSeconds: 60 * 30 // 30 minutes
 };
 
 /**
@@ -179,6 +191,64 @@ export const publishProcessSubmissionFeaturesJob = async (
       label: 'publishProcessSubmissionFeaturesJob',
       message: 'Failed to publish job',
       submissionId: data.submissionId,
+      error
+    });
+
+    return { status: 'error', message: errorMessage };
+  }
+};
+
+/**
+ * Publish a malware scan job to the queue.
+ *
+ * Queues ClamAV scanning for a quarantined submission tarball.
+ *
+ * @param {IMalwareScanJobData} data Job data containing quarantineId
+ * @param {IPublishOptions} [options={}] Job options
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
+ */
+export const publishMalwareScanJob = async (
+  data: IMalwareScanJobData,
+  options: IPublishOptions = {}
+): Promise<PublishJobResult> => {
+  try {
+    const boss = getPgBoss();
+    const mergedOptions = { ...MALWARE_SCAN_OPTIONS, ...options };
+
+    // Ensure queue exists (pg-boss v10 requires this before send)
+    await boss.createQueue(JobQueues.MALWARE_SCAN);
+
+    // Use singletonKey to prevent duplicate concurrent jobs for the same quarantine record
+    const jobId = await boss.send(JobQueues.MALWARE_SCAN, data, {
+      ...mergedOptions,
+      singletonKey: `quarantine-${data.quarantineId}`
+    });
+
+    if (jobId) {
+      defaultLog.info({
+        label: 'publishMalwareScanJob',
+        message: 'Malware scan job published',
+        jobId,
+        quarantineId: data.quarantineId
+      });
+
+      return { status: 'published', jobId };
+    }
+
+    defaultLog.warn({
+      label: 'publishMalwareScanJob',
+      message: 'Job not published (duplicate or throttled)',
+      quarantineId: data.quarantineId
+    });
+
+    return { status: 'duplicate', message: 'Job already exists for this quarantine record' };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    defaultLog.error({
+      label: 'publishMalwareScanJob',
+      message: 'Failed to publish job',
+      quarantineId: data.quarantineId,
       error
     });
 

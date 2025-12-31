@@ -16,7 +16,11 @@ export const JobQueues = {
    * Dead letter queue for failed process-submission-features jobs.
    * Jobs are moved here after all retries are exhausted.
    */
-  PROCESS_SUBMISSION_FEATURES_FAILED: 'process-submission-features-failed'
+  PROCESS_SUBMISSION_FEATURES_FAILED: 'process-submission-features-failed',
+  /**
+   * Malware scan queue for quarantined submissions.
+   */
+  MALWARE_SCAN: 'malware-scan'
 } as const;
 
 export type JobQueueName = (typeof JobQueues)[keyof typeof JobQueues];
