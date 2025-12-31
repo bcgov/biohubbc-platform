@@ -6,14 +6,14 @@ import { SkeletonHorizontalStack } from 'components/loading/SkeletonLoaders';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
-import { SearchFeaturesParams, SearchResponse, SearchSummaryResponse } from 'interfaces/useSearchApi.interface';
+import { ISearchAllFilters, SearchResponse, SearchSummaryResponse } from 'interfaces/useSearchApi.interface';
 import { debounce } from 'lodash-es';
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiPaginationRequestOptions } from 'types/pagination';
-import { SearchListbox } from './input/listbox/SearchListbox';
-import { SearchInput } from './input/SearchInput';
+import { SearchListbox } from './listbox/SearchListbox';
 import { SearchTabs } from './tab/SearchTabs';
 import { ISearchContainerLink } from './tab/SearchTabs.interface';
+import { SearchInput } from 'components/search-filter/SearchInput';
 
 const SEARCH_PREVIEW_PAGINATION: ApiPaginationRequestOptions = { limit: 3, page: 1 };
 const SEARCH_DEBOUNCE_MS = 400;
@@ -32,15 +32,15 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
   const [summary, setSummary] = useState<SearchSummaryResponse | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  const recordsLoader = useDataLoader((params: SearchFeaturesParams, pagination?: ApiPaginationRequestOptions) =>
+  const recordsLoader = useDataLoader((params: ISearchAllFilters, pagination?: ApiPaginationRequestOptions) =>
     api.search.searchAll(params, pagination)
   );
-  const summaryLoader = useDataLoader((params: SearchFeaturesParams) => api.search.searchSummary(params));
+  const summaryLoader = useDataLoader((params: ISearchAllFilters) => api.search.searchSummary(params));
 
   // Load initial summary on mount using empty search string to match everything
   useEffect(() => {
     const loadInitialSummary = async () => {
-      const summaryData = await summaryLoader.load({ search: '' });
+      const summaryData = await summaryLoader.load({ keyword: '' });
       if (summaryData) {
         setSummary(summaryData);
       }
@@ -52,7 +52,7 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
   const debouncedSearch = useMemo(
     () =>
       debounce(async (value: string) => {
-        const params: SearchFeaturesParams = { search: value };
+        const params: ISearchAllFilters = { keyword: value };
         const [recordsData, summaryData] = await Promise.all([
           recordsLoader.refresh(params, SEARCH_PREVIEW_PAGINATION),
           summaryLoader.refresh(params)
@@ -88,7 +88,7 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
         <ClickAwayListener onClickAway={handleClickAway}>
           <Box width="100%" position="relative">
             <SearchInput
-              placeholderText="Enter names, keywords, or relevant terms"
+              placeholder="Enter names, keywords, or relevant terms"
               handleChange={handleChange}
               value={searchValue}
               onFocus={handleFocus}

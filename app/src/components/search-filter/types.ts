@@ -70,7 +70,7 @@ export interface ActiveFilter {
  * Props for the SearchInput component (keyword search only).
  */
 export interface ISearchInputProps {
-  placeholderText: string;
+  placeholder: string;
   handleChange: (e: ChangeEvent<HTMLInputElement>) => void;
   value: string;
   onClear?: () => void;

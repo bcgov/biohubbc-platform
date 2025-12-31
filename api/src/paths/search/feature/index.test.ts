@@ -3,8 +3,8 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
-import { SearchFeatureResultWithRelevancy } from '../../../repositories/search-index-respository';
-import { SearchIndexService } from '../../../services/search-index-service';
+import { SearchFeatureService } from '../../../services/search-feature-service';
+import { SearchFeatureResultWithRelevancy } from '../../../services/search-feature-service.interface';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as search from './index';
 
@@ -15,7 +15,17 @@ describe('searchFeatures', () => {
     sinon.restore();
   });
 
-  it('should return search results for keyword search', async () => {
+  it('should return search results for keyword search with filters', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves(),
+      open: sinon.stub().resolves()
+    });
+    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
         submission_feature_id: 1,
@@ -31,33 +41,47 @@ describe('searchFeatures', () => {
       }
     ];
 
-    const dbConnectionObj = getMockDBConnection({
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
-    });
+    mockReq.body = {
+      filters: {
+        keywords: 'moose habitat'
+      },
+      pagination: {
+        page: '1',
+        limit: '10'
+      }
+    };
 
+    sinon.stub(SearchFeatureService.prototype, 'searchFeatures').resolves(mockResults);
+    sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(mockResults.length);
+
+    const requestHandler = search.searchFeatures();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.jsonValue).to.eql({
+      features: mockResults,
+      pagination: {
+        total: 1,
+        per_page: 10,
+        current_page: 1,
+        last_page: 1,
+        sort: undefined,
+        order: undefined
+      }
+    });
+  });
+
+  it('should return search results for property filters', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves(),
+      open: sinon.stub().resolves()
+    });
     sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    mockReq.body = { keywords: 'moose habitat' };
-
-    const mockSearchFeatures = sinon.stub(SearchIndexService.prototype, 'searchFeatures').resolves(mockResults);
-
-    const requestHandler = search.searchFeatures();
-
-    await requestHandler(mockReq, mockRes, mockNext);
-
-    expect(mockSearchFeatures).to.have.been.calledOnceWith({
-      keywords: 'moose habitat',
-      propertyFilters: undefined
-    });
-    expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql(mockResults);
-  });
-
-  it('should return search results for property filters', async () => {
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
         submission_feature_id: 2,
@@ -73,121 +97,158 @@ describe('searchFeatures', () => {
       }
     ];
 
-    const dbConnectionObj = getMockDBConnection({
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
-    });
+    mockReq.body = {
+      filters: {
+        propertyFilters: [{ propertyName: 'focal_species', value: 'Moose' }]
+      },
+      pagination: {
+        page: '1',
+        limit: '10'
+      }
+    };
 
+    sinon.stub(SearchFeatureService.prototype, 'searchFeatures').resolves(mockResults);
+    sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(mockResults.length);
+
+    const requestHandler = search.searchFeatures();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.jsonValue).to.eql({
+      features: mockResults,
+      pagination: {
+        total: 1,
+        per_page: 10,
+        current_page: 1,
+        last_page: 1,
+        sort: undefined,
+        order: undefined
+      }
+    });
+  });
+
+  it('should handle pagination with multiple pages', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves(),
+      open: sinon.stub().resolves()
+    });
     sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    mockReq.body = {
-      propertyFilters: [{ propertyName: 'focal_species', value: 'Moose' }]
-    };
-
-    const mockSearchFeatures = sinon.stub(SearchIndexService.prototype, 'searchFeatures').resolves(mockResults);
-
-    const requestHandler = search.searchFeatures();
-
-    await requestHandler(mockReq, mockRes, mockNext);
-
-    expect(mockSearchFeatures).to.have.been.calledOnceWith({
-      keywords: undefined,
-      propertyFilters: [{ propertyName: 'focal_species', value: 'Moose' }]
-    });
-    expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql(mockResults);
-  });
-
-  it('should return search results for combined keyword and property filter search', async () => {
     const mockResults: SearchFeatureResultWithRelevancy[] = [
       {
         submission_feature_id: 3,
         submission_id: 12,
         uuid: '550e8400-e29b-41d4-a716-446655440003',
-        feature_type_id: 2,
-        feature_type_name: 'observation',
-        feature_name: 'Wildlife Observation',
-        feature_description: null,
-        submission_name: 'Northern BC Wildlife Survey',
+        feature_type_id: 1,
+        feature_type_name: 'dataset',
+        feature_name: 'Dataset 1',
+        feature_description: 'Description 1',
+        submission_name: 'Submission 1',
         is_secured: false,
-        relevancy_score: 1.2
+        relevancy_score: 0.8
       }
     ];
 
-    const dbConnectionObj = getMockDBConnection({
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
-    });
+    mockReq.body = {
+      filters: {
+        keywords: 'test'
+      },
+      pagination: {
+        page: '2',
+        limit: '5',
+        sort: 'feature_name',
+        order: 'asc'
+      }
+    };
 
+    sinon.stub(SearchFeatureService.prototype, 'searchFeatures').resolves(mockResults);
+    sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(25);
+
+    const requestHandler = search.searchFeatures();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.jsonValue).to.eql({
+      features: mockResults,
+      pagination: {
+        total: 25,
+        per_page: 5,
+        current_page: 2,
+        last_page: 5,
+        sort: 'feature_name',
+        order: 'asc'
+      }
+    });
+  });
+
+  it('should return empty array when no results found', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves(),
+      open: sinon.stub().resolves()
+    });
     sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
     mockReq.body = {
-      keywords: 'wildlife',
-      propertyFilters: [{ propertyName: 'region', value: 'Northern BC' }]
+      filters: {
+        keywords: 'nonexistent'
+      },
+      pagination: {
+        page: '1',
+        limit: '10'
+      }
     };
 
-    const mockSearchFeatures = sinon.stub(SearchIndexService.prototype, 'searchFeatures').resolves(mockResults);
+    sinon.stub(SearchFeatureService.prototype, 'searchFeatures').resolves([]);
+    sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(0);
 
     const requestHandler = search.searchFeatures();
-
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(mockSearchFeatures).to.have.been.calledOnceWith({
-      keywords: 'wildlife',
-      propertyFilters: [{ propertyName: 'region', value: 'Northern BC' }]
-    });
     expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql(mockResults);
-  });
-
-  it('should return empty array when no search criteria provided', async () => {
-    const dbConnectionObj = getMockDBConnection({
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
+    expect(mockRes.jsonValue).to.eql({
+      features: [],
+      pagination: {
+        total: 0,
+        per_page: 10,
+        current_page: 1,
+        last_page: 1,
+        sort: undefined,
+        order: undefined
+      }
     });
-
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    mockReq.body = {};
-
-    const mockSearchFeatures = sinon.stub(SearchIndexService.prototype, 'searchFeatures').resolves([]);
-
-    const requestHandler = search.searchFeatures();
-
-    await requestHandler(mockReq, mockRes, mockNext);
-
-    expect(mockSearchFeatures).to.have.been.calledOnceWith({
-      keywords: undefined,
-      propertyFilters: undefined
-    });
-    expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql([]);
   });
 
   it('should handle errors and rollback', async () => {
     const dbConnectionObj = getMockDBConnection({
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves(),
+      open: sinon.stub().resolves()
     });
-
     sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    mockReq.body = { keywords: 'test' };
+    mockReq.body = {
+      filters: {
+        keywords: 'test'
+      },
+      pagination: {
+        page: '1',
+        limit: '10'
+      }
+    };
 
     const testError = new Error('Test error');
-    sinon.stub(SearchIndexService.prototype, 'searchFeatures').rejects(testError);
+    sinon.stub(SearchFeatureService.prototype, 'searchFeatures').rejects(testError);
 
     const requestHandler = search.searchFeatures();
 
@@ -199,5 +260,58 @@ describe('searchFeatures', () => {
       expect(dbConnectionObj.rollback).to.have.been.calledOnce;
       expect(dbConnectionObj.release).to.have.been.calledOnce;
     }
+  });
+
+  it('should handle missing pagination gracefully', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves(),
+      open: sinon.stub().resolves()
+    });
+    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    const mockResults: SearchFeatureResultWithRelevancy[] = [
+      {
+        submission_feature_id: 4,
+        submission_id: 13,
+        uuid: '550e8400-e29b-41d4-a716-446655440004',
+        feature_type_id: 1,
+        feature_type_name: 'dataset',
+        feature_name: 'Dataset Without Pagination',
+        feature_description: 'Description',
+        submission_name: 'Submission',
+        is_secured: false,
+        relevancy_score: 0.9
+      }
+    ];
+
+    mockReq.body = {
+      filters: {
+        keywords: 'test'
+      }
+      // No pagination provided
+    };
+
+    sinon.stub(SearchFeatureService.prototype, 'searchFeatures').resolves(mockResults);
+    sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(mockResults.length);
+
+    const requestHandler = search.searchFeatures();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.jsonValue).to.eql({
+      features: mockResults,
+      pagination: {
+        total: 1,
+        per_page: 1,
+        current_page: 1,
+        last_page: 1,
+        sort: undefined,
+        order: undefined
+      }
+    });
   });
 });

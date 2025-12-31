@@ -9,7 +9,7 @@ import {
 } from 'interfaces/useSubmissionsApi.interface';
 import React, { PropsWithChildren, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router';
-import { ApiPaginationRequestOptions } from 'types/misc';
+import { ApiPaginationRequestOptions } from 'types/pagination';
 import { firstOrNull } from 'utils/Utils';
 
 /* ------------------------------------------------------------------ */

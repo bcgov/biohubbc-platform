@@ -72,7 +72,7 @@ describe('getAvailableUsers', () => {
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.query = { search: 'ali' };
+    mockReq.query = { keyword: 'ali' };
 
     const requestHandler = getAvailableUsers();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -91,7 +91,7 @@ describe('getAvailableUsers', () => {
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.query = { search: '' };
+    mockReq.query = { keyword: '' };
 
     const requestHandler = getAvailableUsers();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -110,7 +110,7 @@ describe('getAvailableUsers', () => {
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.query = { search: '   ' };
+    mockReq.query = { keyword: '   ' };
 
     const requestHandler = getAvailableUsers();
     await requestHandler(mockReq, mockRes, mockNext);

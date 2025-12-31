@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { searchSummaryResponseSchema } from '../../../openapi/schemas/search/search-summary';
 import { SearchService } from '../../../services/search-service';
 import { getLogger } from '../../../utils/logger';
 
@@ -20,7 +21,7 @@ GET.apiDoc = {
   parameters: [
     {
       in: 'query',
-      name: 'search',
+      name: 'keyword',
       schema: { type: 'string' },
       required: true,
       description: 'Search term to match features, submissions, and taxa.'
@@ -31,37 +32,7 @@ GET.apiDoc = {
       description: 'Summary counts for features, submissions, and taxa.',
       content: {
         'application/json': {
-          schema: {
-            type: 'object',
-            properties: {
-              features: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    feature_type_name: { type: 'string' },
-                    total: { type: 'integer', minimum: 0 }
-                  },
-                  required: ['feature_type_name', 'total']
-                }
-              },
-              submissions: {
-                type: 'object',
-                properties: {
-                  total: { type: 'integer', minimum: 0 }
-                },
-                required: ['total']
-              },
-              taxonomy: {
-                type: 'object',
-                properties: {
-                  total: { type: 'integer', minimum: 0 }
-                },
-                required: ['total']
-              }
-            },
-            required: ['features', 'submissions', 'taxonomy']
-          }
+          schema: searchSummaryResponseSchema
         }
       }
     },
@@ -83,9 +54,9 @@ export function searchSummary(): RequestHandler {
 
       const searchService = new SearchService(connection);
 
-      const searchTerm = req.query.search as string;
+      const searchTerm = req.query.keyword as string;
 
-      const summary = await searchService.getSearchSummary({ search: searchTerm });
+      const summary = await searchService.getSearchSummary({ keyword: searchTerm });
 
       await connection.commit();
 

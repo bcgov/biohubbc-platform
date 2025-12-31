@@ -11,7 +11,7 @@ import {
   SubmissionRecordWithSecurityAndRootFeature
 } from 'interfaces/useSubmissionsApi.interface';
 import qs from 'qs';
-import { ApiPaginationRequestOptions } from 'types/misc';
+import { ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
  * Returns a set of supported CRUD api methods submissions.

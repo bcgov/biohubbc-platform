@@ -3,7 +3,7 @@ import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../database/db';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
-import { SearchIndexService } from '../../services/search-index-service';
+import { SearchFeatureService } from '../../services/search-feature-service';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/dataset/search-index');
@@ -65,10 +65,10 @@ export function indexSubmission(): RequestHandler {
     try {
       await connection.open();
 
-      const searchIndexService = new SearchIndexService(connection);
+      const searchFeatureService = new SearchFeatureService(connection);
 
       // Index the submission record
-      const response = await searchIndexService.indexFeaturesBySubmissionId(submissionId);
+      const response = await searchFeatureService.indexFeaturesBySubmissionId(submissionId);
 
       await connection.commit();
       res.status(200).json(response);

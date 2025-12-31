@@ -1,7 +1,7 @@
 import { SearchFeatureResult, SearchSubmissionResult, SearchTaxonResult } from '../models/search';
 
 export interface SearchParams {
-  search: string;
+  keyword: string;
   feature_type_name?: string;
 }
 

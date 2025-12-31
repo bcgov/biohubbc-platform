@@ -8,16 +8,16 @@ import {
 } from '../repositories/submission-repository';
 import { getS3SignedURL } from '../utils/file-utils';
 import { DBService } from './db-service';
-import { SearchIndexService } from './search-index-service';
+import { SearchFeatureService } from './search-feature-service';
 
 export class SubmissionFeatureService extends DBService {
   private readonly submissionRepository: SubmissionRepository;
-  private readonly searchIndexService: SearchIndexService;
+  private readonly searchFeatureService: SearchFeatureService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.submissionRepository = new SubmissionRepository(connection);
-    this.searchIndexService = new SearchIndexService(connection);
+    this.searchFeatureService = new SearchFeatureService(connection);
   }
 
   /**
@@ -57,7 +57,7 @@ export class SubmissionFeatureService extends DBService {
    * @memberof SubmissionFeatureService
    */
   async indexSubmissionFeatures(submissionId: number): Promise<void> {
-    await this.searchIndexService.indexFeaturesBySubmissionId(submissionId);
+    await this.searchFeatureService.indexFeaturesBySubmissionId(submissionId);
   }
 
   /**
@@ -103,7 +103,7 @@ export class SubmissionFeatureService extends DBService {
       return features;
     }
 
-    const searchKeyValues = await this.searchIndexService.getSearchKeyValuesBySubmissionId(submissionId);
+    const searchKeyValues = await this.searchFeatureService.getSearchKeyValuesBySubmissionId(submissionId);
 
     return features.map((feature) => {
       const data = searchKeyValues
