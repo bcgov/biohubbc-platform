@@ -2,7 +2,6 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { BaseRepository } from './base-repository';
-import { FeaturePropertyRecord } from './search-index-respository';
 
 const FeatureTypeCode = z.object({
   feature_type_id: z.number(),
@@ -104,20 +103,26 @@ export class CodeRepository extends BaseRepository {
    * Get a feature property record by name.
    *
    * @param {string} featurePropertyName
-   * @return {*}  {Promise<FeaturePropertyRecord>}
+   * @return {*}  {Promise<FeaturePropertyCode>}
    * @memberof CodeRepository
    */
-  async getFeaturePropertyByName(featurePropertyName: string): Promise<FeaturePropertyRecord> {
+  async getFeaturePropertyByName(featurePropertyName: string): Promise<FeaturePropertyCode> {
     const sqlStatement = SQL`
-      SELECT
-        *
-      FROM
-        feature_property
-      WHERE
-        name = ${featurePropertyName};
-    `;
+    SELECT
+      fp.feature_property_id,
+      fp.name as feature_property_name,
+      fp.display_name as feature_property_display_name,
+      fpt.feature_property_type_id,
+      fpt.name as feature_property_type_name
+    FROM
+      feature_property fp
+    INNER JOIN
+      feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
+    WHERE
+      fp.name = ${featurePropertyName};
+  `;
 
-    const response = await this.connection.sql(sqlStatement, FeaturePropertyRecord);
+    const response = await this.connection.sql(sqlStatement, FeaturePropertyCode);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get feature property record', [
