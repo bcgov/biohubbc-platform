@@ -2,7 +2,7 @@
 # This DockerFile is used for local development (via compose.yml) only.
 # ########################################################################################################
 
-FROM node:20
+FROM node:24
 
 ENV HOME=/opt/app-root/src
 

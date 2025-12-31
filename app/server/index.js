@@ -51,7 +51,7 @@ import { fileURLToPath } from 'url';
   app.use('/healthcheck', async (_, resp) => {
     // Request server api
     const host = process.env.VITE_API_HOST || process.env.LOCAL_API_HOST || 'localhost';
-    
+
     try {
       const response = await axios.get(`https://${host}/`);
       if (response.status === 200) {
