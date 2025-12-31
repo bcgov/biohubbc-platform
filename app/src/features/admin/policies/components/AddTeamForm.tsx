@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import { useFormikContext } from 'formik';
+import { IAvailableUser } from 'interfaces/useTeamsApi.interface';
 import yup from 'utils/YupSchema';
 import { TeamMemberSelect } from './TeamMemberSelect';
 
@@ -14,6 +15,14 @@ export interface IAddTeamFormValues {
   description: string;
   /** Array of system user IDs for team members */
   member_user_ids: number[];
+}
+
+/**
+ * Props for AddTeamForm component.
+ */
+export interface IAddTeamFormProps {
+  /** Initial users when editing a team (to pre-populate the member selector) */
+  initialUsers?: IAvailableUser[];
 }
 
 /**
@@ -38,8 +47,10 @@ export const AddTeamFormYupSchema = yup.object().shape({
  * Form component for creating or editing a team.
  *
  * Must be used within a Formik context (wrapped by EditDialog or similar).
+ *
+ * @param {IAddTeamFormProps} props
  */
-export const AddTeamForm = () => {
+export const AddTeamForm = ({ initialUsers }: IAddTeamFormProps) => {
   const { values, errors, touched, handleChange, handleBlur, setFieldValue } = useFormikContext<IAddTeamFormValues>();
 
   return (
@@ -72,6 +83,7 @@ export const AddTeamForm = () => {
       <TeamMemberSelect
         selectedUserIds={values.member_user_ids}
         onChange={(userIds) => setFieldValue('member_user_ids', userIds)}
+        initialUsers={initialUsers}
       />
     </Box>
   );

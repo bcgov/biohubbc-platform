@@ -26,6 +26,9 @@ export interface ITeamsResponse {
     total: number;
     page: number;
     limit: number;
+    last_page: number;
+    sort?: string;
+    order?: 'asc' | 'desc';
   };
 }
 

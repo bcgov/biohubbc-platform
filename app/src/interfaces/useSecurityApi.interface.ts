@@ -1,4 +1,3 @@
-import { GridRowSelectionModel } from '@mui/x-data-grid';
 import { ISecurityRuleAndCategory } from 'hooks/api/useSecurityApi';
 
 export interface ISecureDataAccessRequestForm {
@@ -45,7 +44,7 @@ export interface IPatchFeatureSecurityRules {
    * @type {number[]}
    * @memberof IPatchFeatureSecurityRules
    */
-  submissionFeatureIds: number[] | GridRowSelectionModel;
+  submissionFeatureIds: number[];
   /**
    * The array of the security rules that will be applied to all of the given features.
    * Note that it is possible that a particular rule ID may also belong to `stagedForRemove`.
@@ -62,4 +61,12 @@ export interface IPatchFeatureSecurityRules {
    * @memberof IPatchFeatureSecurityRules
    */
   stagedForRemove: ISecurityRuleAndCategory[];
+}
+
+export interface ISubmissionFeatureSecurityRulesSummary {
+  security_rule_id: number;
+  count: number;
+}
+export interface ISubmissionFeatureSecurityRulesSummaryResponse {
+  rules: ISubmissionFeatureSecurityRulesSummary[];
 }

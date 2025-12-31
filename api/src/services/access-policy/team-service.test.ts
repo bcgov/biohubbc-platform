@@ -4,10 +4,10 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { CreateTeam, Team, UpdateTeam } from '../../models/team';
 import { TeamMember } from '../../models/team-member';
-import { TeamMemberRepository } from '../../repositories/authorization/team-member-repository';
+import { TeamMemberRepository, TeamMemberWithUser } from '../../repositories/authorization/team-member-repository';
 import { TeamRepository } from '../../repositories/authorization/team-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { ITeamMemberWithUser, TeamService } from './team-service';
+import { TeamService } from './team-service';
 
 chai.use(sinonChai);
 
@@ -125,16 +125,23 @@ describe('TeamService', () => {
         { team_id: 'team-1', name: 'Team Alpha', description: 'First team' },
         { team_id: 'team-2', name: 'Team Beta', description: 'Second team' }
       ];
-      const mockMembers: ITeamMemberWithUser[] = [
+      const mockMembers: TeamMemberWithUser[] = [
         { team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' }
       ];
 
       sinon.stub(TeamRepository.prototype, 'getTeamsWithPagination').resolves({ teams: mockTeams, total: 2 });
       sinon.stub(service.connection, 'knex').resolves({ rows: mockMembers } as any);
 
-      const result = await service.getTeamsWithMembers({ page: 0, limit: 50 });
+      const result = await service.getTeamsWithMembers({ page: 1, limit: 50 });
 
-      expect(result.pagination).to.eql({ total: 2, page: 0, limit: 50 });
+      expect(result.pagination).to.eql({
+        total: 2,
+        page: 1,
+        limit: 50,
+        last_page: 1,
+        sort: undefined,
+        order: undefined
+      });
       expect(result.teams).to.have.length(2);
       expect(result.teams[0].members).to.eql(mockMembers);
     });
@@ -142,17 +149,24 @@ describe('TeamService', () => {
     it('should return empty array when no teams exist', async () => {
       sinon.stub(TeamRepository.prototype, 'getTeamsWithPagination').resolves({ teams: [], total: 0 });
 
-      const result = await service.getTeamsWithMembers({ page: 0, limit: 50 });
+      const result = await service.getTeamsWithMembers({ page: 1, limit: 50 });
 
       expect(result.teams).to.eql([]);
-      expect(result.pagination).to.eql({ total: 0, page: 0, limit: 50 });
+      expect(result.pagination).to.eql({
+        total: 0,
+        page: 1,
+        limit: 50,
+        last_page: 1,
+        sort: undefined,
+        order: undefined
+      });
     });
   });
 
   describe('getTeamWithMembers', () => {
     it('should return team with its members', async () => {
       const mockTeam: Team = { team_id: 'team-1', name: 'Test Team', description: 'A test team' };
-      const mockMembers: ITeamMemberWithUser[] = [{ team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'bob' }];
+      const mockMembers: TeamMemberWithUser[] = [{ team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'bob' }];
 
       sinon.stub(TeamRepository.prototype, 'getTeam').resolves(mockTeam);
       sinon.stub(service.connection, 'knex').resolves({ rows: mockMembers } as any);
@@ -166,7 +180,7 @@ describe('TeamService', () => {
   describe('createTeamWithMembers', () => {
     it('should create team and add members', async () => {
       const mockTeam: Team = { team_id: 'new-team', name: 'New Team', description: 'A new team' };
-      const mockMembers: ITeamMemberWithUser[] = [
+      const mockMembers: TeamMemberWithUser[] = [
         { team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' },
         { team_member_id: 'tm-2', system_user_id: 2, user_identifier: 'bob' }
       ];
@@ -200,7 +214,7 @@ describe('TeamService', () => {
         { team_member_id: 'tm-1', team_id: 'team-1', system_user_id: 1 },
         { team_member_id: 'tm-2', team_id: 'team-1', system_user_id: 2 }
       ];
-      const newMembers: ITeamMemberWithUser[] = [
+      const newMembers: TeamMemberWithUser[] = [
         { team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' },
         { team_member_id: 'tm-3', system_user_id: 3, user_identifier: 'charlie' }
       ];

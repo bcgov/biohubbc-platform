@@ -12,7 +12,12 @@ const defaultLog = getLogger('paths/administrative/teams/{teamId}');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR], discriminator: 'SystemRole' }]
+    and: [
+      {
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR],
+        discriminator: 'SystemRole'
+      }
+    ]
   })),
   getTeam()
 ];

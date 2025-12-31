@@ -1,11 +1,11 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_IDENTITY_SOURCE } from '../../../constants/database';
 import { SYSTEM_ROLE } from '../../../constants/roles';
-import { getDBConnection, getKnex } from '../../../database/db';
+import { getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { AvailableUsersListResponseSchema } from '../../../openapi/schemas/team';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
+import { UserService } from '../../../services/user-service';
 import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/users');
@@ -21,6 +21,14 @@ GET.apiDoc = {
   description: 'Get available users for team membership (excludes SYSTEM and DATABASE users).',
   tags: ['user'],
   security: [{ Bearer: [] }],
+  parameters: [
+    {
+      in: 'query',
+      name: 'search',
+      schema: { type: 'string' },
+      description: 'Search term to filter users by user_identifier (case-insensitive partial match)'
+    }
+  ],
   responses: {
     200: {
       description: 'List of available users',
@@ -33,6 +41,8 @@ GET.apiDoc = {
 /**
  * Get available users for team membership (excludes SYSTEM and DATABASE users).
  *
+ * Supports optional search parameter for server-side filtering.
+ *
  * @returns {RequestHandler}
  */
 export function getAvailableUsers(): RequestHandler {
@@ -42,19 +52,13 @@ export function getAvailableUsers(): RequestHandler {
     try {
       await connection.open();
 
-      const knex = getKnex();
-      const query = knex
-        .table('system_user as su')
-        .select(['su.system_user_id', 'su.user_identifier'])
-        .innerJoin('user_identity_source as uis', 'su.user_identity_source_id', 'uis.user_identity_source_id')
-        .whereNull('su.record_end_date')
-        .whereNotIn('uis.name', [SYSTEM_IDENTITY_SOURCE.SYSTEM, SYSTEM_IDENTITY_SOURCE.DATABASE])
-        .orderBy('su.user_identifier', 'asc');
+      const search = req.query.search as string | undefined;
 
-      const response = await connection.knex(query);
+      const userService = new UserService(connection);
+      const users = await userService.getAvailableUsers(search);
 
       await connection.commit();
-      return res.status(200).json({ users: response.rows });
+      return res.status(200).json({ users });
     } catch (error) {
       defaultLog.error({ label: 'getAvailableUsers', message: 'error', error });
       await connection.rollback();

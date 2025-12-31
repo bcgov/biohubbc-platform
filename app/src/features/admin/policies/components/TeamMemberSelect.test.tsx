@@ -63,10 +63,16 @@ describe('TeamMemberSelect', () => {
     });
   });
 
-  it('displays selected users as chips when selectedUserIds are provided', async () => {
+  it('displays selected users as chips when selectedUserIds and initialUsers are provided', async () => {
     const mockOnChange = vi.fn();
+    const initialUsers = [
+      { system_user_id: 1, user_identifier: 'alice' },
+      { system_user_id: 2, user_identifier: 'bob' }
+    ];
 
-    const { getByText } = render(<TeamMemberSelect selectedUserIds={[1, 2]} onChange={mockOnChange} />);
+    const { getByText } = render(
+      <TeamMemberSelect selectedUserIds={[1, 2]} onChange={mockOnChange} initialUsers={initialUsers} />
+    );
 
     await waitFor(() => {
       expect(getByText('alice')).toBeVisible();
@@ -74,10 +80,13 @@ describe('TeamMemberSelect', () => {
     });
   });
 
-  it('displays user_identifier for all users', async () => {
+  it('displays user_identifier for selected users with initialUsers', async () => {
     const mockOnChange = vi.fn();
+    const initialUsers = [{ system_user_id: 3, user_identifier: 'charlie' }];
 
-    const { getByText } = render(<TeamMemberSelect selectedUserIds={[3]} onChange={mockOnChange} />);
+    const { getByText } = render(
+      <TeamMemberSelect selectedUserIds={[3]} onChange={mockOnChange} initialUsers={initialUsers} />
+    );
 
     await waitFor(() => {
       expect(getByText('charlie')).toBeVisible();
@@ -145,10 +154,16 @@ describe('TeamMemberSelect', () => {
 
   it('removes user when chip is deleted', async () => {
     const mockOnChange = vi.fn();
+    const initialUsers = [
+      { system_user_id: 1, user_identifier: 'alice' },
+      { system_user_id: 2, user_identifier: 'bob' }
+    ];
 
-    const { getAllByTestId, getByText } = render(<TeamMemberSelect selectedUserIds={[1, 2]} onChange={mockOnChange} />);
+    const { getAllByTestId, getByText } = render(
+      <TeamMemberSelect selectedUserIds={[1, 2]} onChange={mockOnChange} initialUsers={initialUsers} />
+    );
 
-    // Wait for chips to render (users must be loaded first)
+    // Wait for chips to render
     await waitFor(() => {
       expect(getByText('alice')).toBeVisible();
       expect(getByText('bob')).toBeVisible();
@@ -162,5 +177,74 @@ describe('TeamMemberSelect', () => {
     await waitFor(() => {
       expect(mockOnChange).toHaveBeenCalledWith([2]);
     });
+  });
+
+  it('passes search parameter to API when typing', async () => {
+    const mockOnChange = vi.fn();
+
+    const { getByLabelText } = render(<TeamMemberSelect selectedUserIds={[]} onChange={mockOnChange} />);
+
+    // Wait for initial load
+    await waitFor(() => {
+      expect(mockGetAvailableUsers).toHaveBeenCalledWith(undefined);
+    });
+
+    // Clear initial call count
+    mockGetAvailableUsers.mockClear();
+
+    // Type in the search input
+    const input = getByLabelText('Team Members');
+    fireEvent.change(input, { target: { value: 'ali' } });
+
+    // Wait for debounced search to trigger (300ms debounce)
+    await waitFor(
+      () => {
+        expect(mockGetAvailableUsers).toHaveBeenCalledWith('ali');
+      },
+      { timeout: 500 }
+    );
+  });
+
+  it('keeps selected users visible even when search results change', async () => {
+    // Start with all users in search results
+    mockGetAvailableUsers.mockResolvedValueOnce({ users: mockUsers });
+
+    const mockOnChange = vi.fn();
+    const initialUsers = [{ system_user_id: 1, user_identifier: 'alice' }];
+
+    const { getAllByText, getByLabelText, queryByRole } = render(
+      <TeamMemberSelect selectedUserIds={[1]} onChange={mockOnChange} initialUsers={initialUsers} />
+    );
+
+    // Wait for initial load
+    await waitFor(() => {
+      expect(mockGetAvailableUsers).toHaveBeenCalled();
+    });
+
+    // Alice should be visible as selected chip
+    const aliceChip = queryByRole('button', { name: /alice/i });
+    expect(aliceChip).toBeInTheDocument();
+
+    // Mock a search that returns different users (not including alice)
+    mockGetAvailableUsers.mockResolvedValueOnce({
+      users: [{ system_user_id: 4, user_identifier: 'david' }]
+    });
+
+    // Type a search that wouldn't normally include alice
+    const input = getByLabelText('Team Members');
+    fireEvent.change(input, { target: { value: 'dav' } });
+
+    // Wait for search to complete
+    await waitFor(
+      () => {
+        expect(mockGetAvailableUsers).toHaveBeenCalledWith('dav');
+      },
+      { timeout: 500 }
+    );
+
+    // Alice should still be visible as a chip because she's selected (cached)
+    // Use getAllByText since alice may appear as chip and in dropdown
+    const aliceElements = getAllByText('alice');
+    expect(aliceElements.length).toBeGreaterThan(0);
   });
 });

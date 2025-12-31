@@ -64,4 +64,58 @@ describe('getAvailableUsers', () => {
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql({ users: [] });
   });
+
+  it('should return 200 with users matching search parameter', async () => {
+    const mockUsers = [{ system_user_id: 1, user_identifier: 'alice' }];
+
+    const mockDBConnection = getMockDBConnection({ knex: async () => ({ rows: mockUsers } as any) });
+    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.query = { search: 'ali' };
+
+    const requestHandler = getAvailableUsers();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.jsonValue).to.eql({ users: mockUsers });
+  });
+
+  it('should handle empty search parameter', async () => {
+    const mockUsers = [
+      { system_user_id: 1, user_identifier: 'alice' },
+      { system_user_id: 2, user_identifier: 'bob' }
+    ];
+
+    const mockDBConnection = getMockDBConnection({ knex: async () => ({ rows: mockUsers } as any) });
+    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.query = { search: '' };
+
+    const requestHandler = getAvailableUsers();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.jsonValue).to.eql({ users: mockUsers });
+  });
+
+  it('should handle whitespace-only search parameter', async () => {
+    const mockUsers = [
+      { system_user_id: 1, user_identifier: 'alice' },
+      { system_user_id: 2, user_identifier: 'bob' }
+    ];
+
+    const mockDBConnection = getMockDBConnection({ knex: async () => ({ rows: mockUsers } as any) });
+    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.query = { search: '   ' };
+
+    const requestHandler = getAvailableUsers();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.jsonValue).to.eql({ users: mockUsers });
+  });
 });

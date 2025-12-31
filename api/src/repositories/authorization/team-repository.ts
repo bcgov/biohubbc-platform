@@ -86,8 +86,10 @@ export class TeamRepository extends BaseRepository {
    * Get teams with pagination and optional search.
    *
    * @param {object} options - Pagination and search options.
-   * @param {number} options.page - Page number (0-indexed).
+   * @param {number} options.page - Page number (1-indexed).
    * @param {number} options.limit - Number of items per page.
+   * @param {string} [options.sort] - Column to sort by.
+   * @param {string} [options.order] - Sort direction ('asc' or 'desc').
    * @param {string} [options.search] - Optional search term to filter by team name.
    * @return {Promise<{ teams: Team[]; total: number }>}
    * @memberof TeamRepository
@@ -95,6 +97,8 @@ export class TeamRepository extends BaseRepository {
   async getTeamsWithPagination(options: {
     page: number;
     limit: number;
+    sort?: string;
+    order?: 'asc' | 'desc';
     search?: string;
   }): Promise<{ teams: Team[]; total: number }> {
     const knex = getKnex();
@@ -105,20 +109,23 @@ export class TeamRepository extends BaseRepository {
       baseQuery = baseQuery.whereILike('name', `%${options.search}%`);
     }
 
-    // Get total count
+    // Build count query
     const countQuery = baseQuery.clone().count('* as count').first();
-    const countResult = await this.connection.knex(countQuery);
-    const total = Number(countResult.rows[0]?.count || 0);
 
-    // Get paginated results
+    // Build paginated query (1-indexed pagination)
     const paginatedQuery = baseQuery
       .clone()
       .select(['team_id', 'name', 'description'])
-      .orderBy('name', 'asc')
-      .offset(options.page * options.limit)
+      .orderBy(options.sort || 'name', options.order || 'asc')
+      .offset((options.page - 1) * options.limit)
       .limit(options.limit);
 
-    const response = await this.connection.knex(paginatedQuery, Team);
+    // Execute both queries in parallel
+    const [countResult, response] = await Promise.all([
+      this.connection.knex(countQuery),
+      this.connection.knex(paginatedQuery, Team)
+    ]);
+    const total = Number(countResult.rows[0]?.count || 0);
 
     return { teams: response.rows, total };
   }

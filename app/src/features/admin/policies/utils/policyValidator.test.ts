@@ -1,17 +1,17 @@
-import { describe, expect, it } from 'vitest';
-import {
-  validatePolicyDocument,
-  findLineNumber,
-  findColumnRange,
-  IValidationContext,
-  ValidationMarkerSeverity
-} from './policyValidator';
 import { FeatureTypeWithFeaturePropertiesCode } from 'interfaces/useCodesApi.interface';
+import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import {
-  IGetSubmissionGroupedFeatureResponse,
+  ISubmissionFeatureForReview,
   SubmissionRecordWithSecurityAndRootFeature
 } from 'interfaces/useSubmissionsApi.interface';
-import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
+import { describe, expect, it } from 'vitest';
+import {
+  findColumnRange,
+  findLineNumber,
+  IValidationContext,
+  validatePolicyDocument,
+  ValidationMarkerSeverity
+} from './policyValidator';
 
 /**
  * Create a mock submission record for testing.
@@ -94,52 +94,26 @@ const createMockFeatureType = (): FeatureTypeWithFeaturePropertiesCode => ({
  * Create a mock submission features response for testing.
  *
  * @param {number} submissionId - Submission ID
- * @returns {IGetSubmissionGroupedFeatureResponse[]} Mock feature groups
+ * @returns {ISubmissionFeatureForReview[]} Mock features
  */
-const createMockFeatureGroups = (submissionId: number): IGetSubmissionGroupedFeatureResponse[] => [
+const createMockFeatureGroups = (submissionId: number): ISubmissionFeatureForReview[] => [
   {
+    submission_feature_id: 100,
+    uuid: 'feature-uuid-100',
+    submission_id: submissionId,
+    feature_type_id: 1,
     feature_type_name: 'animal',
-    feature_type_display_name: 'Animal',
-    features: [
-      {
-        submission_feature_id: 100,
-        uuid: 'feature-uuid-100',
-        submission_id: submissionId,
-        feature_type_id: 1,
-        source_id: 'source-100',
-        data: { species: 'bear' },
-        parent_submission_feature_id: 0,
-        record_effective_date: '2024-01-01',
-        record_end_date: null,
-        create_date: '2024-01-01T00:00:00Z',
-        create_user: 1,
-        update_date: null,
-        update_user: null,
-        revision_count: 0,
-        feature_type_name: 'animal',
-        feature_type_display_name: 'Animal',
-        submission_feature_security_ids: []
-      },
-      {
-        submission_feature_id: 101,
-        uuid: 'feature-uuid-101',
-        submission_id: submissionId,
-        feature_type_id: 1,
-        source_id: 'source-101',
-        data: { species: 'wolf' },
-        parent_submission_feature_id: 0,
-        record_effective_date: '2024-01-01',
-        record_end_date: null,
-        create_date: '2024-01-01T00:00:00Z',
-        create_user: 1,
-        update_date: null,
-        update_user: null,
-        revision_count: 0,
-        feature_type_name: 'animal',
-        feature_type_display_name: 'Animal',
-        submission_feature_security_ids: []
-      }
-    ]
+    secured: false,
+    submission_feature_security_ids: []
+  },
+  {
+    submission_feature_id: 101,
+    uuid: 'feature-uuid-101',
+    submission_id: submissionId,
+    feature_type_id: 1,
+    feature_type_name: 'animal',
+    secured: false,
+    submission_feature_security_ids: []
   }
 ];
 

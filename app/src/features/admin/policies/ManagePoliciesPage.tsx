@@ -37,7 +37,9 @@ export const ManagePoliciesPage = () => {
     biohubApi.policies.getPolicies({ search: search || undefined })
   );
 
-  const teamsDataLoader = useDataLoader((search?: string) => biohubApi.teams.getTeams({ search: search || undefined }));
+  const teamsDataLoader = useDataLoader((search?: string) =>
+    biohubApi.teams.getTeams({ page: 1, limit: 100, search: search || undefined })
+  );
 
   const teamPoliciesDataLoader = useDataLoader(() => biohubApi.teamPolicies.getTeamPolicies());
 

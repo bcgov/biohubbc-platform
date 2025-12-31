@@ -25,18 +25,35 @@ GET.apiDoc = {
     {
       in: 'query',
       name: 'page',
-      schema: { type: 'integer', default: 0 },
-      description: 'Page number (0-indexed)'
+      required: false,
+      schema: { type: 'integer', minimum: 1 },
+      description: 'Page number (1-indexed, defaults to 1)'
     },
     {
       in: 'query',
       name: 'limit',
-      schema: { type: 'integer', default: 50 },
-      description: 'Items per page (max 100)'
+      required: false,
+      schema: { type: 'integer', minimum: 1, maximum: 100 },
+      description: 'Items per page (defaults to 10, max 100)'
+    },
+    {
+      in: 'query',
+      name: 'sort',
+      required: false,
+      schema: { type: 'string' },
+      description: 'Column to sort by (e.g., name)'
+    },
+    {
+      in: 'query',
+      name: 'order',
+      required: false,
+      schema: { type: 'string', enum: ['asc', 'desc'] },
+      description: 'Sort direction'
     },
     {
       in: 'query',
       name: 'search',
+      required: false,
       schema: { type: 'string' },
       description: 'Search by team name'
     }
@@ -58,14 +75,16 @@ GET.apiDoc = {
 export function getTeams(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
-    const page = Number(req.query.page) || 0;
-    const limit = Math.min(Number(req.query.limit) || 50, 100);
+    const page = Number(req.query.page) || 1;
+    const limit = Math.min(Number(req.query.limit) || 10, 100);
+    const sort = req.query.sort as string | undefined;
+    const order = req.query.order as 'asc' | 'desc' | undefined;
     const search = req.query.search as string | undefined;
 
     try {
       await connection.open();
       const teamService = new TeamService(connection);
-      const result = await teamService.getTeamsWithMembers({ page, limit, search });
+      const result = await teamService.getTeamsWithMembers({ page, limit, sort, order, search });
       await connection.commit();
       return res.status(200).json(result);
     } catch (error) {

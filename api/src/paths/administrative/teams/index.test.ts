@@ -24,7 +24,7 @@ describe('getTeams', () => {
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.query = { page: '0', limit: '50' };
+    mockReq.query = { page: '1', limit: '50' };
 
     const requestHandler = getTeams();
 
@@ -39,7 +39,7 @@ describe('getTeams', () => {
   it('should return 200 with paginated teams', async () => {
     const mockTeams = {
       teams: [{ team_id: 'team-1', name: 'Team Alpha', description: 'First', members: [] }],
-      pagination: { total: 1, page: 0, limit: 50 }
+      pagination: { total: 1, page: 1, limit: 50, last_page: 1 }
     };
 
     const mockDBConnection = getMockDBConnection();
@@ -47,7 +47,7 @@ describe('getTeams', () => {
     sinon.stub(TeamService.prototype, 'getTeamsWithMembers').resolves(mockTeams);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.query = { page: '0', limit: '50' };
+    mockReq.query = { page: '1', limit: '50' };
 
     const requestHandler = getTeams();
     await requestHandler(mockReq, mockRes, mockNext);
@@ -61,16 +61,22 @@ describe('getTeams', () => {
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
     const getTeamsStub = sinon.stub(TeamService.prototype, 'getTeamsWithMembers').resolves({
       teams: [],
-      pagination: { total: 0, page: 0, limit: 50 }
+      pagination: { total: 0, page: 1, limit: 50, last_page: 1 }
     });
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.query = { page: '0', limit: '50', search: 'Research' };
+    mockReq.query = { page: '1', limit: '50', search: 'Research' };
 
     const requestHandler = getTeams();
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(getTeamsStub).to.have.been.calledWith({ page: 0, limit: 50, search: 'Research' });
+    expect(getTeamsStub).to.have.been.calledWith({
+      page: 1,
+      limit: 50,
+      sort: undefined,
+      order: undefined,
+      search: 'Research'
+    });
   });
 
   it('should cap limit at 100', async () => {
@@ -78,16 +84,22 @@ describe('getTeams', () => {
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
     const getTeamsStub = sinon.stub(TeamService.prototype, 'getTeamsWithMembers').resolves({
       teams: [],
-      pagination: { total: 0, page: 0, limit: 100 }
+      pagination: { total: 0, page: 1, limit: 100, last_page: 1 }
     });
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.query = { page: '0', limit: '500' };
+    mockReq.query = { page: '1', limit: '500' };
 
     const requestHandler = getTeams();
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(getTeamsStub).to.have.been.calledWith({ page: 0, limit: 100, search: undefined });
+    expect(getTeamsStub).to.have.been.calledWith({
+      page: 1,
+      limit: 100,
+      sort: undefined,
+      order: undefined,
+      search: undefined
+    });
   });
 });
 

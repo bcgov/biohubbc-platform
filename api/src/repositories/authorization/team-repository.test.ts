@@ -116,7 +116,7 @@ describe('TeamRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repository = new TeamRepository(mockDBConnection);
-      const result = await repository.getTeamsWithPagination({ page: 0, limit: 2 });
+      const result = await repository.getTeamsWithPagination({ page: 1, limit: 2 });
 
       expect(result.teams).to.eql(mockTeams);
       expect(result.total).to.equal(5);
@@ -132,7 +132,7 @@ describe('TeamRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repository = new TeamRepository(mockDBConnection);
-      const result = await repository.getTeamsWithPagination({ page: 0, limit: 50, search: 'Research' });
+      const result = await repository.getTeamsWithPagination({ page: 1, limit: 50, search: 'Research' });
 
       expect(result.teams).to.eql(mockTeams);
       expect(result.total).to.equal(1);
@@ -146,13 +146,13 @@ describe('TeamRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repository = new TeamRepository(mockDBConnection);
-      const result = await repository.getTeamsWithPagination({ page: 0, limit: 50 });
+      const result = await repository.getTeamsWithPagination({ page: 1, limit: 50 });
 
       expect(result.teams).to.eql([]);
       expect(result.total).to.equal(0);
     });
 
-    it('calculates correct offset for page > 0', async () => {
+    it('calculates correct offset for page > 1', async () => {
       const mockTeams = [{ team_id: 'uuid-3', name: 'Team Gamma', description: 'Third team' }];
 
       const knexStub = sinon.stub();
@@ -164,7 +164,7 @@ describe('TeamRepository', () => {
       const repository = new TeamRepository(mockDBConnection);
       const result = await repository.getTeamsWithPagination({ page: 2, limit: 3 });
 
-      // Page 2 with limit 3 should offset by 6 (2 * 3)
+      // Page 2 with limit 3 should offset by 3 ((2-1) * 3) for 1-indexed pagination
       expect(result.teams).to.eql(mockTeams);
       expect(result.total).to.equal(10);
     });
