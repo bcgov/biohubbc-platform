@@ -26,7 +26,7 @@ export const SearchResultsSection = ({
   const renderFeaturesList = () => (
     <Box>
       <SearchSectionHeader label="Features" onTitleClick={() => onViewMore('features')} />
-      {features.data.map((item: SearchFeatureResult, index) => (
+      {features.data.map((item: SearchFeatureResult) => (
         <SearchOptionItem
           key={`feature-${item.submission_feature_id}`}
           name={item.label}

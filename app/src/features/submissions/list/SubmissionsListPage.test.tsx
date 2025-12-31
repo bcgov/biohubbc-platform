@@ -80,21 +80,25 @@ describe('SubmissionsListPage', () => {
           relevancy_score: 0.85
         }
       ];
+
       mockUseApi.search.searchFeatures.mockResolvedValue(mockResults);
       const actions = renderPage();
-
       const searchInput = actions.getByPlaceholderText(/caribou/i);
-      fireEvent.change(searchInput, { target: { value: 'test' } });
+      fireEvent.change(searchInput, { target: { value: 'Secured' } });
 
+      // Wait for the debounce + API to finish
       await waitFor(
         () => {
           const requestAccessBtn = actions.getByRole('button', { name: /request access/i });
           expect(requestAccessBtn).toBeVisible();
           fireEvent.click(requestAccessBtn);
-          expect(actions.getByText(/secure data access request/i)).toBeVisible();
         },
-        { timeout: 1000 }
+        { timeout: 2000 }
       );
+
+      await waitFor(() => {
+        expect(actions.getByText(/secure data access request/i)).toBeVisible();
+      });
     });
   });
 

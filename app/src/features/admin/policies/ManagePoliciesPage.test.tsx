@@ -51,7 +51,7 @@ describe('ManagePoliciesPage', () => {
   });
 
   it('renders the main page content correctly', async () => {
-    mockUseApi.policies.getPolicies.mockReturnValue({ policies: [], pagination: { total: 0, page: 1, limit: 10 } });
+    mockUseApi.policies.getPolicies.mockResolvedValue({ policies: [], pagination: { total: 0, page: 1, limit: 10 } });
 
     const { getByText } = renderContainer();
 
@@ -61,7 +61,7 @@ describe('ManagePoliciesPage', () => {
   });
 
   it('renders the active policies component', async () => {
-    mockUseApi.policies.getPolicies.mockReturnValue({ policies: [], pagination: { total: 0, page: 1, limit: 10 } });
+    mockUseApi.policies.getPolicies.mockResolvedValue({ policies: [], pagination: { total: 0, page: 1, limit: 10 } });
 
     const { getByText } = renderContainer();
 

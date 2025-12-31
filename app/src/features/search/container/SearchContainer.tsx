@@ -3,7 +3,6 @@ import Icon from '@mdi/react';
 import { Box, Button, ClickAwayListener, Stack } from '@mui/material';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonHorizontalStack } from 'components/loading/SkeletonLoaders';
-import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
@@ -41,11 +40,9 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
   // Load initial summary on mount using empty search string to match everything
   useEffect(() => {
     const loadInitialSummary = async () => {
-      try {
-        const summaryData = await summaryLoader.load({ search: '' });
-        summaryData && setSummary(summaryData);
-      } catch (error) {
-        dialogContext.setSnackbar({ open: true, snackbarMessage: (error as APIError).message });
+      const summaryData = await summaryLoader.load({ search: '' });
+      if (summaryData) {
+        setSummary(summaryData);
       }
     };
     loadInitialSummary();
@@ -60,8 +57,12 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
           recordsLoader.refresh(params, SEARCH_PREVIEW_PAGINATION),
           summaryLoader.refresh(params)
         ]);
-        recordsData && setRecords(recordsData);
-        summaryData && setSummary(summaryData);
+        if (recordsData) {
+          setRecords(recordsData);
+        }
+        if (summaryData) {
+          setSummary(summaryData);
+        }
       }, SEARCH_DEBOUNCE_MS),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [SEARCH_PREVIEW_PAGINATION]

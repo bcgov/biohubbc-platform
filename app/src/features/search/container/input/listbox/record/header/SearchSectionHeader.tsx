@@ -30,24 +30,20 @@ export const SearchSectionHeader = ({ label, onTitleClick }: SearchSectionHeader
             padding: 0,
             minWidth: 'auto',
             textTransform: 'none',
-            color: grey[600],
             fontSize: 'inherit',
+            color: grey[400],
             fontWeight: 'inherit',
             justifyContent: 'flex-start',
-            borderBottom: '2px solid transparent',
+            borderBottom: '1px solid transparent',
             transition: 'border-bottom-color 0.2s ease',
             '&:hover': {
               borderBottomColor: 'inherit',
               backgroundColor: 'transparent'
-            },
-            '&:focus-visible': {
-              outline: `2px solid inherit`,
-              outlineOffset: '2px'
             }
           }}>
           <Typography component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }} color="textSecondary">
             {label}
-            <Icon path={mdiArrowTopRight} size={0.6} color={grey[500]} style={{ marginTop: '4px' }} />
+            <Icon path={mdiArrowTopRight} size={0.7} color={grey[500]} style={{ marginTop: '4px' }} />
           </Typography>
         </Button>
       ) : (
