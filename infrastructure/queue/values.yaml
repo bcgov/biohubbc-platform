@@ -28,6 +28,10 @@ app:
     keyPrefix: "" # S3 key optional prefix
     secretName: biohubbc-object-store # Secrets used to read and write to the S3 storage
 
+  # Quarantine Object Store (S3)
+  quarantineObjectStore:
+    secretName: quarantine-object-store # Secrets used to read and write to the S3 storage
+
   # Logging
   logging:
     level: "" # Log level for logs written to the console (console transport)
