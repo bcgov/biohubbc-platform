@@ -1,5 +1,6 @@
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
+import { IMalwareScanJobData, malwareScanJobHandler } from './jobs/malware-scan-job';
 import {
   IProcessSubmissionFeaturesJobData,
   processSubmissionFeaturesFailedHandler,
@@ -39,6 +40,7 @@ export const registerWorkers = async (): Promise<void> => {
     retryBackoff: true,
     expireInSeconds: 900
   });
+  await boss.createQueue(JobQueues.MALWARE_SCAN);
 
   // Register test job handler
   await boss.work<ITestJobData>(
@@ -65,6 +67,15 @@ export const registerWorkers = async (): Promise<void> => {
       batchSize: DEFAULT_BATCH_SIZE
     },
     processSubmissionFeaturesFailedHandler
+  );
+
+  // Register malware scan job handler
+  await boss.work<IMalwareScanJobData>(
+    JobQueues.MALWARE_SCAN,
+    {
+      batchSize: DEFAULT_BATCH_SIZE
+    },
+    malwareScanJobHandler
   );
 
   defaultLog.info({

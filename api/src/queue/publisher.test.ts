@@ -5,7 +5,7 @@ import { SubmissionValidationService } from '../services/submission-validation-s
 import { getMockDBConnection } from '../__mocks__/db';
 import { JobQueues } from './jobs';
 import * as pgBossService from './pg-boss-service';
-import { publishProcessSubmissionFeaturesJob, publishTestJob } from './publisher';
+import { publishMalwareScanJob, publishProcessSubmissionFeaturesJob, publishTestJob } from './publisher';
 
 describe('publisher', () => {
   afterEach(() => {
@@ -260,6 +260,80 @@ describe('publisher', () => {
 
       expect(result.status).to.equal('published');
       expect((result as { status: 'published'; jobId: string }).jobId).to.equal('new-job-id');
+    });
+  });
+
+  describe('publishMalwareScanJob', () => {
+    it('publishes a malware scan job', async () => {
+      const sendStub = sinon.stub().resolves('scan-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      const data = { quarantineId: 'quarantine-123' };
+      const result = await publishMalwareScanJob(data);
+
+      expect(createQueueStub.calledOnce).to.be.true;
+      expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.MALWARE_SCAN);
+      expect(sendStub.calledOnce).to.be.true;
+      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.MALWARE_SCAN);
+      expect(sendStub.firstCall.args[1]).to.deep.equal(data);
+      expect(result.status).to.equal('published');
+      expect((result as { status: 'published'; jobId: string }).jobId).to.equal('scan-job-id');
+    });
+
+    it('uses malware scan options with 30 minute timeout', async () => {
+      const sendStub = sinon.stub().resolves('scan-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      await publishMalwareScanJob({ quarantineId: 'quarantine-456' });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.retryLimit).to.equal(3);
+      expect(options.retryDelay).to.equal(60);
+      expect(options.retryBackoff).to.equal(true);
+      expect(options.expireInSeconds).to.equal(60 * 30); // 30 minutes
+    });
+
+    it('uses singletonKey based on quarantineId to prevent duplicates', async () => {
+      const sendStub = sinon.stub().resolves('scan-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      await publishMalwareScanJob({ quarantineId: '123' });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.singletonKey).to.equal('quarantine-123');
+    });
+
+    it('returns duplicate status when send returns null', async () => {
+      const sendStub = sinon.stub().resolves(null);
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      const result = await publishMalwareScanJob({ quarantineId: 'quarantine-999' });
+
+      expect(result.status).to.equal('duplicate');
+      expect((result as { status: 'duplicate'; message: string }).message).to.equal(
+        'Job already exists for this quarantine record'
+      );
+    });
+
+    it('returns error status when pg-boss throws', async () => {
+      sinon.stub(pgBossService, 'getPgBoss').throws(new Error('pg-boss not initialized'));
+
+      const result = await publishMalwareScanJob({ quarantineId: 'quarantine-000' });
+
+      expect(result.status).to.equal('error');
+      expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
     });
   });
 });
