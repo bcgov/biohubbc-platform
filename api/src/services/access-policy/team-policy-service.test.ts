@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { CreateTeamPolicy, TeamPolicy, UpdateTeamPolicy } from '../../models/team-policy';
+import { CreateTeamPolicy, TeamPolicy, TeamPolicyDetails, UpdateTeamPolicy } from '../../models/team-policy';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { TeamPolicyService } from './team-policy-service';
@@ -81,6 +81,27 @@ describe('TeamPolicyService', () => {
       const result = await service.getTeamPolicies('22222222-2222-2222-2222-222222222222');
 
       expect(stub).to.have.been.calledWith('22222222-2222-2222-2222-222222222222');
+      expect(result).to.eql(mockTeamPolicies);
+    });
+  });
+
+  describe('getAllTeamPolicies', () => {
+    it('should call repository.getAllTeamPolicies and return all team-policy associations with names', async () => {
+      const mockTeamPolicies: TeamPolicyDetails[] = [
+        {
+          team_policy_id: '11111111-1111-1111-1111-111111111111',
+          team_id: '22222222-2222-2222-2222-222222222222',
+          policy_id: '33333333-3333-3333-3333-333333333333',
+          team_name: 'Test Team',
+          policy_name: 'Test Policy'
+        }
+      ];
+
+      const stub = sinon.stub(TeamPolicyRepository.prototype, 'getAllTeamPolicies').resolves(mockTeamPolicies);
+
+      const result = await service.getAllTeamPolicies();
+
+      expect(stub).to.have.been.calledOnce;
       expect(result).to.eql(mockTeamPolicies);
     });
   });

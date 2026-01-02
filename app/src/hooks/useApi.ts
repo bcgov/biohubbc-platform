@@ -11,6 +11,7 @@ import useUserApi from './api/useUserApi';
 import { useFeaturesApi } from './api/useFeaturesApi';
 import usePoliciesApi from './api/usePoliciesApi';
 import { useSearchApi } from './api/useSearchApi';
+import { useTeamPoliciesApi } from './api/useTeamPoliciesApi';
 import { useTeamsApi } from './api/useTeamsApi';
 
 /**
@@ -45,6 +46,8 @@ export const useApi = () => {
 
   const teams = useTeamsApi(apiAxios);
 
+  const teamPolicies = useTeamPoliciesApi(apiAxios);
+
   return {
     user,
     admin,
@@ -56,6 +59,7 @@ export const useApi = () => {
     codes,
     policies,
     search,
-    teams
+    teams,
+    teamPolicies
   };
 };
