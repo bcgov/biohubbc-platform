@@ -18,7 +18,8 @@ app:
     levelFile: info
     fileMaxFiles: 30
 
-# Openshift Resources - can scale workers horizontally
+# Openshift Resources
+# Workers can scale horizontally - maintenance is handled by queue-supervisor
 replicas: 2
 resources:
   requests:

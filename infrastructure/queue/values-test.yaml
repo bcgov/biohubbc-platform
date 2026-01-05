@@ -19,6 +19,7 @@ app:
     fileMaxFiles: 10
 
 # Openshift Resources
+# Workers can scale horizontally - maintenance is handled by queue-supervisor
 replicas: 1
 resources:
   requests:

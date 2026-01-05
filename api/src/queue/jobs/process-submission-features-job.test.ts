@@ -3,7 +3,6 @@ import { describe } from 'mocha';
 import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import * as db from '../../database/db';
-import { SubmissionProcessService } from '../../services/submission-process-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { getMockDBConnection } from '../../__mocks__/db';
 import {
@@ -36,40 +35,34 @@ describe('process-submission-features-job', () => {
       const updateStatusStub = sinon
         .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus')
         .resolves();
-      const processSubmissionStub = sinon.stub(SubmissionProcessService.prototype, 'processSubmission').resolves();
 
       const mockJobs = [createMockJob(123)];
 
       await processSubmissionFeaturesJobHandler(mockJobs);
 
       expect(updateStatusStub.calledWith('test-job-id', 'started')).to.be.true;
-      expect(processSubmissionStub.calledOnceWith(123)).to.be.true;
       expect(updateStatusStub.calledWith('test-job-id', 'completed')).to.be.true;
     });
 
-    it('rolls back and marks job as failed on processing error', async () => {
+    it('rolls back and throws error on processing failure (does not update to failed)', async () => {
       const mockDBConnection = getMockDBConnection();
       const testError = new Error('Processing error');
 
       const rollbackStub = sinon.stub().resolves();
+      const releaseStub = sinon.stub();
       mockDBConnection.open = sinon.stub().resolves();
       mockDBConnection.commit = sinon.stub().resolves();
       mockDBConnection.rollback = rollbackStub;
-      mockDBConnection.release = sinon.stub();
+      mockDBConnection.release = releaseStub;
 
-      const getAPIUserDBConnectionStub = sinon.stub(db, 'getAPIUserDBConnection');
-      getAPIUserDBConnectionStub.onFirstCall().returns(mockDBConnection);
-      // Return a new connection for error tracking
-      const validationConnection = getMockDBConnection();
-      validationConnection.open = sinon.stub().resolves();
-      validationConnection.commit = sinon.stub().resolves();
-      validationConnection.release = sinon.stub();
-      getAPIUserDBConnectionStub.onSecondCall().returns(validationConnection);
+      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
       const updateStatusStub = sinon
         .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus')
-        .resolves();
-      sinon.stub(SubmissionProcessService.prototype, 'processSubmission').rejects(testError);
+        .onFirstCall()
+        .resolves() // 'started' succeeds
+        .onSecondCall()
+        .rejects(testError); // 'completed' fails (simulates processing error)
 
       const mockJobs = [createMockJob(123)];
 
@@ -79,7 +72,9 @@ describe('process-submission-features-job', () => {
       } catch (error) {
         expect(error).to.equal(testError);
         expect(rollbackStub.calledOnce).to.be.true;
-        expect(updateStatusStub.calledWith('test-job-id', 'failed')).to.be.true;
+        expect(releaseStub.calledOnce).to.be.true;
+        // Should NOT update to 'failed' - let pg-boss retry, DLQ will handle final failure
+        expect(updateStatusStub.calledWith('test-job-id', 'failed')).to.be.false;
       }
     });
 
@@ -97,14 +92,14 @@ describe('process-submission-features-job', () => {
       });
 
       sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
-      sinon.stub(SubmissionProcessService.prototype, 'processSubmission').resolves();
 
       const mockJobs = [createMockJob(123, 'job-1'), createMockJob(456, 'job-2')];
 
       await processSubmissionFeaturesJobHandler(mockJobs);
 
       expect(openStub.callCount).to.equal(2);
-      expect(commitStub.callCount).to.equal(2);
+      // 2 commits per job: one for 'started', one for 'completed'
+      expect(commitStub.callCount).to.equal(4);
       expect(releaseStub.callCount).to.equal(2);
     });
 
@@ -131,7 +126,6 @@ describe('process-submission-features-job', () => {
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
       sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
-      sinon.stub(SubmissionProcessService.prototype, 'processSubmission').resolves();
 
       const mockJobs = [createMockJob(123)];
 

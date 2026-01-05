@@ -20,22 +20,10 @@ describe('pg-boss-config', () => {
       expect(config.schema).to.equal('pgboss');
     });
 
-    it('returns config with 7-day archive setting', () => {
-      const config = getPgBossConfig();
-
-      expect(config.archiveCompletedAfterSeconds).to.equal(60 * 60 * 24 * 7);
-    });
-
-    it('returns config with 30-day delete setting', () => {
-      const config = getPgBossConfig();
-
-      expect(config.deleteAfterDays).to.equal(30);
-    });
-
     it('returns config with 30-second monitor interval', () => {
       const config = getPgBossConfig();
 
-      expect(config.monitorStateIntervalSeconds).to.equal(30);
+      expect(config.monitorIntervalSeconds).to.equal(30);
     });
 
     it('defaults port to 5432 when DB_PORT is not set', () => {

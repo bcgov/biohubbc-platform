@@ -70,4 +70,59 @@ export class SubmissionValidationRepository extends BaseRepository {
 
     await this.connection.sql(sql);
   }
+
+  /**
+   * Get the most recent submission validation record for a submission.
+   *
+   * @param {number} submissionId - The submission ID.
+   * @return {Promise<{ submission_validation_id: number; job_id: string; status: SubmissionValidationStatus } | null>}
+   * @memberof SubmissionValidationRepository
+   */
+  async getSubmissionValidationBySubmissionId(
+    submissionId: number
+  ): Promise<{ submission_validation_id: number; job_id: string; status: SubmissionValidationStatus } | null> {
+    const sql = SQL`
+      SELECT submission_validation_id, job_id, status
+      FROM submission_validation
+      WHERE submission_id = ${submissionId}
+      ORDER BY create_date DESC
+      LIMIT 1;
+    `;
+
+    const response = await this.connection.sql<{
+      submission_validation_id: number;
+      job_id: string;
+      status: SubmissionValidationStatus;
+    }>(sql);
+
+    return response.rows[0] ?? null;
+  }
+
+  /**
+   * Update submission validation status by submission ID.
+   *
+   * Used by Dead Letter Queue handler where the original job ID is not available.
+   *
+   * @param {number} submissionId - The submission ID.
+   * @param {SubmissionValidationStatus} status - The new status.
+   * @param {Record<string, unknown>} [metadata] - Optional metadata (e.g., error details).
+   * @return {Promise<void>}
+   * @memberof SubmissionValidationRepository
+   */
+  async updateSubmissionValidationStatusBySubmissionId(
+    submissionId: number,
+    status: SubmissionValidationStatus,
+    metadata?: Record<string, unknown>
+  ): Promise<void> {
+    const sql = SQL`
+      UPDATE submission_validation
+      SET
+        status = ${status},
+        metadata = ${JSON.stringify(metadata ?? null)}::jsonb,
+        ended_at = CASE WHEN ${status} IN ('completed', 'invalid', 'failed') THEN now() ELSE ended_at END
+      WHERE submission_id = ${submissionId};
+    `;
+
+    await this.connection.sql(sql);
+  }
 }

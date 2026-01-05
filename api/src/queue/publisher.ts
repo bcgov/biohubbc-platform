@@ -41,6 +41,7 @@ const DEFAULT_OPTIONS: IPublishOptions = {
  */
 export type PublishJobResult =
   | { status: 'published'; jobId: string }
+  | { status: 'blocked'; message: string; existingStatus: string }
   | { status: 'duplicate'; message: string }
   | { status: 'error'; message: string };
 
@@ -69,7 +70,7 @@ export const publishTestJob = async (data: ITestJobData, options: IPublishOption
   const boss = getPgBoss();
   const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
 
-  // Ensure queue exists (pg-boss v10 requires this before send)
+  // Ensure queue exists before sending jobs
   await boss.createQueue(JobQueues.TEST);
 
   const jobId = await boss.send(JobQueues.TEST, data, mergedOptions);
@@ -90,10 +91,13 @@ export const publishTestJob = async (data: ITestJobData, options: IPublishOption
  * Queues slow operations (indexing, regions) for submission feature processing.
  * Also creates a submission_validation record for tracking.
  *
+ * Blocks if an existing validation record exists unless status is 'failed',
+ * which allows retrying failed jobs.
+ *
  * @param {IDBConnection} connection Database connection for submission validation tracking
  * @param {IProcessSubmissionFeaturesJobData} data Job data containing submissionId
  * @param {IPublishOptions} [options={}] Job options
- * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success, blocked, duplicate, or error
  */
 export const publishProcessSubmissionFeaturesJob = async (
   connection: IDBConnection,
@@ -101,10 +105,43 @@ export const publishProcessSubmissionFeaturesJob = async (
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
   try {
+    const submissionValidationService = new SubmissionValidationService(connection);
+
+    // Check for existing validation record
+    const existingValidation = await submissionValidationService.getSubmissionValidationBySubmissionId(
+      data.submissionId
+    );
+
+    if (existingValidation) {
+      // Only allow retry if status is 'failed'
+      if (existingValidation.status !== 'failed') {
+        defaultLog.warn({
+          label: 'publishProcessSubmissionFeaturesJob',
+          message: 'Blocked: validation record already exists',
+          submissionId: data.submissionId,
+          existingStatus: existingValidation.status,
+          existingJobId: existingValidation.job_id
+        });
+
+        return {
+          status: 'blocked',
+          message: `Validation already exists with status '${existingValidation.status}'`,
+          existingStatus: existingValidation.status
+        };
+      }
+
+      defaultLog.info({
+        label: 'publishProcessSubmissionFeaturesJob',
+        message: 'Retrying failed validation',
+        submissionId: data.submissionId,
+        previousJobId: existingValidation.job_id
+      });
+    }
+
     const boss = getPgBoss();
     const mergedOptions = { ...PROCESS_SUBMISSION_FEATURES_OPTIONS, ...options };
 
-    // Ensure queue exists (pg-boss v10 requires this before send)
+    // Ensure queue exists before sending jobs
     await boss.createQueue(JobQueues.PROCESS_SUBMISSION_FEATURES);
 
     // Use singletonKey to prevent duplicate concurrent jobs for the same submission
@@ -116,7 +153,6 @@ export const publishProcessSubmissionFeaturesJob = async (
     // jobId is null when pg-boss rejects the job (e.g., duplicate singletonKey still active)
     if (jobId) {
       // Create submission validation record for tracking
-      const submissionValidationService = new SubmissionValidationService(connection);
       await submissionValidationService.createSubmissionValidation(data.submissionId, jobId);
 
       defaultLog.info({

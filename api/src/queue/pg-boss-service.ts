@@ -23,10 +23,6 @@ export const initPgBoss = async (): Promise<PgBoss> => {
     defaultLog.error({ label: 'pg-boss', message: 'error', error });
   });
 
-  boss.on('monitor-states', (states) => {
-    defaultLog.debug({ label: 'pg-boss', message: 'states', states });
-  });
-
   await boss.start();
   defaultLog.info({ label: 'pg-boss', message: 'started' });
 

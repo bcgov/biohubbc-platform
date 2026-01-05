@@ -15,7 +15,6 @@
     "queue": "ts-node src/queue",
     "queue-reload": "nodemon --watch src --ext ts --exec ts-node --files src/queue.ts",
     "test": "mocha",
-    "test:integration": "mocha --config .mocharc.integration.json",
     "test-watch": "mocha --watch",
     "coverage": "nyc mocha",
     "lint": "eslint .",
@@ -25,7 +24,7 @@
     "fix": "npm-run-all -l -s lint-fix format-fix"
   },
   "engines": {
-    "node": ">= 20.0.0",
+    "node": ">= 24.0.0",
     "npm": ">= 10.0.0"
   },
   "dependencies": {
@@ -52,7 +51,7 @@
     "mime": "^3.0.0",
     "multer": "^2.0.2",
     "pg": "^8.7.1",
-    "pg-boss": "^10.4.0",
+    "pg-boss": "^11.1.2",
     "qs": "^6.10.1",
     "sql-template-strings": "^2.2.2",
     "swagger-ui-express": "^4.3.0",

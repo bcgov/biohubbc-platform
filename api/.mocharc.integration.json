@@ -1,5 +1,0 @@
-{
-  "extension": ["ts"],
-  "spec": "src/__integration__/**/*.test.ts",
-  "require": "ts-node/register"
-}

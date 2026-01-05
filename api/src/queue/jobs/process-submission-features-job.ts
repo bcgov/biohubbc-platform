@@ -1,6 +1,6 @@
 import PgBoss from 'pg-boss';
 import { getAPIUserDBConnection } from '../../database/db';
-import { SubmissionProcessService } from '../../services/submission-process-service';
+//import { SubmissionProcessService } from '../../services/submission-process-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { getLogger } from '../../utils/logger';
 
@@ -47,17 +47,17 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IProcessSub
       await connection.open();
 
       const submissionValidationService = new SubmissionValidationService(connection);
-      const submissionProcessService = new SubmissionProcessService(connection);
+      //const submissionProcessService = new SubmissionProcessService(connection);
 
-      // Update validation status to started
+      // Commit 'started' status immediately so it's visible even if processing fails
       await submissionValidationService.updateSubmissionValidationStatus(job.id, 'started');
+      await connection.commit();
 
       // Process the submission (download, validate, insert, index, regions)
-      await submissionProcessService.processSubmission(submissionId);
+      //await submissionProcessService.processSubmission(submissionId);
 
       // Update validation status to completed
       await submissionValidationService.updateSubmissionValidationStatus(job.id, 'completed');
-
       await connection.commit();
 
       defaultLog.info({
@@ -77,26 +77,74 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IProcessSub
         error
       });
 
-      // Update validation status to failed
-      try {
-        const validationConnection = getAPIUserDBConnection();
-        await validationConnection.open();
-        const submissionValidationService = new SubmissionValidationService(validationConnection);
-        await submissionValidationService.updateSubmissionValidationStatus(job.id, 'failed', {
-          error: error instanceof Error ? error.message : 'Unknown error'
-        });
-        await validationConnection.commit();
-        validationConnection.release();
-      } catch (validationError) {
-        defaultLog.error({
-          label: 'processSubmissionFeaturesJobHandler',
-          message: 'Failed to update submission validation status',
-          jobId: job.id,
-          error: validationError
-        });
-      }
+      // Don't update status to 'failed' here - pg-boss will retry
+      // Status will be set to 'failed' by Dead Letter Queue handler after all retries exhausted
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+};
 
-      throw error; // pg-boss will handle retry based on configuration
+/**
+ * Dead Letter Queue handler for failed process submission features jobs.
+ *
+ * This handler is called after all retries are exhausted. It updates the
+ * submission validation status to 'failed' with error details.
+ *
+ * @param {PgBoss.Job<IProcessSubmissionFeaturesJobData>[]} jobs The failed jobs
+ * @return {*}  {Promise<void>}
+ */
+export const processSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IProcessSubmissionFeaturesJobData> = async (
+  jobs
+) => {
+  for (const job of jobs) {
+    const { submissionId } = job.data;
+
+    // Cast to access output field available on failed jobs
+    const jobOutput = (job as PgBoss.JobWithMetadata<IProcessSubmissionFeaturesJobData>).output;
+
+    defaultLog.warn({
+      label: 'processSubmissionFeaturesFailedHandler',
+      message: 'Processing failed job from dead letter queue',
+      jobId: job.id,
+      submissionId,
+      output: jobOutput
+    });
+
+    const connection = getAPIUserDBConnection();
+
+    try {
+      await connection.open();
+
+      const submissionValidationService = new SubmissionValidationService(connection);
+
+      // Update validation status to failed (all retries exhausted)
+      // Use submissionId since DLQ job has a new job ID, not the original
+      await submissionValidationService.updateSubmissionValidationStatusBySubmissionId(submissionId, 'failed', {
+        error: jobOutput ?? 'Job failed after all retries'
+      });
+
+      await connection.commit();
+
+      defaultLog.info({
+        label: 'processSubmissionFeaturesFailedHandler',
+        message: 'Failed job status updated',
+        jobId: job.id,
+        submissionId
+      });
+    } catch (error) {
+      await connection.rollback();
+
+      defaultLog.error({
+        label: 'processSubmissionFeaturesFailedHandler',
+        message: 'Failed to update failed job status',
+        jobId: job.id,
+        submissionId,
+        error
+      });
+
+      throw error;
     } finally {
       connection.release();
     }

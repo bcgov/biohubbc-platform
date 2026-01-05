@@ -51,4 +51,40 @@ export class SubmissionValidationService extends DBService {
   ): Promise<void> {
     return this.submissionValidationRepository.updateSubmissionValidationStatus(jobId, status, metadata);
   }
+
+  /**
+   * Get the most recent submission validation record for a submission.
+   *
+   * @param {number} submissionId - The submission ID.
+   * @return {Promise<{ submission_validation_id: number; job_id: string; status: SubmissionValidationStatus } | null>}
+   * @memberof SubmissionValidationService
+   */
+  async getSubmissionValidationBySubmissionId(
+    submissionId: number
+  ): Promise<{ submission_validation_id: number; job_id: string; status: SubmissionValidationStatus } | null> {
+    return this.submissionValidationRepository.getSubmissionValidationBySubmissionId(submissionId);
+  }
+
+  /**
+   * Update submission validation status by submission ID.
+   *
+   * Used by Dead Letter Queue handler where the original job ID is not available.
+   *
+   * @param {number} submissionId - The submission ID.
+   * @param {SubmissionValidationStatus} status - The new status.
+   * @param {Record<string, unknown>} [metadata] - Optional metadata (e.g., error details).
+   * @return {Promise<void>}
+   * @memberof SubmissionValidationService
+   */
+  async updateSubmissionValidationStatusBySubmissionId(
+    submissionId: number,
+    status: SubmissionValidationStatus,
+    metadata?: Record<string, unknown>
+  ): Promise<void> {
+    return this.submissionValidationRepository.updateSubmissionValidationStatusBySubmissionId(
+      submissionId,
+      status,
+      metadata
+    );
+  }
 }

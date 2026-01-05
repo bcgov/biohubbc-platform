@@ -7,14 +7,12 @@ import { getLogger } from './utils/logger';
 const defaultLog = getLogger('queue');
 
 /**
- * Start the queue worker process.
- *
- * Initializes the database pool, pg-boss, and registers job handlers.
+ * Start the queue process.
  *
  * @return {*}  {Promise<void>}
  */
 const startQueue = async (): Promise<void> => {
-  defaultLog.info({ label: 'startQueue', message: 'Initializing queue worker' });
+  defaultLog.info({ label: 'startQueue', message: 'Initializing queue process' });
 
   // Initialize database pool
   initDBPool(defaultPoolConfig);
@@ -26,13 +24,13 @@ const startQueue = async (): Promise<void> => {
   // Register job handlers
   await registerWorkers();
 
-  defaultLog.info({ label: 'startQueue', message: 'Queue worker running' });
+  defaultLog.info({ label: 'startQueue', message: 'Queue process running' });
 };
 
 /**
- * Gracefully shutdown the queue worker.
+ * Gracefully shutdown the queue process.
  *
- * @param {string} signal The signal that triggered the shutdown
+ * @param {string} signal - The signal that triggered the shutdown
  * @return {*}  {Promise<void>}
  */
 const shutdown = async (signal: string): Promise<void> => {
@@ -45,7 +43,7 @@ const shutdown = async (signal: string): Promise<void> => {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
-// Start the queue worker
+// Start the queue process
 startQueue().catch((error) => {
   defaultLog.error({ label: 'startQueue', message: 'Failed to start queue', error });
   process.exit(1);

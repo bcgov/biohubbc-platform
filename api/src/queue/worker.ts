@@ -2,6 +2,7 @@ import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
 import {
   IProcessSubmissionFeaturesJobData,
+  processSubmissionFeaturesFailedHandler,
   processSubmissionFeaturesJobHandler
 } from './jobs/process-submission-features-job';
 import { ITestJobData, testJobHandler } from './jobs/test-job';
@@ -24,9 +25,20 @@ const DEFAULT_BATCH_SIZE = 4;
 export const registerWorkers = async (): Promise<void> => {
   const boss = getPgBoss();
 
-  // Create queues (pg-boss v10 requires this before work/send)
+  // Ensure queues exist before registering workers
   await boss.createQueue(JobQueues.TEST);
-  await boss.createQueue(JobQueues.PROCESS_SUBMISSION_FEATURES);
+
+  // Create dead letter queue first (must exist before main queue references it)
+  await boss.createQueue(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
+
+  // Create main queue with dead letter queue and retry configuration
+  await boss.createQueue(JobQueues.PROCESS_SUBMISSION_FEATURES, {
+    deadLetter: JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED,
+    retryLimit: 2,
+    retryDelay: 60,
+    retryBackoff: true,
+    expireInSeconds: 900
+  });
 
   // Register test job handler
   await boss.work<ITestJobData>(
@@ -44,6 +56,15 @@ export const registerWorkers = async (): Promise<void> => {
       batchSize: DEFAULT_BATCH_SIZE
     },
     processSubmissionFeaturesJobHandler
+  );
+
+  // Register dead letter queue handler for failed jobs
+  await boss.work<IProcessSubmissionFeaturesJobData>(
+    JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED,
+    {
+      batchSize: DEFAULT_BATCH_SIZE
+    },
+    processSubmissionFeaturesFailedHandler
   );
 
   defaultLog.info({

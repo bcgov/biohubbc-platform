@@ -50,13 +50,14 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      // createQueue is called for both queues
-      expect(createQueueStub.callCount).to.equal(2);
+      // createQueue is called for all queues (including dead letter queue)
+      expect(createQueueStub.callCount).to.equal(3);
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.TEST);
-      expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
+      expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
+      expect(createQueueStub.thirdCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
     });
 
-    it('registers all job handlers', async () => {
+    it('configures dead letter queue for process-submission-features', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
       const mockBoss = { work: workStub, createQueue: createQueueStub };
@@ -65,7 +66,24 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      expect(workStub.callCount).to.equal(2);
+      // Third createQueue call (PROCESS_SUBMISSION_FEATURES) should have DLQ config
+      const queueConfig = createQueueStub.thirdCall.args[1];
+      expect(queueConfig.deadLetter).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
+      expect(queueConfig.retryLimit).to.equal(2);
+      expect(queueConfig.retryBackoff).to.equal(true);
+    });
+
+    it('registers all job handlers including dead letter queue handler', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      // 3 handlers: TEST, PROCESS_SUBMISSION_FEATURES, PROCESS_SUBMISSION_FEATURES_FAILED
+      expect(workStub.callCount).to.equal(3);
     });
 
     it('configures batchSize for batch processing', async () => {
@@ -80,6 +98,21 @@ describe('worker', () => {
       // All handlers use the same batch size
       expect(workStub.firstCall.args[1].batchSize).to.equal(4);
       expect(workStub.secondCall.args[1].batchSize).to.equal(4);
+      expect(workStub.thirdCall.args[1].batchSize).to.equal(4);
+    });
+
+    it('registers dead letter queue handler for failed jobs', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      // Third work call is for PROCESS_SUBMISSION_FEATURES_FAILED
+      expect(workStub.thirdCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
+      expect(workStub.thirdCall.args[2]).to.equal(processSubmissionFeaturesJob.processSubmissionFeaturesFailedHandler);
     });
   });
 });
