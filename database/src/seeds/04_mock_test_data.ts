@@ -68,6 +68,26 @@ const insertRecord = async (knex: Knex) => {
   // Dataset
   const parent_submission_feature_id1 = await insertDatasetRecord(knex, { submission_id });
 
+  // Telemetry Deployments
+  const deploymentIds: number[] = [];
+  const deviceInfos: { submission_feature_id: number; device_id: string }[] = [];
+  for (let i = 0; i < 5; i++) {
+    const deploymentId = await insertTelemetryDeployment(knex, {
+      submission_id,
+      parent_submission_feature_id: parent_submission_feature_id1
+    });
+    deploymentIds.push(deploymentId);
+
+    // Devices under deployment
+    for (let j = 0; j < 2; j++) {
+      const deviceInfo = await insertTelemetryDevice(knex, {
+        submission_id,
+        parent_submission_feature_id: deploymentId
+      });
+      deviceInfos.push(deviceInfo);
+    }
+  }
+
   // Sample Sites and their children
   const sampleSitePromises = Array.from({ length: 10 }).map(async () => {
     const parent_submission_feature_id2 = await insertSampleSiteRecord(knex, {
@@ -90,9 +110,17 @@ const insertRecord = async (knex: Knex) => {
   });
 
   // Telemetry
-  const telemetryPromises = Array.from({ length: 100 }).map(() =>
-    insertTelemetryRecord(knex, { submission_id, parent_submission_feature_id: parent_submission_feature_id1 })
-  );
+  const possibleParents = [...deploymentIds, ...deviceInfos.map((d) => d.submission_feature_id)];
+  const telemetryPromises = Array.from({ length: 100 }).map(() => {
+    const randomParent = possibleParents[Math.floor(Math.random() * possibleParents.length)];
+    const isDevice = deviceInfos.some((d) => d.submission_feature_id === randomParent);
+    const deviceInfo = isDevice ? deviceInfos.find((d) => d.submission_feature_id === randomParent) : undefined;
+    return insertTelemetryRecord(knex, {
+      submission_id,
+      parent_submission_feature_id: randomParent,
+      device_id: deviceInfo?.device_id
+    });
+  });
 
   // Wait for all sample sites and telemetry to complete concurrently
   await Promise.all([...sampleSitePromises, ...telemetryPromises]);
@@ -299,7 +327,15 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
 export const insertSubmissionFeature = (options: {
   submission_id: number;
   parent_submission_feature_id: number | null;
-  feature_type: 'dataset' | 'sample_site' | 'species_observation' | 'animal' | 'artifact' | 'telemetry';
+  feature_type:
+    | 'dataset'
+    | 'sample_site'
+    | 'species_observation'
+    | 'animal'
+    | 'artifact'
+    | 'telemetry'
+    | 'telemetry_deployment'
+    | 'telemetry_device';
   data: { [key: string]: any };
 }) => `
     INSERT INTO submission_feature
@@ -450,12 +486,72 @@ const randomIntFromInterval = (min: number, max: number) => {
   return Math.floor(Math.random() * (max - min + 1) + min);
 };
 
-export const insertTelemetryRecord = async (
+export const insertTelemetryDeployment = async (
   knex: Knex,
   options: { submission_id: number; parent_submission_feature_id: number }
 ): Promise<number> => {
+  const deploymentData = {
+    animal_identifier: faker.string.alphanumeric({ length: 10 }),
+    device_key: faker.string.alphanumeric({ length: 8 }),
+    start_date: faker.date.past().toISOString(),
+    end_date: faker.date.future().toISOString()
+  };
+
+  const response = await knex.raw(
+    `${insertSubmissionFeature({
+      submission_id: options.submission_id,
+      parent_submission_feature_id: options.parent_submission_feature_id,
+      feature_type: 'telemetry_deployment',
+      data: deploymentData
+    })}`
+  );
+  const submission_feature_id = response.rows[0].submission_feature_id;
+
+  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
+  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
+
+  await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
+  await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
+
+  return submission_feature_id;
+};
+
+export const insertTelemetryDevice = async (
+  knex: Knex,
+  options: { submission_id: number; parent_submission_feature_id: number; device_id?: string }
+): Promise<{ submission_feature_id: number; device_id: string }> => {
+  const device_id = options.device_id || faker.string.alphanumeric({ length: 8 });
+  const deviceData = {
+    device_id,
+    device_manufacturer: faker.company.name(),
+    device_model: faker.commerce.productName(),
+    description: faker.lorem.sentence(),
+    serial_number: faker.string.alphanumeric({ length: 12 })
+  };
+
+  const response = await knex.raw(
+    `${insertSubmissionFeature({
+      submission_id: options.submission_id,
+      parent_submission_feature_id: options.parent_submission_feature_id,
+      feature_type: 'telemetry_device',
+      data: deviceData
+    })}`
+  );
+  const submission_feature_id = response.rows[0].submission_feature_id;
+
+  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
+  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
+
+  return { submission_feature_id, device_id };
+};
+
+export const insertTelemetryRecord = async (
+  knex: Knex,
+  options: { submission_id: number; parent_submission_feature_id: number; device_id?: string }
+): Promise<number> => {
+  const device_id = options.device_id || faker.string.alphanumeric({ length: 8 });
   const telemetryData = {
-    device_id: faker.string.alphanumeric({ length: 8 }),
+    device_id,
     latitude: faker.number.float({ min: 48.617424, max: 60.664785, multipleOf: 0.000001 }),
     longitude: faker.number.float({ min: -135.878906, max: -114.433594, multipleOf: 0.000001 }),
     timestamp: faker.date.recent().toISOString(),
