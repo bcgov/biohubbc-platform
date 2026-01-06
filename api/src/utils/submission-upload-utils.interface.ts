@@ -1,7 +1,7 @@
 export interface MultipartUploadParams {
   key: string;
   contentType: string;
-  expectedSizeBytes: number;
+  bytes: number;
 }
 
 export interface MultipartUploadResult {

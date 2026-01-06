@@ -60,8 +60,8 @@ export interface IPostSubmissionFeature {
 }
 
 export interface ISubmissionUploadPart {
-  partNumber: number;
-  etag: string;
+  PartNumber: number;
+  ETag: string;
 }
 
 export type SubmissionFeatureRecordWithTypeAndSecurity = {
@@ -125,10 +125,19 @@ export interface PresignedUrl {
   url: string;
 }
 export interface PresignedUploadUrlResponse {
-  submissionId: string;
+  submissionId: number;
   uploadId: string;
+  s3UploadId: string;
+  uploadArchiveId: string;
   key: string;
   partSizeBytes: number;
   partCount: number;
   presignedUrls: PresignedUrl[];
+}
+
+export interface ICreateSubmission {
+  bytes: number;
+  name: string;
+  description: string;
+  comment: string;
 }

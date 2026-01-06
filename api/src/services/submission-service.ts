@@ -4,10 +4,10 @@ import { ApiGeneralError } from '../errors/api-error';
 import { SubmissionFeatureForReview } from '../models/submission';
 import { SubmissionFeatureSearchKeyValues } from '../repositories/search-index-respository';
 import {
+  ICreateSubmission,
   ISubmissionFeature,
   ISubmissionJobQueueRecord,
   ISubmissionModel,
-  ISubmissionRecord,
   PatchSubmissionRecord,
   SubmissionFeature,
   SubmissionFeatureDownloadRecord,
@@ -43,11 +43,11 @@ export class SubmissionService extends DBService {
   /**
    * Insert a new submission record.
    *
-   * @param {ISubmissionRecord} submissionData
+   * @param {ICreateSubmission} submissionData
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async insertSubmissionRecord(submissionData: ISubmissionRecord): Promise<{ submission_id: number }> {
+  async insertSubmissionRecord(submissionData: ICreateSubmission): Promise<{ submission_id: number }> {
     return this.submissionRepository.insertSubmissionRecord(submissionData);
   }
 

@@ -13,8 +13,8 @@ import {
 } from '../repositories/security-repository';
 import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
-import { ArtifactService } from './artifact-service';
 import { DBService } from './db-service';
+import { ArtifactService } from './old-artifact-service';
 import { UserService } from './user-service';
 
 const defaultLog = getLogger('services/security-service');

@@ -1,5 +1,6 @@
 import { AxiosInstance } from 'axios';
 import {
+  ICreateSubmission,
   IGetDownloadSubmissionResponse,
   ISubmissionFeatureForReviewResponse,
   ISubmissionUploadPart,
@@ -159,13 +160,13 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Get presigned URLs to upload submission files
+   * Initiate a new submission upload
    *
-   * @param {number} expectedSizeBytes
+   * @param {ICreateSubmission} submission
    * @returns {Promise<PresignedUploadUrlResponse>}
    */
-  const getSubmissionUploadUrls = async (expectedSizeBytes: number): Promise<PresignedUploadUrlResponse> => {
-    const { data } = await axios.post(`api/submission/upload`, { expectedSizeBytes });
+  const getSubmissionUploadUrls = async (submission: ICreateSubmission): Promise<PresignedUploadUrlResponse> => {
+    const { data } = await axios.post(`api/submission/upload/archive`, submission);
 
     return data;
   };
@@ -174,16 +175,19 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
    * Update the submission upload as completed
    *
    * @param {string} uploadId
+   * @param {string} uploadArchiveId
+   * @param {string} s3UploadId
    * @param {string} key
    * @param {ISubmissionUploadPart[]} parts
    * @returns {Promise<void>}
    */
   const completeSubmissionUpload = async (
     uploadId: string,
+    s3UploadId: string,
     key: string,
     parts: ISubmissionUploadPart[]
   ): Promise<void> => {
-    await axios.put(`api/submission/upload/${uploadId}`, { key, parts });
+    await axios.put(`api/upload/${uploadId}`, { s3UploadId, key, parts });
   };
 
   return {

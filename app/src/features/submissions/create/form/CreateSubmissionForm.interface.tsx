@@ -1,5 +1,6 @@
 export interface ICreateSubmissionForm {
   name: string;
-  description: string | null;
+  description: string;
+  comment: string;
   file: File; // raw .json file of features
 }

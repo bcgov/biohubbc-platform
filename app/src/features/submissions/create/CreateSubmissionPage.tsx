@@ -14,12 +14,14 @@ import { ICreateSubmissionForm } from './form/CreateSubmissionForm.interface';
 const initialSubmissionValues: ICreateSubmissionForm = {
   name: '',
   description: '',
+  comment: '',
   file: null as unknown as File
 };
 
 export const SubmissionYupSchema = yup.object().shape({
   name: yup.string().required('Enter a name for the submission').max(100),
-  description: yup.string().max(500).nullable(),
+  description: yup.string().max(500).required('Description is required'),
+  comment: yup.string().max(500).required('Comment is required'),
   file: yup
     .mixed<File>()
     .required('You must submit a .json file')
@@ -42,9 +44,11 @@ export const CreateSubmissionPage = () => {
   const handleSubmit = async (values: ICreateSubmissionForm) => {
     setIsSubmitting(true);
 
+    const { file, ...submission } = values;
+
     try {
       // Convert the JSON file to Uint8Array
-      const fileBytes = await fileToUint8Array(values.file);
+      const fileBytes = await fileToUint8Array(file);
 
       // Prepare files for TAR - just the JSON file
       const filesToTar = [
@@ -52,22 +56,28 @@ export const CreateSubmissionPage = () => {
           name: 'features.json',
           content: fileBytes
         }
-        // Add more files here
       ];
 
       // Create TAR data
       const tarData = createTarData(filesToTar);
 
       // Request pre-signed upload URLs for multipart upload
-      const uploadResponse = await bioHubApi.submissions.getSubmissionUploadUrls(tarData.length);
+      const uploadResponse = await bioHubApi.submissions.getSubmissionUploadUrls({
+        ...submission,
+        bytes: tarData.length
+      });
       const uploadUrls = uploadResponse.presignedUrls.map((presigned) => presigned.url);
 
       // Upload TAR file in multiple parts
       const parts = await uploadMultipartTar(uploadUrls, tarData);
-      const parsedParts = parts.map((part) => ({ partNumber: part.partNumber, etag: part.etag }));
 
       // Mark upload as complete
-      await bioHubApi.submissions.completeSubmissionUpload(uploadResponse.uploadId, uploadResponse.key, parsedParts);
+      await bioHubApi.submissions.completeSubmissionUpload(
+        uploadResponse.uploadId,
+        uploadResponse.s3UploadId,
+        uploadResponse.key,
+        parts
+      );
 
       dialogContext.setSnackbar({
         snackbarMessage: `Successfully submitted "${values.name}"`,

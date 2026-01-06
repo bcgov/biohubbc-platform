@@ -6,7 +6,7 @@ import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
 import { SubmissionFeatureRecord } from '../../repositories/submission-repository';
 import { SystemUser } from '../../repositories/user-repository';
-import { ArtifactService } from '../../services/artifact-service';
+import { ArtifactService } from '../../services/old-artifact-service';
 import * as keycloakUtils from '../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import { intakeArtifact } from './intake';
