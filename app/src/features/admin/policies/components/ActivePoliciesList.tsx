@@ -11,7 +11,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import EditDialog from 'components/dialog/EditDialog';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
@@ -40,6 +40,10 @@ export interface IActivePoliciesListProps {
   searchTerm: string;
   /** Callback when search term changes */
   onSearch: (term: string) => void;
+  /** Currently selected policy ID for filtering team-policy assignments */
+  selectedPolicyId: string | null;
+  /** Callback when a policy row is selected/deselected */
+  onSelectPolicy: (policyId: string | null) => void;
 }
 
 /**
@@ -57,7 +61,25 @@ export interface IActivePoliciesListProps {
  */
 export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListProps>> = (props) => {
   const biohubApi = useApi();
-  const { policies } = props;
+  const { policies, selectedPolicyId, onSelectPolicy } = props;
+
+  /**
+   * Handle row selection changes in the DataGrid.
+   * Extracts the selected policy ID and calls the parent callback.
+   *
+   * @param {GridRowSelectionModel} model - The new selection model from DataGrid
+   */
+  const handleRowSelectionChange = (model: GridRowSelectionModel) => {
+    const ids = model && 'ids' in model ? Array.from(model.ids) : [];
+    const newSelectedId = (ids[0] as string) || null;
+    onSelectPolicy(newSelectedId);
+  };
+
+  // Convert selectedPolicyId to DataGrid selection model format
+  const rowSelectionModel: GridRowSelectionModel = {
+    type: 'include',
+    ids: selectedPolicyId ? new Set([selectedPolicyId]) : new Set()
+  };
 
   const dialogContext = useDialogContext();
 
@@ -398,7 +420,10 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
             columns={columns}
             getRowId={(row) => row.policy_id}
             pageSizeOptions={[50, 100, 200]}
-            disableRowSelectionOnClick
+            rowSelectionModel={rowSelectionModel}
+            onRowSelectionModelChange={handleRowSelectionChange}
+            checkboxSelection
+            disableMultipleRowSelection
             disableColumnSelector
             disableColumnMenu
             localeText={{ noRowsLabel: 'No Policies' }}
@@ -414,6 +439,12 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
               '& .MuiDataGrid-columnHeaderTitle': {
                 fontWeight: 700,
                 textTransform: 'uppercase'
+              },
+              '& .MuiDataGrid-row.Mui-selected': {
+                backgroundColor: 'action.selected'
+              },
+              '& .MuiDataGrid-row.Mui-selected:hover': {
+                backgroundColor: 'action.selected'
               }
             }}
           />

@@ -1,4 +1,5 @@
 import { useApi } from 'hooks/useApi';
+import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { MemoryRouter } from 'react-router';
 import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -22,14 +23,6 @@ vi.mock('@monaco-editor/react', () => ({
   }
 }));
 
-const renderContainer = (props: IActivePoliciesListProps) => {
-  return render(
-    <MemoryRouter initialEntries={['/']}>
-      <ActivePoliciesList {...props} />
-    </MemoryRouter>
-  );
-};
-
 vi.mock('../../../../hooks/useApi');
 const mockBiohubApi = useApi as Mock;
 
@@ -39,6 +32,23 @@ const mockUseApi = {
     updatePolicy: vi.fn(),
     deletePolicy: vi.fn()
   }
+};
+
+const defaultProps: IActivePoliciesListProps = {
+  policies: [],
+  refresh: vi.fn(),
+  searchTerm: '',
+  onSearch: vi.fn(),
+  selectedPolicyId: null,
+  onSelectPolicy: vi.fn()
+};
+
+const renderContainer = (props: Partial<IActivePoliciesListProps> = {}) => {
+  return render(
+    <MemoryRouter initialEntries={['/']}>
+      <ActivePoliciesList {...defaultProps} {...props} />
+    </MemoryRouter>
+  );
 };
 
 describe('ActivePoliciesList', () => {
@@ -51,13 +61,7 @@ describe('ActivePoliciesList', () => {
   });
 
   it('shows `No Policies` when there are no policies', async () => {
-    const mockRefresh = vi.fn();
-    const { getByText } = renderContainer({
-      policies: [],
-      refresh: mockRefresh,
-      searchTerm: '',
-      onSearch: vi.fn()
-    });
+    const { getByText } = renderContainer({ policies: [] });
 
     await waitFor(() => {
       expect(getByText('No Policies')).toBeVisible();
@@ -65,29 +69,24 @@ describe('ActivePoliciesList', () => {
   });
 
   it('shows a table row for a policy with all fields having values', async () => {
-    const mockRefresh = vi.fn();
+    const mockPolicies: IPolicy[] = [
+      {
+        policy_id: '1',
+        name: 'Test Policy',
+        description: 'Test description',
+        statements: [
+          {
+            policy_statement_id: 's1',
+            policy_id: '1',
+            effect: 'allow',
+            submission_feature_urn: 'urn:*:*:*',
+            conditions: []
+          }
+        ]
+      }
+    ];
 
-    const { getByText } = renderContainer({
-      policies: [
-        {
-          policy_id: '1',
-          name: 'Test Policy',
-          description: 'Test description',
-          statements: [
-            {
-              policy_statement_id: 's1',
-              policy_id: '1',
-              effect: 'allow',
-              submission_feature_urn: 'urn:*:*:*',
-              conditions: []
-            }
-          ]
-        }
-      ],
-      refresh: mockRefresh,
-      searchTerm: '',
-      onSearch: vi.fn()
-    });
+    const { getByText } = renderContainer({ policies: mockPolicies });
 
     await waitFor(() => {
       expect(getByText('Test Policy')).toBeVisible();
@@ -97,20 +96,16 @@ describe('ActivePoliciesList', () => {
   });
 
   it('shows a table row for a policy with fields not having values', async () => {
-    const mockRefresh = vi.fn();
-    const { getAllByText } = renderContainer({
-      policies: [
-        {
-          policy_id: '1',
-          name: 'Empty Policy',
-          description: null,
-          statements: []
-        }
-      ],
-      refresh: mockRefresh,
-      searchTerm: '',
-      onSearch: vi.fn()
-    });
+    const mockPolicies: IPolicy[] = [
+      {
+        policy_id: '1',
+        name: 'Empty Policy',
+        description: null,
+        statements: []
+      }
+    ];
+
+    const { getAllByText } = renderContainer({ policies: mockPolicies });
 
     await waitFor(() => {
       const dashes = getAllByText('-');
@@ -119,16 +114,36 @@ describe('ActivePoliciesList', () => {
   });
 
   it('renders the add new policy button correctly', async () => {
-    const mockRefresh = vi.fn();
-    const { getByTestId } = renderContainer({
-      policies: [],
-      refresh: mockRefresh,
-      searchTerm: '',
-      onSearch: vi.fn()
-    });
+    const { getByTestId } = renderContainer();
 
     await waitFor(() => {
       expect(getByTestId('add-policy-button')).toBeVisible();
+    });
+  });
+
+  describe('Row Selection', () => {
+    it('highlights selected row when selectedPolicyId is provided', async () => {
+      const mockPolicies: IPolicy[] = [
+        {
+          policy_id: 'policy-1',
+          name: 'Test Policy',
+          description: 'Test description',
+          statements: []
+        }
+      ];
+
+      const { getByText } = renderContainer({
+        policies: mockPolicies,
+        selectedPolicyId: 'policy-1'
+      });
+
+      await waitFor(() => {
+        expect(getByText('Test Policy')).toBeVisible();
+      });
+
+      // The row should have the selected class (MUI DataGrid applies Mui-selected)
+      const row = getByText('Test Policy').closest('.MuiDataGrid-row');
+      expect(row).toHaveClass('Mui-selected');
     });
   });
 });

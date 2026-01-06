@@ -1,5 +1,4 @@
 import { useConfigContext } from 'hooks/useContext';
-
 import useAdminApi from './api/useAdminApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
@@ -10,6 +9,7 @@ import { useSearchApi } from './api/useSearchApi';
 import useSecurityApi from './api/useSecurityApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
+import { useTeamPoliciesApi } from './api/useTeamPoliciesApi';
 import { useTeamsApi } from './api/useTeamsApi';
 import useUserApi from './api/useUserApi';
 
@@ -45,6 +45,8 @@ export const useApi = () => {
 
   const teams = useTeamsApi(apiAxios);
 
+  const teamPolicies = useTeamPoliciesApi(apiAxios);
+
   return {
     user,
     admin,
@@ -56,6 +58,7 @@ export const useApi = () => {
     codes,
     policies,
     search,
-    teams
+    teams,
+    teamPolicies
   };
 };
