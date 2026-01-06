@@ -7,6 +7,7 @@ import { SubmissionValidationService } from '../../services/submission-validatio
 import { getMockDBConnection } from '../../__mocks__/db';
 import {
   IProcessSubmissionFeaturesJobData,
+  processSubmissionFeaturesFailedHandler,
   processSubmissionFeaturesJobHandler
 } from './process-submission-features-job';
 
@@ -132,6 +133,89 @@ describe('process-submission-features-job', () => {
       await processSubmissionFeaturesJobHandler(mockJobs);
 
       expect(releaseStub.calledOnce).to.be.true;
+    });
+  });
+
+  describe('processSubmissionFeaturesFailedHandler', () => {
+    const createMockFailedJob = (submissionId: number, jobId = 'dlq-job-id', output?: unknown) =>
+      ({
+        id: jobId,
+        name: '__state__completed__process-submission-features',
+        data: { submissionId },
+        output
+      } as PgBoss.JobWithMetadata<IProcessSubmissionFeaturesJobData>);
+
+    it('updates status to failed with error from job output', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      mockDBConnection.open = sinon.stub().resolves();
+      mockDBConnection.commit = sinon.stub().resolves();
+      mockDBConnection.release = sinon.stub();
+
+      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+
+      const updateStatusBySubmissionIdStub = sinon
+        .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatusBySubmissionId')
+        .resolves();
+
+      const errorOutput = { message: 'Database connection failed' };
+      const mockJobs = [createMockFailedJob(123, 'dlq-job-id', errorOutput)];
+
+      await processSubmissionFeaturesFailedHandler(mockJobs);
+
+      expect(updateStatusBySubmissionIdStub.calledOnce).to.be.true;
+      expect(updateStatusBySubmissionIdStub.firstCall.args[0]).to.equal(123);
+      expect(updateStatusBySubmissionIdStub.firstCall.args[1]).to.equal('failed');
+      expect(updateStatusBySubmissionIdStub.firstCall.args[2]).to.deep.equal({ error: errorOutput });
+    });
+
+    it('uses default error message when job output is null', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      mockDBConnection.open = sinon.stub().resolves();
+      mockDBConnection.commit = sinon.stub().resolves();
+      mockDBConnection.release = sinon.stub();
+
+      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+
+      const updateStatusBySubmissionIdStub = sinon
+        .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatusBySubmissionId')
+        .resolves();
+
+      const mockJobs = [createMockFailedJob(123, 'dlq-job-id', null)];
+
+      await processSubmissionFeaturesFailedHandler(mockJobs);
+
+      expect(updateStatusBySubmissionIdStub.firstCall.args[2]).to.deep.equal({
+        error: 'Job failed after all retries'
+      });
+    });
+
+    it('rolls back and throws on error', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const testError = new Error('Update failed');
+
+      const rollbackStub = sinon.stub().resolves();
+      const releaseStub = sinon.stub();
+      mockDBConnection.open = sinon.stub().resolves();
+      mockDBConnection.rollback = rollbackStub;
+      mockDBConnection.release = releaseStub;
+
+      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+      sinon
+        .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatusBySubmissionId')
+        .rejects(testError);
+
+      const mockJobs = [createMockFailedJob(123)];
+
+      try {
+        await processSubmissionFeaturesFailedHandler(mockJobs);
+        expect.fail('Expected an error to be thrown');
+      } catch (error) {
+        expect(error).to.equal(testError);
+        expect(rollbackStub.calledOnce).to.be.true;
+        expect(releaseStub.calledOnce).to.be.true;
+      }
     });
   });
 });
