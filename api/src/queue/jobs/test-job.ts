@@ -40,7 +40,7 @@ export const testJobHandler: PgBoss.WorkHandler<ITestJobData> = async (jobs) => 
     try {
       await connection.open();
 
-      // TODO: Add actual job processing logic here
+      // Template placeholder - implement job-specific logic when creating real jobs
 
       await connection.commit();
 

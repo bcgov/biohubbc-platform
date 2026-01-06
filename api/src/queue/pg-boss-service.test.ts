@@ -46,7 +46,8 @@ describe('pg-boss-service', () => {
   describe('stopPgBoss', () => {
     it('does nothing when pg-boss has not been initialized', async () => {
       // Should not throw even when pg-boss isn't initialized
-      await stopPgBoss();
+      const result = await stopPgBoss();
+      expect(result).to.be.undefined;
     });
   });
 });

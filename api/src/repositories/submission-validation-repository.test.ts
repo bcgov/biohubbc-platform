@@ -44,8 +44,12 @@ describe('SubmissionValidationRepository', () => {
 
       const repository = new SubmissionValidationRepository(mockDBConnection);
 
-      // Should complete without throwing
-      await repository.updateSubmissionValidationStatus('123e4567-e89b-12d3-a456-426614174000', 'started');
+      const result = await repository.updateSubmissionValidationStatus(
+        '123e4567-e89b-12d3-a456-426614174000',
+        'started'
+      );
+
+      expect(result).to.be.undefined;
     });
 
     it('should update status to completed with metadata', async () => {
@@ -59,10 +63,13 @@ describe('SubmissionValidationRepository', () => {
 
       const repository = new SubmissionValidationRepository(mockDBConnection);
 
-      // Should complete without throwing
-      await repository.updateSubmissionValidationStatus('123e4567-e89b-12d3-a456-426614174000', 'completed', {
-        processed_count: 10
-      });
+      const result = await repository.updateSubmissionValidationStatus(
+        '123e4567-e89b-12d3-a456-426614174000',
+        'completed',
+        { processed_count: 10 }
+      );
+
+      expect(result).to.be.undefined;
     });
 
     it('should update status to failed with error metadata', async () => {
@@ -76,10 +83,13 @@ describe('SubmissionValidationRepository', () => {
 
       const repository = new SubmissionValidationRepository(mockDBConnection);
 
-      // Should complete without throwing
-      await repository.updateSubmissionValidationStatus('123e4567-e89b-12d3-a456-426614174000', 'failed', {
-        error: 'Something went wrong'
-      });
+      const result = await repository.updateSubmissionValidationStatus(
+        '123e4567-e89b-12d3-a456-426614174000',
+        'failed',
+        { error: 'Something went wrong' }
+      );
+
+      expect(result).to.be.undefined;
     });
   });
 });
