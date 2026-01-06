@@ -115,7 +115,7 @@ describe('useSearchApi', () => {
 
       mock.onGet('/api/search/summary').reply(200, mockResponse);
 
-      const result = await useSearchApi(axios).searchSummary({ search: 'moose' }, { page: 1, limit: 10 });
+      const result = await useSearchApi(axios).searchSummary({ search: 'moose' });
 
       expect(result).toEqual(mockResponse);
 

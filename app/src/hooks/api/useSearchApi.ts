@@ -52,18 +52,12 @@ export const useSearchApi = (axios: AxiosInstance) => {
   /**
    * Fetch summary counts for features, submissions, and taxonomy based on search terms.
    *
-   * @param {SearchFeaturesParams} [params] - Optional search parameters.
-   * @param {ApiPaginationRequestOptions} [pagination] - Optional pagination parameters (page & limit).
+   * @param {SearchFeaturesParams} params
    * @returns {Promise<SearchSummaryResponse>} - Returns counts of matching features, submissions, and taxonomy.
    */
-  const searchSummary = async (
-    params?: SearchFeaturesParams,
-    pagination?: ApiPaginationRequestOptions
-  ): Promise<SearchSummaryResponse> => {
-    const mergedParams = { ...params, ...pagination };
-
+  const searchSummary = async (params?: SearchFeaturesParams): Promise<SearchSummaryResponse> => {
     const { data } = await axios.get<SearchSummaryResponse>('api/search/summary', {
-      params: mergedParams,
+      params,
       paramsSerializer: (params) => qs.stringify(params)
     });
 

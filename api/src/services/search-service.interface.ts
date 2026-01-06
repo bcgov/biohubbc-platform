@@ -5,13 +5,13 @@ export interface SearchParams {
   feature_type_name?: string;
 }
 
-export interface PaginatedResult<T> {
+export interface WithCount<T> {
   data: T[];
   total: number;
 }
 
-export interface SearchResponseWithPagination {
-  features: PaginatedResult<SearchFeatureResult>;
-  submissions: PaginatedResult<SearchSubmissionResult>;
-  taxonomy: PaginatedResult<SearchTaxonResult>;
+export interface SearchResponseWithCounts {
+  features: WithCount<SearchFeatureResult>;
+  submissions: WithCount<SearchSubmissionResult>;
+  taxonomy: WithCount<SearchTaxonResult>;
 }

@@ -10,7 +10,7 @@ import {
   SearchSummaryTaxon,
   SearchTaxonResult
 } from '../models/search';
-import { PaginatedResult, SearchParams } from '../services/search-service.interface';
+import { SearchParams, WithCount } from '../services/search-service.interface';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 
@@ -121,13 +121,10 @@ export class SearchRepository extends BaseRepository {
    *
    * @param {SearchParams} params - Object containing the search term
    * @param {ApiPaginationOptions} [pagination] - Optional pagination parameters
-   * @return {Promise<PaginatedResult<SearchFeatureResult>>} Paginated feature results and total count
+   * @return {Promise<WithCount<SearchFeatureResult>>} Paginated feature results and total count
    * @memberof SearchRepository
    */
-  async findFeatures(
-    params: SearchParams,
-    pagination?: ApiPaginationOptions
-  ): Promise<PaginatedResult<SearchFeatureResult>> {
+  async findFeatures(params: SearchParams, pagination?: ApiPaginationOptions): Promise<WithCount<SearchFeatureResult>> {
     const base = this._makeFindFeaturesQuery(params.search);
 
     if (params.feature_type_name) {
@@ -147,13 +144,13 @@ export class SearchRepository extends BaseRepository {
    *
    * @param {SearchParams} params - Object containing the search term
    * @param {ApiPaginationOptions} [pagination] - Optional pagination parameters
-   * @return {Promise<PaginatedResult<SearchSubmissionResult>>} Paginated submission results and total count
+   * @return {Promise<WithCount<SearchSubmissionResult>>} Paginated submission results and total count
    * @memberof SearchRepository
    */
   async findSubmissions(
     params: SearchParams,
     pagination?: ApiPaginationOptions
-  ): Promise<PaginatedResult<SearchSubmissionResult>> {
+  ): Promise<WithCount<SearchSubmissionResult>> {
     const base = this._makeFindSubmissionsQuery(params.search);
     const jsonbObject = `jsonb_build_object('submission_id', submission_id, 'name', name, 'description', description)`;
     const query = this._buildPaginatedQuery(base, jsonbObject, pagination);
@@ -168,13 +165,10 @@ export class SearchRepository extends BaseRepository {
    *
    * @param {SearchParams} params - Object containing the search term
    * @param {ApiPaginationOptions} [pagination] - Optional pagination parameters
-   * @return {Promise<PaginatedResult<SearchTaxonResult>>} Paginated taxon results and total count
+   * @return {Promise<WithCount<SearchTaxonResult>>} Paginated taxon results and total count
    * @memberof SearchRepository
    */
-  async findTaxon(
-    params: SearchParams,
-    pagination?: ApiPaginationOptions
-  ): Promise<PaginatedResult<SearchTaxonResult>> {
+  async findTaxon(params: SearchParams, pagination?: ApiPaginationOptions): Promise<WithCount<SearchTaxonResult>> {
     const base = this._makeFindTaxonQuery(params.search);
     const jsonbObject = `jsonb_build_object('taxon_id', taxon_id, 'itis_scientific_name', itis_scientific_name)`;
     const query = this._buildPaginatedQuery(base, jsonbObject, pagination);

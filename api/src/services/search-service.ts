@@ -2,7 +2,7 @@ import { IDBConnection } from '../database/db';
 import { SearchSummaryResponse } from '../models/search';
 import { SearchRepository } from '../repositories/search-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
-import { SearchParams, SearchResponseWithPagination } from './search-service.interface';
+import { SearchParams, SearchResponseWithCounts } from './search-service.interface';
 
 export class SearchService {
   searchRepository: SearchRepository;
@@ -16,9 +16,9 @@ export class SearchService {
    *
    * @param {SearchParams} params
    * @param {ApiPaginationOptions} pagination
-   * @returns {Promise<SearchSummaryResponse>}
+   * @returns {Promise<SearchResponseWithCounts>}
    */
-  async search(params: SearchParams, pagination?: ApiPaginationOptions): Promise<SearchResponseWithPagination> {
+  async search(params: SearchParams, pagination?: ApiPaginationOptions): Promise<SearchResponseWithCounts> {
     const [features, submissions, taxonomy] = await Promise.all([
       this.searchRepository.findFeatures(params, pagination),
       this.searchRepository.findSubmissions(params, pagination),

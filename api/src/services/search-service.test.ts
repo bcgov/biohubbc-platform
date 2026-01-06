@@ -8,7 +8,7 @@ import { SearchRepository } from '../repositories/search-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SearchService } from './search-service';
-import { PaginatedResult } from './search-service.interface';
+import { WithCount } from './search-service.interface';
 
 chai.use(sinonChai);
 
@@ -27,17 +27,17 @@ describe('SearchService', () => {
 
   describe('search', () => {
     it('should return paginated features, submissions, and taxonomy', async () => {
-      const features: PaginatedResult<SearchFeatureResult> = {
+      const features: WithCount<SearchFeatureResult> = {
         data: [{ submission_feature_id: 1, feature_type_id: 1, label: 'Feature1' }],
         total: 1
       };
 
-      const submissions: PaginatedResult<SearchSubmissionResult> = {
+      const submissions: WithCount<SearchSubmissionResult> = {
         data: [{ submission_id: 10, name: 'Sub1', description: 'Desc1' }],
         total: 1
       };
 
-      const taxonomy: PaginatedResult<SearchTaxonResult> = {
+      const taxonomy: WithCount<SearchTaxonResult> = {
         data: [{ taxon_id: 100, itis_scientific_name: 'TaxonA' }],
         total: 1
       };

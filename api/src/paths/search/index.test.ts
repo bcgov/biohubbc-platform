@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../database/db';
 import { SearchService } from '../../services/search-service';
-import { SearchResponseWithPagination } from '../../services/search-service.interface';
+import { SearchResponseWithCounts } from '../../services/search-service.interface';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as search from './index';
 
@@ -16,7 +16,7 @@ describe('search', () => {
   });
 
   it('should return search results for keyword search', async () => {
-    const mockResults: SearchResponseWithPagination = {
+    const mockResults: SearchResponseWithCounts = {
       submissions: { data: [{ name: 'name', submission_id: 1, description: null }], total: 1 },
       features: {
         data: [
@@ -52,7 +52,7 @@ describe('search', () => {
   });
 
   it('should return search results with pagination', async () => {
-    const mockResults: SearchResponseWithPagination = {
+    const mockResults: SearchResponseWithCounts = {
       submissions: { data: [{ name: 'name', submission_id: 1, description: null }], total: 1 },
       features: {
         data: [
@@ -88,7 +88,7 @@ describe('search', () => {
   });
 
   it('should return empty results when no search criteria provided', async () => {
-    const mockResults: SearchResponseWithPagination = {
+    const mockResults: SearchResponseWithCounts = {
       submissions: { data: [], total: 0 },
       features: { data: [], total: 0 },
       taxonomy: { data: [], total: 0 }

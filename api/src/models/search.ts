@@ -1,10 +1,12 @@
 import { z } from 'zod';
 
-const WithCount = <T extends z.ZodTypeAny>(model: T) =>
+export const WithCount = <T extends z.ZodTypeAny>(model: T) =>
   z.object({
     data: z.array(model),
     total: z.number().int().nonnegative()
   });
+
+export type WithCount<T extends z.ZodTypeAny> = z.infer<ReturnType<typeof WithCount<T>>>;
 
 export const SearchFeatureResult = z.object({
   submission_feature_id: z.number().int().positive(),
