@@ -1,36 +1,32 @@
 import { SQL } from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import {
-  ArtifactQuarantine,
-  CreateArtifactQuarantine,
-  UpdateArtifactQuarantine
-} from '../../models/artifact-quarantine';
+import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
 import { BaseRepository } from '../base-repository';
 
-export class ArtifactQuarantineRepository extends BaseRepository {
+export class ArtifactSecurityRepository extends BaseRepository {
   /**
-   * Get a quarantine record by ID.
+   * Get a security record by ID.
    *
-   * @param {string} uploadArtifactQuarantineId
-   * @return {Promise<ArtifactQuarantine>}
+   * @param {string} uploadArtifactSecurityId
+   * @return {Promise<ArtifactSecurity>}
    */
-  async getArtifactQuarantine(uploadArtifactQuarantineId: string): Promise<ArtifactQuarantine> {
+  async getArtifactSecurity(uploadArtifactSecurityId: string): Promise<ArtifactSecurity> {
     const sqlStatement = SQL`
       SELECT
-        artifact_quarantine_id,
+        artifact_security_id,
         artifact_id,
         status
       FROM
-        biohub.artifact_quarantine
+        biohub.artifact_security
       WHERE
-        artifact_quarantine_id = ${uploadArtifactQuarantineId};
+        artifact_security_id = ${uploadArtifactSecurityId};
     `;
 
-    const response = await this.connection.sql(sqlStatement, ArtifactQuarantine);
+    const response = await this.connection.sql(sqlStatement, ArtifactSecurity);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get quarantine record', [
-        'ArtifactQuarantineRepository->getArtifactQuarantine',
+      throw new ApiExecuteSQLError('Failed to get security record', [
+        'ArtifactSecurityRepository->getArtifactSecurity',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
@@ -39,48 +35,48 @@ export class ArtifactQuarantineRepository extends BaseRepository {
   }
 
   /**
-   * Get all quarantine records.
+   * Get all security records.
    *
-   * @return {Promise<ArtifactQuarantine[]>}
+   * @return {Promise<ArtifactSecurity[]>}
    */
-  async getArtifactQuarantines(): Promise<ArtifactQuarantine[]> {
+  async getArtifactSecuritys(): Promise<ArtifactSecurity[]> {
     const sqlStatement = SQL`
     SELECT
-      artifact_quarantine_id,
+      artifact_security_id,
       artifact_id,
       status
     FROM
-      biohub.artifact_quarantine;
+      biohub.artifact_security;
   `;
 
-    const response = await this.connection.sql(sqlStatement, ArtifactQuarantine);
+    const response = await this.connection.sql(sqlStatement, ArtifactSecurity);
 
     return response.rows;
   }
 
   /**
-   * Insert a new upload artifact quarantine record.
+   * Insert a new upload artifact security record.
    *
-   * @param {CreateArtifactQuarantine} quarantine
-   * @return {Promise<{ quarantine_id: string }>}
+   * @param {CreateArtifactSecurity} security
+   * @return {Promise<{ security_id: string }>}
    */
-  async insertArtifactQuarantine(quarantine: CreateArtifactQuarantine): Promise<{ quarantine_id: string }> {
+  async insertArtifactSecurity(security: CreateArtifactSecurity): Promise<{ security_id: string }> {
     const sqlStatement = SQL`
-      INSERT INTO biohub.artifact_quarantine (
+      INSERT INTO biohub.artifact_security (
         artifact_id,
         status
       ) VALUES (
-        ${quarantine.artifact_id},
-        ${quarantine.security}
+        ${security.artifact_id},
+        ${security.security}
       )
-      RETURNING artifact_quarantine_id;
+      RETURNING artifact_security_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert quarantine record', [
-        'ArtifactQuarantineRepository->insertArtifactQuarantine',
+      throw new ApiExecuteSQLError('Failed to insert security record', [
+        'ArtifactSecurityRepository->insertArtifactSecurity',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
@@ -89,31 +85,31 @@ export class ArtifactQuarantineRepository extends BaseRepository {
   }
 
   /**
-   * Update an existing upload artifact quarantine record.
+   * Update an existing upload artifact security record.
    *
-   * @param {string} uploadArtifactQuarantineId
-   * @param {UpdateArtifactQuarantine} quarantine
-   * @return {Promise<{ quarantine_id: string }>}
+   * @param {string} uploadArtifactSecurityId
+   * @param {UpdateArtifactSecurity} security
+   * @return {Promise<{ security_id: string }>}
    */
-  async updateArtifactQuarantine(
-    uploadArtifactQuarantineId: string,
-    quarantine: UpdateArtifactQuarantine
-  ): Promise<{ quarantine_id: string }> {
+  async updateArtifactSecurity(
+    uploadArtifactSecurityId: string,
+    security: UpdateArtifactSecurity
+  ): Promise<{ security_id: string }> {
     const sqlStatement = SQL`
-      UPDATE biohub.artifact_quarantine
+      UPDATE biohub.artifact_security
       SET
-        status = COALESCE(${quarantine.security}, status),
-        artifact_id = COALESCE(${quarantine.artifact_id}, artifact_id)
+        status = COALESCE(${security.security}, status),
+        artifact_id = COALESCE(${security.artifact_id}, artifact_id)
       WHERE
-        artifact_quarantine_id = ${uploadArtifactQuarantineId}
-      RETURNING artifact_quarantine_id;
+        artifact_security_id = ${uploadArtifactSecurityId}
+      RETURNING artifact_security_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update quarantine record', [
-        'ArtifactQuarantineRepository->updateArtifactQuarantine',
+      throw new ApiExecuteSQLError('Failed to update security record', [
+        'ArtifactSecurityRepository->updateArtifactSecurity',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }

@@ -1,69 +1,67 @@
 import { IDBConnection } from '../../database/db';
 import {
-  ArtifactQuarantineScan,
-  CreateArtifactQuarantineScan,
-  UpdateArtifactQuarantineScan
-} from '../../models/artifact-quarantine-scan';
-import { ArtifactQuarantineScanRepository } from '../../repositories/upload/artifact-quarantine-scan-repository';
-export class ArtifactQuarantineScanService {
-  uploadArtifactQuarantineScanRepository: ArtifactQuarantineScanRepository;
+  ArtifactSecurityScan,
+  CreateArtifactSecurityScan,
+  UpdateArtifactSecurityScan
+} from '../../models/artifact-security-scan';
+import { ArtifactSecurityScanRepository } from '../../repositories/upload/artifact-security-scan-repository';
+export class ArtifactSecurityScanService {
+  uploadArtifactSecurityScanRepository: ArtifactSecurityScanRepository;
 
   /**
-   * Creates an instance of ArtifactQuarantineScanService.
+   * Creates an instance of ArtifactSecurityScanService.
    *
    * @param {IDBConnection} connection Database connection object
-   * @memberof ArtifactQuarantineScanService
+   * @memberof ArtifactSecurityScanService
    */
   constructor(connection: IDBConnection) {
-    this.uploadArtifactQuarantineScanRepository = new ArtifactQuarantineScanRepository(connection);
+    this.uploadArtifactSecurityScanRepository = new ArtifactSecurityScanRepository(connection);
   }
 
   /**
-   * Retrieves a single upload artifact quarantine scan record by its ID.
+   * Retrieves a single upload artifact security scan record by its ID.
    *
    * @param {string} scanId The ID of the scan record
-   * @return {Promise<ArtifactQuarantineScan>} The scan record
-   * @memberof ArtifactQuarantineScanService
+   * @return {Promise<ArtifactSecurityScan>} The scan record
+   * @memberof ArtifactSecurityScanService
    */
-  async getArtifactQuarantineScan(scanId: string): Promise<ArtifactQuarantineScan> {
-    return this.uploadArtifactQuarantineScanRepository.getArtifactQuarantineScan(scanId);
+  async getArtifactSecurityScan(scanId: string): Promise<ArtifactSecurityScan> {
+    return this.uploadArtifactSecurityScanRepository.getArtifactSecurityScan(scanId);
   }
 
   /**
-   * Retrieves all upload artifact quarantine scan records.
+   * Retrieves all upload artifact security scan records.
    *
-   * @return {Promise<ArtifactQuarantineScan[]>} List of scan records
-   * @memberof ArtifactQuarantineScanService
+   * @return {Promise<ArtifactSecurityScan[]>} List of scan records
+   * @memberof ArtifactSecurityScanService
    */
-  async getArtifactQuarantineScans(): Promise<ArtifactQuarantineScan[]> {
-    return this.uploadArtifactQuarantineScanRepository.getArtifactQuarantineScans();
+  async getArtifactSecurityScans(): Promise<ArtifactSecurityScan[]> {
+    return this.uploadArtifactSecurityScanRepository.getArtifactSecurityScans();
   }
 
   /**
-   * Inserts a new upload artifact quarantine scan record.
+   * Inserts a new upload artifact security scan record.
    *
-   * @param {CreateArtifactQuarantineScan} scan The scan record data
-   * @return {Promise<{ artifact_quarantine_scan_id: string }>} The newly created scan record ID
-   * @memberof ArtifactQuarantineScanService
+   * @param {CreateArtifactSecurityScan} scan The scan record data
+   * @return {Promise<{ artifact_security_scan_id: string }>} The newly created scan record ID
+   * @memberof ArtifactSecurityScanService
    */
-  async insertArtifactQuarantineScan(
-    scan: CreateArtifactQuarantineScan
-  ): Promise<{ artifact_quarantine_scan_id: string }> {
-    return this.uploadArtifactQuarantineScanRepository.insertArtifactQuarantineScan(scan);
+  async insertArtifactSecurityScan(scan: CreateArtifactSecurityScan): Promise<{ artifact_security_scan_id: string }> {
+    return this.uploadArtifactSecurityScanRepository.insertArtifactSecurityScan(scan);
   }
 
   /**
-   * Updates an existing upload artifact quarantine scan record by ID.
+   * Updates an existing upload artifact security scan record by ID.
    *
    * @param {string} scanId The ID of the scan record to update
-   * @param {UpdateArtifactQuarantineScan} scan The fields to update
-   * @return {Promise<{ artifact_quarantine_scan_id: string }>} The updated scan record ID
-   * @memberof ArtifactQuarantineScanService
+   * @param {UpdateArtifactSecurityScan} scan The fields to update
+   * @return {Promise<{ artifact_security_scan_id: string }>} The updated scan record ID
+   * @memberof ArtifactSecurityScanService
    */
-  async updateArtifactQuarantineScan(
+  async updateArtifactSecurityScan(
     scanId: string,
-    scan: UpdateArtifactQuarantineScan
-  ): Promise<{ artifact_quarantine_scan_id: string }> {
-    return this.uploadArtifactQuarantineScanRepository.updateArtifactQuarantineScan(scanId, scan);
+    scan: UpdateArtifactSecurityScan
+  ): Promise<{ artifact_security_scan_id: string }> {
+    return this.uploadArtifactSecurityScanRepository.updateArtifactSecurityScan(scanId, scan);
   }
 }

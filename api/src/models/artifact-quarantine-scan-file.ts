@@ -13,30 +13,30 @@ export enum SecurityStatusEnum {
 /**
  * Full record of a scanned file
  */
-export const ArtifactQuarantineScanFile = z.object({
-  artifact_quarantine_scan_file_id: z.string().uuid(),
-  artifact_quarantine_scan_id: z.string().uuid(),
+export const ArtifactSecurityScanFile = z.object({
+  artifact_security_scan_file_id: z.string().uuid(),
+  artifact_security_scan_id: z.string().uuid(),
   file_path: z.string(),
   security: SecurityStatusZod
 });
-export type ArtifactQuarantineScanFile = z.infer<typeof ArtifactQuarantineScanFile>;
+export type ArtifactSecurityScanFile = z.infer<typeof ArtifactSecurityScanFile>;
 
 /**
  * Payload for creating a new scan file record
  */
-export const CreateArtifactQuarantineScanFile = z.object({
-  artifact_quarantine_scan_id: z.string().uuid(),
+export const CreateArtifactSecurityScanFile = z.object({
+  artifact_security_scan_id: z.string().uuid(),
   file_path: z.string(),
   security: SecurityStatusZod
 });
-export type CreateArtifactQuarantineScanFile = z.infer<typeof CreateArtifactQuarantineScanFile>;
+export type CreateArtifactSecurityScanFile = z.infer<typeof CreateArtifactSecurityScanFile>;
 
 /**
  * Payload for updating an existing scan file record
  */
-export const UpdateArtifactQuarantineScanFile = z.object({
-  artifact_quarantine_scan_id: z.string().uuid().optional(),
+export const UpdateArtifactSecurityScanFile = z.object({
+  artifact_security_scan_id: z.string().uuid().optional(),
   file_path: z.string().optional(),
   security: SecurityStatusZod.optional()
 });
-export type UpdateArtifactQuarantineScanFile = z.infer<typeof UpdateArtifactQuarantineScanFile>;
+export type UpdateArtifactSecurityScanFile = z.infer<typeof UpdateArtifactSecurityScanFile>;

@@ -2,38 +2,38 @@ import { z } from 'zod';
 import { ProcessStatusStatusZod } from './process-status';
 
 /**
- * Full record of a quarantine scan
+ * Full record of a security scan
  */
-export const ArtifactQuarantineScan = z.object({
-  artifact_quarantine_scan_id: z.string().uuid(),
-  artifact_quarantine_id: z.string().uuid(),
+export const ArtifactSecurityScan = z.object({
+  artifact_security_scan_id: z.string().uuid(),
+  artifact_security_id: z.string().uuid(),
   status: ProcessStatusStatusZod,
   scanner_version: z.string().nullable(),
   scanned_at: z.string().nullable(),
   results: z.record(z.any()).nullable()
 });
-export type ArtifactQuarantineScan = z.infer<typeof ArtifactQuarantineScan>;
+export type ArtifactSecurityScan = z.infer<typeof ArtifactSecurityScan>;
 
 /**
  * Payload for creating a new scan
  */
-export const CreateArtifactQuarantineScan = z.object({
-  artifact_quarantine_id: z.string().uuid(),
+export const CreateArtifactSecurityScan = z.object({
+  artifact_security_id: z.string().uuid(),
   status: ProcessStatusStatusZod,
   scanner_version: z.string().nullable(),
   scanned_at: z.string().nullable(),
   results: z.record(z.any()).nullable()
 });
-export type CreateArtifactQuarantineScan = z.infer<typeof CreateArtifactQuarantineScan>;
+export type CreateArtifactSecurityScan = z.infer<typeof CreateArtifactSecurityScan>;
 
 /**
  * Payload for updating an existing scan
  */
-export const UpdateArtifactQuarantineScan = z.object({
-  artifact_quarantine_id: z.string().uuid().optional(),
+export const UpdateArtifactSecurityScan = z.object({
+  artifact_security_id: z.string().uuid().optional(),
   status: ProcessStatusStatusZod.optional(),
   scanner_version: z.string().nullable().optional(),
   scanned_at: z.string().nullable().optional(),
   results: z.record(z.any()).nullable().optional()
 });
-export type UpdateArtifactQuarantineScan = z.infer<typeof UpdateArtifactQuarantineScan>;
+export type UpdateArtifactSecurityScan = z.infer<typeof UpdateArtifactSecurityScan>;

@@ -74,11 +74,11 @@ export const _getS3Client = (): S3Client => {
 };
 
 /**
- * Local getter for retrieving the S3 quarantine client.
+ * Local getter for retrieving the S3 security client.
  *
- * @return {*}  {S3Client} The S3 quarantine client
+ * @return {*}  {S3Client} The S3 security client
  */
-export const getQuarantineS3Client = (): S3Client => {
+export const getSecurityS3Client = (): S3Client => {
   return new S3Client({
     endpoint: getObjectStoreUrl(),
     credentials: {
@@ -115,11 +115,11 @@ export const getObjectStoreBucketName = (): string => {
 };
 
 /**
- * Local getter for retrieving the S3 quarantine object store bucket name.
+ * Local getter for retrieving the S3 security object store bucket name.
  *
- * @returns {*} {string} The quarantine object store bucket name
+ * @returns {*} {string} The security object store bucket name
  */
-export const getQuarantineObjectStoreBucketName = (): string => {
+export const getSecurityObjectStoreBucketName = (): string => {
   return process.env.QUARANTINE_OBJECT_STORE_BUCKET_NAME || '';
 };
 

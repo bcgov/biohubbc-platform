@@ -2,56 +2,54 @@ import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import {
-  ArtifactQuarantineScan,
-  CreateArtifactQuarantineScan,
-  UpdateArtifactQuarantineScan
-} from '../../models/artifact-quarantine-scan';
+  ArtifactSecurityScan,
+  CreateArtifactSecurityScan,
+  UpdateArtifactSecurityScan
+} from '../../models/artifact-security-scan';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
-import { ArtifactQuarantineScanRepository } from '../../repositories/upload/artifact-quarantine-scan-repository';
+import { ArtifactSecurityScanRepository } from '../../repositories/upload/artifact-security-scan-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { ArtifactQuarantineScanService } from './artifact-quarantine-scan-service';
+import { ArtifactSecurityScanService } from './artifact-security-scan-service';
 
 chai.use(sinonChai);
 
-describe('ArtifactQuarantineScanService', () => {
+describe('ArtifactSecurityScanService', () => {
   let mockDBConnection: any;
-  let service: ArtifactQuarantineScanService;
+  let service: ArtifactSecurityScanService;
 
   beforeEach(() => {
     mockDBConnection = getMockDBConnection();
-    service = new ArtifactQuarantineScanService(mockDBConnection);
+    service = new ArtifactSecurityScanService(mockDBConnection);
   });
 
   afterEach(() => {
     sinon.restore();
   });
 
-  describe('getArtifactQuarantineScan', () => {
+  describe('getArtifactSecurityScan', () => {
     it('should return a single scan record', async () => {
-      const fakeScan: ArtifactQuarantineScan = {
-        artifact_quarantine_scan_id: 'scan-1',
-        artifact_quarantine_id: 'quarantine-1',
+      const fakeScan: ArtifactSecurityScan = {
+        artifact_security_scan_id: 'scan-1',
+        artifact_security_id: 'security-1',
         status: ProcessStatusStatusEnum.PENDING,
         scanner_version: 'v1',
         scanned_at: '2025-01-01T00:00:00Z',
         results: {}
       };
 
-      const stub = sinon
-        .stub(ArtifactQuarantineScanRepository.prototype, 'getArtifactQuarantineScan')
-        .resolves(fakeScan);
+      const stub = sinon.stub(ArtifactSecurityScanRepository.prototype, 'getArtifactSecurityScan').resolves(fakeScan);
 
-      const result = await service.getArtifactQuarantineScan('scan-1');
+      const result = await service.getArtifactSecurityScan('scan-1');
 
       expect(stub).to.have.been.calledWith('scan-1');
       expect(result).to.eql(fakeScan);
     });
 
     it('should throw an error if repository fails', async () => {
-      sinon.stub(ArtifactQuarantineScanRepository.prototype, 'getArtifactQuarantineScan').throws(new Error('DB Error'));
+      sinon.stub(ArtifactSecurityScanRepository.prototype, 'getArtifactSecurityScan').throws(new Error('DB Error'));
 
       try {
-        await service.getArtifactQuarantineScan('scan-1');
+        await service.getArtifactSecurityScan('scan-1');
         expect.fail('Expected error not thrown');
       } catch (err) {
         expect((err as Error).message).to.equal('DB Error');
@@ -59,20 +57,20 @@ describe('ArtifactQuarantineScanService', () => {
     });
   });
 
-  describe('getArtifactQuarantineScans', () => {
+  describe('getArtifactSecurityScans', () => {
     it('should return all scan records', async () => {
-      const fakeScans: ArtifactQuarantineScan[] = [
+      const fakeScans: ArtifactSecurityScan[] = [
         {
-          artifact_quarantine_scan_id: 'scan-1',
-          artifact_quarantine_id: 'quarantine-1',
+          artifact_security_scan_id: 'scan-1',
+          artifact_security_id: 'security-1',
           status: ProcessStatusStatusEnum.PENDING,
           scanner_version: 'v1',
           scanned_at: '2025-01-01T00:00:00Z',
           results: {}
         },
         {
-          artifact_quarantine_scan_id: 'scan-2',
-          artifact_quarantine_id: 'quarantine-2',
+          artifact_security_scan_id: 'scan-2',
+          artifact_security_id: 'security-2',
           status: ProcessStatusStatusEnum.COMPLETED,
           scanner_version: 'v2',
           scanned_at: '2025-01-02T00:00:00Z',
@@ -80,23 +78,19 @@ describe('ArtifactQuarantineScanService', () => {
         }
       ];
 
-      const stub = sinon
-        .stub(ArtifactQuarantineScanRepository.prototype, 'getArtifactQuarantineScans')
-        .resolves(fakeScans);
+      const stub = sinon.stub(ArtifactSecurityScanRepository.prototype, 'getArtifactSecurityScans').resolves(fakeScans);
 
-      const result = await service.getArtifactQuarantineScans();
+      const result = await service.getArtifactSecurityScans();
 
       expect(stub).to.have.been.calledWith();
       expect(result).to.eql(fakeScans);
     });
 
     it('should throw an error if repository fails', async () => {
-      sinon
-        .stub(ArtifactQuarantineScanRepository.prototype, 'getArtifactQuarantineScans')
-        .throws(new Error('DB Error'));
+      sinon.stub(ArtifactSecurityScanRepository.prototype, 'getArtifactSecurityScans').throws(new Error('DB Error'));
 
       try {
-        await service.getArtifactQuarantineScans();
+        await service.getArtifactSecurityScans();
         expect.fail('Expected error not thrown');
       } catch (err) {
         expect((err as Error).message).to.equal('DB Error');
@@ -104,10 +98,10 @@ describe('ArtifactQuarantineScanService', () => {
     });
   });
 
-  describe('insertArtifactQuarantineScan', () => {
+  describe('insertArtifactSecurityScan', () => {
     it('should insert a new scan record and return its ID', async () => {
-      const fakeInput: CreateArtifactQuarantineScan = {
-        artifact_quarantine_id: 'quarantine-1',
+      const fakeInput: CreateArtifactSecurityScan = {
+        artifact_security_id: 'security-1',
         status: ProcessStatusStatusEnum.PENDING,
         scanner_version: 'v1',
         scanned_at: '2025-01-01T00:00:00Z',
@@ -115,18 +109,18 @@ describe('ArtifactQuarantineScanService', () => {
       };
 
       const stub = sinon
-        .stub(ArtifactQuarantineScanRepository.prototype, 'insertArtifactQuarantineScan')
-        .resolves({ artifact_quarantine_scan_id: 'scan-new' });
+        .stub(ArtifactSecurityScanRepository.prototype, 'insertArtifactSecurityScan')
+        .resolves({ artifact_security_scan_id: 'scan-new' });
 
-      const result = await service.insertArtifactQuarantineScan(fakeInput);
+      const result = await service.insertArtifactSecurityScan(fakeInput);
 
       expect(stub).to.have.been.calledWith(fakeInput);
-      expect(result).to.eql({ artifact_quarantine_scan_id: 'scan-new' });
+      expect(result).to.eql({ artifact_security_scan_id: 'scan-new' });
     });
 
     it('should throw an error if repository fails', async () => {
-      const fakeInput: CreateArtifactQuarantineScan = {
-        artifact_quarantine_id: 'quarantine-1',
+      const fakeInput: CreateArtifactSecurityScan = {
+        artifact_security_id: 'security-1',
         status: ProcessStatusStatusEnum.PENDING,
         scanner_version: 'v1',
         scanned_at: '2025-01-01T00:00:00Z',
@@ -134,11 +128,11 @@ describe('ArtifactQuarantineScanService', () => {
       };
 
       sinon
-        .stub(ArtifactQuarantineScanRepository.prototype, 'insertArtifactQuarantineScan')
+        .stub(ArtifactSecurityScanRepository.prototype, 'insertArtifactSecurityScan')
         .throws(new Error('Insert failed'));
 
       try {
-        await service.insertArtifactQuarantineScan(fakeInput);
+        await service.insertArtifactSecurityScan(fakeInput);
         expect.fail('Expected error not thrown');
       } catch (err) {
         expect((err as Error).message).to.equal('Insert failed');
@@ -146,9 +140,9 @@ describe('ArtifactQuarantineScanService', () => {
     });
   });
 
-  describe('updateArtifactQuarantineScan', () => {
+  describe('updateArtifactSecurityScan', () => {
     it('should update an existing scan record and return its ID', async () => {
-      const fakeInput: UpdateArtifactQuarantineScan = {
+      const fakeInput: UpdateArtifactSecurityScan = {
         status: ProcessStatusStatusEnum.COMPLETED,
         scanner_version: 'v2',
         scanned_at: '2025-02-01T00:00:00Z',
@@ -156,17 +150,17 @@ describe('ArtifactQuarantineScanService', () => {
       };
 
       const stub = sinon
-        .stub(ArtifactQuarantineScanRepository.prototype, 'updateArtifactQuarantineScan')
-        .resolves({ artifact_quarantine_scan_id: 'scan-1' });
+        .stub(ArtifactSecurityScanRepository.prototype, 'updateArtifactSecurityScan')
+        .resolves({ artifact_security_scan_id: 'scan-1' });
 
-      const result = await service.updateArtifactQuarantineScan('scan-1', fakeInput);
+      const result = await service.updateArtifactSecurityScan('scan-1', fakeInput);
 
       expect(stub).to.have.been.calledWith('scan-1', fakeInput);
-      expect(result).to.eql({ artifact_quarantine_scan_id: 'scan-1' });
+      expect(result).to.eql({ artifact_security_scan_id: 'scan-1' });
     });
 
     it('should throw an error if repository fails', async () => {
-      const fakeInput: UpdateArtifactQuarantineScan = {
+      const fakeInput: UpdateArtifactSecurityScan = {
         status: ProcessStatusStatusEnum.COMPLETED,
         scanner_version: 'v2',
         scanned_at: '2025-02-01T00:00:00Z',
@@ -174,11 +168,11 @@ describe('ArtifactQuarantineScanService', () => {
       };
 
       sinon
-        .stub(ArtifactQuarantineScanRepository.prototype, 'updateArtifactQuarantineScan')
+        .stub(ArtifactSecurityScanRepository.prototype, 'updateArtifactSecurityScan')
         .throws(new Error('Update failed'));
 
       try {
-        await service.updateArtifactQuarantineScan('scan-1', fakeInput);
+        await service.updateArtifactSecurityScan('scan-1', fakeInput);
         expect.fail('Expected error not thrown');
       } catch (err) {
         expect((err as Error).message).to.equal('Update failed');

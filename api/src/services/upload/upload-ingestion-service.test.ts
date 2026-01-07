@@ -13,7 +13,7 @@ import * as fileUtils from '../../utils/file-utils';
 import * as submissionUploadUtils from '../../utils/submission-upload-utils';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { SubmissionService } from '../submission-service';
-import { ArtifactQuarantineService } from './artifact-quarantine-service';
+import { ArtifactSecurityService } from './artifact-security-service';
 import { ArtifactService } from './artifact-service';
 import { SubmissionUploadService } from './submission-upload-service';
 import { UploadArchiveService } from './upload-archive-service';
@@ -164,7 +164,7 @@ describe('UploadIngestionService', () => {
       ]
     };
 
-    it('should complete upload successfully and enqueue quarantine artifacts', async () => {
+    it('should complete upload successfully and enqueue security artifacts', async () => {
       const futureDate = dayjs().add(30, 'minute').toISOString();
 
       sinon.stub(UploadService.prototype, 'getUpload').resolves({
@@ -192,22 +192,22 @@ describe('UploadIngestionService', () => {
 
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves(mockRows);
 
-      const insertQuarantineStub = sinon
-        .stub(ArtifactQuarantineService.prototype, 'insertArtifactQuarantine')
-        .resolves({ quarantine_id: 'artifact-quarantine-1' });
+      const insertSecurityStub = sinon
+        .stub(ArtifactSecurityService.prototype, 'insertArtifactSecurity')
+        .resolves({ security_id: 'artifact-security-1' });
 
       const s3ClientStub = { send: sinon.stub().resolves({ ETag: 'etag' }) };
-      sinon.stub(fileUtils, 'getQuarantineS3Client').returns(s3ClientStub as any);
-      sinon.stub(fileUtils, 'getQuarantineObjectStoreBucketName').returns('quarantine-bucket');
+      sinon.stub(fileUtils, 'getSecurityS3Client').returns(s3ClientStub as any);
+      sinon.stub(fileUtils, 'getSecurityObjectStoreBucketName').returns('security-bucket');
 
       await service.completeArchiveUpload(mockParams);
 
-      expect(insertQuarantineStub).to.have.been.calledTwice;
-      expect(insertQuarantineStub.getCall(0).args[0]).to.deep.equal({
+      expect(insertSecurityStub).to.have.been.calledTwice;
+      expect(insertSecurityStub.getCall(0).args[0]).to.deep.equal({
         artifact_id: mockRows[0].artifact_id,
         security: ProcessStatusStatusEnum.PENDING
       });
-      expect(insertQuarantineStub.getCall(1).args[0]).to.deep.equal({
+      expect(insertSecurityStub.getCall(1).args[0]).to.deep.equal({
         artifact_id: mockRows[1].artifact_id,
         security: ProcessStatusStatusEnum.PENDING
       });
@@ -304,14 +304,14 @@ describe('UploadIngestionService', () => {
         }
       ];
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves(mockRows);
-      sinon.stub(ArtifactQuarantineService.prototype, 'insertArtifactQuarantine').resolves();
+      sinon.stub(ArtifactSecurityService.prototype, 'insertArtifactSecurity').resolves();
 
       const fakeS3Client = {
         send: sinon.stub().rejects(new Error('S3 API error: Access Denied'))
       };
 
-      sinon.stub(fileUtils, 'getQuarantineS3Client').returns(fakeS3Client as any);
-      sinon.stub(fileUtils, 'getQuarantineObjectStoreBucketName').returns('quarantine-bucket');
+      sinon.stub(fileUtils, 'getSecurityS3Client').returns(fakeS3Client as any);
+      sinon.stub(fileUtils, 'getSecurityObjectStoreBucketName').returns('security-bucket');
 
       try {
         await service.completeArchiveUpload({
@@ -326,7 +326,7 @@ describe('UploadIngestionService', () => {
       }
     });
 
-    it('should throw if artifact quarantine insert fails', async () => {
+    it('should throw if artifact security insert fails', async () => {
       sinon.stub(UploadService.prototype, 'getUpload').resolves({
         upload_id: 'upload-456',
         s3_upload_id: 's3-upload-111',
@@ -347,18 +347,18 @@ describe('UploadIngestionService', () => {
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves(mockRows);
 
       sinon
-        .stub(ArtifactQuarantineService.prototype, 'insertArtifactQuarantine')
-        .rejects(new Error('Database error: artifact quarantine insert failed'));
+        .stub(ArtifactSecurityService.prototype, 'insertArtifactSecurity')
+        .rejects(new Error('Database error: artifact security insert failed'));
 
       const s3ClientStub = { send: sinon.stub().resolves({ ETag: 'etag' }) };
-      sinon.stub(fileUtils, 'getQuarantineS3Client').returns(s3ClientStub as any);
-      sinon.stub(fileUtils, 'getQuarantineObjectStoreBucketName').returns('quarantine-bucket');
+      sinon.stub(fileUtils, 'getSecurityS3Client').returns(s3ClientStub as any);
+      sinon.stub(fileUtils, 'getSecurityObjectStoreBucketName').returns('security-bucket');
 
       try {
         await service.completeArchiveUpload(mockParams);
         expect.fail('Expected error not thrown');
       } catch (err) {
-        expect((err as Error).message).to.include('artifact quarantine insert failed');
+        expect((err as Error).message).to.include('artifact security insert failed');
       }
     });
   });

@@ -1,60 +1,53 @@
 import { IDBConnection } from '../../database/db';
-import {
-  ArtifactQuarantine,
-  CreateArtifactQuarantine,
-  UpdateArtifactQuarantine
-} from '../../models/artifact-quarantine';
-import { ArtifactQuarantineRepository } from '../../repositories/upload/artifact-quarantine-repository';
+import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
+import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
 import { DBService } from '../db-service';
 
-export class ArtifactQuarantineService extends DBService {
-  uploadArtifactQuarantineRepository: ArtifactQuarantineRepository;
+export class ArtifactSecurityService extends DBService {
+  uploadArtifactSecurityRepository: ArtifactSecurityRepository;
 
   /**
-   * Creates an instance of ArtifactQuarantineService.
+   * Creates an instance of ArtifactSecurityService.
    *
    * @param {IDBConnection} connection Database connection object
-   * @memberof ArtifactQuarantineService
+   * @memberof ArtifactSecurityService
    */
   constructor(connection: IDBConnection) {
     super(connection);
-    this.uploadArtifactQuarantineRepository = new ArtifactQuarantineRepository(connection);
+    this.uploadArtifactSecurityRepository = new ArtifactSecurityRepository(connection);
   }
 
   /**
-   * Retrieves a single upload artifact quarantine record by its ID.
+   * Retrieves a single upload artifact security record by its ID.
    *
-   * @param {string} quarantineId The ID of the quarantine record
-   * @return {Promise<ArtifactQuarantine>} The upload artifact quarantine record
-   * @memberof ArtifactQuarantineService
+   * @param {string} securityId The ID of the security record
+   * @return {Promise<ArtifactSecurity>} The upload artifact security record
+   * @memberof ArtifactSecurityService
    */
-  async getArtifactQuarantine(quarantineId: string): Promise<ArtifactQuarantine> {
-    return this.uploadArtifactQuarantineRepository.getArtifactQuarantine(quarantineId);
+  async getArtifactSecurity(securityId: string): Promise<ArtifactSecurity> {
+    return this.uploadArtifactSecurityRepository.getArtifactSecurity(securityId);
   }
 
   /**
-   * Inserts a new upload artifact quarantine record.
+   * Inserts a new upload artifact security record.
    *
-   * @param {CreateArtifactQuarantine} quarantine The data for the new quarantine record
-   * @return {Promise<{ quarantine_id: string }>} The newly created quarantine record ID
-   * @memberof ArtifactQuarantineService
+   * @param {CreateArtifactSecurity} security The data for the new security record
+   * @return {Promise<{ security_id: string }>} The newly created security record ID
+   * @memberof ArtifactSecurityService
    */
-  async insertArtifactQuarantine(quarantine: CreateArtifactQuarantine): Promise<{ quarantine_id: string }> {
-    return this.uploadArtifactQuarantineRepository.insertArtifactQuarantine(quarantine);
+  async insertArtifactSecurity(security: CreateArtifactSecurity): Promise<{ security_id: string }> {
+    return this.uploadArtifactSecurityRepository.insertArtifactSecurity(security);
   }
 
   /**
-   * Updates an existing upload artifact quarantine record by ID.
+   * Updates an existing upload artifact security record by ID.
    *
-   * @param {string} quarantineId The ID of the quarantine record to update
-   * @param {UpdateArtifactQuarantine} quarantine The fields to update
-   * @return {Promise<{ quarantine_id: string }>} The updated quarantine record ID
-   * @memberof ArtifactQuarantineService
+   * @param {string} securityId The ID of the security record to update
+   * @param {UpdateArtifactSecurity} security The fields to update
+   * @return {Promise<{ security_id: string }>} The updated security record ID
+   * @memberof ArtifactSecurityService
    */
-  async updateArtifactQuarantine(
-    quarantineId: string,
-    quarantine: UpdateArtifactQuarantine
-  ): Promise<{ quarantine_id: string }> {
-    return this.uploadArtifactQuarantineRepository.updateArtifactQuarantine(quarantineId, quarantine);
+  async updateArtifactSecurity(securityId: string, security: UpdateArtifactSecurity): Promise<{ security_id: string }> {
+    return this.uploadArtifactSecurityRepository.updateArtifactSecurity(securityId, security);
   }
 }

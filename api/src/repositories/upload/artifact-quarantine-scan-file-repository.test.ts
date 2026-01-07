@@ -5,107 +5,107 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import {
-  ArtifactQuarantineScanFile,
-  CreateArtifactQuarantineScanFile,
+  ArtifactSecurityScanFile,
+  CreateArtifactSecurityScanFile,
   SecurityStatusEnum,
-  UpdateArtifactQuarantineScanFile
-} from '../../models/artifact-quarantine-scan-file';
+  UpdateArtifactSecurityScanFile
+} from '../../models/artifact-security-scan-file';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { ArtifactQuarantineScanFileRepository } from './artifact-quarantine-scan-file-repository';
+import { ArtifactSecurityScanFileRepository } from './artifact-security-scan-file-repository';
 
 chai.use(sinonChai);
 
-describe('ArtifactQuarantineScanFileRepository', () => {
+describe('ArtifactSecurityScanFileRepository', () => {
   afterEach(() => {
     sinon.restore();
   });
 
-  describe('getArtifactQuarantineScanFile', () => {
+  describe('getArtifactSecurityScanFile', () => {
     it('throws an error if no matching record found', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactQuarantineScanFileRepository(mockDBConnection);
+      const repo = new ArtifactSecurityScanFileRepository(mockDBConnection);
 
       try {
-        await repo.getArtifactQuarantineScanFile('id-1');
+        await repo.getArtifactSecurityScanFile('id-1');
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(ApiExecuteSQLError);
         expect((error as ApiExecuteSQLError).message).to.equal(
-          'Failed to get upload artifact quarantine scan file record'
+          'Failed to get upload artifact security scan file record'
         );
       }
     });
 
     it('returns a record if found', async () => {
-      const mockRow: ArtifactQuarantineScanFile = {
-        artifact_quarantine_scan_file_id: 'id-1',
-        artifact_quarantine_scan_id: 'scan-id-1',
+      const mockRow: ArtifactSecurityScanFile = {
+        artifact_security_scan_file_id: 'id-1',
+        artifact_security_scan_id: 'scan-id-1',
         file_path: 'path/to/file',
         security: SecurityStatusEnum.CLEAN
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactQuarantineScanFileRepository(mockDBConnection);
+      const repo = new ArtifactSecurityScanFileRepository(mockDBConnection);
 
-      const result = await repo.getArtifactQuarantineScanFile('id-1');
+      const result = await repo.getArtifactSecurityScanFile('id-1');
       expect(result).to.eql(mockRow);
     });
   });
 
-  describe('insertArtifactQuarantineScanFile', () => {
+  describe('insertArtifactSecurityScanFile', () => {
     it('throws an error if insert fails', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactQuarantineScanFileRepository(mockDBConnection);
+      const repo = new ArtifactSecurityScanFileRepository(mockDBConnection);
 
-      const payload: CreateArtifactQuarantineScanFile = {
-        artifact_quarantine_scan_id: 'scan-id-1',
+      const payload: CreateArtifactSecurityScanFile = {
+        artifact_security_scan_id: 'scan-id-1',
         file_path: 'path/to/file',
         security: SecurityStatusEnum.CLEAN
       };
 
       try {
-        await repo.insertArtifactQuarantineScanFile(payload);
+        await repo.insertArtifactSecurityScanFile(payload);
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(ApiExecuteSQLError);
         expect((error as ApiExecuteSQLError).message).to.equal(
-          'Failed to insert upload artifact quarantine scan file record'
+          'Failed to insert upload artifact security scan file record'
         );
       }
     });
 
     it('returns the inserted record ID if successful', async () => {
-      const mockRow = { artifact_quarantine_scan_file_id: 'id-1' };
+      const mockRow = { artifact_security_scan_file_id: 'id-1' };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactQuarantineScanFileRepository(mockDBConnection);
+      const repo = new ArtifactSecurityScanFileRepository(mockDBConnection);
 
-      const payload: CreateArtifactQuarantineScanFile = {
-        artifact_quarantine_scan_id: 'scan-id-1',
+      const payload: CreateArtifactSecurityScanFile = {
+        artifact_security_scan_id: 'scan-id-1',
         file_path: 'path/to/file',
         security: SecurityStatusEnum.CLEAN
       };
 
-      const result = await repo.insertArtifactQuarantineScanFile(payload);
+      const result = await repo.insertArtifactSecurityScanFile(payload);
       expect(result).to.eql(mockRow);
     });
   });
 
-  describe('insertArtifactQuarantineScanFileBatch', () => {
+  describe('insertArtifactSecurityScanFileBatch', () => {
     it('throws an error if row count does not match', async () => {
       const mockQueryResponse = { rowCount: 1, rows: [] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactQuarantineScanFileRepository(mockDBConnection);
+      const repo = new ArtifactSecurityScanFileRepository(mockDBConnection);
 
-      const payload: CreateArtifactQuarantineScanFile[] = [
-        { artifact_quarantine_scan_id: 'scan-id-1', file_path: 'file1', security: SecurityStatusEnum.CLEAN },
-        { artifact_quarantine_scan_id: 'scan-id-2', file_path: 'file2', security: SecurityStatusEnum.INFECTED }
+      const payload: CreateArtifactSecurityScanFile[] = [
+        { artifact_security_scan_id: 'scan-id-1', file_path: 'file1', security: SecurityStatusEnum.CLEAN },
+        { artifact_security_scan_id: 'scan-id-2', file_path: 'file2', security: SecurityStatusEnum.INFECTED }
       ];
 
       try {
-        await repo.insertArtifactQuarantineScanFileBatch(payload);
+        await repo.insertArtifactSecurityScanFileBatch(payload);
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(ApiExecuteSQLError);
@@ -113,31 +113,31 @@ describe('ArtifactQuarantineScanFileRepository', () => {
     });
 
     it('returns inserted record IDs if successful', async () => {
-      const mockRows = [{ artifact_quarantine_scan_file_id: 'id-1' }, { artifact_quarantine_scan_file_id: 'id-2' }];
+      const mockRows = [{ artifact_security_scan_file_id: 'id-1' }, { artifact_security_scan_file_id: 'id-2' }];
       const mockQueryResponse = { rowCount: 2, rows: mockRows } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactQuarantineScanFileRepository(mockDBConnection);
+      const repo = new ArtifactSecurityScanFileRepository(mockDBConnection);
 
-      const payload: CreateArtifactQuarantineScanFile[] = [
-        { artifact_quarantine_scan_id: 'scan-id-1', file_path: 'file1', security: SecurityStatusEnum.CLEAN },
-        { artifact_quarantine_scan_id: 'scan-id-2', file_path: 'file2', security: SecurityStatusEnum.INFECTED }
+      const payload: CreateArtifactSecurityScanFile[] = [
+        { artifact_security_scan_id: 'scan-id-1', file_path: 'file1', security: SecurityStatusEnum.CLEAN },
+        { artifact_security_scan_id: 'scan-id-2', file_path: 'file2', security: SecurityStatusEnum.INFECTED }
       ];
 
-      const result = await repo.insertArtifactQuarantineScanFileBatch(payload);
+      const result = await repo.insertArtifactSecurityScanFileBatch(payload);
       expect(result).to.eql(mockRows);
     });
   });
 
-  describe('updateArtifactQuarantineScanFile', () => {
+  describe('updateArtifactSecurityScanFile', () => {
     it('throws an error if update fails', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactQuarantineScanFileRepository(mockDBConnection);
+      const repo = new ArtifactSecurityScanFileRepository(mockDBConnection);
 
-      const payload: UpdateArtifactQuarantineScanFile = { security: SecurityStatusEnum.INFECTED };
+      const payload: UpdateArtifactSecurityScanFile = { security: SecurityStatusEnum.INFECTED };
 
       try {
-        await repo.updateArtifactQuarantineScanFile('id-1', payload);
+        await repo.updateArtifactSecurityScanFile('id-1', payload);
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(ApiExecuteSQLError);
@@ -145,14 +145,14 @@ describe('ArtifactQuarantineScanFileRepository', () => {
     });
 
     it('returns updated record ID if successful', async () => {
-      const mockRow = { artifact_quarantine_scan_file_id: 'id-1' };
+      const mockRow = { artifact_security_scan_file_id: 'id-1' };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactQuarantineScanFileRepository(mockDBConnection);
+      const repo = new ArtifactSecurityScanFileRepository(mockDBConnection);
 
-      const payload: UpdateArtifactQuarantineScanFile = { security: SecurityStatusEnum.INFECTED };
+      const payload: UpdateArtifactSecurityScanFile = { security: SecurityStatusEnum.INFECTED };
 
-      const result = await repo.updateArtifactQuarantineScanFile('id-1', payload);
+      const result = await repo.updateArtifactSecurityScanFile('id-1', payload);
       expect(result).to.eql(mockRow);
     });
   });

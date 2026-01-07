@@ -52,7 +52,7 @@ describe('ObjectStorageService', function () {
       await service.uploadFile(
         BucketType.QUARANTINE,
         file as unknown as Express.Multer.File,
-        'quarantine/file.json',
+        'security/file.json',
         metadata
       );
 
@@ -365,8 +365,8 @@ describe('ObjectStorageService', function () {
     });
   });
 
-  describe('promoteFromQuarantine', function () {
-    it('should promote a file from quarantine to main bucket', async function () {
+  describe('promoteFromSecurity', function () {
+    it('should promote a file from security to main bucket', async function () {
       sendStub.resolves({
         Body: new Readable(),
         ContentType: 'text/plain'
@@ -374,9 +374,9 @@ describe('ObjectStorageService', function () {
 
       sinon.stub(Upload.prototype, 'done').resolves();
 
-      const result = await service.promoteFromQuarantine('quarantine/file.txt');
+      const result = await service.promoteFromSecurity('security/file.txt');
 
-      expect(result).to.eql({ key: 'quarantine/file.txt' });
+      expect(result).to.eql({ key: 'security/file.txt' });
       expect(sendStub).to.have.been.called;
       expect(Upload.prototype.done).to.have.been.called;
     });
@@ -385,7 +385,7 @@ describe('ObjectStorageService', function () {
       sendStub.rejects(new Error('Promotion failed'));
 
       try {
-        await service.promoteFromQuarantine('file.txt');
+        await service.promoteFromSecurity('file.txt');
         expect.fail('Expected error not thrown');
       } catch (err) {
         expect((err as Error).message).to.equal('Promotion failed');

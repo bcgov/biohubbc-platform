@@ -2,42 +2,42 @@ import { z } from 'zod';
 import { SecurityStatusZod } from './artifact-quarantine-scan-file';
 
 /**
- * Full record from artifact_quarantine table
+ * Full record from artifact_security table
  */
-export const ArtifactQuarantine = z.object({
-  artifact_quarantine_id: z.string().uuid(),
+export const ArtifactSecurity = z.object({
+  artifact_security_id: z.string().uuid(),
   artifact_id: z.string().uuid(),
   security: SecurityStatusZod
 });
-export type ArtifactQuarantine = z.infer<typeof ArtifactQuarantine>;
+export type ArtifactSecurity = z.infer<typeof ArtifactSecurity>;
 
 /**
  * Payload for inserting a new record
  */
-export const CreateArtifactQuarantine = z.object({
+export const CreateArtifactSecurity = z.object({
   artifact_id: z.string().uuid(),
   security: SecurityStatusZod
 });
-export type CreateArtifactQuarantine = z.infer<typeof CreateArtifactQuarantine>;
+export type CreateArtifactSecurity = z.infer<typeof CreateArtifactSecurity>;
 
 /**
  * Payload for updating an existing record
  */
-export const UpdateArtifactQuarantine = z.object({
+export const UpdateArtifactSecurity = z.object({
   artifact_id: z.string().uuid().optional(),
   security: SecurityStatusZod.optional()
 });
-export type UpdateArtifactQuarantine = z.infer<typeof UpdateArtifactQuarantine>;
+export type UpdateArtifactSecurity = z.infer<typeof UpdateArtifactSecurity>;
 
 /**
- * Represents a single scan for a quarantined artifact
+ * Represents a single scan for a securityd artifact
  */
-export const ArtifactQuarantineScan = z.object({
-  artifact_quarantine_scan_id: z.string().uuid(),
-  artifact_quarantine_id: z.string().uuid(),
+export const ArtifactSecurityScan = z.object({
+  artifact_security_scan_id: z.string().uuid(),
+  artifact_security_id: z.string().uuid(),
   security: SecurityStatusZod,
   scanner_version: z.string().optional(),
   scanned_at: z.string().optional(),
   results: z.any().optional()
 });
-export type ArtifactQuarantineScan = z.infer<typeof ArtifactQuarantineScan>;
+export type ArtifactSecurityScan = z.infer<typeof ArtifactSecurityScan>;

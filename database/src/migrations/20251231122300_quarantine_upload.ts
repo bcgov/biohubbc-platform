@@ -16,7 +16,7 @@ export async function up(knex: Knex): Promise<void> {
       'expired'     -- Upload session expired without completion
     );
 
-    -- Processing/lifecycle status (for artifact, upload_archive, quarantine_scan)
+    -- Processing/lifecycle status (for artifact, upload_archive, security_scan)
     CREATE TYPE process_status AS ENUM (
       'draft',      -- Not ready for processing
       'pending',    -- Awaiting processing
@@ -24,7 +24,7 @@ export async function up(knex: Knex): Promise<void> {
       'failed'      -- Processing failed
     );
 
-    -- Security/quarantine result status (for artifact_quarantine, artifact_quarantine_scan_file)
+    -- Security/security result status (for artifact_security, artifact_security_scan_file)
     CREATE TYPE security_status AS ENUM (
       'pending',    -- Scan queued but not yet performed
       'clean',      -- Scanned and found safe
@@ -188,8 +188,8 @@ export async function up(knex: Knex): Promise<void> {
     -- ARTIFACT_QUARANTINE
     --------------------------------------------------------------------------------
 
-    CREATE TABLE artifact_quarantine (
-      artifact_quarantine_id uuid DEFAULT public.gen_random_uuid(),
+    CREATE TABLE artifact_security (
+      artifact_security_id uuid DEFAULT public.gen_random_uuid(),
       artifact_id uuid NOT NULL,
       security security_status,
       create_date timestamptz(6) DEFAULT now() NOT NULL,
@@ -197,31 +197,31 @@ export async function up(knex: Knex): Promise<void> {
       update_date timestamptz(6),
       update_user integer,
       revision_count integer DEFAULT 0 NOT NULL,
-      CONSTRAINT artifact_quarantine_pk PRIMARY KEY (artifact_quarantine_id),
-      CONSTRAINT artifact_quarantine_artifact_fk FOREIGN KEY (artifact_id) REFERENCES artifact(artifact_id),
-      CONSTRAINT artifact_quarantine_artifact_uq UNIQUE (artifact_id)
+      CONSTRAINT artifact_security_pk PRIMARY KEY (artifact_security_id),
+      CONSTRAINT artifact_security_artifact_fk FOREIGN KEY (artifact_id) REFERENCES artifact(artifact_id),
+      CONSTRAINT artifact_security_artifact_uq UNIQUE (artifact_id)
     );
 
-    CREATE INDEX artifact_quarantine_security_idx ON artifact_quarantine(security);
-    CREATE INDEX artifact_quarantine_artifact_idx ON artifact_quarantine(artifact_id);
+    CREATE INDEX artifact_security_security_idx ON artifact_security(security);
+    CREATE INDEX artifact_security_artifact_idx ON artifact_security(artifact_id);
 
-    COMMENT ON TABLE artifact_quarantine IS 'Stores the final security/quarantine result for an artifact. One quarantine record per artifact. Contains the most recent security security after scanning. For archive uploads, the archive itself is scanned, and all extracted files reference the same scan. security values: pending (not scanned), clean (safe), infected (malware), error (scan failed), skipped (intentionally not scanned).';
-    COMMENT ON COLUMN artifact_quarantine.artifact_quarantine_id IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN artifact_quarantine.artifact_id IS 'Foreign key to the artifact being quarantined.';
-    COMMENT ON COLUMN artifact_quarantine.security IS 'Final security result of the artifact.';
-    COMMENT ON COLUMN artifact_quarantine.create_date IS 'The datetime the record was created.';
-    COMMENT ON COLUMN artifact_quarantine.create_user IS 'The id of the user who created the record.';
-    COMMENT ON COLUMN artifact_quarantine.update_date IS 'The datetime the record was last updated.';
-    COMMENT ON COLUMN artifact_quarantine.update_user IS 'The id of the user who last updated the record.';
-    COMMENT ON COLUMN artifact_quarantine.revision_count IS 'Revision count used for concurrency control.';
+    COMMENT ON TABLE artifact_security IS 'Stores the final security/security result for an artifact. One security record per artifact. Contains the most recent security security after scanning. For archive uploads, the archive itself is scanned, and all extracted files reference the same scan. security values: pending (not scanned), clean (safe), infected (malware), error (scan failed), skipped (intentionally not scanned).';
+    COMMENT ON COLUMN artifact_security.artifact_security_id IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN artifact_security.artifact_id IS 'Foreign key to the artifact being securityd.';
+    COMMENT ON COLUMN artifact_security.security IS 'Final security result of the artifact.';
+    COMMENT ON COLUMN artifact_security.create_date IS 'The datetime the record was created.';
+    COMMENT ON COLUMN artifact_security.create_user IS 'The id of the user who created the record.';
+    COMMENT ON COLUMN artifact_security.update_date IS 'The datetime the record was last updated.';
+    COMMENT ON COLUMN artifact_security.update_user IS 'The id of the user who last updated the record.';
+    COMMENT ON COLUMN artifact_security.revision_count IS 'Revision count used for concurrency control.';
 
     --------------------------------------------------------------------------------
     -- ARTIFACT_QUARANTINE_SCAN
     --------------------------------------------------------------------------------
 
-    CREATE TABLE artifact_quarantine_scan (
-      artifact_quarantine_scan_id uuid DEFAULT public.gen_random_uuid(),
-      artifact_quarantine_id uuid NOT NULL,
+    CREATE TABLE artifact_security_scan (
+      artifact_security_scan_id uuid DEFAULT public.gen_random_uuid(),
+      artifact_security_id uuid NOT NULL,
       status process_status NOT NULL,
       scanner_version varchar(100),
       scanned_at timestamptz,
@@ -231,33 +231,33 @@ export async function up(knex: Knex): Promise<void> {
       update_date timestamptz(6),
       update_user integer,
       revision_count integer DEFAULT 0 NOT NULL,
-      CONSTRAINT artifact_quarantine_scan_pk PRIMARY KEY (artifact_quarantine_scan_id),
-      CONSTRAINT artifact_quarantine_scan_quarantine_fk FOREIGN KEY (artifact_quarantine_id) REFERENCES artifact_quarantine(artifact_quarantine_id)
+      CONSTRAINT artifact_security_scan_pk PRIMARY KEY (artifact_security_scan_id),
+      CONSTRAINT artifact_security_scan_security_fk FOREIGN KEY (artifact_security_id) REFERENCES artifact_security(artifact_security_id)
     );
 
-    CREATE INDEX artifact_quarantine_scan_quarantine_idx ON artifact_quarantine_scan(artifact_quarantine_id);
-    CREATE INDEX artifact_quarantine_scan_status_idx ON artifact_quarantine_scan(status);
+    CREATE INDEX artifact_security_scan_security_idx ON artifact_security_scan(artifact_security_id);
+    CREATE INDEX artifact_security_scan_status_idx ON artifact_security_scan(status);
 
-    COMMENT ON TABLE artifact_quarantine_scan IS 'Tracks individual malware scan events performed against a quarantined artifact. Processing status tracks lifecycle of scan execution (pending → completed/failed). For archive uploads, the scan is performed on the archive, and all extracted files reference this scan via their quarantine record.';
-    COMMENT ON COLUMN artifact_quarantine_scan.artifact_quarantine_scan_id IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN artifact_quarantine_scan.artifact_quarantine_id IS 'Foreign key to the quarantine record being scanned.';
-    COMMENT ON COLUMN artifact_quarantine_scan.status IS 'Processing status of the scan execution (draft → pending → completed/failed).';
-    COMMENT ON COLUMN artifact_quarantine_scan.scanner_version IS 'Version identifier of the malware scanner.';
-    COMMENT ON COLUMN artifact_quarantine_scan.scanned_at IS 'Timestamp when the scan completed.';
-    COMMENT ON COLUMN artifact_quarantine_scan.results IS 'Raw malware scan output in JSON format.';
-    COMMENT ON COLUMN artifact_quarantine_scan.create_date IS 'The datetime the record was created.';
-    COMMENT ON COLUMN artifact_quarantine_scan.create_user IS 'The id of the user who created the record.';
-    COMMENT ON COLUMN artifact_quarantine_scan.update_date IS 'The datetime the record was last updated.';
-    COMMENT ON COLUMN artifact_quarantine_scan.update_user IS 'The id of the user who last updated the record.';
-    COMMENT ON COLUMN artifact_quarantine_scan.revision_count IS 'Revision count used for concurrency control.';
+    COMMENT ON TABLE artifact_security_scan IS 'Tracks individual malware scan events performed against a securityd artifact. Processing status tracks lifecycle of scan execution (pending → completed/failed). For archive uploads, the scan is performed on the archive, and all extracted files reference this scan via their security record.';
+    COMMENT ON COLUMN artifact_security_scan.artifact_security_scan_id IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN artifact_security_scan.artifact_security_id IS 'Foreign key to the security record being scanned.';
+    COMMENT ON COLUMN artifact_security_scan.status IS 'Processing status of the scan execution (draft → pending → completed/failed).';
+    COMMENT ON COLUMN artifact_security_scan.scanner_version IS 'Version identifier of the malware scanner.';
+    COMMENT ON COLUMN artifact_security_scan.scanned_at IS 'Timestamp when the scan completed.';
+    COMMENT ON COLUMN artifact_security_scan.results IS 'Raw malware scan output in JSON format.';
+    COMMENT ON COLUMN artifact_security_scan.create_date IS 'The datetime the record was created.';
+    COMMENT ON COLUMN artifact_security_scan.create_user IS 'The id of the user who created the record.';
+    COMMENT ON COLUMN artifact_security_scan.update_date IS 'The datetime the record was last updated.';
+    COMMENT ON COLUMN artifact_security_scan.update_user IS 'The id of the user who last updated the record.';
+    COMMENT ON COLUMN artifact_security_scan.revision_count IS 'Revision count used for concurrency control.';
 
     --------------------------------------------------------------------------------
     -- ARTIFACT_QUARANTINE_SCAN_FILE
     --------------------------------------------------------------------------------
 
-    CREATE TABLE artifact_quarantine_scan_file (
-      artifact_quarantine_scan_file_id uuid DEFAULT public.gen_random_uuid(),
-      artifact_quarantine_scan_id uuid NOT NULL,
+    CREATE TABLE artifact_security_scan_file (
+      artifact_security_scan_file_id uuid DEFAULT public.gen_random_uuid(),
+      artifact_security_scan_id uuid NOT NULL,
       file_path text NOT NULL,
       status security_status NOT NULL,
       create_date timestamptz(6) DEFAULT now() NOT NULL,
@@ -265,23 +265,23 @@ export async function up(knex: Knex): Promise<void> {
       update_date timestamptz(6),
       update_user integer,
       revision_count integer DEFAULT 0 NOT NULL,
-      CONSTRAINT artifact_quarantine_scan_file_pk PRIMARY KEY (artifact_quarantine_scan_file_id),
-      CONSTRAINT artifact_quarantine_scan_file_scan_fk FOREIGN KEY (artifact_quarantine_scan_id) REFERENCES artifact_quarantine_scan(artifact_quarantine_scan_id)
+      CONSTRAINT artifact_security_scan_file_pk PRIMARY KEY (artifact_security_scan_file_id),
+      CONSTRAINT artifact_security_scan_file_scan_fk FOREIGN KEY (artifact_security_scan_id) REFERENCES artifact_security_scan(artifact_security_scan_id)
     );
 
-    CREATE INDEX artifact_quarantine_scan_file_scan_idx ON artifact_quarantine_scan_file(artifact_quarantine_scan_id);
-    CREATE INDEX artifact_quarantine_scan_file_result_idx ON artifact_quarantine_scan_file(status);
+    CREATE INDEX artifact_security_scan_file_scan_idx ON artifact_security_scan_file(artifact_security_scan_id);
+    CREATE INDEX artifact_security_scan_file_result_idx ON artifact_security_scan_file(status);
 
-    COMMENT ON TABLE artifact_quarantine_scan_file IS 'Stores per-file malware scan results for a scanned artifact. For archive uploads, contains results for all files within the archive.';
-    COMMENT ON COLUMN artifact_quarantine_scan_file.artifact_quarantine_scan_file_id IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN artifact_quarantine_scan_file.artifact_quarantine_scan_id IS 'Foreign key to the malware scan event.';
-    COMMENT ON COLUMN artifact_quarantine_scan_file.file_path IS 'Path of the file within the artifact.';
-    COMMENT ON COLUMN artifact_quarantine_scan_file.status IS 'Security result of the malware scan for this file (pending, clean, infected, error, skipped).';
-    COMMENT ON COLUMN artifact_quarantine_scan_file.create_date IS 'The datetime the record was created.';
-    COMMENT ON COLUMN artifact_quarantine_scan_file.create_user IS 'The id of the user who created the record.';
-    COMMENT ON COLUMN artifact_quarantine_scan_file.update_date IS 'The datetime the record was last updated.';
-    COMMENT ON COLUMN artifact_quarantine_scan_file.update_user IS 'The id of the user who last updated the record.';
-    COMMENT ON COLUMN artifact_quarantine_scan_file.revision_count IS 'Revision count used for concurrency control.';
+    COMMENT ON TABLE artifact_security_scan_file IS 'Stores per-file malware scan results for a scanned artifact. For archive uploads, contains results for all files within the archive.';
+    COMMENT ON COLUMN artifact_security_scan_file.artifact_security_scan_file_id IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN artifact_security_scan_file.artifact_security_scan_id IS 'Foreign key to the malware scan event.';
+    COMMENT ON COLUMN artifact_security_scan_file.file_path IS 'Path of the file within the artifact.';
+    COMMENT ON COLUMN artifact_security_scan_file.status IS 'Security result of the malware scan for this file (pending, clean, infected, error, skipped).';
+    COMMENT ON COLUMN artifact_security_scan_file.create_date IS 'The datetime the record was created.';
+    COMMENT ON COLUMN artifact_security_scan_file.create_user IS 'The id of the user who created the record.';
+    COMMENT ON COLUMN artifact_security_scan_file.update_date IS 'The datetime the record was last updated.';
+    COMMENT ON COLUMN artifact_security_scan_file.update_user IS 'The id of the user who last updated the record.';
+    COMMENT ON COLUMN artifact_security_scan_file.revision_count IS 'Revision count used for concurrency control.';
 
     --------------------------------------------------------------------------------
     -- SUBMISSION_UPLOAD
@@ -305,7 +305,7 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX submission_upload_submission_idx ON submission_upload(submission_id);
     CREATE INDEX submission_upload_upload_idx ON submission_upload(upload_id);
 
-    COMMENT ON TABLE submission_upload IS 'Associates submissions with the uploads they reference. Submission processing should check that all referenced uploads have completed quarantine (artifact_quarantine.security in (clean, skipped)) before proceeding. If QUARANTINE env var is disabled, quarantine records will be NULL.';
+    COMMENT ON TABLE submission_upload IS 'Associates submissions with the uploads they reference. Submission processing should check that all referenced uploads have completed security (artifact_security.security in (clean, skipped)) before proceeding. If QUARANTINE env var is disabled, security records will be NULL.';
     COMMENT ON COLUMN submission_upload.submission_upload_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN submission_upload.submission_id IS 'Foreign key to the submission record.';
     COMMENT ON COLUMN submission_upload.upload_id IS 'Foreign key to the associated upload.';
@@ -331,14 +331,14 @@ export async function up(knex: Knex): Promise<void> {
     CREATE TRIGGER audit_upload_artifact BEFORE INSERT OR UPDATE OR DELETE ON upload_artifact FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
     CREATE TRIGGER journal_upload_artifact AFTER INSERT OR UPDATE OR DELETE ON upload_artifact FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
 
-    CREATE TRIGGER audit_artifact_quarantine BEFORE INSERT OR UPDATE OR DELETE ON artifact_quarantine FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
-    CREATE TRIGGER journal_artifact_quarantine AFTER INSERT OR UPDATE OR DELETE ON artifact_quarantine FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
+    CREATE TRIGGER audit_artifact_security BEFORE INSERT OR UPDATE OR DELETE ON artifact_security FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
+    CREATE TRIGGER journal_artifact_security AFTER INSERT OR UPDATE OR DELETE ON artifact_security FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
 
-    CREATE TRIGGER audit_artifact_quarantine_scan BEFORE INSERT OR UPDATE OR DELETE ON artifact_quarantine_scan FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
-    CREATE TRIGGER journal_artifact_quarantine_scan AFTER INSERT OR UPDATE OR DELETE ON artifact_quarantine_scan FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
+    CREATE TRIGGER audit_artifact_security_scan BEFORE INSERT OR UPDATE OR DELETE ON artifact_security_scan FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
+    CREATE TRIGGER journal_artifact_security_scan AFTER INSERT OR UPDATE OR DELETE ON artifact_security_scan FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
 
-    CREATE TRIGGER audit_artifact_quarantine_scan_file BEFORE INSERT OR UPDATE OR DELETE ON artifact_quarantine_scan_file FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
-    CREATE TRIGGER journal_artifact_quarantine_scan_file AFTER INSERT OR UPDATE OR DELETE ON artifact_quarantine_scan_file FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
+    CREATE TRIGGER audit_artifact_security_scan_file BEFORE INSERT OR UPDATE OR DELETE ON artifact_security_scan_file FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
+    CREATE TRIGGER journal_artifact_security_scan_file AFTER INSERT OR UPDATE OR DELETE ON artifact_security_scan_file FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
 
     CREATE TRIGGER audit_submission_upload BEFORE INSERT OR UPDATE OR DELETE ON submission_upload FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
     CREATE TRIGGER journal_submission_upload AFTER INSERT OR UPDATE OR DELETE ON submission_upload FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
@@ -349,12 +349,12 @@ export async function down(knex: Knex): Promise<void> {
   await knex.raw(`
     DROP TRIGGER IF EXISTS journal_submission_upload ON submission_upload;
     DROP TRIGGER IF EXISTS audit_submission_upload ON submission_upload;
-    DROP TRIGGER IF EXISTS journal_artifact_quarantine_scan_file ON artifact_quarantine_scan_file;
-    DROP TRIGGER IF EXISTS audit_artifact_quarantine_scan_file ON artifact_quarantine_scan_file;
-    DROP TRIGGER IF EXISTS journal_artifact_quarantine_scan ON artifact_quarantine_scan;
-    DROP TRIGGER IF EXISTS audit_artifact_quarantine_scan ON artifact_quarantine_scan;
-    DROP TRIGGER IF EXISTS journal_artifact_quarantine ON artifact_quarantine;
-    DROP TRIGGER IF EXISTS audit_artifact_quarantine ON artifact_quarantine;
+    DROP TRIGGER IF EXISTS journal_artifact_security_scan_file ON artifact_security_scan_file;
+    DROP TRIGGER IF EXISTS audit_artifact_security_scan_file ON artifact_security_scan_file;
+    DROP TRIGGER IF EXISTS journal_artifact_security_scan ON artifact_security_scan;
+    DROP TRIGGER IF EXISTS audit_artifact_security_scan ON artifact_security_scan;
+    DROP TRIGGER IF EXISTS journal_artifact_security ON artifact_security;
+    DROP TRIGGER IF EXISTS audit_artifact_security ON artifact_security;
     DROP TRIGGER IF EXISTS journal_upload_artifact ON upload_artifact;
     DROP TRIGGER IF EXISTS audit_upload_artifact ON upload_artifact;
     DROP TRIGGER IF EXISTS journal_upload_archive ON upload_archive;
@@ -365,9 +365,9 @@ export async function down(knex: Knex): Promise<void> {
     DROP TRIGGER IF EXISTS audit_upload ON upload;
 
     DROP TABLE IF EXISTS submission_upload;
-    DROP TABLE IF EXISTS artifact_quarantine_scan_file;
-    DROP TABLE IF EXISTS artifact_quarantine_scan;
-    DROP TABLE IF EXISTS artifact_quarantine;
+    DROP TABLE IF EXISTS artifact_security_scan_file;
+    DROP TABLE IF EXISTS artifact_security_scan;
+    DROP TABLE IF EXISTS artifact_security;
     DROP TABLE IF EXISTS upload_artifact;
     DROP TABLE IF EXISTS upload_archive;
     DROP TABLE IF EXISTS artifact;

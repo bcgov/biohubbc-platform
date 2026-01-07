@@ -1,39 +1,39 @@
 import { SQL } from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import {
-  ArtifactQuarantineScan,
-  CreateArtifactQuarantineScan,
-  UpdateArtifactQuarantineScan
-} from '../../models/artifact-quarantine-scan';
+  ArtifactSecurityScan,
+  CreateArtifactSecurityScan,
+  UpdateArtifactSecurityScan
+} from '../../models/artifact-security-scan';
 import { BaseRepository } from '../base-repository';
 
-export class ArtifactQuarantineScanRepository extends BaseRepository {
+export class ArtifactSecurityScanRepository extends BaseRepository {
   /**
-   * Get a quarantine scan record by ID.
+   * Get a security scan record by ID.
    *
-   * @param {string} uploadArtifactQuarantineScanId
-   * @return {Promise<ArtifactQuarantineScan>}
+   * @param {string} uploadArtifactSecurityScanId
+   * @return {Promise<ArtifactSecurityScan>}
    */
-  async getArtifactQuarantineScan(uploadArtifactQuarantineScanId: string): Promise<ArtifactQuarantineScan> {
+  async getArtifactSecurityScan(uploadArtifactSecurityScanId: string): Promise<ArtifactSecurityScan> {
     const sqlStatement = SQL`
       SELECT
-        artifact_quarantine_scan_id,
-        artifact_quarantine_id,
+        artifact_security_scan_id,
+        artifact_security_id,
         status,
         scanner_version,
         scanned_at,
         results
       FROM
-        biohub.artifact_quarantine_scan
+        biohub.artifact_security_scan
       WHERE
-        artifact_quarantine_scan_id = ${uploadArtifactQuarantineScanId};
+        artifact_security_scan_id = ${uploadArtifactSecurityScanId};
     `;
 
-    const response = await this.connection.sql(sqlStatement, ArtifactQuarantineScan);
+    const response = await this.connection.sql(sqlStatement, ArtifactSecurityScan);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get quarantine scan record', [
-        'ArtifactQuarantineScanRepository->getArtifactQuarantineScan',
+      throw new ApiExecuteSQLError('Failed to get security scan record', [
+        'ArtifactSecurityScanRepository->getArtifactSecurityScan',
         `rowCount was ${response.rowCount}, expected 1`
       ]);
     }
@@ -42,59 +42,57 @@ export class ArtifactQuarantineScanRepository extends BaseRepository {
   }
 
   /**
-   * Get all quarantine scan records.
+   * Get all security scan records.
    *
-   * @return {Promise<ArtifactQuarantineScan[]>}
+   * @return {Promise<ArtifactSecurityScan[]>}
    */
-  async getArtifactQuarantineScans(): Promise<ArtifactQuarantineScan[]> {
+  async getArtifactSecurityScans(): Promise<ArtifactSecurityScan[]> {
     const sqlStatement = SQL`
       SELECT
-        artifact_quarantine_scan_id,
-        artifact_quarantine_id,
+        artifact_security_scan_id,
+        artifact_security_id,
         status,
         scanner_version,
         scanned_at,
         results
       FROM
-        biohub.artifact_quarantine_scan;
+        biohub.artifact_security_scan;
     `;
 
-    const response = await this.connection.sql(sqlStatement, ArtifactQuarantineScan);
+    const response = await this.connection.sql(sqlStatement, ArtifactSecurityScan);
 
     return response.rows;
   }
 
   /**
-   * Insert a new upload artifact quarantine scan record.
+   * Insert a new upload artifact security scan record.
    *
-   * @param {CreateArtifactQuarantineScan} scan
-   * @return {Promise<{ artifact_quarantine_scan_id: string }>}
+   * @param {CreateArtifactSecurityScan} scan
+   * @return {Promise<{ artifact_security_scan_id: string }>}
    */
-  async insertArtifactQuarantineScan(
-    scan: CreateArtifactQuarantineScan
-  ): Promise<{ artifact_quarantine_scan_id: string }> {
+  async insertArtifactSecurityScan(scan: CreateArtifactSecurityScan): Promise<{ artifact_security_scan_id: string }> {
     const sqlStatement = SQL`
-      INSERT INTO biohub.artifact_quarantine_scan (
-        artifact_quarantine_id,
+      INSERT INTO biohub.artifact_security_scan (
+        artifact_security_id,
         status,
         scanner_version,
         scanned_at,
         results
       ) VALUES (
-        ${scan.artifact_quarantine_id},
+        ${scan.artifact_security_id},
         ${scan.status},
         ${scan.scanner_version},
         ${scan.scanned_at},
         ${scan.results}
       )
-      RETURNING artifact_quarantine_scan_id;
+      RETURNING artifact_security_scan_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert quarantine scan record', [
-        'ArtifactQuarantineScanRepository->insertArtifactQuarantineScan',
+      throw new ApiExecuteSQLError('Failed to insert security scan record', [
+        'ArtifactSecurityScanRepository->insertArtifactSecurityScan',
         `rowCount was ${response.rowCount}, expected 1`
       ]);
     }
@@ -103,34 +101,34 @@ export class ArtifactQuarantineScanRepository extends BaseRepository {
   }
 
   /**
-   * Update an existing upload artifact quarantine scan record.
+   * Update an existing upload artifact security scan record.
    *
-   * @param {string} uploadArtifactQuarantineScanId
-   * @param {UpdateArtifactQuarantineScan} scan
-   * @return {Promise<{ artifact_quarantine_scan_id: string }>}
+   * @param {string} uploadArtifactSecurityScanId
+   * @param {UpdateArtifactSecurityScan} scan
+   * @return {Promise<{ artifact_security_scan_id: string }>}
    */
-  async updateArtifactQuarantineScan(
-    uploadArtifactQuarantineScanId: string,
-    scan: UpdateArtifactQuarantineScan
-  ): Promise<{ artifact_quarantine_scan_id: string }> {
+  async updateArtifactSecurityScan(
+    uploadArtifactSecurityScanId: string,
+    scan: UpdateArtifactSecurityScan
+  ): Promise<{ artifact_security_scan_id: string }> {
     const sqlStatement = SQL`
-      UPDATE biohub.artifact_quarantine_scan
+      UPDATE biohub.artifact_security_scan
       SET
-        artifact_quarantine_id = COALESCE(${scan.artifact_quarantine_id}, artifact_quarantine_id),
+        artifact_security_id = COALESCE(${scan.artifact_security_id}, artifact_security_id),
         status = COALESCE(${scan.status}, status),
         scanner_version = COALESCE(${scan.scanner_version}, scanner_version),
         scanned_at = COALESCE(${scan.scanned_at}, scanned_at),
         results = COALESCE(${scan.results}, results)
       WHERE
-        artifact_quarantine_scan_id = ${uploadArtifactQuarantineScanId}
-      RETURNING artifact_quarantine_scan_id;
+        artifact_security_scan_id = ${uploadArtifactSecurityScanId}
+      RETURNING artifact_security_scan_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update quarantine scan record', [
-        'ArtifactQuarantineScanRepository->updateArtifactQuarantineScan',
+      throw new ApiExecuteSQLError('Failed to update security scan record', [
+        'ArtifactSecurityScanRepository->updateArtifactSecurityScan',
         `rowCount was ${response.rowCount}, expected 1`
       ]);
     }

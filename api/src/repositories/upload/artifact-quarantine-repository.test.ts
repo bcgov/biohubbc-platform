@@ -4,128 +4,124 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import {
-  ArtifactQuarantine,
-  CreateArtifactQuarantine,
-  UpdateArtifactQuarantine
-} from '../../models/artifact-quarantine';
-import { SecurityStatusEnum } from '../../models/artifact-quarantine-scan-file';
+import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
+import { SecurityStatusEnum } from '../../models/artifact-security-scan-file';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { ArtifactQuarantineRepository } from './artifact-quarantine-repository';
+import { ArtifactSecurityRepository } from './artifact-security-repository';
 
 chai.use(sinonChai);
 
-describe('ArtifactQuarantineRepository', () => {
+describe('ArtifactSecurityRepository', () => {
   afterEach(() => {
     sinon.restore();
   });
 
-  describe('getArtifactQuarantine', () => {
+  describe('getArtifactSecurity', () => {
     it('throws an error if no matching record found', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactQuarantineRepository(mockDBConnection);
+      const repo = new ArtifactSecurityRepository(mockDBConnection);
 
       try {
-        await repo.getArtifactQuarantine('id-1');
+        await repo.getArtifactSecurity('id-1');
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(ApiExecuteSQLError);
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get quarantine record');
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get security record');
       }
     });
 
     it('returns a record if found', async () => {
-      const mockRow: ArtifactQuarantine = {
-        artifact_quarantine_id: 'id-1',
+      const mockRow: ArtifactSecurity = {
+        artifact_security_id: 'id-1',
         artifact_id: 'artifact-uuid',
         security: SecurityStatusEnum.CLEAN
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactQuarantineRepository(mockDBConnection);
+      const repo = new ArtifactSecurityRepository(mockDBConnection);
 
-      const result = await repo.getArtifactQuarantine('id-1');
+      const result = await repo.getArtifactSecurity('id-1');
       expect(result).to.eql(mockRow);
     });
   });
 
-  describe('getArtifactQuarantines', () => {
+  describe('getArtifactSecuritys', () => {
     it('returns an array of records', async () => {
-      const mockRows: ArtifactQuarantine[] = [
-        { artifact_quarantine_id: 'id-1', artifact_id: 'a-1', security: SecurityStatusEnum.CLEAN },
-        { artifact_quarantine_id: 'id-2', artifact_id: 'a-2', security: SecurityStatusEnum.INFECTED }
+      const mockRows: ArtifactSecurity[] = [
+        { artifact_security_id: 'id-1', artifact_id: 'a-1', security: SecurityStatusEnum.CLEAN },
+        { artifact_security_id: 'id-2', artifact_id: 'a-2', security: SecurityStatusEnum.INFECTED }
       ];
       const mockQueryResponse = { rowCount: 2, rows: mockRows } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactQuarantineRepository(mockDBConnection);
+      const repo = new ArtifactSecurityRepository(mockDBConnection);
 
-      const result = await repo.getArtifactQuarantines();
+      const result = await repo.getArtifactSecuritys();
       expect(result).to.eql(mockRows);
     });
   });
 
-  describe('insertArtifactQuarantine', () => {
+  describe('insertArtifactSecurity', () => {
     it('throws an error if insert fails', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactQuarantineRepository(mockDBConnection);
+      const repo = new ArtifactSecurityRepository(mockDBConnection);
 
-      const payload: CreateArtifactQuarantine = {
+      const payload: CreateArtifactSecurity = {
         artifact_id: 'artifact-uuid',
         security: SecurityStatusEnum.CLEAN
       };
 
       try {
-        await repo.insertArtifactQuarantine(payload);
+        await repo.insertArtifactSecurity(payload);
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(ApiExecuteSQLError);
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to insert quarantine record');
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to insert security record');
       }
     });
 
     it('returns the inserted record ID if successful', async () => {
-      const mockRow = { quarantine_id: 'id-1' };
+      const mockRow = { security_id: 'id-1' };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactQuarantineRepository(mockDBConnection);
+      const repo = new ArtifactSecurityRepository(mockDBConnection);
 
-      const payload: CreateArtifactQuarantine = {
+      const payload: CreateArtifactSecurity = {
         artifact_id: 'artifact-uuid',
         security: SecurityStatusEnum.CLEAN
       };
-      const result = await repo.insertArtifactQuarantine(payload);
+      const result = await repo.insertArtifactSecurity(payload);
 
       expect(result).to.eql(mockRow);
     });
   });
 
-  describe('updateArtifactQuarantine', () => {
+  describe('updateArtifactSecurity', () => {
     it('throws an error if update fails', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactQuarantineRepository(mockDBConnection);
+      const repo = new ArtifactSecurityRepository(mockDBConnection);
 
-      const payload: UpdateArtifactQuarantine = { security: SecurityStatusEnum.INFECTED };
+      const payload: UpdateArtifactSecurity = { security: SecurityStatusEnum.INFECTED };
 
       try {
-        await repo.updateArtifactQuarantine('id-1', payload);
+        await repo.updateArtifactSecurity('id-1', payload);
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(ApiExecuteSQLError);
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to update quarantine record');
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to update security record');
       }
     });
 
     it('returns the updated record ID if successful', async () => {
-      const mockRow = { quarantine_id: 'id-1' };
+      const mockRow = { security_id: 'id-1' };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactQuarantineRepository(mockDBConnection);
+      const repo = new ArtifactSecurityRepository(mockDBConnection);
 
-      const payload: UpdateArtifactQuarantine = { security: SecurityStatusEnum.INFECTED };
-      const result = await repo.updateArtifactQuarantine('id-1', payload);
+      const payload: UpdateArtifactSecurity = { security: SecurityStatusEnum.INFECTED };
+      const result = await repo.updateArtifactSecurity('id-1', payload);
 
       expect(result).to.eql(mockRow);
     });

@@ -19,7 +19,7 @@ import { Readable } from 'node:stream';
 
 export enum BucketType {
   MAIN = 'main',
-  QUARANTINE = 'quarantine'
+  QUARANTINE = 'security'
 }
 
 interface BucketConfig {
@@ -189,7 +189,7 @@ export class ObjectStorageService {
   /**
    * Get a file from the specified bucket and return it as a readable stream.
    *
-   * @param {BucketType} bucketType - The bucket to fetch the file from ('main' or 'quarantine').
+   * @param {BucketType} bucketType - The bucket to fetch the file from ('main' or 'security').
    * @param {string} key - The S3 object key.
    * @param {string} [versionId] - Optional S3 object version ID.
    * @return {Promise<Readable>} Resolves to a Node.js Readable stream for the file content.
@@ -331,7 +331,7 @@ export class ObjectStorageService {
   /**
    * Move a file from one bucket to another.
    *
-   * NOTE: A background job will clean up the quarantined bucket to delete old objects that have been copied to the main bucket
+   * NOTE: A background job will clean up the securityd bucket to delete old objects that have been copied to the main bucket
    *
    * @param {BucketType} sourceBucket
    * @param {BucketType} targetBucket
@@ -344,13 +344,13 @@ export class ObjectStorageService {
   }
 
   /**
-   * Copy a file from quarantine bucket to main bucket
+   * Copy a file from security bucket to main bucket
    *
    * @param {string} key
    * @return {*}  {Promise<{key: string}>}
    * @memberof ObjectStorageService
    */
-  async promoteFromQuarantine(key: string): Promise<{ key: string }> {
+  async promoteFromSecurity(key: string): Promise<{ key: string }> {
     await this.copyBetweenBuckets(BucketType.QUARANTINE, BucketType.MAIN, key);
 
     return { key };

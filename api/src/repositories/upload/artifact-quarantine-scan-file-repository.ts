@@ -1,37 +1,37 @@
 import { SQL } from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import {
-  ArtifactQuarantineScanFile,
-  CreateArtifactQuarantineScanFile,
-  UpdateArtifactQuarantineScanFile
-} from '../../models/artifact-quarantine-scan-file';
+  ArtifactSecurityScanFile,
+  CreateArtifactSecurityScanFile,
+  UpdateArtifactSecurityScanFile
+} from '../../models/artifact-security-scan-file';
 import { BaseRepository } from '../base-repository';
 
-export class ArtifactQuarantineScanFileRepository extends BaseRepository {
+export class ArtifactSecurityScanFileRepository extends BaseRepository {
   /**
    * Get a scan file record by its ID.
    *
-   * @param {string} uploadArtifactQuarantineScanFileId
-   * @returns {Promise<ArtifactQuarantineScanFile>}
+   * @param {string} uploadArtifactSecurityScanFileId
+   * @returns {Promise<ArtifactSecurityScanFile>}
    */
-  async getArtifactQuarantineScanFile(uploadArtifactQuarantineScanFileId: string): Promise<ArtifactQuarantineScanFile> {
+  async getArtifactSecurityScanFile(uploadArtifactSecurityScanFileId: string): Promise<ArtifactSecurityScanFile> {
     const sqlStatement = SQL`
       SELECT
-        artifact_quarantine_scan_file_id,
-        artifact_quarantine_scan_id,
+        artifact_security_scan_file_id,
+        artifact_security_scan_id,
         file_path,
         status
       FROM
-        biohub.artifact_quarantine_scan_file
+        biohub.artifact_security_scan_file
       WHERE
-        artifact_quarantine_scan_file_id = ${uploadArtifactQuarantineScanFileId};
+        artifact_security_scan_file_id = ${uploadArtifactSecurityScanFileId};
     `;
 
-    const response = await this.connection.sql(sqlStatement, ArtifactQuarantineScanFile);
+    const response = await this.connection.sql(sqlStatement, ArtifactSecurityScanFile);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get upload artifact quarantine scan file record', [
-        'ArtifactQuarantineScanFileRepository->getArtifactQuarantineScanFile',
+      throw new ApiExecuteSQLError('Failed to get upload artifact security scan file record', [
+        'ArtifactSecurityScanFileRepository->getArtifactSecurityScanFile',
         `rowCount was ${response.rowCount}, expected 1`
       ]);
     }
@@ -42,30 +42,30 @@ export class ArtifactQuarantineScanFileRepository extends BaseRepository {
   /**
    * Insert a new scan file record.
    *
-   * @param {CreateArtifactQuarantineScanFile} scanFile
-   * @returns {Promise<{ artifact_quarantine_scan_file_id: string }>}
+   * @param {CreateArtifactSecurityScanFile} scanFile
+   * @returns {Promise<{ artifact_security_scan_file_id: string }>}
    */
-  async insertArtifactQuarantineScanFile(
-    scanFile: CreateArtifactQuarantineScanFile
-  ): Promise<{ artifact_quarantine_scan_file_id: string }> {
+  async insertArtifactSecurityScanFile(
+    scanFile: CreateArtifactSecurityScanFile
+  ): Promise<{ artifact_security_scan_file_id: string }> {
     const sqlStatement = SQL`
-      INSERT INTO biohub.artifact_quarantine_scan_file (
-        artifact_quarantine_scan_id,
+      INSERT INTO biohub.artifact_security_scan_file (
+        artifact_security_scan_id,
         file_path,
         status
       ) VALUES (
-        ${scanFile.artifact_quarantine_scan_id},
+        ${scanFile.artifact_security_scan_id},
         ${scanFile.file_path},
         ${scanFile.security ?? null}
       )
-      RETURNING artifact_quarantine_scan_file_id;
+      RETURNING artifact_security_scan_file_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert upload artifact quarantine scan file record', [
-        'ArtifactQuarantineScanFileRepository->insertArtifactQuarantineScanFile',
+      throw new ApiExecuteSQLError('Failed to insert upload artifact security scan file record', [
+        'ArtifactSecurityScanFileRepository->insertArtifactSecurityScanFile',
         `rowCount was ${response.rowCount}, expected 1`
       ]);
     }
@@ -76,15 +76,15 @@ export class ArtifactQuarantineScanFileRepository extends BaseRepository {
   /**
    * Insert multiple scan file records in a batch.
    *
-   * @param {CreateArtifactQuarantineScanFile[]} scanFiles
-   * @returns {Promise<{ artifact_quarantine_scan_file_id: string }[]>}
+   * @param {CreateArtifactSecurityScanFile[]} scanFiles
+   * @returns {Promise<{ artifact_security_scan_file_id: string }[]>}
    */
-  async insertArtifactQuarantineScanFileBatch(
-    scanFiles: CreateArtifactQuarantineScanFile[]
-  ): Promise<{ artifact_quarantine_scan_file_id: string }[]> {
+  async insertArtifactSecurityScanFileBatch(
+    scanFiles: CreateArtifactSecurityScanFile[]
+  ): Promise<{ artifact_security_scan_file_id: string }[]> {
     const sqlStatement = SQL`
-      INSERT INTO biohub.artifact_quarantine_scan_file (
-        artifact_quarantine_scan_id,
+      INSERT INTO biohub.artifact_security_scan_file (
+        artifact_security_scan_id,
         file_path,
         status
       ) VALUES
@@ -95,19 +95,19 @@ export class ArtifactQuarantineScanFileRepository extends BaseRepository {
         sqlStatement.append(SQL`,`);
       }
       sqlStatement.append(SQL`(
-        ${file.artifact_quarantine_scan_id},
+        ${file.artifact_security_scan_id},
         ${file.file_path},
         ${file.security ?? null}
       )`);
     });
 
-    sqlStatement.append(SQL` RETURNING artifact_quarantine_scan_file_id`);
+    sqlStatement.append(SQL` RETURNING artifact_security_scan_file_id`);
 
     const response = await this.connection.sql(sqlStatement);
 
     if (response.rowCount !== scanFiles.length) {
-      throw new ApiExecuteSQLError('Failed to insert upload artifact quarantine scan file records', [
-        'ArtifactQuarantineScanFileRepository->insertArtifactQuarantineScanFileBatch',
+      throw new ApiExecuteSQLError('Failed to insert upload artifact security scan file records', [
+        'ArtifactSecurityScanFileRepository->insertArtifactSecurityScanFileBatch',
         `rowCount was ${response.rowCount}, expected ${scanFiles.length}`
       ]);
     }
@@ -118,28 +118,28 @@ export class ArtifactQuarantineScanFileRepository extends BaseRepository {
   /**
    * Update an existing scan file record by ID.
    *
-   * @param {string} uploadArtifactQuarantineScanFileId
-   * @param {UpdateArtifactQuarantineScanFile} scanFile
-   * @returns {Promise<{ artifact_quarantine_scan_file_id: string }>}
+   * @param {string} uploadArtifactSecurityScanFileId
+   * @param {UpdateArtifactSecurityScanFile} scanFile
+   * @returns {Promise<{ artifact_security_scan_file_id: string }>}
    */
-  async updateArtifactQuarantineScanFile(
-    uploadArtifactQuarantineScanFileId: string,
-    scanFile: UpdateArtifactQuarantineScanFile
-  ): Promise<{ artifact_quarantine_scan_file_id: string }> {
+  async updateArtifactSecurityScanFile(
+    uploadArtifactSecurityScanFileId: string,
+    scanFile: UpdateArtifactSecurityScanFile
+  ): Promise<{ artifact_security_scan_file_id: string }> {
     const sqlStatement = SQL`
-      UPDATE biohub.artifact_quarantine_scan_file
+      UPDATE biohub.artifact_security_scan_file
       SET
         status = COALESCE(${scanFile.security}, status)
       WHERE
-        artifact_quarantine_scan_file_id = ${uploadArtifactQuarantineScanFileId}
-      RETURNING artifact_quarantine_scan_file_id;
+        artifact_security_scan_file_id = ${uploadArtifactSecurityScanFileId}
+      RETURNING artifact_security_scan_file_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update upload artifact quarantine scan file record', [
-        'ArtifactQuarantineScanFileRepository->updateArtifactQuarantineScanFile',
+      throw new ApiExecuteSQLError('Failed to update upload artifact security scan file record', [
+        'ArtifactSecurityScanFileRepository->updateArtifactSecurityScanFile',
         `rowCount was ${response.rowCount}, expected 1`
       ]);
     }

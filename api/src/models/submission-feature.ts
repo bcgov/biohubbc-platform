@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ArtifactQuarantine } from './artifact-quarantine';
+import { ArtifactSecurity } from './artifact-quarantine';
 
 /**
  * Model for a single submission feature
@@ -22,13 +22,13 @@ export type PostSubmissionFeatureArray = z.infer<typeof PostSubmissionFeatureArr
 
 /**
  * Submission record schema
- * Now includes a reference to the artifact quarantine record
+ * Now includes a reference to the artifact security record
  */
 export const SubmissionRecordSchema = z.object({
   submission_id: z.string().uuid(),
   uuid: z.string().uuid(),
   uri: z.string().nullable(),
-  artifact_quarantine: ArtifactQuarantine.nullable(),
+  artifact_security: ArtifactSecurity.nullable(),
   security_review_timestamp: z.string().nullable(),
   submitted_timestamp: z.string(),
   name: z.string(),
