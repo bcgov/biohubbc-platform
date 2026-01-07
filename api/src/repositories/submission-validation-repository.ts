@@ -1,17 +1,10 @@
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
+import {
+  SubmissionValidationId,
+  SubmissionValidationRecord,
+  SubmissionValidationStatus
+} from '../models/submission-validation';
 import { BaseRepository } from './base-repository';
-
-/**
- * Valid submission validation status values.
- * - pending: waiting to be processed
- * - started: validation in progress
- * - completed: validation successfully completed
- * - invalid: submission failed validation rules
- * - failed: validation could not be completed due to infrastructure or job errors
- */
-export const SubmissionValidationStatus = z.enum(['pending', 'started', 'completed', 'invalid', 'failed']);
-export type SubmissionValidationStatus = z.infer<typeof SubmissionValidationStatus>;
 
 /**
  * A repository class for accessing submission validation data.
@@ -36,7 +29,7 @@ export class SubmissionValidationRepository extends BaseRepository {
       RETURNING submission_validation_id;
     `;
 
-    const response = await this.connection.sql<{ submission_validation_id: number }>(sql);
+    const response = await this.connection.sql(sql, SubmissionValidationId);
 
     return response.rows[0];
   }
@@ -75,12 +68,10 @@ export class SubmissionValidationRepository extends BaseRepository {
    * Get the most recent submission validation record for a submission.
    *
    * @param {number} submissionId - The submission ID.
-   * @return {Promise<{ submission_validation_id: number; job_id: string; status: SubmissionValidationStatus } | null>}
+   * @return {Promise<SubmissionValidationRecord | null>}
    * @memberof SubmissionValidationRepository
    */
-  async getSubmissionValidationBySubmissionId(
-    submissionId: number
-  ): Promise<{ submission_validation_id: number; job_id: string; status: SubmissionValidationStatus } | null> {
+  async getSubmissionValidationBySubmissionId(submissionId: number): Promise<SubmissionValidationRecord | null> {
     const sql = SQL`
       SELECT submission_validation_id, job_id, status
       FROM submission_validation
@@ -89,11 +80,7 @@ export class SubmissionValidationRepository extends BaseRepository {
       LIMIT 1;
     `;
 
-    const response = await this.connection.sql<{
-      submission_validation_id: number;
-      job_id: string;
-      status: SubmissionValidationStatus;
-    }>(sql);
+    const response = await this.connection.sql(sql, SubmissionValidationRecord);
 
     return response.rows[0] ?? null;
   }

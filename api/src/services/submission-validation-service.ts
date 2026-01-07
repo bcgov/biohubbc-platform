@@ -1,8 +1,6 @@
 import { IDBConnection } from '../database/db';
-import {
-  SubmissionValidationRepository,
-  SubmissionValidationStatus
-} from '../repositories/submission-validation-repository';
+import { SubmissionValidationRecord, SubmissionValidationStatus } from '../models/submission-validation';
+import { SubmissionValidationRepository } from '../repositories/submission-validation-repository';
 import { DBService } from './db-service';
 
 /**
@@ -56,12 +54,10 @@ export class SubmissionValidationService extends DBService {
    * Get the most recent submission validation record for a submission.
    *
    * @param {number} submissionId - The submission ID.
-   * @return {Promise<{ submission_validation_id: number; job_id: string; status: SubmissionValidationStatus } | null>}
+   * @return {Promise<SubmissionValidationRecord | null>}
    * @memberof SubmissionValidationService
    */
-  async getSubmissionValidationBySubmissionId(
-    submissionId: number
-  ): Promise<{ submission_validation_id: number; job_id: string; status: SubmissionValidationStatus } | null> {
+  async getSubmissionValidationBySubmissionId(submissionId: number): Promise<SubmissionValidationRecord | null> {
     return this.submissionValidationRepository.getSubmissionValidationBySubmissionId(submissionId);
   }
 
