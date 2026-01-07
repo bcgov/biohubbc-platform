@@ -153,7 +153,7 @@ const openAPIFramework = initialize({
 app.use('/api-docs', swaggerUIExperss.serve, swaggerUIExperss.setup(openAPIFramework.apiDoc));
 
 // Start api
-try {
+async function main() {
   initDBPool(defaultPoolConfig);
   await initDBConstants();
   await initPgBoss();
@@ -161,10 +161,12 @@ try {
   app.listen(PORT, () => {
     defaultLog.info({ label: 'start api', message: `started api on ${HOST}:${PORT}/api` });
   });
-} catch (error) {
+}
+
+main().catch((error) => {
   defaultLog.error({ label: 'start api', message: 'error', error });
   process.exit(1);
-}
+});
 
 /**
  * Get additional middleware to apply to all routes.

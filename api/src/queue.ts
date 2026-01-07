@@ -44,9 +44,7 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
 // Start the queue process
-try {
-  await startQueue();
-} catch (error) {
+startQueue().catch((error) => {
   defaultLog.error({ label: 'startQueue', message: 'Failed to start queue', error });
   process.exit(1);
-}
+});
