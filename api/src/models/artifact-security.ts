@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SecurityStatusZod } from './artifact-quarantine-scan-file';
+import { SecurityStatusZod } from './artifact-security-scan-file';
 
 /**
  * Full record from artifact_security table

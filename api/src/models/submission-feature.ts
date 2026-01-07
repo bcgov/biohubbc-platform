@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ArtifactSecurity } from './artifact-quarantine';
+import { ArtifactSecurity } from './artifact-security';
 
 /**
  * Model for a single submission feature
