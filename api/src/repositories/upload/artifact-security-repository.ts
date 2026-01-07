@@ -15,7 +15,7 @@ export class ArtifactSecurityRepository extends BaseRepository {
       SELECT
         artifact_security_id,
         artifact_id,
-        status
+        security
       FROM
         biohub.artifact_security
       WHERE
@@ -44,7 +44,7 @@ export class ArtifactSecurityRepository extends BaseRepository {
     SELECT
       artifact_security_id,
       artifact_id,
-      status
+      security
     FROM
       biohub.artifact_security;
   `;
@@ -64,7 +64,7 @@ export class ArtifactSecurityRepository extends BaseRepository {
     const sqlStatement = SQL`
       INSERT INTO biohub.artifact_security (
         artifact_id,
-        status
+        security
       ) VALUES (
         ${security.artifact_id},
         ${security.security}
@@ -98,7 +98,7 @@ export class ArtifactSecurityRepository extends BaseRepository {
     const sqlStatement = SQL`
       UPDATE biohub.artifact_security
       SET
-        status = COALESCE(${security.security}, status),
+        security = COALESCE(${security.security}, security),
         artifact_id = COALESCE(${security.artifact_id}, artifact_id)
       WHERE
         artifact_security_id = ${uploadArtifactSecurityId}
