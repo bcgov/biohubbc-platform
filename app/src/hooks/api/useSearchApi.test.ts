@@ -119,7 +119,7 @@ describe('useSearchApi', () => {
 
       expect(result).toEqual(mockResponse);
 
-      expect(mock.history.get[0].params).toEqual({ search: 'moose', page: 1, limit: 10 });
+      expect(mock.history.get[0].params).toEqual({ search: 'moose' });
     });
   });
 });
