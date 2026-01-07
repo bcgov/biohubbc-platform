@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SecurityStatusZod } from './artifact-security-scan-file';
+import { SecurityStatusZod } from './security-status';
 
 /**
  * Full record from artifact_security table
@@ -25,19 +25,7 @@ export type CreateArtifactSecurity = z.infer<typeof CreateArtifactSecurity>;
  */
 export const UpdateArtifactSecurity = z.object({
   artifact_id: z.string().uuid().optional(),
-  security: SecurityStatusZod.optional()
+  security: SecurityStatusZod.optional(),
+  record_end_date: z.string().nullable().optional()
 });
 export type UpdateArtifactSecurity = z.infer<typeof UpdateArtifactSecurity>;
-
-/**
- * Represents a single scan for a securityd artifact
- */
-export const ArtifactSecurityScan = z.object({
-  artifact_security_scan_id: z.string().uuid(),
-  artifact_security_id: z.string().uuid(),
-  security: SecurityStatusZod,
-  scanner_version: z.string().optional(),
-  scanned_at: z.string().optional(),
-  results: z.any().optional()
-});
-export type ArtifactSecurityScan = z.infer<typeof ArtifactSecurityScan>;

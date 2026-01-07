@@ -2,8 +2,8 @@ import { CompleteMultipartUploadCommand } from '@aws-sdk/client-s3';
 import dayjs from 'dayjs';
 import { HTTP401 } from '../../errors/http-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
-import { SecurityStatusEnum } from '../../models/artifact-security-scan-file';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
+import { SecurityStatusEnum } from '../../models/security-status';
 import { Upload, UploadStatusEnum } from '../../models/upload';
 import { ICreateSubmission } from '../../repositories/submission-repository';
 import { getSecurityObjectStoreBucketName, getSecurityS3Client } from '../../utils/file-utils';
@@ -121,6 +121,7 @@ export class UploadIngestionService extends DBService {
     await this._authorizeUploadCompletion(uploadId, s3UploadId);
 
     // Fetch archive artifacts associated with this upload
+    // NOTE: There is typically only one record, but the flow works for multiple archives
     const uploadArchives = await this.uploadArchiveService.getUploadArchivesByUploadId(uploadId);
 
     // Enqueue each archive artifact for malware scanning
@@ -133,8 +134,8 @@ export class UploadIngestionService extends DBService {
       )
     );
 
-    // NOTE: upload_archive.status is not updated here.
-    // Archive extraction is blocked until malware scanning completes.
+    // NOTE: upload_archive.status is not updated here because
+    // archive extraction is blocked until malware scanning completes.
 
     // Complete the multipart upload in the security bucket
     const s3Client = getSecurityS3Client();

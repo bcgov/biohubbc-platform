@@ -7,9 +7,9 @@ import { ApiExecuteSQLError } from '../../errors/api-error';
 import {
   ArtifactSecurityScanFile,
   CreateArtifactSecurityScanFile,
-  SecurityStatusEnum,
   UpdateArtifactSecurityScanFile
 } from '../../models/artifact-security-scan-file';
+import { SecurityStatusEnum } from '../../models/security-status';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { ArtifactSecurityScanFileRepository } from './artifact-security-scan-file-repository';
 

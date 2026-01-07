@@ -1,60 +1,66 @@
 import chai, { expect } from 'chai';
-import { describe } from 'mocha';
-import { QueryResult } from 'pg';
+import dayjs from 'dayjs';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
-import { SecurityStatusEnum } from '../../models/artifact-security-scan-file';
+import { SecurityStatusEnum } from '../../models/security-status';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { ArtifactSecurityRepository } from './artifact-security-repository';
 
 chai.use(sinonChai);
 
 describe('ArtifactSecurityRepository', () => {
+  let mockDBConnection: any;
+  let repo: ArtifactSecurityRepository;
+
+  const mockSecurityRecord: ArtifactSecurity = {
+    artifact_security_id: '11111111-1111-1111-1111-111111111111',
+    artifact_id: '22222222-2222-2222-2222-222222222222',
+    security: SecurityStatusEnum.CLEAN
+  };
+
+  beforeEach(() => {
+    mockDBConnection = getMockDBConnection();
+    repo = new ArtifactSecurityRepository(mockDBConnection);
+  });
+
   afterEach(() => {
     sinon.restore();
   });
 
   describe('getArtifactSecurity', () => {
     it('throws an error if no matching record found', async () => {
-      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactSecurityRepository(mockDBConnection);
+      sinon.stub(mockDBConnection, 'sql').resolves({ rowCount: 0, rows: [] });
 
       try {
-        await repo.getArtifactSecurity('id-1');
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiExecuteSQLError);
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get security record');
+        await repo.getArtifactSecurity(mockSecurityRecord.artifact_security_id);
+        expect.fail('Expected error not thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ApiExecuteSQLError);
+        expect((err as ApiExecuteSQLError).message).to.equal('Failed to get security record');
       }
     });
 
     it('returns a record if found', async () => {
-      const mockRow: ArtifactSecurity = {
-        artifact_security_id: 'id-1',
-        artifact_id: 'artifact-uuid',
-        security: SecurityStatusEnum.CLEAN
-      };
-      const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactSecurityRepository(mockDBConnection);
+      sinon.stub(mockDBConnection, 'sql').resolves({ rowCount: 1, rows: [mockSecurityRecord] });
 
-      const result = await repo.getArtifactSecurity('id-1');
-      expect(result).to.eql(mockRow);
+      const result = await repo.getArtifactSecurity(mockSecurityRecord.artifact_security_id);
+      expect(result).to.eql(mockSecurityRecord);
     });
   });
 
   describe('getArtifactSecuritys', () => {
-    it('returns an array of records', async () => {
+    it('returns all records', async () => {
       const mockRows: ArtifactSecurity[] = [
-        { artifact_security_id: 'id-1', artifact_id: 'a-1', security: SecurityStatusEnum.CLEAN },
-        { artifact_security_id: 'id-2', artifact_id: 'a-2', security: SecurityStatusEnum.INFECTED }
+        mockSecurityRecord,
+        {
+          artifact_security_id: '33333333-3333-3333-3333-333333333333',
+          artifact_id: '44444444-4444-4444-4444-444444444444',
+          security: SecurityStatusEnum.INFECTED
+        }
       ];
-      const mockQueryResponse = { rowCount: 2, rows: mockRows } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactSecurityRepository(mockDBConnection);
+      sinon.stub(mockDBConnection, 'sql').resolves({ rowCount: mockRows.length, rows: mockRows });
 
       const result = await repo.getArtifactSecuritys();
       expect(result).to.eql(mockRows);
@@ -62,68 +68,64 @@ describe('ArtifactSecurityRepository', () => {
   });
 
   describe('insertArtifactSecurity', () => {
-    it('throws an error if insert fails', async () => {
-      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactSecurityRepository(mockDBConnection);
+    const payload: CreateArtifactSecurity = {
+      artifact_id: '22222222-2222-2222-2222-222222222222',
+      security: SecurityStatusEnum.CLEAN
+    };
 
-      const payload: CreateArtifactSecurity = {
-        artifact_id: 'artifact-uuid',
-        security: SecurityStatusEnum.CLEAN
-      };
+    it('throws an error if insert fails', async () => {
+      sinon.stub(mockDBConnection, 'sql').resolves({ rowCount: 0, rows: [] });
 
       try {
         await repo.insertArtifactSecurity(payload);
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiExecuteSQLError);
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to insert security record');
+        expect.fail('Expected error not thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ApiExecuteSQLError);
+        expect((err as ApiExecuteSQLError).message).to.equal('Failed to insert security record');
       }
     });
 
-    it('returns the inserted record ID if successful', async () => {
-      const mockRow = { security_id: 'id-1' };
-      const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactSecurityRepository(mockDBConnection);
+    it('returns inserted record if successful', async () => {
+      sinon.stub(mockDBConnection, 'sql').resolves({ rowCount: 1, rows: [mockSecurityRecord] });
 
-      const payload: CreateArtifactSecurity = {
-        artifact_id: 'artifact-uuid',
-        security: SecurityStatusEnum.CLEAN
-      };
       const result = await repo.insertArtifactSecurity(payload);
-
-      expect(result).to.eql(mockRow);
+      expect(result).to.eql(mockSecurityRecord);
     });
   });
 
   describe('updateArtifactSecurity', () => {
-    it('throws an error if update fails', async () => {
-      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactSecurityRepository(mockDBConnection);
+    const payload: UpdateArtifactSecurity = {
+      security: SecurityStatusEnum.INFECTED
+    };
 
-      const payload: UpdateArtifactSecurity = { security: SecurityStatusEnum.INFECTED };
+    it('throws an error if update fails', async () => {
+      sinon.stub(mockDBConnection, 'sql').resolves({ rowCount: 0, rows: [] });
 
       try {
-        await repo.updateArtifactSecurity('id-1', payload);
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiExecuteSQLError);
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to update security record');
+        await repo.updateArtifactSecurity(mockSecurityRecord.artifact_security_id, payload);
+        expect.fail('Expected error not thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ApiExecuteSQLError);
+        expect((err as ApiExecuteSQLError).message).to.equal('Failed to update security record');
       }
     });
 
-    it('returns the updated record ID if successful', async () => {
-      const mockRow = { security_id: 'id-1' };
-      const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactSecurityRepository(mockDBConnection);
+    it('returns updated record if successful', async () => {
+      sinon.stub(mockDBConnection, 'sql').resolves({ rowCount: 1, rows: [mockSecurityRecord] });
 
-      const payload: UpdateArtifactSecurity = { security: SecurityStatusEnum.INFECTED };
-      const result = await repo.updateArtifactSecurity('id-1', payload);
+      const result = await repo.updateArtifactSecurity(mockSecurityRecord.artifact_security_id, payload);
+      expect(result).to.eql(mockSecurityRecord);
+    });
 
-      expect(result).to.eql(mockRow);
+    it('allows updating record_end_date', async () => {
+      const now = dayjs().toISOString();
+      const updatedRecord: ArtifactSecurity = { ...mockSecurityRecord };
+      sinon.stub(mockDBConnection, 'sql').resolves({ rowCount: 1, rows: [updatedRecord] });
+
+      const result = await repo.updateArtifactSecurity(mockSecurityRecord.artifact_security_id, {
+        record_end_date: now
+      });
+      expect(result).to.eql(updatedRecord);
     });
   });
 });

@@ -185,22 +185,25 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN upload_artifact.revision_count IS 'Revision count used for concurrency control.';
 
     --------------------------------------------------------------------------------
-    -- ARTIFACT_QUARANTINE
+    -- ARTIFACT_SECURITY
     --------------------------------------------------------------------------------
 
     CREATE TABLE artifact_security (
       artifact_security_id uuid DEFAULT public.gen_random_uuid(),
       artifact_id uuid NOT NULL,
       security security_status,
+      record_end_date timestamptz(6),
       create_date timestamptz(6) DEFAULT now() NOT NULL,
       create_user integer NOT NULL,
       update_date timestamptz(6),
       update_user integer,
       revision_count integer DEFAULT 0 NOT NULL,
       CONSTRAINT artifact_security_pk PRIMARY KEY (artifact_security_id),
-      CONSTRAINT artifact_security_artifact_fk FOREIGN KEY (artifact_id) REFERENCES artifact(artifact_id),
-      CONSTRAINT artifact_security_artifact_uq UNIQUE (artifact_id)
+      CONSTRAINT artifact_security_artifact_fk FOREIGN KEY (artifact_id) REFERENCES artifact(artifact_id)
     );
+
+    -- An artifact can only have one active security status
+    CREATE UNIQUE INDEX artifact_security_security_uk ON artifact_security (security) WHERE record_end_date IS NULL;
 
     CREATE INDEX artifact_security_security_idx ON artifact_security(security);
     CREATE INDEX artifact_security_artifact_idx ON artifact_security(artifact_id);
@@ -209,6 +212,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN artifact_security.artifact_security_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN artifact_security.artifact_id IS 'Foreign key to the artifact being securityd.';
     COMMENT ON COLUMN artifact_security.security IS 'Final security result of the artifact.';
+    COMMENT ON COLUMN artifact_security.record_end_date IS 'Expiry date of the security status.';
     COMMENT ON COLUMN artifact_security.create_date IS 'The datetime the record was created.';
     COMMENT ON COLUMN artifact_security.create_user IS 'The id of the user who created the record.';
     COMMENT ON COLUMN artifact_security.update_date IS 'The datetime the record was last updated.';
@@ -216,7 +220,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN artifact_security.revision_count IS 'Revision count used for concurrency control.';
 
     --------------------------------------------------------------------------------
-    -- ARTIFACT_QUARANTINE_SCAN
+    -- ARTIFACT_SECURITY_SCAN
     --------------------------------------------------------------------------------
 
     CREATE TABLE artifact_security_scan (
@@ -252,14 +256,14 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN artifact_security_scan.revision_count IS 'Revision count used for concurrency control.';
 
     --------------------------------------------------------------------------------
-    -- ARTIFACT_QUARANTINE_SCAN_FILE
+    -- ARTIFACT_SECURITY_SCAN_FILE
     --------------------------------------------------------------------------------
 
     CREATE TABLE artifact_security_scan_file (
       artifact_security_scan_file_id uuid DEFAULT public.gen_random_uuid(),
       artifact_security_scan_id uuid NOT NULL,
       file_path text NOT NULL,
-      status security_status NOT NULL,
+      security security_status NOT NULL,
       create_date timestamptz(6) DEFAULT now() NOT NULL,
       create_user integer NOT NULL,
       update_date timestamptz(6),
@@ -270,13 +274,13 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     CREATE INDEX artifact_security_scan_file_scan_idx ON artifact_security_scan_file(artifact_security_scan_id);
-    CREATE INDEX artifact_security_scan_file_result_idx ON artifact_security_scan_file(status);
+    CREATE INDEX artifact_security_scan_file_result_idx ON artifact_security_scan_file(security);
 
     COMMENT ON TABLE artifact_security_scan_file IS 'Stores per-file malware scan results for a scanned artifact. For archive uploads, contains results for all files within the archive.';
     COMMENT ON COLUMN artifact_security_scan_file.artifact_security_scan_file_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN artifact_security_scan_file.artifact_security_scan_id IS 'Foreign key to the malware scan event.';
     COMMENT ON COLUMN artifact_security_scan_file.file_path IS 'Path of the file within the artifact.';
-    COMMENT ON COLUMN artifact_security_scan_file.status IS 'Security result of the malware scan for this file (pending, clean, infected, error, skipped).';
+    COMMENT ON COLUMN artifact_security_scan_file.security IS 'Security result of the malware scan for this file (pending, clean, infected, error, skipped).';
     COMMENT ON COLUMN artifact_security_scan_file.create_date IS 'The datetime the record was created.';
     COMMENT ON COLUMN artifact_security_scan_file.create_user IS 'The id of the user who created the record.';
     COMMENT ON COLUMN artifact_security_scan_file.update_date IS 'The datetime the record was last updated.';
@@ -305,7 +309,7 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX submission_upload_submission_idx ON submission_upload(submission_id);
     CREATE INDEX submission_upload_upload_idx ON submission_upload(upload_id);
 
-    COMMENT ON TABLE submission_upload IS 'Associates submissions with the uploads they reference. Submission processing should check that all referenced uploads have completed security (artifact_security.security in (clean, skipped)) before proceeding. If QUARANTINE env var is disabled, security records will be NULL.';
+    COMMENT ON TABLE submission_upload IS 'Associates submissions with the uploads they reference.';
     COMMENT ON COLUMN submission_upload.submission_upload_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN submission_upload.submission_id IS 'Foreign key to the submission record.';
     COMMENT ON COLUMN submission_upload.upload_id IS 'Foreign key to the associated upload.';

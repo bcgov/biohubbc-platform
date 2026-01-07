@@ -6,6 +6,7 @@ import { v4 } from 'uuid';
 import { IDBConnection } from '../../database/db';
 import { HTTP401 } from '../../errors/http-error';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
+import { SecurityStatusEnum } from '../../models/security-status';
 import { UploadStatusEnum } from '../../models/upload';
 import { UploadArchive } from '../../models/upload-archive';
 import { ICreateSubmission } from '../../repositories/submission-repository';
@@ -192,9 +193,11 @@ describe('UploadIngestionService', () => {
 
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves(mockRows);
 
-      const insertSecurityStub = sinon
-        .stub(ArtifactSecurityService.prototype, 'insertArtifactSecurity')
-        .resolves({ security_id: 'artifact-security-1' });
+      const insertSecurityStub = sinon.stub(ArtifactSecurityService.prototype, 'insertArtifactSecurity').resolves({
+        artifact_security_id: 'artifact-security-1',
+        security: SecurityStatusEnum.PENDING,
+        artifact_id: 'artifact-1'
+      });
 
       const s3ClientStub = { send: sinon.stub().resolves({ ETag: 'etag' }) };
       sinon.stub(fileUtils, 'getSecurityS3Client').returns(s3ClientStub as any);
@@ -205,11 +208,11 @@ describe('UploadIngestionService', () => {
       expect(insertSecurityStub).to.have.been.calledTwice;
       expect(insertSecurityStub.getCall(0).args[0]).to.deep.equal({
         artifact_id: mockRows[0].artifact_id,
-        security: ProcessStatusStatusEnum.PENDING
+        security: SecurityStatusEnum.PENDING
       });
       expect(insertSecurityStub.getCall(1).args[0]).to.deep.equal({
         artifact_id: mockRows[1].artifact_id,
-        security: ProcessStatusStatusEnum.PENDING
+        security: SecurityStatusEnum.PENDING
       });
 
       expect(s3ClientStub.send).to.have.been.calledOnce;
@@ -295,6 +298,7 @@ describe('UploadIngestionService', () => {
         record_end_date: dayjs().add(30, 'minute').toISOString(),
         create_user: 1
       });
+
       const mockRows = [
         {
           artifact_id: 'artifact-1',
@@ -303,6 +307,7 @@ describe('UploadIngestionService', () => {
           upload_id: 'upload-456'
         }
       ];
+
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves(mockRows);
       sinon.stub(ArtifactSecurityService.prototype, 'insertArtifactSecurity').resolves();
 

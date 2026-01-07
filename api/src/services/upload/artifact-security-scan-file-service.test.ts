@@ -4,9 +4,9 @@ import sinonChai from 'sinon-chai';
 import {
   ArtifactSecurityScanFile,
   CreateArtifactSecurityScanFile,
-  SecurityStatusEnum,
   UpdateArtifactSecurityScanFile
 } from '../../models/artifact-security-scan-file';
+import { SecurityStatusEnum } from '../../models/security-status';
 import { ArtifactSecurityScanFileRepository } from '../../repositories/upload/artifact-security-scan-file-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { ArtifactSecurityScanFileService } from './artifact-security-scan-file-service';

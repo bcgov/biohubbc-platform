@@ -32,10 +32,10 @@ export class ArtifactSecurityService extends DBService {
    * Inserts a new upload artifact security record.
    *
    * @param {CreateArtifactSecurity} security The data for the new security record
-   * @return {Promise<{ security_id: string }>} The newly created security record ID
+   * @return {Promise<ArtifactSecurity>} The newly created security record ID
    * @memberof ArtifactSecurityService
    */
-  async insertArtifactSecurity(security: CreateArtifactSecurity): Promise<{ security_id: string }> {
+  async insertArtifactSecurity(security: CreateArtifactSecurity): Promise<ArtifactSecurity> {
     return this.uploadArtifactSecurityRepository.insertArtifactSecurity(security);
   }
 
@@ -44,10 +44,10 @@ export class ArtifactSecurityService extends DBService {
    *
    * @param {string} securityId The ID of the security record to update
    * @param {UpdateArtifactSecurity} security The fields to update
-   * @return {Promise<{ security_id: string }>} The updated security record ID
+   * @return {Promise<ArtifactSecurity>} The updated security record ID
    * @memberof ArtifactSecurityService
    */
-  async updateArtifactSecurity(securityId: string, security: UpdateArtifactSecurity): Promise<{ security_id: string }> {
+  async updateArtifactSecurity(securityId: string, security: UpdateArtifactSecurity): Promise<ArtifactSecurity> {
     return this.uploadArtifactSecurityRepository.updateArtifactSecurity(securityId, security);
   }
 }
