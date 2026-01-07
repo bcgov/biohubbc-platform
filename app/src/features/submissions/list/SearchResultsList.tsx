@@ -11,12 +11,12 @@ import { grey } from '@mui/material/colors';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/system/Stack';
-import { SearchFeatureResult } from 'interfaces/useSearchApi.interface';
+import { SearchFeatureResultWithRelevance } from 'interfaces/useSearchApi.interface';
 
 export interface ISearchResultsListProps {
-  results: SearchFeatureResult[];
-  onDownload: (result: SearchFeatureResult) => void;
-  onAccessRequest: (result: SearchFeatureResult) => void;
+  results: SearchFeatureResultWithRelevance[];
+  onDownload: (result: SearchFeatureResultWithRelevance) => void;
+  onAccessRequest: (result: SearchFeatureResultWithRelevance) => void;
 }
 
 /**

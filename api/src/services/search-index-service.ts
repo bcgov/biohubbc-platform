@@ -6,7 +6,7 @@ import {
   InsertSpatialSearchableRecord,
   InsertStringSearchableRecord,
   IPropertyFilter,
-  SearchFeatureResult,
+  SearchFeatureResultWithRelevancy,
   SearchIndexRepository,
   SubmissionFeatureCombinedSearchValues,
   SubmissionFeatureSearchKeyValues
@@ -178,10 +178,10 @@ export class SearchIndexService extends DBService {
    * Results are sorted by relevancy score.
    *
    * @param {ISearchFeaturesParams} params - Search parameters
-   * @return {*}  {Promise<SearchFeatureResult[]>}
+   * @return {*}  {Promise<SearchFeatureResultWithRelevancy[]>}
    * @memberof SearchIndexService
    */
-  async searchFeatures(params: ISearchFeaturesParams): Promise<SearchFeatureResult[]> {
+  async searchFeatures(params: ISearchFeaturesParams): Promise<SearchFeatureResultWithRelevancy[]> {
     defaultLog.debug({ label: 'searchFeatures', params });
 
     const { keywords, propertyFilters } = params;
@@ -210,7 +210,7 @@ export class SearchIndexService extends DBService {
       validFilters.length > 0 ? await this.searchIndexRepository.searchFeaturesByPropertyFilters(validFilters) : [];
 
     // Determine final results based on what criteria were provided
-    let finalResults: SearchFeatureResult[];
+    let finalResults: SearchFeatureResultWithRelevancy[];
 
     if (keywordArray.length > 0 && validFilters.length > 0) {
       // AND logic: return only features that appear in BOTH result sets

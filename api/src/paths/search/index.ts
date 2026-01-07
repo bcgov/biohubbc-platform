@@ -2,132 +2,111 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection } from '../../database/db';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
-import { IPropertyFilter } from '../../repositories/search-index-respository';
-import { SearchIndexService } from '../../services/search-index-service';
+import { SearchService } from '../../services/search-service';
 import { getLogger } from '../../utils/logger';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 
-const defaultLog = getLogger('paths/search');
+const defaultLog = getLogger('paths/search/index');
 
-export const POST: Operation = [searchFeatures()];
+export const GET: Operation = [searchAll()];
 
-POST.apiDoc = {
-  description: 'Search for features by keywords and/or property filters.',
+GET.apiDoc = {
+  description: 'Search features, submissions, and taxonomy.',
   tags: ['search'],
-  requestBody: {
-    description: 'Search parameters',
-    required: false,
-    content: {
-      'application/json': {
-        schema: {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            keywords: {
-              type: 'string',
-              description: 'Space-separated keywords to search for in feature property values'
-            },
-            propertyFilters: {
-              type: 'array',
-              description: 'Filter by specific property name and value combinations',
-              items: {
-                type: 'object',
-                additionalProperties: false,
-                required: ['featureTypeName', 'propertyName', 'propertyType', 'value'],
-                properties: {
-                  featureTypeName: {
-                    type: 'string',
-                    description: 'The name of the feature type to filter on (e.g., dataset, observation)'
-                  },
-                  propertyName: {
-                    type: 'string',
-                    description: 'The name of the property to filter on'
-                  },
-                  propertyType: {
-                    type: 'string',
-                    enum: ['string', 'number', 'datetime'],
-                    description: 'The type of the property (determines which search table to query)'
-                  },
-                  value: {
-                    type: 'string',
-                    description: 'The value to search for'
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+  security: [
+    {
+      OptionalBearer: []
     }
-  },
+  ],
+  parameters: [
+    {
+      in: 'query',
+      name: 'search',
+      schema: { type: 'string' },
+      required: true,
+      description: 'Search term to match features, submissions, and taxa.'
+    },
+    {
+      in: 'query',
+      name: 'page',
+      schema: { type: 'integer', minimum: 1 },
+      required: false,
+      description: 'Page number for pagination.'
+    },
+    {
+      in: 'query',
+      name: 'limit',
+      schema: { type: 'integer', minimum: 1 },
+      required: false,
+      description: 'Number of items per page.'
+    }
+  ],
   responses: {
     200: {
-      description: 'Search results sorted by relevancy',
+      description: 'Paginated search results for features, submissions, and taxonomy.',
       content: {
         'application/json': {
           schema: {
-            type: 'array',
-            items: {
-              type: 'object',
-              additionalProperties: false,
-              required: [
-                'submission_feature_id',
-                'submission_id',
-                'uuid',
-                'feature_type_id',
-                'feature_type_name',
-                'submission_name',
-                'is_secured',
-                'relevancy_score'
-              ],
-              properties: {
-                submission_feature_id: {
-                  type: 'integer',
-                  minimum: 1,
-                  description: 'The ID of the submission feature'
+            type: 'object',
+            properties: {
+              features: {
+                type: 'object',
+                properties: {
+                  data: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        submission_feature_id: { type: 'integer' },
+                        feature_type_id: { type: 'integer' },
+                        label: { type: 'string' }
+                      },
+                      required: ['submission_feature_id', 'feature_type_id', 'label']
+                    }
+                  },
+                  total: { type: 'integer' }
                 },
-                submission_id: {
-                  type: 'integer',
-                  minimum: 1,
-                  description: 'The ID of the submission containing this feature'
+                required: ['data', 'total']
+              },
+              submissions: {
+                type: 'object',
+                properties: {
+                  data: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        submission_id: { type: 'integer' },
+                        name: { type: 'string' },
+                        description: { type: 'string', nullable: true }
+                      },
+                      required: ['submission_id', 'name']
+                    }
+                  },
+                  total: { type: 'integer' }
                 },
-                uuid: {
-                  type: 'string',
-                  format: 'uuid',
-                  description: 'The unique identifier of the submission feature'
+                required: ['data', 'total']
+              },
+              taxonomy: {
+                type: 'object',
+                properties: {
+                  data: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        taxon_id: { type: 'integer' },
+                        itis_scientific_name: { type: 'string' }
+                      },
+                      required: ['taxon_id', 'itis_scientific_name']
+                    }
+                  },
+                  total: { type: 'integer' }
                 },
-                feature_type_id: {
-                  type: 'integer',
-                  minimum: 1,
-                  description: 'The ID of the feature type'
-                },
-                feature_type_name: {
-                  type: 'string',
-                  description: 'The name of the feature type (e.g., dataset, observation)'
-                },
-                feature_name: {
-                  type: 'string',
-                  nullable: true,
-                  description: 'The name of the feature from its data'
-                },
-                feature_description: {
-                  type: 'string',
-                  nullable: true,
-                  description: 'The description of the feature from its data'
-                },
-                submission_name: {
-                  type: 'string',
-                  description: 'The name of the parent submission'
-                },
-                is_secured: {
-                  type: 'boolean',
-                  description: 'Whether the feature has active security rules applied'
-                },
-                relevancy_score: {
-                  type: 'number',
-                  description: 'The relevancy score for ranking results'
-                }
+                required: ['data', 'total']
               }
-            }
+            },
+            required: ['features', 'submissions', 'taxonomy']
           }
         }
       }
@@ -137,28 +116,33 @@ POST.apiDoc = {
 };
 
 /**
- * Search for features by keywords and/or property filters.
- *
- * @returns {RequestHandler}
+ * Handler for searching features, submissions, and taxonomy.
  */
-export function searchFeatures(): RequestHandler {
+export function searchAll(): RequestHandler {
   return async (req, res) => {
     const connection = getAPIUserDBConnection();
 
     try {
       await connection.open();
 
-      const keywords = req.body?.keywords as string | undefined;
-      const propertyFilters = req.body?.propertyFilters as IPropertyFilter[] | undefined;
+      const searchService = new SearchService(connection);
 
-      const service = new SearchIndexService(connection);
-      const response = await service.searchFeatures({ keywords, propertyFilters });
+      // Extract search params from query
+      const searchTerm = req.query.search as string;
+      const page = req.query.page ? Number(req.query.page) : undefined;
+      const limit = req.query.limit ? Number(req.query.limit) : undefined;
+
+      const pagination: ApiPaginationOptions | undefined = page && limit ? { page, limit } : undefined;
+
+      const result = await searchService.search({ search: searchTerm }, pagination);
 
       await connection.commit();
 
-      return res.status(200).json(response);
+      res.setHeader('Cache-Control', 'public, max-age=90');
+
+      res.status(200).json(result);
     } catch (error) {
-      defaultLog.error({ label: 'searchFeatures', message: 'error', error });
+      defaultLog.error({ label: 'searchAll', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

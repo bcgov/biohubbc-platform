@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
-import { SearchFeatureResult } from 'interfaces/useSearchApi.interface';
+import { SearchFeatureResultWithRelevance } from 'interfaces/useSearchApi.interface';
 import { MemoryRouter } from 'react-router';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -66,7 +66,7 @@ describe('SubmissionsListPage', () => {
     });
 
     it('should open dialog on request access button click from search results', async () => {
-      const mockResults: SearchFeatureResult[] = [
+      const mockResults: SearchFeatureResultWithRelevance[] = [
         {
           submission_feature_id: 1,
           submission_id: 10,
@@ -80,21 +80,25 @@ describe('SubmissionsListPage', () => {
           relevancy_score: 0.85
         }
       ];
+
       mockUseApi.search.searchFeatures.mockResolvedValue(mockResults);
       const actions = renderPage();
-
       const searchInput = actions.getByPlaceholderText(/caribou/i);
-      fireEvent.change(searchInput, { target: { value: 'test' } });
+      fireEvent.change(searchInput, { target: { value: 'Secured' } });
 
+      // Wait for the debounce + API to finish
       await waitFor(
         () => {
           const requestAccessBtn = actions.getByRole('button', { name: /request access/i });
           expect(requestAccessBtn).toBeVisible();
           fireEvent.click(requestAccessBtn);
-          expect(actions.getByText(/secure data access request/i)).toBeVisible();
         },
-        { timeout: 1000 }
+        { timeout: 2000 }
       );
+
+      await waitFor(() => {
+        expect(actions.getByText(/secure data access request/i)).toBeVisible();
+      });
     });
   });
 
@@ -140,7 +144,7 @@ describe('SubmissionsListPage', () => {
     });
 
     it('should display search results with feature information', async () => {
-      const mockResults: SearchFeatureResult[] = [
+      const mockResults: SearchFeatureResultWithRelevance[] = [
         {
           submission_feature_id: 1,
           submission_id: 10,
@@ -176,7 +180,7 @@ describe('SubmissionsListPage', () => {
     });
 
     it('should display secured indicator for secured features', async () => {
-      const mockResults: SearchFeatureResult[] = [
+      const mockResults: SearchFeatureResultWithRelevance[] = [
         {
           submission_feature_id: 2,
           submission_id: 11,

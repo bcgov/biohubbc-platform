@@ -1,15 +1,17 @@
 import { fireEvent, waitFor } from '@testing-library/react';
-import { SearchFeatureResult } from 'interfaces/useSearchApi.interface';
+import { SearchFeatureResultWithRelevance } from 'interfaces/useSearchApi.interface';
 import { render } from 'test-helpers/test-utils';
 import SearchResultsList from './SearchResultsList';
 
 const mockOnDownload = vi.fn();
 const mockOnAccessRequest = vi.fn();
 
-const renderComponent = (results: SearchFeatureResult[]) =>
+const renderComponent = (results: SearchFeatureResultWithRelevance[]) =>
   render(<SearchResultsList results={results} onDownload={mockOnDownload} onAccessRequest={mockOnAccessRequest} />);
 
-const createMockResult = (overrides: Partial<SearchFeatureResult> = {}): SearchFeatureResult => ({
+const createMockResult = (
+  overrides: Partial<SearchFeatureResultWithRelevance> = {}
+): SearchFeatureResultWithRelevance => ({
   submission_feature_id: 1,
   submission_id: 10,
   uuid: '550e8400-e29b-41d4-a716-446655440001',

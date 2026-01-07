@@ -135,7 +135,7 @@ export type SubmissionFeatureCombinedSearchValues = z.infer<typeof SubmissionFea
 /**
  * Represents a search result for a feature with full details for display.
  */
-export const SearchFeatureResult = z.object({
+export const SearchFeatureResultWithRelevancy = z.object({
   submission_feature_id: z.number(),
   submission_id: z.number(),
   uuid: z.string(),
@@ -148,7 +148,7 @@ export const SearchFeatureResult = z.object({
   relevancy_score: z.number()
 });
 
-export type SearchFeatureResult = z.infer<typeof SearchFeatureResult>;
+export type SearchFeatureResultWithRelevancy = z.infer<typeof SearchFeatureResultWithRelevancy>;
 
 /**
  * Represents a property filter for searching.
@@ -474,10 +474,10 @@ export class SearchIndexRepository extends BaseRepository {
    * Each keyword is searched independently and results are aggregated.
    *
    * @param {string[]} keywords - Array of keywords to search for
-   * @return {*}  {Promise<SearchFeatureResult[]>}
+   * @return {*}  {Promise<SearchFeatureResultWithRelevancy[]>}
    * @memberof SearchIndexRepository
    */
-  async searchFeaturesByKeywords(keywords: string[]): Promise<SearchFeatureResult[]> {
+  async searchFeaturesByKeywords(keywords: string[]): Promise<SearchFeatureResultWithRelevancy[]> {
     defaultLog.debug({ label: 'searchFeaturesByKeywords', keywords });
 
     if (!keywords.length) {
@@ -529,7 +529,7 @@ export class SearchIndexRepository extends BaseRepository {
         relevancy_score DESC;
     `;
 
-    const response = await this.connection.sql(sqlStatement, SearchFeatureResult);
+    const response = await this.connection.sql(sqlStatement, SearchFeatureResultWithRelevancy);
 
     return response.rows;
   }
@@ -539,10 +539,10 @@ export class SearchIndexRepository extends BaseRepository {
    * Queries the appropriate search table based on property type.
    *
    * @param {IPropertyFilter[]} filters - Array of property filters
-   * @return {*}  {Promise<SearchFeatureResult[]>}
+   * @return {*}  {Promise<SearchFeatureResultWithRelevancy[]>}
    * @memberof SearchIndexRepository
    */
-  async searchFeaturesByPropertyFilters(filters: IPropertyFilter[]): Promise<SearchFeatureResult[]> {
+  async searchFeaturesByPropertyFilters(filters: IPropertyFilter[]): Promise<SearchFeatureResultWithRelevancy[]> {
     defaultLog.debug({ label: 'searchFeaturesByPropertyFilters', filters });
 
     if (!filters.length) {
@@ -721,7 +721,7 @@ export class SearchIndexRepository extends BaseRepository {
         relevancy_score DESC;
     `);
 
-    const response = await this.connection.sql(query, SearchFeatureResult);
+    const response = await this.connection.sql(query, SearchFeatureResultWithRelevancy);
 
     return response.rows;
   }

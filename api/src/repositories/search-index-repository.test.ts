@@ -5,10 +5,9 @@ import { ApiExecuteSQLError } from '../errors/api-error';
 import { getMockDBConnection } from '../__mocks__/db';
 import {
   FeaturePropertyRecordWithPropertyTypeName,
-  SearchFeatureResult,
+  SearchFeatureResultWithRelevancy,
   SearchIndexRepository
 } from './search-index-respository';
-
 describe('SearchIndexRepository', () => {
   afterEach(() => {
     Sinon.restore();
@@ -611,7 +610,7 @@ describe('SearchIndexRepository', () => {
 
   describe('searchFeaturesByKeywords', () => {
     it('returns matching features for a single keyword', async () => {
-      const mockRows: SearchFeatureResult[] = [
+      const mockRows: SearchFeatureResultWithRelevancy[] = [
         {
           submission_feature_id: 1,
           submission_id: 10,
@@ -645,7 +644,7 @@ describe('SearchIndexRepository', () => {
     });
 
     it('returns matching features for multiple keywords', async () => {
-      const mockRows: SearchFeatureResult[] = [
+      const mockRows: SearchFeatureResultWithRelevancy[] = [
         {
           submission_feature_id: 1,
           submission_id: 10,
@@ -719,7 +718,7 @@ describe('SearchIndexRepository', () => {
 
   describe('searchFeaturesByPropertyFilters', () => {
     it('returns matching features for a single property filter', async () => {
-      const mockRows: SearchFeatureResult[] = [
+      const mockRows: SearchFeatureResultWithRelevancy[] = [
         {
           submission_feature_id: 1,
           submission_id: 10,
@@ -754,7 +753,7 @@ describe('SearchIndexRepository', () => {
     });
 
     it('returns matching features for multiple property filters', async () => {
-      const mockRows: SearchFeatureResult[] = [
+      const mockRows: SearchFeatureResultWithRelevancy[] = [
         {
           submission_feature_id: 1,
           submission_id: 10,

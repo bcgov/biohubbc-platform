@@ -101,6 +101,7 @@ const appTheme = createTheme({
       },
       styleOverrides: {
         root: {
+          padding: '8px 24px',
           '&:focus': {
             outline: '2px solid #3B99FC',
             outlineOffset: '-1px'
@@ -167,11 +168,12 @@ const appTheme = createTheme({
     },
     MuiOutlinedInput: {
       styleOverrides: {
-        root: ({ ownerState, theme }) => ({
-          ...(ownerState && {
-            backgroundColor: theme.palette.grey[50]
-          })
-        })
+        root: {
+          padding: '8px 12px !important',
+          '& .MuiInputBase-input': {
+            marginLeft: '12px'
+          }
+        }
       }
     },
     MuiTable: {

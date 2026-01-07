@@ -1,18 +1,17 @@
 import { useConfigContext } from 'hooks/useContext';
-
 import useAdminApi from './api/useAdminApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
 import useCodesApi from './api/useCodesApi';
-import useSecurityApi from './api/useSecurityApi';
-import useSubmissionsApi from './api/useSubmissionsApi';
-import useTaxonomyApi from './api/useTaxonomyApi';
-import useUserApi from './api/useUserApi';
 import { useFeaturesApi } from './api/useFeaturesApi';
 import usePoliciesApi from './api/usePoliciesApi';
 import { useSearchApi } from './api/useSearchApi';
+import useSecurityApi from './api/useSecurityApi';
+import useSubmissionsApi from './api/useSubmissionsApi';
+import useTaxonomyApi from './api/useTaxonomyApi';
 import { useTeamPoliciesApi } from './api/useTeamPoliciesApi';
 import { useTeamsApi } from './api/useTeamsApi';
+import useUserApi from './api/useUserApi';
 
 /**
  * Returns a set of supported api methods.

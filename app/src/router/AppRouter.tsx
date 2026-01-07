@@ -17,7 +17,7 @@ export const AppRouter = () => {
         path="/search/*"
         element={
           <>
-            <PageTitle title="Search Search" description="Browse and manage search" />
+            <PageTitle title="Search Data" description="Search and download data" />
             <SearchRouter />
           </>
         }

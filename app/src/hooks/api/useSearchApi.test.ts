@@ -1,6 +1,11 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
-import { SearchFeatureResult } from 'interfaces/useSearchApi.interface';
+import { PRIORITY_FEATURE_TYPE } from 'constants/feature-type';
+import {
+  SearchFeatureResultWithRelevance,
+  SearchResponse,
+  SearchSummaryResponse
+} from 'interfaces/useSearchApi.interface';
 import { useSearchApi } from './useSearchApi';
 
 describe('useSearchApi', () => {
@@ -15,8 +20,8 @@ describe('useSearchApi', () => {
   });
 
   describe('searchFeatures', () => {
-    it('should make POST request to /api/search with keywords', async () => {
-      const mockResults: SearchFeatureResult[] = [
+    it('should make POST request to /api/search/feature with keywords', async () => {
+      const mockResults: SearchFeatureResultWithRelevance[] = [
         {
           submission_feature_id: 1,
           submission_id: 10,
@@ -31,7 +36,7 @@ describe('useSearchApi', () => {
         }
       ];
 
-      mock.onPost('/api/search').reply(200, mockResults);
+      mock.onPost('/api/search/feature').reply(200, mockResults);
 
       const result = await useSearchApi(axios).searchFeatures({ keywords: 'moose' });
 
@@ -40,7 +45,7 @@ describe('useSearchApi', () => {
     });
 
     it('should make POST request with property filters', async () => {
-      const mockResults: SearchFeatureResult[] = [
+      const mockResults: SearchFeatureResultWithRelevance[] = [
         {
           submission_feature_id: 2,
           submission_id: 11,
@@ -55,7 +60,7 @@ describe('useSearchApi', () => {
         }
       ];
 
-      mock.onPost('/api/search').reply(200, mockResults);
+      mock.onPost('/api/search/feature').reply(200, mockResults);
 
       const result = await useSearchApi(axios).searchFeatures({
         propertyFilters: [{ featureTypeName: 'animal', propertyName: 'species', propertyType: 'string', value: 'bear' }]
@@ -72,11 +77,49 @@ describe('useSearchApi', () => {
     });
 
     it('should return empty array when no results', async () => {
-      mock.onPost('/api/search').reply(200, []);
+      mock.onPost('/api/search/feature').reply(200, []);
 
       const result = await useSearchApi(axios).searchFeatures({ keywords: 'nonexistent' });
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('searchAll', () => {
+    it('should make GET request to /api/search with query params', async () => {
+      const mockResponse: SearchResponse = {
+        features: { data: [{ submission_feature_id: 1, label: 'Label', feature_type_id: 1 }], total: 5000 },
+        submissions: { data: [], total: 1 },
+        taxonomy: { data: [], total: 0 }
+      };
+
+      mock.onGet('/api/search').reply(200, mockResponse);
+
+      const result = await useSearchApi(axios).searchAll({ search: 'test' }, { page: 1, limit: 10 });
+
+      expect(result).toEqual(mockResponse);
+      expect(mock.history.get[0].params).toEqual({ search: 'test', page: 1, limit: 10 });
+    });
+  });
+
+  describe('searchSummary', () => {
+    it('should make GET request to /api/search/summary and return typed summary', async () => {
+      const mockResponse: SearchSummaryResponse = {
+        features: [
+          { feature_type_name: PRIORITY_FEATURE_TYPE.DATASET, total: 5 },
+          { feature_type_name: PRIORITY_FEATURE_TYPE.REPORT, total: 3 }
+        ],
+        submissions: { total: 2 },
+        taxonomy: { total: 4 }
+      };
+
+      mock.onGet('/api/search/summary').reply(200, mockResponse);
+
+      const result = await useSearchApi(axios).searchSummary({ search: 'moose' });
+
+      expect(result).toEqual(mockResponse);
+
+      expect(mock.history.get[0].params).toEqual({ search: 'moose' });
     });
   });
 });

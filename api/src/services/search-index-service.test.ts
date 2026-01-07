@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { SearchFeatureResult, SearchIndexRepository } from '../repositories/search-index-respository';
+import { SearchFeatureResultWithRelevancy, SearchIndexRepository } from '../repositories/search-index-respository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CodeService } from './code-service';
@@ -287,7 +287,7 @@ describe('SearchIndexService', () => {
       const mockDBConnection = getMockDBConnection();
       const searchIndexService = new SearchIndexService(mockDBConnection);
 
-      const mockResults: SearchFeatureResult[] = [
+      const mockResults: SearchFeatureResultWithRelevancy[] = [
         {
           submission_feature_id: 1,
           submission_id: 10,
@@ -328,7 +328,7 @@ describe('SearchIndexService', () => {
       const mockDBConnection = getMockDBConnection();
       const searchIndexService = new SearchIndexService(mockDBConnection);
 
-      const mockResults: SearchFeatureResult[] = [
+      const mockResults: SearchFeatureResultWithRelevancy[] = [
         {
           submission_feature_id: 2,
           submission_id: 11,
@@ -362,7 +362,7 @@ describe('SearchIndexService', () => {
       const mockDBConnection = getMockDBConnection();
       const searchIndexService = new SearchIndexService(mockDBConnection);
 
-      const keywordResults: SearchFeatureResult[] = [
+      const keywordResults: SearchFeatureResultWithRelevancy[] = [
         {
           submission_feature_id: 1,
           submission_id: 10,
@@ -377,7 +377,7 @@ describe('SearchIndexService', () => {
         }
       ];
 
-      const filterResults: SearchFeatureResult[] = [
+      const filterResults: SearchFeatureResultWithRelevancy[] = [
         {
           submission_feature_id: 1,
           submission_id: 10,
@@ -449,7 +449,7 @@ describe('SearchIndexService', () => {
       const mockDBConnection = getMockDBConnection();
       const searchIndexService = new SearchIndexService(mockDBConnection);
 
-      const mockResults: SearchFeatureResult[] = [
+      const mockResults: SearchFeatureResultWithRelevancy[] = [
         {
           submission_feature_id: 1,
           submission_id: 10,
