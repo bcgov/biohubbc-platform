@@ -32,7 +32,7 @@ describe('ArtifactQuarantineScanFileService', () => {
         artifact_quarantine_scan_file_id: 'scan-file-1',
         artifact_quarantine_scan_id: 'scan-1',
         file_path: 'folder/file.txt',
-        status: SecurityStatusEnum.INFECTED
+        security: SecurityStatusEnum.INFECTED
       };
 
       const stub = sinon
@@ -64,7 +64,7 @@ describe('ArtifactQuarantineScanFileService', () => {
       const fakeInput: CreateArtifactQuarantineScanFile = {
         artifact_quarantine_scan_id: 'scan-1',
         file_path: 'folder/file.txt',
-        status: SecurityStatusEnum.INFECTED
+        security: SecurityStatusEnum.INFECTED
       };
 
       const stub = sinon
@@ -81,7 +81,7 @@ describe('ArtifactQuarantineScanFileService', () => {
       const fakeInput: CreateArtifactQuarantineScanFile = {
         artifact_quarantine_scan_id: 'scan-1',
         file_path: 'folder/file.txt',
-        status: SecurityStatusEnum.INFECTED
+        security: SecurityStatusEnum.INFECTED
       };
 
       sinon
@@ -103,12 +103,12 @@ describe('ArtifactQuarantineScanFileService', () => {
         {
           artifact_quarantine_scan_id: 'scan-1',
           file_path: 'file1.txt',
-          status: SecurityStatusEnum.INFECTED
+          security: SecurityStatusEnum.INFECTED
         },
         {
           artifact_quarantine_scan_id: 'scan-1',
           file_path: 'file2.txt',
-          status: SecurityStatusEnum.INFECTED
+          security: SecurityStatusEnum.INFECTED
         }
       ];
 
@@ -133,7 +133,7 @@ describe('ArtifactQuarantineScanFileService', () => {
         {
           artifact_quarantine_scan_id: 'scan-1',
           file_path: 'file1.txt',
-          status: SecurityStatusEnum.INFECTED
+          security: SecurityStatusEnum.INFECTED
         }
       ];
 
@@ -153,7 +153,7 @@ describe('ArtifactQuarantineScanFileService', () => {
   describe('updateArtifactQuarantineScanFile', () => {
     it('should update an existing scan file record and return its ID', async () => {
       const fakeInput: UpdateArtifactQuarantineScanFile = {
-        status: SecurityStatusEnum.INFECTED
+        security: SecurityStatusEnum.INFECTED
       };
 
       const stub = sinon
@@ -168,7 +168,7 @@ describe('ArtifactQuarantineScanFileService', () => {
 
     it('should throw an error if repository fails', async () => {
       const fakeInput: UpdateArtifactQuarantineScanFile = {
-        status: SecurityStatusEnum.INFECTED
+        security: SecurityStatusEnum.INFECTED
       };
 
       sinon

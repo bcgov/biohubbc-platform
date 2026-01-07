@@ -2,6 +2,7 @@ import { CompleteMultipartUploadCommand } from '@aws-sdk/client-s3';
 import dayjs from 'dayjs';
 import { HTTP401 } from '../../errors/http-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
+import { SecurityStatusEnum } from '../../models/artifact-quarantine-scan-file';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { Upload, UploadStatusEnum } from '../../models/upload';
 import { ICreateSubmission } from '../../repositories/submission-repository';
@@ -9,9 +10,11 @@ import { getQuarantineObjectStoreBucketName, getQuarantineS3Client } from '../..
 import { generateMultipartUploadPresignedUrls } from '../../utils/submission-upload-utils';
 import { DBService } from '../db-service';
 import { SubmissionService } from '../submission-service';
+import { ArtifactQuarantineService } from './artifact-quarantine-service';
 import { ArtifactService } from './artifact-service';
 import { SubmissionUploadService } from './submission-upload-service';
 import { UploadArchiveService } from './upload-archive-service';
+import { UploadArtifactService } from './upload-artifact-service';
 import { CompleteMultipartUploadParams, PresignedUploadUrlResponse } from './upload-ingestion-service.interface';
 import { UploadService } from './upload-service';
 
@@ -26,9 +29,11 @@ import { UploadService } from './upload-service';
 export class UploadIngestionService extends DBService {
   submissionService = new SubmissionService(this.connection);
   uploadService = new UploadService(this.connection);
+  uploadArtifactService = new UploadArtifactService(this.connection);
   artifactService = new ArtifactService(this.connection);
   uploadArchiveService = new UploadArchiveService(this.connection);
   submissionUploadService = new SubmissionUploadService(this.connection);
+  artifactQuarantineService = new ArtifactQuarantineService(this.connection);
 
   /**
    * Create a new archive upload
@@ -69,7 +74,7 @@ export class UploadIngestionService extends DBService {
     const { upload_archive_id } = await this.uploadArchiveService.insertUploadArchive({
       upload_id,
       artifact_id: artifact.artifact_id,
-      status: ProcessStatusStatusEnum.DRAFT
+      status: ProcessStatusStatusEnum.DRAFT // Draft indicates that the archive record is not ready for processing
     });
 
     // 6. Initialize multipart upload
@@ -100,7 +105,11 @@ export class UploadIngestionService extends DBService {
   }
 
   /**
-   * Finalize a multipart upload after all parts have been uploaded.
+   * Finalize a multipart archive upload after all parts have been uploaded.
+   *
+   * This completes the upload in the quarantine bucket and enqueues the
+   * archive artifact(s) for malware scanning.
+   *
    *
    * @param {CompleteMultipartUploadCommand} params
    * @returns {Promise<void>}
@@ -108,25 +117,26 @@ export class UploadIngestionService extends DBService {
   async completeArchiveUpload(params: CompleteMultipartUploadParams): Promise<void> {
     const { uploadId, s3UploadId, key, parts } = params;
 
-    await Promise.all([
-      // 1. Authorize upload completion - the whole transaction will roll back if authorization fails
-      this._authorizeUploadCompletion(uploadId, s3UploadId),
-      // 2. Update upload as COMPLETED to prevent re-use
-      this.uploadService.updateUpload(uploadId, {
-        status: UploadStatusEnum.COMPLETED
-      }),
-      // 3. Update artifacts as PENDING to trigger processing -> background worker must scan for malware
-      this.artifactService.updateArtifactsByUploadId(uploadId, {
-        uploaded_at: dayjs().toISOString(),
-        status: ArtifactStatusEnum.PENDING
-      }),
-      // 4. Mark archive as PENDING to trigger processing -> background worker must open the archive and index files
-      this.uploadArchiveService.updateUploadArchivesByUploadId(uploadId, {
-        status: ProcessStatusStatusEnum.PENDING
-      })
-    ]);
+    // Ensure the caller is allowed to complete this upload
+    await this._authorizeUploadCompletion(uploadId, s3UploadId);
 
-    // 5. Complete multipart upload in S3
+    // Fetch archive artifacts associated with this upload
+    const uploadArchives = await this.uploadArchiveService.getUploadArchivesByUploadId(uploadId);
+
+    // Enqueue each archive artifact for malware scanning
+    await Promise.all(
+      uploadArchives.map((archive) =>
+        this.artifactQuarantineService.insertArtifactQuarantine({
+          artifact_id: archive.artifact_id,
+          security: SecurityStatusEnum.PENDING
+        })
+      )
+    );
+
+    // NOTE: upload_archive.status is not updated here.
+    // Archive extraction is blocked until malware scanning completes.
+
+    // Complete the multipart upload in the quarantine bucket
     const s3Client = getQuarantineS3Client();
     await s3Client.send(
       new CompleteMultipartUploadCommand({

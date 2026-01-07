@@ -56,7 +56,7 @@ export class ArtifactQuarantineScanFileRepository extends BaseRepository {
       ) VALUES (
         ${scanFile.artifact_quarantine_scan_id},
         ${scanFile.file_path},
-        ${scanFile.status ?? null}
+        ${scanFile.security ?? null}
       )
       RETURNING artifact_quarantine_scan_file_id;
     `;
@@ -97,7 +97,7 @@ export class ArtifactQuarantineScanFileRepository extends BaseRepository {
       sqlStatement.append(SQL`(
         ${file.artifact_quarantine_scan_id},
         ${file.file_path},
-        ${file.status ?? null}
+        ${file.security ?? null}
       )`);
     });
 
@@ -129,7 +129,7 @@ export class ArtifactQuarantineScanFileRepository extends BaseRepository {
     const sqlStatement = SQL`
       UPDATE biohub.artifact_quarantine_scan_file
       SET
-        status = COALESCE(${scanFile.status}, status)
+        status = COALESCE(${scanFile.security}, status)
       WHERE
         artifact_quarantine_scan_file_id = ${uploadArtifactQuarantineScanFileId}
       RETURNING artifact_quarantine_scan_file_id;

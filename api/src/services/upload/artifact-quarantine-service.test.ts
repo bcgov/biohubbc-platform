@@ -7,7 +7,6 @@ import {
   UpdateArtifactQuarantine
 } from '../../models/artifact-quarantine';
 import { SecurityStatusEnum } from '../../models/artifact-quarantine-scan-file';
-import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { ArtifactQuarantineRepository } from '../../repositories/upload/artifact-quarantine-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { ArtifactQuarantineService } from './artifact-quarantine-service';
@@ -31,8 +30,8 @@ describe('ArtifactQuarantineService', () => {
     it('should return a single quarantine record', async () => {
       const fakeQuarantine: ArtifactQuarantine = {
         artifact_quarantine_id: 'uuid-1',
-        upload_artifact_id: 'artifact-1',
-        status: SecurityStatusEnum.CLEAN
+        artifact_id: 'artifact-1',
+        security: SecurityStatusEnum.CLEAN
       };
 
       const stub = sinon.stub(ArtifactQuarantineRepository.prototype, 'getArtifactQuarantine').resolves(fakeQuarantine);
@@ -58,8 +57,8 @@ describe('ArtifactQuarantineService', () => {
   describe('insertArtifactQuarantine', () => {
     it('should insert a new quarantine record and return its ID', async () => {
       const fakeInput: CreateArtifactQuarantine = {
-        upload_artifact_id: 'artifact-1',
-        status: ProcessStatusStatusEnum.PENDING
+        artifact_id: 'artifact-1',
+        security: SecurityStatusEnum.CLEAN
       };
 
       const stub = sinon
@@ -74,8 +73,8 @@ describe('ArtifactQuarantineService', () => {
 
     it('should throw an error if repository fails', async () => {
       const fakeInput: CreateArtifactQuarantine = {
-        upload_artifact_id: 'artifact-1',
-        status: ProcessStatusStatusEnum.PENDING
+        artifact_id: 'artifact-1',
+        security: SecurityStatusEnum.CLEAN
       };
 
       sinon.stub(ArtifactQuarantineRepository.prototype, 'insertArtifactQuarantine').throws(new Error('Insert failed'));
@@ -92,7 +91,7 @@ describe('ArtifactQuarantineService', () => {
   describe('updateArtifactQuarantine', () => {
     it('should update an existing quarantine record and return its ID', async () => {
       const fakeInput: UpdateArtifactQuarantine = {
-        status: SecurityStatusEnum.INFECTED
+        security: SecurityStatusEnum.INFECTED
       };
 
       const stub = sinon
@@ -107,7 +106,7 @@ describe('ArtifactQuarantineService', () => {
 
     it('should throw an error if repository fails', async () => {
       const fakeInput: UpdateArtifactQuarantine = {
-        status: SecurityStatusEnum.INFECTED
+        security: SecurityStatusEnum.INFECTED
       };
 
       sinon.stub(ArtifactQuarantineRepository.prototype, 'updateArtifactQuarantine').throws(new Error('Update failed'));

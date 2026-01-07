@@ -36,8 +36,7 @@ export async function up(knex: Knex): Promise<void> {
     -- Type of upload artifact
     CREATE TYPE upload_artifact_role AS ENUM (
       'feature',  
-      'attachment',
-      'archive'
+      'attachment'
     );
 
     --------------------------------------------------------------------------------
@@ -192,7 +191,7 @@ export async function up(knex: Knex): Promise<void> {
     CREATE TABLE artifact_quarantine (
       artifact_quarantine_id uuid DEFAULT public.gen_random_uuid(),
       artifact_id uuid NOT NULL,
-      status security_status,
+      security security_status,
       create_date timestamptz(6) DEFAULT now() NOT NULL,
       create_user integer NOT NULL,
       update_date timestamptz(6),
@@ -203,13 +202,13 @@ export async function up(knex: Knex): Promise<void> {
       CONSTRAINT artifact_quarantine_artifact_uq UNIQUE (artifact_id)
     );
 
-    CREATE INDEX artifact_quarantine_status_idx ON artifact_quarantine(status);
+    CREATE INDEX artifact_quarantine_security_idx ON artifact_quarantine(security);
     CREATE INDEX artifact_quarantine_artifact_idx ON artifact_quarantine(artifact_id);
 
-    COMMENT ON TABLE artifact_quarantine IS 'Stores the final security/quarantine result for an artifact. One quarantine record per artifact. Contains the most recent security status after scanning. For archive uploads, the archive itself is scanned, and all extracted files reference the same scan. Status values: pending (not scanned), clean (safe), infected (malware), error (scan failed), skipped (intentionally not scanned).';
+    COMMENT ON TABLE artifact_quarantine IS 'Stores the final security/quarantine result for an artifact. One quarantine record per artifact. Contains the most recent security security after scanning. For archive uploads, the archive itself is scanned, and all extracted files reference the same scan. security values: pending (not scanned), clean (safe), infected (malware), error (scan failed), skipped (intentionally not scanned).';
     COMMENT ON COLUMN artifact_quarantine.artifact_quarantine_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN artifact_quarantine.artifact_id IS 'Foreign key to the artifact being quarantined.';
-    COMMENT ON COLUMN artifact_quarantine.status IS 'Final security result of the artifact (pending, clean, infected, error, skipped). NULL if not yet evaluated.';
+    COMMENT ON COLUMN artifact_quarantine.security IS 'Final security result of the artifact.';
     COMMENT ON COLUMN artifact_quarantine.create_date IS 'The datetime the record was created.';
     COMMENT ON COLUMN artifact_quarantine.create_user IS 'The id of the user who created the record.';
     COMMENT ON COLUMN artifact_quarantine.update_date IS 'The datetime the record was last updated.';
@@ -306,7 +305,7 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX submission_upload_submission_idx ON submission_upload(submission_id);
     CREATE INDEX submission_upload_upload_idx ON submission_upload(upload_id);
 
-    COMMENT ON TABLE submission_upload IS 'Associates submissions with the uploads they reference. Submission processing should check that all referenced uploads have completed quarantine (artifact_quarantine.status in (clean, skipped)) before proceeding. If QUARANTINE env var is disabled, quarantine records will be NULL.';
+    COMMENT ON TABLE submission_upload IS 'Associates submissions with the uploads they reference. Submission processing should check that all referenced uploads have completed quarantine (artifact_quarantine.security in (clean, skipped)) before proceeding. If QUARANTINE env var is disabled, quarantine records will be NULL.';
     COMMENT ON COLUMN submission_upload.submission_upload_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN submission_upload.submission_id IS 'Foreign key to the submission record.';
     COMMENT ON COLUMN submission_upload.upload_id IS 'Foreign key to the associated upload.';

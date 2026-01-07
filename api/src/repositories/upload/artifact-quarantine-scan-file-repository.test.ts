@@ -7,6 +7,7 @@ import { ApiExecuteSQLError } from '../../errors/api-error';
 import {
   ArtifactQuarantineScanFile,
   CreateArtifactQuarantineScanFile,
+  SecurityStatusEnum,
   UpdateArtifactQuarantineScanFile
 } from '../../models/artifact-quarantine-scan-file';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -41,7 +42,7 @@ describe('ArtifactQuarantineScanFileRepository', () => {
         artifact_quarantine_scan_file_id: 'id-1',
         artifact_quarantine_scan_id: 'scan-id-1',
         file_path: 'path/to/file',
-        status: 'pending'
+        security: SecurityStatusEnum.CLEAN
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
@@ -61,7 +62,7 @@ describe('ArtifactQuarantineScanFileRepository', () => {
       const payload: CreateArtifactQuarantineScanFile = {
         artifact_quarantine_scan_id: 'scan-id-1',
         file_path: 'path/to/file',
-        status: 'pending'
+        security: SecurityStatusEnum.CLEAN
       };
 
       try {
@@ -84,7 +85,7 @@ describe('ArtifactQuarantineScanFileRepository', () => {
       const payload: CreateArtifactQuarantineScanFile = {
         artifact_quarantine_scan_id: 'scan-id-1',
         file_path: 'path/to/file',
-        status: 'pending'
+        security: SecurityStatusEnum.CLEAN
       };
 
       const result = await repo.insertArtifactQuarantineScanFile(payload);
@@ -99,8 +100,8 @@ describe('ArtifactQuarantineScanFileRepository', () => {
       const repo = new ArtifactQuarantineScanFileRepository(mockDBConnection);
 
       const payload: CreateArtifactQuarantineScanFile[] = [
-        { artifact_quarantine_scan_id: 'scan-id-1', file_path: 'file1', status: 'pending' },
-        { artifact_quarantine_scan_id: 'scan-id-2', file_path: 'file2', status: 'clean' }
+        { artifact_quarantine_scan_id: 'scan-id-1', file_path: 'file1', security: SecurityStatusEnum.CLEAN },
+        { artifact_quarantine_scan_id: 'scan-id-2', file_path: 'file2', security: SecurityStatusEnum.INFECTED }
       ];
 
       try {
@@ -118,8 +119,8 @@ describe('ArtifactQuarantineScanFileRepository', () => {
       const repo = new ArtifactQuarantineScanFileRepository(mockDBConnection);
 
       const payload: CreateArtifactQuarantineScanFile[] = [
-        { artifact_quarantine_scan_id: 'scan-id-1', file_path: 'file1', status: 'pending' },
-        { artifact_quarantine_scan_id: 'scan-id-2', file_path: 'file2', status: 'clean' }
+        { artifact_quarantine_scan_id: 'scan-id-1', file_path: 'file1', security: SecurityStatusEnum.CLEAN },
+        { artifact_quarantine_scan_id: 'scan-id-2', file_path: 'file2', security: SecurityStatusEnum.INFECTED }
       ];
 
       const result = await repo.insertArtifactQuarantineScanFileBatch(payload);
@@ -133,7 +134,7 @@ describe('ArtifactQuarantineScanFileRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new ArtifactQuarantineScanFileRepository(mockDBConnection);
 
-      const payload: UpdateArtifactQuarantineScanFile = { status: 'clean' };
+      const payload: UpdateArtifactQuarantineScanFile = { security: SecurityStatusEnum.INFECTED };
 
       try {
         await repo.updateArtifactQuarantineScanFile('id-1', payload);
@@ -149,7 +150,7 @@ describe('ArtifactQuarantineScanFileRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new ArtifactQuarantineScanFileRepository(mockDBConnection);
 
-      const payload: UpdateArtifactQuarantineScanFile = { status: 'clean' };
+      const payload: UpdateArtifactQuarantineScanFile = { security: SecurityStatusEnum.INFECTED };
 
       const result = await repo.updateArtifactQuarantineScanFile('id-1', payload);
       expect(result).to.eql(mockRow);

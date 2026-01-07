@@ -18,7 +18,7 @@ export class ArtifactQuarantineRepository extends BaseRepository {
     const sqlStatement = SQL`
       SELECT
         artifact_quarantine_id,
-        upload_artifact_id,
+        artifact_id,
         status
       FROM
         biohub.artifact_quarantine
@@ -47,7 +47,7 @@ export class ArtifactQuarantineRepository extends BaseRepository {
     const sqlStatement = SQL`
     SELECT
       artifact_quarantine_id,
-      upload_artifact_id,
+      artifact_id,
       status
     FROM
       biohub.artifact_quarantine;
@@ -67,11 +67,11 @@ export class ArtifactQuarantineRepository extends BaseRepository {
   async insertArtifactQuarantine(quarantine: CreateArtifactQuarantine): Promise<{ quarantine_id: string }> {
     const sqlStatement = SQL`
       INSERT INTO biohub.artifact_quarantine (
-        upload_artifact_id,
+        artifact_id,
         status
       ) VALUES (
-        ${quarantine.upload_artifact_id},
-        ${quarantine.status}
+        ${quarantine.artifact_id},
+        ${quarantine.security}
       )
       RETURNING artifact_quarantine_id;
     `;
@@ -102,8 +102,8 @@ export class ArtifactQuarantineRepository extends BaseRepository {
     const sqlStatement = SQL`
       UPDATE biohub.artifact_quarantine
       SET
-        status = COALESCE(${quarantine.status}, status),
-        upload_artifact_id = COALESCE(${quarantine.upload_artifact_id}, upload_artifact_id)
+        status = COALESCE(${quarantine.security}, status),
+        artifact_id = COALESCE(${quarantine.artifact_id}, artifact_id)
       WHERE
         artifact_quarantine_id = ${uploadArtifactQuarantineId}
       RETURNING artifact_quarantine_id;

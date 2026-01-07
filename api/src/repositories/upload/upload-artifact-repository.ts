@@ -17,7 +17,8 @@ export class UploadArtifactRepository extends BaseRepository {
         upload_artifact_id,
         upload_id,
         artifact_id,
-        role
+        role,
+        upload_archive_id
       FROM
         upload_artifact
       WHERE
@@ -47,7 +48,8 @@ export class UploadArtifactRepository extends BaseRepository {
         upload_artifact_id,
         upload_id,
         artifact_id,
-        role
+        role,
+        upload_archive_id
       FROM
         upload_artifact;
     `;
@@ -109,7 +111,7 @@ export class UploadArtifactRepository extends BaseRepository {
         upload_id = COALESCE(${uploadArtifact.upload_id}, upload_id),
         artifact_id = COALESCE(${uploadArtifact.artifact_id}, artifact_id),
         role = COALESCE(${uploadArtifact.role}, role),
-        upload_archive_id = COALESCE(${uploadArtifact.upload_archive_id}, upload_archive_id),
+        upload_archive_id = COALESCE(${uploadArtifact.upload_archive_id}, upload_archive_id)
       WHERE
         upload_artifact_id = ${uploadArtifactId}
       RETURNING upload_artifact_id;

@@ -9,6 +9,7 @@ import {
   CreateArtifactQuarantine,
   UpdateArtifactQuarantine
 } from '../../models/artifact-quarantine';
+import { SecurityStatusEnum } from '../../models/artifact-quarantine-scan-file';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { ArtifactQuarantineRepository } from './artifact-quarantine-repository';
 
@@ -37,8 +38,8 @@ describe('ArtifactQuarantineRepository', () => {
     it('returns a record if found', async () => {
       const mockRow: ArtifactQuarantine = {
         artifact_quarantine_id: 'id-1',
-        upload_artifact_id: 'artifact-uuid',
-        status: 'pending'
+        artifact_id: 'artifact-uuid',
+        security: SecurityStatusEnum.CLEAN
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
@@ -52,8 +53,8 @@ describe('ArtifactQuarantineRepository', () => {
   describe('getArtifactQuarantines', () => {
     it('returns an array of records', async () => {
       const mockRows: ArtifactQuarantine[] = [
-        { artifact_quarantine_id: 'id-1', upload_artifact_id: 'a-1', status: 'pending' },
-        { artifact_quarantine_id: 'id-2', upload_artifact_id: 'a-2', status: 'clean' }
+        { artifact_quarantine_id: 'id-1', artifact_id: 'a-1', security: SecurityStatusEnum.CLEAN },
+        { artifact_quarantine_id: 'id-2', artifact_id: 'a-2', security: SecurityStatusEnum.INFECTED }
       ];
       const mockQueryResponse = { rowCount: 2, rows: mockRows } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
@@ -71,8 +72,8 @@ describe('ArtifactQuarantineRepository', () => {
       const repo = new ArtifactQuarantineRepository(mockDBConnection);
 
       const payload: CreateArtifactQuarantine = {
-        upload_artifact_id: 'artifact-uuid',
-        status: 'pending'
+        artifact_id: 'artifact-uuid',
+        security: SecurityStatusEnum.CLEAN
       };
 
       try {
@@ -91,8 +92,8 @@ describe('ArtifactQuarantineRepository', () => {
       const repo = new ArtifactQuarantineRepository(mockDBConnection);
 
       const payload: CreateArtifactQuarantine = {
-        upload_artifact_id: 'artifact-uuid',
-        status: 'pending'
+        artifact_id: 'artifact-uuid',
+        security: SecurityStatusEnum.CLEAN
       };
       const result = await repo.insertArtifactQuarantine(payload);
 
@@ -106,7 +107,7 @@ describe('ArtifactQuarantineRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new ArtifactQuarantineRepository(mockDBConnection);
 
-      const payload: UpdateArtifactQuarantine = { status: 'clean' };
+      const payload: UpdateArtifactQuarantine = { security: SecurityStatusEnum.INFECTED };
 
       try {
         await repo.updateArtifactQuarantine('id-1', payload);
@@ -123,7 +124,7 @@ describe('ArtifactQuarantineRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new ArtifactQuarantineRepository(mockDBConnection);
 
-      const payload: UpdateArtifactQuarantine = { status: 'clean' };
+      const payload: UpdateArtifactQuarantine = { security: SecurityStatusEnum.INFECTED };
       const result = await repo.updateArtifactQuarantine('id-1', payload);
 
       expect(result).to.eql(mockRow);

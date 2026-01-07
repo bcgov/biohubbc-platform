@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const SecurityResultStatusZod = z.enum(['pending', 'clean', 'infected', 'error', 'skipped']);
+export const SecurityStatusZod = z.enum(['pending', 'clean', 'infected', 'error', 'skipped']);
 
 export enum SecurityStatusEnum {
   PENDING = 'pending',
@@ -17,7 +17,7 @@ export const ArtifactQuarantineScanFile = z.object({
   artifact_quarantine_scan_file_id: z.string().uuid(),
   artifact_quarantine_scan_id: z.string().uuid(),
   file_path: z.string(),
-  status: SecurityResultStatusZod
+  security: SecurityStatusZod
 });
 export type ArtifactQuarantineScanFile = z.infer<typeof ArtifactQuarantineScanFile>;
 
@@ -27,7 +27,7 @@ export type ArtifactQuarantineScanFile = z.infer<typeof ArtifactQuarantineScanFi
 export const CreateArtifactQuarantineScanFile = z.object({
   artifact_quarantine_scan_id: z.string().uuid(),
   file_path: z.string(),
-  status: SecurityResultStatusZod
+  security: SecurityStatusZod
 });
 export type CreateArtifactQuarantineScanFile = z.infer<typeof CreateArtifactQuarantineScanFile>;
 
@@ -37,6 +37,6 @@ export type CreateArtifactQuarantineScanFile = z.infer<typeof CreateArtifactQuar
 export const UpdateArtifactQuarantineScanFile = z.object({
   artifact_quarantine_scan_id: z.string().uuid().optional(),
   file_path: z.string().optional(),
-  status: SecurityResultStatusZod.optional()
+  security: SecurityStatusZod.optional()
 });
 export type UpdateArtifactQuarantineScanFile = z.infer<typeof UpdateArtifactQuarantineScanFile>;
