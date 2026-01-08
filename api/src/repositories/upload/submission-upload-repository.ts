@@ -58,7 +58,7 @@ export class SubmissionUploadRepository extends BaseRepository {
     const knex = getKnex();
 
     let query = knex
-      .select('submission_upload_id', 'submission_id', 'upload_id', 'ua.status')
+      .select('submission_upload_id', 'submission_id', 'upload_id')
       .from('submission_upload')
       .join('upload_artifact ua', 'ua.upload_id', 'submission_upload.upload_id')
       .where('submission_id', submissionId);
