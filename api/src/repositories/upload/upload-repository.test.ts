@@ -33,7 +33,7 @@ describe('UploadRepository', () => {
     it('returns a record if found', async () => {
       const mockRow: Upload = {
         upload_id: 'upload-id-1',
-        status: UploadStatusEnum.COMPLETED,
+        upload_status: UploadStatusEnum.COMPLETED,
         record_end_date: new Date('2025-01-01T00:00:00Z').toISOString(),
         create_user: 1,
         s3_upload_id: 's3-upload-id'
@@ -52,7 +52,7 @@ describe('UploadRepository', () => {
       const mockRows: Upload[] = [
         {
           upload_id: 'upload-id-1',
-          status: UploadStatusEnum.COMPLETED,
+          upload_status: UploadStatusEnum.COMPLETED,
           record_end_date: new Date('2025-01-01T00:00:00Z').toISOString(),
           create_user: 1,
           s3_upload_id: 's3-upload-id'
@@ -74,7 +74,7 @@ describe('UploadRepository', () => {
       const repo = new UploadRepository(mockDBConnection);
 
       const payload: CreateUpload = {
-        status: UploadStatusEnum.COMPLETED,
+        upload_status: UploadStatusEnum.COMPLETED,
         record_end_date: new Date('2025-01-01T00:00:00Z').toISOString(),
         s3_upload_id: 's3-upload-id'
       };
@@ -95,7 +95,7 @@ describe('UploadRepository', () => {
       const repo = new UploadRepository(mockDBConnection);
 
       const payload: CreateUpload = {
-        status: UploadStatusEnum.COMPLETED,
+        upload_status: UploadStatusEnum.COMPLETED,
         record_end_date: new Date('2025-01-01T00:00:00Z').toISOString(),
         s3_upload_id: 's3-upload-id'
       };
@@ -110,7 +110,7 @@ describe('UploadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new UploadRepository(mockDBConnection);
 
-      const payload: UpdateUpload = { status: UploadStatusEnum.COMPLETED };
+      const payload: UpdateUpload = { upload_status: UploadStatusEnum.COMPLETED };
 
       try {
         await repo.updateUpload('upload-id-1', payload);
@@ -127,7 +127,7 @@ describe('UploadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new UploadRepository(mockDBConnection);
 
-      const payload: UpdateUpload = { status: UploadStatusEnum.COMPLETED };
+      const payload: UpdateUpload = { upload_status: UploadStatusEnum.COMPLETED };
       const result = await repo.updateUpload('upload-id-1', payload);
       expect(result).to.eql(mockRow);
     });

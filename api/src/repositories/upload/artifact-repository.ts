@@ -16,7 +16,7 @@ export class ArtifactRepository extends BaseRepository {
     const sqlStatement = SQL`
       SELECT
         artifact_id,
-        status,
+        artifact_status,
         bucket,
         object_key,
         byte_size,
@@ -50,7 +50,7 @@ export class ArtifactRepository extends BaseRepository {
     const sqlStatement = SQL`
       SELECT
         artifact_id,
-        status,
+        artifact_status,
         bucket,
         object_key,
         byte_size,
@@ -78,14 +78,14 @@ export class ArtifactRepository extends BaseRepository {
         bucket,
         object_key,
         byte_size,
-        status,
+        artifact_status,
         checksum_sha256,
         uploaded_at
       ) VALUES (
         ${artifact.bucket},
         ${artifact.object_key},
         ${artifact.byte_size ?? null},
-        ${artifact.status},
+        ${artifact.artifact_status},
         ${artifact.checksum_sha256 ?? null},
         ${artifact.uploaded_at ?? null}
       )
@@ -117,7 +117,7 @@ export class ArtifactRepository extends BaseRepository {
       UPDATE artifact
       SET
         bucket = COALESCE(${artifact.bucket}, bucket),
-        status = COALESCE(${artifact.status}, status),
+        artifact_status = COALESCE(${artifact.artifact_status}, artifact_status),
         object_key = COALESCE(${artifact.object_key}, object_key),
         byte_size = COALESCE(${artifact.byte_size}, byte_size),
         checksum_sha256 = COALESCE(${artifact.checksum_sha256}, checksum_sha256),
@@ -150,7 +150,7 @@ export class ArtifactRepository extends BaseRepository {
   async updateArtifactsByUploadId(uploadId: string, artifact: UpdateArtifact): Promise<{ artifact_id: string }[]> {
     const sqlStatement = SQL`
       UPDATE artifact AS a
-      SET status = COALESCE(${artifact.status ?? null}, a.status),
+      SET artifact_status = COALESCE(${artifact.artifact_status ?? null}, a.artifact_status),
           uploaded_at = COALESCE(${artifact.uploaded_at}, a.uploaded_at)
       FROM upload_archive AS ua
       JOIN upload AS u ON ua.upload_id = u.upload_id

@@ -17,7 +17,7 @@ export class UploadArchiveRepository extends BaseRepository {
         upload_archive_id,
         upload_id,
         artifact_id,
-        status
+        archive_status
       FROM
         upload_archive
       WHERE
@@ -47,7 +47,7 @@ export class UploadArchiveRepository extends BaseRepository {
         upload_archive_id,
         upload_id,
         artifact_id,
-        status
+        archive_status
       FROM
         upload_archive;
     `;
@@ -68,7 +68,7 @@ export class UploadArchiveRepository extends BaseRepository {
         upload_archive_id,
         upload_id,
         artifact_id,
-        status
+        archive_status
       FROM
         upload_archive
       WHERE
@@ -91,11 +91,11 @@ export class UploadArchiveRepository extends BaseRepository {
       INSERT INTO upload_archive (
         upload_id,
         artifact_id,
-        status
+        archive_status
       ) VALUES (
         ${uploadArchive.upload_id},
         ${uploadArchive.artifact_id},
-        ${uploadArchive.status}
+        ${uploadArchive.archive_status}
       )
       RETURNING upload_archive_id;
     `;
@@ -129,7 +129,7 @@ export class UploadArchiveRepository extends BaseRepository {
       SET
         upload_id = COALESCE(${uploadArchive.upload_id}, upload_id),
         artifact_id = COALESCE(${uploadArchive.artifact_id}, artifact_id),
-        status = COALESCE(${uploadArchive.status}, status)
+        archive_status = COALESCE(${uploadArchive.archive_status}, archive_status)
       WHERE
         upload_archive_id = ${uploadArchiveId}
       RETURNING upload_archive_id;
@@ -164,7 +164,7 @@ export class UploadArchiveRepository extends BaseRepository {
       SET
         upload_id = COALESCE(${uploadArchive.upload_id}, upload_id),
         artifact_id = COALESCE(${uploadArchive.artifact_id}, artifact_id),
-        status = COALESCE(${uploadArchive.status}, status)
+        archive_status = COALESCE(${uploadArchive.archive_status}, archive_status)
       WHERE
         upload_id = ${uploadId}
       RETURNING upload_archive_id;

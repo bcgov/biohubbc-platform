@@ -48,7 +48,7 @@ export class UploadIngestionService extends DBService {
 
     // 2. Create upload session
     const { upload_id } = await this.uploadService.insertUpload({
-      status: UploadStatusEnum.PENDING,
+      upload_status: UploadStatusEnum.PENDING,
       record_end_date: dayjs().add(30, 'minute').toISOString(),
       s3_upload_id: null
     });
@@ -63,7 +63,7 @@ export class UploadIngestionService extends DBService {
     const key = `submissions/${submission_id}/uploads/${upload_id}.tar`;
     const artifact = await this.artifactService.insertArtifact({
       bucket: getSecurityObjectStoreBucketName(),
-      status: ArtifactStatusEnum.PENDING,
+      artifact_status: ArtifactStatusEnum.PENDING,
       object_key: key,
       byte_size: bytes,
       checksum_sha256: null,
@@ -74,7 +74,7 @@ export class UploadIngestionService extends DBService {
     const { upload_archive_id } = await this.uploadArchiveService.insertUploadArchive({
       upload_id,
       artifact_id: artifact.artifact_id,
-      status: ProcessStatusStatusEnum.DRAFT // Draft indicates that the archive record is not ready for processing
+      archive_status: ProcessStatusStatusEnum.DRAFT // Draft indicates that the archive record is not ready for processing
     });
 
     // 6. Initialize multipart upload
@@ -123,11 +123,11 @@ export class UploadIngestionService extends DBService {
     await Promise.all([
       // 2. Update upload status to completed
       this.uploadService.updateUpload(uploadId, {
-        status: UploadStatusEnum.COMPLETED
+        upload_status: UploadStatusEnum.COMPLETED
       }),
       // 3. Mark all artifacts as uploaded
       this.artifactService.updateArtifactsByUploadId(uploadId, {
-        status: ArtifactStatusEnum.UPLOADED,
+        artifact_status: ArtifactStatusEnum.UPLOADED,
         uploaded_at: dayjs().toISOString()
       }),
       // 4. Enqueue all artifacts for malware scanning
@@ -135,7 +135,9 @@ export class UploadIngestionService extends DBService {
         security: SecurityStatusEnum.PENDING
       }),
       // 5. Enqueue archives for extraction, but with status = BLOCKED since malware scan must complete first
-      this.uploadArchiveService.updateUploadArchivesByUploadId(uploadId, { status: ProcessStatusStatusEnum.BLOCKED })
+      this.uploadArchiveService.updateUploadArchivesByUploadId(uploadId, {
+        archive_status: ProcessStatusStatusEnum.BLOCKED
+      })
     ]);
 
     // 6. Complete the multipart upload in the security bucket
@@ -176,7 +178,7 @@ export class UploadIngestionService extends DBService {
       now.isBefore(upload.record_end_date) &&
       // Ensure the upload status is PENDING
       // Only uploads that are in a pending state can be finalized; completed or failed uploads cannot
-      upload.status === UploadStatusEnum.PENDING;
+      upload.upload_status === UploadStatusEnum.PENDING;
 
     // If any of the above checks fail, the caller is unauthorized
     if (!authorized) {

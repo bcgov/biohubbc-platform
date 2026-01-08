@@ -34,7 +34,7 @@ describe('ArtifactRepository', () => {
       const mockRow: Artifact = {
         artifact_id: 'artifact-uuid-1',
         bucket: 'test-bucket',
-        status: ArtifactStatusEnum.UPLOADED,
+        artifact_status: ArtifactStatusEnum.UPLOADED,
         object_key: 'key.txt',
         byte_size: 1234,
         checksum_sha256: 'checksum',
@@ -60,7 +60,7 @@ describe('ArtifactRepository', () => {
         {
           artifact_id: 'artifact-uuid-1',
           bucket: 'bucket1',
-          status: ArtifactStatusEnum.UPLOADED,
+          artifact_status: ArtifactStatusEnum.UPLOADED,
           object_key: 'key1.txt',
           byte_size: 123,
           checksum_sha256: 'abc',
@@ -69,7 +69,7 @@ describe('ArtifactRepository', () => {
         {
           artifact_id: 'artifact-uuid-2',
           bucket: 'bucket2',
-          status: ArtifactStatusEnum.ARCHIVED,
+          artifact_status: ArtifactStatusEnum.ARCHIVED,
           object_key: 'key2.txt',
           byte_size: 456,
           checksum_sha256: 'def',
@@ -98,7 +98,7 @@ describe('ArtifactRepository', () => {
 
       const payload: CreateArtifact = {
         bucket: 'bucket',
-        status: ArtifactStatusEnum.UPLOADED,
+        artifact_status: ArtifactStatusEnum.UPLOADED,
         object_key: 'key.txt',
         byte_size: 100,
         checksum_sha256: 'abc',
@@ -122,7 +122,7 @@ describe('ArtifactRepository', () => {
 
       const payload: CreateArtifact = {
         bucket: 'bucket',
-        status: ArtifactStatusEnum.UPLOADED,
+        artifact_status: ArtifactStatusEnum.UPLOADED,
         object_key: 'key.txt',
         byte_size: 100,
         checksum_sha256: 'abc',

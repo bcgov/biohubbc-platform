@@ -32,7 +32,7 @@ describe('ArtifactSecurityScanService', () => {
       const fakeScan: ArtifactSecurityScan = {
         artifact_security_scan_id: 'scan-1',
         artifact_security_id: 'security-1',
-        status: ProcessStatusStatusEnum.PENDING,
+        scan_status: ProcessStatusStatusEnum.PENDING,
         scanner_version: 'v1',
         scanned_at: '2025-01-01T00:00:00Z',
         results: {}
@@ -64,7 +64,7 @@ describe('ArtifactSecurityScanService', () => {
         {
           artifact_security_scan_id: 'scan-1',
           artifact_security_id: 'security-1',
-          status: ProcessStatusStatusEnum.PENDING,
+          scan_status: ProcessStatusStatusEnum.PENDING,
           scanner_version: 'v1',
           scanned_at: '2025-01-01T00:00:00Z',
           results: {}
@@ -72,7 +72,7 @@ describe('ArtifactSecurityScanService', () => {
         {
           artifact_security_scan_id: 'scan-2',
           artifact_security_id: 'security-2',
-          status: ProcessStatusStatusEnum.COMPLETED,
+          scan_status: ProcessStatusStatusEnum.COMPLETED,
           scanner_version: 'v2',
           scanned_at: '2025-01-02T00:00:00Z',
           results: { reason: 'malware detected' }
@@ -103,7 +103,7 @@ describe('ArtifactSecurityScanService', () => {
     it('should insert a new scan record and return its ID', async () => {
       const fakeInput: CreateArtifactSecurityScan = {
         artifact_security_id: 'security-1',
-        status: ProcessStatusStatusEnum.PENDING,
+        scan_status: ProcessStatusStatusEnum.PENDING,
         scanner_version: 'v1',
         scanned_at: '2025-01-01T00:00:00Z',
         results: {}
@@ -122,7 +122,7 @@ describe('ArtifactSecurityScanService', () => {
     it('should throw an error if repository fails', async () => {
       const fakeInput: CreateArtifactSecurityScan = {
         artifact_security_id: 'security-1',
-        status: ProcessStatusStatusEnum.PENDING,
+        scan_status: ProcessStatusStatusEnum.PENDING,
         scanner_version: 'v1',
         scanned_at: '2025-01-01T00:00:00Z',
         results: {}
@@ -144,7 +144,7 @@ describe('ArtifactSecurityScanService', () => {
   describe('updateArtifactSecurityScan', () => {
     it('should update an existing scan record and return its ID', async () => {
       const fakeInput: UpdateArtifactSecurityScan = {
-        status: ProcessStatusStatusEnum.COMPLETED,
+        scan_status: ProcessStatusStatusEnum.COMPLETED,
         scanner_version: 'v2',
         scanned_at: '2025-02-01T00:00:00Z',
         results: { reason: 'malware detected' }
@@ -162,7 +162,7 @@ describe('ArtifactSecurityScanService', () => {
 
     it('should throw an error if repository fails', async () => {
       const fakeInput: UpdateArtifactSecurityScan = {
-        status: ProcessStatusStatusEnum.COMPLETED,
+        scan_status: ProcessStatusStatusEnum.COMPLETED,
         scanner_version: 'v2',
         scanned_at: '2025-02-01T00:00:00Z',
         results: { reason: 'malware detected' }

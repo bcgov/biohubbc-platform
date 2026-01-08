@@ -15,7 +15,7 @@ export class UploadRepository extends BaseRepository {
       SELECT
         upload_id,
         s3_upload_id,
-        status,
+        upload_status,
         record_end_date,
         create_user
       FROM
@@ -46,7 +46,7 @@ export class UploadRepository extends BaseRepository {
       SELECT
         upload_id,
         s3_upload_id,
-        status,
+        upload_status,
         record_end_date,
         create_user
       FROM
@@ -64,11 +64,11 @@ export class UploadRepository extends BaseRepository {
   async insertUpload(upload: CreateUpload): Promise<{ upload_id: string }> {
     const sqlStatement = SQL`
       INSERT INTO upload (
-        status,
+        upload_status,
         s3_upload_id,
         record_end_date
       ) VALUES (
-        ${upload.status},
+        ${upload.upload_status},
         ${upload.s3_upload_id},
         ${upload.record_end_date ?? null}
       )
@@ -94,7 +94,7 @@ export class UploadRepository extends BaseRepository {
     const sqlStatement = SQL`
       UPDATE upload
       SET
-        status = COALESCE(${upload.status}, status),
+        upload_status = COALESCE(${upload.upload_status}, upload_status),
         s3_upload_id = COALESCE(${upload.s3_upload_id}, s3_upload_id),
         record_end_date = COALESCE(${upload.record_end_date}, record_end_date)
       WHERE

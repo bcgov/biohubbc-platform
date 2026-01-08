@@ -19,7 +19,7 @@ export class ArtifactSecurityScanRepository extends BaseRepository {
       SELECT
         artifact_security_scan_id,
         artifact_security_id,
-        status,
+        scan_status,
         scanner_version,
         scanned_at,
         results
@@ -51,7 +51,7 @@ export class ArtifactSecurityScanRepository extends BaseRepository {
       SELECT
         artifact_security_scan_id,
         artifact_security_id,
-        status,
+        scan_status,
         scanner_version,
         scanned_at,
         results
@@ -74,13 +74,13 @@ export class ArtifactSecurityScanRepository extends BaseRepository {
     const sqlStatement = SQL`
       INSERT INTO biohub.artifact_security_scan (
         artifact_security_id,
-        status,
+        scan_status,
         scanner_version,
         scanned_at,
         results
       ) VALUES (
         ${scan.artifact_security_id},
-        ${scan.status},
+        ${scan.scan_status},
         ${scan.scanner_version},
         ${scan.scanned_at},
         ${scan.results}
@@ -115,7 +115,7 @@ export class ArtifactSecurityScanRepository extends BaseRepository {
       UPDATE biohub.artifact_security_scan
       SET
         artifact_security_id = COALESCE(${scan.artifact_security_id}, artifact_security_id),
-        status = COALESCE(${scan.status}, status),
+        scan_status = COALESCE(${scan.scan_status}, scan_status),
         scanner_version = COALESCE(${scan.scanner_version}, scanner_version),
         scanned_at = COALESCE(${scan.scanned_at}, scanned_at),
         results = COALESCE(${scan.results}, results)

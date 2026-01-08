@@ -39,7 +39,7 @@ describe('ArtifactSecurityScanRepository', () => {
       const mockRow: ArtifactSecurityScan = {
         artifact_security_scan_id: 'scan-id-1',
         artifact_security_id: 'security-id-1',
-        status: ProcessStatusStatusEnum.PENDING,
+        scan_status: ProcessStatusStatusEnum.PENDING,
         scanner_version: 'v1.0',
         scanned_at: new Date().toISOString(),
         results: { issues: 0 }
@@ -59,7 +59,7 @@ describe('ArtifactSecurityScanRepository', () => {
         {
           artifact_security_scan_id: 'scan-id-1',
           artifact_security_id: 'security-id-1',
-          status: ProcessStatusStatusEnum.PENDING,
+          scan_status: ProcessStatusStatusEnum.PENDING,
           scanner_version: 'v1.0',
           scanned_at: new Date().toISOString(),
           results: { issues: 0 }
@@ -82,7 +82,7 @@ describe('ArtifactSecurityScanRepository', () => {
 
       const payload: CreateArtifactSecurityScan = {
         artifact_security_id: 'security-id-1',
-        status: ProcessStatusStatusEnum.PENDING,
+        scan_status: ProcessStatusStatusEnum.PENDING,
         scanner_version: 'v1.0',
         scanned_at: new Date().toISOString(),
         results: { issues: 0 }
@@ -105,7 +105,7 @@ describe('ArtifactSecurityScanRepository', () => {
 
       const payload: CreateArtifactSecurityScan = {
         artifact_security_id: 'security-id-1',
-        status: ProcessStatusStatusEnum.PENDING,
+        scan_status: ProcessStatusStatusEnum.PENDING,
         scanner_version: 'v1.0',
         scanned_at: new Date().toISOString(),
         results: { issues: 0 }
@@ -122,7 +122,7 @@ describe('ArtifactSecurityScanRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new ArtifactSecurityScanRepository(mockDBConnection);
 
-      const payload: UpdateArtifactSecurityScan = { status: ProcessStatusStatusEnum.COMPLETED };
+      const payload: UpdateArtifactSecurityScan = { scan_status: ProcessStatusStatusEnum.COMPLETED };
 
       try {
         await repo.updateArtifactSecurityScan('scan-id-1', payload);
@@ -139,7 +139,7 @@ describe('ArtifactSecurityScanRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new ArtifactSecurityScanRepository(mockDBConnection);
 
-      const payload: UpdateArtifactSecurityScan = { status: ProcessStatusStatusEnum.COMPLETED };
+      const payload: UpdateArtifactSecurityScan = { scan_status: ProcessStatusStatusEnum.COMPLETED };
 
       const result = await repo.updateArtifactSecurityScan('scan-id-1', payload);
       expect(result).to.eql(mockRow);

@@ -20,7 +20,7 @@ export class ArtifactSecurityScanFileRepository extends BaseRepository {
         artifact_security_scan_file_id,
         artifact_security_scan_id,
         file_path,
-        security
+        result
       FROM
         biohub.artifact_security_scan_file
       WHERE
@@ -50,17 +50,17 @@ export class ArtifactSecurityScanFileRepository extends BaseRepository {
       INSERT INTO biohub.artifact_security_scan_file (
         artifact_security_scan_id,
         file_path,
-        security
+        result
       ) VALUES (
         ${scanFile.artifact_security_scan_id},
         ${scanFile.file_path},
-        ${scanFile.security ?? null}
+        ${scanFile.result ?? null}
       )
       RETURNING 
         artifact_security_scan_file_id,
         artifact_security_scan_id,
         file_path,
-        security;
+        result;
     `;
 
     const response = await this.connection.sql(sqlStatement, ArtifactSecurityScanFile);
@@ -88,7 +88,7 @@ export class ArtifactSecurityScanFileRepository extends BaseRepository {
       INSERT INTO biohub.artifact_security_scan_file (
         artifact_security_scan_id,
         file_path,
-        security
+        result
       ) VALUES
     `;
 
@@ -99,7 +99,7 @@ export class ArtifactSecurityScanFileRepository extends BaseRepository {
       sqlStatement.append(SQL`(
         ${file.artifact_security_scan_id},
         ${file.file_path},
-        ${file.security ?? null}
+        ${file.result ?? null}
       )`);
     });
 
@@ -133,14 +133,14 @@ export class ArtifactSecurityScanFileRepository extends BaseRepository {
     const sqlStatement = SQL`
       UPDATE biohub.artifact_security_scan_file
       SET
-        security = COALESCE(${scanFile.security}, security)
+        security = COALESCE(${scanFile.result}, security)
       WHERE
         artifact_security_scan_file_id = ${uploadArtifactSecurityScanFileId}
       RETURNING 
         artifact_security_scan_file_id,
         artifact_security_scan_id,
         file_path,
-        security;
+        result;
     `;
 
     const response = await this.connection.sql(sqlStatement, ArtifactSecurityScanFile);

@@ -8,7 +8,7 @@ export const ArtifactSecurityScanFile = z.object({
   artifact_security_scan_file_id: z.string().uuid(),
   artifact_security_scan_id: z.string().uuid(),
   file_path: z.string(),
-  security: SecurityStatusZod
+  result: SecurityStatusZod
 });
 export type ArtifactSecurityScanFile = z.infer<typeof ArtifactSecurityScanFile>;
 
@@ -18,7 +18,7 @@ export type ArtifactSecurityScanFile = z.infer<typeof ArtifactSecurityScanFile>;
 export const CreateArtifactSecurityScanFile = z.object({
   artifact_security_scan_id: z.string().uuid(),
   file_path: z.string(),
-  security: SecurityStatusZod
+  result: SecurityStatusZod
 });
 export type CreateArtifactSecurityScanFile = z.infer<typeof CreateArtifactSecurityScanFile>;
 
@@ -28,6 +28,6 @@ export type CreateArtifactSecurityScanFile = z.infer<typeof CreateArtifactSecuri
 export const UpdateArtifactSecurityScanFile = z.object({
   artifact_security_scan_id: z.string().uuid().optional(),
   file_path: z.string().optional(),
-  security: SecurityStatusZod.optional()
+  result: SecurityStatusZod.optional()
 });
 export type UpdateArtifactSecurityScanFile = z.infer<typeof UpdateArtifactSecurityScanFile>;

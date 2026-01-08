@@ -26,7 +26,7 @@ describe('UploadService', () => {
     it('should retrieve a single upload record', async () => {
       const fakeUpload: Upload = {
         upload_id: '123',
-        status: UploadStatusEnum.COMPLETED,
+        upload_status: UploadStatusEnum.COMPLETED,
         record_end_date: new Date().toISOString(),
         create_user: 1,
         s3_upload_id: 's3-upload-id'
@@ -58,14 +58,14 @@ describe('UploadService', () => {
       const fakeUploads: Upload[] = [
         {
           upload_id: '1',
-          status: UploadStatusEnum.COMPLETED,
+          upload_status: UploadStatusEnum.COMPLETED,
           record_end_date: new Date().toISOString(),
           create_user: 1,
           s3_upload_id: 's3-upload-id'
         },
         {
           upload_id: '2',
-          status: UploadStatusEnum.COMPLETED,
+          upload_status: UploadStatusEnum.COMPLETED,
           record_end_date: '2025-12-31',
           create_user: 1,
           s3_upload_id: 's3-upload-id'
@@ -96,7 +96,7 @@ describe('UploadService', () => {
   describe('insertUpload', () => {
     it('should insert a new upload', async () => {
       const newUpload: CreateUpload = {
-        status: UploadStatusEnum.COMPLETED,
+        upload_status: UploadStatusEnum.COMPLETED,
         record_end_date: new Date().toISOString(),
         s3_upload_id: 's3-upload-id'
       };
@@ -111,7 +111,7 @@ describe('UploadService', () => {
 
     it('should throw an error if repository fails', async () => {
       const newUpload: CreateUpload = {
-        status: UploadStatusEnum.COMPLETED,
+        upload_status: UploadStatusEnum.COMPLETED,
         record_end_date: new Date().toISOString(),
 
         s3_upload_id: 's3-upload-id'
@@ -132,7 +132,7 @@ describe('UploadService', () => {
   describe('updateUpload', () => {
     it('should update an existing upload', async () => {
       const updateData: UpdateUpload = {
-        status: UploadStatusEnum.COMPLETED
+        upload_status: UploadStatusEnum.COMPLETED
       };
 
       const stub = sinon.stub(UploadRepository.prototype, 'updateUpload').resolves({ upload_id: '123' });
@@ -145,7 +145,7 @@ describe('UploadService', () => {
 
     it('should throw an error if repository fails', async () => {
       const updateData: UpdateUpload = {
-        status: UploadStatusEnum.COMPLETED
+        upload_status: UploadStatusEnum.COMPLETED
       };
 
       const stub = sinon.stub(UploadRepository.prototype, 'updateUpload').rejects(new Error('DB error'));

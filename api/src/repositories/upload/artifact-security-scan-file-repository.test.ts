@@ -42,7 +42,7 @@ describe('ArtifactSecurityScanFileRepository', () => {
         artifact_security_scan_file_id: 'id-1',
         artifact_security_scan_id: 'scan-id-1',
         file_path: 'path/to/file',
-        security: SecurityStatusEnum.CLEAN
+        result: SecurityStatusEnum.CLEAN
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
@@ -62,7 +62,7 @@ describe('ArtifactSecurityScanFileRepository', () => {
       const payload: CreateArtifactSecurityScanFile = {
         artifact_security_scan_id: 'scan-id-1',
         file_path: 'path/to/file',
-        security: SecurityStatusEnum.CLEAN
+        result: SecurityStatusEnum.CLEAN
       };
 
       try {
@@ -85,7 +85,7 @@ describe('ArtifactSecurityScanFileRepository', () => {
       const payload: CreateArtifactSecurityScanFile = {
         artifact_security_scan_id: 'scan-id-1',
         file_path: 'path/to/file',
-        security: SecurityStatusEnum.CLEAN
+        result: SecurityStatusEnum.CLEAN
       };
 
       const result = await repo.insertArtifactSecurityScanFile(payload);
@@ -100,8 +100,8 @@ describe('ArtifactSecurityScanFileRepository', () => {
       const repo = new ArtifactSecurityScanFileRepository(mockDBConnection);
 
       const payload: CreateArtifactSecurityScanFile[] = [
-        { artifact_security_scan_id: 'scan-id-1', file_path: 'file1', security: SecurityStatusEnum.CLEAN },
-        { artifact_security_scan_id: 'scan-id-2', file_path: 'file2', security: SecurityStatusEnum.INFECTED }
+        { artifact_security_scan_id: 'scan-id-1', file_path: 'file1', result: SecurityStatusEnum.CLEAN },
+        { artifact_security_scan_id: 'scan-id-2', file_path: 'file2', result: SecurityStatusEnum.INFECTED }
       ];
 
       try {
@@ -119,8 +119,8 @@ describe('ArtifactSecurityScanFileRepository', () => {
       const repo = new ArtifactSecurityScanFileRepository(mockDBConnection);
 
       const payload: CreateArtifactSecurityScanFile[] = [
-        { artifact_security_scan_id: 'scan-id-1', file_path: 'file1', security: SecurityStatusEnum.CLEAN },
-        { artifact_security_scan_id: 'scan-id-2', file_path: 'file2', security: SecurityStatusEnum.INFECTED }
+        { artifact_security_scan_id: 'scan-id-1', file_path: 'file1', result: SecurityStatusEnum.CLEAN },
+        { artifact_security_scan_id: 'scan-id-2', file_path: 'file2', result: SecurityStatusEnum.INFECTED }
       ];
 
       const result = await repo.insertArtifactSecurityScanFileBatch(payload);
@@ -134,7 +134,7 @@ describe('ArtifactSecurityScanFileRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new ArtifactSecurityScanFileRepository(mockDBConnection);
 
-      const payload: UpdateArtifactSecurityScanFile = { security: SecurityStatusEnum.INFECTED };
+      const payload: UpdateArtifactSecurityScanFile = { result: SecurityStatusEnum.INFECTED };
 
       try {
         await repo.updateArtifactSecurityScanFile('id-1', payload);
@@ -150,7 +150,7 @@ describe('ArtifactSecurityScanFileRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new ArtifactSecurityScanFileRepository(mockDBConnection);
 
-      const payload: UpdateArtifactSecurityScanFile = { security: SecurityStatusEnum.INFECTED };
+      const payload: UpdateArtifactSecurityScanFile = { result: SecurityStatusEnum.INFECTED };
 
       const result = await repo.updateArtifactSecurityScanFile('id-1', payload);
       expect(result).to.eql(mockRow);

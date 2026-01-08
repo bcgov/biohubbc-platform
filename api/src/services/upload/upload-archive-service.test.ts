@@ -29,7 +29,7 @@ describe('UploadArchiveService', () => {
         upload_archive_id: 'archive-1',
         upload_id: 'upload-1',
         artifact_id: 'artifact-1',
-        status: ProcessStatusStatusEnum.PENDING
+        archive_status: ProcessStatusStatusEnum.PENDING
       };
 
       const stub = sinon.stub(UploadArchiveRepository.prototype, 'getUploadArchive').resolves(fakeUploadArchive);
@@ -57,7 +57,7 @@ describe('UploadArchiveService', () => {
       const fakeInput: CreateUploadArchive = {
         upload_id: 'upload-1',
         artifact_id: 'artifact-1',
-        status: ProcessStatusStatusEnum.PENDING
+        archive_status: ProcessStatusStatusEnum.PENDING
       };
 
       const stub = sinon
@@ -74,7 +74,7 @@ describe('UploadArchiveService', () => {
       const fakeInput: CreateUploadArchive = {
         upload_id: 'upload-1',
         artifact_id: 'artifact-1',
-        status: ProcessStatusStatusEnum.PENDING
+        archive_status: ProcessStatusStatusEnum.PENDING
       };
 
       sinon.stub(UploadArchiveRepository.prototype, 'insertUploadArchive').rejects(new Error('Insert failed'));
@@ -91,7 +91,7 @@ describe('UploadArchiveService', () => {
   describe('updateUploadArchive', () => {
     it('should update an existing upload archive record and return its ID', async () => {
       const fakeInput: UpdateUploadArchive = {
-        status: ProcessStatusStatusEnum.COMPLETED
+        archive_status: ProcessStatusStatusEnum.COMPLETED
       };
 
       const stub = sinon
@@ -106,7 +106,7 @@ describe('UploadArchiveService', () => {
 
     it('should throw an error if repository fails', async () => {
       const fakeInput: UpdateUploadArchive = {
-        status: ProcessStatusStatusEnum.COMPLETED
+        archive_status: ProcessStatusStatusEnum.COMPLETED
       };
 
       sinon.stub(UploadArchiveRepository.prototype, 'updateUploadArchive').rejects(new Error('Update failed'));
@@ -123,7 +123,7 @@ describe('UploadArchiveService', () => {
   describe('updateUploadArchivesByUploadId', () => {
     it('should update multiple upload archive records for a given upload ID', async () => {
       const fakeInput: UpdateUploadArchive = {
-        status: ProcessStatusStatusEnum.COMPLETED
+        archive_status: ProcessStatusStatusEnum.COMPLETED
       };
 
       const stub = sinon
@@ -140,7 +140,7 @@ describe('UploadArchiveService', () => {
 
     it('should throw an error if repository fails', async () => {
       const fakeInput: UpdateUploadArchive = {
-        status: ProcessStatusStatusEnum.COMPLETED
+        archive_status: ProcessStatusStatusEnum.COMPLETED
       };
 
       sinon
@@ -163,13 +163,13 @@ describe('UploadArchiveService', () => {
           upload_archive_id: 'archive-1',
           upload_id: 'upload-1',
           artifact_id: 'artifact-1',
-          status: ProcessStatusStatusEnum.PENDING
+          archive_status: ProcessStatusStatusEnum.PENDING
         },
         {
           upload_archive_id: 'archive-2',
           upload_id: 'upload-1',
           artifact_id: 'artifact-2',
-          status: ProcessStatusStatusEnum.COMPLETED
+          archive_status: ProcessStatusStatusEnum.COMPLETED
         }
       ];
 

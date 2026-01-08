@@ -33,7 +33,7 @@ describe('ArtifactSecurityScanFileService', () => {
         artifact_security_scan_file_id: 'scan-file-1',
         artifact_security_scan_id: 'scan-1',
         file_path: 'folder/file.txt',
-        security: SecurityStatusEnum.INFECTED
+        result: SecurityStatusEnum.INFECTED
       };
 
       sinon.stub(ArtifactSecurityScanFileRepository.prototype, 'getArtifactSecurityScanFile').resolves(fakeScanFile);
@@ -62,14 +62,14 @@ describe('ArtifactSecurityScanFileService', () => {
       const fakeInput: CreateArtifactSecurityScanFile = {
         artifact_security_scan_id: 'scan-1',
         file_path: 'folder/file.txt',
-        security: SecurityStatusEnum.INFECTED
+        result: SecurityStatusEnum.INFECTED
       };
 
       const fakeOutput: ArtifactSecurityScanFile = {
         artifact_security_scan_file_id: 'scan-file-new',
         artifact_security_scan_id: 'artifact-security-scan-1',
         file_path: 'file/path',
-        security: SecurityStatusEnum.CLEAN
+        result: SecurityStatusEnum.CLEAN
       };
 
       sinon.stub(ArtifactSecurityScanFileRepository.prototype, 'insertArtifactSecurityScanFile').resolves(fakeOutput);
@@ -83,7 +83,7 @@ describe('ArtifactSecurityScanFileService', () => {
       const fakeInput: CreateArtifactSecurityScanFile = {
         artifact_security_scan_id: 'scan-1',
         file_path: 'folder/file.txt',
-        security: SecurityStatusEnum.INFECTED
+        result: SecurityStatusEnum.INFECTED
       };
 
       sinon
@@ -105,12 +105,12 @@ describe('ArtifactSecurityScanFileService', () => {
         {
           artifact_security_scan_id: 'scan-1',
           file_path: 'file1.txt',
-          security: SecurityStatusEnum.INFECTED
+          result: SecurityStatusEnum.INFECTED
         },
         {
           artifact_security_scan_id: 'scan-1',
           file_path: 'file2.txt',
-          security: SecurityStatusEnum.INFECTED
+          result: SecurityStatusEnum.INFECTED
         }
       ];
 
@@ -119,13 +119,13 @@ describe('ArtifactSecurityScanFileService', () => {
           artifact_security_scan_file_id: 'scan-file-1',
           artifact_security_scan_id: 'artifact-security-scan-1',
           file_path: 'file/path1',
-          security: SecurityStatusEnum.CLEAN
+          result: SecurityStatusEnum.CLEAN
         },
         {
           artifact_security_scan_file_id: 'scan-file-2',
           artifact_security_scan_id: 'artifact-security-scan-1',
           file_path: 'file/path2',
-          security: SecurityStatusEnum.CLEAN
+          result: SecurityStatusEnum.CLEAN
         }
       ];
 
@@ -143,7 +143,7 @@ describe('ArtifactSecurityScanFileService', () => {
         {
           artifact_security_scan_id: 'scan-1',
           file_path: 'file1.txt',
-          security: SecurityStatusEnum.INFECTED
+          result: SecurityStatusEnum.INFECTED
         }
       ];
 
@@ -163,14 +163,14 @@ describe('ArtifactSecurityScanFileService', () => {
   describe('updateArtifactSecurityScanFile', () => {
     it('should update an existing scan file record and return the record', async () => {
       const fakeInput: UpdateArtifactSecurityScanFile = {
-        security: SecurityStatusEnum.INFECTED
+        result: SecurityStatusEnum.INFECTED
       };
 
       const fakeOutput: ArtifactSecurityScanFile = {
         artifact_security_scan_file_id: 'scan-file-1',
         artifact_security_scan_id: 'artifact-security-scan-1',
         file_path: 'file/path',
-        security: SecurityStatusEnum.CLEAN
+        result: SecurityStatusEnum.CLEAN
       };
 
       sinon.stub(ArtifactSecurityScanFileRepository.prototype, 'updateArtifactSecurityScanFile').resolves(fakeOutput);
@@ -182,7 +182,7 @@ describe('ArtifactSecurityScanFileService', () => {
 
     it('should throw an error if repository fails', async () => {
       const fakeInput: UpdateArtifactSecurityScanFile = {
-        security: SecurityStatusEnum.INFECTED
+        result: SecurityStatusEnum.INFECTED
       };
 
       sinon

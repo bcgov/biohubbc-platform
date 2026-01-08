@@ -8,7 +8,7 @@ export const UploadArchive = z.object({
   upload_archive_id: z.string().uuid(),
   upload_id: z.string().uuid(),
   artifact_id: z.string().uuid(),
-  status: ProcessStatusStatusZod
+  archive_status: ProcessStatusStatusZod
 });
 export type UploadArchive = z.infer<typeof UploadArchive>;
 
@@ -18,7 +18,7 @@ export type UploadArchive = z.infer<typeof UploadArchive>;
 export const CreateUploadArchive = z.object({
   upload_id: z.string().uuid(),
   artifact_id: z.string().uuid(),
-  status: ProcessStatusStatusZod
+  archive_status: ProcessStatusStatusZod
 });
 export type CreateUploadArchive = z.infer<typeof CreateUploadArchive>;
 
@@ -28,6 +28,6 @@ export type CreateUploadArchive = z.infer<typeof CreateUploadArchive>;
 export const UpdateUploadArchive = z.object({
   upload_id: z.string().uuid().optional(),
   artifact_id: z.string().uuid().optional(),
-  status: ProcessStatusStatusZod.optional()
+  archive_status: ProcessStatusStatusZod.optional()
 });
 export type UpdateUploadArchive = z.infer<typeof UpdateUploadArchive>;

@@ -169,7 +169,7 @@ describe('UploadIngestionService', () => {
     const mockUpload: Upload = {
       upload_id: 'upload-456',
       s3_upload_id: 's3-upload-111',
-      status: UploadStatusEnum.PENDING,
+      upload_status: UploadStatusEnum.PENDING,
       record_end_date: dayjs().add(30, 'minute').toISOString(),
       create_user: 1
     };
@@ -190,13 +190,13 @@ describe('UploadIngestionService', () => {
     const mockUploadArchiveRecords: UploadArchive[] = [
       {
         upload_archive_id: 'upload-archive-1',
-        status: ProcessStatusStatusEnum.BLOCKED,
+        archive_status: ProcessStatusStatusEnum.BLOCKED,
         artifact_id: 'artifact-1',
         upload_id: 'upload-456'
       },
       {
         upload_archive_id: 'upload-archive-2',
-        status: ProcessStatusStatusEnum.BLOCKED,
+        archive_status: ProcessStatusStatusEnum.BLOCKED,
         artifact_id: 'artifact-2',
         upload_id: 'upload-456'
       }
@@ -257,7 +257,7 @@ describe('UploadIngestionService', () => {
     it('should throw HTTP401 if upload is not in PENDING status', async () => {
       const invalidUpload = {
         ...mockUpload,
-        status: UploadStatusEnum.COMPLETED
+        upload_status: UploadStatusEnum.COMPLETED
       };
       sinon.stub(UploadService.prototype, 'getUpload').resolves(invalidUpload);
 

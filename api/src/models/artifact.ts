@@ -15,7 +15,7 @@ export enum ArtifactStatusEnum {
  */
 export const Artifact = z.object({
   artifact_id: z.string().uuid(),
-  status: ArtifactStatusZod,
+  artifact_status: ArtifactStatusZod,
   bucket: z.string().max(200),
   object_key: z.string(),
   byte_size: z.number().int().nullable(),
@@ -29,7 +29,7 @@ export type Artifact = z.infer<typeof Artifact>;
  */
 export const CreateArtifact = z.object({
   bucket: z.string().max(200),
-  status: ArtifactStatusZod,
+  artifact_status: ArtifactStatusZod,
   object_key: z.string(),
   byte_size: z.number().int().nullable(),
   checksum_sha256: z.string().length(64).nullable(),
@@ -42,7 +42,7 @@ export type CreateArtifact = z.infer<typeof CreateArtifact>;
  */
 export const UpdateArtifact = z.object({
   bucket: z.string().max(200).optional(),
-  status: ArtifactStatusZod.optional(),
+  artifact_status: ArtifactStatusZod.optional(),
   object_key: z.string().optional(),
   byte_size: z.number().int().nullable().optional(),
   checksum_sha256: z.string().length(64).nullable().optional(),
