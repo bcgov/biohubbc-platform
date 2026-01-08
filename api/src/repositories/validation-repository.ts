@@ -1,6 +1,11 @@
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import {
+  FeatureProperty,
+  FeatureTypeRecord,
+  FeatureTypeWithProperties,
+  FeatureTypeWithPropertiesRow
+} from '../models/feature-type';
 import { BaseRepository } from './base-repository';
 
 export interface IInsertStyleSchema {
@@ -10,16 +15,6 @@ export interface IInsertStyleSchema {
 export interface IStyleModel {
   something: any; //TODO
 }
-
-export const FeatureProperties = z.object({
-  name: z.string(),
-  display_name: z.string(),
-  description: z.string(),
-  type_name: z.string(),
-  required_value: z.boolean()
-});
-
-export type FeatureProperties = z.infer<typeof FeatureProperties>;
 
 /**
  * A repository class for accessing validation data.
@@ -33,10 +28,10 @@ export class ValidationRepository extends BaseRepository {
    * Get feature properties for given feature type.
    *
    * @param {string} featureType
-   * @return {*}  {Promise<FeatureProperties[]>}
+   * @return {*}  {Promise<FeatureProperty[]>}
    * @memberof ValidationRepository
    */
-  async getFeatureValidationProperties(featureType: string): Promise<FeatureProperties[]> {
+  async getFeatureValidationProperties(featureType: string): Promise<FeatureProperty[]> {
     const sqlStatement = SQL`
       SELECT
         feature_property.name,
@@ -60,7 +55,7 @@ export class ValidationRepository extends BaseRepository {
         feature_property.calculated_value = false;
     `;
 
-    const response = await this.connection.sql(sqlStatement, FeatureProperties);
+    const response = await this.connection.sql(sqlStatement, FeatureProperty);
 
     if (response.rowCount === 0) {
       throw new ApiExecuteSQLError(`Failed to get validation properties for feature type: ${featureType}`, [
@@ -70,6 +65,75 @@ export class ValidationRepository extends BaseRepository {
     }
 
     return response.rows;
+  }
+
+  /**
+   * Get feature type with its associated properties.
+   * Returns null if the feature type does not exist.
+   * Returns empty properties array if the feature type exists but has no properties.
+   *
+   * @param {string} name - The feature type name to look up
+   * @return {Promise<FeatureTypeWithProperties | null>} The feature type with properties, or null if not found
+   * @memberof ValidationRepository
+   */
+  async getFeatureTypeWithProperties(name: string): Promise<FeatureTypeWithProperties | null> {
+    const sqlStatement = SQL`
+      SELECT
+        ft.feature_type_id,
+        ft.name,
+        ft.display_name,
+        fp.name as property_name,
+        fp.display_name as property_display_name,
+        fp.description as property_description,
+        fpt.name as property_type_name,
+        ftp.required_value
+      FROM
+        feature_type ft
+      LEFT JOIN
+        feature_type_property ftp ON ft.feature_type_id = ftp.feature_type_id
+        AND ftp.record_end_date IS NULL
+      LEFT JOIN
+        feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+        AND fp.calculated_value = false
+        AND fp.record_end_date IS NULL
+      LEFT JOIN
+        feature_property_type fpt ON fp.feature_property_type_id = fpt.feature_property_type_id
+        AND fpt.record_end_date IS NULL
+      WHERE
+        ft.name = ${name}
+        AND ft.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, FeatureTypeWithPropertiesRow);
+
+    // No rows means feature type doesn't exist or is soft-deleted
+    if (response.rowCount === 0) {
+      return null;
+    }
+
+    // Extract feature type info from the first row
+    const firstRow = response.rows[0];
+    const featureType: FeatureTypeRecord = {
+      feature_type_id: firstRow.feature_type_id,
+      name: firstRow.name,
+      display_name: firstRow.display_name
+    };
+
+    // Extract properties from all rows (filter out null properties from LEFT JOIN)
+    const properties: FeatureProperty[] = response.rows
+      .filter((row) => row.property_name !== null)
+      .map((row) => ({
+        name: row.property_name as string,
+        display_name: row.property_display_name as string,
+        description: row.property_description as string,
+        type_name: row.property_type_name as string,
+        required_value: row.required_value as boolean
+      }));
+
+    return {
+      featureType,
+      properties
+    };
   }
 
   /**

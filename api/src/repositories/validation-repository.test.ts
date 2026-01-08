@@ -58,6 +58,130 @@ describe('ValidationRepository', () => {
     });
   });
 
+  describe('getFeatureTypeWithProperties', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should return feature type with properties when valid', async () => {
+      const mockQueryResponse = {
+        rowCount: 2,
+        rows: [
+          {
+            feature_type_id: 1,
+            name: 'dataset',
+            display_name: 'Dataset',
+            property_name: 'name',
+            property_display_name: 'Name',
+            property_description: 'The name of the dataset',
+            property_type_name: 'string',
+            required_value: true
+          },
+          {
+            feature_type_id: 1,
+            name: 'dataset',
+            display_name: 'Dataset',
+            property_name: 'description',
+            property_display_name: 'Description',
+            property_description: 'The description of the dataset',
+            property_type_name: 'string',
+            required_value: false
+          }
+        ]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const validationRepository = new ValidationRepository(mockDBConnection);
+
+      const response = await validationRepository.getFeatureTypeWithProperties('dataset');
+
+      expect(response).to.eql({
+        featureType: {
+          feature_type_id: 1,
+          name: 'dataset',
+          display_name: 'Dataset'
+        },
+        properties: [
+          {
+            name: 'name',
+            display_name: 'Name',
+            description: 'The name of the dataset',
+            type_name: 'string',
+            required_value: true
+          },
+          {
+            name: 'description',
+            display_name: 'Description',
+            description: 'The description of the dataset',
+            type_name: 'string',
+            required_value: false
+          }
+        ]
+      });
+    });
+
+    it('should return null when feature type does not exist', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const validationRepository = new ValidationRepository(mockDBConnection);
+
+      const response = await validationRepository.getFeatureTypeWithProperties('nonexistent_type');
+
+      expect(response).to.be.null;
+    });
+
+    it('should return empty properties array when type has no properties', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [
+          {
+            feature_type_id: 99,
+            name: 'empty_type',
+            display_name: 'Empty Type',
+            property_name: null,
+            property_display_name: null,
+            property_description: null,
+            property_type_name: null,
+            required_value: null
+          }
+        ]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const validationRepository = new ValidationRepository(mockDBConnection);
+
+      const response = await validationRepository.getFeatureTypeWithProperties('empty_type');
+
+      expect(response).to.eql({
+        featureType: {
+          feature_type_id: 99,
+          name: 'empty_type',
+          display_name: 'Empty Type'
+        },
+        properties: []
+      });
+    });
+  });
+
   describe('insertStyleSchema', () => {
     afterEach(() => {
       sinon.restore();

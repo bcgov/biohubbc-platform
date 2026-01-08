@@ -21,6 +21,18 @@ export type PostSubmissionFeature = z.infer<typeof PostSubmissionFeatureSchema>;
 export type PostSubmissionFeatureArray = z.infer<typeof PostSubmissionFeatureArraySchema>;
 
 /**
+ * Flat submission feature structure matching SIMS IFlattenedBlock.
+ * Parent-child relationships are expressed via UUID references.
+ */
+export interface IFlattenedBlock {
+  id: string;
+  type: string;
+  properties: Record<string, unknown>;
+  content: string[];
+  parent: string | null;
+}
+
+/**
  * Submission record schema
  * Now includes a reference to the artifact security record
  */
