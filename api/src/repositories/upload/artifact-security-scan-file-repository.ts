@@ -103,9 +103,7 @@ export class ArtifactSecurityScanFileRepository extends BaseRepository {
       )`);
     });
 
-    sqlStatement.append(
-      SQL` RETURNING artifact_security_scan_file_id, artifact_security_scan_id, file_path, security;`
-    );
+    sqlStatement.append(SQL` RETURNING artifact_security_scan_file_id, artifact_security_scan_id, file_path, result;`);
 
     const response = await this.connection.sql(sqlStatement, ArtifactSecurityScanFile);
 
@@ -133,7 +131,7 @@ export class ArtifactSecurityScanFileRepository extends BaseRepository {
     const sqlStatement = SQL`
       UPDATE biohub.artifact_security_scan_file
       SET
-        security = COALESCE(${scanFile.result}, security)
+        result = COALESCE(${scanFile.result}, result)
       WHERE
         artifact_security_scan_file_id = ${uploadArtifactSecurityScanFileId}
       RETURNING 
