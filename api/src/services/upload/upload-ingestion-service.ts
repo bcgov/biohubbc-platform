@@ -134,11 +134,11 @@ export class UploadIngestionService extends DBService {
       this.artifactSecurityService.insertArtifactSecurityByUploadId(uploadId, {
         security: SecurityStatusEnum.PENDING
       }),
-      // 4. Enqueue archives for extraction, but with status = BLOCKED since malware scan must complete first
+      // 5. Enqueue archives for extraction, but with status = BLOCKED since malware scan must complete first
       this.uploadArchiveService.updateUploadArchivesByUploadId(uploadId, { status: ProcessStatusStatusEnum.BLOCKED })
     ]);
 
-    // 5. Complete the multipart upload in the security bucket
+    // 6. Complete the multipart upload in the security bucket
     const s3Client = getSecurityS3Client();
     await s3Client.send(
       new CompleteMultipartUploadCommand({
