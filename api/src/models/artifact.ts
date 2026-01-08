@@ -1,12 +1,13 @@
 import { z } from 'zod';
 
-export const ArtifactStatusZod = z.enum(['draft', 'pending', 'completed', 'failed']);
+export const ArtifactStatusZod = z.enum(['pending', 'uploaded', 'deleted', 'failed', 'archived']);
 
 export enum ArtifactStatusEnum {
-  DRAFT = 'draft',
   PENDING = 'pending',
-  COMPLETED = 'completed',
-  FAILED = 'failed'
+  UPLOADED = 'uploaded',
+  DELETED = 'deleted',
+  FAILED = 'failed',
+  ARCHIVED = 'archived'
 }
 
 /**

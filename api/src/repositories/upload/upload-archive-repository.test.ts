@@ -4,6 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { CreateUploadArchive, UpdateUploadArchive, UploadArchive } from '../../models/upload-archive';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { UploadArchiveRepository } from './upload-archive-repository';
@@ -35,7 +36,7 @@ describe('UploadArchiveRepository', () => {
         upload_archive_id: 'upload-archive-id-1',
         upload_id: 'upload-id-1',
         artifact_id: 'artifact-id-1',
-        status: 'pending'
+        status: ProcessStatusStatusEnum.PENDING
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
@@ -53,13 +54,13 @@ describe('UploadArchiveRepository', () => {
           upload_archive_id: 'upload-archive-id-1',
           upload_id: 'upload-id-1',
           artifact_id: 'artifact-id-1',
-          status: 'pending'
+          status: ProcessStatusStatusEnum.PENDING
         },
         {
           upload_archive_id: 'upload-archive-id-2',
           upload_id: 'upload-id-2',
           artifact_id: 'artifact-id-2',
-          status: 'completed'
+          status: ProcessStatusStatusEnum.COMPLETED
         }
       ];
       const mockQueryResponse = { rowCount: 2, rows: mockRows } as any as Promise<QueryResult<any>>;
@@ -96,13 +97,13 @@ describe('UploadArchiveRepository', () => {
           upload_archive_id: 'upload-archive-id-1',
           upload_id: 'upload-id-1',
           artifact_id: 'artifact-id-1',
-          status: 'pending'
+          status: ProcessStatusStatusEnum.PENDING
         },
         {
           upload_archive_id: 'upload-archive-id-2',
           upload_id: 'upload-id-1',
           artifact_id: 'artifact-id-2',
-          status: 'completed'
+          status: ProcessStatusStatusEnum.COMPLETED
         }
       ];
       const mockQueryResponse = { rowCount: 2, rows: mockRows } as any as Promise<QueryResult<any>>;
@@ -123,7 +124,7 @@ describe('UploadArchiveRepository', () => {
       const payload: CreateUploadArchive = {
         upload_id: 'upload-id-1',
         artifact_id: 'artifact-id-1',
-        status: 'draft'
+        status: ProcessStatusStatusEnum.PENDING
       };
 
       try {
@@ -144,7 +145,7 @@ describe('UploadArchiveRepository', () => {
       const payload: CreateUploadArchive = {
         upload_id: 'upload-id-1',
         artifact_id: 'artifact-id-1',
-        status: 'draft'
+        status: ProcessStatusStatusEnum.PENDING
       };
       const result = await repo.insertUploadArchive(payload);
       expect(result).to.eql(mockRow);
@@ -158,7 +159,7 @@ describe('UploadArchiveRepository', () => {
       const repo = new UploadArchiveRepository(mockDBConnection);
 
       const payload: UpdateUploadArchive = {
-        status: 'completed'
+        status: ProcessStatusStatusEnum.COMPLETED
       };
 
       try {
@@ -177,7 +178,7 @@ describe('UploadArchiveRepository', () => {
       const repo = new UploadArchiveRepository(mockDBConnection);
 
       const payload: UpdateUploadArchive = {
-        status: 'completed'
+        status: ProcessStatusStatusEnum.COMPLETED
       };
       const result = await repo.updateUploadArchive('upload-archive-id-1', payload);
       expect(result).to.eql(mockRow);
@@ -191,7 +192,7 @@ describe('UploadArchiveRepository', () => {
       const repo = new UploadArchiveRepository(mockDBConnection);
 
       const payload: UpdateUploadArchive = {
-        status: 'completed'
+        status: ProcessStatusStatusEnum.COMPLETED
       };
 
       try {
@@ -210,7 +211,7 @@ describe('UploadArchiveRepository', () => {
       const repo = new UploadArchiveRepository(mockDBConnection);
 
       const payload: UpdateUploadArchive = {
-        status: 'completed'
+        status: ProcessStatusStatusEnum.COMPLETED
       };
       const result = await repo.updateUploadArchivesByUploadId('upload-id-1', payload);
       expect(result).to.eql(mockRows);

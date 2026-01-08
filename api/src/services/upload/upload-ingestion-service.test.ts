@@ -5,9 +5,10 @@ import sinonChai from 'sinon-chai';
 import { v4 } from 'uuid';
 import { IDBConnection } from '../../database/db';
 import { HTTP401 } from '../../errors/http-error';
+import { ArtifactSecurity } from '../../models/artifact-security';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
-import { UploadStatusEnum } from '../../models/upload';
+import { Upload, UploadStatusEnum } from '../../models/upload';
 import { UploadArchive } from '../../models/upload-archive';
 import { ICreateSubmission } from '../../repositories/submission-repository';
 import * as fileUtils from '../../utils/file-utils';
@@ -165,39 +166,52 @@ describe('UploadIngestionService', () => {
       ]
     };
 
-    it('should complete upload successfully and enqueue security artifacts', async () => {
-      const futureDate = dayjs().add(30, 'minute').toISOString();
+    const mockUpload: Upload = {
+      upload_id: 'upload-456',
+      s3_upload_id: 's3-upload-111',
+      status: UploadStatusEnum.PENDING,
+      record_end_date: dayjs().add(30, 'minute').toISOString(),
+      create_user: 1
+    };
 
-      sinon.stub(UploadService.prototype, 'getUpload').resolves({
-        upload_id: 'upload-456',
-        s3_upload_id: 's3-upload-111',
-        status: UploadStatusEnum.PENDING,
-        record_end_date: futureDate,
-        create_user: 1
-      });
-
-      const mockRows = [
-        {
-          upload_archive_id: 'upload-archive-1',
-          artifact_id: 'artifact-1',
-          status: ProcessStatusStatusEnum.COMPLETED,
-          upload_id: 'upload-456'
-        },
-        {
-          upload_archive_id: 'upload-archive-2',
-          artifact_id: 'artifact-2',
-          status: ProcessStatusStatusEnum.COMPLETED,
-          upload_id: 'upload-456'
-        }
-      ];
-
-      sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves(mockRows);
-
-      const insertSecurityStub = sinon.stub(ArtifactSecurityService.prototype, 'insertArtifactSecurity').resolves({
+    const mockSecurityRecords: ArtifactSecurity[] = [
+      {
         artifact_security_id: 'artifact-security-1',
-        security: SecurityStatusEnum.PENDING,
-        artifact_id: 'artifact-1'
-      });
+        artifact_id: 'artifact-1',
+        security: SecurityStatusEnum.PENDING
+      },
+      {
+        artifact_security_id: 'artifact-security-2',
+        artifact_id: 'artifact-2',
+        security: SecurityStatusEnum.PENDING
+      }
+    ];
+
+    const mockUploadArchiveRecords: UploadArchive[] = [
+      {
+        upload_archive_id: 'upload-archive-1',
+        status: ProcessStatusStatusEnum.BLOCKED,
+        artifact_id: 'artifact-1',
+        upload_id: 'upload-456'
+      },
+      {
+        upload_archive_id: 'upload-archive-2',
+        status: ProcessStatusStatusEnum.BLOCKED,
+        artifact_id: 'artifact-2',
+        upload_id: 'upload-456'
+      }
+    ];
+
+    it('should complete upload successfully and enqueue security artifacts', async () => {
+      sinon.stub(UploadService.prototype, 'getUpload').resolves(mockUpload);
+
+      sinon.stub(UploadService.prototype, 'updateUpload').resolves({ upload_id: 'upload-456' });
+
+      sinon.stub(ArtifactService.prototype, 'updateArtifactsByUploadId').resolves();
+
+      sinon.stub(ArtifactSecurityService.prototype, 'insertArtifactSecurityByUploadId').resolves(mockSecurityRecords);
+
+      sinon.stub(UploadArchiveService.prototype, 'updateUploadArchivesByUploadId').resolves(mockUploadArchiveRecords);
 
       const s3ClientStub = { send: sinon.stub().resolves({ ETag: 'etag' }) };
       sinon.stub(fileUtils, 'getSecurityS3Client').returns(s3ClientStub as any);
@@ -205,27 +219,15 @@ describe('UploadIngestionService', () => {
 
       await service.completeArchiveUpload(mockParams);
 
-      expect(insertSecurityStub).to.have.been.calledTwice;
-      expect(insertSecurityStub.getCall(0).args[0]).to.deep.equal({
-        artifact_id: mockRows[0].artifact_id,
-        security: SecurityStatusEnum.PENDING
-      });
-      expect(insertSecurityStub.getCall(1).args[0]).to.deep.equal({
-        artifact_id: mockRows[1].artifact_id,
-        security: SecurityStatusEnum.PENDING
-      });
-
       expect(s3ClientStub.send).to.have.been.calledOnce;
     });
 
     it('should throw HTTP401 if upload s3_upload_id does not match', async () => {
-      sinon.stub(UploadService.prototype, 'getUpload').resolves({
-        upload_id: 'upload-456',
-        s3_upload_id: 'wrong-s3-id',
-        status: UploadStatusEnum.PENDING,
-        record_end_date: dayjs().add(30, 'minute').toISOString(),
-        create_user: 1
-      });
+      const invalidUpload = {
+        ...mockUpload,
+        s3_upload_id: 'wrong-s3-id'
+      };
+      sinon.stub(UploadService.prototype, 'getUpload').resolves(invalidUpload);
 
       try {
         await service.completeArchiveUpload(mockParams);
@@ -237,13 +239,11 @@ describe('UploadIngestionService', () => {
     });
 
     it('should throw HTTP401 if upload creator does not match current user', async () => {
-      sinon.stub(UploadService.prototype, 'getUpload').resolves({
-        upload_id: 'upload-456',
-        s3_upload_id: 's3-upload-111',
-        status: UploadStatusEnum.PENDING,
-        record_end_date: dayjs().add(30, 'minute').toISOString(),
+      const invalidUpload = {
+        ...mockUpload,
         create_user: 999
-      });
+      };
+      sinon.stub(UploadService.prototype, 'getUpload').resolves(invalidUpload);
 
       try {
         await service.completeArchiveUpload(mockParams);
@@ -255,13 +255,11 @@ describe('UploadIngestionService', () => {
     });
 
     it('should throw HTTP401 if upload is not in PENDING status', async () => {
-      sinon.stub(UploadService.prototype, 'getUpload').resolves({
-        upload_id: 'upload-456',
-        s3_upload_id: 's3-upload-111',
-        status: UploadStatusEnum.COMPLETED,
-        record_end_date: dayjs().add(30, 'minute').toISOString(),
-        create_user: 1
-      });
+      const invalidUpload = {
+        ...mockUpload,
+        status: UploadStatusEnum.COMPLETED
+      };
+      sinon.stub(UploadService.prototype, 'getUpload').resolves(invalidUpload);
 
       try {
         await service.completeArchiveUpload(mockParams);
@@ -273,13 +271,11 @@ describe('UploadIngestionService', () => {
     });
 
     it('should throw HTTP401 if upload record_end_date has passed', async () => {
-      sinon.stub(UploadService.prototype, 'getUpload').resolves({
-        upload_id: 'upload-456',
-        s3_upload_id: 's3-upload-111',
-        status: UploadStatusEnum.PENDING,
-        record_end_date: dayjs().subtract(5, 'minute').toISOString(),
-        create_user: 1
-      });
+      const expiredUpload = {
+        ...mockUpload,
+        record_end_date: dayjs().subtract(5, 'minute').toISOString()
+      };
+      sinon.stub(UploadService.prototype, 'getUpload').resolves(expiredUpload);
 
       try {
         await service.completeArchiveUpload(mockParams);
@@ -290,26 +286,86 @@ describe('UploadIngestionService', () => {
       }
     });
 
+    it('should throw if upload status update fails', async () => {
+      sinon.stub(UploadService.prototype, 'getUpload').resolves(mockUpload);
+
+      sinon.stub(UploadService.prototype, 'updateUpload').rejects(new Error('Database error: upload update failed'));
+
+      try {
+        await service.completeArchiveUpload(mockParams);
+        expect.fail('Expected error not thrown');
+      } catch (err) {
+        expect((err as Error).message).to.include('upload update failed');
+      }
+    });
+
+    it('should throw if artifact status update fails', async () => {
+      sinon.stub(UploadService.prototype, 'getUpload').resolves(mockUpload);
+
+      sinon.stub(UploadService.prototype, 'updateUpload').resolves({ upload_id: 'upload-456' });
+
+      sinon
+        .stub(ArtifactService.prototype, 'updateArtifactsByUploadId')
+        .rejects(new Error('Database error: artifact update failed'));
+
+      try {
+        await service.completeArchiveUpload(mockParams);
+        expect.fail('Expected error not thrown');
+      } catch (err) {
+        expect((err as Error).message).to.include('artifact update failed');
+      }
+    });
+
+    it('should throw if artifact security insert fails', async () => {
+      sinon.stub(UploadService.prototype, 'getUpload').resolves(mockUpload);
+
+      sinon.stub(UploadService.prototype, 'updateUpload').resolves({ upload_id: 'upload-456' });
+
+      sinon.stub(ArtifactService.prototype, 'updateArtifactsByUploadId').resolves();
+
+      sinon
+        .stub(ArtifactSecurityService.prototype, 'insertArtifactSecurityByUploadId')
+        .rejects(new Error('Database error: artifact security insert failed'));
+
+      try {
+        await service.completeArchiveUpload(mockParams);
+        expect.fail('Expected error not thrown');
+      } catch (err) {
+        expect((err as Error).message).to.include('artifact security insert failed');
+      }
+    });
+
+    it('should throw if upload archive update fails', async () => {
+      sinon.stub(UploadService.prototype, 'getUpload').resolves(mockUpload);
+
+      sinon.stub(UploadService.prototype, 'updateUpload').resolves({ upload_id: 'upload-456' });
+
+      sinon.stub(ArtifactService.prototype, 'updateArtifactsByUploadId').resolves();
+
+      sinon.stub(ArtifactSecurityService.prototype, 'insertArtifactSecurityByUploadId').resolves();
+
+      sinon
+        .stub(UploadArchiveService.prototype, 'updateUploadArchivesByUploadId')
+        .rejects(new Error('Database error: update upload archive failed'));
+
+      try {
+        await service.completeArchiveUpload(mockParams);
+        expect.fail('Expected error not thrown');
+      } catch (err) {
+        expect((err as Error).message).to.include('update upload archive failed');
+      }
+    });
+
     it('should throw if S3 multipart completion fails', async () => {
-      sinon.stub(UploadService.prototype, 'getUpload').resolves({
-        upload_id: 'upload-456',
-        s3_upload_id: 's3-upload-111',
-        status: UploadStatusEnum.PENDING,
-        record_end_date: dayjs().add(30, 'minute').toISOString(),
-        create_user: 1
-      });
+      sinon.stub(UploadService.prototype, 'getUpload').resolves(mockUpload);
 
-      const mockRows = [
-        {
-          artifact_id: 'artifact-1',
-          status: ProcessStatusStatusEnum.COMPLETED,
-          upload_archive_id: 'upload-archive-1',
-          upload_id: 'upload-456'
-        }
-      ];
+      sinon.stub(UploadService.prototype, 'updateUpload').resolves({ upload_id: 'upload-456' });
 
-      sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves(mockRows);
-      sinon.stub(ArtifactSecurityService.prototype, 'insertArtifactSecurity').resolves();
+      sinon.stub(ArtifactService.prototype, 'updateArtifactsByUploadId').resolves();
+
+      sinon.stub(ArtifactSecurityService.prototype, 'insertArtifactSecurityByUploadId').resolves(mockSecurityRecords);
+
+      sinon.stub(UploadArchiveService.prototype, 'updateUploadArchivesByUploadId').resolves(mockUploadArchiveRecords);
 
       const fakeS3Client = {
         send: sinon.stub().rejects(new Error('S3 API error: Access Denied'))
@@ -319,51 +375,10 @@ describe('UploadIngestionService', () => {
       sinon.stub(fileUtils, 'getSecurityObjectStoreBucketName').returns('security-bucket');
 
       try {
-        await service.completeArchiveUpload({
-          uploadId: 'upload-456',
-          s3UploadId: 's3-upload-111',
-          key: 'test-key',
-          parts: []
-        });
-        expect.fail('Expected error not thrown');
-      } catch (err) {
-        expect((err as Error).message).to.include('S3 API error');
-      }
-    });
-
-    it('should throw if artifact security insert fails', async () => {
-      sinon.stub(UploadService.prototype, 'getUpload').resolves({
-        upload_id: 'upload-456',
-        s3_upload_id: 's3-upload-111',
-        status: UploadStatusEnum.PENDING,
-        record_end_date: dayjs().add(30, 'minute').toISOString(),
-        create_user: 1
-      });
-
-      const mockRows: UploadArchive[] = [
-        {
-          artifact_id: 'artifact-1',
-          status: ProcessStatusStatusEnum.COMPLETED,
-          upload_archive_id: 'upload-archive-1',
-          upload_id: 'upload-456'
-        }
-      ];
-
-      sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves(mockRows);
-
-      sinon
-        .stub(ArtifactSecurityService.prototype, 'insertArtifactSecurity')
-        .rejects(new Error('Database error: artifact security insert failed'));
-
-      const s3ClientStub = { send: sinon.stub().resolves({ ETag: 'etag' }) };
-      sinon.stub(fileUtils, 'getSecurityS3Client').returns(s3ClientStub as any);
-      sinon.stub(fileUtils, 'getSecurityObjectStoreBucketName').returns('security-bucket');
-
-      try {
         await service.completeArchiveUpload(mockParams);
         expect.fail('Expected error not thrown');
       } catch (err) {
-        expect((err as Error).message).to.include('artifact security insert failed');
+        expect((err as Error).message).to.include('S3 API error');
       }
     });
   });

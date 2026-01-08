@@ -1,6 +1,7 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { IDBConnection } from '../../database/db';
 import {
   ArtifactSecurityScan,
   CreateArtifactSecurityScan,
@@ -14,7 +15,7 @@ import { ArtifactSecurityScanService } from './artifact-security-scan-service';
 chai.use(sinonChai);
 
 describe('ArtifactSecurityScanService', () => {
-  let mockDBConnection: any;
+  let mockDBConnection: IDBConnection;
   let service: ArtifactSecurityScanService;
 
   beforeEach(() => {

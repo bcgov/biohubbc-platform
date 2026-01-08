@@ -1,6 +1,7 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { IDBConnection } from '../../database/db';
 import { Artifact, ArtifactStatusEnum, CreateArtifact, UpdateArtifact } from '../../models/artifact';
 import { ArtifactRepository } from '../../repositories/upload/artifact-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -9,7 +10,7 @@ import { ArtifactService } from './artifact-service';
 chai.use(sinonChai);
 
 describe('ArtifactService', () => {
-  let mockDBConnection: any;
+  let mockDBConnection: IDBConnection;
   let service: ArtifactService;
 
   beforeEach(() => {
@@ -26,7 +27,7 @@ describe('ArtifactService', () => {
       const fakeArtifact: Artifact = {
         artifact_id: 'artifact-1',
         bucket: 'test-bucket',
-        status: ArtifactStatusEnum.COMPLETED,
+        status: ArtifactStatusEnum.PENDING,
         object_key: 'test-object-key',
         byte_size: 1234,
         checksum_sha256: 'abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
@@ -58,7 +59,7 @@ describe('ArtifactService', () => {
       const fakeArtifacts: Artifact[] = [
         {
           artifact_id: 'artifact-1',
-          status: ArtifactStatusEnum.PENDING,
+          status: ArtifactStatusEnum.UPLOADED,
           bucket: 'test-bucket-1',
           object_key: 'test-object-key-1',
           byte_size: 1234,
@@ -67,7 +68,7 @@ describe('ArtifactService', () => {
         },
         {
           artifact_id: 'artifact-2',
-          status: ArtifactStatusEnum.COMPLETED,
+          status: ArtifactStatusEnum.PENDING,
           bucket: 'test-bucket-2',
           object_key: 'test-object-key-2',
           byte_size: 5678,
@@ -100,7 +101,7 @@ describe('ArtifactService', () => {
     it('should insert a new artifact and return its ID', async () => {
       const fakeInput: CreateArtifact = {
         bucket: 'test-bucket',
-        status: ArtifactStatusEnum.COMPLETED,
+        status: ArtifactStatusEnum.PENDING,
         object_key: 'test-object-key',
         byte_size: 1234,
         checksum_sha256: 'abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
@@ -118,7 +119,7 @@ describe('ArtifactService', () => {
     it('should throw an error if repository fails', async () => {
       const fakeInput: CreateArtifact = {
         bucket: 'test-bucket',
-        status: ArtifactStatusEnum.COMPLETED,
+        status: ArtifactStatusEnum.PENDING,
         object_key: 'test-object-key',
         byte_size: 1234,
         checksum_sha256: 'abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef',

@@ -110,34 +110,35 @@ export class UploadIngestionService extends DBService {
    * This completes the upload in the security bucket and enqueues the
    * archive artifact(s) for malware scanning.
    *
-   *
-   * @param {CompleteMultipartUploadCommand} params
+   * @param {CompleteMultipartUploadParams} params
    * @returns {Promise<void>}
    */
   async completeArchiveUpload(params: CompleteMultipartUploadParams): Promise<void> {
     const { uploadId, s3UploadId, key, parts } = params;
 
-    // Ensure the caller is allowed to complete this upload
+    // 1. Ensure the caller is allowed to complete this upload
     await this._authorizeUploadCompletion(uploadId, s3UploadId);
 
-    // Fetch archive artifacts associated with this upload
-    // NOTE: There is typically only one record, but the flow works for multiple archives
-    const uploadArchives = await this.uploadArchiveService.getUploadArchivesByUploadId(uploadId);
+    // Update upload status, artifact statuses, and enqueue for security scanning
+    await Promise.all([
+      // 2. Update upload status to completed
+      this.uploadService.updateUpload(uploadId, {
+        status: UploadStatusEnum.COMPLETED
+      }),
+      // 3. Mark all artifacts as uploaded
+      this.artifactService.updateArtifactsByUploadId(uploadId, {
+        status: ArtifactStatusEnum.UPLOADED,
+        uploaded_at: dayjs().toISOString()
+      }),
+      // 4. Enqueue all artifacts for malware scanning
+      this.artifactSecurityService.insertArtifactSecurityByUploadId(uploadId, {
+        security: SecurityStatusEnum.PENDING
+      }),
+      // 4. Enqueue archives for extraction, but with status = BLOCKED since malware scan must complete first
+      this.uploadArchiveService.updateUploadArchivesByUploadId(uploadId, { status: ProcessStatusStatusEnum.BLOCKED })
+    ]);
 
-    // Enqueue each archive artifact for malware scanning
-    await Promise.all(
-      uploadArchives.map((archive) =>
-        this.artifactSecurityService.insertArtifactSecurity({
-          artifact_id: archive.artifact_id,
-          security: SecurityStatusEnum.PENDING
-        })
-      )
-    );
-
-    // NOTE: upload_archive.status is not updated here because
-    // archive extraction is blocked until malware scanning completes.
-
-    // Complete the multipart upload in the security bucket
+    // 5. Complete the multipart upload in the security bucket
     const s3Client = getSecurityS3Client();
     await s3Client.send(
       new CompleteMultipartUploadCommand({

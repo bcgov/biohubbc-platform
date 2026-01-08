@@ -181,10 +181,11 @@ export class ArtifactRepository extends BaseRepository {
   async deleteArtifact(artifactId: string): Promise<void> {
     const sqlStatement = SQL`
       DELETE FROM artifact
-      WHERE artifact_id = ${artifactId};
+      WHERE artifact_id = ${artifactId}
+      RETURNING artifact_id;
     `;
 
-    const response = await this.connection.sql(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, z.object({ artifact_id: z.string().uuid() }));
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to delete artifact record', [

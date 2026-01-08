@@ -20,7 +20,7 @@ export class ArtifactSecurityScanFileRepository extends BaseRepository {
         artifact_security_scan_file_id,
         artifact_security_scan_id,
         file_path,
-        status
+        security
       FROM
         biohub.artifact_security_scan_file
       WHERE
@@ -43,25 +43,27 @@ export class ArtifactSecurityScanFileRepository extends BaseRepository {
    * Insert a new scan file record.
    *
    * @param {CreateArtifactSecurityScanFile} scanFile
-   * @returns {Promise<{ artifact_security_scan_file_id: string }>}
+   * @returns {Promise<ArtifactSecurityScanFile>}
    */
-  async insertArtifactSecurityScanFile(
-    scanFile: CreateArtifactSecurityScanFile
-  ): Promise<{ artifact_security_scan_file_id: string }> {
+  async insertArtifactSecurityScanFile(scanFile: CreateArtifactSecurityScanFile): Promise<ArtifactSecurityScanFile> {
     const sqlStatement = SQL`
       INSERT INTO biohub.artifact_security_scan_file (
         artifact_security_scan_id,
         file_path,
-        status
+        security
       ) VALUES (
         ${scanFile.artifact_security_scan_id},
         ${scanFile.file_path},
         ${scanFile.security ?? null}
       )
-      RETURNING artifact_security_scan_file_id;
+      RETURNING 
+        artifact_security_scan_file_id,
+        artifact_security_scan_id,
+        file_path,
+        security;
     `;
 
-    const response = await this.connection.sql(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, ArtifactSecurityScanFile);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert upload artifact security scan file record', [
@@ -77,16 +79,16 @@ export class ArtifactSecurityScanFileRepository extends BaseRepository {
    * Insert multiple scan file records in a batch.
    *
    * @param {CreateArtifactSecurityScanFile[]} scanFiles
-   * @returns {Promise<{ artifact_security_scan_file_id: string }[]>}
+   * @returns {Promise<ArtifactSecurityScanFile[]>}
    */
   async insertArtifactSecurityScanFileBatch(
     scanFiles: CreateArtifactSecurityScanFile[]
-  ): Promise<{ artifact_security_scan_file_id: string }[]> {
+  ): Promise<ArtifactSecurityScanFile[]> {
     const sqlStatement = SQL`
       INSERT INTO biohub.artifact_security_scan_file (
         artifact_security_scan_id,
         file_path,
-        status
+        security
       ) VALUES
     `;
 
@@ -101,9 +103,11 @@ export class ArtifactSecurityScanFileRepository extends BaseRepository {
       )`);
     });
 
-    sqlStatement.append(SQL` RETURNING artifact_security_scan_file_id`);
+    sqlStatement.append(
+      SQL` RETURNING artifact_security_scan_file_id, artifact_security_scan_id, file_path, security;`
+    );
 
-    const response = await this.connection.sql(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, ArtifactSecurityScanFile);
 
     if (response.rowCount !== scanFiles.length) {
       throw new ApiExecuteSQLError('Failed to insert upload artifact security scan file records', [
@@ -120,22 +124,26 @@ export class ArtifactSecurityScanFileRepository extends BaseRepository {
    *
    * @param {string} uploadArtifactSecurityScanFileId
    * @param {UpdateArtifactSecurityScanFile} scanFile
-   * @returns {Promise<{ artifact_security_scan_file_id: string }>}
+   * @returns {Promise<ArtifactSecurityScanFile>}
    */
   async updateArtifactSecurityScanFile(
     uploadArtifactSecurityScanFileId: string,
     scanFile: UpdateArtifactSecurityScanFile
-  ): Promise<{ artifact_security_scan_file_id: string }> {
+  ): Promise<ArtifactSecurityScanFile> {
     const sqlStatement = SQL`
       UPDATE biohub.artifact_security_scan_file
       SET
-        status = COALESCE(${scanFile.security}, status)
+        security = COALESCE(${scanFile.security}, security)
       WHERE
         artifact_security_scan_file_id = ${uploadArtifactSecurityScanFileId}
-      RETURNING artifact_security_scan_file_id;
+      RETURNING 
+        artifact_security_scan_file_id,
+        artifact_security_scan_id,
+        file_path,
+        security;
     `;
 
-    const response = await this.connection.sql(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, ArtifactSecurityScanFile);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to update upload artifact security scan file record', [

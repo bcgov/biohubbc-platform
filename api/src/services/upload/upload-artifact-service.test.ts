@@ -1,6 +1,7 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { IDBConnection } from '../../database/db';
 import {
   CreateUploadArtifact,
   UpdateUploadArtifact,
@@ -14,7 +15,7 @@ import { UploadArtifactService } from './upload-artifact-service';
 chai.use(sinonChai);
 
 describe('UploadArtifactService', () => {
-  let mockDBConnection: any;
+  let mockDBConnection: IDBConnection;
   let service: UploadArtifactService;
 
   beforeEach(() => {

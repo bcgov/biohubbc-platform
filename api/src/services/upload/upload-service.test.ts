@@ -1,6 +1,7 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { IDBConnection } from '../../database/db';
 import { CreateUpload, UpdateUpload, Upload, UploadStatusEnum } from '../../models/upload';
 import { UploadRepository } from '../../repositories/upload/upload-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -9,7 +10,7 @@ import { UploadService } from './upload-service';
 chai.use(sinonChai);
 
 describe('UploadService', () => {
-  let mockDBConnection: any;
+  let mockDBConnection: IDBConnection;
   let uploadService: UploadService;
 
   beforeEach(() => {

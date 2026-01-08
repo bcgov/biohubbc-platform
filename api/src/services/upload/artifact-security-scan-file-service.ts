@@ -33,12 +33,10 @@ export class ArtifactSecurityScanFileService {
    * Inserts a new upload artifact security scan file record.
    *
    * @param {CreateArtifactSecurityScanFile} scanFile The scan file data
-   * @return {Promise<{ artifact_security_scan_file_id: string }>} The newly created scan file ID
+   * @return {Promise<ArtifactSecurityScanFile>} The newly created scan file ID
    * @memberof ArtifactSecurityScanFileService
    */
-  async insertArtifactSecurityScanFile(
-    scanFile: CreateArtifactSecurityScanFile
-  ): Promise<{ artifact_security_scan_file_id: string }> {
+  async insertArtifactSecurityScanFile(scanFile: CreateArtifactSecurityScanFile): Promise<ArtifactSecurityScanFile> {
     return this.uploadArtifactSecurityScanFileRepository.insertArtifactSecurityScanFile(scanFile);
   }
 
@@ -46,12 +44,12 @@ export class ArtifactSecurityScanFileService {
    * Inserts multiple upload artifact security scan files in a single batch.
    *
    * @param {CreateArtifactSecurityScanFile[]} scanFiles List of scan files to insert
-   * @return {Promise<{ artifact_security_scan_file_id: string }[]>} Array of newly created scan file IDs
+   * @return {Promise<ArtifactSecurityScanFile[]>} Array of newly created scan file IDs
    * @memberof ArtifactSecurityScanFileService
    */
   async insertArtifactSecurityScanFileBatch(
     scanFiles: CreateArtifactSecurityScanFile[]
-  ): Promise<{ artifact_security_scan_file_id: string }[]> {
+  ): Promise<ArtifactSecurityScanFile[]> {
     return this.uploadArtifactSecurityScanFileRepository.insertArtifactSecurityScanFileBatch(scanFiles);
   }
 
@@ -60,13 +58,13 @@ export class ArtifactSecurityScanFileService {
    *
    * @param {string} scanFileId The ID of the scan file to update
    * @param {UpdateArtifactSecurityScanFile} scanFile Fields to update
-   * @return {Promise<{ artifact_security_scan_file_id: string }>} The updated scan file ID
+   * @return {Promise<ArtifactSecurityScanFile>} The updated scan file ID
    * @memberof ArtifactSecurityScanFileService
    */
   async updateArtifactSecurityScanFile(
     scanFileId: string,
     scanFile: UpdateArtifactSecurityScanFile
-  ): Promise<{ artifact_security_scan_file_id: string }> {
+  ): Promise<ArtifactSecurityScanFile> {
     return this.uploadArtifactSecurityScanFileRepository.updateArtifactSecurityScanFile(scanFileId, scanFile);
   }
 }

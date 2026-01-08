@@ -13,12 +13,23 @@ export async function up(knex: Knex): Promise<void> {
       'pending',    -- Upload session created but not yet completed
       'completed',  -- Upload session finished successfully
       'aborted',    -- Upload session was canceled
-      'expired'     -- Upload session expired without completion
+      'expired',    -- Upload session expired without completion
+      'failed'      -- Upload failed, eg. failed to generate presigned upload URL
     );
 
-    -- Processing/lifecycle status (for artifact, upload_archive, security_scan)
+    -- Lifecycle status of an artifact
+    CREATE TYPE artifact_status AS ENUM (
+      'pending', 
+      'uploaded',
+      'deleted', 
+      'failed',
+      'archived'
+    );
+
+    -- Generic lifecycle status, related to background tasks
     CREATE TYPE process_status AS ENUM (
       'draft',      -- Not ready for processing
+      'blocked',    -- Blocked by another task or condition
       'pending',    -- Awaiting processing
       'completed',  -- Processing complete
       'failed'      -- Processing failed
@@ -33,7 +44,7 @@ export async function up(knex: Knex): Promise<void> {
       'skipped'     -- Scan intentionally skipped
     );
 
-    -- Type of upload artifact
+    -- Type of upload artifact in the submission tarball
     CREATE TYPE upload_artifact_role AS ENUM (
       'feature',  
       'attachment'
@@ -80,7 +91,7 @@ export async function up(knex: Knex): Promise<void> {
       object_key text NOT NULL,
       byte_size bigint,
       checksum_sha256 varchar(64),
-      status process_status NOT NULL,
+      status artifact_status NOT NULL,
       uploaded_at timestamptz(6),
       create_date timestamptz(6) DEFAULT now() NOT NULL,
       create_user integer NOT NULL,
@@ -91,7 +102,7 @@ export async function up(knex: Knex): Promise<void> {
       CONSTRAINT artifact_bucket_key_uq UNIQUE (bucket, object_key),
       CONSTRAINT check_status_when_uploaded_at_null
         CHECK (
-          uploaded_at IS NOT NULL OR status = 'pending'::process_status
+          uploaded_at IS NOT NULL OR status = 'pending'
         )
     );
 
@@ -203,7 +214,7 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     -- An artifact can only have one active security status
-    CREATE UNIQUE INDEX artifact_security_security_uk ON artifact_security (security) WHERE record_end_date IS NULL;
+    CREATE UNIQUE INDEX artifact_security_security_uk ON artifact_security (artifact_id, security) WHERE record_end_date IS NULL;
 
     CREATE INDEX artifact_security_security_idx ON artifact_security(security);
     CREATE INDEX artifact_security_artifact_idx ON artifact_security(artifact_id);

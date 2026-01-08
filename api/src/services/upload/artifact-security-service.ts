@@ -40,6 +40,21 @@ export class ArtifactSecurityService extends DBService {
   }
 
   /**
+   * Inserts artifact security records for all artifacts associated with an upload.
+   *
+   * @param {string} uploadId The upload session ID
+   * @param {Omit<CreateArtifactSecurity, 'artifact_id'>} security The security data (artifact_id is derived from upload)
+   * @return {Promise<ArtifactSecurity[]>} The newly created security records
+   * @memberof ArtifactSecurityService
+   */
+  async insertArtifactSecurityByUploadId(
+    uploadId: string,
+    security: Omit<CreateArtifactSecurity, 'artifact_id'>
+  ): Promise<ArtifactSecurity[]> {
+    return this.uploadArtifactSecurityRepository.insertArtifactSecurityByUploadId(uploadId, security);
+  }
+
+  /**
    * Updates an existing upload artifact security record by ID.
    *
    * @param {string} securityId The ID of the security record to update

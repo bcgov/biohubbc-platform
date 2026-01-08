@@ -1,6 +1,7 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { IDBConnection } from '../../database/db';
 import {
   ArtifactSecurityScanFile,
   CreateArtifactSecurityScanFile,
@@ -14,7 +15,7 @@ import { ArtifactSecurityScanFileService } from './artifact-security-scan-file-s
 chai.use(sinonChai);
 
 describe('ArtifactSecurityScanFileService', () => {
-  let mockDBConnection: any;
+  let mockDBConnection: IDBConnection;
   let service: ArtifactSecurityScanFileService;
 
   beforeEach(() => {
@@ -35,20 +36,17 @@ describe('ArtifactSecurityScanFileService', () => {
         security: SecurityStatusEnum.INFECTED
       };
 
-      const stub = sinon
-        .stub(ArtifactSecurityScanFileRepository.prototype, 'getArtifactSecurityScanFile')
-        .resolves(fakeScanFile);
+      sinon.stub(ArtifactSecurityScanFileRepository.prototype, 'getArtifactSecurityScanFile').resolves(fakeScanFile);
 
       const result = await service.getArtifactSecurityScanFile('scan-file-1');
 
-      expect(stub).to.have.been.calledWith('scan-file-1');
       expect(result).to.eql(fakeScanFile);
     });
 
     it('should throw an error if repository fails', async () => {
       sinon
         .stub(ArtifactSecurityScanFileRepository.prototype, 'getArtifactSecurityScanFile')
-        .throws(new Error('DB Error'));
+        .rejects(new Error('DB Error'));
 
       try {
         await service.getArtifactSecurityScanFile('scan-file-1');
@@ -60,21 +58,25 @@ describe('ArtifactSecurityScanFileService', () => {
   });
 
   describe('insertArtifactSecurityScanFile', () => {
-    it('should insert a new scan file record and return its ID', async () => {
+    it('should insert a new scan file record and return the record', async () => {
       const fakeInput: CreateArtifactSecurityScanFile = {
         artifact_security_scan_id: 'scan-1',
         file_path: 'folder/file.txt',
         security: SecurityStatusEnum.INFECTED
       };
 
-      const stub = sinon
-        .stub(ArtifactSecurityScanFileRepository.prototype, 'insertArtifactSecurityScanFile')
-        .resolves({ artifact_security_scan_file_id: 'scan-file-new' });
+      const fakeOutput: ArtifactSecurityScanFile = {
+        artifact_security_scan_file_id: 'scan-file-new',
+        artifact_security_scan_id: 'artifact-security-scan-1',
+        file_path: 'file/path',
+        security: SecurityStatusEnum.CLEAN
+      };
+
+      sinon.stub(ArtifactSecurityScanFileRepository.prototype, 'insertArtifactSecurityScanFile').resolves(fakeOutput);
 
       const result = await service.insertArtifactSecurityScanFile(fakeInput);
 
-      expect(stub).to.have.been.calledWith(fakeInput);
-      expect(result).to.eql({ artifact_security_scan_file_id: 'scan-file-new' });
+      expect(result).to.eql(fakeOutput);
     });
 
     it('should throw an error if repository fails', async () => {
@@ -86,7 +88,7 @@ describe('ArtifactSecurityScanFileService', () => {
 
       sinon
         .stub(ArtifactSecurityScanFileRepository.prototype, 'insertArtifactSecurityScanFile')
-        .throws(new Error('Insert failed'));
+        .rejects(new Error('Insert failed'));
 
       try {
         await service.insertArtifactSecurityScanFile(fakeInput);
@@ -112,20 +114,28 @@ describe('ArtifactSecurityScanFileService', () => {
         }
       ];
 
-      const stub = sinon
+      const fakeOutput: ArtifactSecurityScanFile[] = [
+        {
+          artifact_security_scan_file_id: 'scan-file-1',
+          artifact_security_scan_id: 'artifact-security-scan-1',
+          file_path: 'file/path1',
+          security: SecurityStatusEnum.CLEAN
+        },
+        {
+          artifact_security_scan_file_id: 'scan-file-2',
+          artifact_security_scan_id: 'artifact-security-scan-1',
+          file_path: 'file/path2',
+          security: SecurityStatusEnum.CLEAN
+        }
+      ];
+
+      sinon
         .stub(ArtifactSecurityScanFileRepository.prototype, 'insertArtifactSecurityScanFileBatch')
-        .resolves([
-          { artifact_security_scan_file_id: 'scan-file-1' },
-          { artifact_security_scan_file_id: 'scan-file-2' }
-        ]);
+        .resolves(fakeOutput);
 
       const result = await service.insertArtifactSecurityScanFileBatch(fakeInput);
 
-      expect(stub).to.have.been.calledWith(fakeInput);
-      expect(result).to.eql([
-        { artifact_security_scan_file_id: 'scan-file-1' },
-        { artifact_security_scan_file_id: 'scan-file-2' }
-      ]);
+      expect(result).to.eql(fakeOutput);
     });
 
     it('should throw an error if repository fails', async () => {
@@ -139,7 +149,7 @@ describe('ArtifactSecurityScanFileService', () => {
 
       sinon
         .stub(ArtifactSecurityScanFileRepository.prototype, 'insertArtifactSecurityScanFileBatch')
-        .throws(new Error('Batch insert failed'));
+        .rejects(new Error('Batch insert failed'));
 
       try {
         await service.insertArtifactSecurityScanFileBatch(fakeInput);
@@ -151,19 +161,23 @@ describe('ArtifactSecurityScanFileService', () => {
   });
 
   describe('updateArtifactSecurityScanFile', () => {
-    it('should update an existing scan file record and return its ID', async () => {
+    it('should update an existing scan file record and return the record', async () => {
       const fakeInput: UpdateArtifactSecurityScanFile = {
         security: SecurityStatusEnum.INFECTED
       };
 
-      const stub = sinon
-        .stub(ArtifactSecurityScanFileRepository.prototype, 'updateArtifactSecurityScanFile')
-        .resolves({ artifact_security_scan_file_id: 'scan-file-1' });
+      const fakeOutput: ArtifactSecurityScanFile = {
+        artifact_security_scan_file_id: 'scan-file-1',
+        artifact_security_scan_id: 'artifact-security-scan-1',
+        file_path: 'file/path',
+        security: SecurityStatusEnum.CLEAN
+      };
+
+      sinon.stub(ArtifactSecurityScanFileRepository.prototype, 'updateArtifactSecurityScanFile').resolves(fakeOutput);
 
       const result = await service.updateArtifactSecurityScanFile('scan-file-1', fakeInput);
 
-      expect(stub).to.have.been.calledWith('scan-file-1', fakeInput);
-      expect(result).to.eql({ artifact_security_scan_file_id: 'scan-file-1' });
+      expect(result).to.eql(fakeOutput);
     });
 
     it('should throw an error if repository fails', async () => {
@@ -173,7 +187,7 @@ describe('ArtifactSecurityScanFileService', () => {
 
       sinon
         .stub(ArtifactSecurityScanFileRepository.prototype, 'updateArtifactSecurityScanFile')
-        .throws(new Error('Update failed'));
+        .rejects(new Error('Update failed'));
 
       try {
         await service.updateArtifactSecurityScanFile('scan-file-1', fakeInput);

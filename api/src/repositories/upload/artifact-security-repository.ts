@@ -88,6 +88,40 @@ export class ArtifactSecurityRepository extends BaseRepository {
   }
 
   /**
+   * Insert artifact security records for all artifacts associated with an upload.
+   *
+   * @param {string} uploadId The upload session ID
+   * @param {Omit<CreateArtifactSecurity, 'artifact_id'>} security The security data
+   * @return {Promise<ArtifactSecurity[]>}
+   */
+  async insertArtifactSecurityByUploadId(
+    uploadId: string,
+    security: Omit<CreateArtifactSecurity, 'artifact_id'>
+  ): Promise<ArtifactSecurity[]> {
+    const sqlStatement = SQL`
+    INSERT INTO artifact_security (
+      artifact_id,
+      security
+    )
+    SELECT ua.artifact_id, ${security.security}
+    FROM upload_archive AS ua
+    WHERE ua.upload_id = ${uploadId}
+    RETURNING 
+      artifact_security_id,
+      artifact_id,
+      security;
+  `;
+    const response = await this.connection.sql(sqlStatement, ArtifactSecurity);
+    if (response.rowCount === 0) {
+      throw new ApiExecuteSQLError('Failed to insert security records', [
+        'ArtifactSecurityRepository->insertArtifactSecurityByUploadId',
+        'rowCount was 0, expected at least 1 record'
+      ]);
+    }
+    return response.rows;
+  }
+
+  /**
    * Update an existing upload artifact security record.
    *
    * @param {string} uploadArtifactSecurityId

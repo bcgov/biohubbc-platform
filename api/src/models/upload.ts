@@ -1,12 +1,13 @@
 import { z } from 'zod';
 
-export const UploadStatusZod = z.enum(['pending', 'completed', 'aborted', 'expired']);
+export const UploadStatusZod = z.enum(['pending', 'completed', 'aborted', 'expired', 'failed']);
 
 export enum UploadStatusEnum {
   PENDING = 'pending',
   COMPLETED = 'completed',
   ABORTED = 'aborted',
-  EXPIRED = 'expired'
+  EXPIRED = 'expired',
+  FAILED = 'failed'
 }
 
 export const Upload = z.object({
