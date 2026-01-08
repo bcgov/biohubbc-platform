@@ -7,8 +7,8 @@ import { ApiError } from '../errors/api-error';
 import { IgcNotifyGenericMessage } from '../interfaces/gcnotify.interface';
 import { Artifact } from '../repositories/artifact-repository';
 import { getMockDBConnection } from '../__mocks__/db';
-import { ArtifactService } from './artifact-service';
 import { GCNotifyService, ISubmitArtifactRequestAccess } from './gcnotify-service';
+import { ArtifactService } from './old-artifact-service';
 
 chai.use(sinonChai);
 

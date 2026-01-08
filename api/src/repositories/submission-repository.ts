@@ -27,13 +27,21 @@ export interface ISearchSubmissionCriteria {
 
 export interface ISubmissionRecord {
   submission_id?: number;
-  source_transform_id: number;
   uuid: string;
   create_date?: string;
   create_user?: string;
   update_date?: string;
   update_user?: string;
   revision_count?: string;
+}
+
+export interface ICreateSubmission {
+  uuid: string;
+  system_user_id: number;
+  source_system: 'SIMS';
+  name: string;
+  description: string;
+  comment: string;
 }
 
 export const SubmissionFeatureRecord = z.object({
@@ -308,18 +316,26 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Insert a new submission record.
    *
-   * @param {ISubmissionRecord} submissionData
+   * @param {ICreateSubmission} submissionData
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async insertSubmissionRecord(submissionData: ISubmissionRecord): Promise<{ submission_id: number }> {
+  async insertSubmissionRecord(submissionData: ICreateSubmission): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
-        source_transform_id,
-        uuid
+        uuid,
+        system_user_id,
+        source_system,
+        name,
+        description,
+        comment
       ) VALUES (
-        ${submissionData.source_transform_id},
-        ${submissionData.uuid}
+        ${submissionData.uuid},
+        ${submissionData.system_user_id},
+        ${submissionData.source_system},
+        ${submissionData.name},
+        ${submissionData.description},
+        ${submissionData.comment}
       )
       RETURNING
         submission_id;

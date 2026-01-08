@@ -9,8 +9,8 @@ import { SecurityRepository } from '../repositories/security-repository';
 import { SubmissionFeatureRecord } from '../repositories/submission-repository';
 import * as fileUtils from '../utils/file-utils';
 import { getMockDBConnection } from '../__mocks__/db';
-import { ArtifactService } from './artifact-service';
 import { CodeService } from './code-service';
+import { ArtifactService } from './old-artifact-service';
 import { SubmissionService } from './submission-service';
 
 chai.use(sinonChai);

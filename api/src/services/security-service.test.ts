@@ -7,7 +7,7 @@ import { Artifact } from '../repositories/artifact-repository';
 import { SecurityRepository } from '../repositories/security-repository';
 import * as fileUtils from '../utils/file-utils';
 import { getMockDBConnection } from '../__mocks__/db';
-import { ArtifactService } from './artifact-service';
+import { ArtifactService } from './old-artifact-service';
 import { SecurityService } from './security-service';
 import { UserService } from './user-service';
 

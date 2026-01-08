@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../database/db';
-import { ArtifactService } from '../../services/artifact-service';
+import { ArtifactService } from '../../services/old-artifact-service';
 import * as keycloakUtils from '../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import { deleteArtifact } from './delete';

@@ -1,9 +1,9 @@
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
-import { debounce } from 'lodash-es';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
+import { debounce } from 'lodash-es';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivePoliciesList } from './components/ActivePoliciesList';
 import { TeamPoliciesContainer } from './components/TeamPoliciesContainer';
@@ -48,8 +48,7 @@ export const ManagePoliciesPage = () => {
     policiesDataLoader.load(debouncedPolicySearchTerm);
     teamsDataLoader.load(debouncedTeamSearchTerm);
     teamPoliciesDataLoader.load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [teamPoliciesDataLoader, teamsDataLoader, policiesDataLoader, debouncedPolicySearchTerm, debouncedTeamSearchTerm]);
 
   // Data
   const policies = policiesDataLoader.data?.policies ?? [];

@@ -39,7 +39,14 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.insertSubmissionRecord({ uuid: '', source_transform_id: 1 });
+        await submissionRepository.insertSubmissionRecord({
+          uuid: '',
+          comment: 'comment',
+          description: 'description',
+          name: 'name',
+          source_system: 'SIMS',
+          system_user_id: 1
+        });
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission record');
@@ -57,7 +64,11 @@ describe('SubmissionRepository', () => {
 
       const response = await submissionRepository.insertSubmissionRecord({
         uuid: 'uuid',
-        source_transform_id: 1
+        comment: 'comment',
+        description: 'description',
+        name: 'name',
+        source_system: 'SIMS',
+        system_user_id: 1
       });
 
       expect(response.submission_id).to.equal(1);
@@ -182,9 +193,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should succeed with valid data, without optional version parameter', async () => {
-      const mockResponse = {
-        source_transform_id: 1
-      } as unknown as ISourceTransformModel;
+      const mockResponse = {} as unknown as ISourceTransformModel;
 
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
@@ -198,9 +207,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should succeed with valid data, with optional version parameter', async () => {
-      const mockResponse = {
-        source_transform_id: 1
-      } as unknown as ISourceTransformModel;
+      const mockResponse = {} as unknown as ISourceTransformModel;
 
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
@@ -235,9 +242,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should succeed with valid data, without optional version parameter', async () => {
-      const mockResponse = {
-        source_transform_id: 1
-      } as unknown as ISourceTransformModel;
+      const mockResponse = {} as unknown as ISourceTransformModel;
 
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 

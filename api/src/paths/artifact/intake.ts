@@ -4,7 +4,7 @@ import { getServiceAccountDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
-import { ArtifactService } from '../../services/artifact-service';
+import { ArtifactService } from '../../services/old-artifact-service';
 import { getServiceClientSystemUser } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 
