@@ -1,65 +1,14 @@
 import { IDBConnection } from '../database/db';
 import { FeatureProperty, FeatureTypeWithProperties } from '../models/feature-type';
 import { IFlattenedBlock } from '../models/submission-feature';
+import { SubmissionRepository } from '../repositories/submission-repository';
 import { ValidationRepository } from '../repositories/validation-repository';
 import { GeoJSONFeatureCollectionZodSchema } from '../zod-schema/geoJsonZodSchema';
 import { DBService } from './db-service';
-
-/**
- * Validation error types for submission feature validation.
- * Used to categorize validation errors for structured error reporting.
- */
-export enum ValidationErrorType {
-  // Structure errors
-  /** Feature is missing a required field (id, type, properties, content, or parent) */
-  MISSING_FIELD = 'Missing Field',
-
-  // Type errors
-  /** Feature type does not exist in the feature_type table */
-  INVALID_FEATURE_TYPE = 'Invalid Feature Type',
-
-  // Property errors
-  /** Property is not allowed for this feature type */
-  INVALID_PROPERTY = 'Invalid Property',
-  /** A required property for this feature type is missing */
-  MISSING_REQUIRED_PROPERTY = 'Missing Required Property',
-  /** Property value has wrong type (e.g., string instead of number) */
-  INVALID_PROPERTY_TYPE = 'Invalid Property Type',
-
-  // Reference errors
-  /** Multiple features have the same id */
-  DUPLICATE_ID = 'Duplicate ID',
-  /** Parent or content UUID does not resolve to a feature in the submission */
-  UNRESOLVED_REFERENCE = 'Unresolved Reference',
-  /** Feature references itself in parent or content */
-  SELF_REFERENCE = 'Self Reference'
-}
-
-/**
- * Structured validation error for submission feature validation.
- * Contains details about what failed and where.
- */
-export interface ValidationError {
-  type: ValidationErrorType;
-  featureId?: string;
-  featureType?: string;
-  field?: string;
-  value?: string;
-  message: string;
-}
-
-/**
- * Result of validating submission features.
- * Contains validation status and all collected errors.
- */
-export interface ValidationResult {
-  valid: boolean;
-  errors: ValidationError[];
-}
+import { IValidationError, IValidationResult, ValidationErrorType } from './feature-ingestion-service.interface';
 
 /**
  * Service for ingesting flat submission features.
- * Used by pipeline step 6 (feature validation/insertion).
  *
  * This service handles:
  * - Validation of flat feature format (IFlattenedBlock[])
@@ -82,6 +31,76 @@ export class FeatureIngestionService extends DBService {
   }
 
   // ============================================================================
+  // INGESTION METHODS (validation + insertion)
+  // ============================================================================
+
+  /**
+   * Ingest flat submission features: validate and insert.
+   *
+   * Idempotent: soft-deletes existing features before inserting, safe for job retries.
+   *
+   * @param {number} submissionId - The submission to add features to
+   * @param {IFlattenedBlock[]} features - Flat array of features with UUID references
+   * @returns {Promise<IValidationResult>} Validation result with valid flag and any errors
+   * @memberof FeatureIngestionService
+   */
+  async ingestFeatures(submissionId: number, features: IFlattenedBlock[]): Promise<IValidationResult> {
+    // 1. Validate all features
+    const validationResult = await this.validateFlatSubmissionFeatures(features);
+
+    if (!validationResult.valid) {
+      return validationResult;
+    }
+
+    // 2. Delete existing features (idempotency for job retries)
+    const submissionRepository = new SubmissionRepository(this.connection);
+    await submissionRepository.deleteSubmissionFeatures(submissionId);
+
+    // 3. Insert features (two-pass for parent references)
+    await this.insertFlatFeatures(submissionId, features);
+
+    return { valid: true, errors: [] };
+  }
+
+  /**
+   * Insert flat features using two-pass approach.
+   * Pass 1: Insert all features with parent = NULL
+   * Pass 2: Update parent references using UUID → ID mapping
+   *
+   * @private
+   * @param {number} submissionId - The submission ID
+   * @param {IFlattenedBlock[]} features - Features to insert
+   * @memberof FeatureIngestionService
+   */
+  private async insertFlatFeatures(submissionId: number, features: IFlattenedBlock[]): Promise<void> {
+    const submissionRepository = new SubmissionRepository(this.connection);
+    const uuidToDbId = new Map<string, number>();
+
+    // Pass 1: Insert all features without parent references
+    for (const feature of features) {
+      const result = await submissionRepository.insertSubmissionFeatureRecord(
+        submissionId,
+        null, // parent set in pass 2
+        feature.id,
+        feature.type,
+        feature.properties
+      );
+      uuidToDbId.set(feature.id, result.submission_feature_id);
+    }
+
+    // Pass 2: Update parent references
+    for (const feature of features) {
+      if (feature.parent) {
+        const parentDbId = uuidToDbId.get(feature.parent);
+        const featureDbId = uuidToDbId.get(feature.id);
+        if (parentDbId && featureDbId) {
+          await submissionRepository.updateSubmissionFeatureParent(featureDbId, parentDbId);
+        }
+      }
+    }
+  }
+
+  // ============================================================================
   // FLAT VALIDATION METHODS (for archive upload flow with IFlattenedBlock[])
   // ============================================================================
 
@@ -92,11 +111,11 @@ export class FeatureIngestionService extends DBService {
    * Used by the archive upload flow (pipeline step 6).
    *
    * @param {IFlattenedBlock[]} features - Array of flat submission features
-   * @return {Promise<ValidationResult>} Validation result with all collected errors
+   * @return {Promise<IValidationResult>} Validation result with all collected errors
    * @memberof FeatureIngestionService
    */
-  async validateFlatSubmissionFeatures(features: IFlattenedBlock[]): Promise<ValidationResult> {
-    const errors: ValidationError[] = [];
+  async validateFlatSubmissionFeatures(features: IFlattenedBlock[]): Promise<IValidationResult> {
+    const errors: IValidationError[] = [];
 
     // First pass: collect all feature IDs and check for duplicates
     const allIds = new Set<string>();
@@ -161,11 +180,11 @@ export class FeatureIngestionService extends DBService {
    * "each feature must include an ID, a feature_type, a properties object, and a references collection"
    *
    * @param {IFlattenedBlock} feature - Feature to validate
-   * @return {ValidationError[]} Array of validation errors (empty if valid)
+   * @return {IValidationError[]} Array of validation errors (empty if valid)
    * @memberof FeatureIngestionService
    */
-  validateFeatureStructure(feature: IFlattenedBlock): ValidationError[] {
-    const errors: ValidationError[] = [];
+  validateFeatureStructure(feature: IFlattenedBlock): IValidationError[] {
+    const errors: IValidationError[] = [];
     const featureId = feature.id || 'unknown';
 
     // Check required fields per ticket spec: ID, feature_type, properties, references
@@ -222,11 +241,11 @@ export class FeatureIngestionService extends DBService {
    * Validate that a feature's type exists in the database.
    *
    * @param {IFlattenedBlock} feature - Feature to validate
-   * @return {Promise<ValidationError[]>} Array of validation errors (empty if valid)
+   * @return {Promise<IValidationError[]>} Array of validation errors (empty if valid)
    * @memberof FeatureIngestionService
    */
-  async validateFeatureType(feature: IFlattenedBlock): Promise<ValidationError[]> {
-    const errors: ValidationError[] = [];
+  async validateFeatureType(feature: IFlattenedBlock): Promise<IValidationError[]> {
+    const errors: IValidationError[] = [];
 
     const featureTypeWithProps = await this.getFeatureTypeWithPropertiesCached(feature.type);
 
@@ -248,11 +267,11 @@ export class FeatureIngestionService extends DBService {
    *
    * @param {IFlattenedBlock} feature - Feature to validate
    * @param {FeatureProperty[]} allowedProperties - Properties defined for this feature type
-   * @return {ValidationError[]} Array of validation errors (empty if valid)
+   * @return {IValidationError[]} Array of validation errors (empty if valid)
    * @memberof FeatureIngestionService
    */
-  validateFeaturePropertyFlat(feature: IFlattenedBlock, allowedProperties: FeatureProperty[]): ValidationError[] {
-    const errors: ValidationError[] = [];
+  validateFeaturePropertyFlat(feature: IFlattenedBlock, allowedProperties: FeatureProperty[]): IValidationError[] {
+    const errors: IValidationError[] = [];
     const allowedPropertyNames = new Set(allowedProperties.map((p) => p.name));
 
     // Check for unknown properties
@@ -305,11 +324,11 @@ export class FeatureIngestionService extends DBService {
    * @param {IFlattenedBlock} feature - Feature being validated
    * @param {FeatureProperty} prop - Property definition
    * @param {unknown} value - Actual value to validate
-   * @return {ValidationError | null} Validation error if type mismatch, null otherwise
+   * @return {IValidationError | null} Validation error if type mismatch, null otherwise
    * @memberof FeatureIngestionService
    */
-  validatePropertyType(feature: IFlattenedBlock, prop: FeatureProperty, value: unknown): ValidationError | null {
-    const createTypeError = (expected: string): ValidationError => ({
+  validatePropertyType(feature: IFlattenedBlock, prop: FeatureProperty, value: unknown): IValidationError | null {
+    const createTypeError = (expected: string): IValidationError => ({
       type: ValidationErrorType.INVALID_PROPERTY_TYPE,
       featureId: feature.id,
       featureType: feature.type,
@@ -362,11 +381,11 @@ export class FeatureIngestionService extends DBService {
    *
    * @param {IFlattenedBlock[]} features - All features in the submission
    * @param {Set<string>} allIds - Set of all feature IDs
-   * @return {ValidationError[]} Array of validation errors (empty if valid)
+   * @return {IValidationError[]} Array of validation errors (empty if valid)
    * @memberof FeatureIngestionService
    */
-  validateReferences(features: IFlattenedBlock[], allIds: Set<string>): ValidationError[] {
-    const errors: ValidationError[] = [];
+  validateReferences(features: IFlattenedBlock[], allIds: Set<string>): IValidationError[] {
+    const errors: IValidationError[] = [];
 
     for (const feature of features) {
       const parentErrors = this.validateParentReference(feature, allIds);
@@ -382,10 +401,10 @@ export class FeatureIngestionService extends DBService {
    *
    * @param {IFlattenedBlock} feature - Feature being validated
    * @param {Set<string>} allIds - Set of all feature IDs
-   * @return {ValidationError[]} Array of validation errors (empty if valid)
+   * @return {IValidationError[]} Array of validation errors (empty if valid)
    * @memberof FeatureIngestionService
    */
-  private validateParentReference(feature: IFlattenedBlock, allIds: Set<string>): ValidationError[] {
+  private validateParentReference(feature: IFlattenedBlock, allIds: Set<string>): IValidationError[] {
     if (feature.parent === null) {
       return [];
     }
@@ -422,15 +441,15 @@ export class FeatureIngestionService extends DBService {
    *
    * @param {IFlattenedBlock} feature - Feature being validated
    * @param {Set<string>} allIds - Set of all feature IDs
-   * @return {ValidationError[]} Array of validation errors (empty if valid)
+   * @return {IValidationError[]} Array of validation errors (empty if valid)
    * @memberof FeatureIngestionService
    */
-  private validateContentReferences(feature: IFlattenedBlock, allIds: Set<string>): ValidationError[] {
+  private validateContentReferences(feature: IFlattenedBlock, allIds: Set<string>): IValidationError[] {
     if (!feature.content) {
       return [];
     }
 
-    const errors: ValidationError[] = [];
+    const errors: IValidationError[] = [];
 
     for (const childId of feature.content) {
       const error = this.validateSingleContentReference(feature, childId, allIds);
@@ -448,14 +467,14 @@ export class FeatureIngestionService extends DBService {
    * @param {IFlattenedBlock} feature - Feature being validated
    * @param {string} childId - Child ID being referenced
    * @param {Set<string>} allIds - Set of all feature IDs
-   * @return {ValidationError | null} Validation error if invalid, null if valid
+   * @return {IValidationError | null} Validation error if invalid, null if valid
    * @memberof FeatureIngestionService
    */
   private validateSingleContentReference(
     feature: IFlattenedBlock,
     childId: string,
     allIds: Set<string>
-  ): ValidationError | null {
+  ): IValidationError | null {
     if (childId === feature.id) {
       return {
         type: ValidationErrorType.SELF_REFERENCE,

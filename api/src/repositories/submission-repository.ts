@@ -458,6 +458,43 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Update the parent reference for a submission feature.
+   *
+   * @param {number} submissionFeatureId The ID of the feature to update.
+   * @param {number} parentSubmissionFeatureId The ID of the parent feature.
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionFeatureParent(submissionFeatureId: number, parentSubmissionFeatureId: number): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission_feature
+      SET parent_submission_feature_id = ${parentSubmissionFeatureId}
+      WHERE submission_feature_id = ${submissionFeatureId};
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Delete all submission features for a submission (soft delete).
+   * Used for idempotency - allows job retries to start fresh.
+   *
+   * @param {number} submissionId The submission ID.
+   * @return {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async deleteSubmissionFeatures(submissionId: number): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission_feature
+      SET record_end_date = NOW()
+      WHERE submission_id = ${submissionId}
+        AND record_end_date IS NULL;
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
    * Get feature type id by name.
    *
    * @param {string} name
