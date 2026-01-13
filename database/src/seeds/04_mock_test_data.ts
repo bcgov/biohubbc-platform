@@ -557,6 +557,7 @@ export const insertTelemetryRecord = async (
     timestamp: faker.date.recent().toISOString(),
     temperature: faker.number.float({ min: -20, max: 50, multipleOf: 0.1 }),
     humidity: faker.number.float({ min: 0, max: 100, multipleOf: 0.1 }),
+    dop: faker.number.float({ min: 1, max: 20, multipleOf: 0.1 }),
     status: faker.helpers.arrayElement(['active', 'idle', 'error'])
   };
 
@@ -575,6 +576,7 @@ export const insertTelemetryRecord = async (
   await knex.raw(`${insertSearchString({ submission_feature_id })}`); // e.g., status
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`); // e.g., temperature
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`); // e.g., humidity
+  await knex.raw(`${insertSearchNumber({ submission_feature_id })}`); // e.g., dop
 
   // Spatial search index
   await knex.raw(
