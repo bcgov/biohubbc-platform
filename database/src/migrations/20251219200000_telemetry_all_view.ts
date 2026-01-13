@@ -19,6 +19,7 @@ export async function up(knex: Knex): Promise<void> {
       (sf.data->>'latitude')::numeric as latitude,
       (sf.data->>'longitude')::numeric as longitude,
       (sf.data->>'timestamp')::timestamptz as timestamp,
+      (sf.data->>'dop')::numeric as dop,
       dep.data->>'device_key' as device_key,
       dep.data->>'animal_id' as animal_id
     FROM biohub.submission_feature sf
@@ -26,7 +27,8 @@ export async function up(knex: Knex): Promise<void> {
     LEFT JOIN biohub.submission_feature dep ON dep.submission_feature_id = sf.parent_submission_feature_id
       AND dep.feature_type_id = (SELECT feature_type_id FROM biohub.feature_type WHERE name = 'telemetry_deployment')
     WHERE ft.name = 'telemetry'
-      AND sf.record_end_date IS NULL;
+      AND sf.record_end_date IS NULL
+      AND (sf.data->>'timestamp')::timestamptz <= (NOW() - INTERVAL '4 months');
   `);
 }
 
