@@ -4,10 +4,26 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../errors/api-error';
+import { FeatureProperty, FeatureTypeWithProperties, FeatureTypeWithPropertiesRow } from '../models/feature-type';
 import { getMockDBConnection } from '../__mocks__/db';
-import { IInsertStyleSchema, ValidationRepository } from './validation-repository';
+import { IInsertStyleSchema, IStyleModel, ValidationRepository } from './validation-repository';
 
 chai.use(sinonChai);
+
+/**
+ * Helper to create a properly typed QueryResult for mock responses.
+ * Type the rows parameter to get compile-time field validation,
+ * but return QueryResult<any> to satisfy the mock DB connection signature.
+ */
+function mockQueryResult<T>(rows: T[], rowCount?: number): QueryResult<any> {
+  return {
+    rowCount: rowCount ?? rows.length,
+    rows,
+    command: '',
+    oid: 0,
+    fields: []
+  };
+}
 
 describe('ValidationRepository', () => {
   describe('getFeatureValidationProperties', () => {
@@ -16,16 +32,13 @@ describe('ValidationRepository', () => {
     });
 
     it('should throw an error when select sql fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+      const mockQueryResponse = mockQueryResult<FeatureProperty>([], 0);
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: async () => mockQueryResponse
       });
 
       const validationRepository = new ValidationRepository(mockDBConnection);
-
       const featureType = 'type';
 
       try {
@@ -39,22 +52,21 @@ describe('ValidationRepository', () => {
     });
 
     it('should succeed with valid data', async () => {
-      const mockQueryResponse = {
-        rowCount: 1,
-        rows: [{ name: 'dataset', display_name: 'Dataset', description: 'asd', type: 'string' }]
-      } as any as Promise<QueryResult<any>>;
+      // Type mock data with Zod-inferred type - TypeScript will catch field name errors
+      const mockData: FeatureProperty[] = [
+        { name: 'dataset', display_name: 'Dataset', description: 'asd', type_name: 'string', required_value: true }
+      ];
+      const mockQueryResponse = mockQueryResult(mockData);
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: async () => mockQueryResponse
       });
 
       const validationRepository = new ValidationRepository(mockDBConnection);
-
       const response = await validationRepository.getFeatureValidationProperties('type');
 
-      expect(response).to.eql([{ name: 'dataset', display_name: 'Dataset', description: 'asd', type: 'string' }]);
+      // Reuse typed mock data in assertion
+      expect(response).to.eql(mockData);
     });
   });
 
@@ -64,43 +76,40 @@ describe('ValidationRepository', () => {
     });
 
     it('should return feature type with properties when valid', async () => {
-      const mockQueryResponse = {
-        rowCount: 2,
-        rows: [
-          {
-            feature_type_id: 1,
-            name: 'dataset',
-            display_name: 'Dataset',
-            property_name: 'name',
-            property_display_name: 'Name',
-            property_description: 'The name of the dataset',
-            property_type_name: 'string',
-            required_value: true
-          },
-          {
-            feature_type_id: 1,
-            name: 'dataset',
-            display_name: 'Dataset',
-            property_name: 'description',
-            property_display_name: 'Description',
-            property_description: 'The description of the dataset',
-            property_type_name: 'string',
-            required_value: false
-          }
-        ]
-      } as any as Promise<QueryResult<any>>;
+      // Type mock data with Zod-inferred type - TypeScript will catch field name errors
+      const mockRows: FeatureTypeWithPropertiesRow[] = [
+        {
+          feature_type_id: 1,
+          name: 'dataset',
+          display_name: 'Dataset',
+          property_name: 'name',
+          property_display_name: 'Name',
+          property_description: 'The name of the dataset',
+          property_type_name: 'string',
+          required_value: true
+        },
+        {
+          feature_type_id: 1,
+          name: 'dataset',
+          display_name: 'Dataset',
+          property_name: 'description',
+          property_display_name: 'Description',
+          property_description: 'The description of the dataset',
+          property_type_name: 'string',
+          required_value: false
+        }
+      ];
+      const mockQueryResponse = mockQueryResult(mockRows);
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: async () => mockQueryResponse
       });
 
       const validationRepository = new ValidationRepository(mockDBConnection);
-
       const response = await validationRepository.getFeatureTypeWithProperties('dataset');
 
-      expect(response).to.eql({
+      // Type expected response with Zod-inferred type
+      const expectedResponse: FeatureTypeWithProperties = {
         featureType: {
           feature_type_id: 1,
           name: 'dataset',
@@ -122,63 +131,57 @@ describe('ValidationRepository', () => {
             required_value: false
           }
         ]
-      });
+      };
+
+      expect(response).to.eql(expectedResponse);
     });
 
     it('should return null when feature type does not exist', async () => {
-      const mockQueryResponse = {
-        rowCount: 0,
-        rows: []
-      } as any as Promise<QueryResult<any>>;
+      const mockQueryResponse = mockQueryResult<FeatureTypeWithPropertiesRow>([], 0);
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: async () => mockQueryResponse
       });
 
       const validationRepository = new ValidationRepository(mockDBConnection);
-
       const response = await validationRepository.getFeatureTypeWithProperties('nonexistent_type');
 
       expect(response).to.be.null;
     });
 
     it('should return empty properties array when type has no properties', async () => {
-      const mockQueryResponse = {
-        rowCount: 1,
-        rows: [
-          {
-            feature_type_id: 99,
-            name: 'empty_type',
-            display_name: 'Empty Type',
-            property_name: null,
-            property_display_name: null,
-            property_description: null,
-            property_type_name: null,
-            required_value: null
-          }
-        ]
-      } as any as Promise<QueryResult<any>>;
+      // Type mock data with Zod-inferred type
+      const mockRows: FeatureTypeWithPropertiesRow[] = [
+        {
+          feature_type_id: 99,
+          name: 'empty_type',
+          display_name: 'Empty Type',
+          property_name: null,
+          property_display_name: null,
+          property_description: null,
+          property_type_name: null,
+          required_value: null
+        }
+      ];
+      const mockQueryResponse = mockQueryResult(mockRows);
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: async () => mockQueryResponse
       });
 
       const validationRepository = new ValidationRepository(mockDBConnection);
-
       const response = await validationRepository.getFeatureTypeWithProperties('empty_type');
 
-      expect(response).to.eql({
+      const expectedResponse: FeatureTypeWithProperties = {
         featureType: {
           feature_type_id: 99,
           name: 'empty_type',
           display_name: 'Empty Type'
         },
         properties: []
-      });
+      };
+
+      expect(response).to.eql(expectedResponse);
     });
   });
 
@@ -187,21 +190,19 @@ describe('ValidationRepository', () => {
       sinon.restore();
     });
 
-    const mockParams = { something: 'thing' };
+    const mockParams: IInsertStyleSchema = { something: 'thing' };
 
     it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+      const mockQueryResponse = mockQueryResult<{ style_id: number }>([], 0);
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: async () => mockQueryResponse
       });
 
       const validationRepository = new ValidationRepository(mockDBConnection);
 
       try {
-        await validationRepository.insertStyleSchema(mockParams as unknown as IInsertStyleSchema);
+        await validationRepository.insertStyleSchema(mockParams);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert style schema');
@@ -209,17 +210,15 @@ describe('ValidationRepository', () => {
     });
 
     it('should succeed with valid data', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [{ style_id: 1 }] } as any as Promise<QueryResult<any>>;
+      const mockData = [{ style_id: 1 }];
+      const mockQueryResponse = mockQueryResult(mockData);
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: async () => mockQueryResponse
       });
 
       const validationRepository = new ValidationRepository(mockDBConnection);
-
-      const response = await validationRepository.insertStyleSchema(mockParams as unknown as IInsertStyleSchema);
+      const response = await validationRepository.insertStyleSchema(mockParams);
 
       expect(response.style_id).to.equal(1);
     });
@@ -230,13 +229,11 @@ describe('ValidationRepository', () => {
       sinon.restore();
     });
 
-    it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+    it('should throw an error when select sql fails', async () => {
+      const mockQueryResponse = mockQueryResult<IStyleModel>([], 0);
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: async () => mockQueryResponse
       });
 
       const validationRepository = new ValidationRepository(mockDBConnection);
@@ -250,20 +247,17 @@ describe('ValidationRepository', () => {
     });
 
     it('should succeed with valid data', async () => {
-      const mockResponse = { something: 'thing' };
-      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+      const mockData: IStyleModel[] = [{ something: 'thing' }];
+      const mockQueryResponse = mockQueryResult(mockData);
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: async () => mockQueryResponse
       });
 
       const validationRepository = new ValidationRepository(mockDBConnection);
-
       const response = await validationRepository.getStyleSchemaByStyleId(1);
 
-      expect(response).to.eql(mockResponse);
+      expect(response).to.eql(mockData[0]);
     });
   });
 });

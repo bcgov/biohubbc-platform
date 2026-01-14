@@ -1589,4 +1589,74 @@ describe('SubmissionRepository', () => {
       }
     });
   });
+
+  describe('updateSubmissionFeatureParent', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should update the parent submission feature id successfully', async () => {
+      const mockQueryResponse: QueryResult<never> = {
+        rowCount: 1,
+        rows: [],
+        command: '',
+        oid: 0,
+        fields: []
+      };
+
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      await submissionRepository.updateSubmissionFeatureParent(10, 5);
+
+      expect(sqlStub).to.have.been.calledOnce;
+    });
+  });
+
+  describe('deleteSubmissionFeatures', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should soft delete all submission features for a submission', async () => {
+      const mockQueryResponse: QueryResult<never> = {
+        rowCount: 3,
+        rows: [],
+        command: '',
+        oid: 0,
+        fields: []
+      };
+
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      await submissionRepository.deleteSubmissionFeatures(1);
+
+      expect(sqlStub).to.have.been.calledOnce;
+    });
+
+    it('should complete successfully even when no features exist to delete', async () => {
+      const mockQueryResponse: QueryResult<never> = {
+        rowCount: 0,
+        rows: [],
+        command: '',
+        oid: 0,
+        fields: []
+      };
+
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      // Should not throw even when rowCount is 0
+      await submissionRepository.deleteSubmissionFeatures(999);
+
+      expect(sqlStub).to.have.been.calledOnce;
+    });
+  });
 });

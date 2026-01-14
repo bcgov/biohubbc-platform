@@ -15,15 +15,16 @@ export const FeatureProperty = z.object({
 export type FeatureProperty = z.infer<typeof FeatureProperty>;
 
 /**
- * Schema for feature type basic info.
+ * Schema for feature type basic info (minimal fields).
+ * Use FeatureTypeRecord from submission-repository for full database record.
  */
-export const FeatureTypeRecord = z.object({
+export const FeatureTypeSummary = z.object({
   feature_type_id: z.number(),
   name: z.string(),
   display_name: z.string()
 });
 
-export type FeatureTypeRecord = z.infer<typeof FeatureTypeRecord>;
+export type FeatureTypeSummary = z.infer<typeof FeatureTypeSummary>;
 
 /**
  * Schema for raw DB row when querying feature type with properties.
@@ -47,7 +48,7 @@ export type FeatureTypeWithPropertiesRow = z.infer<typeof FeatureTypeWithPropert
  * Transformed result after processing raw DB rows.
  */
 export const FeatureTypeWithProperties = z.object({
-  featureType: FeatureTypeRecord,
+  featureType: FeatureTypeSummary,
   properties: z.array(FeatureProperty)
 });
 

@@ -2,7 +2,7 @@ import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
   FeatureProperty,
-  FeatureTypeRecord,
+  FeatureTypeSummary,
   FeatureTypeWithProperties,
   FeatureTypeWithPropertiesRow
 } from '../models/feature-type';
@@ -113,7 +113,7 @@ export class ValidationRepository extends BaseRepository {
 
     // Extract feature type info from the first row
     const firstRow = response.rows[0];
-    const featureType: FeatureTypeRecord = {
+    const featureType: FeatureTypeSummary = {
       feature_type_id: firstRow.feature_type_id,
       name: firstRow.name,
       display_name: firstRow.display_name
