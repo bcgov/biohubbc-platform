@@ -2,6 +2,8 @@ import { IDBConnection } from '../../database/db';
 import { parseFeatureUrn } from '../../database/urn-utils';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
+import { makePaginationResponse } from '../../utils/pagination';
+import { ApiPaginationOptions, ApiPaginationResults } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
 import {
   CreatePolicyStatementInput,
@@ -94,18 +96,19 @@ export class PolicyService extends DBService {
   /**
    * Get all policies with their statements, with pagination and search.
    *
-   * @param {object} options - Pagination and search options.
-   * @param {number} options.page - Page number (0-indexed).
-   * @param {number} options.limit - Number of items per page.
-   * @param {string} [options.search] - Optional search term to filter by policy name.
-   * @return {Promise<{ policies: PolicyWithStatements[]; pagination: { total: number; page: number; limit: number } }>}
+   * @param {string} [search] - Optional search term to filter by policy name.
+   * @param {ApiPaginationOptions} pagination - Pagination options.
+   * @return {Promise<{ policies: PolicyWithStatements[]; pagination: ApiPaginationResults }>}
    * @memberof PolicyService
    */
-  async getPoliciesWithStatements(options: { page: number; limit: number; search?: string }): Promise<{
+  async getPoliciesWithStatements(
+    search: string | undefined,
+    pagination: ApiPaginationOptions
+  ): Promise<{
     policies: PolicyWithStatements[];
-    pagination: { total: number; page: number; limit: number };
+    pagination: ApiPaginationResults;
   }> {
-    const { policies, total } = await this.policyRepository.getPoliciesWithPagination(options);
+    const { policies, total } = await this.policyRepository.getPoliciesWithPagination(search, pagination);
 
     const policiesWithStatements = await Promise.all(
       policies.map(async (policy) => ({
@@ -116,7 +119,7 @@ export class PolicyService extends DBService {
 
     return {
       policies: policiesWithStatements,
-      pagination: { total, page: options.page, limit: options.limit }
+      pagination: makePaginationResponse(total, pagination)
     };
   }
 

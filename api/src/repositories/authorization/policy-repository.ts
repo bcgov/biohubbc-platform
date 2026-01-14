@@ -4,6 +4,7 @@ import { FeatureUrn } from '../../database/urn-utils.interface';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyEffect } from '../../models/policy-statement';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
 /**
@@ -85,24 +86,21 @@ export class PolicyRepository extends BaseRepository {
   /**
    * Get policies with pagination and optional search.
    *
-   * @param {object} options - Pagination and search options.
-   * @param {number} options.page - Page number (0-indexed).
-   * @param {number} options.limit - Number of items per page.
-   * @param {string} [options.search] - Optional search term to filter by policy name.
+   * @param {string} [search] - Optional search term to filter by policy name.
+   * @param {ApiPaginationOptions} pagination - Pagination options.
    * @return {Promise<{ policies: Policy[]; total: number }>} - Paginated policies and total count.
    * @memberof PolicyRepository
    */
-  async getPoliciesWithPagination(options: {
-    page: number;
-    limit: number;
-    search?: string;
-  }): Promise<{ policies: Policy[]; total: number }> {
+  async getPoliciesWithPagination(
+    search: string | undefined,
+    pagination: ApiPaginationOptions
+  ): Promise<{ policies: Policy[]; total: number }> {
     const knex = getKnex();
 
     let baseQuery = knex.table('policy').where('record_end_date', null);
 
-    if (options.search) {
-      baseQuery = baseQuery.whereILike('name', `%${options.search}%`);
+    if (search) {
+      baseQuery = baseQuery.whereILike('name', `%${search}%`);
     }
 
     // Get total count
@@ -110,13 +108,13 @@ export class PolicyRepository extends BaseRepository {
     const countResult = await this.connection.knex(countQuery);
     const total = Number(countResult.rows[0]?.count || 0);
 
-    // Get paginated results
+    // Get paginated results (page is 1-indexed, so offset = (page - 1) * limit)
     const paginatedQuery = baseQuery
       .clone()
       .select(['policy_id', 'name', 'description'])
-      .orderBy('name', 'asc')
-      .offset(options.page * options.limit)
-      .limit(options.limit);
+      .orderBy(pagination.sort || 'name', pagination.order || 'asc')
+      .offset((pagination.page - 1) * pagination.limit)
+      .limit(pagination.limit);
 
     const response = await this.connection.knex(paginatedQuery, Policy);
 

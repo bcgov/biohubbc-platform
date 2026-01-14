@@ -5,6 +5,7 @@
  */
 
 import { OpenAPIV3 } from 'openapi-types';
+import { paginationResponseSchema } from './pagination';
 
 /**
  * Schema for policy statement condition.
@@ -162,24 +163,7 @@ export const PoliciesListResponseSchema: OpenAPIV3.SchemaObject = {
       items: PolicyWithStatementsSchema,
       description: 'List of policies with statements'
     },
-    pagination: {
-      type: 'object',
-      required: ['total', 'page', 'limit'],
-      properties: {
-        total: {
-          type: 'integer',
-          description: 'Total number of policies'
-        },
-        page: {
-          type: 'integer',
-          description: 'Current page number (0-indexed)'
-        },
-        limit: {
-          type: 'integer',
-          description: 'Number of items per page'
-        }
-      }
-    }
+    pagination: paginationResponseSchema
   }
 };
 

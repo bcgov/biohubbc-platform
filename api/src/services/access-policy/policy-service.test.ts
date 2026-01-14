@@ -137,9 +137,9 @@ describe('PolicyService', () => {
         .stub(PolicyStatementConditionRepository.prototype, 'getPolicyStatementConditions')
         .resolves(mockConditions);
 
-      const result = await policyService.getPoliciesWithStatements({ page: 0, limit: 50 });
+      const result = await policyService.getPoliciesWithStatements(undefined, { page: 1, limit: 10 });
 
-      expect(getPoliciesWithPaginationStub).to.have.been.calledWith({ page: 0, limit: 50 });
+      expect(getPoliciesWithPaginationStub).to.have.been.calledWith(undefined, { page: 1, limit: 10 });
       expect(getPolicyStatementsStub).to.have.been.called;
       expect(getConditionsStub).to.have.been.called;
       expect(result).to.eql({
@@ -147,7 +147,7 @@ describe('PolicyService', () => {
           { ...mockPolicies[0], statements: [{ ...mockStatements[0], conditions: mockConditions }] },
           { ...mockPolicies[1], statements: [{ ...mockStatements[0], conditions: mockConditions }] }
         ],
-        pagination: { total: 2, page: 0, limit: 50 }
+        pagination: { total: 2, per_page: 10, current_page: 1, last_page: 1, sort: undefined, order: undefined }
       });
     });
 
@@ -156,12 +156,12 @@ describe('PolicyService', () => {
         .stub(PolicyRepository.prototype, 'getPoliciesWithPagination')
         .resolves({ policies: [], total: 0 });
 
-      const result = await policyService.getPoliciesWithStatements({ page: 0, limit: 50 });
+      const result = await policyService.getPoliciesWithStatements(undefined, { page: 1, limit: 10 });
 
-      expect(getPoliciesWithPaginationStub).to.have.been.calledWith({ page: 0, limit: 50 });
+      expect(getPoliciesWithPaginationStub).to.have.been.calledWith(undefined, { page: 1, limit: 10 });
       expect(result).to.eql({
         policies: [],
-        pagination: { total: 0, page: 0, limit: 50 }
+        pagination: { total: 0, per_page: 10, current_page: 1, last_page: 1, sort: undefined, order: undefined }
       });
     });
   });

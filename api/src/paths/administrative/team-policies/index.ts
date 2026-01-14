@@ -11,6 +11,7 @@ import {
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { TeamPolicyService } from '../../../services/access-policy/team-policy-service';
 import { getLogger } from '../../../utils/logger';
+import { ApiPaginationOptions } from '../../../zod-schema/pagination';
 
 const defaultLog = getLogger('paths/administrative/team-policies');
 
@@ -36,6 +37,36 @@ GET.apiDoc = {
       Bearer: []
     }
   ],
+  parameters: [
+    {
+      in: 'query',
+      name: 'page',
+      required: false,
+      schema: { type: 'integer', minimum: 1 },
+      description: 'Page number (1-indexed, defaults to 1)'
+    },
+    {
+      in: 'query',
+      name: 'limit',
+      required: false,
+      schema: { type: 'integer', minimum: 1, maximum: 100 },
+      description: 'Items per page (defaults to 10, max 100)'
+    },
+    {
+      in: 'query',
+      name: 'sort',
+      required: false,
+      schema: { type: 'string' },
+      description: 'Column to sort by (e.g., team_name, policy_name)'
+    },
+    {
+      in: 'query',
+      name: 'order',
+      required: false,
+      schema: { type: 'string', enum: ['asc', 'desc'] },
+      description: 'Sort direction'
+    }
+  ],
   responses: {
     200: {
       description: 'List of team-policy associations.',
@@ -58,15 +89,22 @@ export function getTeamPolicies(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
 
+    const pagination: ApiPaginationOptions = {
+      page: Number(req.query.page) || 1,
+      limit: Math.min(Number(req.query.limit) || 10, 100),
+      sort: req.query.sort as string | undefined,
+      order: req.query.order as 'asc' | 'desc' | undefined
+    };
+
     try {
       await connection.open();
 
       const teamPolicyService = new TeamPolicyService(connection);
-      const teamPolicies = await teamPolicyService.getAllTeamPolicies();
+      const response = await teamPolicyService.getAllTeamPoliciesWithPagination(pagination);
 
       await connection.commit();
 
-      return res.status(200).json({ team_policies: teamPolicies });
+      return res.status(200).json(response);
     } catch (error) {
       defaultLog.error({ label: 'getTeamPolicies', message: 'error', error });
       await connection.rollback();

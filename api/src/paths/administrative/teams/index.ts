@@ -7,6 +7,7 @@ import { CreateTeamRequestSchema, TeamsListResponseSchema, TeamWithMembersSchema
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { TeamService } from '../../../services/access-policy/team-service';
 import { getLogger } from '../../../utils/logger';
+import { ApiPaginationOptions } from '../../../zod-schema/pagination';
 
 const defaultLog = getLogger('paths/administrative/teams');
 
@@ -75,16 +76,19 @@ GET.apiDoc = {
 export function getTeams(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
-    const page = Number(req.query.page) || 1;
-    const limit = Math.min(Number(req.query.limit) || 10, 100);
-    const sort = req.query.sort as string | undefined;
-    const order = req.query.order as 'asc' | 'desc' | undefined;
+
     const search = req.query.search as string | undefined;
+    const pagination: ApiPaginationOptions = {
+      page: Number(req.query.page) || 1,
+      limit: Math.min(Number(req.query.limit) || 10, 100),
+      sort: req.query.sort as string | undefined,
+      order: req.query.order as 'asc' | 'desc' | undefined
+    };
 
     try {
       await connection.open();
       const teamService = new TeamService(connection);
-      const result = await teamService.getTeamsWithMembers({ page, limit, sort, order, search });
+      const result = await teamService.getTeamsWithMembers(search, pagination);
       await connection.commit();
       return res.status(200).json(result);
     } catch (error) {

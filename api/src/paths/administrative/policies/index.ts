@@ -11,6 +11,7 @@ import {
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { PolicyService } from '../../../services/access-policy/policy-service';
 import { getLogger } from '../../../utils/logger';
+import { ApiPaginationOptions } from '../../../zod-schema/pagination';
 
 const defaultLog = getLogger('paths/administrative/policies');
 
@@ -40,30 +41,36 @@ GET.apiDoc = {
     {
       in: 'query',
       name: 'page',
-      schema: {
-        type: 'integer',
-        minimum: 0,
-        default: 0
-      },
-      description: 'Page number (0-indexed)'
+      required: false,
+      schema: { type: 'integer', minimum: 1 },
+      description: 'Page number (1-indexed, defaults to 1)'
     },
     {
       in: 'query',
       name: 'limit',
-      schema: {
-        type: 'integer',
-        minimum: 1,
-        maximum: 100,
-        default: 50
-      },
-      description: 'Number of items per page'
+      required: false,
+      schema: { type: 'integer', minimum: 1, maximum: 100 },
+      description: 'Items per page (defaults to 10, max 100)'
+    },
+    {
+      in: 'query',
+      name: 'sort',
+      required: false,
+      schema: { type: 'string' },
+      description: 'Column to sort by (e.g., name)'
+    },
+    {
+      in: 'query',
+      name: 'order',
+      required: false,
+      schema: { type: 'string', enum: ['asc', 'desc'] },
+      description: 'Sort direction'
     },
     {
       in: 'query',
       name: 'search',
-      schema: {
-        type: 'string'
-      },
+      required: false,
+      schema: { type: 'string' },
       description: 'Search term to filter policies by name'
     }
   ],
@@ -89,15 +96,19 @@ export function getPolicies(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
 
-    const page = Number(req.query.page) || 0;
-    const limit = Number(req.query.limit) || 50;
     const search = req.query.search as string | undefined;
+    const pagination: ApiPaginationOptions = {
+      page: Number(req.query.page) || 1,
+      limit: Math.min(Number(req.query.limit) || 10, 100),
+      sort: req.query.sort as string | undefined,
+      order: req.query.order as 'asc' | 'desc' | undefined
+    };
 
     try {
       await connection.open();
 
       const policyService = new PolicyService(connection);
-      const response = await policyService.getPoliciesWithStatements({ page, limit, search });
+      const response = await policyService.getPoliciesWithStatements(search, pagination);
 
       await connection.commit();
 
