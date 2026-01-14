@@ -1,7 +1,8 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getServiceAccountDBConnection } from '../../database/db';
-import { HTTP400 } from '../../errors/http-error';
+import { ApiConflictError } from '../../errors/api-error';
+import { HTTP400, HTTP409 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { ContributorService } from '../../services/contributor-service';
@@ -73,6 +74,12 @@ export function registerNewContributor(): RequestHandler {
     } catch (error) {
       defaultLog.error({ label: 'registerNewContributor', message: 'error', error });
       await connection.rollback();
+
+      // Convert ApiConflictError to HTTP409
+      if (error instanceof ApiConflictError) {
+        throw HTTP409.fromApiError(error);
+      }
+
       throw error;
     } finally {
       connection.release();

@@ -5,7 +5,8 @@ import sinonChai from 'sinon-chai';
 
 import { registerNewContributor } from '.';
 import * as db from '../../database/db';
-import { HTTPError } from '../../errors/http-error';
+import { ApiConflictError } from '../../errors/api-error';
+import { HTTP409, HTTPError } from '../../errors/http-error';
 import { SystemUser } from '../../repositories/user-repository';
 import { ContributorService } from '../../services/contributor-service';
 import * as keycloakUtils from '../../utils/keycloak-utils';
@@ -98,6 +99,41 @@ describe('registerNewContributor', () => {
     } catch (error) {
       expect(mockDBConnection.rollback).to.have.been.calledOnce;
       expect((error as Error).message).to.equal('Contributor error');
+    }
+  });
+
+  it('returns HTTP409 if contributor already exists', async () => {
+    const mockDBConnection = getMockDBConnection({
+      open: sinon.stub(),
+      release: sinon.stub(),
+      commit: sinon.stub(),
+      rollback: sinon.stub()
+    });
+    sinon.stub(db, 'getServiceAccountDBConnection').returns(mockDBConnection);
+
+    const mockSystemUser = {
+      system_user_id: 42
+    } as SystemUser;
+
+    sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(mockSystemUser);
+    sinon
+      .stub(ContributorService.prototype, 'addNewContributor')
+      .rejects(new ApiConflictError('Contributor already exists', ['A contributor with client_id already exists']));
+
+    const requestHandler = registerNewContributor();
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    mockReq['keycloak_token'] = { clientId: 'existing-client-id' };
+
+    try {
+      await requestHandler(mockReq, mockRes, mockNext);
+      expect.fail('Should have thrown HTTP409');
+    } catch (error) {
+      expect(error).to.be.instanceOf(HTTP409);
+      expect((error as HTTP409).status).to.equal(409);
+      expect((error as HTTP409).message).to.equal('Contributor already exists');
+      expect(mockDBConnection.rollback).to.have.been.calledOnce;
     }
   });
 });
