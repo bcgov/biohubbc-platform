@@ -96,7 +96,7 @@ const insertRecord = async (knex: Knex) => {
     });
 
     // Animals
-    const animalPromises = Array.from({ length: 2 }).map(() =>
+    const animalPromises = Array.from({ length: 5 }).map(() =>
       insertAnimalRecord(knex, { submission_id, parent_submission_feature_id: parent_submission_feature_id2 })
     );
 
@@ -554,7 +554,7 @@ export const insertTelemetryRecord = async (
     device_id,
     latitude: faker.number.float({ min: 48.617424, max: 60.664785, multipleOf: 0.000001 }),
     longitude: faker.number.float({ min: -135.878906, max: -114.433594, multipleOf: 0.000001 }),
-    timestamp: faker.date.recent().toISOString(),
+    timestamp: faker.date.between({ from: '2020-01-01T00:00:00.000Z', to: new Date().toISOString() }).toISOString(),
     temperature: faker.number.float({ min: -20, max: 50, multipleOf: 0.1 }),
     humidity: faker.number.float({ min: 0, max: 100, multipleOf: 0.1 }),
     dop: faker.number.float({ min: 1, max: 20, multipleOf: 0.1 }),
