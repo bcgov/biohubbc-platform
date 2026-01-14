@@ -122,10 +122,10 @@ export async function up(knex: Knex): Promise<void> {
             false
         ),
         (
-            (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'number'),
+            (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
             'environment_quantitative_value',
             'Environment Quantitative Value',
-            'The numeric value for a quantitative environmental measurement.',
+            'The value and unitfor a quantitative environmental measurement.',
             false
         ),
 
@@ -142,13 +142,6 @@ export async function up(knex: Knex): Promise<void> {
             'method_response_metric_id',
             'Method Response Metric ID',
             'Reference to a method response metric code table entry.',
-            false
-        ),
-        (
-            (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'attractant_lookup_id',
-            'Attractant Lookup ID',
-            'Reference to an attractant lookup code table entry.',
             false
         ),
 
@@ -652,7 +645,6 @@ export async function down(knex: Knex): Promise<void> {
     DELETE FROM feature_property WHERE name = 'technique_attribute_quantitative_id';
     DELETE FROM feature_property WHERE name = 'technique_attribute_qualitative_option_id';
     DELETE FROM feature_property WHERE name = 'technique_attribute_qualitative_id';
-    DELETE FROM feature_property WHERE name = 'attractant_lookup_id';
     DELETE FROM feature_property WHERE name = 'method_response_metric_id';
     DELETE FROM feature_property WHERE name = 'method_lookup_id';
     DELETE FROM feature_property WHERE name = 'environment_quantitative_value';
