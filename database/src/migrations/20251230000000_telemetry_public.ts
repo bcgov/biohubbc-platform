@@ -20,7 +20,7 @@ export async function up(knex: Knex): Promise<void> {
       (sf.data->>'longitude')::numeric as longitude,
       (sf.data->>'timestamp')::timestamptz as timestamp,
       (sf.data->>'dop')::numeric as dop,
-      td.data->>'device_key' as device_key,
+      dep.data->>'device_key' as device_key,
       dep.data->>'animal_id' as animal_id
     FROM biohub.submission_feature sf
     JOIN biohub.feature_type ft ON sf.feature_type_id = ft.feature_type_id
