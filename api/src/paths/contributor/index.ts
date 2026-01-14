@@ -9,7 +9,7 @@ import { getServiceClientSystemUser } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 import { CreateContributor } from './index.interface';
 
-const defaultLog = getLogger('paths/codeset');
+const defaultLog = getLogger('paths/contributor');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => {
@@ -26,11 +26,11 @@ export const POST: Operation = [
 
 POST.apiDoc = {
   description: 'Registers the requesting service account as a new contributor',
-  tags: ['codeset'],
+  tags: ['contributor'],
   security: [{ Bearer: [] }],
   responses: {
-    200: {
-      description: 'Codeset accepted successfully.'
+    201: {
+      description: 'Contributor registered successfully.'
     },
     ...defaultErrorResponses
   }
