@@ -103,6 +103,18 @@ export class MockRes {
   });
 
   /**
+   * The value of the last `.sendStatus(<value>)` call.
+   *
+   * @type {*}
+   * @memberof MockRes
+   */
+  sendStatusValue: any;
+  sendStatus = sinon.fake((value: any) => {
+    this.sendStatusValue = value;
+    return this;
+  });
+
+  /**
    * The value of the last `.send(<value>)` call.
    *
    * @type {*}
