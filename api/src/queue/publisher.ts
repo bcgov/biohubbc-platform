@@ -201,9 +201,9 @@ export const publishProcessSubmissionFeaturesJob = async (
 /**
  * Publish a malware scan job to the queue.
  *
- * Queues ClamAV scanning for a quarantined submission tarball.
+ * Queues ClamAV scanning for an uploaded artifact.
  *
- * @param {IMalwareScanJobData} data Job data containing quarantineId
+ * @param {IMalwareScanJobData} data Job data containing artifactSecurityId
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
  */
@@ -218,10 +218,10 @@ export const publishMalwareScanJob = async (
     // Ensure queue exists (pg-boss v10 requires this before send)
     await boss.createQueue(JobQueues.MALWARE_SCAN);
 
-    // Use singletonKey to prevent duplicate concurrent jobs for the same quarantine record
+    // Use singletonKey to prevent duplicate concurrent jobs for the same artifact security record
     const jobId = await boss.send(JobQueues.MALWARE_SCAN, data, {
       ...mergedOptions,
-      singletonKey: `quarantine-${data.quarantineId}`
+      singletonKey: `artifact-security-${data.artifactSecurityId}`
     });
 
     if (jobId) {
@@ -229,7 +229,7 @@ export const publishMalwareScanJob = async (
         label: 'publishMalwareScanJob',
         message: 'Malware scan job published',
         jobId,
-        quarantineId: data.quarantineId
+        artifactSecurityId: data.artifactSecurityId
       });
 
       return { status: 'published', jobId };
@@ -238,17 +238,17 @@ export const publishMalwareScanJob = async (
     defaultLog.warn({
       label: 'publishMalwareScanJob',
       message: 'Job not published (duplicate or throttled)',
-      quarantineId: data.quarantineId
+      artifactSecurityId: data.artifactSecurityId
     });
 
-    return { status: 'duplicate', message: 'Job already exists for this quarantine record' };
+    return { status: 'duplicate', message: 'Job already exists for this artifact security record' };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     defaultLog.error({
       label: 'publishMalwareScanJob',
       message: 'Failed to publish job',
-      quarantineId: data.quarantineId,
+      artifactSecurityId: data.artifactSecurityId,
       error
     });
 

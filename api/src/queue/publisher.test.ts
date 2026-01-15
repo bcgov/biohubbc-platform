@@ -271,7 +271,7 @@ describe('publisher', () => {
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
-      const data = { quarantineId: 'quarantine-123' };
+      const data = { artifactSecurityId: 'artifact-security-123' };
       const result = await publishMalwareScanJob(data);
 
       expect(createQueueStub.calledOnce).to.be.true;
@@ -290,7 +290,7 @@ describe('publisher', () => {
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
-      await publishMalwareScanJob({ quarantineId: 'quarantine-456' });
+      await publishMalwareScanJob({ artifactSecurityId: 'artifact-security-456' });
 
       const options = sendStub.firstCall.args[2];
       expect(options.retryLimit).to.equal(3);
@@ -299,17 +299,17 @@ describe('publisher', () => {
       expect(options.expireInSeconds).to.equal(60 * 30); // 30 minutes
     });
 
-    it('uses singletonKey based on quarantineId to prevent duplicates', async () => {
+    it('uses singletonKey based on artifactSecurityId to prevent duplicates', async () => {
       const sendStub = sinon.stub().resolves('scan-job-id');
       const createQueueStub = sinon.stub().resolves();
       const mockBoss = { send: sendStub, createQueue: createQueueStub };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
-      await publishMalwareScanJob({ quarantineId: '123' });
+      await publishMalwareScanJob({ artifactSecurityId: '123' });
 
       const options = sendStub.firstCall.args[2];
-      expect(options.singletonKey).to.equal('quarantine-123');
+      expect(options.singletonKey).to.equal('artifact-security-123');
     });
 
     it('returns duplicate status when send returns null', async () => {
@@ -319,18 +319,18 @@ describe('publisher', () => {
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
-      const result = await publishMalwareScanJob({ quarantineId: 'quarantine-999' });
+      const result = await publishMalwareScanJob({ artifactSecurityId: 'artifact-security-999' });
 
       expect(result.status).to.equal('duplicate');
       expect((result as { status: 'duplicate'; message: string }).message).to.equal(
-        'Job already exists for this quarantine record'
+        'Job already exists for this artifact security record'
       );
     });
 
     it('returns error status when pg-boss throws', async () => {
       sinon.stub(pgBossService, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
-      const result = await publishMalwareScanJob({ quarantineId: 'quarantine-000' });
+      const result = await publishMalwareScanJob({ artifactSecurityId: 'artifact-security-000' });
 
       expect(result.status).to.equal('error');
       expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
