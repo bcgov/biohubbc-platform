@@ -47,14 +47,13 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IProcessSub
       await connection.open();
 
       const submissionValidationService = new SubmissionValidationService(connection);
-      //const submissionProcessService = new SubmissionProcessService(connection);
-
+ 
       // Commit 'started' status immediately so it's visible even if processing fails
       await submissionValidationService.updateSubmissionValidationStatus(job.id, 'started');
       await connection.commit();
 
       // Process the submission (download, validate, insert, index, regions)
-      //await submissionProcessService.processSubmission(submissionId);
+      //TODO: call submission feature validation service;
 
       // Update validation status to completed
       await submissionValidationService.updateSubmissionValidationStatus(job.id, 'completed');
