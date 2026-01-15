@@ -1,10 +1,13 @@
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
+import { GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { debounce } from 'lodash-es';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ApiPaginationRequestOptions } from 'types/misc';
+import { firstOrNull } from 'utils/Utils';
 import { ActivePoliciesList } from './components/ActivePoliciesList';
 import { TeamPoliciesContainer } from './components/TeamPoliciesContainer';
 import { TeamsContainer } from './components/TeamsContainer';
@@ -32,23 +35,105 @@ export const ManagePoliciesPage = () => {
   const [teamSearchTerm, setTeamSearchTerm] = useState('');
   const [debouncedTeamSearchTerm, setDebouncedTeamSearchTerm] = useState('');
 
+  // Policies pagination state
+  const [policiesPaginationModel, setPoliciesPaginationModel] = useState<GridPaginationModel>({
+    page: 0,
+    pageSize: 50
+  });
+  const [policiesSortModel, setPoliciesSortModel] = useState<GridSortModel>([{ field: 'name', sort: 'asc' }]);
+
+  // Teams pagination state
+  const [teamsPaginationModel, setTeamsPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 10 });
+  const [teamsSortModel, setTeamsSortModel] = useState<GridSortModel>([{ field: 'name', sort: 'asc' }]);
+
+  // TeamPolicies pagination state
+  const [teamPoliciesPaginationModel, setTeamPoliciesPaginationModel] = useState<GridPaginationModel>({
+    page: 0,
+    pageSize: 10
+  });
+  const [teamPoliciesSortModel, setTeamPoliciesSortModel] = useState<GridSortModel>([
+    { field: 'team_name', sort: 'asc' }
+  ]);
+
+  // Policies pagination options (memoized to prevent unnecessary re-renders)
+  const policiesPagination: ApiPaginationRequestOptions = useMemo(() => {
+    const sort = firstOrNull(policiesSortModel);
+    return {
+      page: policiesPaginationModel.page + 1,
+      limit: policiesPaginationModel.pageSize,
+      sort: sort?.field,
+      order: sort?.sort as 'asc' | 'desc' | undefined
+    };
+  }, [policiesPaginationModel, policiesSortModel]);
+
+  // Teams pagination options (memoized to prevent unnecessary re-renders)
+  const teamsPagination: ApiPaginationRequestOptions = useMemo(() => {
+    const sort = firstOrNull(teamsSortModel);
+    return {
+      page: teamsPaginationModel.page + 1,
+      limit: teamsPaginationModel.pageSize,
+      sort: sort?.field,
+      order: sort?.sort as 'asc' | 'desc' | undefined
+    };
+  }, [teamsPaginationModel, teamsSortModel]);
+
+  // TeamPolicies pagination options (memoized to prevent unnecessary re-renders)
+  const teamPoliciesPagination: ApiPaginationRequestOptions = useMemo(() => {
+    const sort = firstOrNull(teamPoliciesSortModel);
+    return {
+      page: teamPoliciesPaginationModel.page + 1,
+      limit: teamPoliciesPaginationModel.pageSize,
+      sort: sort?.field,
+      order: sort?.sort as 'asc' | 'desc' | undefined
+    };
+  }, [teamPoliciesPaginationModel, teamPoliciesSortModel]);
+
   // Data loaders
-  const policiesDataLoader = useDataLoader((search?: string) =>
-    biohubApi.policies.getPolicies({ search: search || undefined })
+  const policiesDataLoader = useDataLoader((pagination: ApiPaginationRequestOptions, search?: string) =>
+    biohubApi.policies.getPolicies({ search }, pagination)
   );
 
-  const teamsDataLoader = useDataLoader((search?: string) =>
-    biohubApi.teams.getTeams({ page: 1, limit: 100, search: search || undefined })
+  const teamsDataLoader = useDataLoader((pagination: ApiPaginationRequestOptions, search?: string) =>
+    biohubApi.teams.getTeams({ search }, pagination)
   );
 
-  const teamPoliciesDataLoader = useDataLoader(() => biohubApi.teamPolicies.getTeamPolicies());
+  const teamPoliciesDataLoader = useDataLoader((pagination: ApiPaginationRequestOptions) =>
+    biohubApi.teamPolicies.getTeamPolicies(pagination)
+  );
 
   // Load data on mount
   useEffect(() => {
-    policiesDataLoader.load(debouncedPolicySearchTerm);
-    teamsDataLoader.load(debouncedTeamSearchTerm);
-    teamPoliciesDataLoader.load();
-  }, [teamPoliciesDataLoader, teamsDataLoader, policiesDataLoader, debouncedPolicySearchTerm, debouncedTeamSearchTerm]);
+    policiesDataLoader.load(policiesPagination, debouncedPolicySearchTerm);
+    teamsDataLoader.load(teamsPagination, debouncedTeamSearchTerm);
+    teamPoliciesDataLoader.load(teamPoliciesPagination);
+  }, [
+    teamPoliciesDataLoader,
+    teamsDataLoader,
+    policiesDataLoader,
+    debouncedPolicySearchTerm,
+    debouncedTeamSearchTerm,
+    policiesPagination,
+    teamsPagination,
+    teamPoliciesPagination
+  ]);
+
+  // Refresh policies when pagination/sort changes
+  useEffect(() => {
+    policiesDataLoader.refresh(policiesPagination, debouncedPolicySearchTerm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [policiesPagination]);
+
+  // Refresh teams when pagination/sort changes
+  useEffect(() => {
+    teamsDataLoader.refresh(teamsPagination, debouncedTeamSearchTerm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamsPagination]);
+
+  // Refresh teamPolicies when pagination/sort changes
+  useEffect(() => {
+    teamPoliciesDataLoader.refresh(teamPoliciesPagination);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamPoliciesPagination]);
 
   // Data
   const policies = policiesDataLoader.data?.policies ?? [];
@@ -79,9 +164,9 @@ export const ManagePoliciesPage = () => {
   // Debounced search handlers
   const debouncedPolicyRefresh = useMemo(
     () =>
-      debounce((term: string) => {
+      debounce((term: string, pagination: ApiPaginationRequestOptions) => {
         setDebouncedPolicySearchTerm(term);
-        policiesDataLoader.refresh(term);
+        policiesDataLoader.refresh(pagination, term);
       }, 300),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -89,9 +174,9 @@ export const ManagePoliciesPage = () => {
 
   const debouncedTeamRefresh = useMemo(
     () =>
-      debounce((term: string) => {
+      debounce((term: string, pagination: ApiPaginationRequestOptions) => {
         setDebouncedTeamSearchTerm(term);
-        teamsDataLoader.refresh(term);
+        teamsDataLoader.refresh(pagination, term);
       }, 300),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -100,19 +185,23 @@ export const ManagePoliciesPage = () => {
   const handlePolicySearch = useCallback(
     (term: string) => {
       setPolicySearchTerm(term);
-      debouncedPolicyRefresh(term);
+      // Reset to first page when searching
+      setPoliciesPaginationModel((prev) => ({ ...prev, page: 0 }));
+      debouncedPolicyRefresh(term, { ...policiesPagination, page: 1 });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [policiesPagination]
   );
 
   const handleTeamSearch = useCallback(
     (term: string) => {
       setTeamSearchTerm(term);
-      debouncedTeamRefresh(term);
+      // Reset to first page when searching
+      setTeamsPaginationModel((prev) => ({ ...prev, page: 0 }));
+      debouncedTeamRefresh(term, { ...teamsPagination, page: 1 });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [teamsPagination]
   );
 
   // Selection handlers
@@ -126,24 +215,29 @@ export const ManagePoliciesPage = () => {
 
   // Refresh handlers
   const refreshPolicies = useCallback(() => {
-    policiesDataLoader.refresh(debouncedPolicySearchTerm);
+    policiesDataLoader.refresh(policiesPagination, debouncedPolicySearchTerm);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedPolicySearchTerm]);
+  }, [debouncedPolicySearchTerm, policiesPagination]);
 
   const refreshTeams = useCallback(() => {
-    teamsDataLoader.refresh(debouncedTeamSearchTerm);
+    teamsDataLoader.refresh(teamsPagination, debouncedTeamSearchTerm);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedTeamSearchTerm]);
+  }, [debouncedTeamSearchTerm, teamsPagination]);
 
   const refreshTeamPolicies = useCallback(() => {
-    teamPoliciesDataLoader.refresh();
+    teamPoliciesDataLoader.refresh(teamPoliciesPagination);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [teamPoliciesPagination]);
 
   return (
     <Box py={7}>
       <ActivePoliciesList
         policies={policies}
+        rowCount={policiesDataLoader.data?.pagination.total ?? 0}
+        paginationModel={policiesPaginationModel}
+        setPaginationModel={setPoliciesPaginationModel}
+        sortModel={policiesSortModel}
+        setSortModel={setPoliciesSortModel}
         refresh={refreshPolicies}
         searchTerm={policySearchTerm}
         onSearch={handlePolicySearch}
@@ -155,6 +249,11 @@ export const ManagePoliciesPage = () => {
         <Paper>
           <TeamsContainer
             teams={teams}
+            rowCount={teamsDataLoader.data?.pagination.total ?? 0}
+            paginationModel={teamsPaginationModel}
+            setPaginationModel={setTeamsPaginationModel}
+            sortModel={teamsSortModel}
+            setSortModel={setTeamsSortModel}
             refresh={refreshTeams}
             searchTerm={teamSearchTerm}
             onSearch={handleTeamSearch}
@@ -168,6 +267,11 @@ export const ManagePoliciesPage = () => {
         <Paper>
           <TeamPoliciesContainer
             teamPolicies={filteredTeamPolicies}
+            rowCount={teamPoliciesDataLoader.data?.pagination.total ?? 0}
+            paginationModel={teamPoliciesPaginationModel}
+            setPaginationModel={setTeamPoliciesPaginationModel}
+            sortModel={teamPoliciesSortModel}
+            setSortModel={setTeamPoliciesSortModel}
             selectedTeam={selectedTeam}
             selectedPolicy={selectedPolicy}
             refresh={refreshTeamPolicies}

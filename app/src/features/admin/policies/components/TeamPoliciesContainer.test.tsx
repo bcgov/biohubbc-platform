@@ -52,6 +52,11 @@ const mockUseApi = {
 
 const defaultProps: ITeamPoliciesContainerProps = {
   teamPolicies: mockTeamPolicies,
+  rowCount: 2,
+  paginationModel: { page: 0, pageSize: 10 },
+  setPaginationModel: vi.fn(),
+  sortModel: [{ field: 'team_name', sort: 'asc' }],
+  setSortModel: vi.fn(),
   selectedTeam: null,
   selectedPolicy: null,
   refresh: vi.fn()
@@ -95,7 +100,7 @@ describe('TeamPoliciesContainer', () => {
   });
 
   it('shows empty state when no assignments exist', async () => {
-    const { getByText } = renderContainer({ teamPolicies: [] });
+    const { getByText } = renderContainer({ teamPolicies: [], rowCount: 0 });
 
     await waitFor(() => {
       expect(getByText('No Team-Policy Assignments')).toBeVisible();

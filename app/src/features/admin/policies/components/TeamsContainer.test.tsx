@@ -47,6 +47,11 @@ const mockUseApi = {
 
 const defaultProps: ITeamsContainerProps = {
   teams: mockTeams,
+  rowCount: 2,
+  paginationModel: { page: 0, pageSize: 10 },
+  setPaginationModel: vi.fn(),
+  sortModel: [{ field: 'name', sort: 'asc' }],
+  setSortModel: vi.fn(),
   refresh: vi.fn(),
   searchTerm: '',
   onSearch: vi.fn(),
@@ -133,7 +138,7 @@ describe('TeamsContainer', () => {
   });
 
   it('shows `No Teams` when there are no teams', async () => {
-    const { getByText } = renderContainer({ teams: [] });
+    const { getByText } = renderContainer({ teams: [], rowCount: 0 });
 
     await waitFor(() => {
       expect(getByText('No Teams')).toBeVisible();
@@ -346,6 +351,55 @@ describe('TeamsContainer', () => {
         const searchInput = getByPlaceholderText('Search by team name');
         expect(searchInput).toHaveValue('Beta');
       });
+    });
+  });
+
+  describe('Server Pagination', () => {
+    it('displays rowCount in header for server-side pagination', async () => {
+      // rowCount prop controls the total displayed, not the array length
+      const { getByText } = renderContainer({ teams: mockTeams, rowCount: 100 });
+
+      await waitFor(() => {
+        // Header should show rowCount (100), not teams.length (2)
+        expect(getByText('(100)')).toBeVisible();
+      });
+    });
+
+    it('calls setPaginationModel when page size changes', async () => {
+      const mockSetPaginationModel = vi.fn();
+      const { getByRole } = renderContainer({ setPaginationModel: mockSetPaginationModel });
+
+      await waitFor(() => {
+        // Find the page size selector (combobox)
+        const pageSizeSelector = getByRole('combobox');
+        expect(pageSizeSelector).toBeVisible();
+      });
+
+      // Change page size
+      const pageSizeSelector = getByRole('combobox');
+      fireEvent.mouseDown(pageSizeSelector);
+
+      await waitFor(() => {
+        const option25 = getByRole('option', { name: '25' });
+        fireEvent.click(option25);
+      });
+
+      expect(mockSetPaginationModel).toHaveBeenCalled();
+    });
+
+    it('calls setSortModel when column header is clicked', async () => {
+      const mockSetSortModel = vi.fn();
+      const { getByText } = renderContainer({ setSortModel: mockSetSortModel });
+
+      await waitFor(() => {
+        expect(getByText('Alpha Team')).toBeVisible();
+      });
+
+      // Click on the Name column header to trigger sort
+      const nameHeader = getByText('Name');
+      fireEvent.click(nameHeader);
+
+      expect(mockSetSortModel).toHaveBeenCalled();
     });
   });
 
