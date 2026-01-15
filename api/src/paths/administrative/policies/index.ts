@@ -3,6 +3,7 @@ import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema } from '../../../openapi/schemas/pagination';
 import {
   CreatePolicyRequestSchema,
   PoliciesListResponseSchema,
@@ -38,34 +39,7 @@ GET.apiDoc = {
     }
   ],
   parameters: [
-    {
-      in: 'query',
-      name: 'page',
-      required: false,
-      schema: { type: 'integer', minimum: 1 },
-      description: 'Page number (1-indexed, defaults to 1)'
-    },
-    {
-      in: 'query',
-      name: 'limit',
-      required: false,
-      schema: { type: 'integer', minimum: 1, maximum: 100 },
-      description: 'Items per page (defaults to 10, max 100)'
-    },
-    {
-      in: 'query',
-      name: 'sort',
-      required: false,
-      schema: { type: 'string' },
-      description: 'Column to sort by (e.g., name)'
-    },
-    {
-      in: 'query',
-      name: 'order',
-      required: false,
-      schema: { type: 'string', enum: ['asc', 'desc'] },
-      description: 'Sort direction'
-    },
+    ...paginationRequestQueryParamSchema,
     {
       in: 'query',
       name: 'search',
