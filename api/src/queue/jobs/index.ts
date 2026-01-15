@@ -18,7 +18,7 @@ export const JobQueues = {
    */
   PROCESS_SUBMISSION_FEATURES_FAILED: 'process-submission-features-failed',
   /**
-   * Malware scan queue for quarantined submissions.
+   * Malware scan queue for uploaded artifacts awaiting security scans.
    */
   MALWARE_SCAN: 'malware-scan'
 } as const;
