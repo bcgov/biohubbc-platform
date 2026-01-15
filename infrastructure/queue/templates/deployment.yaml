@@ -85,7 +85,7 @@ spec:
                   name: {{ include "dbHost" . }}
       containers:
         - name: queue-worker
-          command: ['node', 'dist/queue.js']
+          command: ['node', 'src/queue.js']
           env:
             - name: VERSION
               value: {{ .Values.environment.name }}-{{ .Chart.AppVersion }}-{{ .Values.environment.changeId }}
@@ -171,7 +171,7 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - pgrep -f "node dist/queue.js" > /dev/null
+                - pgrep -f "node src/queue.js" > /dev/null
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
@@ -182,7 +182,7 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - pgrep -f "node dist/queue.js" > /dev/null
+                - pgrep -f "node src/queue.js" > /dev/null
             initialDelaySeconds: 0
             periodSeconds: 30
             timeoutSeconds: 5
