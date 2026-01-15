@@ -77,16 +77,9 @@ export async function up(knex: Knex): Promise<void> {
         ),
         (
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'first_nations_id',
-            'First Nations ID',
-            'Reference to a First Nations code table entry.',
-            false
-        ),
-        (
-            (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'site_strategy_id',
-            'Site Strategy ID',
-            'Reference to a site strategy code table entry.',
+            'site_strategy__codeset_id',
+            'Site Strategy Codeset ID',
+            'Reference to a site strategy codeset category entry.',
             false
         ),
 
@@ -102,23 +95,23 @@ export async function up(knex: Knex): Promise<void> {
     -- Observation Environmental Condition properties
         (
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'environment_qualitative_id',
-            'Environment Qualitative ID',
-            'Reference to an environment qualitative code table entry.',
+            'environment_qualitative__codeset_id',
+            'Environment Qualitative Codeset ID',
+            'Reference to an environment qualitative codeset category entry.',
             false
         ),
         (
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'environment_qualitative_option_id',
-            'Environment Qualitative Option ID',
-            'Reference to an environment qualitative option code table entry.',
+            'environment_qualitative_option__codeset_id',
+            'Environment Qualitative Option Codeset ID',
+            'Reference to an environment qualitative option codeset category entry.',
             false
         ),
         (
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'environment_quantitative_id',
-            'Environment Quantitative ID',
-            'Reference to an environment quantitative code table entry.',
+            'environment_quantitative__codeset_id',
+            'Environment Quantitative Codeset ID',
+            'Reference to an environment quantitative codeset category entry.',
             false
         ),
         (
@@ -132,91 +125,91 @@ export async function up(knex: Knex): Promise<void> {
     -- Sample Technique properties
         (
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'method_lookup_id',
-            'Method Lookup ID',
-            'Reference to a method lookup code table entry.',
+            'method_lookup__codeset_id',
+            'Method Lookup Codeset ID',
+            'Reference to a method lookup codeset category entry.',
             false
         ),
         (
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'method_response_metric_id',
-            'Method Response Metric ID',
-            'Reference to a method response metric code table entry.',
+            'method_response_metric__codeset_id',
+            'Method Response Metric Codeset ID',
+            'Reference to a method response metric codeset category entry.',
             false
         ),
 
     -- Sample Technique Detail properties
         (
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'technique_attribute_qualitative_id',
-            'Technique Attribute Qualitative ID',
-            'Reference to a technique attribute qualitative code table entry.',
+            'technique_attribute_qualitative__codeset_id',
+            'Technique Attribute Qualitative Codeset ID',
+            'Reference to a technique attribute qualitative codeset category entry.',
             false
         ),
         (
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'technique_attribute_qualitative_option_id',
-            'Technique Attribute Qualitative Option ID',
-            'Reference to a technique attribute qualitative option code table entry.',
+            'technique_attribute_qualitative_option__codeset_id',
+            'Technique Attribute Qualitative Option Codeset ID',
+            'Reference to a technique attribute qualitative option codeset category entry.',
             false
         ),
         (
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'technique_attribute_quantitative_id',
-            'Technique Attribute Quantitative ID',
-            'Reference to a technique attribute quantitative code table entry.',
+            'technique_attribute_quantitative__codeset_id',
+            'Technique Attribute Quantitative Codeset ID',
+            'Reference to a technique attribute quantitative codeset category entry.',
             false
         ),
 
     -- Sample Technique Vantage properties
         (
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'vantage_category_id',
-            'Vantage Category ID',
-            'Reference to a vantage category code table entry.',
+            'vantage_category__codeset_id',
+            'Vantage Category Codeset ID',
+            'Reference to a vantage category codeset category entry.',
             false
         ),
         (
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'vantage_id',
-            'Vantage ID',
-            'Reference to a vantage code table entry.',
+            'vantage__codeset_id',
+            'Vantage Codeset ID',
+            'Reference to a vantage codeset category entry.',
             false
         ),
 
     -- Species Observation properties
         (
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'observation_sign_id',
-            'Observation Sign ID',
-            'Reference to an observation sign code table entry.',
+            'observation_sign__codeset_id',
+            'Observation Sign Codeset ID',
+            'Reference to an observation sign codeset category entry.',
             false
         ),
 
     -- Telemetry Device properties
         (
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'device_make_id',
-            'Device Make ID',
-            'Reference to a device make code table entry.',
+            'device_make__codeset_id',
+            'Device Make Codeset ID',
+            'Reference to a device make codeset category entry.',
             false
         ),
 
     -- Telemetry Frequency properties
         (
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'frequency_unit_id',
-            'Frequency Unit ID',
-            'Reference to a frequency unit code table entry.',
+            'frequency_unit__codeset_id',
+            'Frequency Unit Codeset ID',
+            'Reference to a frequency unit codeset category entry.',
             false
         ),
 
     -- Habitat Feature properties
         (
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
-            'habitat_feature_type_id',
-            'Habitat Feature Type ID',
-            'Reference to a habitat feature type code table entry.',
+            'habitat_feature_type__codeset_id',
+            'Habitat Feature Type Codeset ID',
+            'Reference to a habitat feature type codeset category entry.',
             false
         );
 
@@ -246,20 +239,20 @@ export async function up(knex: Knex): Promise<void> {
             false
         ),
 
-        -- Observation Environmental Condition: environment_qualitative_id, environment_qualitative_option_id, environment_quantitative_id, environment_quantitative_value
+        -- Observation Environmental Condition: environment_qualitative__codeset_id, environment_qualitative_option__codeset_id, environment_quantitative__codeset_id, environment_quantitative_value
         (
             (SELECT feature_type_id FROM feature_type WHERE name = 'observation_environmental_condition'),
-            (SELECT feature_property_id FROM feature_property WHERE name = 'environment_qualitative_id'),
+            (SELECT feature_property_id FROM feature_property WHERE name = 'environment_qualitative__codeset_id'),
             false
         ),
         (
             (SELECT feature_type_id FROM feature_type WHERE name = 'observation_environmental_condition'),
-            (SELECT feature_property_id FROM feature_property WHERE name = 'environment_qualitative_option_id'),
+            (SELECT feature_property_id FROM feature_property WHERE name = 'environment_qualitative_option__codeset_id'),
             false
         ),
         (
             (SELECT feature_type_id FROM feature_type WHERE name = 'observation_environmental_condition'),
-            (SELECT feature_property_id FROM feature_property WHERE name = 'environment_quantitative_id'),
+            (SELECT feature_property_id FROM feature_property WHERE name = 'environment_quantitative__codeset_id'),
             false
         ),
         (
@@ -268,72 +261,72 @@ export async function up(knex: Knex): Promise<void> {
             false
         ),
 
-        -- Sample Technique: method_lookup_id, method_response_metric_id
+        -- Sample Technique: method_lookup__codeset_id, method_response_metric__codeset_id
         (
             (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
-            (SELECT feature_property_id FROM feature_property WHERE name = 'method_lookup_id'),
+            (SELECT feature_property_id FROM feature_property WHERE name = 'method_lookup__codeset_id'),
             true
         ),
         (
             (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
-            (SELECT feature_property_id FROM feature_property WHERE name = 'method_response_metric_id'),
+            (SELECT feature_property_id FROM feature_property WHERE name = 'method_response_metric__codeset_id'),
             true
         ),
 
-        -- Sample Technique Detail: technique_attribute_qualitative_id, technique_attribute_qualitative_option_id, technique_attribute_quantitative_id
+        -- Sample Technique Detail: technique_attribute_qualitative__codeset_id, technique_attribute_qualitative_option__codeset_id, technique_attribute_quantitative__codeset_id
         (
             (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_detail'),
-            (SELECT feature_property_id FROM feature_property WHERE name = 'technique_attribute_qualitative_id'),
+            (SELECT feature_property_id FROM feature_property WHERE name = 'technique_attribute_qualitative__codeset_id'),
             false
         ),
         (
             (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_detail'),
-            (SELECT feature_property_id FROM feature_property WHERE name = 'technique_attribute_qualitative_option_id'),
+            (SELECT feature_property_id FROM feature_property WHERE name = 'technique_attribute_qualitative_option__codeset_id'),
             false
         ),
         (
             (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_detail'),
-            (SELECT feature_property_id FROM feature_property WHERE name = 'technique_attribute_quantitative_id'),
+            (SELECT feature_property_id FROM feature_property WHERE name = 'technique_attribute_quantitative__codeset_id'),
             false
         ),
 
-        -- Sample Technique Vantage: vantage_category_id, vantage_id
+        -- Sample Technique Vantage: vantage_category__codeset_id, vantage__codeset_id
         (
             (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_vantage'),
-            (SELECT feature_property_id FROM feature_property WHERE name = 'vantage_category_id'),
+            (SELECT feature_property_id FROM feature_property WHERE name = 'vantage_category__codeset_id'),
             false
         ),
         (
             (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_vantage'),
-            (SELECT feature_property_id FROM feature_property WHERE name = 'vantage_id'),
+            (SELECT feature_property_id FROM feature_property WHERE name = 'vantage__codeset_id'),
             false
         ),
 
-        -- Species Observation: observation_sign_id
+        -- Species Observation: observation_sign__codeset_id
         (
             (SELECT feature_type_id FROM feature_type WHERE name = 'species_observation'),
-            (SELECT feature_property_id FROM feature_property WHERE name = 'observation_sign_id'),
+            (SELECT feature_property_id FROM feature_property WHERE name = 'observation_sign__codeset_id'),
             false
         ),
 
-        -- Telemetry Device: device_make_id
+        -- Telemetry Device: device_make__codeset_id
         (
             (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_device'),
-            (SELECT feature_property_id FROM feature_property WHERE name = 'device_make_id'),
+            (SELECT feature_property_id FROM feature_property WHERE name = 'device_make__codeset_id'),
             true
         ),
 
-        -- Telemetry Frequency: frequency_unit_id
+        -- Telemetry Frequency: frequency_unit__codeset_id
         (
             (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_frequency'),
-            (SELECT feature_property_id FROM feature_property WHERE name = 'frequency_unit_id'),
+            (SELECT feature_property_id FROM feature_property WHERE name = 'frequency_unit__codeset_id'),
             false
         ),
 
-        -- Habitat Feature: habitat_feature_type_id
+        -- Habitat Feature: habitat_feature_type__codeset_id
         (
             (SELECT feature_type_id FROM feature_type WHERE name = 'habitat_feature'),
-            (SELECT feature_property_id FROM feature_property WHERE name = 'habitat_feature_type_id'),
+            (SELECT feature_property_id FROM feature_property WHERE name = 'habitat_feature_type__codeset_id'),
             true
         );
 
@@ -355,84 +348,84 @@ export async function up(knex: Knex): Promise<void> {
     AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'sample_technique')
     AND record_end_date IS NULL;
 
-    -- Observation Environmental Condition: environmental_condition (replaced by environment_qualitative_id/environment_quantitative_id)
+    -- Observation Environmental Condition: environmental_condition (replaced by environment_qualitative__codeset_id/environment_quantitative__codeset_id)
     UPDATE feature_type_property
     SET record_end_date = now()
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'observation_environmental_condition')
     AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'environmental_condition')
     AND record_end_date IS NULL;
 
-    -- Observation Environmental Condition: environmental_condition_value (replaced by environment_qualitative_option_id/environment_quantitative_value)
+    -- Observation Environmental Condition: environmental_condition_value (replaced by environment_qualitative_option__codeset_id/environment_quantitative_value)
     UPDATE feature_type_property
     SET record_end_date = now()
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'observation_environmental_condition')
     AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'environmental_condition_value')
     AND record_end_date IS NULL;
 
-    -- Sample Technique: method_name (replaced by method_lookup_id)
+    -- Sample Technique: method_name (replaced by method_lookup__codeset_id)
     UPDATE feature_type_property
     SET record_end_date = now()
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique')
     AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'method_name')
     AND record_end_date IS NULL;
 
-    -- Sample Technique: response_metric (replaced by method_response_metric_id)
+    -- Sample Technique: response_metric (replaced by method_response_metric__codeset_id)
     UPDATE feature_type_property
     SET record_end_date = now()
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique')
     AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'response_metric')
     AND record_end_date IS NULL;
 
-    -- Sample Technique Detail: method_attribute (replaced by technique_attribute_qualitative_id)
+    -- Sample Technique Detail: method_attribute (replaced by technique_attribute_qualitative__codeset_id)
     UPDATE feature_type_property
     SET record_end_date = now()
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_detail')
     AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'method_attribute')
     AND record_end_date IS NULL;
 
-    -- Sample Technique Detail: method_value (replaced by technique_attribute_qualitative_option_id)
+    -- Sample Technique Detail: method_value (replaced by technique_attribute_qualitative_option__codeset_id)
     UPDATE feature_type_property
     SET record_end_date = now()
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_detail')
     AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'method_value')
     AND record_end_date IS NULL;
 
-    -- Sample Technique Vantage: method_vantage (replaced by vantage_category_id)
+    -- Sample Technique Vantage: method_vantage (replaced by vantage_category__codeset_id)
     UPDATE feature_type_property
     SET record_end_date = now()
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_vantage')
     AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'method_vantage')
     AND record_end_date IS NULL;
 
-    -- Sample Technique Vantage: method_value (replaced by vantage_id)
+    -- Sample Technique Vantage: method_value (replaced by vantage__codeset_id)
     UPDATE feature_type_property
     SET record_end_date = now()
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_vantage')
     AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'method_value')
     AND record_end_date IS NULL;
 
-    -- Species Observation: sign (replaced by observation_sign_id)
+    -- Species Observation: sign (replaced by observation_sign__codeset_id)
     UPDATE feature_type_property
     SET record_end_date = now()
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'species_observation')
     AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'sign')
     AND record_end_date IS NULL;
 
-    -- Telemetry Device: device_manufacturer (replaced by device_make_id)
+    -- Telemetry Device: device_manufacturer (replaced by device_make__codeset_id)
     UPDATE feature_type_property
     SET record_end_date = now()
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_device')
     AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'device_manufacturer')
     AND record_end_date IS NULL;
 
-    -- Telemetry Frequency: frequency_unit (replaced by frequency_unit_id)
+    -- Telemetry Frequency: frequency_unit (replaced by frequency_unit__codeset_id)
     UPDATE feature_type_property
     SET record_end_date = now()
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_frequency')
     AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'frequency_unit')
     AND record_end_date IS NULL;
 
-    -- Habitat Feature: name (replaced by habitat_feature_type_id for the type reference)
+    -- Habitat Feature: name (replaced by habitat_feature_type__codeset_id for the type reference)
     UPDATE feature_type_property
     SET record_end_date = now()
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'habitat_feature')
@@ -551,73 +544,73 @@ export async function down(knex: Knex): Promise<void> {
     -- Remove new property-to-type links
     ----------------------------------------------------------------------------------------
 
-    -- Habitat Feature: habitat_feature_type_id
+    -- Habitat Feature: habitat_feature_type__codeset_id
     DELETE FROM feature_type_property
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'habitat_feature')
-    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'habitat_feature_type_id');
+    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'habitat_feature_type__codeset_id');
 
-    -- Telemetry Frequency: frequency_unit_id
+    -- Telemetry Frequency: frequency_unit__codeset_id
     DELETE FROM feature_type_property
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_frequency')
-    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'frequency_unit_id');
+    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'frequency_unit__codeset_id');
 
-    -- Telemetry Device: device_make_id
+    -- Telemetry Device: device_make__codeset_id
     DELETE FROM feature_type_property
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_device')
-    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'device_make_id');
+    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'device_make__codeset_id');
 
-    -- Species Observation: observation_sign_id
+    -- Species Observation: observation_sign__codeset_id
     DELETE FROM feature_type_property
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'species_observation')
-    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'observation_sign_id');
+    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'observation_sign__codeset_id');
 
-    -- Sample Technique Vantage: vantage_id, vantage_category_id
+    -- Sample Technique Vantage: vantage__codeset_id, vantage_category__codeset_id
     DELETE FROM feature_type_property
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_vantage')
-    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'vantage_id');
+    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'vantage__codeset_id');
 
     DELETE FROM feature_type_property
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_vantage')
-    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'vantage_category_id');
+    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'vantage_category__codeset_id');
 
-    -- Sample Technique Detail: technique_attribute_quantitative_id, technique_attribute_qualitative_option_id, technique_attribute_qualitative_id
+    -- Sample Technique Detail: technique_attribute_quantitative__codeset_id, technique_attribute_qualitative_option__codeset_id, technique_attribute_qualitative__codeset_id
     DELETE FROM feature_type_property
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_detail')
-    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'technique_attribute_quantitative_id');
-
-    DELETE FROM feature_type_property
-    WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_detail')
-    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'technique_attribute_qualitative_option_id');
+    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'technique_attribute_quantitative__codeset_id');
 
     DELETE FROM feature_type_property
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_detail')
-    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'technique_attribute_qualitative_id');
+    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'technique_attribute_qualitative_option__codeset_id');
 
-    -- Sample Technique: method_response_metric_id, method_lookup_id
+    DELETE FROM feature_type_property
+    WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique_detail')
+    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'technique_attribute_qualitative__codeset_id');
+
+    -- Sample Technique: method_response_metric__codeset_id, method_lookup__codeset_id
     DELETE FROM feature_type_property
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique')
-    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'method_response_metric_id');
+    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'method_response_metric__codeset_id');
 
     DELETE FROM feature_type_property
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique')
-    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'method_lookup_id');
+    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'method_lookup__codeset_id');
 
-    -- Observation Environmental Condition: environment_quantitative_value, environment_quantitative_id, environment_qualitative_option_id, environment_qualitative_id
+    -- Observation Environmental Condition: environment_quantitative_value, environment_quantitative__codeset_id, environment_qualitative_option__codeset_id, environment_qualitative__codeset_id
     DELETE FROM feature_type_property
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'observation_environmental_condition')
     AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'environment_quantitative_value');
 
     DELETE FROM feature_type_property
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'observation_environmental_condition')
-    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'environment_quantitative_id');
+    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'environment_quantitative__codeset_id');
 
     DELETE FROM feature_type_property
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'observation_environmental_condition')
-    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'environment_qualitative_option_id');
+    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'environment_qualitative_option__codeset_id');
 
     DELETE FROM feature_type_property
     WHERE feature_type_id = (SELECT feature_type_id FROM feature_type WHERE name = 'observation_environmental_condition')
-    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'environment_qualitative_id');
+    AND feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'environment_qualitative__codeset_id');
 
     -- Sample Period: method_technique_id
     DELETE FROM feature_type_property
@@ -636,24 +629,24 @@ export async function down(knex: Knex): Promise<void> {
     ----------------------------------------------------------------------------------------
     -- Remove new feature properties
     ----------------------------------------------------------------------------------------
-    DELETE FROM feature_property WHERE name = 'habitat_feature_type_id';
-    DELETE FROM feature_property WHERE name = 'frequency_unit_id';
-    DELETE FROM feature_property WHERE name = 'device_make_id';
-    DELETE FROM feature_property WHERE name = 'observation_sign_id';
-    DELETE FROM feature_property WHERE name = 'vantage_id';
-    DELETE FROM feature_property WHERE name = 'vantage_category_id';
-    DELETE FROM feature_property WHERE name = 'technique_attribute_quantitative_id';
-    DELETE FROM feature_property WHERE name = 'technique_attribute_qualitative_option_id';
-    DELETE FROM feature_property WHERE name = 'technique_attribute_qualitative_id';
-    DELETE FROM feature_property WHERE name = 'method_response_metric_id';
-    DELETE FROM feature_property WHERE name = 'method_lookup_id';
+    DELETE FROM feature_property WHERE name = 'habitat_feature_type__codeset_id';
+    DELETE FROM feature_property WHERE name = 'frequency_unit__codeset_id';
+    DELETE FROM feature_property WHERE name = 'device_make__codeset_id';
+    DELETE FROM feature_property WHERE name = 'observation_sign__codeset_id';
+    DELETE FROM feature_property WHERE name = 'vantage__codeset_id';
+    DELETE FROM feature_property WHERE name = 'vantage_category__codeset_id';
+    DELETE FROM feature_property WHERE name = 'technique_attribute_quantitative__codeset_id';
+    DELETE FROM feature_property WHERE name = 'technique_attribute_qualitative_option__codeset_id';
+    DELETE FROM feature_property WHERE name = 'technique_attribute_qualitative__codeset_id';
+    DELETE FROM feature_property WHERE name = 'method_response_metric__codeset_id';
+    DELETE FROM feature_property WHERE name = 'method_lookup__codeset_id';
     DELETE FROM feature_property WHERE name = 'environment_quantitative_value';
-    DELETE FROM feature_property WHERE name = 'environment_quantitative_id';
-    DELETE FROM feature_property WHERE name = 'environment_qualitative_option_id';
-    DELETE FROM feature_property WHERE name = 'environment_qualitative_id';
+    DELETE FROM feature_property WHERE name = 'environment_quantitative__codeset_id';
+    DELETE FROM feature_property WHERE name = 'environment_qualitative_option__codeset_id';
+    DELETE FROM feature_property WHERE name = 'environment_qualitative__codeset_id';
     DELETE FROM feature_property WHERE name = 'method_technique_id';
-    DELETE FROM feature_property WHERE name = 'site_strategy_id';
-    DELETE FROM feature_property WHERE name = 'first_nations_id';
+    DELETE FROM feature_property WHERE name = 'site_strategy__codeset_id';
+    DELETE FROM feature_property WHERE name = 'first_nations__codeset_id';
     DELETE FROM feature_property WHERE name = 'stakeholder_partnerships';
     DELETE FROM feature_property WHERE name = 'indigenous_partnerships';
 
