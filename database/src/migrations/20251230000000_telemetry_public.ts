@@ -14,7 +14,7 @@ WITH deployments AS (
     SELECT
         dep.submission_feature_id,
         dep.data->>'device_key' AS device_key,
-        dep.data->>'animal_id' AS animal_id
+        dep.data->>'animal_identifier' AS animal_id
     FROM biohub.submission_feature dep
     JOIN biohub.feature_type ft_dep
       ON dep.feature_type_id = ft_dep.feature_type_id
