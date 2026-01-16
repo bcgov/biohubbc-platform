@@ -24,7 +24,12 @@ describe('jobs/index', () => {
         'PROCESS_SUBMISSION_FEATURES_FAILED',
         'MALWARE_SCAN'
       ]);
-      expect(Object.keys(JobQueues)).to.deep.equal(['TEST', 'PROCESS_SUBMISSION_FEATURES', 'PROCESS_SUBMISSION_FEATURES_FAILED', 'MALWARE_SCAN']);
+      expect(Object.keys(JobQueues)).to.deep.equal([
+        'TEST',
+        'PROCESS_SUBMISSION_FEATURES',
+        'PROCESS_SUBMISSION_FEATURES_FAILED',
+        'MALWARE_SCAN'
+      ]);
     });
 
     it('defines the MALWARE_SCAN queue', () => {
