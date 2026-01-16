@@ -2,13 +2,9 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { FeatureProperty } from '../models/feature-type';
 import { ISubmissionFeature } from '../repositories/submission-repository';
-import {
-  FeatureProperties,
-  IInsertStyleSchema,
-  IStyleModel,
-  ValidationRepository
-} from '../repositories/validation-repository';
+import { IInsertStyleSchema, IStyleModel, ValidationRepository } from '../repositories/validation-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ValidationService } from './validation-service';
 
@@ -211,7 +207,7 @@ describe('ValidationService', () => {
     it('fetches validation properties and calls validate', async () => {
       const mockDBConnection = getMockDBConnection();
 
-      const mockFeatureProperties: FeatureProperties[] = [
+      const mockFeatureProperty: FeatureProperty[] = [
         {
           name: 'field1',
           display_name: 'Field 1',
@@ -223,7 +219,7 @@ describe('ValidationService', () => {
 
       const getFeatureValidationPropertiesStub = sinon
         .stub(ValidationService.prototype, 'getFeatureValidationProperties')
-        .resolves(mockFeatureProperties);
+        .resolves(mockFeatureProperty);
 
       const validatePropertiesStub = sinon.stub(ValidationService.prototype, 'validateProperties').returns(true);
 
@@ -244,7 +240,7 @@ describe('ValidationService', () => {
 
       expect(result).to.be.true;
       expect(getFeatureValidationPropertiesStub).to.have.been.calledOnceWith('feature type');
-      expect(validatePropertiesStub).to.have.been.calledOnceWith(mockFeatureProperties, mockSubmissionProperties);
+      expect(validatePropertiesStub).to.have.been.calledOnceWith(mockFeatureProperty, mockSubmissionProperties);
     });
   });
 
