@@ -52,7 +52,7 @@ describe('worker', () => {
       await registerWorkers();
 
       // Third call is for MALWARE_SCAN queue
-      console.log('workstub', workStub.getCalls())
+      console.log('workstub', workStub.getCalls());
       expect(workStub.getCall(3).args[0]).to.equal(JobQueues.MALWARE_SCAN);
       expect(workStub.getCall(3).args[2]).to.equal(malwareScanJob.malwareScanJobHandler);
     });
