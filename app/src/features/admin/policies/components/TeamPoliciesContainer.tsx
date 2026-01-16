@@ -287,6 +287,7 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
         onPaginationModelChange={setPaginationModel}
         pageSizeOptions={[10, 25, 50]}
         sortingMode="server"
+        sortingOrder={['asc', 'desc']}
         sortModel={sortModel}
         onSortModelChange={setSortModel}
         rowCount={rowCount}

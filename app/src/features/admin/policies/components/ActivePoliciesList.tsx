@@ -434,6 +434,7 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
             onPaginationModelChange={setPaginationModel}
             pageSizeOptions={[50, 100, 200]}
             sortingMode="server"
+            sortingOrder={['asc', 'desc']}
             sortModel={sortModel}
             onSortModelChange={setSortModel}
             rowCount={rowCount}

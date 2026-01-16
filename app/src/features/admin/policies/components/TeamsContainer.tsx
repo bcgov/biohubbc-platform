@@ -404,6 +404,7 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
           onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[10, 25, 50]}
           sortingMode="server"
+          sortingOrder={['asc', 'desc']}
           sortModel={sortModel}
           onSortModelChange={setSortModel}
           rowCount={rowCount}
