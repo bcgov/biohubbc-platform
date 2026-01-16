@@ -52,8 +52,9 @@ describe('worker', () => {
       await registerWorkers();
 
       // Third call is for MALWARE_SCAN queue
-      expect(workStub.thirdCall.args[0]).to.equal(JobQueues.MALWARE_SCAN);
-      expect(workStub.thirdCall.args[2]).to.equal(malwareScanJob.malwareScanJobHandler);
+      console.log('workstub', workStub.getCalls())
+      expect(workStub.getCall(3).args[0]).to.equal(JobQueues.MALWARE_SCAN);
+      expect(workStub.getCall(3).args[2]).to.equal(malwareScanJob.malwareScanJobHandler);
     });
 
     it('creates queues before registering workers (pg-boss v10 requirement)', async () => {
@@ -70,7 +71,7 @@ describe('worker', () => {
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.TEST);
       expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.thirdCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
-      expect(createQueueStub.getCall(4).args[0]).to.equal(JobQueues.MALWARE_SCAN);
+      expect(createQueueStub.getCall(3).args[0]).to.equal(JobQueues.MALWARE_SCAN);
     });
 
     it('configures dead letter queue for process-submission-features', async () => {
@@ -98,8 +99,8 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      // 3 handlers: TEST, PROCESS_SUBMISSION_FEATURES, PROCESS_SUBMISSION_FEATURES_FAILED
-      expect(workStub.callCount).to.equal(3);
+      // 3 handlers: TEST, PROCESS_SUBMISSION_FEATURES, PROCESS_SUBMISSION_FEATURES_FAILED, MALWARE_SCAN
+      expect(workStub.callCount).to.equal(4);
     });
 
     it('configures batchSize for batch processing', async () => {
