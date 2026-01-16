@@ -10,6 +10,7 @@ import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
 import { Upload, UploadStatusEnum } from '../../models/upload';
 import { UploadArchive } from '../../models/upload-archive';
+import * as publisher from '../../queue/publisher';
 import { ICreateSubmission } from '../../repositories/submission-repository';
 import * as fileUtils from '../../utils/file-utils';
 import * as submissionUploadUtils from '../../utils/submission-upload-utils';
@@ -202,6 +203,10 @@ describe('UploadIngestionService', () => {
       }
     ];
 
+    beforeEach(() => {
+      sinon.stub(publisher, 'publishMalwareScanJob').resolves({ status: 'published', jobId: 'job-1' } as any);
+    });
+
     it('should complete upload successfully and enqueue security artifacts', async () => {
       sinon.stub(UploadService.prototype, 'getUpload').resolves(mockUpload);
 
@@ -219,6 +224,10 @@ describe('UploadIngestionService', () => {
 
       await service.completeArchiveUpload(mockParams);
 
+      const publishStub = publisher.publishMalwareScanJob as sinon.SinonStub;
+      expect(publishStub.callCount).to.equal(mockSecurityRecords.length);
+      expect(publishStub.firstCall.args[0]).to.deep.equal({ artifactSecurityId: 'artifact-security-1' });
+      expect(publishStub.secondCall.args[0]).to.deep.equal({ artifactSecurityId: 'artifact-security-2' });
       expect(s3ClientStub.send).to.have.been.calledOnce;
     });
 

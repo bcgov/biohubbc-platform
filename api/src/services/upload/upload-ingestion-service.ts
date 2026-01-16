@@ -5,6 +5,7 @@ import { ArtifactStatusEnum } from '../../models/artifact';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
 import { Upload, UploadStatusEnum } from '../../models/upload';
+import { publishMalwareScanJob } from '../../queue/publisher';
 import { ICreateSubmission } from '../../repositories/submission-repository';
 import { getSecurityObjectStoreBucketName, getSecurityS3Client } from '../../utils/file-utils';
 import { generateMultipartUploadPresignedUrls } from '../../utils/submission-upload-utils';
@@ -120,7 +121,7 @@ export class UploadIngestionService extends DBService {
     await this._authorizeUploadCompletion(uploadId, s3UploadId);
 
     // Update upload status, artifact statuses, and enqueue for security scanning
-    await Promise.all([
+    const [, , securityRecords] = await Promise.all([
       // 2. Update upload status to completed
       this.uploadService.updateUpload(uploadId, {
         upload_status: UploadStatusEnum.COMPLETED
@@ -139,6 +140,11 @@ export class UploadIngestionService extends DBService {
         archive_status: ProcessStatusStatusEnum.BLOCKED
       })
     ]);
+
+    // Publish malware jobs, but do not throw on error to avoid blocking upload completion
+    await Promise.all(
+      securityRecords.map((record) => publishMalwareScanJob({ artifactSecurityId: record.artifact_security_id }))
+    );
 
     // 6. Complete the multipart upload in the security bucket
     const s3Client = getSecurityS3Client();
