@@ -65,7 +65,7 @@ const MALWARE_SCAN_OPTIONS: IPublishOptions = {
   retryLimit: 3,
   retryDelay: 60,
   retryBackoff: true,
-  expireInSeconds: 60 * 30 // 30 minutes
+  expireInSeconds: 60 * 60 // 60 minutes
 };
 
 /**
@@ -215,7 +215,6 @@ export const publishMalwareScanJob = async (
     const boss = getPgBoss();
     const mergedOptions = { ...MALWARE_SCAN_OPTIONS, ...options };
 
-    // Ensure queue exists (pg-boss v10 requires this before send)
     await boss.createQueue(JobQueues.MALWARE_SCAN);
 
     // Use singletonKey to prevent duplicate concurrent jobs for the same artifact security record
