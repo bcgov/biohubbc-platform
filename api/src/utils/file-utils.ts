@@ -32,12 +32,6 @@ export interface IArtifactS3FileKey {
   submissionFeatureId: number;
 }
 
-export interface IQueueS3FileKey {
-  queueId: number;
-  datasetUUID: string;
-  fileName: string;
-}
-
 /**
  * Local getter for retrieving the ClamAV client.
  *
@@ -384,30 +378,6 @@ export function generateSubmissionFeatureS3FileKey(options: IArtifactS3FileKey) 
   return [getS3KeyPrefix(), 'submissions', options.submissionId, 'features', options.submissionFeatureId]
     .filter(Boolean)
     .join('/');
-}
-
-/**
- * Generate an S3 key for a submission job queue file.
- *
- * @example
- * <s3_key_prefix>/queue/<queue_id>/datasets/<dataset_uuid>/dwca/<file_name>
- *
- * @export
- * @param {IQueueS3FileKey} options
- * @return {*}
- */
-export function generateQueueS3FileKey(options: IQueueS3FileKey) {
-  const keyParts: (string | number)[] = [];
-
-  keyParts.push(getS3KeyPrefix());
-  keyParts.push('queue');
-  keyParts.push(options.queueId);
-  keyParts.push('datasets');
-  keyParts.push(options.datasetUUID);
-  keyParts.push('dwca');
-  keyParts.push(options.fileName);
-
-  return keyParts.filter(Boolean).join('/');
 }
 
 /**

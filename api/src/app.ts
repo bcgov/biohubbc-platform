@@ -7,6 +7,7 @@ import { defaultPoolConfig, initDBPool } from './database/db';
 import { initDBConstants } from './database/db-constants';
 import { ensureHTTPError, HTTP400, HTTP500 } from './errors/http-error';
 import { rootAPIDoc } from './openapi/root-api-doc';
+import { initPgBoss } from './queue/pg-boss-service';
 import { authenticateRequest, authenticateRequestOptional } from './request-handlers/security/authentication';
 import { initRequestStorage } from './utils/async-request-storage';
 import { scanFileForVirus } from './utils/file-utils';
@@ -152,17 +153,20 @@ const openAPIFramework = initialize({
 app.use('/api-docs', swaggerUIExperss.serve, swaggerUIExperss.setup(openAPIFramework.apiDoc));
 
 // Start api
-try {
+async function main() {
   initDBPool(defaultPoolConfig);
-  initDBConstants();
+  await initDBConstants();
+  await initPgBoss();
 
   app.listen(PORT, () => {
     defaultLog.info({ label: 'start api', message: `started api on ${HOST}:${PORT}/api` });
   });
-} catch (error) {
+}
+
+main().catch((error) => {
   defaultLog.error({ label: 'start api', message: 'error', error });
   process.exit(1);
-}
+});
 
 /**
  * Get additional middleware to apply to all routes.

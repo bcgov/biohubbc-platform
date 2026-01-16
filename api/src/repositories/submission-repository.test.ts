@@ -384,45 +384,6 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('getSubmissionJobQueue', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      try {
-        await submissionRepository.getSubmissionJobQueue(1);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal(
-          'Failed to get submission job queue from submission id'
-        );
-      }
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockResponse = {
-        id: 1
-      };
-
-      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.getSubmissionJobQueue(1);
-
-      expect(response).to.eql(mockResponse);
-    });
-  });
-
   describe('getUnreviewedSubmissionsForAdmins', () => {
     beforeEach(() => {
       sinon.restore();

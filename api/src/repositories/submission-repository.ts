@@ -197,20 +197,6 @@ export enum SUBMISSION_MESSAGE_TYPE {
   'DEBUG' = 'Debug'
 }
 
-export interface ISubmissionJobQueueRecord {
-  submission_job_queue_id: number;
-  submission_id: number;
-  job_start_timestamp: string | null;
-  job_end_timestamp: string | null;
-  security_request: string | null; // JSON string
-  key: string | null;
-  create_date: string;
-  create_user: number;
-  update_date: string | null;
-  update_user: number | null;
-  revision_count: number;
-}
-
 export interface ISubmissionObservationRecord {
   submission_observation_id?: number;
   submission_id: number;
@@ -757,36 +743,6 @@ export class SubmissionRepository extends BaseRepository {
       throw new ApiExecuteSQLError('Failed to insert submission message record', [
         'SubmissionRepository->insertSubmissionMessage',
         'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
-   * Fetch row of submission job queue by submission Id
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<ISubmissionJobQueueRecord>}
-   * @memberof SubmissionRepository
-   */
-  async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueueRecord> {
-    const sqlStatement = SQL`
-      SELECT
-        *
-      FROM
-        submission_job_queue
-      WHERE
-        submission_id = ${submissionId} ORDER BY CREATE_DATE DESC LIMIT 1
-      ;
-    `;
-
-    const response = await this.connection.sql<ISubmissionJobQueueRecord>(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to get submission job queue from submission id', [
-        'SubmissionRepository->getSubmissionJobQueue',
-        'rowCount was null or undefined, expected rowCount >= 0'
       ]);
     }
 
