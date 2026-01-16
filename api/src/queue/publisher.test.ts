@@ -296,7 +296,7 @@ describe('publisher', () => {
       expect(options.retryLimit).to.equal(3);
       expect(options.retryDelay).to.equal(60);
       expect(options.retryBackoff).to.equal(true);
-      expect(options.expireInSeconds).to.equal(60 * 30); // 30 minutes
+      expect(options.expireInSeconds).to.equal(60 * 60); // 60 minutes
     });
 
     it('uses singletonKey based on artifactSecurityId to prevent duplicates', async () => {

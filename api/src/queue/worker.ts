@@ -40,6 +40,7 @@ export const registerWorkers = async (): Promise<void> => {
     retryBackoff: true,
     expireInSeconds: 900
   });
+  
   await boss.createQueue(JobQueues.MALWARE_SCAN);
 
   // Register test job handler
