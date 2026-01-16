@@ -6,7 +6,6 @@ import { SubmissionFeatureSearchKeyValues } from '../repositories/search-index-r
 import {
   ICreateSubmission,
   ISubmissionFeature,
-  ISubmissionJobQueueRecord,
   ISubmissionModel,
   PatchSubmissionRecord,
   SubmissionFeature,
@@ -251,17 +250,6 @@ export class SubmissionService extends DBService {
       submission_status_id,
       submission_message_id
     };
-  }
-
-  /**
-   *  Fetch row of submission job queue by submission Id
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<ISubmissionJobQueueRecord>}
-   * @memberof SubmissionService
-   */
-  async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueueRecord> {
-    return this.submissionRepository.getSubmissionJobQueue(submissionId);
   }
 
   /**

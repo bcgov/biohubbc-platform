@@ -5,7 +5,6 @@ import {
   bulkDeleteFilesFromS3,
   deleteFileFromS3,
   generateDatasetS3FileKey,
-  generateQueueS3FileKey,
   getObjectStoreBucketName,
   getObjectStoreUrl,
   getS3HostUrl,
@@ -189,18 +188,6 @@ describe('getS3KeyPrefix', () => {
 
     const result = getS3KeyPrefix();
     expect(result).to.equal('biohub');
-  });
-});
-
-describe('generateQueueS3FileKey', () => {
-  it('returns an s3 key with a prefix', async () => {
-    const result = generateQueueS3FileKey({
-      queueId: 1,
-      datasetUUID: '123-456-789',
-      fileName: 'testFileName'
-    });
-
-    expect(result).to.equal(`${process.env.S3_KEY_PREFIX || 'biohub'}/queue/1/datasets/123-456-789/dwca/testFileName`);
   });
 });
 
