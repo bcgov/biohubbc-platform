@@ -37,7 +37,7 @@ const mockUseApi = {
 const defaultProps: IActivePoliciesListProps = {
   policies: [],
   rowCount: 0,
-  paginationModel: { page: 0, pageSize: 50 },
+  paginationModel: { page: 0, pageSize: 10 },
   setPaginationModel: vi.fn(),
   sortModel: [{ field: 'name', sort: 'asc' }],
   setSortModel: vi.fn(),
@@ -188,8 +188,8 @@ describe('ActivePoliciesList', () => {
       fireEvent.mouseDown(pageSizeSelector);
 
       await waitFor(() => {
-        const option100 = getByRole('option', { name: '100' });
-        fireEvent.click(option100);
+        const option25 = getByRole('option', { name: '25' });
+        fireEvent.click(option25);
       });
 
       expect(mockSetPaginationModel).toHaveBeenCalled();
