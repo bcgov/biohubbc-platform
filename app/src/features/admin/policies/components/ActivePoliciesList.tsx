@@ -432,7 +432,7 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
             paginationMode="server"
             paginationModel={paginationModel}
             onPaginationModelChange={setPaginationModel}
-            pageSizeOptions={[50, 100, 200]}
+            pageSizeOptions={[10, 25, 50]}
             sortingMode="server"
             sortingOrder={['asc', 'desc']}
             sortModel={sortModel}

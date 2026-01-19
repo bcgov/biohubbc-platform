@@ -38,7 +38,7 @@ export const ManagePoliciesPage = () => {
   // Policies pagination state
   const [policiesPaginationModel, setPoliciesPaginationModel] = useState<GridPaginationModel>({
     page: 0,
-    pageSize: 50
+    pageSize: 10
   });
   const [policiesSortModel, setPoliciesSortModel] = useState<GridSortModel>([{ field: 'name', sort: 'asc' }]);
 
