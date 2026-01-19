@@ -21,7 +21,7 @@ export const GET: Operation = [
 
 GET.apiDoc = {
   description: 'Get all teams with optional pagination and search.',
-  tags: ['team'],
+  tags: ['admin'],
   security: [{ Bearer: [] }],
   parameters: [
     ...paginationRequestQueryParamSchema,
@@ -84,7 +84,7 @@ export const POST: Operation = [
 
 POST.apiDoc = {
   description: 'Create a new team with members.',
-  tags: ['team'],
+  tags: ['admin'],
   security: [{ Bearer: [] }],
   requestBody: {
     required: true,
