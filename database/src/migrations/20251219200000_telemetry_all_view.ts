@@ -30,7 +30,14 @@ SELECT
     (EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz))::int AS YEAR,
     (sf.data->>'latitude')::numeric AS Latitude,
     (sf.data->>'longitude')::numeric AS Longitude,
-    (sf.data->>'dop')::numeric AS dop
+    (sf.data->>'dop')::numeric AS dop,
+    CASE
+      WHEN sf.submission_feature_id IN (
+        SELECT submission_feature_id
+        FROM biohub.submission_feature_security
+      ) THEN 'Secured'
+      ELSE 'Open'
+    END AS SECURITY
     -- contingent on feature array: join to dataset and get the survey name and id, and the study area id
 FROM biohub.submission_feature sf
 JOIN biohub.feature_type ft
@@ -51,6 +58,7 @@ WHERE ft.name = 'telemetry'
     COMMENT ON COLUMN bcgw.telemetry_all.dop IS 'The dilution of precision';
     COMMENT ON COLUMN bcgw.telemetry_all.device_key IS 'The vendor and device serial';
     COMMENT ON COLUMN bcgw.telemetry_all.animal_id IS 'The identifier of the animal wearing the telemetry device';
+    COMMENT ON COLUMN bcgw.telemetry_all.SECURITY IS 'The security status of the feature';
   `);
 }
 
