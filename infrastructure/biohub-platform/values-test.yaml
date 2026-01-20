@@ -30,14 +30,14 @@ biohub-platform-app:
   # App configuration
   app:
     nodeEnv: production
-    apiHost: api-biohub-platform.apps.silver.devops.gov.bc.ca
+    apiHost: api-test-biohub-platform.apps.silver.devops.gov.bc.ca
 
     # Siteminder
-    siteminderLogoutURL: "https://logon7.gov.bc.ca/clp-cgi/logoff.cgi"
+    siteminderLogoutURL: "https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi"
 
     # Keycloak
     keycloak:
-      host: "https://loginproxy.gov.bc.ca/auth"
+      host: "https://test.loginproxy.gov.bc.ca/auth"
     
   # Openshift Resources
   replicas: 1
