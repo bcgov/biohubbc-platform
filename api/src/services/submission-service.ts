@@ -1,12 +1,12 @@
 import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
+import { SubmissionFeatureForReview } from '../models/submission';
 import { SubmissionFeatureSearchKeyValues } from '../repositories/search-index-respository';
 import {
+  ICreateSubmission,
   ISubmissionFeature,
-  ISubmissionJobQueueRecord,
   ISubmissionModel,
-  ISubmissionRecord,
   PatchSubmissionRecord,
   SubmissionFeature,
   SubmissionFeatureDownloadRecord,
@@ -24,6 +24,7 @@ import {
 } from '../repositories/submission-repository';
 import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
 import { SearchIndexService } from './search-index-service';
 
@@ -41,11 +42,11 @@ export class SubmissionService extends DBService {
   /**
    * Insert a new submission record.
    *
-   * @param {ISubmissionRecord} submissionData
+   * @param {ICreateSubmission} submissionData
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async insertSubmissionRecord(submissionData: ISubmissionRecord): Promise<{ submission_id: number }> {
+  async insertSubmissionRecord(submissionData: ICreateSubmission): Promise<{ submission_id: number }> {
     return this.submissionRepository.insertSubmissionRecord(submissionData);
   }
 
@@ -252,17 +253,6 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   *  Fetch row of submission job queue by submission Id
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<ISubmissionJobQueueRecord>}
-   * @memberof SubmissionService
-   */
-  async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueueRecord> {
-    return this.submissionRepository.getSubmissionJobQueue(submissionId);
-  }
-
-  /**
    * Get all submissions that are pending security review (are unreviewed).
    *
    * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
@@ -358,6 +348,30 @@ export class SubmissionService extends DBService {
     }));
 
     return submissionFeatures;
+  }
+
+  /**
+   * Fetch the flattened array of features in the given submission with optional pagination
+   *
+   * @param submissionId
+   * @param pagination
+   * @returns {Promise<SubmissionFeatureForReview[]>}
+   */
+  async getSubmissionFeatures(
+    submissionId: number,
+    pagination?: ApiPaginationOptions
+  ): Promise<SubmissionFeatureForReview[]> {
+    return this.submissionRepository.getSubmissionFeatures(submissionId, pagination);
+  }
+
+  /**
+   * Fetch the total count of features in the given submission
+   *
+   * @param submissionId
+   * @returns {Promise<number>}
+   */
+  async getSubmissionFeaturesCount(submissionId: number): Promise<number> {
+    return this.submissionRepository.getSubmissionFeaturesCount(submissionId);
   }
 
   /**

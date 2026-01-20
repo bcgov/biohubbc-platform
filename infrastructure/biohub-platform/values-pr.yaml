@@ -18,6 +18,9 @@ database-setup:
 api:
   enabled: true
 
+queue:
+  enabled: true
+
 # Values passed to biohub-platform-app subchart
 biohub-platform-app:
   environment:
@@ -145,3 +148,35 @@ biohub-platform-api:
 
   # Route configuration (OpenShift)
   # route.host will be dynamically set: "biohub-platform-api-1234-a0ec71-dev.apps.silver.devops.gov.bc.ca"
+
+# Values passed to biohub-platform-queue subchart
+biohub-platform-queue:
+  environment:
+    licensePlate: "a0ec71"
+    name: dev
+    # id will be dynamically set: "1234"
+    # changeId will be dynamically set: "1234"
+    ts: ""
+
+  # Queue worker configuration
+  app:
+    nodeEnv: development
+    nodeOptions: --max_old_space_size=512
+    # objectStore.keyPrefix will be dynamically set: "local/1234/biohub"
+
+    # Logging
+    logging:
+      level: debug
+      levelFile: debug
+      fileMaxFiles: 2  # Smaller for PR environments
+
+  # Openshift Resources
+  # Workers can scale horizontally - maintenance is handled by queue-supervisor
+  replicas: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi

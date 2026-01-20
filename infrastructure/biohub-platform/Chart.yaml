@@ -26,3 +26,9 @@ dependencies:
     condition: api.enabled
     dependsOn:
       - biohub-platform-db-setup
+  - name: biohub-platform-queue
+    repository: file://../queue
+    version: 0.1.0
+    condition: queue.enabled
+    dependsOn:
+      - biohub-platform-db-setup

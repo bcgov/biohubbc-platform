@@ -1,4 +1,4 @@
-import axios, { AxiosResponse } from 'axios';
+import axios from 'axios';
 
 /**
  * TAR file constants
@@ -25,11 +25,9 @@ interface TarFileData {
  */
 export interface UploadResult {
   /** The part number in the multipart upload sequence */
-  partNumber: number;
+  PartNumber: number;
   /** The ETag returned by the server for this part */
-  etag: string;
-  /** The full HTTP response from the upload request */
-  response: AxiosResponse;
+  ETag: string;
 }
 
 /**
@@ -54,44 +52,39 @@ const createTarHeader = (filename: string, fileSize: number): Uint8Array => {
   const header = new Uint8Array(TAR_HEADER_SIZE);
   const encoder = new TextEncoder();
 
-  try {
-    // Filename (100 bytes, null-terminated)
-    const nameBytes = encoder.encode(filename).slice(0, 100);
-    header.set(nameBytes, 0);
+  // Filename (100 bytes, null-terminated)
+  header.set(encoder.encode(filename).slice(0, 100), 0);
 
-    // File mode (8 bytes)
-    header.set(encoder.encode(DEFAULT_FILE_MODE), 100);
+  // File mode (8 bytes)
+  header.set(encoder.encode(DEFAULT_FILE_MODE), 100);
 
-    // Owner ID (8 bytes)
-    header.set(encoder.encode(DEFAULT_OWNER_ID), 108);
+  // Owner ID (8 bytes)
+  header.set(encoder.encode(DEFAULT_OWNER_ID), 108);
 
-    // Group ID (8 bytes)
-    header.set(encoder.encode(DEFAULT_GROUP_ID), 116);
+  // Group ID (8 bytes)
+  header.set(encoder.encode(DEFAULT_GROUP_ID), 116);
 
-    // File size (12 bytes, octal representation)
-    const sizeOctal = fileSize.toString(8).padStart(11, '0') + '\0';
-    header.set(encoder.encode(sizeOctal), 124);
+  // File size (12 bytes, octal representation)
+  header.set(encoder.encode(fileSize.toString(8).padStart(11, '0') + '\0'), 124);
 
-    // Modification time (12 bytes, current time in octal)
-    const currentTime = Math.floor(Date.now() / 1000);
-    const mtime = currentTime.toString(8).padStart(11, '0') + '\0';
-    header.set(encoder.encode(mtime), 136);
+  // Modification time (12 bytes, current time in octal)
+  const mtime =
+    Math.floor(Date.now() / 1000)
+      .toString(8)
+      .padStart(11, '0') + '\0';
+  header.set(encoder.encode(mtime), 136);
 
-    // Checksum placeholder (8 spaces)
-    header.set(encoder.encode('        '), 148);
+  // Checksum placeholder (8 spaces)
+  header.set(encoder.encode('        '), 148);
 
-    // Type flag (1 byte) - regular file
-    header.set(encoder.encode(REGULAR_FILE_TYPE), 156);
+  // Type flag (1 byte) - regular file
+  header.set(encoder.encode(REGULAR_FILE_TYPE), 156);
 
-    // Calculate and set checksum
-    const checksum = calculateChecksum(header);
-    const checksumStr = checksum.toString(8).padStart(6, '0') + '\0 ';
-    header.set(encoder.encode(checksumStr), 148);
+  // Calculate and set checksum
+  const checksum = calculateChecksum(header);
+  header.set(encoder.encode(checksum.toString(8).padStart(6, '0') + '\0 '), 148);
 
-    return header;
-  } catch (error) {
-    throw new Error(`Failed to create TAR header for ${filename}: ${error}`);
-  }
+  return header;
 };
 
 /**
@@ -165,25 +158,19 @@ export const createTarData = (files: TarFileData[]): Uint8Array => {
       throw new Error('Each file must have a name and content');
     }
 
-    // Add header
-    const header = createTarHeader(file.name, file.content.length);
-    chunks.push(header);
-
-    // Add file content
+    chunks.push(createTarHeader(file.name, file.content.length));
     chunks.push(file.content);
 
-    // Add padding to align to 512-byte boundary
-    const paddingSize = TAR_BLOCK_SIZE - (file.content.length % TAR_BLOCK_SIZE);
-    if (paddingSize < TAR_BLOCK_SIZE) {
-      chunks.push(new Uint8Array(paddingSize));
+    const padding = TAR_BLOCK_SIZE - (file.content.length % TAR_BLOCK_SIZE);
+    if (padding < TAR_BLOCK_SIZE) {
+      chunks.push(new Uint8Array(padding));
     }
   }
 
-  // Add two 512-byte zero blocks to mark end of archive
+  // End-of-archive markers
   chunks.push(new Uint8Array(TAR_BLOCK_SIZE));
   chunks.push(new Uint8Array(TAR_BLOCK_SIZE));
 
-  // Combine all chunks into single Uint8Array
   return concatenateChunks(chunks);
 };
 
@@ -247,35 +234,28 @@ const splitTarDataIntoChunks = (tarData: Uint8Array, numChunks: number): Uint8Ar
  * @param url - The presigned URL to upload to
  * @param chunk - The data chunk to upload
  * @param partNumber - The part number for this chunk in the multipart sequence
- * @returns Promise resolving to upload result with part number, ETag, and response
+ * @returns Promise resolving to upload result with part number and ETag
  * @throws {Error} When upload fails, times out, or ETag is missing
  */
 const uploadChunk = async (url: string, chunk: Uint8Array, partNumber: number): Promise<UploadResult> => {
-  try {
-    const response = await axios.put(url, chunk, {
-      headers: {
-        'Content-Type': 'application/x-tar'
-      },
-      timeout: 30000 // 30 second timeout
-    });
+  const response = await axios.put(url, chunk, {
+    headers: { 'Content-Type': 'application/x-tar' },
+    timeout: 30000
+  });
 
-    if (response.status !== 200) {
-      throw new Error(`Upload failed with status ${response.status}: ${response.statusText}`);
-    }
-
-    const etag = response.headers.etag || response.headers.ETag;
-    if (!etag) {
-      throw new Error('No ETag returned from upload');
-    }
-
-    return {
-      partNumber,
-      etag: etag.replace(/"/g, ''), // Remove quotes from ETag
-      response
-    };
-  } catch (error) {
-    throw new Error(`Upload failed for part ${partNumber}: ${error}`);
+  if (response.status !== 200) {
+    throw new Error(`Upload failed with status ${response.status}: ${response.statusText}`);
   }
+
+  const etag = response.headers.etag || response.headers.ETag;
+  if (!etag) {
+    throw new Error('No ETag returned from upload');
+  }
+
+  return {
+    PartNumber: partNumber,
+    ETag: etag.replaceAll('"', '')
+  };
 };
 
 /**
@@ -302,11 +282,11 @@ export const uploadMultipartTar = async (
 ): Promise<UploadResult[]> => {
   const { concurrencyLimit = 4, onProgress } = options;
 
-  if (!presignedUrls || presignedUrls.length === 0) {
+  if (!presignedUrls.length) {
     throw new Error('Presigned URLs are required');
   }
 
-  if (!tarData || tarData.length === 0) {
+  if (!tarData.length) {
     throw new Error('TAR data is required');
   }
 
@@ -314,28 +294,20 @@ export const uploadMultipartTar = async (
     throw new Error('Concurrency limit must be positive');
   }
 
-  // Split TAR data into chunks matching the number of presigned URLs
   const chunks = splitTarDataIntoChunks(tarData, presignedUrls.length);
   const results: UploadResult[] = [];
 
-  // Process uploads in batches to respect concurrency limit
   for (let i = 0; i < presignedUrls.length; i += concurrencyLimit) {
     const urlBatch = presignedUrls.slice(i, i + concurrencyLimit);
     const dataBatch = chunks.slice(i, i + concurrencyLimit);
 
-    const batchPromises = urlBatch.map((url, index) => uploadChunk(url, dataBatch[index], i + index + 1));
+    const batchResults = await Promise.all(
+      urlBatch.map((url, index) => uploadChunk(url, dataBatch[index], i + index + 1))
+    );
 
-    try {
-      const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults);
-
-      // Report progress if callback provided
-      onProgress?.(results.length, presignedUrls.length);
-    } catch (error) {
-      throw new Error(`Batch upload failed: ${error}`);
-    }
+    results.push(...batchResults);
+    onProgress?.(results.length, presignedUrls.length);
   }
 
-  // Sort results by part number to maintain order
-  return results.sort((a, b) => a.partNumber - b.partNumber);
+  return results.sort((a, b) => a.PartNumber - b.PartNumber);
 };

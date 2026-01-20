@@ -4,12 +4,14 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Container from '@mui/material/Container';
+import Divider from '@mui/material/Divider';
 import InputAdornment from '@mui/material/InputAdornment';
 import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import EditDialog from 'components/dialog/EditDialog';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
@@ -38,6 +40,10 @@ export interface IActivePoliciesListProps {
   searchTerm: string;
   /** Callback when search term changes */
   onSearch: (term: string) => void;
+  /** Currently selected policy ID for filtering team-policy assignments */
+  selectedPolicyId: string | null;
+  /** Callback when a policy row is selected/deselected */
+  onSelectPolicy: (policyId: string | null) => void;
 }
 
 /**
@@ -55,7 +61,25 @@ export interface IActivePoliciesListProps {
  */
 export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListProps>> = (props) => {
   const biohubApi = useApi();
-  const { policies } = props;
+  const { policies, selectedPolicyId, onSelectPolicy } = props;
+
+  /**
+   * Handle row selection changes in the DataGrid.
+   * Extracts the selected policy ID and calls the parent callback.
+   *
+   * @param {GridRowSelectionModel} model - The new selection model from DataGrid
+   */
+  const handleRowSelectionChange = (model: GridRowSelectionModel) => {
+    const ids = model && 'ids' in model ? Array.from(model.ids) : [];
+    const newSelectedId = (ids[0] as string) || null;
+    onSelectPolicy(newSelectedId);
+  };
+
+  // Convert selectedPolicyId to DataGrid selection model format
+  const rowSelectionModel: GridRowSelectionModel = {
+    type: 'include',
+    ids: selectedPolicyId ? new Set([selectedPolicyId]) : new Set()
+  };
 
   const dialogContext = useDialogContext();
 
@@ -349,67 +373,57 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
   return (
     <>
       <Container maxWidth="xl">
-        <Box mb={6} display="flex" justifyContent="space-between" alignItems="center">
-          <Typography
-            variant="h1"
-            sx={{
-              mt: -2
-            }}>
-            Manage Policies
-          </Typography>
-          <Button
-            size="large"
-            color="primary"
-            variant="contained"
-            data-testid="add-policy-button"
-            aria-label={'Add Policy'}
-            startIcon={<Icon path={mdiPlus} size={1} />}
-            onClick={() => setOpenAddPolicyDialog(true)}
-            sx={{
-              mt: -2,
-              fontWeight: 700
-            }}>
-            Add Policy
-          </Button>
+        <Box mb={6}>
+          <Typography variant="h1">Manage Policies</Typography>
         </Box>
         <Paper>
-          <Toolbar
-            sx={{
-              pl: { sm: 2 },
-              pr: { xs: 1, sm: 1 },
-              display: 'flex',
-              justifyContent: 'space-between'
-            }}>
-            <Typography variant="h4" component="h2">
+          <Toolbar disableGutters sx={{ px: 2 }}>
+            <Typography variant="h4" component="h2" flexGrow={1}>
               Active Policies{' '}
               <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
                 ({policies?.length || 0})
               </Typography>
             </Typography>
-            <TextField
-              size="small"
-              placeholder="Search by policy name"
-              value={props.searchTerm}
-              onChange={(e) => props.onSearch(e.target.value)}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Icon path={mdiMagnify} size={0.875} />
-                    </InputAdornment>
-                  )
-                }
-              }}
-              sx={{ width: 300 }}
-            />
+            <Stack gap={1} direction="row" alignItems="center">
+              <TextField
+                size="small"
+                placeholder="Search by policy name"
+                value={props.searchTerm}
+                onChange={(e) => props.onSearch(e.target.value)}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Icon path={mdiMagnify} size={0.875} />
+                      </InputAdornment>
+                    )
+                  }
+                }}
+                sx={{ width: 250 }}
+              />
+              <Button
+                variant="contained"
+                color="primary"
+                data-testid="add-policy-button"
+                startIcon={<Icon path={mdiPlus} size={0.8} />}
+                onClick={() => setOpenAddPolicyDialog(true)}>
+                Add
+              </Button>
+            </Stack>
           </Toolbar>
+
+          <Divider flexItem />
+
           <DataGrid
             data-testid="active-policies-table"
             rows={policies}
             columns={columns}
             getRowId={(row) => row.policy_id}
             pageSizeOptions={[50, 100, 200]}
-            disableRowSelectionOnClick
+            rowSelectionModel={rowSelectionModel}
+            onRowSelectionModelChange={handleRowSelectionChange}
+            checkboxSelection
+            disableMultipleRowSelection
             disableColumnSelector
             disableColumnMenu
             localeText={{ noRowsLabel: 'No Policies' }}
@@ -425,6 +439,12 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
               '& .MuiDataGrid-columnHeaderTitle': {
                 fontWeight: 700,
                 textTransform: 'uppercase'
+              },
+              '& .MuiDataGrid-row.Mui-selected': {
+                backgroundColor: 'action.selected'
+              },
+              '& .MuiDataGrid-row.Mui-selected:hover': {
+                backgroundColor: 'action.selected'
               }
             }}
           />

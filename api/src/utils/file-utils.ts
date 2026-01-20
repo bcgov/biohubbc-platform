@@ -32,12 +32,6 @@ export interface IArtifactS3FileKey {
   submissionFeatureId: number;
 }
 
-export interface IQueueS3FileKey {
-  queueId: number;
-  datasetUUID: string;
-  fileName: string;
-}
-
 /**
  * Local getter for retrieving the ClamAV client.
  *
@@ -63,7 +57,7 @@ export const _getClamAvScanner = async (): Promise<NodeClam> => {
  */
 export const _getS3Client = (): S3Client => {
   return new S3Client({
-    endpoint: _getObjectStoreUrl(),
+    endpoint: getObjectStoreUrl(),
     credentials: {
       accessKeyId: process.env.OBJECT_STORE_ACCESS_KEY_ID!,
       secretAccessKey: process.env.OBJECT_STORE_SECRET_KEY_ID!
@@ -74,13 +68,13 @@ export const _getS3Client = (): S3Client => {
 };
 
 /**
- * Local getter for retrieving the S3 quarantine client.
+ * Local getter for retrieving the S3 security client.
  *
- * @return {*}  {S3Client} The S3 quarantine client
+ * @return {*}  {S3Client} The S3 security client
  */
-export const _getQuarantineS3Client = (): S3Client => {
+export const getSecurityS3Client = (): S3Client => {
   return new S3Client({
-    endpoint: _getObjectStoreUrl(),
+    endpoint: getObjectStoreUrl(),
     credentials: {
       accessKeyId: process.env.QUARANTINE_OBJECT_STORE_ACCESS_KEY_ID!,
       secretAccessKey: process.env.QUARANTINE_OBJECT_STORE_SECRET_KEY_ID!
@@ -95,7 +89,7 @@ export const _getQuarantineS3Client = (): S3Client => {
  *
  * @returns {*} {string} The object store URL
  */
-export const _getObjectStoreUrl = (): string => {
+export const getObjectStoreUrl = (): string => {
   const url = process.env.OBJECT_STORE_URL || 'https://nrs.objectstore.gov.bc.ca';
 
   if (!['https://', 'http://'].some((protocol) => url.toLowerCase().startsWith(protocol))) {
@@ -110,16 +104,16 @@ export const _getObjectStoreUrl = (): string => {
  *
  * @returns {*} {string} The object store bucket name
  */
-export const _getObjectStoreBucketName = (): string => {
+export const getObjectStoreBucketName = (): string => {
   return process.env.OBJECT_STORE_BUCKET_NAME || '';
 };
 
 /**
- * Local getter for retrieving the S3 quarantine object store bucket name.
+ * Local getter for retrieving the S3 security object store bucket name.
  *
- * @returns {*} {string} The quarantine object store bucket name
+ * @returns {*} {string} The security object store bucket name
  */
-export const _getQuarantineObjectStoreBucketName = (): string => {
+export const getSecurityObjectStoreBucketName = (): string => {
   return process.env.QUARANTINE_OBJECT_STORE_BUCKET_NAME || '';
 };
 
@@ -133,7 +127,7 @@ export const _getQuarantineObjectStoreBucketName = (): string => {
  */
 export const getS3HostUrl = (key?: string): string => {
   // Appends the given S3 object key, trimming between 0 and 2 trailing '/' characters
-  return `${_getObjectStoreUrl()}/${_getObjectStoreBucketName()}/${key || ''}`.replace(/\/{0,2}$/, '');
+  return `${getObjectStoreUrl()}/${getObjectStoreBucketName()}/${key || ''}`.replace(/\/{0,2}$/, '');
 };
 
 /**
@@ -163,7 +157,7 @@ export async function deleteFileFromS3(key: string): Promise<DeleteObjectCommand
 
   return s3Client.send(
     new DeleteObjectCommand({
-      Bucket: _getObjectStoreBucketName(),
+      Bucket: getObjectStoreBucketName(),
       Key: key
     })
   );
@@ -188,7 +182,7 @@ export async function bulkDeleteFilesFromS3(keys: string[]): Promise<DeleteObjec
 
   return s3Client.send(
     new DeleteObjectsCommand({
-      Bucket: _getObjectStoreBucketName(),
+      Bucket: getObjectStoreBucketName(),
       Delete: {
         Objects: keys.map((key) => ({ Key: key }))
       }
@@ -214,7 +208,7 @@ export async function uploadFileToS3(
 
   return s3Client.send(
     new PutObjectCommand({
-      Bucket: _getObjectStoreBucketName(),
+      Bucket: getObjectStoreBucketName(),
       Body: file.buffer,
       ContentType: file.mimetype,
       Key: key,
@@ -243,7 +237,7 @@ export async function uploadBufferToS3(
 
   return s3Client.send(
     new PutObjectCommand({
-      Bucket: _getObjectStoreBucketName(),
+      Bucket: getObjectStoreBucketName(),
       Body: buffer,
       ContentType: mimetype,
       Key: key,
@@ -271,7 +265,7 @@ export async function uploadStreamToS3(
   const streamUpload = new Upload({
     client: _getS3Client(),
     params: {
-      Bucket: _getObjectStoreBucketName(),
+      Bucket: getObjectStoreBucketName(),
       Key: key,
       Body: stream,
       ContentType: mimetype,
@@ -295,7 +289,7 @@ export async function getFileFromS3(key: string, versionId?: string): Promise<Ge
 
   return s3Client.send(
     new GetObjectCommand({
-      Bucket: _getObjectStoreBucketName(),
+      Bucket: getObjectStoreBucketName(),
       Key: key,
       VersionId: versionId
     })
@@ -315,7 +309,7 @@ export const listFilesFromS3 = async (path: string): Promise<ListObjectsCommandO
 
   return s3Client.send(
     new ListObjectsCommand({
-      Bucket: _getObjectStoreBucketName(),
+      Bucket: getObjectStoreBucketName(),
       Prefix: path
     })
   );
@@ -331,7 +325,7 @@ export const listFilesFromS3 = async (path: string): Promise<ListObjectsCommandO
 export async function getObjectMeta(key: string): Promise<HeadObjectCommandOutput> {
   const s3Client = _getS3Client();
 
-  return s3Client.send(new HeadObjectCommand({ Bucket: _getObjectStoreBucketName(), Key: key }));
+  return s3Client.send(new HeadObjectCommand({ Bucket: getObjectStoreBucketName(), Key: key }));
 }
 
 /**
@@ -350,7 +344,7 @@ export async function getS3SignedURL(key: string): Promise<string | null> {
   return getSignedUrl(
     s3Client,
     new GetObjectCommand({
-      Bucket: _getObjectStoreBucketName(),
+      Bucket: getObjectStoreBucketName(),
       Key: key
     }),
     {
@@ -384,30 +378,6 @@ export function generateSubmissionFeatureS3FileKey(options: IArtifactS3FileKey) 
   return [getS3KeyPrefix(), 'submissions', options.submissionId, 'features', options.submissionFeatureId]
     .filter(Boolean)
     .join('/');
-}
-
-/**
- * Generate an S3 key for a submission job queue file.
- *
- * @example
- * <s3_key_prefix>/queue/<queue_id>/datasets/<dataset_uuid>/dwca/<file_name>
- *
- * @export
- * @param {IQueueS3FileKey} options
- * @return {*}
- */
-export function generateQueueS3FileKey(options: IQueueS3FileKey) {
-  const keyParts: (string | number)[] = [];
-
-  keyParts.push(getS3KeyPrefix());
-  keyParts.push('queue');
-  keyParts.push(options.queueId);
-  keyParts.push('datasets');
-  keyParts.push(options.datasetUUID);
-  keyParts.push('dwca');
-  keyParts.push(options.fileName);
-
-  return keyParts.filter(Boolean).join('/');
 }
 
 /**

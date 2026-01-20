@@ -76,3 +76,13 @@ api:
     changeId: ""
     ts: ""
   # Add any api-specific overrides here
+
+queue:
+  enabled: true
+  environment:
+    licensePlate: "a0ec71"
+    name: ""
+    id: ""
+    changeId: ""
+    ts: ""
+  # Add any queue-specific overrides here

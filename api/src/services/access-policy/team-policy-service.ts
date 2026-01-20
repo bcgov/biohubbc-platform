@@ -1,5 +1,5 @@
 import { IDBConnection } from '../../database/db';
-import { CreateTeamPolicy, TeamPolicy, UpdateTeamPolicy } from '../../models/team-policy';
+import { CreateTeamPolicy, TeamPolicy, TeamPolicyDetails, UpdateTeamPolicy } from '../../models/team-policy';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { DBService } from '../db-service';
 
@@ -42,6 +42,16 @@ export class TeamPolicyService extends DBService {
    */
   getTeamPolicies(teamId: string): Promise<TeamPolicy[]> {
     return this.teamPolicyRepository.getTeamPolicies(teamId);
+  }
+
+  /**
+   * Get all team-policy associations with team and policy names for display.
+   *
+   * @return {Promise<TeamPolicyDetails[]>} - List of team policy records with names.
+   * @memberof TeamPolicyService
+   */
+  getAllTeamPolicies(): Promise<TeamPolicyDetails[]> {
+    return this.teamPolicyRepository.getAllTeamPolicies();
   }
 
   /**

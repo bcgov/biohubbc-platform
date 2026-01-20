@@ -3,6 +3,8 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import { SubmissionFeatureForReview } from '../models/submission';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
 
@@ -25,13 +27,21 @@ export interface ISearchSubmissionCriteria {
 
 export interface ISubmissionRecord {
   submission_id?: number;
-  source_transform_id: number;
   uuid: string;
   create_date?: string;
   create_user?: string;
   update_date?: string;
   update_user?: string;
   revision_count?: string;
+}
+
+export interface ICreateSubmission {
+  uuid: string;
+  system_user_id: number;
+  source_system: 'SIMS';
+  name: string;
+  description: string;
+  comment: string;
 }
 
 export const SubmissionFeatureRecord = z.object({
@@ -187,20 +197,6 @@ export enum SUBMISSION_MESSAGE_TYPE {
   'DEBUG' = 'Debug'
 }
 
-export interface ISubmissionJobQueueRecord {
-  submission_job_queue_id: number;
-  submission_id: number;
-  job_start_timestamp: string | null;
-  job_end_timestamp: string | null;
-  security_request: string | null; // JSON string
-  key: string | null;
-  create_date: string;
-  create_user: number;
-  update_date: string | null;
-  update_user: number | null;
-  revision_count: number;
-}
-
 export interface ISubmissionObservationRecord {
   submission_observation_id?: number;
   submission_id: number;
@@ -306,18 +302,26 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Insert a new submission record.
    *
-   * @param {ISubmissionRecord} submissionData
+   * @param {ICreateSubmission} submissionData
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async insertSubmissionRecord(submissionData: ISubmissionRecord): Promise<{ submission_id: number }> {
+  async insertSubmissionRecord(submissionData: ICreateSubmission): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
-        source_transform_id,
-        uuid
+        uuid,
+        system_user_id,
+        source_system,
+        name,
+        description,
+        comment
       ) VALUES (
-        ${submissionData.source_transform_id},
-        ${submissionData.uuid}
+        ${submissionData.uuid},
+        ${submissionData.system_user_id},
+        ${submissionData.source_system},
+        ${submissionData.name},
+        ${submissionData.description},
+        ${submissionData.comment}
       )
       RETURNING
         submission_id;
@@ -437,6 +441,43 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Update the parent reference for a submission feature.
+   *
+   * @param {number} submissionFeatureId The ID of the feature to update.
+   * @param {number} parentSubmissionFeatureId The ID of the parent feature.
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionFeatureParent(submissionFeatureId: number, parentSubmissionFeatureId: number): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission_feature
+      SET parent_submission_feature_id = ${parentSubmissionFeatureId}
+      WHERE submission_feature_id = ${submissionFeatureId};
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Delete all submission features for a submission (soft delete).
+   * Used for idempotency - allows job retries to start fresh.
+   *
+   * @param {number} submissionId The submission ID.
+   * @return {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async deleteSubmissionFeatures(submissionId: number): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission_feature
+      SET record_end_date = NOW()
+      WHERE submission_id = ${submissionId}
+        AND record_end_date IS NULL;
+    `;
+
+    await this.connection.sql(sqlStatement);
   }
 
   /**
@@ -702,36 +743,6 @@ export class SubmissionRepository extends BaseRepository {
       throw new ApiExecuteSQLError('Failed to insert submission message record', [
         'SubmissionRepository->insertSubmissionMessage',
         'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
-   * Fetch row of submission job queue by submission Id
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<ISubmissionJobQueueRecord>}
-   * @memberof SubmissionRepository
-   */
-  async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueueRecord> {
-    const sqlStatement = SQL`
-      SELECT
-        *
-      FROM
-        submission_job_queue
-      WHERE
-        submission_id = ${submissionId} ORDER BY CREATE_DATE DESC LIMIT 1
-      ;
-    `;
-
-    const response = await this.connection.sql<ISubmissionJobQueueRecord>(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to get submission job queue from submission id', [
-        'SubmissionRepository->getSubmissionJobQueue',
-        'rowCount was null or undefined, expected rowCount >= 0'
       ]);
     }
 
@@ -1730,5 +1741,110 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0].value;
+  }
+
+  /**
+   * Build the base query for submission features.
+   *
+   * @param {number} submissionId
+   * @param {Knex} knex
+   * @return {Knex.QueryBuilder}
+   * @memberof SubmissionRepository
+   */
+  private _getSubmissionFeaturesBaseQuery(submissionId: number, knex: Knex) {
+    const baseQuery = knex('submission_feature')
+      .select(
+        'submission_feature.submission_id',
+        'submission_feature.submission_feature_id',
+        'submission_feature.feature_type_id',
+        knex.raw('feature_type.name AS feature_type_name'),
+        knex.raw(`
+        EXISTS (
+          SELECT 1 
+          FROM submission_feature_security sfs
+          WHERE sfs.submission_feature_id = submission_feature.submission_feature_id
+        ) AS secured
+      `)
+      )
+      .leftJoin('feature_type', 'feature_type.feature_type_id', 'submission_feature.feature_type_id')
+      .where('submission_feature.submission_id', submissionId);
+
+    return knex.with('base_features', baseQuery).distinct('*').from('base_features');
+  }
+
+  /**
+   * Get all submission features by submission id, paginated.
+   *
+   * @param {number} submissionId
+   * @param {ApiPaginationOptions} pagination
+   * @return {Promise<SubmissionFeatureForReview[]>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionFeatures(
+    submissionId: number,
+    pagination?: ApiPaginationOptions
+  ): Promise<SubmissionFeatureForReview[]> {
+    const knex = getKnex();
+
+    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex);
+
+    this.applyPagination(baseQuery, pagination);
+
+    const response = await this.connection.knex(baseQuery, SubmissionFeatureForReview);
+
+    return response.rows;
+  }
+
+  /**
+   * Get the total number of submission features for a given submission.
+   *
+   * @param {number} submissionId
+   * @return {Promise<number>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionFeaturesCount(submissionId: number): Promise<number> {
+    const knex = getKnex();
+
+    // Wrap the base query as a subquery
+    const baseQuery = this._getSubmissionFeaturesBaseQuery(submissionId, knex);
+    const countQuery = knex.from(baseQuery.as('sf_base')).select(knex.raw('count(*)::integer as count'));
+
+    const response = await this.connection.knex(countQuery, z.object({ count: z.number() }));
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to get submission feature count', [
+        'SubmissionRepository->getSubmissionFeaturesCount',
+        'rowCount was null or undefined, expected rowCount != 0'
+      ]);
+    }
+
+    return response.rows[0].count;
+  }
+
+  /**
+   * Apply pagination + sorting to a Knex query.
+   *
+   * @param {Knex.QueryBuilder} query
+   * @param {ApiPaginationOptions} pagination
+   * @memberof SubmissionRepository
+   */
+  applyPagination(query: any, pagination?: ApiPaginationOptions) {
+    if (!pagination) {
+      return query;
+    }
+
+    if (pagination.limit) {
+      query.limit(pagination.limit);
+    }
+
+    if (pagination.page && pagination.limit) {
+      query.offset((pagination.page - 1) * pagination.limit);
+    }
+
+    if (pagination.sort && pagination.order) {
+      query.orderBy(pagination.sort, pagination.order);
+    }
+
+    return query;
   }
 }

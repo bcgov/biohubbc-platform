@@ -106,7 +106,13 @@ describe('intake', () => {
         create_date: '2024-01-01',
         update_user: null,
         update_date: null,
-        revision_count: 0
+        revision_count: 0,
+        display_name: null,
+        given_name: null,
+        family_name: null,
+        email: null,
+        agency: null,
+        notes: null
       };
 
       sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(serviceClientSystemUser);

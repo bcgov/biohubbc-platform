@@ -7,7 +7,6 @@ import { SubmissionFeatureSearchKeyValues } from '../repositories/search-index-r
 import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
   ISubmissionFeature,
-  ISubmissionJobQueueRecord,
   ISubmissionModel,
   PatchSubmissionRecord,
   SubmissionFeatureDownloadRecord,
@@ -41,7 +40,14 @@ describe('SubmissionService', () => {
 
       const repo = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionRecord').resolves({ submission_id: 1 });
 
-      const response = await submissionService.insertSubmissionRecord({ uuid: '', source_transform_id: 1 });
+      const response = await submissionService.insertSubmissionRecord({
+        uuid: '',
+        comment: 'comment',
+        description: 'description',
+        name: 'name',
+        source_system: 'SIMS',
+        system_user_id: 1
+      });
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });
@@ -382,22 +388,6 @@ describe('SubmissionService', () => {
         submission_status_id: 2,
         submission_message_id: 1
       });
-    });
-  });
-
-  describe('getSubmissionJobQueue', () => {
-    it('should return a submission job queue record', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionJobQueue')
-        .resolves({ test: 'test' } as unknown as ISubmissionJobQueueRecord);
-
-      const response = await submissionService.getSubmissionJobQueue(1);
-
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ test: 'test' });
     });
   });
 

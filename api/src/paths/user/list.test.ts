@@ -38,7 +38,13 @@ describe('users', () => {
           update_date: null,
           revision_count: 0,
           role_ids: [1, 2],
-          role_names: ['System Admin', 'Project Lead']
+          role_names: ['System Admin', 'Project Lead'],
+          display_name: null,
+          given_name: null,
+          family_name: null,
+          email: null,
+          agency: null,
+          notes: null
         }
       ];
 

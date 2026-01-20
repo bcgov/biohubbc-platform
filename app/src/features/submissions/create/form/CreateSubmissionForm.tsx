@@ -48,6 +48,16 @@ export const CreateSubmissionForm = () => {
         }}
       />
 
+      {/* Comment Field */}
+      <CustomTextField
+        name="comment"
+        label="Comment"
+        other={{
+          multiline: true,
+          rows: 4
+        }}
+      />
+
       {errors?.file && (
         <Alert severity="error" variant="filled" icon={<Icon path={mdiAlertCircle} size={1} />}>
           {errors.file.toString()}

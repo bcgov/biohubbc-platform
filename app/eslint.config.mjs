@@ -1,8 +1,9 @@
 import eslintJs from '@eslint/js';
+import tsPlugin from '@typescript-eslint/eslint-plugin';
+import tsParser from '@typescript-eslint/parser';
 import eslintPluginPrettier from 'eslint-plugin-prettier';
 import eslintPluginReactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
-import typescriptEslint from 'typescript-eslint';
 
 export default [
   {
@@ -19,7 +20,7 @@ export default [
   {
     files: ['src/**/*.js', 'src/**/*.ts', 'src/**/*.jsx', 'src/**/*.tsx'],
     languageOptions: {
-      parser: typescriptEslint.parser,
+      parser: tsParser,
       parserOptions: {
         ecmaVersion: 'latest',
         sourceType: 'module'
@@ -30,21 +31,14 @@ export default [
       }
     },
     plugins: {
-      '@typescript-eslint': typescriptEslint.plugin,
+      '@typescript-eslint': tsPlugin,
       prettier: eslintPluginPrettier,
       'react-hooks': eslintPluginReactHooks
     },
     rules: {
-      // Root ESLint rules
       ...eslintJs.configs.recommended.rules,
-      // Root TypeScript rules
-      ...typescriptEslint.configs.recommended.rules,
-      // Root React Hooks rules
+      ...tsPlugin.configs.recommended.rules,
       ...eslintPluginReactHooks.configs.recommended.rules,
-      // Prettier rules
-      'prettier/prettier': ['warn'],
-      // TypeScript rules
-      // TODO: Change no-explicit-any to error, but in its own PR that also fixes the errors
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
       '@typescript-eslint/ban-ts-comment': [
@@ -57,8 +51,7 @@ export default [
         }
       ],
       '@typescript-eslint/no-unused-vars': [
-        // TODO: Change to error instead of warn, but in its own PR that also fixes the errors
-        'off',
+        'error',
         {
           args: 'all',
           argsIgnorePattern: '^_',
@@ -72,6 +65,12 @@ export default [
       'no-var': 'error',
       'no-lonely-if': 'error',
       curly: 'error'
+    }
+  },
+  {
+    files: ['**/*.test.ts', '**/*.test.js', '**/*.spec.ts', '**/*.spec.js'],
+    rules: {
+      '@typescript-eslint/no-unused-expressions': 'off'
     }
   }
 ];

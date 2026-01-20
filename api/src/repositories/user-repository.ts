@@ -1,32 +1,28 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
+import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import { SystemUser, SystemUserExtended } from '../models/user';
 import { BaseRepository } from './base-repository';
 
-export const SystemUser = z.object({
+// Re-export for backward compatibility
+export { SystemUser, SystemUserExtended } from '../models/user';
+
+/**
+ * Maximum number of users to return in getAvailableUsers.
+ */
+const MAX_AVAILABLE_USERS_LIMIT = 50;
+
+/**
+ * A user available for team membership.
+ */
+export const AvailableUser = z.object({
   system_user_id: z.number(),
-  user_identity_source_id: z.number(),
-  user_identifier: z.string(),
-  user_guid: z.string(),
-  record_effective_date: z.string(),
-  record_end_date: z.string().nullable(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number()
+  user_identifier: z.string()
 });
 
-export type SystemUser = z.infer<typeof SystemUser>;
-
-export const SystemUserExtended = SystemUser.extend({
-  identity_source: z.string(),
-  role_ids: z.array(z.number()),
-  role_names: z.array(z.string())
-});
-
-export type SystemUserExtended = z.infer<typeof SystemUserExtended>;
+export type AvailableUser = z.infer<typeof AvailableUser>;
 
 const SystemRoles = z.object({
   system_role_id: z.number(),
@@ -34,6 +30,20 @@ const SystemRoles = z.object({
 });
 
 export type SystemRoles = z.infer<typeof SystemRoles>;
+
+/**
+ * Parameters for adding a new system user.
+ */
+export interface IAddSystemUserParams {
+  userGuid: string;
+  userIdentifier: string;
+  identitySource: string;
+  displayName?: string | null;
+  email?: string | null;
+  givenName?: string | null;
+  familyName?: string | null;
+  agency?: string | null;
+}
 
 export class UserRepository extends BaseRepository {
   /**
@@ -100,6 +110,12 @@ export class UserRepository extends BaseRepository {
         su.update_date,
         su.update_user,
         su.revision_count,
+        su.display_name,
+        su.given_name,
+        su.family_name,
+        su.email,
+        su.agency,
+        su.notes,
         uis.name;
     `;
 
@@ -157,6 +173,12 @@ export class UserRepository extends BaseRepository {
         su.update_date,
         su.update_user,
         su.revision_count,
+        su.display_name,
+        su.given_name,
+        su.family_name,
+        su.email,
+        su.agency,
+        su.notes,
         uis.name;
     `;
 
@@ -211,6 +233,12 @@ export class UserRepository extends BaseRepository {
         su.update_date,
         su.update_user,
         su.revision_count,
+        su.display_name,
+        su.given_name,
+        su.family_name,
+        su.email,
+        su.agency,
+        su.notes,
         uis.name;
     `;
 
@@ -224,13 +252,11 @@ export class UserRepository extends BaseRepository {
    *
    * Note: Will fail if the system user already exists.
    *
-   * @param {string} userGuid
-   * @param {string} userIdentifier
-   * @param {string} identitySource
+   * @param {IAddSystemUserParams} params - The user parameters
    * @return {*}  {Promise<SystemUser>}
    * @memberof UserRepository
    */
-  async addSystemUser(userGuid: string, userIdentifier: string, identitySource: string): Promise<SystemUser> {
+  async addSystemUser(params: IAddSystemUserParams): Promise<SystemUser> {
     const sqlStatement = SQL`
       INSERT INTO
         "system_user"
@@ -238,20 +264,30 @@ export class UserRepository extends BaseRepository {
         user_guid,
         user_identity_source_id,
         user_identifier,
-        record_effective_date
+        record_effective_date,
+        display_name,
+        email,
+        given_name,
+        family_name,
+        agency
       )
       VALUES (
-        ${userGuid},
+        ${params.userGuid},
         (
           SELECT
             user_identity_source_id
           FROM
             user_identity_source
           WHERE
-            name = ${identitySource.toUpperCase()}
+            name = ${params.identitySource.toUpperCase()}
         ),
-        ${userIdentifier},
-        now()
+        ${params.userIdentifier},
+        now(),
+        ${params.displayName ?? null},
+        ${params.email ?? null},
+        ${params.givenName ?? null},
+        ${params.familyName ?? null},
+        ${params.agency ?? null}
       )
       RETURNING
         *;
@@ -310,6 +346,12 @@ export class UserRepository extends BaseRepository {
         su.update_date,
         su.update_user,
         su.revision_count,
+        su.display_name,
+        su.given_name,
+        su.family_name,
+        su.email,
+        su.agency,
+        su.notes,
         uis.name;
     `;
 
@@ -424,6 +466,77 @@ export class UserRepository extends BaseRepository {
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to insert user system roles', [
         'UserRepository->addUserSystemRoles',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+  }
+
+  /**
+   * Get available users for team membership (excludes SYSTEM and DATABASE users).
+   *
+   * @param {string} [search] - Optional search term to filter by user_identifier.
+   * @return {Promise<AvailableUser[]>}
+   * @memberof UserRepository
+   */
+  async getAvailableUsers(search?: string): Promise<AvailableUser[]> {
+    const knex = getKnex();
+    const query = knex
+      .table('system_user as su')
+      .select(['su.system_user_id', 'su.user_identifier'])
+      .innerJoin('user_identity_source as uis', 'su.user_identity_source_id', 'uis.user_identity_source_id')
+      .whereNull('su.record_end_date')
+      .whereNotIn('uis.name', [SYSTEM_IDENTITY_SOURCE.SYSTEM, SYSTEM_IDENTITY_SOURCE.DATABASE])
+      .orderBy('su.user_identifier', 'asc')
+      .limit(MAX_AVAILABLE_USERS_LIMIT);
+
+    if (search?.trim()) {
+      query.whereILike('su.user_identifier', `%${search.trim()}%`);
+    }
+
+    const response = await this.connection.knex(query, AvailableUser);
+    return response.rows;
+  }
+
+  /**
+   * Updates a system user's profile fields.
+   *
+   * @param {number} systemUserId - The ID of the user to update
+   * @param {string | null} displayName - User's display name
+   * @param {string | null} email - User's email
+   * @param {string | null} givenName - User's first name
+   * @param {string | null} familyName - User's last name
+   * @param {string | null} agency - User's organization (BCeID Business only)
+   * @return {*}  {Promise<void>}
+   * @memberof UserRepository
+   */
+  async updateSystemUserProfile(
+    systemUserId: number,
+    displayName: string | null,
+    email: string | null,
+    givenName: string | null,
+    familyName: string | null,
+    agency: string | null
+  ): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE
+        "system_user"
+      SET
+        display_name = ${displayName},
+        email = ${email},
+        given_name = ${givenName},
+        family_name = ${familyName},
+        agency = ${agency}
+      WHERE
+        system_user_id = ${systemUserId}
+      RETURNING
+        *;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update system user profile', [
+        'UserRepository->updateSystemUserProfile',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }

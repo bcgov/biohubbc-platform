@@ -8,6 +8,17 @@ export const TeamPolicy = z.object({
 
 export type TeamPolicy = z.infer<typeof TeamPolicy>;
 
+/**
+ * Team policy with joined team and policy names for display.
+ * Follows SIMS pattern of returning display-ready data.
+ */
+export const TeamPolicyDetails = TeamPolicy.extend({
+  team_name: z.string(),
+  policy_name: z.string()
+});
+
+export type TeamPolicyDetails = z.infer<typeof TeamPolicyDetails>;
+
 export interface CreateTeamPolicy {
   team_id: string;
   policy_id: string;

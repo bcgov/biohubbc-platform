@@ -552,6 +552,9 @@ jobs:
             --set-string biohub-platform-api.environment.ts=$TS \
             --set-string biohub-platform-api.environment.id=$PR_NUMBER \
             --set-string biohub-platform-api.environment.changeId=$PR_NUMBER \
+            --set-string biohub-platform-queue.environment.ts=$TS \
+            --set-string biohub-platform-queue.environment.id=$PR_NUMBER \
+            --set-string biohub-platform-queue.environment.changeId=$PR_NUMBER \
             --wait --timeout=600s
           
           echo "Helm chart deployment completed for PR $PR_NUMBER"

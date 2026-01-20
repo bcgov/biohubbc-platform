@@ -1,0 +1,104 @@
+/**
+ * OpenAPI schemas for Team-Policy endpoints.
+ *
+ * These schemas define the API contract for team-policy association management.
+ */
+
+import { OpenAPIV3 } from 'openapi-types';
+
+/**
+ * Schema for a team-policy association with names for display.
+ */
+export const TeamPolicyDetailsSchema: OpenAPIV3.SchemaObject = {
+  title: 'TeamPolicyDetails',
+  type: 'object',
+  required: ['team_policy_id', 'team_id', 'policy_id', 'team_name', 'policy_name'],
+  properties: {
+    team_policy_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'Unique identifier for the team-policy association'
+    },
+    team_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'ID of the team'
+    },
+    policy_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'ID of the policy'
+    },
+    team_name: {
+      type: 'string',
+      description: 'Name of the team'
+    },
+    policy_name: {
+      type: 'string',
+      description: 'Name of the policy'
+    }
+  }
+};
+
+/**
+ * Schema for team-policies list response.
+ */
+export const TeamPoliciesResponseSchema: OpenAPIV3.SchemaObject = {
+  title: 'TeamPoliciesResponse',
+  type: 'object',
+  required: ['team_policies'],
+  properties: {
+    team_policies: {
+      type: 'array',
+      items: TeamPolicyDetailsSchema,
+      description: 'List of team-policy associations with names'
+    }
+  }
+};
+
+/**
+ * Schema for create team-policy request body.
+ */
+export const CreateTeamPolicyRequestSchema: OpenAPIV3.SchemaObject = {
+  title: 'CreateTeamPolicyRequest',
+  type: 'object',
+  required: ['team_id', 'policy_id'],
+  properties: {
+    team_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'ID of the team to associate'
+    },
+    policy_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'ID of the policy to associate'
+    }
+  }
+};
+
+/**
+ * Schema for created team-policy response (basic, without names).
+ */
+export const TeamPolicySchema: OpenAPIV3.SchemaObject = {
+  title: 'TeamPolicy',
+  type: 'object',
+  required: ['team_policy_id', 'team_id', 'policy_id'],
+  properties: {
+    team_policy_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'Unique identifier for the team-policy association'
+    },
+    team_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'ID of the team'
+    },
+    policy_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'ID of the policy'
+    }
+  }
+};

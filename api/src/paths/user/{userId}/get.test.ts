@@ -64,7 +64,13 @@ describe('user', () => {
         update_date: null,
         revision_count: 0,
         role_ids: [],
-        role_names: []
+        role_names: [],
+        display_name: null,
+        given_name: null,
+        family_name: null,
+        email: null,
+        agency: null,
+        notes: null
       });
 
       const requestHandler = user.getUserById();
@@ -85,7 +91,13 @@ describe('user', () => {
         update_date: null,
         revision_count: 0,
         role_ids: [],
-        role_names: []
+        role_names: [],
+        display_name: null,
+        given_name: null,
+        family_name: null,
+        email: null,
+        agency: null,
+        notes: null
       });
     });
   });

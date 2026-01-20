@@ -106,3 +106,54 @@ export const getServiceClientSystemUser = (keycloakToken: Record<string, any>): 
   // Find and return a matching known service client, if one exists
   return getDBConstants().serviceClientUsers.find((item) => item.user_guid === sub) || null;
 };
+
+/**
+ * Parses out the user's display name from a keycloak token.
+ *
+ * @param {Record<string, any>} keycloakToken
+ * @return {*}  {(string | null)}
+ */
+export const getDisplayName = (keycloakToken: Record<string, any>): string | null => {
+  return keycloakToken?.['display_name'] ?? null;
+};
+
+/**
+ * Parses out the user's email from a keycloak token.
+ *
+ * @param {Record<string, any>} keycloakToken
+ * @return {*}  {(string | null)}
+ */
+export const getEmail = (keycloakToken: Record<string, any>): string | null => {
+  return keycloakToken?.['email'] ?? null;
+};
+
+/**
+ * Parses out the user's given name (first name) from a keycloak token.
+ *
+ * @param {Record<string, any>} keycloakToken
+ * @return {*}  {(string | null)}
+ */
+export const getGivenName = (keycloakToken: Record<string, any>): string | null => {
+  return keycloakToken?.['given_name'] ?? null;
+};
+
+/**
+ * Parses out the user's family name (last name) from a keycloak token.
+ *
+ * @param {Record<string, any>} keycloakToken
+ * @return {*}  {(string | null)}
+ */
+export const getFamilyName = (keycloakToken: Record<string, any>): string | null => {
+  return keycloakToken?.['family_name'] ?? null;
+};
+
+/**
+ * Parses out the user's agency from a keycloak token.
+ * This is only available for BCeID Business users via the `bceid_business_name` field.
+ *
+ * @param {Record<string, any>} keycloakToken
+ * @return {*}  {(string | null)}
+ */
+export const getAgency = (keycloakToken: Record<string, any>): string | null => {
+  return keycloakToken?.['bceid_business_name'] ?? null;
+};
