@@ -22,17 +22,16 @@ WITH deployments AS (
       AND dep.record_end_date IS NULL
 )
 SELECT
-    sf.submission_feature_id,
-    sf.uuid,
-    sf.submission_id,
-    sf.source_id,
-    sf.data->>'device_id' AS device_id,
-    (sf.data->>'latitude')::numeric AS latitude,
-    (sf.data->>'longitude')::numeric AS longitude,
-    (sf.data->>'timestamp')::timestamptz AS timestamp,
-    (sf.data->>'dop')::numeric AS dop,
+    sf.submission_feature_id AS Feature_ID,
+    d.animal_id,
+    -- Contingent on Feature Array: Add columns Species Code, Species english name, species scientific name, Sex, Ecological Unit
     d.device_key,
-    d.animal_id
+    (sf.data->>'timestamp')::timestamptz AS DATETIME,
+    (EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz))::int AS YEAR,
+    (sf.data->>'latitude')::numeric AS Latitude,
+    (sf.data->>'longitude')::numeric AS Longitude,
+    (sf.data->>'dop')::numeric AS dop
+    -- contingent on feature array: join to dataset and get the survey name and id, and the study area id
 FROM biohub.submission_feature sf
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
@@ -41,6 +40,17 @@ LEFT JOIN deployments d
 WHERE ft.name = 'telemetry'
   AND sf.record_end_date IS NULL
   AND (sf.data->>'timestamp')::timestamptz <= (NOW() - INTERVAL '4 months');
+  `);
+
+  await knex.raw(`
+    COMMENT ON COLUMN bcgw.telemetry_all.Feature_ID IS 'System generated surrogate primary key identifier';
+    COMMENT ON COLUMN bcgw.telemetry_all.Latitude IS 'The latitude of the GPS location';
+    COMMENT ON COLUMN bcgw.telemetry_all.Longitude IS 'The longitude of the GPS location';
+    COMMENT ON COLUMN bcgw.telemetry_all.DATETIME IS 'The date and time that the GPS location was recorded';
+    COMMENT ON COLUMN bcgw.telemetry_all.YEAR IS 'The year that the GPS location was recorded';
+    COMMENT ON COLUMN bcgw.telemetry_all.dop IS 'The dilution of precision';
+    COMMENT ON COLUMN bcgw.telemetry_all.device_key IS 'The vendor and device serial';
+    COMMENT ON COLUMN bcgw.telemetry_all.animal_id IS 'The identifier of the animal wearing the telemetry device';
   `);
 }
 
