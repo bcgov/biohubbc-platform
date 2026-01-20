@@ -106,7 +106,7 @@ biohub-platform-api:
   app:
     nodeEnv: production
     nodeOptions: --max_old_space_size=4500  # 75% of 6Gi memory limit
-    appHost: sims.nrs.gov.bc.ca  # Vanity URL for prod
+    appHost: biohub-platform.apps.silver.devops.gov.bc.ca
 
     # Keycloak
     keycloak:
