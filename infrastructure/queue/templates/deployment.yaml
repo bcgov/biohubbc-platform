@@ -96,6 +96,8 @@ spec:
             - name: NODE_OPTIONS
               value: {{ .Values.app.nodeOptions }}
             # Clamav
+            - name: ENABLE_FILE_VIRUS_SCAN
+              value: {{ .Values.app.clamav.enabled | quote }}
             - name: CLAMAV_HOST
               value: {{ .Values.app.clamav.host }}
             - name: CLAMAV_PORT
