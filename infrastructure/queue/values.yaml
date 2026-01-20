@@ -32,6 +32,12 @@ app:
   quarantineObjectStore:
     secretName: quarantine-object-store # Secrets used to read and write to the S3 storage
 
+  # Clamav
+  clamav:
+    enabled: true
+    host: clamav
+    port: 3310
+
   # Logging
   logging:
     level: "" # Log level for logs written to the console (console transport)
