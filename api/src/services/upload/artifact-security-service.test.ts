@@ -1,12 +1,21 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { Readable } from 'stream';
 import { IDBConnection } from '../../database/db';
 import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
+import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
+import { ProcessStatusStatusEnum } from '../../models/process-status';
+import { UploadArchive } from '../../models/upload-archive';
 import { SecurityStatusEnum } from '../../models/security-status';
 import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
+import * as fileUtils from '../../utils/file-utils';
 import { getMockDBConnection } from '../../__mocks__/db';
+import { ObjectStorageService } from '../object-storage/object-storage-service';
+import { ArtifactSecurityScanService } from './artifact-security-scan-service';
 import { ArtifactSecurityService } from './artifact-security-service';
+import { ArtifactService } from './artifact-service';
+import { UploadArchiveService } from './upload-archive-service';
 
 chai.use(sinonChai);
 
@@ -201,6 +210,219 @@ describe('ArtifactSecurityService', () => {
       } catch (err) {
         expect((err as Error).message).to.equal('Update failed');
       }
+    });
+  });
+
+  describe('executeScan', () => {
+    const mockArtifact: Artifact = {
+      artifact_id: 'artifact-1',
+      artifact_status: ArtifactStatusEnum.UPLOADED,
+      bucket: 'security-bucket',
+      object_key: 'uploads/test.tar',
+      byte_size: 1000,
+      checksum_sha256: null,
+      uploaded_at: '2024-01-01T00:00:00Z'
+    };
+
+    const mockSecurityRecord: ArtifactSecurity = {
+      artifact_security_id: 'security-1',
+      artifact_id: 'artifact-1',
+      security: SecurityStatusEnum.PENDING
+    };
+
+    beforeEach(() => {
+      process.env.QUARANTINE_OBJECT_STORE_BUCKET_NAME = 'security-bucket';
+      process.env.OBJECT_STORE_BUCKET_NAME = 'main-bucket';
+    });
+
+    it('should return early if already processed (idempotent)', async () => {
+      const processedRecord: ArtifactSecurity = {
+        ...mockSecurityRecord,
+        security: SecurityStatusEnum.CLEAN
+      };
+
+      sinon.stub(ArtifactSecurityRepository.prototype, 'getArtifactSecurity').resolves(processedRecord);
+      sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
+      const insertScanStub = sinon.stub(ArtifactSecurityScanService.prototype, 'insertArtifactSecurityScan');
+
+      const result = await service.executeScan('security-1');
+
+      expect(result.securityStatus).to.equal(SecurityStatusEnum.CLEAN);
+      expect(insertScanStub.called).to.be.false;
+    });
+
+    it('should return ERROR if artifact is not uploaded', async () => {
+      const pendingArtifact: Artifact = {
+        ...mockArtifact,
+        artifact_status: ArtifactStatusEnum.PENDING
+      };
+
+      sinon.stub(ArtifactSecurityRepository.prototype, 'getArtifactSecurity').resolves(mockSecurityRecord);
+      sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(pendingArtifact);
+      const updateSecurityStub = sinon
+        .stub(ArtifactSecurityRepository.prototype, 'updateArtifactSecurity')
+        .resolves({ ...mockSecurityRecord, security: SecurityStatusEnum.ERROR });
+
+      const result = await service.executeScan('security-1');
+
+      expect(result.securityStatus).to.equal(SecurityStatusEnum.ERROR);
+      expect(updateSecurityStub.calledOnceWith('security-1', { security: SecurityStatusEnum.ERROR })).to.be.true;
+    });
+
+    it('should create scan record and run scan successfully', async () => {
+      sinon.stub(ArtifactSecurityRepository.prototype, 'getArtifactSecurity').resolves(mockSecurityRecord);
+      sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
+      const insertScanStub = sinon
+        .stub(ArtifactSecurityScanService.prototype, 'insertArtifactSecurityScan')
+        .resolves({ artifact_security_scan_id: 'scan-1' });
+      const updateScanStub = sinon
+        .stub(ArtifactSecurityScanService.prototype, 'updateArtifactSecurityScan')
+        .resolves({ artifact_security_scan_id: 'scan-1' });
+      sinon
+        .stub(ArtifactSecurityRepository.prototype, 'updateArtifactSecurity')
+        .resolves({ ...mockSecurityRecord, security: SecurityStatusEnum.INFECTED });
+
+      sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from('test-data'));
+      sinon.stub(fileUtils, '_getClamAvScanner').resolves({
+        scanStream: sinon.stub().resolves({ isInfected: true, viruses: ['TestVirus'] })
+      } as any);
+
+      const result = await service.executeScan('security-1');
+
+      expect(result.securityStatus).to.equal(SecurityStatusEnum.INFECTED);
+      expect(insertScanStub.calledOnce).to.be.true;
+      expect(updateScanStub.calledOnce).to.be.true;
+      expect(updateScanStub.firstCall.args[1].scan_status).to.equal(ProcessStatusStatusEnum.COMPLETED);
+    });
+
+    it('should update security status to INFECTED when ClamAV detects malware', async () => {
+      sinon.stub(ArtifactSecurityRepository.prototype, 'getArtifactSecurity').resolves(mockSecurityRecord);
+      sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
+      sinon
+        .stub(ArtifactSecurityScanService.prototype, 'insertArtifactSecurityScan')
+        .resolves({ artifact_security_scan_id: 'scan-1' });
+      sinon
+        .stub(ArtifactSecurityScanService.prototype, 'updateArtifactSecurityScan')
+        .resolves({ artifact_security_scan_id: 'scan-1' });
+
+      // Use callsFake to capture what the code passes, rather than pre-determining the result
+      const updateSecurityStub = sinon
+        .stub(ArtifactSecurityRepository.prototype, 'updateArtifactSecurity')
+        .callsFake(async (id, data) => ({
+          artifact_security_id: id,
+          artifact_id: mockArtifact.artifact_id,
+          security: data.security as SecurityStatusEnum
+        }));
+
+      sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from('test-data'));
+
+      // KEY INPUT: ClamAV says infected
+      sinon.stub(fileUtils, '_getClamAvScanner').resolves({
+        scanStream: sinon.stub().resolves({ isInfected: true, viruses: ['TestVirus'] })
+      } as any);
+
+      const result = await service.executeScan('security-1');
+
+      // Verify the DECISION: code should pass INFECTED to updateArtifactSecurity
+      expect(updateSecurityStub.calledOnce).to.be.true;
+      expect(updateSecurityStub.firstCall.args[1]).to.deep.equal({
+        security: SecurityStatusEnum.INFECTED
+      });
+
+      // Verify the result reflects the decision
+      expect(result.securityStatus).to.equal(SecurityStatusEnum.INFECTED);
+    });
+
+    it('should call handleCleanScanResult on clean scan', async () => {
+      sinon.stub(ArtifactSecurityRepository.prototype, 'getArtifactSecurity').resolves(mockSecurityRecord);
+      sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
+      sinon
+        .stub(ArtifactSecurityScanService.prototype, 'insertArtifactSecurityScan')
+        .resolves({ artifact_security_scan_id: 'scan-1' });
+      sinon
+        .stub(ArtifactSecurityScanService.prototype, 'updateArtifactSecurityScan')
+        .resolves({ artifact_security_scan_id: 'scan-1' });
+      sinon
+        .stub(ArtifactSecurityRepository.prototype, 'updateArtifactSecurity')
+        .resolves({ ...mockSecurityRecord, security: SecurityStatusEnum.CLEAN });
+
+      sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from('test-data'));
+      sinon.stub(fileUtils, '_getClamAvScanner').resolves({
+        scanStream: sinon.stub().resolves({ isInfected: false })
+      } as any);
+
+      const promoteStub = sinon.stub(ObjectStorageService.prototype, 'promoteFromSecurity').resolves({ key: 'test.tar' });
+      sinon.stub(UploadArchiveService.prototype, 'getUploadArchiveByArtifactId').resolves(null);
+
+      await service.executeScan('security-1');
+
+      expect(promoteStub.calledOnceWith('uploads/test.tar')).to.be.true;
+    });
+
+    it('should update scan record to FAILED on error and rethrow', async () => {
+      const testError = new Error('ClamAV connection failed');
+
+      sinon.stub(ArtifactSecurityRepository.prototype, 'getArtifactSecurity').resolves(mockSecurityRecord);
+      sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
+      sinon
+        .stub(ArtifactSecurityScanService.prototype, 'insertArtifactSecurityScan')
+        .resolves({ artifact_security_scan_id: 'scan-1' });
+      const updateScanStub = sinon
+        .stub(ArtifactSecurityScanService.prototype, 'updateArtifactSecurityScan')
+        .resolves({ artifact_security_scan_id: 'scan-1' });
+
+      sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from('test-data'));
+      sinon.stub(fileUtils, '_getClamAvScanner').rejects(testError);
+
+      try {
+        await service.executeScan('security-1');
+        expect.fail('Expected error not thrown');
+      } catch (err) {
+        expect(err).to.equal(testError);
+        expect(updateScanStub.calledWith('scan-1', sinon.match({ scan_status: ProcessStatusStatusEnum.FAILED }))).to.be
+          .true;
+        expect(updateScanStub.lastCall.args[1].results).to.deep.include({ error: 'ClamAV connection failed' });
+      }
+    });
+  });
+
+  describe('handleCleanScanResult', () => {
+    it('should promote file from security bucket to main bucket', async () => {
+      const promoteStub = sinon.stub(ObjectStorageService.prototype, 'promoteFromSecurity').resolves({ key: 'test.tar' });
+      sinon.stub(UploadArchiveService.prototype, 'getUploadArchiveByArtifactId').resolves(null);
+
+      await service.handleCleanScanResult('artifact-1', 'uploads/test.tar');
+
+      expect(promoteStub.calledOnceWith('uploads/test.tar')).to.be.true;
+    });
+
+    it('should update upload_archive status to PENDING if archive exists', async () => {
+      const mockUploadArchive: UploadArchive = {
+        upload_archive_id: 'archive-1',
+        upload_id: 'upload-1',
+        artifact_id: 'artifact-1',
+        archive_status: ProcessStatusStatusEnum.BLOCKED
+      };
+      sinon.stub(ObjectStorageService.prototype, 'promoteFromSecurity').resolves({ key: 'test.tar' });
+      sinon.stub(UploadArchiveService.prototype, 'getUploadArchiveByArtifactId').resolves(mockUploadArchive);
+      const updateArchiveStub = sinon.stub(UploadArchiveService.prototype, 'updateUploadArchive').resolves({
+        upload_archive_id: 'archive-1'
+      });
+
+      await service.handleCleanScanResult('artifact-1', 'uploads/test.tar');
+
+      expect(updateArchiveStub.calledOnceWith('archive-1', { archive_status: ProcessStatusStatusEnum.PENDING })).to.be
+        .true;
+    });
+
+    it('should handle missing upload_archive gracefully', async () => {
+      sinon.stub(ObjectStorageService.prototype, 'promoteFromSecurity').resolves({ key: 'test.tar' });
+      sinon.stub(UploadArchiveService.prototype, 'getUploadArchiveByArtifactId').resolves(null);
+      const updateArchiveStub = sinon.stub(UploadArchiveService.prototype, 'updateUploadArchive');
+
+      await service.handleCleanScanResult('artifact-1', 'uploads/test.tar');
+
+      expect(updateArchiveStub.called).to.be.false;
     });
   });
 });

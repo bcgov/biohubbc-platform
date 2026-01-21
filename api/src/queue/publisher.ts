@@ -4,7 +4,6 @@ import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
 import { IMalwareScanJobData } from './jobs/malware-scan-job';
 import { IProcessSubmissionFeaturesJobData } from './jobs/process-submission-features-job';
-import { ITestJobData } from './jobs/test-job';
 import { getPgBoss } from './pg-boss-service';
 
 const defaultLog = getLogger('queue/publisher');
@@ -28,13 +27,6 @@ export interface IPublishOptions {
   /** Job priority (higher = processed first) */
   priority?: number;
 }
-
-const DEFAULT_OPTIONS: IPublishOptions = {
-  retryLimit: 2,
-  retryDelay: 60,
-  retryBackoff: true,
-  expireInSeconds: 60 * 60 // 1 hour
-};
 
 /**
  * Result of publishing a job.
@@ -66,35 +58,6 @@ const MALWARE_SCAN_OPTIONS: IPublishOptions = {
   retryDelay: 60,
   retryBackoff: true,
   expireInSeconds: 60 * 60 // 60 minutes
-};
-
-/**
- * Publish a test job to the queue.
- *
- * This is a template demonstrating the pattern for publishing jobs.
- * Create similar functions for each job type.
- *
- * @param {ITestJobData} data Job data
- * @param {IPublishOptions} [options={}] Job options
- * @return {*}  {(Promise<string | null>)} Job ID if successful, null otherwise
- */
-export const publishTestJob = async (data: ITestJobData, options: IPublishOptions = {}): Promise<string | null> => {
-  const boss = getPgBoss();
-  const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
-
-  // Ensure queue exists before sending jobs
-  await boss.createQueue(JobQueues.TEST);
-
-  const jobId = await boss.send(JobQueues.TEST, data, mergedOptions);
-
-  defaultLog.info({
-    label: 'publishTestJob',
-    message: 'Job published',
-    jobId,
-    data
-  });
-
-  return jobId;
 };
 
 /**

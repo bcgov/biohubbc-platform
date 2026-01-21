@@ -75,6 +75,17 @@ export class UploadArchiveService extends DBService {
   }
 
   /**
+   * Retrieves an upload archive record by artifact ID.
+   *
+   * @param {string} artifactId The ID of the artifact
+   * @return {Promise<UploadArchive | null>} The upload archive record or null if not found
+   * @memberof UploadArchiveService
+   */
+  async getUploadArchiveByArtifactId(artifactId: string): Promise<UploadArchive | null> {
+    return this.uploadArchiveRepository.getUploadArchiveByArtifactId(artifactId);
+  }
+
+  /**
    * Deletes an upload archive record by its ID.
    *
    * @param {string} uploadArchiveId The ID of the upload archive record to delete

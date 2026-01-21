@@ -120,7 +120,7 @@ export class UploadIngestionService extends DBService {
     // 1. Ensure the caller is allowed to complete this upload
     await this._authorizeUploadCompletion(uploadId, s3UploadId);
 
-    // Update upload status, artifact statuses, and enqueue for security scanning
+    // Update upload status, artifact statuses, and create security records
     const [, , securityRecords] = await Promise.all([
       // 2. Update upload status to completed
       this.uploadService.updateUpload(uploadId, {
@@ -131,20 +131,15 @@ export class UploadIngestionService extends DBService {
         artifact_status: ArtifactStatusEnum.UPLOADED,
         uploaded_at: dayjs().toISOString()
       }),
-      // 4. Enqueue all artifacts for malware scanning
+      // 4. Create artifact_security records for malware scanning
       this.artifactSecurityService.insertArtifactSecurityByUploadId(uploadId, {
         security: SecurityStatusEnum.PENDING
       }),
-      // 5. Enqueue archives for extraction, but with status = BLOCKED since malware scan must complete first
+      // 5. Block archives for extraction until malware scan completes
       this.uploadArchiveService.updateUploadArchivesByUploadId(uploadId, {
         archive_status: ProcessStatusStatusEnum.BLOCKED
       })
     ]);
-
-    // Publish malware jobs, but do not throw on error to avoid blocking upload completion
-    await Promise.all(
-      securityRecords.map((record) => publishMalwareScanJob({ artifactSecurityId: record.artifact_security_id }))
-    );
 
     // 6. Complete the multipart upload in the security bucket
     const s3Client = getSecurityS3Client();
@@ -155,6 +150,11 @@ export class UploadIngestionService extends DBService {
         UploadId: s3UploadId,
         MultipartUpload: { Parts: parts }
       })
+    );
+
+    // 7. Publish malware scan jobs for each artifact_security record
+    await Promise.all(
+      securityRecords.map((record) => publishMalwareScanJob({ artifactSecurityId: record.artifact_security_id }))
     );
   }
 
