@@ -166,12 +166,20 @@ services:
 
   # Build the clamav docker image
   clamav:
-    image: mkodockx/docker-clamav:latest
+    image: clamav/clamav-debian:latest
     container_name: ${DOCKER_PROJECT_NAME}-clamav-${DOCKER_NAMESPACE}-container
     ports:
       - ${CLAMAV_PORT}:3310
+    volumes:
+      - clamav_db:/var/lib/clamav
     networks:
       - biohubbc-network
+    healthcheck:
+      test: ["CMD", "clamdscan", "--ping", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s  # ClamAV takes ~2 min to load virus definitions
 
   ## Build the app docker image
   app:
@@ -237,3 +245,5 @@ networks:
 volumes:
   postgres:
     name: ${DOCKER_PROJECT_NAME}-db-${DOCKER_NAMESPACE}-vol
+  clamav_db:
+    name: ${DOCKER_PROJECT_NAME}-clamav-${DOCKER_NAMESPACE}-vol

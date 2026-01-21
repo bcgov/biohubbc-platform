@@ -365,7 +365,7 @@ describe('UploadIngestionService', () => {
       }
     });
 
-    it('should throw if S3 multipart completion fails', async () => {
+    it('should throw if S3 multipart completion fails and should NOT publish malware jobs', async () => {
       sinon.stub(UploadService.prototype, 'getUpload').resolves(mockUpload);
 
       sinon.stub(UploadService.prototype, 'updateUpload').resolves({ upload_id: 'upload-456' });
@@ -388,6 +388,10 @@ describe('UploadIngestionService', () => {
         expect.fail('Expected error not thrown');
       } catch (err) {
         expect((err as Error).message).to.include('S3 API error');
+
+        // Verify no malware jobs were published since S3 failed before job publishing
+        const publishStub = publisher.publishMalwareScanJob as sinon.SinonStub;
+        expect(publishStub.called).to.be.false;
       }
     });
   });
