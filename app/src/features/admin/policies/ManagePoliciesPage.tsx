@@ -89,11 +89,11 @@ export const ManagePoliciesPage = () => {
   }, [teamPoliciesPaginationModel, teamPoliciesSortModel]);
 
   // Data loaders
-  const policiesDataLoader = useDataLoader((pagination: ApiPaginationRequestOptions, search?: string) =>
+  const policiesDataLoader = useDataLoader((search: string | undefined, pagination: ApiPaginationRequestOptions) =>
     biohubApi.policies.getPolicies({ search }, pagination)
   );
 
-  const teamsDataLoader = useDataLoader((pagination: ApiPaginationRequestOptions, search?: string) =>
+  const teamsDataLoader = useDataLoader((search: string | undefined, pagination: ApiPaginationRequestOptions) =>
     biohubApi.teams.getTeams({ search }, pagination)
   );
 
@@ -103,8 +103,8 @@ export const ManagePoliciesPage = () => {
 
   // Load data on mount
   useEffect(() => {
-    policiesDataLoader.load(policiesPagination, debouncedPolicySearchTerm);
-    teamsDataLoader.load(teamsPagination, debouncedTeamSearchTerm);
+    policiesDataLoader.load(debouncedPolicySearchTerm, policiesPagination);
+    teamsDataLoader.load(debouncedTeamSearchTerm, teamsPagination);
     teamPoliciesDataLoader.load(teamPoliciesPagination);
   }, [
     teamPoliciesDataLoader,
@@ -119,13 +119,13 @@ export const ManagePoliciesPage = () => {
 
   // Refresh policies when pagination/sort changes
   useEffect(() => {
-    policiesDataLoader.refresh(policiesPagination, debouncedPolicySearchTerm);
+    policiesDataLoader.refresh(debouncedPolicySearchTerm, policiesPagination);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [policiesPagination]);
 
   // Refresh teams when pagination/sort changes
   useEffect(() => {
-    teamsDataLoader.refresh(teamsPagination, debouncedTeamSearchTerm);
+    teamsDataLoader.refresh(debouncedTeamSearchTerm, teamsPagination);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamsPagination]);
 
@@ -166,7 +166,7 @@ export const ManagePoliciesPage = () => {
     () =>
       debounce((term: string, pagination: ApiPaginationRequestOptions) => {
         setDebouncedPolicySearchTerm(term);
-        policiesDataLoader.refresh(pagination, term);
+        policiesDataLoader.refresh(term, pagination);
       }, 300),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -176,7 +176,7 @@ export const ManagePoliciesPage = () => {
     () =>
       debounce((term: string, pagination: ApiPaginationRequestOptions) => {
         setDebouncedTeamSearchTerm(term);
-        teamsDataLoader.refresh(pagination, term);
+        teamsDataLoader.refresh(term, pagination);
       }, 300),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -215,12 +215,12 @@ export const ManagePoliciesPage = () => {
 
   // Refresh handlers
   const refreshPolicies = useCallback(() => {
-    policiesDataLoader.refresh(policiesPagination, debouncedPolicySearchTerm);
+    policiesDataLoader.refresh(debouncedPolicySearchTerm, policiesPagination);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedPolicySearchTerm, policiesPagination]);
 
   const refreshTeams = useCallback(() => {
-    teamsDataLoader.refresh(teamsPagination, debouncedTeamSearchTerm);
+    teamsDataLoader.refresh(debouncedTeamSearchTerm, teamsPagination);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedTeamSearchTerm, teamsPagination]);
 
