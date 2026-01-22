@@ -1,34 +1,16 @@
 import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
 import { useCallback } from 'react';
+import { SidebarOption } from '../components/section/option/SearchSidebarOption';
+import { SearchSidebarSection } from '../components/section/SearchSidebarSection';
 import { useFeatureSearch } from '../hooks/useFeatureSearch';
 import { RecommendedFiltersState } from '../hooks/useRecommendedFilters';
-import { SidebarOption } from '../section/option/SearchSidebarOption';
-import { SearchSidebarSection } from '../section/SearchSidebarSection';
 
 interface SearchSidebarFeatureTypesProps {
-  /**
-   * {@type RecommendedFiltersState} recommended - Recommended filter options
-   */
   recommended: RecommendedFiltersState;
-  /**
-   * {@type SidebarOption[]} featureTypeOptions - Available feature type options
-   */
   featureTypeOptions: SidebarOption[];
-  /**
-   * {@type string[]} selectedValues - Currently selected feature type values
-   */
   selectedValues: string[];
-  /**
-   * {@type Set<string | number>} omitListedRecommendedIds - Omitted recommended IDs
-   */
   omitListedRecommendedIds: Set<string | number>;
-  /**
-   * {@type (param: UrlParamKey, value: string, replace?: boolean) => void} onFilterChange - Callback for filter changes
-   */
   onFilterChange: (update: { param: UrlParamKey; value: string; replace?: boolean }) => void;
-  /**
-   * {@type (id: string | number) => void} onOmitListRecommended - Callback for omitting recommended items
-   */
   onOmitListRecommended: (id: string | number) => void;
 }
 

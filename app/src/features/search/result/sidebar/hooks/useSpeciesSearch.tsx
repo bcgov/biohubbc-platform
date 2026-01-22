@@ -12,7 +12,9 @@ export interface ISpeciesSearchOption {
 
 /**
  * Hook for searching species with debounced API requests.
- * Returns rows, loading state, and a search handler.
+ * Returns rows, loading state, and a search handler for keyword-based searches.
+ * @param {number} [debounceMs=300] - Debounce delay for search queries in milliseconds
+ * @returns {Object} Object containing rows, isLoading, and handleSearch
  */
 export const useSpeciesSearch = (debounceMs = 300) => {
   const api = useApi();
@@ -24,9 +26,7 @@ export const useSpeciesSearch = (debounceMs = 300) => {
       if (!query) {
         return [];
       }
-
       const data = await api.taxonomy.searchSpecies(query);
-
       return (
         data.searchResponse?.map((item) => ({
           label: item.scientificName,
@@ -45,6 +45,10 @@ export const useSpeciesSearch = (debounceMs = 300) => {
   // Debounced refresh
   const debouncedRefreshRef = useRef(debounce((query: string) => loader.refresh(query), debounceMs)).current;
 
+  /**
+   * Search for species by keyword with debouncing
+   * @param {string} query - The search keyword
+   */
   const handleSearch = useCallback(
     (query: string) => {
       debouncedRefreshRef(query);

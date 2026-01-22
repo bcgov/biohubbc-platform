@@ -2,7 +2,7 @@ import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { debounce } from 'lodash-es';
 import { useCallback, useEffect, useRef } from 'react';
-import { SidebarOption } from '../section/option/SearchSidebarOption';
+import { SidebarOption } from '../components/section/option/SearchSidebarOption';
 
 /**
  * Hook for searching features locally with debounced filtering.

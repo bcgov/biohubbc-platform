@@ -2,7 +2,7 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { ISearchPropertyFilters } from 'interfaces/useSearchApi.interface';
 import { useCallback, useRef, useState } from 'react';
-import { SidebarOption } from '../section/option/SearchSidebarOption';
+import { SidebarOption } from '../components/section/option/SearchSidebarOption';
 
 /**
  * Recommended filters state

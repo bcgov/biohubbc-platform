@@ -1,31 +1,16 @@
 import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
 import { TypedURLSearchParams } from 'hooks/useSearchQuery';
 import { useCallback, useMemo } from 'react';
+import { SidebarOption } from '../components/section/option/SearchSidebarOption';
+import { SearchSidebarSection } from '../components/section/SearchSidebarSection';
 import { usePropertySearch } from '../hooks/usePropertySearch';
 import { RecommendedFiltersState } from '../hooks/useRecommendedFilters';
-import { SidebarOption } from '../section/option/SearchSidebarOption';
-import { SearchSidebarSection } from '../section/SearchSidebarSection';
 
 interface SearchSidebarPropertiesProps {
-  /**
-   * {@type RecommendedFiltersState} recommended - Recommended filter options
-   */
   recommended: RecommendedFiltersState;
-  /**
-   * {@type TypedURLSearchParams} queryParams - Current query parameters
-   */
   queryParams: TypedURLSearchParams<Record<string, string>>;
-  /**
-   * {@type Set<string | number>} omitListedRecommendedIds - Omitted recommended IDs
-   */
   omitListedRecommendedIds: Set<string | number>;
-  /**
-   * {@type (param: UrlParamKey, value: string, replace?: boolean) => void} onFilterChange - Callback for filter changes
-   */
   onFilterChange: (update: { param: UrlParamKey; value: string; replace?: boolean }) => void;
-  /**
-   * {@type (id: string | number) => void} onOmitListRecommended - Callback for omitting recommended items
-   */
   onOmitListRecommended: (id: string | number) => void;
 }
 
@@ -42,7 +27,7 @@ export const SearchSidebarProperties = ({
   onFilterChange,
   onOmitListRecommended
 }: SearchSidebarPropertiesProps) => {
-  const { rows: propertyRows, handleSearch: handlePropertySearch } = usePropertySearch();
+  const { rows: propertyRows, handleSearch } = usePropertySearch();
 
   /**
    * Get property params by filtering out pagination and metadata params
@@ -107,9 +92,9 @@ export const SearchSidebarProperties = ({
    */
   const handlePropertySearch = useCallback(
     (query: string) => {
-      handlePropertySearch({ keyword: query, feature_types: selectedFeatureTypes });
+      handleSearch({ keyword: query, feature_types: selectedFeatureTypes });
     },
-    [handlePropertySearch, selectedFeatureTypes]
+    [handleSearch, selectedFeatureTypes]
   );
 
   return (

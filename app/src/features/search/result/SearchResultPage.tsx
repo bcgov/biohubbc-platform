@@ -124,7 +124,9 @@ export const SearchResultPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, featureType, allFeatureTypes]);
 
-  // REMOVE RECOMMENDED: omitList it, deselect if selected, and trigger search
+  /**
+   * REMOVE RECOMMENDED: omitList it, deselect if selected, and trigger search
+   */
   const handleOmitListRecommended = useCallback(
     (type: keyof OmitListedRecommendedState, id: string | number) => {
       const normalizedId = normalizeValue(id);
@@ -152,7 +154,9 @@ export const SearchResultPage = () => {
     [searchParams, removeParamValue, normalizeValue]
   );
 
-  // UPDATE FILTERS: select/deselect options from query params
+  /**
+   * UPDATE FILTERS: select/deselect options from query params
+   */
   const handleFilterChange = useCallback(
     ({ param, value, replace }: { param: UrlParamKey; value: string; replace?: boolean }) => {
       const normalizedValue = normalizeValue(value);
@@ -182,6 +186,9 @@ export const SearchResultPage = () => {
   const activeSort = pagination?.sort ?? 'relevancy_score';
   const sortOrder = pagination?.order ?? 'desc';
 
+  /**
+   * Handle sort option changes
+   */
   const handleSortChange = useCallback(
     (sort: string) => {
       if (sort === activeSort) {

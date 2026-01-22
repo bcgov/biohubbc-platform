@@ -9,7 +9,7 @@ import {
 } from 'interfaces/useSearchApi.interface';
 import { debounce } from 'lodash-es';
 import { useCallback, useEffect, useRef } from 'react';
-import { SidebarOption } from '../section/option/SearchSidebarOption';
+import { SidebarOption } from '../components/section/option/SearchSidebarOption';
 
 /**
  * Hook for searching properties with debounced API requests.

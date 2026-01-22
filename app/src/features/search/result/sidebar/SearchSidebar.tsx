@@ -1,149 +1,85 @@
 import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
 import { TypedURLSearchParams } from 'hooks/useSearchQuery';
-import { useCallback, useEffect, useMemo } from 'react';
-import { SidebarHeader } from './header/SearchSidebarHeader';
-import { useFeatureSearch } from './hooks/useFeatureSearch';
-import { usePropertySearch } from './hooks/usePropertySearch';
+import { useMemo } from 'react';
+import { SidebarOption } from './components/section/option/SearchSidebarOption';
+import { SearchSidebarFeatureTypes } from './feature-type/SearchSidebarFeatureType';
 import { OmitListedRecommendedState, RecommendedFiltersState } from './hooks/useRecommendedFilters';
-import { useSpeciesSearch } from './hooks/useSpeciesSearch';
-import { SidebarOption } from './section/option/SearchSidebarOption';
-import { SearchSidebarSection } from './section/SearchSidebarSection';
+import { SearchSidebarProperties } from './property/SearchSidebarProperty';
+import { SearchSidebarSpecies } from './species/SearchSidebarSpecies';
+import { SidebarHeader } from './components/header/SearchSidebarHeader';
 
 interface SearchSidebarProps {
+  /**
+   * {@type RecommendedFiltersState} recommended - Recommended filter options for all sections
+   */
   recommended: RecommendedFiltersState;
+  /**
+   * {@type SidebarOption[]} featureTypeOptions - Available feature type options
+   */
   featureTypeOptions: SidebarOption[];
+  /**
+   * {@type TypedURLSearchParams} queryParams - Current query parameters
+   */
   queryParams: TypedURLSearchParams<Record<string, string>>;
+  /**
+   * {@type OmitListedRecommendedState} omitListedRecommended - Omitted recommended items per session
+   */
   omitListedRecommended: OmitListedRecommendedState;
+  /**
+   * {@type (update: {param: UrlParamKey; value: string; replace?: boolean}) => void} onFilterChange - Callback for filter changes
+   */
   onFilterChange: (update: { param: UrlParamKey; value: string; replace?: boolean }) => void;
+  /**
+   * {@type (type: keyof OmitListedRecommendedState, id: string | number) => void} onOmitListRecommended - Callback for omitting recommended items
+   */
   onOmitListRecommended: (type: keyof OmitListedRecommendedState, id: string | number) => void;
 }
 
 /**
  * Renders sidebar for applying filters to the search
+ * Manages feature types, species, and properties filter sections
  * @param {SearchSidebarProps} props
  * @returns {*}
  */
-export const SearchSidebar = (props: SearchSidebarProps) => {
-  const { recommended, featureTypeOptions, queryParams, omitListedRecommended, onFilterChange, onOmitListRecommended } =
-    props;
+export const SearchSidebar = ({
+  recommended,
+  featureTypeOptions,
+  queryParams,
+  omitListedRecommended,
+  onFilterChange,
+  onOmitListRecommended
+}: SearchSidebarProps) => {
+  const selectedFeatureTypes = useMemo(() => queryParams.getAll(URL_PARAMS.FEATURE_TYPE).map(String), [queryParams]);
 
-  /**
-   * Search handlers for finding filter options, independent of the main search results.
-   * Main search results are only updated when an option is selected.
-   */
-  const { rows: speciesOptions, handleSearch: handleSpeciesSearch } = useSpeciesSearch();
-  const { rows: featureRows, handleSearch: handleFeatureSearch } = useFeatureSearch(featureTypeOptions);
-  const { rows: propertyRows, handleSearch: handlePropertySearch } = usePropertySearch();
-
-  const selectedFeatureTypes = useMemo(() => queryParams.getAll(URL_PARAMS.FEATURE_TYPE), [queryParams]);
   const selectedSpecies = useMemo(() => queryParams.getAll(URL_PARAMS.SPECIES), [queryParams]);
-
-  /**
-   * Get property params by filtering out pagination and metadata params
-   * @returns {string[]} Array of property parameter keys
-   */
-  const selectedProperties = useMemo(() => {
-    const EXCLUDED_PARAMS = new Set([
-      URL_PARAMS.SEARCH_QUERY,
-      URL_PARAMS.FEATURE_TYPE,
-      URL_PARAMS.SPECIES,
-      URL_PARAMS.PAGE,
-      URL_PARAMS.LIMIT,
-      URL_PARAMS.SORT,
-      URL_PARAMS.ORDER
-    ]);
-
-    return Array.from(queryParams.keys()).filter((key) => !EXCLUDED_PARAMS.has(key as UrlParamKey));
-  }, [queryParams]);
-
-  /**
-   * Load selected species that aren't in the options array yet
-   * by searching for them via their TSN
-   */
-  useEffect(() => {
-    selectedSpecies.forEach((tsn) => {
-      // Check if this TSN is already in the options
-      const isInOptions = speciesOptions.some((opt) => String(opt.value) === tsn);
-
-      // If not in options, search for it to load the full option with label
-      if (!isInOptions) {
-        handleSpeciesSearch(tsn);
-      }
-    });
-  }, [selectedSpecies, speciesOptions, handleSpeciesSearch]);
-
-  /**
-   * SELECT: add to query params, trigger search with this filter
-   */
-  const handleSelectOption = useCallback(
-    (param: UrlParamKey, option: SidebarOption) => {
-      onFilterChange({
-        param,
-        value: String(option.value),
-        replace: false // appends the value, for arrays like ?q=456&q=789
-      });
-    },
-    [onFilterChange]
-  );
-
-  /**
-   * DESELECT: remove from query params, trigger search without this filter
-   */
-  const handleDeselectOption = useCallback(
-    (param: UrlParamKey, value: string | number) => {
-      onFilterChange({
-        param,
-        value: String(value),
-        replace: undefined
-      });
-    },
-    [onFilterChange]
-  );
 
   return (
     <>
       <SidebarHeader title="Filters" />
 
-      <SearchSidebarSection
-        title="Feature Types"
-        options={featureRows}
-        recommendedOptions={recommended.feature_types}
-        selectedValues={selectedFeatureTypes.map(String)}
+      <SearchSidebarFeatureTypes
+        recommended={recommended}
+        featureTypeOptions={featureTypeOptions}
+        selectedValues={selectedFeatureTypes}
         omitListedRecommendedIds={omitListedRecommended.feature_types}
-        searchPlaceholder="Search features..."
-        checkbox
-        onSearch={handleFeatureSearch}
-        onSelectOption={(opt) => handleSelectOption(URL_PARAMS.FEATURE_TYPE, opt)}
-        onDeselectOption={(opt) => handleDeselectOption(URL_PARAMS.FEATURE_TYPE, opt.value)}
-        onRemoveRecommendedOption={(id) => onOmitListRecommended('feature_types', id)}
+        onFilterChange={onFilterChange}
+        onOmitListRecommended={(id) => onOmitListRecommended('feature_types', id)}
       />
 
-      <SearchSidebarSection
-        title="Species"
-        options={speciesOptions}
-        recommendedOptions={recommended.species}
+      <SearchSidebarSpecies
+        recommended={recommended}
         selectedValues={selectedSpecies}
         omitListedRecommendedIds={omitListedRecommended.species}
-        searchPlaceholder="Search species..."
-        checkbox
-        onSearch={handleSpeciesSearch}
-        onSelectOption={(opt) => handleSelectOption(URL_PARAMS.SPECIES, opt)}
-        onDeselectOption={(opt) => handleDeselectOption(URL_PARAMS.SPECIES, opt.value)}
-        onRemoveRecommendedOption={(id) => onOmitListRecommended('species', id)}
+        onFilterChange={onFilterChange}
+        onOmitListRecommended={(id) => onOmitListRecommended('species', id)}
       />
 
-      <SearchSidebarSection
-        title="Properties"
-        options={propertyRows}
-        recommendedOptions={recommended.properties}
-        selectedValues={selectedProperties.map(String)}
+      <SearchSidebarProperties
+        recommended={recommended}
+        queryParams={queryParams}
         omitListedRecommendedIds={omitListedRecommended.properties}
-        searchPlaceholder="Search properties..."
-        checkbox
-        onSearch={(query) => handlePropertySearch({ keyword: query, feature_types: selectedFeatureTypes })}
-        onSelectOption={(opt) => handleSelectOption(String(opt.value) as UrlParamKey, opt)}
-        onDeselectOption={(opt) => handleDeselectOption(String(opt.value) as UrlParamKey, opt.value)}
-        onRemoveRecommendedOption={(id) => onOmitListRecommended('properties', id)}
+        onFilterChange={onFilterChange}
+        onOmitListRecommended={(id) => onOmitListRecommended('properties', id)}
       />
     </>
   );
