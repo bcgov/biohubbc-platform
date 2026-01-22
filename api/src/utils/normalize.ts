@@ -41,7 +41,7 @@ export const normalizeSearchValue = (
       return val; // string[]
     }
     // Mixed array → normalize to string[]
-    return val.map((v) => String(v)) as string[];
+    return val.map(String);
   }
   // Scalars returned as-is
   return val;
