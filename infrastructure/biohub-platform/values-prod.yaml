@@ -106,7 +106,7 @@ biohub-platform-api:
   app:
     nodeEnv: production
     nodeOptions: --max_old_space_size=4500  # 75% of 6Gi memory limit
-    appHost: sims.nrs.gov.bc.ca  # Vanity URL for prod
+    appHost: biohub-platform.apps.silver.devops.gov.bc.ca
 
     # Keycloak
     keycloak:
@@ -141,3 +141,35 @@ biohub-platform-api:
   # Route configuration (OpenShift)
   route:
     host: api-biohub-platform.apps.silver.devops.gov.bc.ca
+
+# Values passed to biohub-platform-queue subchart
+biohub-platform-queue:
+  environment:
+    licensePlate: "a0ec71"
+    name: prod
+    id: deploy
+    # changeId will be dynamically set
+    ts: ""
+
+  # Queue worker configuration
+  app:
+    nodeEnv: production
+    nodeOptions: --max_old_space_size=1024
+    # objectStore.keyPrefix will be dynamically set: "biohub"
+
+    # Logging
+    logging:
+      level: silent
+      levelFile: debug
+      fileMaxFiles: 30
+
+  # Openshift Resources
+  # Workers can scale horizontally - maintenance is handled by queue-supervisor
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi

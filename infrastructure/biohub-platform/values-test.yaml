@@ -30,14 +30,14 @@ biohub-platform-app:
   # App configuration
   app:
     nodeEnv: production
-    apiHost: api-biohub-platform.apps.silver.devops.gov.bc.ca
+    apiHost: api-test-biohub-platform.apps.silver.devops.gov.bc.ca
 
     # Siteminder
-    siteminderLogoutURL: "https://logon7.gov.bc.ca/clp-cgi/logoff.cgi"
+    siteminderLogoutURL: "https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi"
 
     # Keycloak
     keycloak:
-      host: "https://loginproxy.gov.bc.ca/auth"
+      host: "https://test.loginproxy.gov.bc.ca/auth"
     
   # Openshift Resources
   replicas: 1
@@ -148,3 +148,35 @@ biohub-platform-api:
   # Route configuration (OpenShift)
   route:
     host: api-test-biohub-platform.apps.silver.devops.gov.bc.ca
+
+# Values passed to biohub-platform-queue subchart
+biohub-platform-queue:
+  environment:
+    licensePlate: "a0ec71"
+    name: test
+    id: deploy
+    # changeId will be dynamically set
+    ts: ""
+
+  # Queue worker configuration
+  app:
+    nodeEnv: production
+    nodeOptions: --max_old_space_size=512
+    # objectStore.keyPrefix will be dynamically set: "biohub"
+
+    # Logging
+    logging:
+      level: warn
+      levelFile: debug
+      fileMaxFiles: 10
+
+  # Openshift Resources
+  # Workers can scale horizontally - maintenance is handled by queue-supervisor
+  replicas: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 512Mi
