@@ -16,6 +16,7 @@
     "queue-reload": "nodemon --watch src --ext ts --exec ts-node --files src/queue.ts",
     "test": "mocha",
     "test-watch": "mocha --watch",
+    "test:integration": "ts-node src/__integration__/malware-scan-worker.integration.ts",
     "coverage": "nyc mocha",
     "lint": "eslint .",
     "lint-fix": "eslint . --fix",
