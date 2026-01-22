@@ -39,7 +39,13 @@ describe('removeSystemUser', () => {
       update_date: null,
       revision_count: 0,
       role_ids: [1, 2],
-      role_names: ['role 1', 'role 2']
+      role_names: ['role 1', 'role 2'],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null
     });
 
     try {
@@ -78,7 +84,13 @@ describe('removeSystemUser', () => {
       update_date: null,
       revision_count: 0,
       role_ids: [1, 2],
-      role_names: ['role 1', 'role 2']
+      role_names: ['role 1', 'role 2'],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null
     });
 
     const expectedError = new Error('A database error');
@@ -118,7 +130,13 @@ describe('removeSystemUser', () => {
       update_date: null,
       revision_count: 0,
       role_ids: [1, 2],
-      role_names: ['role 1', 'role 2']
+      role_names: ['role 1', 'role 2'],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null
     });
 
     sinon.stub(UserService.prototype, 'deleteUserSystemRoles').resolves();
@@ -160,7 +178,13 @@ describe('removeSystemUser', () => {
       update_date: null,
       revision_count: 0,
       role_ids: [1, 2],
-      role_names: ['role 1', 'role 2']
+      role_names: ['role 1', 'role 2'],
+      display_name: null,
+      given_name: null,
+      family_name: null,
+      email: null,
+      agency: null,
+      notes: null
     });
 
     sinon.stub(UserService.prototype, 'deleteUserSystemRoles').resolves();

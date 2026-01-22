@@ -1,3 +1,4 @@
+import { ApiPaginationResponseParams } from 'types/misc';
 import { SECURITY_APPLIED_STATUS } from './useDatasetApi.interface';
 
 /** NET-NEW INTERFACES FOR UPDATED SCHEMA **/
@@ -44,6 +45,25 @@ export interface ISubmissionFeature {
   create_date: string;
   create_user: string;
 }
+
+type SubmissionPropertyValue =
+  | string
+  | number
+  | boolean
+  | SubmissionPropertyValue[]
+  | { [key: string]: SubmissionPropertyValue };
+
+export interface IPostSubmissionFeature {
+  feature_type: string;
+  properties: Record<string, SubmissionPropertyValue>;
+  children: IPostSubmissionFeature[];
+}
+
+export interface ISubmissionUploadPart {
+  PartNumber: number;
+  ETag: string;
+}
+
 export type SubmissionFeatureRecordWithTypeAndSecurity = {
   submission_feature_id: number;
   uuid: string;
@@ -70,6 +90,21 @@ export interface IGetSubmissionGroupedFeatureResponse {
   features: SubmissionFeatureRecordWithTypeAndSecurity[];
 }
 
+export type ISubmissionFeatureForReview = {
+  submission_feature_id: number;
+  uuid: string;
+  submission_id: number;
+  feature_type_id: number;
+  feature_type_name: string;
+  secured: boolean;
+  submission_feature_security_ids: number[];
+};
+
+export interface ISubmissionFeatureForReviewResponse {
+  features: ISubmissionFeatureForReview[];
+  pagination: ApiPaginationResponseParams;
+}
+
 export interface IGetDownloadSubmissionResponse {
   submission_feature_id: number;
   parent_submission_feature_id: number;
@@ -84,3 +119,25 @@ export type SubmissionFeatureSignedUrlPayload = {
   submissionFeatureKey: string;
   submissionFeatureValue: string;
 };
+
+export interface PresignedUrl {
+  partNumber: number;
+  url: string;
+}
+export interface PresignedUploadUrlResponse {
+  submissionId: number;
+  uploadId: string;
+  s3UploadId: string;
+  uploadArchiveId: string;
+  key: string;
+  partSizeBytes: number;
+  partCount: number;
+  presignedUrls: PresignedUrl[];
+}
+
+export interface ICreateSubmission {
+  bytes: number;
+  name: string;
+  description: string;
+  comment: string;
+}

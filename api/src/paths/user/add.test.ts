@@ -162,7 +162,13 @@ describe('user', () => {
         update_user: null,
         revision_count: 1,
         role_ids: [1],
-        role_names: []
+        role_names: [],
+        display_name: null,
+        given_name: null,
+        family_name: null,
+        email: null,
+        agency: null,
+        notes: null
       };
 
       const ensureSystemUserStub = sinon.stub(UserService.prototype, 'ensureSystemUser').resolves(mockUserObject);

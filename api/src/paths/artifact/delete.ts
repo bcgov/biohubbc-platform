@@ -3,7 +3,7 @@ import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { getDBConnection, getServiceAccountDBConnection } from '../../database/db';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
-import { ArtifactService } from '../../services/artifact-service';
+import { ArtifactService } from '../../services/old-artifact-service';
 import { getServiceClientSystemUser } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 
@@ -96,11 +96,11 @@ export function deleteArtifact(): RequestHandler {
   return async (req, res) => {
     defaultLog.debug({ label: 'deleteArtifact', message: 'request body', req_body: req.query });
 
-    const serviceClientUser = getServiceClientSystemUser(req['keycloak_token']);
+    const serviceClientUser = getServiceClientSystemUser(req.keycloak_token);
 
     const connection = serviceClientUser
       ? getServiceAccountDBConnection(serviceClientUser)
-      : getDBConnection(req['keycloak_token']);
+      : getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();

@@ -1,25 +1,23 @@
-import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
-import { Router } from 'react-router';
+import { MemoryRouter } from 'react-router';
 import { cleanup, render, waitFor } from 'test-helpers/test-utils';
+import { Mock } from 'vitest';
 import ActiveUsersList, { IActiveUsersListProps } from './ActiveUsersList';
-
-const history = createMemoryHistory();
 
 const renderContainer = (props: IActiveUsersListProps) => {
   return render(
-    <Router history={history}>
+    <MemoryRouter initialEntries={['/']}>
       <ActiveUsersList {...props} />
-    </Router>
+    </MemoryRouter>
   );
 };
 
-jest.mock('../../../hooks/useApi');
-const mockBiohubApi = useApi as jest.Mock;
+vi.mock('../../../hooks/useApi');
+const mockBiohubApi = useApi as Mock;
 
 const mockUseApi = {
   user: {
-    getRoles: jest.fn()
+    getRoles: vi.fn()
   }
 };
 
@@ -33,7 +31,7 @@ describe('ActiveUsersList', () => {
   });
 
   it('shows `No Active Users` when there are no active users', async () => {
-    const mockGetUsers = jest.fn();
+    const mockGetUsers = vi.fn();
     const { getByText } = renderContainer({
       activeUsers: [],
       refresh: mockGetUsers
@@ -45,7 +43,7 @@ describe('ActiveUsersList', () => {
   });
 
   it('shows a table row for an active user with all fields having values', async () => {
-    const mockGetUsers = jest.fn();
+    const mockGetUsers = vi.fn();
 
     const { getByText } = renderContainer({
       activeUsers: [
@@ -56,7 +54,9 @@ describe('ActiveUsersList', () => {
           record_end_date: '2020-10-10',
           identity_source: '',
           role_ids: [1, 2],
-          role_names: ['role 1', 'role 2']
+          role_names: ['role 1', 'role 2'],
+          display_name: null,
+          email: null
         }
       ],
       refresh: mockGetUsers
@@ -69,7 +69,7 @@ describe('ActiveUsersList', () => {
   });
 
   it('shows a table row for an active user with fields not having values', async () => {
-    const mockGetUsers = jest.fn();
+    const mockGetUsers = vi.fn();
     const { getByTestId } = renderContainer({
       activeUsers: [
         {
@@ -79,7 +79,9 @@ describe('ActiveUsersList', () => {
           record_end_date: '2020-10-10',
           identity_source: '',
           role_ids: [],
-          role_names: []
+          role_names: [],
+          display_name: null,
+          email: null
         }
       ],
       refresh: mockGetUsers
@@ -91,7 +93,7 @@ describe('ActiveUsersList', () => {
   });
 
   it('renders the add new users button correctly', async () => {
-    const mockGetUsers = jest.fn();
+    const mockGetUsers = vi.fn();
     const { getByTestId } = renderContainer({
       activeUsers: [],
       refresh: mockGetUsers

@@ -101,6 +101,7 @@ const appTheme = createTheme({
       },
       styleOverrides: {
         root: {
+          padding: '8px 24px',
           '&:focus': {
             outline: '2px solid #3B99FC',
             outlineOffset: '-1px'
@@ -167,11 +168,12 @@ const appTheme = createTheme({
     },
     MuiOutlinedInput: {
       styleOverrides: {
-        root: ({ ownerState, theme }) => ({
-          ...(ownerState && {
-            backgroundColor: theme.palette.grey[50]
-          })
-        })
+        root: {
+          padding: '8px 12px !important',
+          '& .MuiInputBase-input': {
+            marginLeft: '12px'
+          }
+        }
       }
     },
     MuiTable: {
@@ -207,16 +209,34 @@ const appTheme = createTheme({
       styleOverrides: {
         root: {
           fontSize: '0.875rem',
+          backgroundColor: 'transparent',
           borderWidth: 0,
           '& .MuiDataGrid-columnHeaders': {
             fontSize: '0.875rem',
             fontWeight: 700,
+            backgroundColor: 'transparent',
             color: grey[600]
           },
           '& .MuiDataGrid-columnHeader': {
             textTransform: 'uppercase',
             fontWeight: 700,
-            letterSpacing: '0.02rem'
+            letterSpacing: '0.02rem',
+            backgroundColor: 'transparent',
+            minWidth: 100
+          },
+          '& .MuiDataGrid-columnHeaderCheckbox': {
+            minWidth: '75px !important'
+          },
+          '& .MuiDataGrid-row': {
+            backgroundColor: 'transparent'
+          },
+          '& .MuiDataGrid-cell': {
+            backgroundColor: 'transparent',
+            padding: '0 4px'
+          },
+          '& .MuiDataGrid-cellCheckbox': {
+            backgroundColor: 'transparent',
+            minWidth: 75
           },
           '& .MuiLink-root': {
             fontFamily: 'inherit',

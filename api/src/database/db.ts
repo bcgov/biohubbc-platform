@@ -6,7 +6,7 @@ import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import * as UserQueries from '../queries/database/user-context-queries';
 import { SystemUser } from '../repositories/user-repository';
-import { getUserGuid, getUserIdentitySource } from '../utils/keycloak-utils';
+import { getServiceClientSystemUser, getUserGuid, getUserIdentitySource } from '../utils/keycloak-utils';
 import { getLogger } from '../utils/logger';
 import { asyncErrorWrapper, syncErrorWrapper } from './db-utils';
 
@@ -174,7 +174,7 @@ export interface IDBConnection {
  *
  * Usage Example:
  *
- * const connection = await getDBConnection(req['keycloak_token']);
+ * const connection = await getDBConnection(req.keycloak_token);
  * try {
  *   await connection.open();
  *   await connection.sql(sqlStatement1);
@@ -447,7 +447,13 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
   const _setUserContext = async () => {
     const userGuid = getUserGuid(_token);
 
-    const userIdentitySource = getUserIdentitySource(_token);
+    // Check if this is a known service client - if so, use SYSTEM identity source
+    let userIdentitySource = getUserIdentitySource(_token);
+    const serviceClientUser = getServiceClientSystemUser(_token);
+    if (serviceClientUser) {
+      // This is a known service client, use SYSTEM identity source
+      userIdentitySource = SYSTEM_IDENTITY_SOURCE.SYSTEM;
+    }
 
     if (!userGuid || !userIdentitySource) {
       throw new ApiGeneralError('Failed to identify authenticated user');

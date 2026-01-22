@@ -1,6 +1,7 @@
 import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
+import { useEffect } from 'react';
 import { useAuth } from 'react-oidc-context';
 import { coerceIdentitySource } from 'utils/authUtils';
 
@@ -36,11 +37,13 @@ function useBiohubUserWrapper(): IBiohubUserWrapper {
 
   const biohubApi = useApi();
 
-  const biohubUserDataLoader = useDataLoader(() => biohubApi.user.getUser());
+  const biohubUserDataLoader = useDataLoader(() => biohubApi.user.getOrRegisterUser());
 
-  if (auth.isAuthenticated) {
-    biohubUserDataLoader.load();
-  }
+  useEffect(() => {
+    if (auth.isAuthenticated) {
+      biohubUserDataLoader.load();
+    }
+  }, [auth.isAuthenticated, biohubUserDataLoader]);
 
   const isLoading = !biohubUserDataLoader.isReady;
 

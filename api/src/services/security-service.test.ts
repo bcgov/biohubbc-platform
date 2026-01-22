@@ -7,7 +7,7 @@ import { Artifact } from '../repositories/artifact-repository';
 import { SecurityRepository } from '../repositories/security-repository';
 import * as fileUtils from '../utils/file-utils';
 import { getMockDBConnection } from '../__mocks__/db';
-import { ArtifactService } from './artifact-service';
+import { ArtifactService } from './old-artifact-service';
 import { SecurityService } from './security-service';
 import { UserService } from './user-service';
 
@@ -568,6 +568,68 @@ describe('SecurityService', () => {
 
       expect(getArtifactsByDatasetIdStub).to.be.calledWith('datasetId');
       expect(result).to.eql(false);
+    });
+  });
+
+  describe('patchSecurityRulesOnSubmission', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const removeStub = sinon.stub(SecurityRepository.prototype, 'removeSecurityFromSubmission').resolves([]);
+
+      const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityToSubmission').resolves([]);
+
+      await service.patchSecurityRulesOnSubmission(1, [4, 5], [6, 7]);
+
+      expect(removeStub).to.be.calledWith(1, [6, 7]);
+      expect(applyStub).to.be.calledWith(1, [4, 5]);
+    });
+
+    it('should succeed when no remove rule IDs are provided', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const removeStub = sinon.stub(SecurityRepository.prototype, 'removeSecurityFromSubmission').resolves([]);
+
+      const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityToSubmission').resolves([]);
+
+      await service.patchSecurityRulesOnSubmission(1, [4, 5], []);
+
+      expect(removeStub).to.not.be.called;
+      expect(applyStub).to.be.calledWith(1, [4, 5]);
+    });
+
+    it('should succeed when no apply rule IDs are provided', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const removeStub = sinon.stub(SecurityRepository.prototype, 'removeSecurityFromSubmission').resolves([]);
+
+      const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityToSubmission').resolves([]);
+
+      await service.patchSecurityRulesOnSubmission(1, [], [6, 7]);
+
+      expect(applyStub).to.not.be.called;
+      expect(removeStub).to.be.calledWith(1, [6, 7]);
+    });
+
+    it('should succeed when both apply and remove rule IDs are empty', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const removeStub = sinon.stub(SecurityRepository.prototype, 'removeSecurityFromSubmission').resolves([]);
+
+      const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityToSubmission').resolves([]);
+
+      await service.patchSecurityRulesOnSubmission(1, [], []);
+
+      expect(removeStub).to.not.be.called;
+      expect(applyStub).to.not.be.called;
     });
   });
 

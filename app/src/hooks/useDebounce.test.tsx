@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import useDebounce from './useDebounce';
 
-const mockCallback = jest.fn();
+const mockCallback = vi.fn();
 
 describe('useDebounce', () => {
   it('should debounce repeated calls', async () => {

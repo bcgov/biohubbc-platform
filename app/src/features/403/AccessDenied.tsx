@@ -5,28 +5,28 @@ import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
-import { Redirect, useHistory } from 'react-router';
+import { Navigate, useNavigate } from 'react-router-dom';
 
 const AccessDenied = () => {
-  const history = useHistory();
-
   const authStateContext = useAuthStateContext();
+  const navigate = useNavigate();
 
   if (!authStateContext.auth.isAuthenticated) {
-    // User is not logged in
-    return <Redirect to={{ pathname: '/' }} />;
+    // User is not logged in, redirect to home
+    return <Navigate to="/" replace />;
   }
 
   return (
     <Container>
       <Box pt={6} textAlign="center">
         <Icon path={mdiAlertCircleOutline} size={2} color="#ff5252" />
-        <h1>Access Denied</h1>
-        <Typography>{`You do not have permission to access this page.`}</Typography>
+        <Typography variant="h3" component="h1" gutterBottom>
+          Access Denied
+        </Typography>
+        <Typography>You do not have permission to access this page.</Typography>
         <Box pt={4}>
           <Button
-            onClick={() => history.push('/')}
-            type="submit"
+            onClick={() => navigate('/')}
             size="large"
             variant="contained"
             color="primary"

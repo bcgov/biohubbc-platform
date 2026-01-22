@@ -6,7 +6,7 @@ import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
 import { SubmissionFeatureRecord } from '../../repositories/submission-repository';
 import { SystemUser } from '../../repositories/user-repository';
-import { ArtifactService } from '../../services/artifact-service';
+import { ArtifactService } from '../../services/old-artifact-service';
 import * as keycloakUtils from '../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import { intakeArtifact } from './intake';
@@ -161,6 +161,7 @@ describe('intakeArtifact', () => {
     const uploadArtifactResponse: SubmissionFeatureRecord = {
       submission_feature_id: 1,
       uuid: '456-234-345',
+      urn: 'urn:2:artifact:1',
       submission_id: 2,
       feature_type_id: 3,
       source_id: 'source-id',

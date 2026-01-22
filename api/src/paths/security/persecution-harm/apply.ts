@@ -86,7 +86,7 @@ POST.apiDoc = {
 export function applySecurityRulesToArtifacts(): RequestHandler {
   return async (req, res) => {
     defaultLog.debug({ label: 'applySecurityRulesToArtifacts', message: 'request body', req_body: req.body });
-    const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
+    const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     const { artifactIds, securityReasonIds } = req.body;
 

@@ -4,8 +4,8 @@ import { ApiError, ApiErrorType } from '../errors/api-error';
 import { IgcNotifyGenericMessage, IgcNotifyPostReturn } from '../interfaces/gcnotify.interface';
 import { getLogger } from '../utils/logger';
 import { formatPhoneNumber, makeLoginUrl } from '../utils/string-utils';
-import { ArtifactService } from './artifact-service';
 import { DBService } from './db-service';
+import { ArtifactService } from './old-artifact-service';
 
 export interface ISubmitArtifactRequestAccess {
   fullName: string;

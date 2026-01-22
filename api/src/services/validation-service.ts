@@ -1,12 +1,8 @@
 import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
+import { FeatureProperty } from '../models/feature-type';
 import { ISubmissionFeature } from '../repositories/submission-repository';
-import {
-  FeatureProperties,
-  IInsertStyleSchema,
-  IStyleModel,
-  ValidationRepository
-} from '../repositories/validation-repository';
+import { IInsertStyleSchema, IStyleModel, ValidationRepository } from '../repositories/validation-repository';
 import { getLogger } from '../utils/logger';
 import { GeoJSONFeatureCollectionZodSchema } from '../zod-schema/geoJsonZodSchema';
 import { DBService } from './db-service';
@@ -15,13 +11,13 @@ const defaultLog = getLogger('services/validation-service');
 
 export class ValidationService extends DBService {
   validationRepository: ValidationRepository;
-  validationPropertiesCache: Map<string, FeatureProperties[]>;
+  validationPropertiesCache: Map<string, FeatureProperty[]>;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.validationRepository = new ValidationRepository(connection);
-    this.validationPropertiesCache = new Map<string, FeatureProperties[]>();
+    this.validationPropertiesCache = new Map<string, FeatureProperty[]>();
   }
 
   /**
@@ -82,15 +78,15 @@ export class ValidationService extends DBService {
   /**
    * Validate the properties of a submission feature.
    *
-   * @param {FeatureProperties[]} properties The known/recognized properties of a feature type.
+   * @param {FeatureProperty[]} properties The known/recognized properties of a feature type.
    * @param {ISubmissionFeature['properties']} dataProperties The raw/original properties of a submission feature.
    * @return {*}  {boolean} `true` if the submission feature is valid, `false` otherwise.
    * @memberof ValidationService
    */
-  validateProperties(properties: FeatureProperties[], dataProperties: ISubmissionFeature['properties']): boolean {
+  validateProperties(properties: FeatureProperty[], dataProperties: ISubmissionFeature['properties']): boolean {
     defaultLog.debug({ label: 'validateProperties', message: 'params', properties, dataProperties });
 
-    const throwPropertyError = (property: FeatureProperties) => {
+    const throwPropertyError = (property: FeatureProperty) => {
       throw new Error(`Property ${property.name} is not of type ${property.type_name}`);
     };
 
@@ -123,7 +119,12 @@ export class ValidationService extends DBService {
           }
           break;
         case 'object':
-          if (typeof dataProperty !== 'object') {
+          if (typeof dataProperty !== 'object' || Array.isArray(dataProperty)) {
+            throwPropertyError(property);
+          }
+          break;
+        case 'array':
+          if (!Array.isArray(dataProperty)) {
             throwPropertyError(property);
           }
           break;
@@ -155,7 +156,7 @@ export class ValidationService extends DBService {
     return true;
   }
 
-  async getFeatureValidationProperties(featureType: string): Promise<FeatureProperties[]> {
+  async getFeatureValidationProperties(featureType: string): Promise<FeatureProperty[]> {
     let properties = this.validationPropertiesCache.get(featureType);
 
     if (!properties) {

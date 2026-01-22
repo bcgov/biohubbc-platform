@@ -81,6 +81,16 @@ export const rootAPIDoc = {
           }
         }
       },
+      '404': {
+        description: 'Not Found',
+        content: {
+          'application/json': {
+            schema: {
+              $ref: '#/components/schemas/Error'
+            }
+          }
+        }
+      },
       '409': {
         description: 'Conflict',
         content: {
@@ -140,6 +150,122 @@ export const rootAPIDoc = {
             }
           }
         }
+      },
+      SystemUser: {
+        title: 'System User',
+        description: 'A system user record with role information',
+        type: 'object',
+        required: [
+          'system_user_id',
+          'user_identity_source_id',
+          'user_identifier',
+          'user_guid',
+          'record_effective_date',
+          'record_end_date',
+          'create_date',
+          'create_user',
+          'update_date',
+          'update_user',
+          'revision_count',
+          'identity_source',
+          'role_ids',
+          'role_names'
+        ],
+        properties: {
+          system_user_id: {
+            description: 'user id',
+            type: 'integer',
+            minimum: 1
+          },
+          user_identity_source_id: {
+            type: 'integer'
+          },
+          user_identifier: {
+            description: 'The unique user identifier',
+            type: 'string'
+          },
+          user_guid: {
+            type: 'string',
+            description: 'The GUID for the user.',
+            nullable: true
+          },
+          record_effective_date: {
+            type: 'string'
+          },
+          record_end_date: {
+            type: 'string',
+            nullable: true
+          },
+          create_date: {
+            type: 'string'
+          },
+          create_user: {
+            type: 'integer',
+            minimum: 1
+          },
+          update_date: {
+            type: 'string',
+            nullable: true
+          },
+          update_user: {
+            type: 'integer',
+            minimum: 1,
+            nullable: true
+          },
+          revision_count: {
+            type: 'integer',
+            minimum: 0
+          },
+          identity_source: {
+            type: 'string'
+          },
+          role_ids: {
+            description: 'list of role ids for the user',
+            type: 'array',
+            items: {
+              type: 'integer',
+              minimum: 1
+            }
+          },
+          role_names: {
+            description: 'list of role names for the user',
+            type: 'array',
+            items: {
+              type: 'string'
+            }
+          },
+          display_name: {
+            description: 'User display name',
+            type: 'string',
+            nullable: true
+          },
+          given_name: {
+            description: 'User given (first) name',
+            type: 'string',
+            nullable: true
+          },
+          family_name: {
+            description: 'User family (last) name',
+            type: 'string',
+            nullable: true
+          },
+          email: {
+            description: 'User email address',
+            type: 'string',
+            nullable: true
+          },
+          agency: {
+            description: 'User organization (BCeID Business only)',
+            type: 'string',
+            nullable: true
+          },
+          notes: {
+            description: 'Admin notes about the user',
+            type: 'string',
+            nullable: true
+          }
+        },
+        additionalProperties: false
       },
       SubmissionFeature: {
         title: 'BioHub Data Submission Feature',

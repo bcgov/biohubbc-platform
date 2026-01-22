@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { SearchIndexRepository } from '../repositories/search-index-respository';
+import { SearchFeatureResultWithRelevancy, SearchIndexRepository } from '../repositories/search-index-respository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CodeService } from './code-service';
@@ -28,6 +28,7 @@ describe('SearchIndexService', () => {
             submission_feature_id: 11111,
             submission_id: 777,
             feature_type_id: 1,
+            urn: `urn:777:dataset:11111`,
             data: {
               name: 'Dataset1',
               description: 'Desc1'
@@ -49,6 +50,7 @@ describe('SearchIndexService', () => {
           {
             submission_feature_id: 22222,
             submission_id: 777,
+            urn: `urn:777:dataset:22222`,
             feature_type_id: 2,
             data: {
               count: 70,
@@ -75,6 +77,7 @@ describe('SearchIndexService', () => {
           {
             submission_feature_id: 33333,
             submission_id: 777,
+            urn: `urn:777:dataset:33333`,
             feature_type_id: 3,
             data: {
               filename: 'myText.txt',
@@ -276,6 +279,209 @@ describe('SearchIndexService', () => {
           value: -127
         }
       ]);
+    });
+  });
+
+  describe('searchFeatures', () => {
+    it('should split keywords by whitespace and search', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchIndexService = new SearchIndexService(mockDBConnection);
+
+      const mockResults: SearchFeatureResultWithRelevancy[] = [
+        {
+          submission_feature_id: 1,
+          submission_id: 10,
+          uuid: '550e8400-e29b-41d4-a716-446655440001',
+          feature_type_id: 1,
+          feature_type_name: 'dataset',
+          feature_name: 'Moose Study',
+          feature_description: 'A study of moose',
+          submission_name: 'Wildlife Project',
+          is_secured: false,
+          relevancy_score: 0.5
+        }
+      ];
+
+      const searchByKeywordsStub = sinon
+        .stub(SearchIndexRepository.prototype, 'searchFeaturesByKeywords')
+        .resolves(mockResults);
+
+      const result = await searchIndexService.searchFeatures({ keywords: 'moose habitat' });
+
+      expect(searchByKeywordsStub).to.be.calledOnceWith(['moose', 'habitat']);
+      expect(result).to.have.lengthOf(1);
+      expect(result[0].submission_feature_id).to.equal(1);
+    });
+
+    it('should handle extra whitespace in keywords', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchIndexService = new SearchIndexService(mockDBConnection);
+
+      const searchByKeywordsStub = sinon.stub(SearchIndexRepository.prototype, 'searchFeaturesByKeywords').resolves([]);
+
+      await searchIndexService.searchFeatures({ keywords: '  moose   habitat  ' });
+
+      expect(searchByKeywordsStub).to.be.calledOnceWith(['moose', 'habitat']);
+    });
+
+    it('should search by property filters', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchIndexService = new SearchIndexService(mockDBConnection);
+
+      const mockResults: SearchFeatureResultWithRelevancy[] = [
+        {
+          submission_feature_id: 2,
+          submission_id: 11,
+          uuid: '550e8400-e29b-41d4-a716-446655440002',
+          feature_type_id: 1,
+          feature_type_name: 'dataset',
+          feature_name: 'Moose Survey',
+          feature_description: 'Survey data',
+          submission_name: 'Wildlife Survey',
+          is_secured: true,
+          relevancy_score: 0.6
+        }
+      ];
+
+      const searchByFiltersStub = sinon
+        .stub(SearchIndexRepository.prototype, 'searchFeaturesByPropertyFilters')
+        .resolves(mockResults);
+
+      const result = await searchIndexService.searchFeatures({
+        propertyFilters: [{ featureTypeName: 'animal', propertyName: 'name', propertyType: 'string', value: 'moose' }]
+      });
+
+      expect(searchByFiltersStub).to.be.calledOnceWith([
+        { featureTypeName: 'animal', propertyName: 'name', propertyType: 'string', value: 'moose' }
+      ]);
+      expect(result).to.have.lengthOf(1);
+      expect(result[0].submission_feature_id).to.equal(2);
+    });
+
+    it('should aggregate results from keywords and filters', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchIndexService = new SearchIndexService(mockDBConnection);
+
+      const keywordResults: SearchFeatureResultWithRelevancy[] = [
+        {
+          submission_feature_id: 1,
+          submission_id: 10,
+          uuid: '550e8400-e29b-41d4-a716-446655440001',
+          feature_type_id: 1,
+          feature_type_name: 'dataset',
+          feature_name: 'Moose Study',
+          feature_description: 'A study of moose',
+          submission_name: 'Wildlife Project',
+          is_secured: false,
+          relevancy_score: 0.5
+        }
+      ];
+
+      const filterResults: SearchFeatureResultWithRelevancy[] = [
+        {
+          submission_feature_id: 1,
+          submission_id: 10,
+          uuid: '550e8400-e29b-41d4-a716-446655440001',
+          feature_type_id: 1,
+          feature_type_name: 'dataset',
+          feature_name: 'Moose Study',
+          feature_description: 'A study of moose',
+          submission_name: 'Wildlife Project',
+          is_secured: false,
+          relevancy_score: 0.3
+        }
+      ];
+
+      sinon.stub(SearchIndexRepository.prototype, 'searchFeaturesByKeywords').resolves(keywordResults);
+      sinon.stub(SearchIndexRepository.prototype, 'searchFeaturesByPropertyFilters').resolves(filterResults);
+
+      const result = await searchIndexService.searchFeatures({
+        keywords: 'moose',
+        propertyFilters: [{ featureTypeName: 'animal', propertyName: 'name', propertyType: 'string', value: 'moose' }]
+      });
+
+      expect(result).to.have.lengthOf(1);
+      // Relevancy scores should be aggregated (0.5 + 0.3 = 0.8)
+      expect(result[0].relevancy_score).to.equal(0.8);
+    });
+
+    it('should return empty array when no search criteria provided', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchIndexService = new SearchIndexService(mockDBConnection);
+
+      const result = await searchIndexService.searchFeatures({});
+
+      expect(result).to.eql([]);
+    });
+
+    it('should return empty array for empty keywords string', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchIndexService = new SearchIndexService(mockDBConnection);
+
+      const result = await searchIndexService.searchFeatures({ keywords: '   ' });
+
+      expect(result).to.eql([]);
+    });
+
+    it('should filter out invalid property filters', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchIndexService = new SearchIndexService(mockDBConnection);
+
+      const searchByFiltersStub = sinon
+        .stub(SearchIndexRepository.prototype, 'searchFeaturesByPropertyFilters')
+        .resolves([]);
+
+      await searchIndexService.searchFeatures({
+        propertyFilters: [
+          { featureTypeName: 'animal', propertyName: 'name', propertyType: 'string', value: 'moose' },
+          { featureTypeName: 'animal', propertyName: '', propertyType: 'string', value: 'invalid' },
+          { featureTypeName: 'animal', propertyName: 'desc', propertyType: 'string', value: '' }
+        ]
+      });
+
+      // Only the valid filter should be passed
+      expect(searchByFiltersStub).to.be.calledOnceWith([
+        { featureTypeName: 'animal', propertyName: 'name', propertyType: 'string', value: 'moose' }
+      ]);
+    });
+
+    it('should sort results by relevancy score descending', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchIndexService = new SearchIndexService(mockDBConnection);
+
+      const mockResults: SearchFeatureResultWithRelevancy[] = [
+        {
+          submission_feature_id: 1,
+          submission_id: 10,
+          uuid: '550e8400-e29b-41d4-a716-446655440001',
+          feature_type_id: 1,
+          feature_type_name: 'dataset',
+          feature_name: 'Study A',
+          feature_description: 'Description A',
+          submission_name: 'Project A',
+          is_secured: false,
+          relevancy_score: 0.3
+        },
+        {
+          submission_feature_id: 2,
+          submission_id: 11,
+          uuid: '550e8400-e29b-41d4-a716-446655440002',
+          feature_type_id: 1,
+          feature_type_name: 'dataset',
+          feature_name: 'Study B',
+          feature_description: 'Description B',
+          submission_name: 'Project B',
+          is_secured: true,
+          relevancy_score: 0.8
+        }
+      ];
+
+      sinon.stub(SearchIndexRepository.prototype, 'searchFeaturesByKeywords').resolves(mockResults);
+
+      const result = await searchIndexService.searchFeatures({ keywords: 'moose' });
+
+      expect(result[0].submission_feature_id).to.equal(2);
+      expect(result[1].submission_feature_id).to.equal(1);
     });
   });
 });

@@ -1,6 +1,6 @@
 import SQL from 'sql-template-strings';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
-import { SystemUser } from '../repositories/user-repository';
+import { SystemUser } from '../models/user';
 
 export type DBConstants = {
   serviceClientUsers: SystemUser[];
@@ -62,7 +62,23 @@ export const getDBConstants = function (): DBConstants {
 
 const selectServiceAccountsSqlStatement = SQL`
   SELECT
-    *
+    "system_user".system_user_id,
+    "system_user".user_identity_source_id,
+    "system_user".user_identifier,
+    "system_user".user_guid,
+    "system_user".record_effective_date,
+    "system_user".record_end_date,
+    "system_user".create_date,
+    "system_user".create_user,
+    "system_user".update_date,
+    "system_user".update_user,
+    "system_user".revision_count,
+    "system_user".display_name,
+    "system_user".given_name,
+    "system_user".family_name,
+    "system_user".email,
+    "system_user".agency,
+    "system_user".notes
   FROM
     "system_user"
   INNER JOIN

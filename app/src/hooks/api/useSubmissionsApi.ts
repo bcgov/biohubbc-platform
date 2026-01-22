@@ -1,12 +1,17 @@
 import { AxiosInstance } from 'axios';
 import {
+  ICreateSubmission,
   IGetDownloadSubmissionResponse,
-  IGetSubmissionGroupedFeatureResponse,
+  ISubmissionFeatureForReviewResponse,
+  ISubmissionUploadPart,
+  PresignedUploadUrlResponse,
   SubmissionFeatureSignedUrlPayload,
   SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
   SubmissionRecordWithSecurityAndRootFeature
 } from 'interfaces/useSubmissionsApi.interface';
+import qs from 'qs';
+import { ApiPaginationRequestOptions } from 'types/misc';
 
 /**
  * Returns a set of supported CRUD api methods submissions.
@@ -42,14 +47,25 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * For the given submission, fetches all feature groups (e.g., "dataset", "sample_site"), with their
-   * respective features.
+   * For the given submission, fetches all features for a submission (flat),
+   * with server-side pagination + sorting support.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<IGetSubmissionFeatureResponse>}
+   * @param {ApiPaginationRequestOptions} pagination
+   * @return {Promise<ISubmissionFeatureForReviewResponse>}
    */
-  const getSubmissionFeatureGroups = async (submissionId: number): Promise<IGetSubmissionGroupedFeatureResponse[]> => {
-    const { data } = await axios.get(`api/submission/${submissionId}/features`);
+  const getSubmissionFeatures = async (
+    submissionId: number,
+    pagination?: ApiPaginationRequestOptions
+  ): Promise<ISubmissionFeatureForReviewResponse> => {
+    const params = {
+      ...pagination
+    };
+
+    const { data } = await axios.get(`/api/submission/${submissionId}/features`, {
+      params,
+      paramsSerializer: (params) => qs.stringify(params)
+    });
 
     return data;
   };
@@ -143,17 +159,50 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Initiate a new submission upload
+   *
+   * @param {ICreateSubmission} submission
+   * @returns {Promise<PresignedUploadUrlResponse>}
+   */
+  const getSubmissionUploadUrls = async (submission: ICreateSubmission): Promise<PresignedUploadUrlResponse> => {
+    const { data } = await axios.post(`api/submission/upload/archive`, submission);
+
+    return data;
+  };
+
+  /**
+   * Update the submission upload as completed
+   *
+   * @param {string} uploadId
+   * @param {string} uploadArchiveId
+   * @param {string} s3UploadId
+   * @param {string} key
+   * @param {ISubmissionUploadPart[]} parts
+   * @returns {Promise<void>}
+   */
+  const completeSubmissionUpload = async (
+    uploadId: string,
+    s3UploadId: string,
+    key: string,
+    parts: ISubmissionUploadPart[]
+  ): Promise<void> => {
+    await axios.put(`api/upload/${uploadId}`, { s3UploadId, key, parts });
+  };
+
   return {
     getSubmissionDownloadPackage,
     getSubmissionPublishedDownloadPackage,
-    getSubmissionFeatureGroups,
+    getSubmissionFeatures,
     getSubmissionRecordWithSecurity,
     getUnreviewedSubmissionsForAdmins,
     getReviewedSubmissionsForAdmins,
     getPublishedSubmissionsForAdmins,
     updateSubmissionRecord,
     getPublishedSubmissions,
-    getSubmissionFeatureSignedUrl
+    getSubmissionFeatureSignedUrl,
+    getSubmissionUploadUrls,
+    completeSubmissionUpload
   };
 };
 

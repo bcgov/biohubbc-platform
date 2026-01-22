@@ -1,7 +1,6 @@
 import { SYSTEM_ROLE } from 'constants/roles';
 import { AuthStateContext } from 'contexts/authStateContext';
-import { createMemoryHistory } from 'history';
-import { Route, Router } from 'react-router';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import {
   getMockAuthState,
   SystemAdminAuthState,
@@ -11,8 +10,6 @@ import {
 import { render } from 'test-helpers/test-utils';
 import { AuthGuard, SystemRoleGuard, UnAuthGuard } from './Guards';
 
-const history = createMemoryHistory({ initialEntries: ['test/123'] });
-
 describe('Guards', () => {
   describe('SystemRoleGuard', () => {
     describe('with no fallback', () => {
@@ -20,15 +17,20 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <div data-testid="child-component" />
-                </SystemRoleGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
+                      <div data-testid="child-component" />
+                    </SystemRoleGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(getByTestId('child-component')).toBeInTheDocument();
@@ -38,15 +40,20 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemUserAuthState });
 
         const { queryByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <div data-testid="child-component" />
-                </SystemRoleGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
+                      <div data-testid="child-component" />
+                    </SystemRoleGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(queryByTestId('child-component')).not.toBeInTheDocument();
@@ -58,17 +65,22 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { queryByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <SystemRoleGuard
-                  validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={<div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </SystemRoleGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <SystemRoleGuard
+                      validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                      fallback={<div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </SystemRoleGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(queryByTestId('child-component')).toBeInTheDocument();
@@ -79,17 +91,22 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <SystemRoleGuard
-                  validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={<div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </SystemRoleGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <SystemRoleGuard
+                      validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                      fallback={<div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </SystemRoleGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(queryByTestId('child-component')).not.toBeInTheDocument();
@@ -102,17 +119,22 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <SystemRoleGuard
-                  validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={() => <div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </SystemRoleGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <SystemRoleGuard
+                      validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                      fallback={() => <div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </SystemRoleGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(getByTestId('child-component')).toBeInTheDocument();
@@ -123,17 +145,22 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <SystemRoleGuard
-                  validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={() => <div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </SystemRoleGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <SystemRoleGuard
+                      validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                      fallback={() => <div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </SystemRoleGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(queryByTestId('child-component')).not.toBeInTheDocument();
@@ -148,15 +175,20 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <AuthGuard>
-                  <div data-testid="child-component" />
-                </AuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <AuthGuard>
+                      <div data-testid="child-component" />
+                    </AuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(getByTestId('child-component')).toBeInTheDocument();
@@ -166,15 +198,20 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
 
         const { queryByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <AuthGuard>
-                  <div data-testid="child-component" />
-                </AuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <AuthGuard>
+                      <div data-testid="child-component" />
+                    </AuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(queryByTestId('child-component')).not.toBeInTheDocument();
@@ -186,15 +223,20 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <AuthGuard fallback={<div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </AuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <AuthGuard fallback={<div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </AuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(getByTestId('child-component')).toBeInTheDocument();
@@ -205,15 +247,20 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <AuthGuard fallback={<div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </AuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <AuthGuard fallback={<div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </AuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(queryByTestId('child-component')).not.toBeInTheDocument();
@@ -226,15 +273,20 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <AuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </AuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <AuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </AuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(getByTestId('child-component')).toBeInTheDocument();
@@ -245,15 +297,20 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <AuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </AuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <AuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </AuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(queryByTestId('child-component')).not.toBeInTheDocument();
@@ -267,15 +324,20 @@ describe('Guards', () => {
       it('renders the child when user is not authenticated', () => {
         const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
         const { getByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <UnAuthGuard>
-                  <div data-testid="child-component" />
-                </UnAuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <UnAuthGuard>
+                      <div data-testid="child-component" />
+                    </UnAuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(getByTestId('child-component')).toBeInTheDocument();
@@ -285,15 +347,20 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { queryByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <UnAuthGuard>
-                  <div data-testid="child-component" />
-                </UnAuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <UnAuthGuard>
+                      <div data-testid="child-component" />
+                    </UnAuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(queryByTestId('child-component')).not.toBeInTheDocument();
@@ -305,15 +372,20 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <UnAuthGuard fallback={<div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </UnAuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <UnAuthGuard fallback={<div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </UnAuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(getByTestId('child-component')).toBeInTheDocument();
@@ -324,15 +396,20 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <UnAuthGuard fallback={<div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </UnAuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <UnAuthGuard fallback={<div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </UnAuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(queryByTestId('child-component')).not.toBeInTheDocument();
@@ -345,15 +422,20 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <UnAuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </UnAuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <UnAuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </UnAuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(getByTestId('child-component')).toBeInTheDocument();
@@ -364,15 +446,20 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <Router history={history}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <UnAuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </UnAuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
-          </Router>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <UnAuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </UnAuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
+          </MemoryRouter>
         );
 
         expect(queryByTestId('child-component')).not.toBeInTheDocument();

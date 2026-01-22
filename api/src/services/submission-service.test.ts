@@ -7,7 +7,6 @@ import { SubmissionFeatureSearchKeyValues } from '../repositories/search-index-r
 import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
   ISubmissionFeature,
-  ISubmissionJobQueueRecord,
   ISubmissionModel,
   PatchSubmissionRecord,
   SubmissionFeatureDownloadRecord,
@@ -41,7 +40,14 @@ describe('SubmissionService', () => {
 
       const repo = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionRecord').resolves({ submission_id: 1 });
 
-      const response = await submissionService.insertSubmissionRecord({ uuid: '', source_transform_id: 1 });
+      const response = await submissionService.insertSubmissionRecord({
+        uuid: '',
+        comment: 'comment',
+        description: 'description',
+        name: 'name',
+        source_system: 'SIMS',
+        system_user_id: 1
+      });
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });
@@ -64,6 +70,7 @@ describe('SubmissionService', () => {
         description: 'description',
         comment: 'comment',
         publish_timestamp: '2023-12-12',
+        record_end_date: '2023-12-12',
         create_date: '2023-12-12',
         create_user: 1,
         update_date: null,
@@ -384,22 +391,6 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('getSubmissionJobQueue', () => {
-    it('should return a submission job queue record', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionJobQueue')
-        .resolves({ test: 'test' } as unknown as ISubmissionJobQueueRecord);
-
-      const response = await submissionService.getSubmissionJobQueue(1);
-
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ test: 'test' });
-    });
-  });
-
   describe('getUnreviewedSubmissionsForAdmins', () => {
     it('should return an array of submission records', async () => {
       const mockSubmissionRecords: SubmissionRecordWithSecurityAndRootFeatureType[] = [
@@ -414,6 +405,7 @@ describe('SubmissionService', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: '2023-12-12',
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -435,6 +427,7 @@ describe('SubmissionService', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: '2023-12-12',
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
@@ -476,6 +469,7 @@ describe('SubmissionService', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: null,
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -497,6 +491,7 @@ describe('SubmissionService', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: null,
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
@@ -538,6 +533,7 @@ describe('SubmissionService', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: null,
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -559,6 +555,7 @@ describe('SubmissionService', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: null,
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
@@ -602,6 +599,7 @@ describe('SubmissionService', () => {
         description: null,
         comment: 'comment',
         publish_timestamp: '2023-12-12',
+        record_end_date: 'string',
         create_date: 'string',
         create_user: 1,
         update_date: null,
@@ -634,6 +632,7 @@ describe('SubmissionService', () => {
           name: 'name',
           description: 'description',
           publish_timestamp: '2023-12-12',
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -654,6 +653,7 @@ describe('SubmissionService', () => {
           name: 'name',
           description: 'description',
           publish_timestamp: '2023-12-12',
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
@@ -674,6 +674,7 @@ describe('SubmissionService', () => {
           name: 'name',
           description: 'description',
           publish_timestamp: '2023-12-12',
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
@@ -712,6 +713,7 @@ describe('SubmissionService', () => {
           submission_feature_id: 1,
           uuid: '111-234-345',
           submission_id: submissionId,
+          urn: `urn:${submissionId}:dataset:1`,
           feature_type_id: 2,
           source_id: 'source-id-1',
           data: {},
@@ -731,6 +733,7 @@ describe('SubmissionService', () => {
           submission_feature_id: 2,
           uuid: '222-234-345',
           submission_id: submissionId,
+          urn: `urn:${submissionId}:dataset:2`,
           feature_type_id: 2,
           source_id: 'source-id-2',
           data: {},
@@ -750,6 +753,7 @@ describe('SubmissionService', () => {
           submission_feature_id: 3,
           uuid: '333-234-345',
           submission_id: submissionId,
+          urn: `urn:${submissionId}:dataset:3`,
           feature_type_id: 2,
           source_id: 'source-id-3',
           data: {},
@@ -769,6 +773,7 @@ describe('SubmissionService', () => {
           submission_feature_id: 4,
           uuid: '444-234-345',
           submission_id: submissionId,
+          urn: `urn:${submissionId}:dataset:4`,
           feature_type_id: 3,
           source_id: 'source-id-4',
           data: {},
@@ -826,6 +831,7 @@ describe('SubmissionService', () => {
           submission_feature_id: 1,
           uuid: '111-234-345',
           submission_id: submissionId,
+          urn: `urn:${submissionId}:dataset:1`,
           feature_type_id: 2,
           source_id: 'source-id-1',
           data: {},
@@ -845,6 +851,7 @@ describe('SubmissionService', () => {
           submission_feature_id: 2,
           uuid: '222-234-345',
           submission_id: submissionId,
+          urn: `urn:${submissionId}:dataset:2`,
           feature_type_id: 2,
           source_id: 'source-id-2',
           data: {},
@@ -864,6 +871,7 @@ describe('SubmissionService', () => {
           submission_feature_id: 3,
           uuid: '333-234-345',
           submission_id: submissionId,
+          urn: `urn:${submissionId}:dataset:3`,
           feature_type_id: 2,
           source_id: 'source-id-3',
           data: {},
@@ -883,6 +891,7 @@ describe('SubmissionService', () => {
           submission_feature_id: 4,
           uuid: '444-234-345',
           submission_id: submissionId,
+          urn: `urn:${submissionId}:dataset:4`,
           feature_type_id: 3,
           source_id: 'source-id-4',
           data: {},
@@ -1080,6 +1089,7 @@ describe('SubmissionService', () => {
         description: 'description',
         comment: 'comment',
         publish_timestamp: '2023-12-12',
+        record_end_date: '2023-12-12',
         create_date: '2023-12-12',
         create_user: 1,
         update_date: null,
@@ -1109,6 +1119,7 @@ describe('SubmissionService', () => {
       const submissionFeature: SubmissionFeatureRecord = {
         submission_feature_id: 2,
         uuid: '234-456-234',
+        urn: 'urn:3:dataset:2',
         submission_id: 3,
         feature_type_id: 1,
         source_id: 'source-id',
@@ -1144,6 +1155,7 @@ describe('SubmissionService', () => {
       const submissionFeature: SubmissionFeatureRecord = {
         submission_feature_id: 2,
         uuid: '234-456-234',
+        urn: 'urn:3:dataset:2',
         submission_id: 3,
         feature_type_id: 1,
         source_id: 'source-id',

@@ -103,7 +103,21 @@ const SubmissionsListSortMenu = <RecordType extends object, SortableRecordType e
   };
 
   const handleMenuItemClick = (sortKey: keyof RecordType) => {
-    const sortDirection = !sortProp || sortProp.sort === 'desc' ? 'asc' : 'desc';
+    let sortDirection: 'asc' | 'desc';
+
+    // Case 1: User clicked the same key again → toggle sort direction
+    if (sortProp?.key === sortKey) {
+      sortDirection = sortProp.sort === 'asc' ? 'desc' : 'asc';
+
+      // Case 2: First click and apiSortSync exists with the same key → toggle from API direction
+    } else if (!sortProp && apiSortSync?.key === sortKey) {
+      sortDirection = apiSortSync.sort === 'asc' ? 'desc' : 'asc';
+
+      // Case 3: New key or no initial sort → start with 'asc'
+    } else {
+      sortDirection = 'asc';
+    }
+
     const newSortProp: SortProp<RecordType> = {
       key: sortKey,
       sort: sortDirection

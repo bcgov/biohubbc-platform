@@ -106,7 +106,13 @@ describe('intake', () => {
         create_date: '2024-01-01',
         update_user: null,
         update_date: null,
-        revision_count: 0
+        revision_count: 0,
+        display_name: null,
+        given_name: null,
+        family_name: null,
+        email: null,
+        agency: null,
+        notes: null
       };
 
       sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(serviceClientSystemUser);
@@ -130,6 +136,7 @@ describe('intake', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: '2023-12-12',
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -149,6 +156,7 @@ describe('intake', () => {
         {
           submission_feature_id: 2,
           submission_id: submissionId,
+          urn: `urn:${submissionId}:artifact:2`,
           feature_type_id: 3,
           uuid: '321-645-978',
           source_id: '4',
@@ -206,12 +214,13 @@ describe('intake', () => {
       expect(indexFeaturesBySubmissionIdStub).to.have.been.calledOnceWith(submissionId);
       expect(findSubmissionFeaturesStub).to.have.been.calledOnceWith({
         submissionId: submissionId,
-        featureTypeNames: ['artifact']
+        featureTypeNames: ['artifact', 'file', 'report']
       });
 
       expect(calculateAndAddRegionsForSubmissionStub).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.eql(200);
       expect(mockRes.jsonValue).to.eql({
+        submission_id: submissionId,
         submission_uuid: '123-456-789',
         artifact_upload_keys: [
           {

@@ -41,50 +41,61 @@ export async function seed(knex: Knex): Promise<void> {
     return knex.raw(`SELECT null;`); // dummy query to appease knex
   }
 
-  await knex.raw(`
-    SET SCHEMA 'biohub';
-    SET SEARCH_PATH = 'biohub','public';
-  `);
+  // Transaction so that the schema and search path is set for the SQL statements in insertRecord()
+  await knex.transaction(async (trx) => {
+    await trx.raw(`
+      SET SCHEMA 'biohub';
+      SET SEARCH_PATH = 'biohub','public';
+    `);
 
-  for (let i = 0; i < NUM_MOCK_FEATURE_SUBMISSIONS; i++) {
-    await insertRecord(knex);
-  }
+    for (let i = 0; i < NUM_MOCK_FEATURE_SUBMISSIONS; i++) {
+      await insertRecord(trx); // pass the transaction instead of knex
+    }
+  });
 }
 
 /**
- * Insert a single submission record, a single dataset record, and 50 observation records.
+ * Insert a single submission record, a single dataset record, and related records.
  *
  * @param {Knex} knex
  */
 const insertRecord = async (knex: Knex) => {
-  // Submission (1)
-  const isReviewed = Math.random() > 0.5; // Mark half of submissions as reviewed
-  const isPublished = isReviewed && Math.random() > 0.5; // Mark half of reviewed submissions as published
+  // Submission
+  const isReviewed = Math.random() > 0.5;
+  const isPublished = isReviewed && Math.random() > 0.5;
   const submission_id = await insertSubmissionRecord(knex, isReviewed, isPublished);
 
-  // Dataset (1)
+  // Dataset
   const parent_submission_feature_id1 = await insertDatasetRecord(knex, { submission_id });
 
-  // Sample Sites (10)
-  for (let i = 0; i < 10; i++) {
+  // Sample Sites and their children
+  const sampleSitePromises = Array.from({ length: 10 }).map(async () => {
     const parent_submission_feature_id2 = await insertSampleSiteRecord(knex, {
       submission_id,
       parent_submission_feature_id: parent_submission_feature_id1
     });
 
-    // Animals (2 per sample site)
-    for (let i = 0; i < 2; i++) {
-      await insertAnimalRecord(knex, { submission_id, parent_submission_feature_id: parent_submission_feature_id2 });
-    }
+    // Animals
+    const animalPromises = Array.from({ length: 2 }).map(() =>
+      insertAnimalRecord(knex, { submission_id, parent_submission_feature_id: parent_submission_feature_id2 })
+    );
 
-    // Observations (20 per sample site)
-    for (let i = 0; i < 20; i++) {
-      await insertObservationRecord(knex, {
-        submission_id,
-        parent_submission_feature_id: parent_submission_feature_id2
-      });
-    }
-  }
+    // Observations
+    const observationPromises = Array.from({ length: 20 }).map(() =>
+      insertObservationRecord(knex, { submission_id, parent_submission_feature_id: parent_submission_feature_id2 })
+    );
+
+    // Wait for all animals and observations for this sample site
+    await Promise.all([...animalPromises, ...observationPromises]);
+  });
+
+  // Telemetry
+  const telemetryPromises = Array.from({ length: 100 }).map(() =>
+    insertTelemetryRecord(knex, { submission_id, parent_submission_feature_id: parent_submission_feature_id1 })
+  );
+
+  // Wait for all sample sites and telemetry to complete concurrently
+  await Promise.all([...sampleSitePromises, ...telemetryPromises]);
 };
 
 export const insertSubmissionRecord = async (
@@ -105,7 +116,7 @@ export const insertDatasetRecord = async (knex: Knex, options: { submission_id: 
       parent_submission_feature_id: null,
       feature_type: 'dataset',
       data: {
-        name: `Survey ${faker.animal.type()} ${faker.commerce.department()}}`,
+        name: `Survey ${faker.animal.type()} ${faker.commerce.department()}`,
         start_date: faker.date.past().toISOString(),
         end_date: faker.date.future().toISOString(),
         geometry: random.point(
@@ -177,9 +188,9 @@ export const insertObservationRecord = async (
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
       parent_submission_feature_id: options.parent_submission_feature_id,
-      feature_type: 'observation',
+      feature_type: 'species_observation',
       data: {
-        taxonomy: faker.number.int({ min: 10000, max: 99999 }),
+        taxon_id: faker.number.int({ min: 10000, max: 99999 }),
         geometry: random.point(
           1, // number of features in feature collection
           [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
@@ -223,7 +234,7 @@ const insertAnimalRecord = async (
       data: {
         species: faker.animal.type(),
         count: faker.number.int({ min: 0, max: 100 }),
-        taxonomy: faker.number.int({ min: 10000, max: 99999 }),
+        taxon_id: faker.number.int({ min: 10000, max: 99999 }),
         start_date: faker.date.past().toISOString(),
         end_date: faker.date.future().toISOString()
       }
@@ -288,7 +299,7 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
 export const insertSubmissionFeature = (options: {
   submission_id: number;
   parent_submission_feature_id: number | null;
-  feature_type: 'dataset' | 'sample_site' | 'observation' | 'animal' | 'artifact';
+  feature_type: 'dataset' | 'sample_site' | 'species_observation' | 'animal' | 'artifact' | 'telemetry';
   data: { [key: string]: any };
 }) => `
     INSERT INTO submission_feature
@@ -352,7 +363,7 @@ const insertSearchStringTaxonomy = (options: { submission_feature_id: number }) 
     values
     (
         ${options.submission_feature_id},
-        (select feature_property_id from feature_property where name = 'taxonomy'),
+        (select feature_property_id from feature_property where name = 'taxon_id'),
         $$${faker.number.int({ min: 10000, max: 99999 })}$$
     );
 `;
@@ -437,4 +448,44 @@ const insertSpatialPoint = (options: { submission_feature_id: number }) =>
 
 const randomIntFromInterval = (min: number, max: number) => {
   return Math.floor(Math.random() * (max - min + 1) + min);
+};
+
+export const insertTelemetryRecord = async (
+  knex: Knex,
+  options: { submission_id: number; parent_submission_feature_id: number }
+): Promise<number> => {
+  const telemetryData = {
+    device_id: faker.string.alphanumeric({ length: 8 }),
+    latitude: faker.number.float({ min: 48.617424, max: 60.664785, multipleOf: 0.000001 }),
+    longitude: faker.number.float({ min: -135.878906, max: -114.433594, multipleOf: 0.000001 }),
+    timestamp: faker.date.recent().toISOString(),
+    temperature: faker.number.float({ min: -20, max: 50, multipleOf: 0.1 }),
+    humidity: faker.number.float({ min: 0, max: 100, multipleOf: 0.1 }),
+    status: faker.helpers.arrayElement(['active', 'idle', 'error'])
+  };
+
+  const response = await knex.raw(
+    `${insertSubmissionFeature({
+      submission_id: options.submission_id,
+      parent_submission_feature_id: options.parent_submission_feature_id,
+      feature_type: 'telemetry',
+      data: telemetryData
+    })}`
+  );
+
+  const submission_feature_id = response.rows[0].submission_feature_id;
+
+  // Add search indices
+  await knex.raw(`${insertSearchString({ submission_feature_id })}`); // e.g., status
+  await knex.raw(`${insertSearchNumber({ submission_feature_id })}`); // e.g., temperature
+  await knex.raw(`${insertSearchNumber({ submission_feature_id })}`); // e.g., humidity
+
+  // Spatial search index
+  await knex.raw(
+    `${insertSpatialPoint({
+      submission_feature_id
+    })}`
+  );
+
+  return submission_feature_id;
 };

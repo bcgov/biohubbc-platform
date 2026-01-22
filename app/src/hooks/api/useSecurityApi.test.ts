@@ -1,6 +1,6 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
-import { secureDataAccessRequestFormInitialValues } from 'features/datasets/security/SecureDataAccessRequestForm';
+import { secureDataAccessRequestFormInitialValues } from 'features/submissions/page/security/SecureDataAccessRequestForm';
 import useSecurityApi from './useSecurityApi';
 
 describe('useSecurityApi', () => {

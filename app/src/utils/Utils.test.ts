@@ -1,10 +1,10 @@
 import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
-import { LatLngBounds, LatLngLiteral } from 'leaflet';
+import { expect } from 'vitest';
 import {
   downloadFile,
   ensureProtocol,
-  getFeatureObjectFromLatLngBounds,
+  firstOrNull,
   getFormattedAmount,
   getFormattedDate,
   getFormattedDateRangeString,
@@ -73,7 +73,7 @@ describe('getFormattedAmount', () => {
 describe('getFormattedDate', () => {
   beforeAll(() => {
     // ignore warning about invalid date string being passed to dayjs
-    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   it('returns empty string if invalid date is provided', async () => {
@@ -92,7 +92,7 @@ describe('getFormattedDate', () => {
 describe('getFormattedDateRangeString', () => {
   beforeAll(() => {
     // ignore warning about invalid date string being passed to dayjs
-    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   it('returns empty string if invalid startDate is provided', async () => {
@@ -151,34 +151,6 @@ describe('getFormattedFileSize', () => {
   });
 });
 
-describe('getFeatureObjectFromLatLngBounds', () => {
-  it('returns a feature object', () => {
-    const southWest: LatLngLiteral = { lat: 111, lng: 222 };
-    const northEast: LatLngLiteral = { lat: 333, lng: 444 };
-
-    const bounds = new LatLngBounds(southWest, northEast);
-
-    const feature = getFeatureObjectFromLatLngBounds(bounds);
-
-    expect(feature).toEqual({
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'Polygon',
-        coordinates: [
-          [
-            [southWest.lng, southWest.lat],
-            [southWest.lng, northEast.lat],
-            [northEast.lng, northEast.lat],
-            [northEast.lng, southWest.lat],
-            [southWest.lng, southWest.lat]
-          ]
-        ]
-      }
-    });
-  });
-});
-
 describe('isObject', () => {
   describe('returns false', () => {
     it('when undefined', () => {
@@ -228,7 +200,6 @@ describe('isObject', () => {
     });
 
     it('when a new Object', () => {
-      // eslint-disable-next-line no-new-object
       expect(isObject(new Object())).toEqual(true);
     });
   });
@@ -305,9 +276,9 @@ describe('downloadFile', () => {
   it('should create an anchor element with the provided URL and simulate a click', () => {
     const url = 'https://example.com/file.pdf';
     const anchor = document.createElement('a');
-    jest.spyOn(document, 'createElement').mockReturnValue(anchor);
-    jest.spyOn(anchor, 'click');
-    jest.spyOn(anchor, 'remove');
+    vi.spyOn(document, 'createElement').mockReturnValue(anchor);
+    vi.spyOn(anchor, 'click');
+    vi.spyOn(anchor, 'remove');
 
     downloadFile(url);
 
@@ -380,5 +351,33 @@ describe('getFormattedIdentitySource', () => {
     const result = getFormattedIdentitySource(null as unknown as SYSTEM_IDENTITY_SOURCE);
 
     expect(result).toEqual(null);
+  });
+
+  describe('firstOrNull', () => {
+    it('returns the first element of a non-empty array', () => {
+      const response = firstOrNull(['apple', 'banana', 'cherry']);
+      expect(response).toEqual('apple');
+    });
+
+    it('returns null for an empty array', () => {
+      const response = firstOrNull([]);
+      expect(response).toBeNull();
+    });
+
+    it('works with numbers', () => {
+      const response = firstOrNull([10, 20, 30]);
+      expect(response).toEqual(10);
+    });
+
+    it('works with a single-element array', () => {
+      const response = firstOrNull(['only']);
+      expect(response).toEqual('only');
+    });
+
+    it('works with objects', () => {
+      const arr = [{ id: 1 }, { id: 2 }];
+      const response = firstOrNull(arr);
+      expect(response).toEqual({ id: 1 });
+    });
   });
 });

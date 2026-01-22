@@ -1,28 +1,27 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getDBConnection } from '../../database/db';
+import { getAPIUserDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
-import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
-import { UserService } from '../../services/user-service';
+import { IUserProfile, UserService } from '../../services/user-service';
+import {
+  getAgency,
+  getDisplayName,
+  getEmail,
+  getFamilyName,
+  getGivenName,
+  getUserGuid,
+  getUserIdentifier,
+  getUserIdentitySource
+} from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 
-const defaultLog = getLogger('paths/user/{userId}');
+const defaultLog = getLogger('paths/user/self');
 
-export const GET: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          discriminator: 'SystemUser'
-        }
-      ]
-    };
-  }),
-  getUser()
-];
+export const PUT: Operation = [upsertUser()];
 
-GET.apiDoc = {
-  description: 'Get user details for the currently authenticated user.',
+PUT.apiDoc = {
+  description:
+    'Upsert the currently authenticated user. Creates a new user with Member role if not found, or updates profile fields if the user exists and is active. Returns 401 if the user is expired.',
   tags: ['user'],
   security: [
     {
@@ -31,93 +30,21 @@ GET.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'User details for the currently authenticated user.',
+      description: 'User profile updated successfully.',
       content: {
         'application/json': {
           schema: {
-            title: 'User Response Object',
-            type: 'object',
-            required: [
-              'system_user_id',
-              'user_identity_source_id',
-              'user_identifier',
-              'user_guid',
-              'record_effective_date',
-              'record_end_date',
-              'create_date',
-              'create_user',
-              'update_date',
-              'update_user',
-              'revision_count',
-              'identity_source',
-              'role_ids',
-              'role_names'
-            ],
-            properties: {
-              system_user_id: {
-                description: 'user id',
-                type: 'integer',
-                minimum: 1
-              },
-              user_identity_source_id: {
-                type: 'integer'
-              },
-              user_identifier: {
-                description: 'The unique user identifier',
-                type: 'string'
-              },
-              user_guid: {
-                type: 'string',
-                description: 'The GUID for the user.',
-                nullable: true
-              },
-              record_effective_date: {
-                type: 'string'
-              },
-              record_end_date: {
-                type: 'string',
-                nullable: true
-              },
-              create_date: {
-                type: 'string'
-              },
-              create_user: {
-                type: 'integer',
-                minimum: 1
-              },
-              update_date: {
-                type: 'string',
-                nullable: true
-              },
-              update_user: {
-                type: 'integer',
-                minimum: 1,
-                nullable: true
-              },
-              revision_count: {
-                type: 'integer',
-                minimum: 0
-              },
-              identity_source: {
-                type: 'string'
-              },
-              role_ids: {
-                description: 'list of role ids for the user',
-                type: 'array',
-                items: {
-                  type: 'integer',
-                  minimum: 1
-                }
-              },
-              role_names: {
-                description: 'list of role names for the user',
-                type: 'array',
-                items: {
-                  type: 'string'
-                }
-              }
-            },
-            additionalProperties: false
+            $ref: '#/components/schemas/SystemUser'
+          }
+        }
+      }
+    },
+    201: {
+      description: 'User successfully created.',
+      content: {
+        'application/json': {
+          schema: {
+            $ref: '#/components/schemas/SystemUser'
           }
         }
       }
@@ -127,9 +54,6 @@ GET.apiDoc = {
     },
     401: {
       $ref: '#/components/responses/401'
-    },
-    403: {
-      $ref: '#/components/responses/403'
     },
     500: {
       $ref: '#/components/responses/500'
@@ -141,33 +65,54 @@ GET.apiDoc = {
 };
 
 /**
- * Get the currently logged in user.
+ * Upsert the currently authenticated user.
+ *
+ * - If user doesn't exist: creates with Member role (returns 201)
+ * - If user exists and is active: updates profile fields (returns 200)
+ * - If user exists but is expired: throws 401
  *
  * @returns {RequestHandler}
  */
-export function getUser(): RequestHandler {
+export function upsertUser(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req['keycloak_token']);
+    // Use API user connection since the user may not exist yet
+    const connection = getAPIUserDBConnection();
 
     try {
-      await connection.open();
+      // Extract user details from JWT token
+      const userGuid = getUserGuid(req.keycloak_token);
+      const userIdentifier = getUserIdentifier(req.keycloak_token);
+      const identitySource = getUserIdentitySource(req.keycloak_token);
 
-      const userId = connection.systemUserId();
-
-      if (!userId) {
-        throw new HTTP400('Failed to identify system user ID');
+      if (!userGuid) {
+        throw new HTTP400('Failed to identify user GUID from token');
       }
+
+      if (!userIdentifier) {
+        throw new HTTP400('Failed to identify user identifier from token');
+      }
+
+      // Extract profile fields from token
+      const profile: IUserProfile = {
+        displayName: getDisplayName(req.keycloak_token),
+        email: getEmail(req.keycloak_token),
+        givenName: getGivenName(req.keycloak_token),
+        familyName: getFamilyName(req.keycloak_token),
+        agency: getAgency(req.keycloak_token)
+      };
+
+      await connection.open();
 
       const userService = new UserService(connection);
 
-      // Fetch system user record
-      const userObject = await userService.getUserById(userId);
+      // Upsert user - creates if not found, updates if active, throws 401 if expired
+      const { user, created } = await userService.upsertSelf(userGuid, userIdentifier, identitySource, profile);
 
       await connection.commit();
 
-      return res.status(200).json(userObject);
+      return res.status(created ? 201 : 200).json(user);
     } catch (error) {
-      defaultLog.error({ label: 'getUser', message: 'error', error });
+      defaultLog.error({ label: 'upsertUser', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

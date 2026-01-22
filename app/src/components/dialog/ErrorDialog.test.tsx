@@ -10,8 +10,8 @@ describe('ErrorDialog', () => {
           dialogTitle="This is dialog title"
           dialogText="This is dialog text"
           open={true}
-          onClose={() => jest.fn()}
-          onOk={() => jest.fn()}
+          onClose={() => vi.fn()}
+          onOk={() => vi.fn()}
         />
       </div>
     );
@@ -28,8 +28,8 @@ describe('ErrorDialog', () => {
           dialogText="This is dialog text"
           dialogError="This is dialog error"
           open={true}
-          onClose={() => jest.fn()}
-          onOk={() => jest.fn()}
+          onClose={() => vi.fn()}
+          onOk={() => vi.fn()}
         />
       </div>
     );
@@ -48,8 +48,8 @@ describe('ErrorDialog', () => {
           dialogErrorDetails={['an error', { error: 'another error' }]}
           dialogError="This is dialog error"
           open={true}
-          onClose={() => jest.fn()}
-          onOk={() => jest.fn()}
+          onClose={() => vi.fn()}
+          onOk={() => vi.fn()}
         />
       </div>
     );

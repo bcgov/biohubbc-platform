@@ -4,7 +4,8 @@ import {
   insertDatasetRecord,
   insertSampleSiteRecord,
   insertSubmissionFeature,
-  insertSubmissionRecord
+  insertSubmissionRecord,
+  insertTelemetryRecord
 } from './04_mock_test_data';
 
 const ENABLE_MOCK_FEATURE_SEEDING = Boolean(process.env.ENABLE_MOCK_FEATURE_SEEDING === 'true' || false);
@@ -55,8 +56,8 @@ const insertArtifactRecord = async (
   const sql = insertSubmissionFeature({
     submission_id: row.submission_id,
     parent_submission_feature_id: row.parent_submission_feature_id,
-    feature_type: 'artifact',
-    data: { artifact_key: S3_KEY }
+    feature_type: 'file',
+    data: { file: S3_KEY }
   });
 
   const submission_feature = await knex.raw(sql);
@@ -81,6 +82,7 @@ const createSubmissionWithSecurity = async (
   const submission_id = await insertSubmissionRecord(knex, reviewed, reviewed);
   const parent_submission_feature_id = await insertDatasetRecord(knex, { submission_id });
   const submission_feature_id = await insertSampleSiteRecord(knex, { submission_id, parent_submission_feature_id });
+  const telemetry_feature_id = await insertTelemetryRecord(knex, { submission_id, parent_submission_feature_id });
 
   await insertArtifactRecord(knex, { submission_id, parent_submission_feature_id });
 
@@ -92,6 +94,7 @@ const createSubmissionWithSecurity = async (
   if (securityLevel === 'SECURE') {
     await insertFeatureSecurity(knex, parent_submission_feature_id, 2);
     await insertFeatureSecurity(knex, submission_feature_id, 3);
+    await insertFeatureSecurity(knex, telemetry_feature_id, 2);
     return;
   }
 };

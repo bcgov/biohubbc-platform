@@ -11,7 +11,7 @@ import FileUploadItem, {
 } from 'components/attachments/FileUploadItem';
 import FileUploadItemActionButton from 'components/attachments/FileUploadItemActionButton';
 import FileUploadItemProgressBar from 'components/attachments/FileUploadItemProgressBar';
-import React, { useRef, useState } from 'react';
+import React, { JSX, useRef, useState } from 'react';
 import { FileError, FileRejection } from 'react-dropzone';
 
 export interface IUploadFile {

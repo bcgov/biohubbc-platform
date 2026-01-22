@@ -1,0 +1,30 @@
+# Development environment values for Biohub
+environment:
+  name: dev
+  id: deploy
+
+# Queue worker configuration
+app:
+  nodeEnv: development
+  nodeOptions: --max_old_space_size=1024
+
+  # Object Store (S3)
+  objectStore:
+    keyPrefix: biohub
+
+  # Logging
+  logging:
+    level: info
+    levelFile: debug
+    fileMaxFiles: 10
+
+# Openshift Resources
+# Workers can scale horizontally - maintenance is handled by queue-supervisor
+replicas: 1
+resources:
+  requests:
+    cpu: 25m
+    memory: 128Mi
+  limits:
+    cpu: 300m
+    memory: 1Gi

@@ -196,7 +196,13 @@ describe('keycloakUtils', () => {
         create_user: 1,
         update_date: null,
         update_user: null,
-        revision_count: 0
+        revision_count: 0,
+        display_name: null,
+        given_name: null,
+        family_name: null,
+        email: null,
+        agency: null,
+        notes: null
       };
 
       const dbConstantsMock: dbConstants.DBConstants = { serviceClientUsers: [serviceClientSystemUser] };

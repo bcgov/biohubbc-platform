@@ -41,9 +41,10 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV}
       - NODE_OPTIONS=${API_NODE_OPTIONS}
+      - API_RESPONSE_VALIDATION_ENABLED=${API_RESPONSE_VALIDATION_ENABLED}
+      - DATABASE_RESPONSE_VALIDATION_ENABLED=${DATABASE_RESPONSE_VALIDATION_ENABLED}
       # ITIS API
       - ITIS_SOLR_URL=${ITIS_SOLR_URL}
-      - S3_KEY_PREFIX=${S3_KEY_PREFIX}
       - TZ=${API_TZ}
       - API_HOST=${API_HOST}
       - API_PORT=${API_PORT}
@@ -74,6 +75,12 @@ services:
       - OBJECT_STORE_ACCESS_KEY_ID=${OBJECT_STORE_ACCESS_KEY_ID}
       - OBJECT_STORE_SECRET_KEY_ID=${OBJECT_STORE_SECRET_KEY_ID}
       - OBJECT_STORE_BUCKET_NAME=${OBJECT_STORE_BUCKET_NAME}
+      - S3_KEY_PREFIX=${S3_KEY_PREFIX}
+      # Quarantine Object Store (S3)
+      - QUARANTINE_OBJECT_STORE_URL=${QUARANTINE_OBJECT_STORE_URL}
+      - QUARANTINE_OBJECT_STORE_ACCESS_KEY_ID=${QUARANTINE_OBJECT_STORE_ACCESS_KEY_ID}
+      - QUARANTINE_OBJECT_STORE_SECRET_KEY_ID=${QUARANTINE_OBJECT_STORE_SECRET_KEY_ID}
+      - QUARANTINE_OBJECT_STORE_BUCKET_NAME=${QUARANTINE_OBJECT_STORE_BUCKET_NAME}
       - MAX_REQ_BODY_SIZE=${MAX_REQ_BODY_SIZE}
       - MAX_UPLOAD_NUM_FILES=${MAX_UPLOAD_NUM_FILES}
       - MAX_UPLOAD_FILE_SIZE=${MAX_UPLOAD_FILE_SIZE}
@@ -109,19 +116,18 @@ services:
       db_setup:
         condition: service_completed_successfully
 
-  # Build the api_worker docker image
+  ## Build the queue worker docker image
   queue:
     image: ${DOCKER_PROJECT_NAME}-queue-${DOCKER_NAMESPACE}-img
     container_name: ${DOCKER_PROJECT_NAME}-queue-${DOCKER_NAMESPACE}-container
     build:
       context: ./api
-      dockerfile: ./.docker/queue/Dockerfile
+      dockerfile: ./.docker/api/Dockerfile
+    command: npm run queue-reload
     environment:
       - NODE_ENV=${NODE_ENV}
-      - S3_KEY_PREFIX=${S3_KEY_PREFIX}
-      - API_HOST=${API_HOST}
-      - API_PORT=${API_PORT}
       - TZ=${API_TZ}
+      # Database
       - DB_HOST=${DB_HOST}
       - DB_USER_API=${DB_USER_API}
       - DB_USER_API_PASS=${DB_USER_API_PASS}
@@ -132,20 +138,23 @@ services:
       - DB_CONNECTION_MAX_USES=${DB_CONNECTION_MAX_USES}
       - DB_CONNECTION_TIMEOUT=${DB_CONNECTION_TIMEOUT}
       - DB_IDLE_TIMEOUT=${DB_IDLE_TIMEOUT}
+      # Object Store (S3)
       - OBJECT_STORE_URL=${OBJECT_STORE_URL}
       - OBJECT_STORE_ACCESS_KEY_ID=${OBJECT_STORE_ACCESS_KEY_ID}
       - OBJECT_STORE_SECRET_KEY_ID=${OBJECT_STORE_SECRET_KEY_ID}
       - OBJECT_STORE_BUCKET_NAME=${OBJECT_STORE_BUCKET_NAME}
+      - S3_KEY_PREFIX=${S3_KEY_PREFIX}
+      # Logging
       - LOG_LEVEL=${LOG_LEVEL}
-      - APP_HOST=${APP_HOST}
     volumes:
       - ./api:/opt/app-root/src
-      - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
+      - /opt/app-root/src/node_modules
     networks:
       - biohubbc-network
     depends_on:
-      - db
-      - db_setup
+      db:
+        condition: service_healthy
+      # Note: db_setup dependency removed - queue is meant to run after make web/backend
 
   # Build the clamav docker image
   clamav:
@@ -167,18 +176,18 @@ services:
     ports:
       - ${APP_PORT}:${APP_PORT}
     environment:
-      - NODE_ENV=${NODE_ENV}
-      - NODE_OPTIONS=${APP_NODE_OPTIONS}
-      - REACT_APP_NODE_ENV=${NODE_ENV}
-      - PORT=${APP_PORT}
-      - REACT_APP_API_HOST=${API_HOST}
-      - REACT_APP_API_PORT=${API_PORT}
-      - REACT_APP_MAX_UPLOAD_NUM_FILES=${MAX_UPLOAD_NUM_FILES}
-      - REACT_APP_MAX_UPLOAD_FILE_SIZE=${MAX_UPLOAD_FILE_SIZE}
-      - REACT_APP_SITEMINDER_LOGOUT_URL=${SITEMINDER_LOGOUT_URL}
-      - REACT_APP_KEYCLOAK_HOST=${KEYCLOAK_HOST}
-      - REACT_APP_KEYCLOAK_REALM=${KEYCLOAK_REALM}
-      - REACT_APP_KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID}
+      - VITE_NODE_OPTIONS=${APP_NODE_OPTIONS}
+      - VITE_CHANGE_VERSION="1.0"
+      - VITE_NODE_ENV=${NODE_ENV}
+      - VITE_PORT=${APP_PORT}
+      - VITE_API_HOST=${API_HOST}
+      - VITE_API_PORT=${API_PORT}
+      - VITE_MAX_UPLOAD_NUM_FILES=${MAX_UPLOAD_NUM_FILES}
+      - VITE_MAX_UPLOAD_FILE_SIZE=${MAX_UPLOAD_FILE_SIZE}
+      - VITE_SITEMINDER_LOGOUT_URL=${SITEMINDER_LOGOUT_URL}
+      - VITE_KEYCLOAK_HOST=${KEYCLOAK_HOST}
+      - VITE_KEYCLOAK_REALM=${KEYCLOAK_REALM}
+      - VITE_KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID}
     volumes:
       - ./app:/opt/app-root/src
       - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules

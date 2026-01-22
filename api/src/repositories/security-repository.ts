@@ -73,6 +73,17 @@ export const SubmissionFeatureSecurityRecord = z.object({
 });
 export type SubmissionFeatureSecurityRecord = z.infer<typeof SubmissionFeatureSecurityRecord>;
 
+export const SubmissionFeatureSecurityRulesSummary = z.object({
+  rules: z.array(
+    z.object({
+      security_rule_id: z.number(),
+      count: z.number()
+    })
+  )
+});
+
+export type SubmissionFeatureSecurityRulesSummary = z.infer<typeof SubmissionFeatureSecurityRulesSummary>;
+
 export const SecurityReason = z.object({
   id: z.number(),
   type_id: z.number()
@@ -360,8 +371,6 @@ export class SecurityRepository extends BaseRepository {
     submissionFeatureIds: number[],
     securityRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    defaultLog.debug({ label: 'applySecurityRulesToSubmissionFeatures', submissionFeatureIds, securityRuleIds });
-
     const queryValues = submissionFeatureIds.flatMap((submissionFeatureId) => {
       return securityRuleIds.flatMap((securityRuleId) => `(${submissionFeatureId}, ${securityRuleId}, 'NOW()')`);
     });
@@ -378,6 +387,74 @@ export class SecurityRepository extends BaseRepository {
       RETURNING *;`);
 
     const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
+    return response.rows;
+  }
+
+  /**
+   * Applies all given security rules to all features of a submission.
+   *
+   * @param {number} submissionId
+   * @param {number[]} securityRuleIds
+   * @return {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityRepository
+   */
+  async applySecurityToSubmission(
+    submissionId: number,
+    securityRuleIds: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
+    if (!securityRuleIds.length) {
+      return [];
+    }
+
+    const placeholders = securityRuleIds.map((_, i) => `($${i + 1}::int)`).join(', ');
+    const submissionIdPlaceholder = `$${securityRuleIds.length + 1}`;
+
+    const sql = `
+      INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date)
+      SELECT sf.submission_feature_id, r.security_rule_id, NOW()
+      FROM submission_feature sf
+      CROSS JOIN (VALUES ${placeholders}) AS r(security_rule_id)
+      WHERE sf.submission_id = ${submissionIdPlaceholder}
+      ON CONFLICT (submission_feature_id, security_rule_id) DO NOTHING
+      RETURNING *;
+    `;
+
+    const insertSQL = SQL([sql], ...securityRuleIds, submissionId);
+
+    const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
+    return response.rows;
+  }
+
+  /**
+   * Removes security rules from all features of a submission.
+   * If no rule IDs are provided, all security rules will be removed.
+   *
+   * @param {number} submissionId
+   * @param {number[]} [removeRuleIds]
+   * @return {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityRepository
+   */
+  async removeSecurityFromSubmission(
+    submissionId: number,
+    removeRuleIds?: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
+    const knex = getKnex();
+
+    const queryBuilder = knex
+      .queryBuilder()
+      .delete()
+      .from('submission_feature_security as sfs')
+      .whereIn(
+        'sfs.submission_feature_id',
+        knex.select('sf.submission_feature_id').from('submission_feature as sf').where('sf.submission_id', submissionId)
+      )
+      .returning('*');
+
+    if (removeRuleIds?.length) {
+      queryBuilder.whereIn('sfs.security_rule_id', removeRuleIds);
+    }
+
+    const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
     return response.rows;
   }
 
@@ -450,24 +527,49 @@ export class SecurityRepository extends BaseRepository {
 
     return response.rows;
   }
-
   /**
-   * Gets Submission Feature Security Records for a given set of submission features
+   * Get summary of rules applied to given submission.
+   * If features are provided, the subset applicable to those features is returned.
    *
-   * @param {number} submissionId
-   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @param submissionId
+   * @param submissionFeatureIds Optional array of feature IDs
+   * @returns {Promise<SubmissionFeatureSecurityRulesSummary>}
    * @memberof SecurityRepository
    */
-  async getAllSecurityRulesForSubmission(submissionId: number): Promise<SubmissionFeatureSecurityRecord[]> {
-    const queryBuilder = getKnex()
-      .select('*')
-      .from('submission_feature_security')
-      .whereIn('submission_feature_id', (subQuery) => {
-        return subQuery.select('submission_feature_id').from('submission_feature').where('submission_id', submissionId);
-      });
+  async getSubmissionFeatureSecuritySummary(
+    submissionId: number,
+    submissionFeatureIds?: number[]
+  ): Promise<SubmissionFeatureSecurityRulesSummary> {
+    const knex = getKnex(); // your knex instance
 
-    const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
+    // Base subquery to get submission_feature_ids
+    const featureIdsSubQuery = knex('submission_feature')
+      .select('submission_feature_id')
+      .where('submission_id', submissionId);
 
-    return response.rows;
+    // Build the main query using a CTE
+    const finalQuery = knex
+      .with('grouped_rules', (qb) => {
+        qb.select('sfs.security_rule_id', knex.raw('COUNT(*)::int AS count'))
+          .from('submission_feature_security as sfs')
+          .whereIn('sfs.submission_feature_id', featureIdsSubQuery)
+          .modify((qb) => {
+            // Conditionally filter for specific features
+            if (submissionFeatureIds && submissionFeatureIds.length > 0) {
+              qb.whereIn('sfs.submission_feature_id', submissionFeatureIds);
+            }
+          })
+          .groupBy('sfs.security_rule_id');
+      })
+      .select(
+        knex.raw(
+          `COALESCE(jsonb_agg(jsonb_build_object('security_rule_id', security_rule_id, 'count', count)), '[]'::jsonb) AS rules`
+        )
+      )
+      .from('grouped_rules');
+
+    const response = await this.connection.knex(finalQuery, SubmissionFeatureSecurityRulesSummary);
+
+    return response.rows[0];
   }
 }

@@ -39,7 +39,14 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.insertSubmissionRecord({ uuid: '', source_transform_id: 1 });
+        await submissionRepository.insertSubmissionRecord({
+          uuid: '',
+          comment: 'comment',
+          description: 'description',
+          name: 'name',
+          source_system: 'SIMS',
+          system_user_id: 1
+        });
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission record');
@@ -57,7 +64,11 @@ describe('SubmissionRepository', () => {
 
       const response = await submissionRepository.insertSubmissionRecord({
         uuid: 'uuid',
-        source_transform_id: 1
+        comment: 'comment',
+        description: 'description',
+        name: 'name',
+        source_system: 'SIMS',
+        system_user_id: 1
       });
 
       expect(response.submission_id).to.equal(1);
@@ -182,9 +193,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should succeed with valid data, without optional version parameter', async () => {
-      const mockResponse = {
-        source_transform_id: 1
-      } as unknown as ISourceTransformModel;
+      const mockResponse = {} as unknown as ISourceTransformModel;
 
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
@@ -198,9 +207,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should succeed with valid data, with optional version parameter', async () => {
-      const mockResponse = {
-        source_transform_id: 1
-      } as unknown as ISourceTransformModel;
+      const mockResponse = {} as unknown as ISourceTransformModel;
 
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
@@ -235,9 +242,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should succeed with valid data, without optional version parameter', async () => {
-      const mockResponse = {
-        source_transform_id: 1
-      } as unknown as ISourceTransformModel;
+      const mockResponse = {} as unknown as ISourceTransformModel;
 
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
@@ -379,45 +384,6 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('getSubmissionJobQueue', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      try {
-        await submissionRepository.getSubmissionJobQueue(1);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal(
-          'Failed to get submission job queue from submission id'
-        );
-      }
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockResponse = {
-        id: 1
-      };
-
-      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.getSubmissionJobQueue(1);
-
-      expect(response).to.eql(mockResponse);
-    });
-  });
-
   describe('getUnreviewedSubmissionsForAdmins', () => {
     beforeEach(() => {
       sinon.restore();
@@ -436,6 +402,7 @@ describe('SubmissionRepository', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: '2023-12-12',
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -453,6 +420,7 @@ describe('SubmissionRepository', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: '2023-12-12',
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
@@ -491,6 +459,7 @@ describe('SubmissionRepository', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: null,
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -508,6 +477,7 @@ describe('SubmissionRepository', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: null,
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
@@ -546,6 +516,7 @@ describe('SubmissionRepository', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: '2023-12-12',
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -563,6 +534,7 @@ describe('SubmissionRepository', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: '2023-12-12',
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
@@ -600,6 +572,7 @@ describe('SubmissionRepository', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: '2023-12-12',
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -617,11 +590,11 @@ describe('SubmissionRepository', () => {
           name: 'name',
           description: 'description',
           comment: 'comment',
-          create_date: '2023-12-12',
           publish_timestamp: '2023-12-12',
-          security: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
-
+          record_end_date: '2023-12-12',
+          create_date: '2023-12-12',
           create_user: 1,
+          security: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
           update_date: '2023-12-12',
           update_user: 1,
           revision_count: 1
@@ -636,8 +609,9 @@ describe('SubmissionRepository', () => {
           name: 'name',
           description: 'description',
           comment: 'comment',
-          create_date: '2023-12-12',
           publish_timestamp: '2023-12-12',
+          record_end_date: '2023-12-12',
+          create_date: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
           update_user: 1,
@@ -901,6 +875,7 @@ describe('SubmissionRepository', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: '2023-12-12',
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -938,6 +913,7 @@ describe('SubmissionRepository', () => {
           description: 'description',
           comment: 'comment',
           publish_timestamp: '2023-12-12',
+          record_end_date: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -1133,6 +1109,7 @@ describe('SubmissionRepository', () => {
       const submissionFeatureRecord: SubmissionFeatureRecord = {
         submission_feature_id: 2,
         uuid: '234-456-234',
+        urn: 'urn:3:dataset:2',
         submission_id: 3,
         feature_type_id: 1,
         source_id: 'source-id',
@@ -1172,6 +1149,7 @@ describe('SubmissionRepository', () => {
           submission_feature_id: 2,
           uuid: '234-456-234',
           submission_id: 3,
+          urn: 'urn:3:dataset:2',
           feature_type_id: 1,
           source_id: 'source-id',
           data: {},
@@ -1220,6 +1198,7 @@ describe('SubmissionRepository', () => {
         source_system: 'string',
         name: 'string',
         description: null,
+        record_end_date: 'string',
         create_date: 'string',
         create_user: 1,
         update_date: null,
@@ -1498,6 +1477,147 @@ describe('SubmissionRepository', () => {
       });
 
       expect(response).to.eql('KEY');
+    });
+  });
+
+  describe('getSubmissionFeaturesBySubmissionId', () => {
+    it('should return a list of submission features', async () => {
+      const mockResponse = {
+        rows: [
+          {
+            submission_feature_id: 1,
+            feature_type_name: 'Type A',
+            feature_type_display_name: 'Display A',
+            submission_feature_security_ids: [1, 2]
+          }
+        ],
+        rowCount: 1
+      } as any;
+      const dbConnection = getMockDBConnection({ sql: () => mockResponse });
+
+      const repository = new SubmissionRepository(dbConnection);
+
+      const response = await repository.getSubmissionFeaturesBySubmissionId(123);
+
+      expect(response).to.eql([
+        {
+          submission_feature_id: 1,
+          feature_type_name: 'Type A',
+          feature_type_display_name: 'Display A',
+          submission_feature_security_ids: [1, 2]
+        }
+      ]);
+    });
+
+    it('should throw an error when rowCount is 0', async () => {
+      const mockResponse = { rows: [], rowCount: 0 } as any;
+      const dbConnection = getMockDBConnection({ sql: () => mockResponse });
+
+      const repository = new SubmissionRepository(dbConnection);
+
+      try {
+        await repository.getSubmissionFeaturesBySubmissionId(123);
+        expect.fail();
+      } catch (error) {
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get submission feature record');
+      }
+    });
+  });
+
+  describe('getSubmissionFeaturesCount', () => {
+    it('should return the correct submission feature count', async () => {
+      const mockQueryResponse = { rows: [{ count: 42 }], rowCount: 1 } as any;
+      const dbConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const repository = new SubmissionRepository(dbConnection);
+
+      const count = await repository.getSubmissionFeaturesCount(123);
+
+      expect(count).to.equal(42);
+    });
+
+    it('should throw an error when count query fails', async () => {
+      const mockQueryResponse = { rows: [], rowCount: 0 } as any;
+      const dbConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const repository = new SubmissionRepository(dbConnection);
+
+      try {
+        await repository.getSubmissionFeaturesCount(123);
+        expect.fail();
+      } catch (error) {
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get submission feature count');
+      }
+    });
+  });
+
+  describe('updateSubmissionFeatureParent', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should update the parent submission feature id successfully', async () => {
+      const mockQueryResponse: QueryResult<never> = {
+        rowCount: 1,
+        rows: [],
+        command: '',
+        oid: 0,
+        fields: []
+      };
+
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      await submissionRepository.updateSubmissionFeatureParent(10, 5);
+
+      expect(sqlStub).to.have.been.calledOnce;
+    });
+  });
+
+  describe('deleteSubmissionFeatures', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should soft delete all submission features for a submission', async () => {
+      const mockQueryResponse: QueryResult<never> = {
+        rowCount: 3,
+        rows: [],
+        command: '',
+        oid: 0,
+        fields: []
+      };
+
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      await submissionRepository.deleteSubmissionFeatures(1);
+
+      expect(sqlStub).to.have.been.calledOnce;
+    });
+
+    it('should complete successfully even when no features exist to delete', async () => {
+      const mockQueryResponse: QueryResult<never> = {
+        rowCount: 0,
+        rows: [],
+        command: '',
+        oid: 0,
+        fields: []
+      };
+
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      // Should not throw even when rowCount is 0
+      await submissionRepository.deleteSubmissionFeatures(999);
+
+      expect(sqlStub).to.have.been.calledOnce;
     });
   });
 });

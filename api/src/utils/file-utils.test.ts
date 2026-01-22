@@ -5,13 +5,12 @@ import {
   bulkDeleteFilesFromS3,
   deleteFileFromS3,
   generateDatasetS3FileKey,
-  generateQueueS3FileKey,
+  getObjectStoreBucketName,
+  getObjectStoreUrl,
   getS3HostUrl,
   getS3KeyPrefix,
   getS3SignedURL,
   _getClamAvScanner,
-  _getObjectStoreBucketName,
-  _getObjectStoreUrl,
   _getS3Client
 } from './file-utils';
 
@@ -112,7 +111,7 @@ describe('_getClamAvScanner', () => {
   });
 });
 
-describe('_getObjectStoreBucketName', () => {
+describe('getObjectStoreBucketName', () => {
   const OBJECT_STORE_BUCKET_NAME = process.env.OBJECT_STORE_BUCKET_NAME;
 
   afterEach(() => {
@@ -122,19 +121,19 @@ describe('_getObjectStoreBucketName', () => {
   it('should return an object store bucket name', () => {
     process.env.OBJECT_STORE_BUCKET_NAME = 'test-bucket1';
 
-    const result = _getObjectStoreBucketName();
+    const result = getObjectStoreBucketName();
     expect(result).to.equal('test-bucket1');
   });
 
   it('should return its default value', () => {
     Object.assign(process.env, { OBJECT_STORE_BUCKET_NAME: undefined });
 
-    const result = _getObjectStoreBucketName();
+    const result = getObjectStoreBucketName();
     expect(result).to.equal('');
   });
 });
 
-describe('_getObjectStoreUrl', () => {
+describe('getObjectStoreUrl', () => {
   const OBJECT_STORE_URL = process.env.OBJECT_STORE_URL;
 
   afterEach(() => {
@@ -144,28 +143,28 @@ describe('_getObjectStoreUrl', () => {
   it('should return an object store bucket name that http protocol', () => {
     process.env.OBJECT_STORE_URL = 'http://s3.host.example.com';
 
-    const result = _getObjectStoreUrl();
+    const result = getObjectStoreUrl();
     expect(result).to.equal('http://s3.host.example.com');
   });
 
   it('should return an object store bucket name that https protocol', () => {
     process.env.OBJECT_STORE_URL = 'https://s3.host.example.com';
 
-    const result = _getObjectStoreUrl();
+    const result = getObjectStoreUrl();
     expect(result).to.equal('https://s3.host.example.com');
   });
 
   it('should return an object store bucket name that had no protocol', () => {
     process.env.OBJECT_STORE_URL = 's3.host.example.com';
 
-    const result = _getObjectStoreUrl();
+    const result = getObjectStoreUrl();
     expect(result).to.equal('https://s3.host.example.com');
   });
 
   it('should return its default value', () => {
     Object.assign(process.env, { OBJECT_STORE_URL: undefined });
 
-    const result = _getObjectStoreUrl();
+    const result = getObjectStoreUrl();
     expect(result).to.equal('https://nrs.objectstore.gov.bc.ca');
   });
 });
@@ -192,18 +191,6 @@ describe('getS3KeyPrefix', () => {
   });
 });
 
-describe('generateQueueS3FileKey', () => {
-  it('returns an s3 key with a prefix', async () => {
-    const result = generateQueueS3FileKey({
-      queueId: 1,
-      datasetUUID: '123-456-789',
-      fileName: 'testFileName'
-    });
-
-    expect(result).to.equal('biohub/queue/1/datasets/123-456-789/dwca/testFileName');
-  });
-});
-
 describe('generateDatasetS3FileKey', () => {
   it('returns an s3 key with a prefix', async () => {
     const result = generateDatasetS3FileKey({
@@ -211,6 +198,6 @@ describe('generateDatasetS3FileKey', () => {
       fileName: 'testFileName'
     });
 
-    expect(result).to.equal('biohub/datasets/123-456-789/dwca/testFileName');
+    expect(result).to.equal(`${process.env.S3_KEY_PREFIX || 'biohub'}/datasets/123-456-789/dwca/testFileName`);
   });
 });
