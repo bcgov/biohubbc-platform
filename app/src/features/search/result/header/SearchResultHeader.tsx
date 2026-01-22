@@ -1,5 +1,5 @@
 import { Button, Stack } from '@mui/material';
-import { SearchInput } from 'components/search-filter/SearchInput';
+import { SearchInput } from 'components/search/SearchInput';
 import { useEffect, useState } from 'react';
 
 interface SearchResultHeaderProps {

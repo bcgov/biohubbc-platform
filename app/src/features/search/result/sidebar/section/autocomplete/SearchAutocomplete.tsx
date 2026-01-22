@@ -35,7 +35,7 @@ export const SearchAutocomplete = ({
       size="small"
       options={options}
       value={value}
-      filterOptions={(x) => x} // disable frontend filtering
+      filterOptions={(x) => x}
       getOptionLabel={(option) => option.label}
       onChange={(_, newValue) => {
         setInputValue(''); // Clear the input value

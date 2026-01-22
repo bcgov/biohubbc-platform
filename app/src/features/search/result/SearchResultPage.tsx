@@ -44,7 +44,7 @@ export const SearchResultPage = () => {
     [codesDataLoader.data]
   );
 
-  const featureOptions = useMemo(
+  const featureTypeOptions = useMemo(
     () =>
       tabs.map((tab) => ({
         label: tab.label ?? tab.value,
@@ -62,6 +62,18 @@ export const SearchResultPage = () => {
     [codesDataLoader.data]
   );
 
+  /**
+   * Normalize value to lowercase for case-insensitive comparisons
+   * @param {string | number | undefined} value - The value to normalize
+   * @returns {string | number} The normalized value
+   */
+  const normalizeValue = useCallback((value: string | number | undefined): string | number => {
+    if (value === undefined || value === null) {
+      return '';
+    }
+    return String(value).toLowerCase();
+  }, []);
+
   // Build omitList from selected filters + manually omitListed items
   const computedOmitListedRecommended = useMemo(() => {
     const omitList: OmitListedRecommendedState = {
@@ -73,19 +85,19 @@ export const SearchResultPage = () => {
     // Add currently selected filters to the omitList
     if (searchParams.has(URL_PARAMS.SPECIES)) {
       const speciesValues = searchParams.getAll(URL_PARAMS.SPECIES);
-      speciesValues.forEach((val) => omitList.species.add(val.toLowerCase()));
+      speciesValues.forEach((val) => omitList.species.add(normalizeValue(val)));
     }
 
     if (searchParams.has(URL_PARAMS.FEATURE_TYPE)) {
       const featureTypeValues = searchParams.getAll(URL_PARAMS.FEATURE_TYPE);
-      featureTypeValues.forEach((val) => omitList.feature_types.add(val.toLowerCase()));
+      featureTypeValues.forEach((val) => omitList.feature_types.add(normalizeValue(val)));
     }
 
     // Note: Properties are filtered by feature type, so we don't omitList them globally
     // They're handled per feature type in the sidebar
 
     return omitList;
-  }, [omitListedRecommended, searchParams]);
+  }, [omitListedRecommended, searchParams, normalizeValue]);
 
   // Refresh recommended filters when search query or filters change
   useEffect(() => {
@@ -111,16 +123,6 @@ export const SearchResultPage = () => {
     refreshRecommended(recommendedFiltersInput);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, featureType, allFeatureTypes]);
-
-  /**
-   * Normalize value to lowercase for case-insensitive comparisons
-   */
-  const normalizeValue = useCallback((value: string | number | undefined): string | number => {
-    if (value === undefined || value === null) {
-      return '';
-    }
-    return String(value).toLowerCase();
-  }, []);
 
   // REMOVE RECOMMENDED: omitList it, deselect if selected, and trigger search
   const handleOmitListRecommended = useCallback(
@@ -170,14 +172,14 @@ export const SearchResultPage = () => {
   // Sort handling
   const sortOptionsBase = useMemo(
     () => [
-      { label: 'Date', value: 'created_at' },
-      { label: 'Name', value: 'name' },
-      { label: 'Relevance', value: 'relevance' }
+      { label: 'Date', value: 'create_date' },
+      { label: 'Name', value: 'feature_type_name' },
+      { label: 'Relevance', value: 'relevancy_score' }
     ],
     []
   );
 
-  const activeSort = pagination?.sort ?? 'relevance';
+  const activeSort = pagination?.sort ?? 'relevancy_score';
   const sortOrder = pagination?.order ?? 'desc';
 
   const handleSortChange = useCallback(
@@ -225,7 +227,7 @@ export const SearchResultPage = () => {
         }}>
         <SearchSidebar
           recommended={recommended}
-          featureOptions={featureOptions}
+          featureTypeOptions={featureTypeOptions}
           queryParams={searchParams}
           omitListedRecommended={computedOmitListedRecommended}
           onFilterChange={handleFilterChange}

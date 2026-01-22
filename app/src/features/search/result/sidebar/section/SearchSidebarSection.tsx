@@ -1,6 +1,6 @@
 import { Typography } from '@mui/material';
 import { Box } from '@mui/system';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SearchAutocomplete } from './autocomplete/SearchAutocomplete';
 import { SearchSidebarOption, SidebarOption } from './option/SearchSidebarOption';
 
@@ -59,6 +59,43 @@ export const SearchSidebarSection = ({
     }
     return String(value).toLowerCase();
   }, []);
+
+  /**
+   * Sync cache with selectedValues from URL params
+   * Ensures all selected values are cached so they display as selected checkboxes
+   */
+  useEffect(() => {
+    setSearchResultsCache((prev) => {
+      const next = new Map(prev);
+      const normalizedSelectedSet = new Set(selectedValues.map((val) => normalizeValue(val)));
+
+      // Add selected values to cache if not already there
+      selectedValues.forEach((value) => {
+        const normalized = normalizeValue(value);
+
+        // Check if already in cache (by normalized value)
+        const alreadyCached = Array.from(next.values()).some((opt) => normalizeValue(opt.value) === normalized);
+
+        if (!alreadyCached) {
+          // Create a minimal placeholder option for selected values not yet loaded
+          next.set(value, {
+            value,
+            label: String(value)
+          } as SidebarOption);
+        }
+      });
+
+      // Remove unselected values from cache
+      for (const [key, option] of next.entries()) {
+        const normalized = normalizeValue(option.value);
+        if (!normalizedSelectedSet.has(normalized)) {
+          next.delete(key);
+        }
+      }
+
+      return next;
+    });
+  }, [selectedValues, normalizeValue]);
 
   const handleCheckboxChange = useCallback(
     (option: SidebarOption, willBeSelected: boolean) => {
@@ -128,6 +165,33 @@ export const SearchSidebarSection = ({
     return merged;
   }, [searchResults, activeRecommended, normalizedSelectedValues, normalizeValue]);
 
+  /**
+   * Handle remove action: clears from URL params and omits from recommended list
+   * @param {SidebarOption} option - The option being removed
+   * @param {boolean} isSelected - Whether the option is currently selected
+   */
+  const handleRemoveOption = useCallback(
+    (option: SidebarOption, isSelected: boolean) => {
+      const normalizedValue = normalizeValue(option.value);
+
+      // Remove from search cache
+      setSearchResultsCache((prev) => {
+        const next = new Map(prev);
+        next.delete(option.value);
+        return next;
+      });
+
+      // Deselect if currently selected (removes from URL params)
+      if (isSelected) {
+        onDeselectOption(option);
+      }
+
+      // Always omit from recommended list, regardless of source
+      onRemoveRecommendedOption(normalizedValue);
+    },
+    [normalizeValue, onDeselectOption, onRemoveRecommendedOption]
+  );
+
   return (
     <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column' }}>
       {title && (
@@ -167,16 +231,7 @@ export const SearchSidebarSection = ({
               selected={isSelected}
               onCheckboxChange={() => handleCheckboxChange(option, !isSelected)}
               onClick={() => handleCheckboxChange(option, !isSelected)}
-              onRemove={() => {
-                setSearchResultsCache((prev) => {
-                  const next = new Map(prev);
-                  next.delete(option.value);
-                  return next;
-                });
-                if (isRecommended) {
-                  onRemoveRecommendedOption(normalizeValue(option.value));
-                }
-              }}
+              onRemove={() => handleRemoveOption(option, isSelected)}
             />
           );
         })}

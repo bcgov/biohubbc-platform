@@ -52,7 +52,8 @@ export const SearchFeatureResultWithRelevancy = z.object({
   feature_description: z.string().nullable(),
   submission_name: z.string(),
   is_secured: z.boolean(),
-  relevancy_score: z.number()
+  relevancy_score: z.number(),
+  create_date: z.string()
 });
 
 export type SearchableRecord = z.infer<typeof SearchableRecord>;

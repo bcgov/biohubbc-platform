@@ -3,6 +3,7 @@ import Icon from '@mdi/react';
 import { Box, Button, ClickAwayListener, Stack } from '@mui/material';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonHorizontalStack } from 'components/loading/SkeletonLoaders';
+import { SearchInput } from 'components/search/SearchInput';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
@@ -13,7 +14,6 @@ import { ApiPaginationRequestOptions } from 'types/pagination';
 import { SearchListbox } from './listbox/SearchListbox';
 import { SearchTabs } from './tab/SearchTabs';
 import { ISearchContainerLink } from './tab/SearchTabs.interface';
-import { SearchInput } from 'components/search-filter/SearchInput';
 
 const SEARCH_PREVIEW_PAGINATION: ApiPaginationRequestOptions = { limit: 3, page: 1 };
 const SEARCH_DEBOUNCE_MS = 400;

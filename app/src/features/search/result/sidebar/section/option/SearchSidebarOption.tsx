@@ -60,7 +60,8 @@ export const SearchSidebarOption = ({
             primary={option.label}
             primaryTypographyProps={{
               fontSize: '0.8rem',
-              color: recommended ? 'textSecondary' : 'textPrimary'
+              color: recommended ? 'textSecondary' : 'textPrimary',
+              textTransform: 'capitalize'
             }}
           />
         </Box>

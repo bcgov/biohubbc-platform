@@ -121,9 +121,9 @@ export class SearchFeatureRepository extends BaseRepository {
 
   /**
    * Searches for submission features matching the provided filters with relevancy scoring.
-   * @param filters - Search filters including keyword, feature types, species, and property conditions
-   * @param pagination - Optional pagination options (page and limit)
-   * @returns Promise resolving to array of matching features with relevancy scores
+   * @param {ISearchFeaturesFilters} filters - Search filters including keyword, feature types, species, and property conditions
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options (page, limit, sort, and order)
+   * @returns {Promise<SearchFeatureResultWithRelevancy[]>} Promise resolving to array of matching features with relevancy scores
    */
   async searchFeaturesByFilters(
     filters: ISearchFeaturesFilters,
@@ -139,10 +139,8 @@ export class SearchFeatureRepository extends BaseRepository {
     const knex = getKnex();
     let query = this.buildSearchQuery(knex, filters);
 
-    if (pagination) {
-      const offset = (pagination.page - 1) * pagination.limit;
-      query = query.limit(pagination.limit).offset(offset);
-    }
+    // Apply pagination and sorting using base repository method
+    query = this.applyPagination(query, pagination);
 
     const response = await this.connection.knex(query, SearchFeatureResultWithRelevancy);
 
@@ -151,8 +149,8 @@ export class SearchFeatureRepository extends BaseRepository {
 
   /**
    * Gets the count of features matching the provided search criteria.
-   * @param filters - Search filters to count results for
-   * @returns Promise resolving to the count of matching features
+   * @param {ISearchFeaturesFilters} filters - Search filters to count results for
+   * @returns {Promise<number>} Promise resolving to the count of matching features
    */
   async searchFeaturesByFiltersCount(filters: ISearchFeaturesFilters): Promise<number> {
     defaultLog.debug({ label: 'searchFeaturesByFiltersCount', filters });
@@ -165,9 +163,9 @@ export class SearchFeatureRepository extends BaseRepository {
 
   /**
    * Builds the search query combining all filter types and CTEs.
-   * @param knex - Knex instance
-   * @param filters - Search filters to apply
-   * @returns Knex query builder with all filters applied
+   * @param {Knex} knex - Knex instance
+   * @param {ISearchFeaturesFilters} filters - Search filters to apply
+   * @returns {Knex.QueryBuilder} Knex query builder with all filters applied
    */
   private buildSearchQuery(knex: Knex, filters: ISearchFeaturesFilters): Knex.QueryBuilder {
     const keyword = filters.keyword ?? '';
@@ -179,12 +177,12 @@ export class SearchFeatureRepository extends BaseRepository {
 
   /**
    * Combines all filter CTEs into a single query with intersection and relevancy aggregation.
-   * @param knex - Knex instance
-   * @param keyword - Search keyword for full-text search
-   * @param featureTypes - Feature type names to filter by
-   * @param speciesFilters - Species values to filter by
-   * @param propertyGroups - Property condition groups to filter by
-   * @returns Knex query builder with all CTEs and final selection
+   * @param {Knex} knex - Knex instance
+   * @param {string} keyword - Search keyword for full-text search
+   * @param {string[]} featureTypes - Feature type names to filter by
+   * @param {string[]} speciesFilters - Species values to filter by
+   * @param {ISearchFeaturePropertyGroup[]} propertyGroups - Property condition groups to filter by
+   * @returns {Knex.QueryBuilder} Knex query builder with all CTEs and final selection
    */
   private buildQueryWithCTEs(
     knex: Knex,
@@ -199,7 +197,7 @@ export class SearchFeatureRepository extends BaseRepository {
       }
     ).length;
 
-    let query = knex
+    const query = knex
       .queryBuilder()
       .with('keyword_results', (qb) => {
         if (keyword.trim()) {
@@ -255,7 +253,8 @@ export class SearchFeatureRepository extends BaseRepository {
             knex.raw('null::text as feature_description'),
             knex.raw('null::text as submission_name'),
             knex.raw('null::boolean as is_secured'),
-            knex.raw('0::integer as relevancy_score')
+            knex.raw('0::integer as relevancy_score'),
+            knex.raw('null::text as create_date')
           ).whereRaw('false');
         } else {
           qb.from(activeSets[0]);
@@ -281,6 +280,7 @@ export class SearchFeatureRepository extends BaseRepository {
           'feature_description',
           'submission_name',
           'is_secured',
+          'create_date',
           knex.raw('SUM(relevancy_score) as total_relevancy_score')
         )
           .from('active_ctes')
@@ -294,7 +294,8 @@ export class SearchFeatureRepository extends BaseRepository {
             'feature_name',
             'feature_description',
             'submission_name',
-            'is_secured'
+            'is_secured',
+            'create_date'
           );
       });
 
@@ -309,18 +310,18 @@ export class SearchFeatureRepository extends BaseRepository {
         'feature_description',
         'submission_name',
         'is_secured',
-        'total_relevancy_score as relevancy_score'
+        'total_relevancy_score as relevancy_score',
+        'create_date'
       )
-      .from('aggregated_results')
-      .orderBy('total_relevancy_score', 'desc');
+      .from('aggregated_results');
   }
 
   /**
    * Builds CTE for keyword-based full-text search in search_string table.
    * Uses PostgreSQL tsvector/tsquery for ranking and relevancy scoring.
-   * @param keyword - The search keyword
-   * @param knex - Knex instance
-   * @returns Knex query builder for keyword search CTE
+   * @param {string} keyword - The search keyword
+   * @param {Knex} knex - Knex instance
+   * @returns {Knex.QueryBuilder} Knex query builder for keyword search CTE
    */
   private buildKeywordSearchCTE(keyword: string, knex: Knex): Knex.QueryBuilder {
     return knex('search_string as ss')
@@ -335,6 +336,7 @@ export class SearchFeatureRepository extends BaseRepository {
         knex.raw(`sf.data->>'description' as feature_description`),
         's.name as submission_name',
         'security_check.is_secured',
+        'sf.create_date',
         knex.raw(`ts_rank(to_tsvector('english', ss.value), plainto_tsquery('english', ?)) as relevancy_score`, [
           keyword
         ])
@@ -347,9 +349,9 @@ export class SearchFeatureRepository extends BaseRepository {
 
   /**
    * Builds CTE for feature type filtering.
-   * @param featureTypes - Array of feature type names to filter by
-   * @param knex - Knex instance
-   * @returns Knex query builder for feature type search CTE
+   * @param {string[]} featureTypes - Array of feature type names to filter by
+   * @param {Knex} knex - Knex instance
+   * @returns {Knex.QueryBuilder} Knex query builder for feature type search CTE
    */
   private buildFeatureTypeSearchCTE(featureTypes: string[], knex: Knex): Knex.QueryBuilder {
     return knex('submission_feature as sf')
@@ -364,6 +366,7 @@ export class SearchFeatureRepository extends BaseRepository {
         knex.raw(`sf.data->>'description' as feature_description`),
         's.name as submission_name',
         'security_check.is_secured',
+        'sf.create_date',
         knex.raw('1.0 as relevancy_score')
       )
       .join('submission as s', 'sf.submission_id', 's.submission_id')
@@ -375,9 +378,9 @@ export class SearchFeatureRepository extends BaseRepository {
   /**
    * Builds CTE for species filtering.
    * Searches the search_string table for 'species' property matching provided values.
-   * @param speciesFilters - Array of species values to filter by
-   * @param knex - Knex instance
-   * @returns Knex query builder for species search CTE
+   * @param {string[]} speciesFilters - Array of species values to filter by
+   * @param {Knex} knex - Knex instance
+   * @returns {Knex.QueryBuilder} Knex query builder for species search CTE
    */
   private buildSpeciesSearchCTE(speciesFilters: string[], knex: Knex): Knex.QueryBuilder {
     return knex('search_string as ss')
@@ -392,6 +395,7 @@ export class SearchFeatureRepository extends BaseRepository {
         knex.raw(`sf.data->>'description' as feature_description`),
         's.name as submission_name',
         'security_check.is_secured',
+        'sf.create_date',
         knex.raw('1.0 as relevancy_score')
       )
       .join('submission_feature as sf', 'ss.submission_feature_id', 'sf.submission_feature_id')
@@ -406,9 +410,9 @@ export class SearchFeatureRepository extends BaseRepository {
   /**
    * Builds CTE for property-based filtering with complex conditions.
    * Handles multiple property groups with AND/OR operands.
-   * @param propertyGroups - Array of property condition groups
-   * @param knex - Knex instance
-   * @returns Knex query builder for property search CTE
+   * @param {ISearchFeaturePropertyGroup[]} propertyGroups - Array of property condition groups
+   * @param {Knex} knex - Knex instance
+   * @returns {Knex.QueryBuilder} Knex query builder for property search CTE
    */
   private buildPropertySearchCTE(propertyGroups: ISearchFeaturePropertyGroup[], knex: Knex): Knex.QueryBuilder {
     const groupQueries = propertyGroups.map((group) => {
@@ -430,6 +434,7 @@ export class SearchFeatureRepository extends BaseRepository {
         'feature_description',
         'submission_name',
         'is_secured',
+        'create_date',
         knex.raw('SUM(relevancy_score) as relevancy_score')
       )
       .groupBy(
@@ -441,15 +446,16 @@ export class SearchFeatureRepository extends BaseRepository {
         'feature_name',
         'feature_description',
         'submission_name',
-        'is_secured'
+        'is_secured',
+        'create_date'
       );
   }
 
   /**
    * Builds query for a single property group with AND/OR logic.
-   * @param group - Property group with operand and conditions
-   * @param knex - Knex instance
-   * @returns Knex query builder combining conditions
+   * @param {ISearchFeaturePropertyGroup} group - Property group with operand and conditions
+   * @param {Knex} knex - Knex instance
+   * @returns {Knex.QueryBuilder} Knex query builder combining conditions
    */
   private buildPropertyGroupQuery(group: ISearchFeaturePropertyGroup, knex: Knex): Knex.QueryBuilder {
     const conditionQueries = group.conditions.map((cond) => {
@@ -471,9 +477,9 @@ export class SearchFeatureRepository extends BaseRepository {
   /**
    * Builds query for a single property condition across all search types.
    * Unions results from string, number, and datetime search tables with operator applied.
-   * @param condition - Property condition with name, operator, and value
-   * @param knex - Knex instance
-   * @returns Knex query builder for condition
+   * @param {ISearchFeaturePropertyCondition} condition - Property condition with name, operator, and value
+   * @param {Knex} knex - Knex instance
+   * @returns {Knex.QueryBuilder} Knex query builder for condition
    */
   private buildConditionQuery(condition: ISearchFeaturePropertyCondition, knex: Knex): Knex.QueryBuilder {
     const stringQuery = this.buildPropertyValueQuery('search_string', condition.name, knex);
@@ -492,10 +498,10 @@ export class SearchFeatureRepository extends BaseRepository {
   /**
    * Builds base query for property value search from a specific search table type.
    * Handles joins to submission_feature, submission, feature_type, and feature_property.
-   * @param searchTable - The search table name ('search_string', 'search_number', etc.)
-   * @param propertyName - The feature property name to filter by
-   * @param knex - Knex instance
-   * @returns Knex query builder for property value search
+   * @param {string} searchTable - The search table name ('search_string', 'search_number', etc.)
+   * @param {string} propertyName - The feature property name to filter by
+   * @param {Knex} knex - Knex instance
+   * @returns {Knex.QueryBuilder} Knex query builder for property value search
    */
   private buildPropertyValueQuery(searchTable: string, propertyName: string, knex: Knex): Knex.QueryBuilder {
     return knex(`${searchTable} as ss`)
@@ -510,6 +516,7 @@ export class SearchFeatureRepository extends BaseRepository {
         knex.raw(`sf.data->>'description' as feature_description`),
         's.name as submission_name',
         'security_check.is_secured',
+        'sf.create_date',
         knex.raw('1.0 as relevancy_score')
       )
       .join('submission_feature as sf', 'ss.submission_feature_id', 'sf.submission_feature_id')
