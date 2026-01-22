@@ -1,4 +1,5 @@
 import chai, { expect } from 'chai';
+import dayjs from 'dayjs';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
@@ -37,7 +38,8 @@ describe('searchFeatures', () => {
         feature_description: 'A study of moose habitat in Northern BC',
         submission_name: 'Wildlife Monitoring Project',
         is_secured: false,
-        relevancy_score: 0.75
+        relevancy_score: 0.75,
+        create_date: dayjs().toISOString()
       }
     ];
 
@@ -93,7 +95,8 @@ describe('searchFeatures', () => {
         feature_description: 'Population survey data for moose',
         submission_name: 'Species Census 2024',
         is_secured: true,
-        relevancy_score: 0.6
+        relevancy_score: 0.6,
+        create_date: dayjs().toISOString()
       }
     ];
 
@@ -149,7 +152,8 @@ describe('searchFeatures', () => {
         feature_description: 'Description 1',
         submission_name: 'Submission 1',
         is_secured: false,
-        relevancy_score: 0.8
+        relevancy_score: 0.8,
+        create_date: dayjs().toISOString()
       }
     ];
 
@@ -284,7 +288,8 @@ describe('searchFeatures', () => {
         feature_description: 'Description',
         submission_name: 'Submission',
         is_secured: false,
-        relevancy_score: 0.9
+        relevancy_score: 0.9,
+        create_date: dayjs().toISOString()
       }
     ];
 

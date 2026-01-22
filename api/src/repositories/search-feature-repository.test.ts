@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import dayjs from 'dayjs';
 import { QueryResult } from 'pg';
 import Sinon from 'sinon';
 import { ApiExecuteSQLError } from '../errors/api-error';
@@ -292,7 +293,8 @@ describe('SearchFeatureRepository', () => {
           feature_description: 'A study of moose',
           submission_name: 'Wildlife Project',
           is_secured: false,
-          relevancy_score: 0.8
+          relevancy_score: 0.8,
+          create_date: dayjs().toISOString()
         }
       ];
 
@@ -328,7 +330,8 @@ describe('SearchFeatureRepository', () => {
           feature_description: null,
           submission_name: 'Wildlife Project',
           is_secured: false,
-          relevancy_score: 1.0
+          relevancy_score: 1.0,
+          create_date: dayjs().toISOString()
         }
       ];
 
@@ -363,7 +366,8 @@ describe('SearchFeatureRepository', () => {
           feature_description: null,
           submission_name: 'Wildlife Project',
           is_secured: false,
-          relevancy_score: 1.0
+          relevancy_score: 1.0,
+          create_date: dayjs().toISOString()
         }
       ];
 
@@ -398,7 +402,8 @@ describe('SearchFeatureRepository', () => {
           feature_description: null,
           submission_name: 'Project',
           is_secured: false,
-          relevancy_score: 1.0
+          relevancy_score: 1.0,
+          create_date: dayjs().toISOString()
         }
       ];
 
@@ -443,7 +448,8 @@ describe('SearchFeatureRepository', () => {
           feature_description: null,
           submission_name: 'Project',
           is_secured: false,
-          relevancy_score: 1.0
+          relevancy_score: 1.0,
+          create_date: dayjs().toISOString()
         }
       ];
 

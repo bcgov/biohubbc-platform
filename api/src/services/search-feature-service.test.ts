@@ -1,4 +1,5 @@
 import chai, { expect } from 'chai';
+import dayjs from 'dayjs';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
@@ -408,7 +409,8 @@ describe('SearchFeatureService', () => {
           feature_description: 'A study of moose',
           submission_name: 'Wildlife Project',
           is_secured: false,
-          relevancy_score: 0.5
+          relevancy_score: 0.5,
+          create_date: dayjs().toISOString()
         }
       ];
 
@@ -435,7 +437,8 @@ describe('SearchFeatureService', () => {
           feature_description: 'Moose dataset',
           submission_name: 'Wildlife Project',
           is_secured: false,
-          relevancy_score: 1.0
+          relevancy_score: 1.0,
+          create_date: dayjs().toISOString()
         }
       ];
 
@@ -462,7 +465,9 @@ describe('SearchFeatureService', () => {
           feature_description: null,
           submission_name: 'Wildlife Project',
           is_secured: false,
-          relevancy_score: 1.0
+          relevancy_score: 1.0,
+
+          create_date: dayjs().toISOString()
         }
       ];
 
@@ -489,7 +494,9 @@ describe('SearchFeatureService', () => {
           feature_description: null,
           submission_name: 'Project',
           is_secured: false,
-          relevancy_score: 1.0
+          relevancy_score: 1.0,
+
+          create_date: dayjs().toISOString()
         }
       ];
 
@@ -528,7 +535,9 @@ describe('SearchFeatureService', () => {
           feature_description: null,
           submission_name: 'Project',
           is_secured: false,
-          relevancy_score: 1.0
+          relevancy_score: 1.0,
+
+          create_date: dayjs().toISOString()
         }
       ];
 
