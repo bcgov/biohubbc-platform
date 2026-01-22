@@ -16,7 +16,7 @@ export async function up(knex: Knex): Promise<void> {
     -- Insert feature types
     ----------------------------------------------------------------------------------------
     INSERT INTO feature_type (name, display_name, description)
-    VALUES 
+    SELECT * FROM (VALUES 
         (
             'animal',
             'Animal',
@@ -151,7 +151,13 @@ export async function up(knex: Knex): Promise<void> {
             'telemetry_device',
             'Telemetry device',
             'A telemetry device.'
-        );
+        )
+    ) AS v(name, display_name, description)
+    WHERE NOT EXISTS (
+        SELECT 1 FROM feature_type 
+        WHERE feature_type.name = v.name 
+        AND feature_type.record_end_date IS NULL
+    );
 
 
     ----------------------------------------------------------------------------------------
@@ -159,7 +165,7 @@ export async function up(knex: Knex): Promise<void> {
     ----------------------------------------------------------------------------------------
     INSERT INTO 
         feature_property_type (name, description)
-    VALUES 
+    SELECT * FROM (VALUES 
         ('array', 'An array type'),
         ('artifact_key', 'An artifact key type (string)'),
         ('boolean', 'A boolean type'),
@@ -167,14 +173,20 @@ export async function up(knex: Knex): Promise<void> {
         ('number', 'A number type'),
         ('object', 'An object type'),
         ('spatial', 'A spatial type'),
-        ('string', 'A string type');
+        ('string', 'A string type')
+    ) AS v(name, description)
+    WHERE NOT EXISTS (
+        SELECT 1 FROM feature_property_type 
+        WHERE feature_property_type.name = v.name 
+        AND feature_property_type.record_end_date IS NULL
+    );
 
     ----------------------------------------------------------------------------------------
     -- Insert feature properties
     ----------------------------------------------------------------------------------------
     INSERT INTO 
         feature_property (feature_property_type_id, name, display_name, description, calculated_value)
-    VALUES 
+    SELECT * FROM (VALUES 
         -- COMMON PROPERTIES
         (
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),  
@@ -628,14 +640,20 @@ export async function up(knex: Knex): Promise<void> {
             'Sign',
             'The sign of the species observation.',
             false
-        );
+        )
+    ) AS v(feature_property_type_id, name, display_name, description, calculated_value)
+    WHERE NOT EXISTS (
+        SELECT 1 FROM feature_property 
+        WHERE feature_property.name = v.name 
+        AND feature_property.record_end_date IS NULL
+    );
 
 ----------------------------------------------------------------------------------------
 -- Assign feature properties to feature types
 ----------------------------------------------------------------------------------------
 INSERT INTO 
     feature_type_property (feature_type_id, feature_property_id, required_value)
-VALUES
+SELECT * FROM (VALUES
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'animal'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'taxon_id'),
@@ -1130,7 +1148,14 @@ VALUES
         (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_device'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'serial_number'),
         true
-    );
+    )
+) AS v(feature_type_id, feature_property_id, required_value)
+WHERE NOT EXISTS (
+    SELECT 1 FROM feature_type_property 
+    WHERE feature_type_property.feature_type_id = v.feature_type_id 
+    AND feature_type_property.feature_property_id = v.feature_property_id
+    AND feature_type_property.record_end_date IS NULL
+);
   `);
 }
 
