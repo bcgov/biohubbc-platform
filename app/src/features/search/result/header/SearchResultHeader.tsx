@@ -6,15 +6,21 @@ interface SearchResultHeaderProps {
   isSubmitting: boolean;
   searchTerm: string;
   onSubmit: (value: string) => void;
+  onClear: () => void;
 }
 
-export const SearchResultHeader = ({ isSubmitting, searchTerm, onSubmit }: SearchResultHeaderProps) => {
+export const SearchResultHeader = ({ isSubmitting, searchTerm, onSubmit, onClear }: SearchResultHeaderProps) => {
   const [value, setValue] = useState(searchTerm);
 
   // sync input with external searchTerm
   useEffect(() => {
     setValue(searchTerm);
   }, [searchTerm]);
+
+  const handleClear = () => {
+    setValue('');
+    onClear();
+  };
 
   return (
     <Stack
@@ -28,7 +34,7 @@ export const SearchResultHeader = ({ isSubmitting, searchTerm, onSubmit }: Searc
         value={value}
         placeholder="Search…"
         onChange={(e) => setValue(e.target.value)}
-        onClear={() => setValue('')}
+        onClear={handleClear}
         onSubmit={onSubmit}
       />
 

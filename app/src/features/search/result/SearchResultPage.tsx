@@ -20,7 +20,7 @@ export enum SEARCH_RESULT_OPTION_VIEW {
 }
 
 export const SearchResultPage = () => {
-  const { rows, isLoading, searchParams, setSearchParams, removeParamValue, pagination } = useSearchResults();
+  const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination } = useSearchResults();
   const { codesDataLoader } = useCodesContext();
 
   const hasBeenCalled = useRef(false);
@@ -142,7 +142,7 @@ export const SearchResultPage = () => {
 
       // Deselect if currently selected
       if (param && searchParams.has(param, normalizedId)) {
-        removeParamValue(param, normalizedId);
+        removeSearchParam(param, normalizedId);
       }
 
       // OmitList it (store normalized value)
@@ -151,7 +151,7 @@ export const SearchResultPage = () => {
         [type]: new Set([...prev[type], normalizedId])
       }));
     },
-    [searchParams, removeParamValue, normalizeValue]
+    [searchParams, removeSearchParam, normalizeValue]
   );
 
   /**
@@ -164,13 +164,13 @@ export const SearchResultPage = () => {
 
       if (replace === undefined) {
         // DESELECT: remove from query params
-        removeParamValue(param, normalizedValue);
+        removeSearchParam(param, normalizedValue);
       } else {
         // SELECT: add to query params (or replace if replace=true)
         setSearchParams({ [param]: normalizedValue as string }, replace);
       }
     },
-    [setSearchParams, removeParamValue, normalizeValue]
+    [setSearchParams, removeSearchParam, normalizeValue]
   );
 
   // Sort handling
@@ -256,6 +256,7 @@ export const SearchResultPage = () => {
                   replace: true
                 })
               }
+              onClear={() => removeSearchParam(URL_PARAMS.SEARCH_QUERY)}
               isSubmitting={isLoading}
             />
           </PageHeader>

@@ -11,21 +11,19 @@ export interface SearchResultsSectionProps {
   onSubmissionSelect: (submissionId: number) => void;
   onTaxonomySelect: (taxonId: number) => void;
   onFeatureSelect: (featureId: number) => void;
-  onViewMore: (sectionKey: string) => void;
 }
 
 export const SearchResultsSection = ({
   results,
   onSubmissionSelect,
   onTaxonomySelect,
-  onFeatureSelect,
-  onViewMore
+  onFeatureSelect
 }: SearchResultsSectionProps) => {
   const { features, submissions, taxonomy } = results;
 
   const renderFeaturesList = () => (
     <Box>
-      <SearchSectionHeader label="Features" onTitleClick={() => onViewMore('features')} />
+      <SearchSectionHeader label="Features" />
       {features.data.map((item: SearchFeatureResult) => (
         <SearchOptionItem
           key={`feature-${item.submission_feature_id}`}
@@ -39,7 +37,7 @@ export const SearchResultsSection = ({
 
   const renderSubmissionsList = () => (
     <Box>
-      <SearchSectionHeader label="Submissions" onTitleClick={() => onViewMore('submissions')} />
+      <SearchSectionHeader label="Submissions" />
       {submissions.data.map((item) => (
         <SearchOptionItem
           key={`submission-${item.submission_id}`}
@@ -51,23 +49,16 @@ export const SearchResultsSection = ({
     </Box>
   );
 
-  const renderTaxonomyList = () => {
-    if (taxonomy.data.length === 0) {
-      return null;
-    }
-
-    /**
-     * Highlight the first taxon (best match) with a cardcomponent
-     */
-    const firstTaxon = taxonomy.data[0];
-
-    return (
-      <Box>
-        <SearchSectionHeader label="Species" onTitleClick={() => onViewMore('taxonomy')} />
-        <SearchTaxonCard key={firstTaxon.taxon_id} taxon={firstTaxon} onSelect={(id) => onTaxonomySelect(id)} />
-      </Box>
-    );
-  };
+  const renderTaxonomyList = () => (
+    <Box>
+      <SearchSectionHeader label="Species" />
+      <SearchTaxonCard
+        key={taxonomy.data[0].taxon_id}
+        taxon={taxonomy.data[0]}
+        onSelect={(id) => onTaxonomySelect(id)}
+      />
+    </Box>
+  );
 
   return (
     <>

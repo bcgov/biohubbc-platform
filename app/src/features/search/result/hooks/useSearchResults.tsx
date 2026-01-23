@@ -136,17 +136,24 @@ export const useSearchResults = () => {
   );
 
   /**
-   * Remove a single value from a multi-value param
+   * Remove a single value from a multi-value param,
+   * or all values if value is not provided
    */
-  const removeParamValue = useCallback(
-    (key: UrlParamKey, value: string | number) => {
+  const removeSearchParam = useCallback(
+    (key: UrlParamKey, value?: string | number) => {
       const normalizedKey = key.toLowerCase() as UrlParamKey;
-      const normalizedValue = normalizeValue(value);
       const newParams = new TypedURLSearchParams(searchParams.toString());
-      const remaining = newParams.getAll(normalizedKey).filter((v) => v !== normalizedValue);
 
-      newParams.delete(normalizedKey);
-      remaining.forEach((v) => newParams.append(normalizedKey, v));
+      if (value !== undefined) {
+        const normalizedValue = normalizeValue(value);
+        const remaining = newParams.getAll(normalizedKey).filter((v) => v !== normalizedValue);
+
+        newParams.delete(normalizedKey);
+        remaining.forEach((v) => newParams.append(normalizedKey, v));
+      } else {
+        // No value → remove all values for this key
+        newParams.delete(normalizedKey);
+      }
 
       // Reset page unless updating page/limit
       if (
@@ -170,7 +177,7 @@ export const useSearchResults = () => {
     searchParams,
     setSearchParams,
     getParam,
-    removeParamValue,
+    removeSearchParam,
     pagination: searchDataLoader.data?.pagination
   };
 };

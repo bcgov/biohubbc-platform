@@ -23,61 +23,17 @@ export interface SearchListboxProps {
 
 export const SearchListbox = ({ records, summary, searchTerm, isLoading = false }: SearchListboxProps) => {
   const navigate = useNavigate();
-  const handleSummaryItemSelect = useCallback(
-    (term: string) => {
+
+  const navigateWithQuery = useCallback(
+    (value: string | number) => {
       navigate(
         buildSearchQuery('list', {
-          [URL_PARAMS.SEARCH_QUERY]: term
+          [URL_PARAMS.SEARCH_QUERY]: value
         })
       );
     },
     [navigate]
   );
-
-  const handleViewMore = useCallback(() => {
-    navigate(buildSearchQuery('list', {}));
-  }, [navigate]);
-
-  const handleSubmissionSelect = useCallback(
-    (submissionId: number | string) => {
-      navigate(
-        buildSearchQuery('list', {
-          [URL_PARAMS.SEARCH_QUERY]: submissionId
-        })
-      );
-    },
-    [navigate]
-  );
-
-  const handleTaxonomySelect = useCallback(
-    (taxonId: number | string) => {
-      navigate(
-        buildSearchQuery('list', {
-          [URL_PARAMS.SEARCH_QUERY]: taxonId
-        })
-      );
-    },
-    [navigate]
-  );
-
-  const handleFeatureSelect = useCallback(
-    (featureId: number | string) => {
-      navigate(
-        buildSearchQuery('list', {
-          [URL_PARAMS.SEARCH_QUERY]: featureId
-        })
-      );
-    },
-    [navigate]
-  );
-
-  const handleSearchEverything = useCallback(() => {
-    navigate(
-      buildSearchQuery('list', {
-        [URL_PARAMS.SEARCH_QUERY]: searchTerm
-      })
-    );
-  }, [navigate, searchTerm]);
 
   const hasResults = !!records || !!summary;
 
@@ -101,25 +57,25 @@ export const SearchListbox = ({ records, summary, searchTerm, isLoading = false 
         <>
           {searchTerm && (
             <SearchOptionItem
-              startIcon={<Icon path={mdiMagnify} size={1} style={{ display: 'block' }} />}
+              startIcon={<Icon path={mdiMagnify} size={1} />}
               name={`Search for "${searchTerm}"`}
               sx={{
                 color: appTheme.palette.primary.light,
                 bgcolor: grey[100],
                 borderRadius: 1
               }}
-              description={undefined}
-              onSelect={handleSearchEverything}
+              onSelect={() => navigateWithQuery(searchTerm)}
             />
           )}
-          {summary && <SearchSummarySection results={summary} onItemSelect={handleSummaryItemSelect} />}
+
+          {summary && <SearchSummarySection results={summary} onItemSelect={(term) => navigateWithQuery(term)} />}
+
           {records && (
             <SearchResultsSection
               results={records}
-              onSubmissionSelect={handleSubmissionSelect}
-              onTaxonomySelect={handleTaxonomySelect}
-              onFeatureSelect={handleFeatureSelect}
-              onViewMore={handleViewMore}
+              onSubmissionSelect={(id) => navigateWithQuery(id)}
+              onTaxonomySelect={(id) => navigateWithQuery(id)}
+              onFeatureSelect={(id) => navigateWithQuery(id)}
             />
           )}
         </>

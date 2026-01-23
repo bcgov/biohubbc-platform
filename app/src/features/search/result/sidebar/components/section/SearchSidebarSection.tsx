@@ -99,14 +99,16 @@ export const SearchSidebarSection = ({
 
   const handleCheckboxChange = useCallback(
     (option: SidebarOption, willBeSelected: boolean) => {
+      const normalizedValue = normalizeValue(option.value);
       if (willBeSelected) {
         setSearchResultsCache((prev) => new Map(prev).set(option.value, option));
         onSelectOption(option);
       } else {
         onDeselectOption(option);
       }
+      onRemoveRecommendedOption(normalizedValue);
     },
-    [onSelectOption, onDeselectOption]
+    [onSelectOption, onDeselectOption, normalizeValue, onRemoveRecommendedOption]
   );
 
   // Normalize selected values for comparison
