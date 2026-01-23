@@ -1,24 +1,14 @@
-import { Typography } from '@mui/material';
-import { Box } from '@mui/system';
+import { Box, Typography } from '@mui/material';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SearchAutocomplete } from './autocomplete/SearchAutocomplete';
 import { SearchSidebarOption, SidebarOption } from './option/SearchSidebarOption';
 
-/**
- * Filter section configuration and state
- *
- * OPERATIONS:
- * 1. SELECT - adds option to query params, triggers search with that filter
- * 2. DESELECT - removes option from query params, triggers search without that filter, option stays in cache
- * 3. REMOVE - removes option from recommended list permanently (omitListed), deselects if selected,
- *    triggers search without that filter
- */
 export interface FilterSectionProps {
   title: string;
-  options: SidebarOption[]; // searchable options (from search/API)
-  recommendedOptions: SidebarOption[]; // recommended options, based on the query params
-  selectedValues: Array<string | number>; // applied options, based on the query params
-  omitListedRecommendedIds: Set<string | number>; // recommended options that have been dismissed by the user
+  options: SidebarOption[]; // from search/API
+  recommendedOptions: SidebarOption[]; // recommended based on query
+  selectedValues: Array<string | number>; // from query params
+  omitListedRecommendedIds: Set<string | number>; // IDs user dismissed
   searchPlaceholder?: string;
   checkbox?: boolean;
   onSearch?: (query: string) => void;
@@ -27,184 +17,145 @@ export interface FilterSectionProps {
   onRemoveRecommendedOption: (id: string | number) => void;
 }
 
-interface MergedOption {
-  option: SidebarOption;
-  isRecommended: boolean;
-  isSelected: boolean;
-  source: 'search' | 'recommended';
-}
+/**
+ * Searchbar section:
+ * - Caches options that have been interacted with
+ * - Removing an option clears it from the cache and adds it to the omit list
+ * - Clicking an option toggles it in the URL params, for search
+ *
+ * @param {FilterSectionProps} props
+ * @returns {*}
+ */
+export const SearchSidebarSection = (props: FilterSectionProps) => {
+  const {
+    title,
+    options,
+    recommendedOptions,
+    selectedValues,
+    omitListedRecommendedIds,
+    searchPlaceholder = 'Search...',
+    checkbox = false,
+    onSearch,
+    onSelectOption,
+    onDeselectOption,
+    onRemoveRecommendedOption
+  } = props;
 
-export const SearchSidebarSection = ({
-  title,
-  options,
-  recommendedOptions,
-  selectedValues,
-  omitListedRecommendedIds,
-  searchPlaceholder = 'Search...',
-  checkbox = false,
-  onSearch,
-  onSelectOption,
-  onDeselectOption,
-  onRemoveRecommendedOption
-}: FilterSectionProps) => {
-  // Cache for displaying search results (populated via search API)
-  const [searchResultsCache, setSearchResultsCache] = useState<Map<string | number, SidebarOption>>(new Map());
+  // Normalize a value once
+  const normalize = useCallback((v: string | number | undefined) => String(v ?? '').toLowerCase(), []);
 
-  /**
-   * Normalize value to lowercase for case-insensitive comparisons
-   */
-  const normalizeValue = useCallback((value: string | number | undefined): string | number => {
-    if (value === undefined || value === null) {
-      return '';
-    }
-    return String(value).toLowerCase();
-  }, []);
+  // Cache for main options (search results + selected values)
+  const [cache, setCache] = useState<Map<string, SidebarOption>>(new Map());
 
-  /**
-   * Sync cache with selectedValues from URL params
-   * Ensures all selected values are cached so they display as selected checkboxes
-   */
+  // Sync cache with selectedValues (add only, never remove)
   useEffect(() => {
-    setSearchResultsCache((prev) => {
+    setCache((prev) => {
       const next = new Map(prev);
-      const normalizedSelectedSet = new Set(selectedValues.map((val) => normalizeValue(val)));
-
-      // Add selected values to cache if not already there
-      selectedValues.forEach((value) => {
-        const normalized = normalizeValue(value);
-
-        // Check if already in cache (by normalized value)
-        const alreadyCached = Array.from(next.values()).some((opt) => normalizeValue(opt.value) === normalized);
-
-        if (!alreadyCached) {
-          // Create a minimal placeholder option for selected values not yet loaded
-          next.set(value, {
-            value,
-            label: String(value)
-          } as SidebarOption);
+      selectedValues.forEach((val) => {
+        const id = normalize(val);
+        if (!next.has(id)) {
+          next.set(id, { value: val, label: String(val) });
         }
       });
-
-      // Remove unselected values from cache
-      for (const [key, option] of next.entries()) {
-        const normalized = normalizeValue(option.value);
-        if (!normalizedSelectedSet.has(normalized)) {
-          next.delete(key);
-        }
-      }
-
       return next;
     });
-  }, [selectedValues, normalizeValue]);
+  }, [selectedValues, normalize]);
 
+  // Handle checkbox changes
   const handleCheckboxChange = useCallback(
-    (option: SidebarOption, willBeSelected: boolean) => {
-      const normalizedValue = normalizeValue(option.value);
-      if (willBeSelected) {
-        setSearchResultsCache((prev) => new Map(prev).set(option.value, option));
+    (option: SidebarOption, willSelect: boolean) => {
+      const id = normalize(option.value);
+
+      if (willSelect) {
+        // Add to cache
+        setCache((prev) => new Map(prev).set(id, option));
+
+        // Update selectedValues (query params)
         onSelectOption(option);
+
+        // Transition from recommended → main
+        onRemoveRecommendedOption(id);
       } else {
+        // Only deselect, do NOT remove from cache
         onDeselectOption(option);
       }
-      onRemoveRecommendedOption(normalizedValue);
     },
-    [onSelectOption, onDeselectOption, normalizeValue, onRemoveRecommendedOption]
+    [normalize, onSelectOption, onDeselectOption, onRemoveRecommendedOption]
   );
 
-  // Normalize selected values for comparison
-  const normalizedSelectedValues = useMemo(
-    () => selectedValues.map((val) => normalizeValue(val)),
-    [selectedValues, normalizeValue]
-  );
-
-  // Active recommended options (not omitListed)
-  const activeRecommended = useMemo(
-    () => recommendedOptions.filter((opt) => !omitListedRecommendedIds.has(normalizeValue(opt.value))),
-    [recommendedOptions, omitListedRecommendedIds, normalizeValue]
-  );
-
-  // Search results from cache
-  const searchResults = useMemo(() => Array.from(searchResultsCache.values()), [searchResultsCache]);
-
-  // Merge all options into a single array, sorted by name
-  const mergedOptions = useMemo(() => {
-    const merged: MergedOption[] = [];
-    const seenIds = new Set<string | number>();
-
-    // Add search results
-    searchResults.forEach((option) => {
-      const normalizedValue = normalizeValue(option.value);
-      merged.push({
-        option,
-        isRecommended: false,
-        isSelected: normalizedSelectedValues.includes(normalizedValue),
-        source: 'search'
-      });
-      seenIds.add(normalizedValue);
-    });
-
-    // Add recommended options
-    activeRecommended.forEach((option) => {
-      const normalizedValue = normalizeValue(option.value);
-      if (!seenIds.has(normalizedValue)) {
-        merged.push({
-          option,
-          isRecommended: true,
-          isSelected: normalizedSelectedValues.includes(normalizedValue),
-          source: 'recommended'
-        });
-        seenIds.add(normalizedValue);
-      }
-    });
-
-    // Sort by option label/name
-    merged.sort((a, b) => {
-      const aLabel = String(a.option.label || a.option.value).toLowerCase();
-      const bLabel = String(b.option.label || b.option.value).toLowerCase();
-      return aLabel.localeCompare(bLabel);
-    });
-
-    return merged;
-  }, [searchResults, activeRecommended, normalizedSelectedValues, normalizeValue]);
-
-  /**
-   * Handle remove action: clears from URL params and omits from recommended list
-   * @param {SidebarOption} option - The option being removed
-   * @param {boolean} isSelected - Whether the option is currently selected
-   */
-  const handleRemoveOption = useCallback(
+  // Handle remove action
+  const handleRemove = useCallback(
     (option: SidebarOption, isSelected: boolean) => {
-      const normalizedValue = normalizeValue(option.value);
+      const id = normalize(option.value);
 
-      // Remove from search cache
-      setSearchResultsCache((prev) => {
+      // Remove from cache
+      setCache((prev) => {
         const next = new Map(prev);
-        next.delete(option.value);
+        next.delete(id);
         return next;
       });
 
-      // Deselect if currently selected (removes from URL params)
       if (isSelected) {
         onDeselectOption(option);
       }
 
-      // Always omit from recommended list, regardless of source
-      onRemoveRecommendedOption(normalizedValue);
+      onRemoveRecommendedOption(id);
     },
-    [normalizeValue, onDeselectOption, onRemoveRecommendedOption]
+    [normalize, onDeselectOption, onRemoveRecommendedOption]
+  );
+
+  // Compute active recommended options (exclude omitted)
+  const activeRecommended = useMemo(
+    () => recommendedOptions.filter((opt) => !omitListedRecommendedIds.has(normalize(opt.value))),
+    [recommendedOptions, omitListedRecommendedIds, normalize]
+  );
+
+  // Merge cache + recommended, marking selected / recommended flags
+  const mergedOptions = useMemo(() => {
+    const selectedSet = new Set(selectedValues.map(normalize));
+    const merged: Array<{ option: SidebarOption; isSelected: boolean; isRecommended: boolean }> = [];
+
+    // Cache items first
+    cache.forEach((option) => {
+      const id = normalize(option.value);
+      merged.push({ option, isSelected: selectedSet.has(id), isRecommended: false });
+    });
+
+    // Recommended items not in cache
+    activeRecommended.forEach((option) => {
+      const id = normalize(option.value);
+      if (!cache.has(id)) {
+        merged.push({ option, isSelected: selectedSet.has(id), isRecommended: true });
+      }
+    });
+
+    // Sort by label
+    merged.sort((a, b) => String(a.option.label).localeCompare(String(b.option.label)));
+    return merged;
+  }, [cache, activeRecommended, selectedValues, normalize]);
+
+  // Handler for selecting an option in the autocomplete dropdown
+  const handleAutocompleteSelect = useCallback(
+    (option: SidebarOption | null) => {
+      if (!option) {
+        return;
+      }
+
+      const id = normalize(option.value);
+      const isAlreadySelected = selectedValues.some((val) => normalize(val) === id);
+
+      if (!isAlreadySelected) {
+        // Only select if not already selected
+        handleCheckboxChange(option, true);
+      }
+    },
+    [normalize, selectedValues, handleCheckboxChange]
   );
 
   return (
     <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column' }}>
       {title && (
-        <Typography
-          sx={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: '#697386',
-            textTransform: 'uppercase',
-            mb: 1
-          }}>
+        <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#697386', textTransform: 'uppercase', mb: 1 }}>
           {title}
         </Typography>
       )}
@@ -215,25 +166,23 @@ export const SearchSidebarSection = ({
           placeholder={searchPlaceholder}
           value={null}
           onInputChange={onSearch}
-          onChange={(option) => option && handleCheckboxChange(option, true)}
+          onChange={(option) => option && handleAutocompleteSelect(option)}
         />
       </Box>
 
       <Box sx={{ maxHeight: '250px', overflowY: 'auto' }}>
-        {/* Render merged options sorted by name */}
-        {mergedOptions.map(({ option, isRecommended, isSelected }) => {
-          const normalizedValue = normalizeValue(option.value);
-
+        {mergedOptions.map(({ option, isSelected, isRecommended }) => {
+          const id = normalize(option.value);
           return (
             <SearchSidebarOption
-              key={normalizedValue}
+              key={id}
               option={option}
-              recommended={isRecommended}
               checkbox={checkbox}
               selected={isSelected}
-              onCheckboxChange={() => handleCheckboxChange(option, !isSelected)}
+              recommended={isRecommended}
               onClick={() => handleCheckboxChange(option, !isSelected)}
-              onRemove={() => handleRemoveOption(option, isSelected)}
+              onCheckboxChange={() => handleCheckboxChange(option, !isSelected)}
+              onRemove={() => handleRemove(option, isSelected)}
             />
           );
         })}
