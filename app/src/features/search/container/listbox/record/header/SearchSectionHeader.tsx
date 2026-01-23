@@ -9,22 +9,15 @@ export interface SearchSectionHeaderProps {
 }
 
 export const SearchSectionHeader = ({ label, onTitleClick }: SearchSectionHeaderProps) => {
-  const isClickable = !!onTitleClick;
+  const isClickable = Boolean(onTitleClick);
 
-  const content = (
-    <Typography
-      component="span"
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 0.5,
-        color: grey[600],
-        fontSize: 'inherit',
-        fontWeight: 'inherit'
-      }}>
-      {label}
-      {isClickable && <Icon path={mdiArrowTopRight} size={0.7} color={grey[600]} style={{ marginTop: '4px' }} />}
-    </Typography>
+  const headerContent = (
+    <Box display="flex" alignItems="center" gap={0.5}>
+      <Typography variant="subtitle2" color={grey[600]} component="span" sx={{ fontWeight: 500, lineHeight: 1 }}>
+        {label}
+      </Typography>
+      {isClickable && <Icon path={mdiArrowTopRight} size={0.7} color={grey[600]} />}
+    </Box>
   );
 
   return (
@@ -33,27 +26,24 @@ export const SearchSectionHeader = ({ label, onTitleClick }: SearchSectionHeader
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        pb: 1,
         pt: 2,
+        pb: 1,
         px: 2
       }}>
       {isClickable ? (
         <ButtonBase
           onClick={onTitleClick}
           sx={{
+            p: 0,
             borderRadius: 0,
             justifyContent: 'flex-start',
-            padding: 0,
-            borderBottom: '1px solid transparent',
-            transition: 'border-bottom-color 0.2s ease',
-            '&:hover': {
-              borderBottomColor: grey[400]
-            }
+            '&:hover': { borderBottom: `1px solid ${grey[400]}` },
+            transition: 'border-bottom-color 0.2s ease'
           }}>
-          {content}
+          {headerContent}
         </ButtonBase>
       ) : (
-        content
+        headerContent
       )}
     </Box>
   );

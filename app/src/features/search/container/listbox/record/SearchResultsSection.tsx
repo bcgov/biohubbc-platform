@@ -1,10 +1,10 @@
-import { mdiCubeOutline, mdiSquareSmall } from '@mdi/js';
+import { mdiCubeOutline, mdiSourceBranch, mdiSquareSmall } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Box } from '@mui/material';
+import { Box, ListItemButton, ListItemIcon, ListItemText, Stack } from '@mui/material';
+import { grey } from '@mui/material/colors';
 import { SearchFeatureResult, SearchResponse } from 'interfaces/useSearchApi.interface';
-import { SearchOptionItem } from '../components/SearchOptionItem';
+import { pluralize } from 'utils/Utils';
 import { SearchSectionHeader } from './header/SearchSectionHeader';
-import { SearchTaxonCard } from './taxonomy/SearchTaxonCard';
 
 export interface SearchResultsSectionProps {
   results: SearchResponse;
@@ -21,50 +21,81 @@ export const SearchResultsSection = ({
 }: SearchResultsSectionProps) => {
   const { features, submissions, taxonomy } = results;
 
-  const renderFeaturesList = () => (
-    <Box>
+  const renderFeatures = () => (
+    <Stack>
       <SearchSectionHeader label="Features" />
       {features.data.map((item: SearchFeatureResult) => (
-        <SearchOptionItem
+        <ListItemButton
+          role="option"
           key={`feature-${item.submission_feature_id}`}
-          name={item.label}
-          startIcon={<Icon path={mdiSquareSmall} size={1} style={{ display: 'block' }} />}
-          onSelect={() => onFeatureSelect(item.submission_feature_id)}
-        />
+          onClick={() => onFeatureSelect(item.submission_feature_id)}
+          data-search-item
+          sx={{ borderRadius: 1 }}>
+          <ListItemIcon>
+            <Icon path={mdiSquareSmall} size={1} style={{ display: 'block' }} />
+          </ListItemIcon>
+          <ListItemText primary={<Box flex="1 1 auto">{item.label}</Box>} sx={{ m: 0 }} />
+        </ListItemButton>
       ))}
-    </Box>
+    </Stack>
   );
 
-  const renderSubmissionsList = () => (
-    <Box>
+  const renderSubmissions = () => (
+    <Stack sx={{ mt: 1 }}>
       <SearchSectionHeader label="Submissions" />
       {submissions.data.map((item) => (
-        <SearchOptionItem
+        <ListItemButton
+          role="option"
           key={`submission-${item.submission_id}`}
-          name={item.name}
-          startIcon={<Icon path={mdiCubeOutline} size={1} style={{ display: 'block' }} />}
-          onSelect={() => onSubmissionSelect(item.submission_id)}
-        />
+          onClick={() => onSubmissionSelect(item.submission_id)}
+          data-search-item
+          sx={{ borderRadius: 1 }}>
+          <ListItemIcon>
+            <Icon path={mdiCubeOutline} size={1} style={{ display: 'block' }} />
+          </ListItemIcon>
+          <ListItemText primary={<Box flex="1 1 auto">{item.name}</Box>} sx={{ m: 0 }} />
+        </ListItemButton>
       ))}
-    </Box>
+    </Stack>
   );
 
-  const renderTaxonomyList = () => (
-    <Box>
+  const renderTaxonomy = () => (
+    <Stack sx={{ mt: 1 }}>
       <SearchSectionHeader label="Species" />
-      <SearchTaxonCard
-        key={taxonomy.data[0].taxon_id}
-        taxon={taxonomy.data[0]}
-        onSelect={(id) => onTaxonomySelect(id)}
-      />
-    </Box>
+      {taxonomy.data.map((t) => {
+        const countLabel = pluralize(1, 'result');
+        return (
+          <ListItemButton
+            role="option"
+            key={`taxon-${t.taxon_id}`}
+            onClick={() => onTaxonomySelect(t.taxon_id)}
+            data-search-item
+            sx={{ borderRadius: 1, bgcolor: grey[50] }}>
+            <ListItemIcon>
+              <Icon path={mdiSourceBranch} size={1} style={{ display: 'block' }} />
+            </ListItemIcon>
+            <ListItemText
+              primary={
+                <Box display="flex" alignItems="center">
+                  <Box flex="1 1 auto">{t.itis_scientific_name}</Box>
+                  <Box flex="0 0 auto" color="text.secondary">
+                    {countLabel}
+                  </Box>
+                </Box>
+              }
+              sx={{ m: 0 }}
+            />
+          </ListItemButton>
+        );
+      })}
+    </Stack>
   );
 
   return (
     <>
-      {features.data.length > 0 && renderFeaturesList()}
-      {submissions.data.length > 0 && renderSubmissionsList()}
-      {taxonomy.data.length > 0 && renderTaxonomyList()}
+      {features.data.length > 0 && renderFeatures()}
+      {submissions.data.length > 0 && renderSubmissions()}
+      {taxonomy.data.length > 0 && renderTaxonomy()}
     </>
   );
 };

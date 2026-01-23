@@ -8,7 +8,7 @@ import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { ISearchAllFilters, SearchResponse, SearchSummaryResponse } from 'interfaces/useSearchApi.interface';
 import { debounce } from 'lodash-es';
-import { ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 import { buildSearchQuery } from 'utils/search';
@@ -33,6 +33,8 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
   const [records, setRecords] = useState<SearchResponse | null>(null);
   const [summary, setSummary] = useState<SearchSummaryResponse | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const recordsLoader = useDataLoader((params: ISearchAllFilters, pagination?: ApiPaginationRequestOptions) =>
     api.search.searchAll(params, pagination)
@@ -70,12 +72,8 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
     [recordsLoader, summaryLoader]
   );
 
-  // Debounced preview search
   const debouncedSearch = useMemo(
-    () =>
-      debounce((value: string) => {
-        runPreviewSearch(value);
-      }, SEARCH_DEBOUNCE_MS),
+    () => debounce((value: string) => runPreviewSearch(value), SEARCH_DEBOUNCE_MS),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
@@ -90,23 +88,28 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
     [debouncedSearch]
   );
 
-  // Enter key → navigate to list page
+  // Key down → Enter or ArrowDown
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter' && searchValue.trim()) {
         e.preventDefault();
         debouncedSearch.cancel();
-
         navigate(
           buildSearchQuery('list', {
             [URL_PARAMS.SEARCH_QUERY]: searchValue
           })
         );
-
         setIsDropdownOpen(false);
       }
+
+      // ArrowDown focuses first item in listbox
+      if (e.key === 'ArrowDown' && (records || summary)) {
+        e.preventDefault();
+        const firstItem = document.querySelector<HTMLButtonElement>('[data-search-item]:first-of-type');
+        firstItem?.focus();
+      }
     },
-    [debouncedSearch, navigate, searchValue]
+    [debouncedSearch, navigate, searchValue, records, summary]
   );
 
   const handleFocus = useCallback(() => setIsDropdownOpen(true), []);
@@ -125,6 +128,7 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
             value={searchValue}
             onFocus={handleFocus}
             onKeyDown={handleKeyDown}
+            inputRef={inputRef}
           />
 
           {shouldShowDropdown && (

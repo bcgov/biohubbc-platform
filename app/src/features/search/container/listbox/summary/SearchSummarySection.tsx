@@ -1,11 +1,10 @@
 import { mdiMagnify, mdiSourceBranch } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Box } from '@mui/material';
+import { Box, ListItemButton, ListItemIcon, ListItemText, Stack } from '@mui/material';
 import { FEATURE_TYPE_CONFIG } from 'constants/feature-type';
 import { SearchSummaryResponse } from 'interfaces/useSearchApi.interface';
 import { useMemo } from 'react';
 import { pluralize } from 'utils/Utils';
-import { SearchOptionItem } from '../components/SearchOptionItem';
 import { SearchSectionHeader } from '../record/header/SearchSectionHeader';
 
 export interface SearchSummarySectionProps {
@@ -17,6 +16,7 @@ export const SearchSummarySection = ({ results, onItemSelect }: SearchSummarySec
   const hasFeatureResults = results.features.length > 0;
   const hasTaxonomyResults = results.taxonomy?.total > 0;
 
+  // Features list
   const featureItems = useMemo(
     () =>
       results.features.map((feature) => {
@@ -25,18 +25,33 @@ export const SearchSummarySection = ({ results, onItemSelect }: SearchSummarySec
         const countLabel = pluralize(feature.total, 'result');
 
         return (
-          <SearchOptionItem
+          <ListItemButton
+            role="option"
             key={feature.feature_type_name}
-            name={label}
-            description={`${feature.total} ${countLabel}`}
-            startIcon={<Icon path={mdiMagnify} size={1} style={{ display: 'block' }} />}
-            onSelect={() => onItemSelect(feature.feature_type_name)}
-          />
+            onClick={() => onItemSelect(feature.feature_type_name)}
+            data-search-item
+            sx={{ borderRadius: 1 }}>
+            <ListItemIcon>
+              <Icon path={mdiMagnify} size={1} style={{ display: 'block' }} />
+            </ListItemIcon>
+            <ListItemText
+              primary={
+                <Box display="flex" alignItems="center">
+                  <Box flex="1 1 auto">{label}</Box>
+                  <Box flex="0 0 auto" color="text.secondary">
+                    {`${feature.total} ${countLabel}`}
+                  </Box>
+                </Box>
+              }
+              sx={{ m: 0 }}
+            />
+          </ListItemButton>
         );
       }),
     [results.features, onItemSelect]
   );
 
+  // Taxonomy / Species list
   const taxonomyItem = useMemo(() => {
     if (!hasTaxonomyResults) {
       return null;
@@ -45,12 +60,22 @@ export const SearchSummarySection = ({ results, onItemSelect }: SearchSummarySec
     const countLabel = pluralize(results.taxonomy.total, 'result');
 
     return (
-      <SearchOptionItem
-        name="Species"
-        description={`${results.taxonomy.total} ${countLabel}`}
-        startIcon={<Icon path={mdiSourceBranch} size={1} style={{ display: 'block' }} />}
-        onSelect={() => onItemSelect('species')}
-      />
+      <ListItemButton role="option" onClick={() => onItemSelect('species')} data-search-item sx={{ borderRadius: 1 }}>
+        <ListItemIcon>
+          <Icon path={mdiSourceBranch} size={1} style={{ display: 'block' }} />
+        </ListItemIcon>
+        <ListItemText
+          primary={
+            <Box display="flex" alignItems="center">
+              <Box flex="1 1 auto">Species</Box>
+              <Box flex="0 0 auto" color="text.secondary">
+                {`${results.taxonomy.total} ${countLabel}`}
+              </Box>
+            </Box>
+          }
+          sx={{ m: 0 }}
+        />
+      </ListItemButton>
     );
   }, [hasTaxonomyResults, results.taxonomy, onItemSelect]);
 
@@ -59,17 +84,15 @@ export const SearchSummarySection = ({ results, onItemSelect }: SearchSummarySec
   }
 
   return (
-    <Box component="ul" sx={{ listStyle: 'none', p: 0, m: 0 }}>
-      {featureItems}
+    <Stack>
+      {hasFeatureResults && <>{featureItems}</>}
 
-      {hasTaxonomyResults && (
+      {taxonomyItem && (
         <>
-          <li>
-            <SearchSectionHeader label="Species" />
-          </li>
+          <SearchSectionHeader label="Species" />
           {taxonomyItem}
         </>
       )}
-    </Box>
+    </Stack>
   );
 };
