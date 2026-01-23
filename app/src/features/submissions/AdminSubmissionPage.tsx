@@ -10,6 +10,7 @@ import SubmissionHeaderSecurityStatus from './components/SubmissionHeaderSecurit
 import { SubmissionHeaderToolbar } from './components/SubmissionHeaderToolbar';
 import { SecurityReviewFeatures } from './features/SecurityReviewFeatures';
 import { FeatureRow } from './features/table/SecurityReviewFeaturesTable.interface';
+import { SubmissionUploadStatus } from './page/status/SubmissionUploadStatus';
 
 /**
  * Page for admins to complete security reviews
@@ -117,6 +118,10 @@ export const AdminSubmissionPage = () => {
       />
 
       <Container maxWidth="xl">
+        <Paper sx={{ my: 3 }}>
+          <SubmissionUploadStatus submissionId={submission.submission_id} />
+        </Paper>
+
         <Paper sx={{ my: 3 }}>
           <SecurityReviewFeatures
             rows={rows}
