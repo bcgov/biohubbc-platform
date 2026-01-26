@@ -18,7 +18,7 @@ describe('usePoliciesApi', () => {
     it('returns paginated policies', async () => {
       const mockResponse = {
         policies: [{ policy_id: '1', name: 'Policy 1', description: null, statements: [] }],
-        pagination: { total: 1, page: 1, limit: 10 }
+        pagination: { total: 1, current_page: 1, last_page: 1, per_page: 10 }
       };
 
       mock.onGet('/api/administrative/policies').reply(200, mockResponse);
@@ -31,14 +31,14 @@ describe('usePoliciesApi', () => {
     it('passes query params', async () => {
       const mockResponse = {
         policies: [],
-        pagination: { total: 0, page: 2, limit: 20 }
+        pagination: { total: 0, current_page: 2, last_page: 1, per_page: 20 }
       };
 
       mock.onGet('/api/administrative/policies').reply(200, mockResponse);
 
-      const result = await usePoliciesApi(axios).getPolicies({ page: 2, limit: 20 });
+      const result = await usePoliciesApi(axios).getPolicies(undefined, { page: 2, limit: 20 });
 
-      expect(result.pagination.page).toEqual(2);
+      expect(result.pagination.current_page).toEqual(2);
     });
   });
 
