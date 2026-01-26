@@ -55,16 +55,16 @@ export const SearchSidebarSection = (props: FilterSectionProps) => {
 
       selectedValues.forEach((val) => {
         const id = normalizeQueryParam(val);
-        if (!next.has(id)) {
-          // Check if we have the full option data, otherwise use placeholder
-          const fullOption = optionsMap.get(id);
-          next.set(id, fullOption || { value: val, label: String(val) });
-        } else {
+        if (next.has(id)) {
           // Update existing cache entry with proper label if available
           const fullOption = optionsMap.get(id);
           if (fullOption) {
             next.set(id, fullOption);
           }
+        } else {
+          // Check if we have the full option data, otherwise use placeholder
+          const fullOption = optionsMap.get(id);
+          next.set(id, fullOption || { value: val, label: String(val) });
         }
       });
       return next;

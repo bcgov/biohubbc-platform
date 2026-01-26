@@ -6,10 +6,10 @@ import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { toApiPagination, useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ApiPaginationRequestOptions } from 'types/misc';
 import { ActivePoliciesList } from './components/ActivePoliciesList';
 import { TeamPoliciesContainer } from './components/TeamPoliciesContainer';
 import { TeamsContainer } from './components/TeamsContainer';
+import { ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
  * Admin page for managing policies, teams, and team-policy assignments.

@@ -1,8 +1,8 @@
 import { GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import { useCallback, useEffect, useState } from 'react';
-import { ApiPaginationRequestOptions } from 'types/misc';
 import useDataLoader from './useDataLoader';
 import useDebounce from './useDebounce';
+import { ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
  * Configuration options for the useServerPaginatedDataGrid hook.

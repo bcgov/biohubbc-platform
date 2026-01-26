@@ -133,7 +133,7 @@ export const useSearchResults = () => {
       const normalizedKey = key.toLowerCase() as UrlParamKey;
       const newParams = new TypedURLSearchParams(searchParams.toString());
 
-      if (value !== undefined) {
+      if (value) {
         const normalizedValue = normalizeQueryParam(value);
         const remaining = newParams.getAll(normalizedKey).filter((v) => v !== normalizedValue);
 

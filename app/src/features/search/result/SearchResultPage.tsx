@@ -156,7 +156,7 @@ export const SearchResultPage = () => {
         removeSearchParam(param, normalizedValue);
       } else {
         // SELECT: add to query params (or replace if replace=true)
-        setSearchParams({ [param]: normalizedValue as string }, replace);
+        setSearchParams({ [param]: normalizedValue }, replace);
       }
     },
     [setSearchParams, removeSearchParam]
