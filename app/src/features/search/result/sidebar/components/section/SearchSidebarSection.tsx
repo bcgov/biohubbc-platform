@@ -45,19 +45,31 @@ export const SearchSidebarSection = (props: FilterSectionProps) => {
   // Cache for main options (search results + selected values)
   const [cache, setCache] = useState<Map<string, SidebarOption>>(new Map());
 
-  // Sync cache with selectedValues (add only, never remove)
+  // Sync cache with selectedValues - update with proper labels from options if available
   useEffect(() => {
     setCache((prev) => {
       const next = new Map(prev);
+
+      // Create a lookup map from options for fast access
+      const optionsMap = new Map(options.map((opt) => [normalizeQueryParam(opt.value), opt]));
+
       selectedValues.forEach((val) => {
         const id = normalizeQueryParam(val);
         if (!next.has(id)) {
-          next.set(id, { value: val, label: String(val) });
+          // Check if we have the full option data, otherwise use placeholder
+          const fullOption = optionsMap.get(id);
+          next.set(id, fullOption || { value: val, label: String(val) });
+        } else {
+          // Update existing cache entry with proper label if available
+          const fullOption = optionsMap.get(id);
+          if (fullOption) {
+            next.set(id, fullOption);
+          }
         }
       });
       return next;
     });
-  }, [selectedValues]);
+  }, [selectedValues, options]);
 
   // Handle checkbox changes
   const handleCheckboxChange = useCallback(

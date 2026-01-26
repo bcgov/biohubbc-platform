@@ -33,12 +33,14 @@ export const useTaxonomyApi = (axios: AxiosInstance) => {
   /**
    * Fetch species by their IDs
    *
-   * @param {number[]} ids - Array of species IDs
+   * @param {number[]} tsns - Array of species TSNs
    * @returns {Promise<ITaxonomyListResponse>}
    */
-  const getSpeciesFromIds = async (ids: number[]): Promise<ITaxonomyListResponse> => {
-    const { data } = await axios.get<ITaxonomyListResponse>('/api/taxonomy/species/list', {
-      params: { ids: qs.stringify(ids) }
+  const getSpeciesFromIds = async (tsns: number[]): Promise<ITaxonomyListResponse> => {
+    const params = { tsn: tsns };
+    const { data } = await axios.get<ITaxonomyListResponse>('/api/taxonomy/taxon/tsn', {
+      params,
+      paramsSerializer: (p) => qs.stringify(p)
     });
 
     return data;

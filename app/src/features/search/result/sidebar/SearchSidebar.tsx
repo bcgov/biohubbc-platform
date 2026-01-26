@@ -1,12 +1,12 @@
 import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
 import { TypedURLSearchParams } from 'hooks/useSearchQuery';
 import { useMemo } from 'react';
+import { SidebarHeader } from './components/header/SearchSidebarHeader';
 import { SidebarOption } from './components/section/option/SearchSidebarOption';
 import { SearchSidebarFeatureTypes } from './feature-type/SearchSidebarFeatureType';
 import { OmitListedRecommendedState, RecommendedFiltersState } from './hooks/useRecommendedFilters';
 import { SearchSidebarProperties } from './property/SearchSidebarProperty';
 import { SearchSidebarSpecies } from './species/SearchSidebarSpecies';
-import { SidebarHeader } from './components/header/SearchSidebarHeader';
 
 interface SearchSidebarProps {
   /**
