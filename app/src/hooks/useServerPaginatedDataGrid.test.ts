@@ -65,38 +65,26 @@ describe('useServerPaginatedDataGrid', () => {
   describe('toApiPagination helper', () => {
     it('converts 0-indexed page to 1-indexed API page', () => {
       // WHY HIGH VALUE: Tests critical page index conversion that could cause off-by-one bugs
-      const result = toApiPagination(
-        { page: 0, pageSize: 10 },
-        [{ field: 'name', sort: 'asc' }]
-      );
+      const result = toApiPagination({ page: 0, pageSize: 10 }, [{ field: 'name', sort: 'asc' }]);
 
       expect(result.page).toBe(1);
     });
 
     it('passes pageSize as limit', () => {
-      const result = toApiPagination(
-        { page: 0, pageSize: 25 },
-        [{ field: 'name', sort: 'asc' }]
-      );
+      const result = toApiPagination({ page: 0, pageSize: 25 }, [{ field: 'name', sort: 'asc' }]);
 
       expect(result.limit).toBe(25);
     });
 
     it('extracts sort field and order from sort model', () => {
-      const result = toApiPagination(
-        { page: 0, pageSize: 10 },
-        [{ field: 'created_at', sort: 'desc' }]
-      );
+      const result = toApiPagination({ page: 0, pageSize: 10 }, [{ field: 'created_at', sort: 'desc' }]);
 
       expect(result.sort).toBe('created_at');
       expect(result.order).toBe('desc');
     });
 
     it('handles empty sort model', () => {
-      const result = toApiPagination(
-        { page: 0, pageSize: 10 },
-        []
-      );
+      const result = toApiPagination({ page: 0, pageSize: 10 }, []);
 
       expect(result.sort).toBeUndefined();
       expect(result.order).toBeUndefined();
@@ -106,35 +94,31 @@ describe('useServerPaginatedDataGrid', () => {
   describe('initial state', () => {
     it('returns default pagination model with provided pageSize', () => {
       // WHY HIGH VALUE: Tests that defaults are correctly applied
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions({ defaultPageSize: 25 }))
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions({ defaultPageSize: 25 })));
 
       expect(result.current.paginationModel).toEqual({ page: 0, pageSize: 25 });
     });
 
     it('returns default sort model from options', () => {
       const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions({
-          defaultSort: { field: 'created_at', sort: 'desc' }
-        }))
+        useServerPaginatedDataGrid(
+          createDefaultOptions({
+            defaultSort: { field: 'created_at', sort: 'desc' }
+          })
+        )
       );
 
       expect(result.current.sortModel).toEqual([{ field: 'created_at', sort: 'desc' }]);
     });
 
     it('starts with empty search term', () => {
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions())
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
       expect(result.current.searchTerm).toBe('');
     });
 
     it('starts with empty data array when no response', () => {
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions())
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
       expect(result.current.data).toEqual([]);
       expect(result.current.rowCount).toBe(0);
@@ -158,21 +142,19 @@ describe('useServerPaginatedDataGrid', () => {
     });
 
     it('uses custom defaultPageSize in initial load', () => {
-      renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions({ defaultPageSize: 50 }))
-      );
+      renderHook(() => useServerPaginatedDataGrid(createDefaultOptions({ defaultPageSize: 50 })));
 
-      expect(mockLoad).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({ limit: 50 })
-      );
+      expect(mockLoad).toHaveBeenCalledWith(undefined, expect.objectContaining({ limit: 50 }));
     });
   });
 
   describe('data extraction', () => {
     it('extracts data array from response using extractData', async () => {
       // WHY HIGH VALUE: Tests that extractData callback is used correctly
-      const mockItems = [{ id: '1', name: 'Alpha' }, { id: '2', name: 'Beta' }];
+      const mockItems = [
+        { id: '1', name: 'Alpha' },
+        { id: '2', name: 'Beta' }
+      ];
 
       mockUseDataLoader.mockReturnValue({
         data: { items: mockItems, pagination: { total: 2 } },
@@ -185,9 +167,7 @@ describe('useServerPaginatedDataGrid', () => {
         setData: vi.fn()
       });
 
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions())
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
       expect(result.current.data).toEqual(mockItems);
     });
@@ -204,9 +184,7 @@ describe('useServerPaginatedDataGrid', () => {
         setData: vi.fn()
       });
 
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions())
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
       expect(result.current.rowCount).toBe(42);
     });
@@ -215,9 +193,7 @@ describe('useServerPaginatedDataGrid', () => {
   describe('handleSearch', () => {
     it('updates searchTerm immediately', () => {
       // WHY HIGH VALUE: Tests that UI input is responsive (not debounced)
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions())
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
       act(() => {
         result.current.handleSearch('test query');
@@ -229,9 +205,7 @@ describe('useServerPaginatedDataGrid', () => {
 
     it('debounces the API call', () => {
       // WHY HIGH VALUE: Tests debounce behavior - API not called immediately
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions({ debounceMs: 300 }))
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions({ debounceMs: 300 })));
 
       // Clear the initial load call
       mockRefresh.mockClear();
@@ -254,9 +228,7 @@ describe('useServerPaginatedDataGrid', () => {
 
     it('resets to page 1 when searching', () => {
       // WHY HIGH VALUE: Tests critical UX behavior - search should reset pagination
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions({ debounceMs: 300 }))
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions({ debounceMs: 300 })));
 
       // First, change to page 2
       act(() => {
@@ -282,16 +254,11 @@ describe('useServerPaginatedDataGrid', () => {
       expect(result.current.paginationModel.page).toBe(0);
 
       // API should be called with page 1
-      expect(mockRefresh).toHaveBeenCalledWith(
-        'query',
-        expect.objectContaining({ page: 1 })
-      );
+      expect(mockRefresh).toHaveBeenCalledWith('query', expect.objectContaining({ page: 1 }));
     });
 
     it('passes search term to API after debounce', () => {
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions({ debounceMs: 300 }))
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions({ debounceMs: 300 })));
 
       mockRefresh.mockClear();
 
@@ -303,19 +270,14 @@ describe('useServerPaginatedDataGrid', () => {
         vi.advanceTimersByTime(300);
       });
 
-      expect(mockRefresh).toHaveBeenCalledWith(
-        'alpha',
-        expect.any(Object)
-      );
+      expect(mockRefresh).toHaveBeenCalledWith('alpha', expect.any(Object));
     });
   });
 
   describe('handlePaginationChange', () => {
     it('updates pagination model immediately', () => {
       // WHY HIGH VALUE: Tests that pagination state updates correctly
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions())
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
       act(() => {
         result.current.handlePaginationChange({ page: 3, pageSize: 25 });
@@ -326,9 +288,7 @@ describe('useServerPaginatedDataGrid', () => {
 
     it('calls API immediately with new pagination (no debounce)', () => {
       // WHY HIGH VALUE: Tests that pagination changes fetch immediately (unlike search)
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions())
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
       mockRefresh.mockClear();
 
@@ -348,9 +308,7 @@ describe('useServerPaginatedDataGrid', () => {
 
     it('preserves current search term when paginating', () => {
       // WHY HIGH VALUE: Tests that search context is maintained across pagination
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions({ debounceMs: 300 }))
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions({ debounceMs: 300 })));
 
       // First, do a search
       act(() => {
@@ -369,19 +327,14 @@ describe('useServerPaginatedDataGrid', () => {
       });
 
       // Search term should be preserved
-      expect(mockRefresh).toHaveBeenCalledWith(
-        'test',
-        expect.any(Object)
-      );
+      expect(mockRefresh).toHaveBeenCalledWith('test', expect.any(Object));
     });
   });
 
   describe('handleSortChange', () => {
     it('updates sort model immediately', () => {
       // WHY HIGH VALUE: Tests that sort state updates correctly
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions())
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
       act(() => {
         result.current.handleSortChange([{ field: 'created_at', sort: 'desc' }]);
@@ -392,9 +345,7 @@ describe('useServerPaginatedDataGrid', () => {
 
     it('calls API immediately with new sort (no debounce)', () => {
       // WHY HIGH VALUE: Tests that sort changes fetch immediately
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions())
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
       mockRefresh.mockClear();
 
@@ -413,9 +364,7 @@ describe('useServerPaginatedDataGrid', () => {
 
     it('preserves current pagination when sorting', () => {
       // WHY HIGH VALUE: Tests that page context is maintained across sort changes
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions())
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
       // First, go to page 2
       act(() => {
@@ -442,9 +391,7 @@ describe('useServerPaginatedDataGrid', () => {
   describe('refresh', () => {
     it('calls API with current state', () => {
       // WHY HIGH VALUE: Tests manual refresh uses all current params
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions({ debounceMs: 300 }))
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions({ debounceMs: 300 })));
 
       // Set up some state
       act(() => {
@@ -496,9 +443,7 @@ describe('useServerPaginatedDataGrid', () => {
         setData: vi.fn()
       });
 
-      const { result } = renderHook(() =>
-        useServerPaginatedDataGrid(createDefaultOptions())
-      );
+      const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
       expect(result.current.isLoading).toBe(true);
     });

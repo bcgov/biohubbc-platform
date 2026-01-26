@@ -43,8 +43,13 @@ export const ManagePoliciesPage = () => {
   });
 
   // TeamPolicies - simpler pattern (no search, has client-side filtering)
-  const [teamPoliciesPaginationModel, setTeamPoliciesPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 10 });
-  const [teamPoliciesSortModel, setTeamPoliciesSortModel] = useState<GridSortModel>([{ field: 'team_name', sort: 'asc' }]);
+  const [teamPoliciesPaginationModel, setTeamPoliciesPaginationModel] = useState<GridPaginationModel>({
+    page: 0,
+    pageSize: 10
+  });
+  const [teamPoliciesSortModel, setTeamPoliciesSortModel] = useState<GridSortModel>([
+    { field: 'team_name', sort: 'asc' }
+  ]);
 
   const teamPoliciesDataLoader = useDataLoader((pagination: ApiPaginationRequestOptions) =>
     biohubApi.teamPolicies.getTeamPolicies(pagination)

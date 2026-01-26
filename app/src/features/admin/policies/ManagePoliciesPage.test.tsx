@@ -36,8 +36,7 @@ vi.mock('./components/ActivePoliciesList', () => ({
           key={p.policy_id}
           data-testid={`policy-${p.policy_id}`}
           data-selected={selectedPolicyId === p.policy_id}
-          onClick={() => onSelectPolicy(selectedPolicyId === p.policy_id ? null : p.policy_id)}
-        >
+          onClick={() => onSelectPolicy(selectedPolicyId === p.policy_id ? null : p.policy_id)}>
           {p.name}
         </div>
       ))}
@@ -53,8 +52,7 @@ vi.mock('./components/TeamsContainer', () => ({
           key={t.team_id}
           data-testid={`team-${t.team_id}`}
           data-selected={selectedTeamId === t.team_id}
-          onClick={() => onSelectTeam(selectedTeamId === t.team_id ? null : t.team_id)}
-        >
+          onClick={() => onSelectTeam(selectedTeamId === t.team_id ? null : t.team_id)}>
           {t.name}
         </div>
       ))}
