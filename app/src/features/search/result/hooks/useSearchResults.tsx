@@ -5,10 +5,9 @@ import useDataLoader from 'hooks/useDataLoader';
 import { TypedURLSearchParams, useSearchQueryParams } from 'hooks/useSearchQuery';
 import { ISearchFeaturesFilters, SearchFeatureResponse } from 'interfaces/useSearchApi.interface';
 import { debounce } from 'lodash-es';
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { ApiPaginationRequestOptions } from 'types/pagination';
-
-type NormalizableValue = string | number | undefined;
+import { normalizeQueryParam } from 'utils/query-param';
 
 /**
  * Custom hook for managing search results with URL-driven filters, sorting, and pagination.
@@ -23,16 +22,6 @@ export const useSearchResults = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
   const { searchParams, setSearchParams: setRawSearchParams } = useSearchQueryParams();
-
-  /**
-   * Normalize value to lowercase
-   */
-  const normalizeValue = useCallback((value: NormalizableValue): string | undefined => {
-    if (value === undefined || value === null) {
-      return undefined;
-    }
-    return String(value).toLowerCase();
-  }, []);
 
   /** Build API request from URL params */
   const buildRequest = (params: URLSearchParams) => {
@@ -102,12 +91,12 @@ export const useSearchResults = () => {
    * @param callback Optional callback for refreshing recommended options
    */
   const setSearchParams = useCallback(
-    (updates: Partial<Record<UrlParamKey, NormalizableValue>>, replace: boolean = true) => {
+    (updates: Partial<Record<UrlParamKey, string>>, replace: boolean = true) => {
       const newParams = new TypedURLSearchParams(searchParams.toString());
 
       Object.entries(updates).forEach(([key, value]) => {
         const k = key.toLowerCase() as UrlParamKey;
-        const normalizedValue = normalizeValue(value as NormalizableValue);
+        const normalizedValue = normalizeQueryParam(value);
 
         if (normalizedValue === undefined || normalizedValue === '') {
           newParams.delete(k);
@@ -132,7 +121,7 @@ export const useSearchResults = () => {
 
       updateParams(newParams);
     },
-    [searchParams, updateParams, normalizeValue]
+    [searchParams, updateParams]
   );
 
   /**
@@ -145,7 +134,7 @@ export const useSearchResults = () => {
       const newParams = new TypedURLSearchParams(searchParams.toString());
 
       if (value !== undefined) {
-        const normalizedValue = normalizeValue(value);
+        const normalizedValue = normalizeQueryParam(value);
         const remaining = newParams.getAll(normalizedKey).filter((v) => v !== normalizedValue);
 
         newParams.delete(normalizedKey);
@@ -166,10 +155,15 @@ export const useSearchResults = () => {
 
       updateParams(newParams);
     },
-    [searchParams, updateParams, normalizeValue]
+    [searchParams, updateParams]
   );
 
   const getParam = useCallback((key: UrlParamKey) => searchParams.get(key) ?? undefined, [searchParams]);
+
+  // Load on mount
+  useEffect(() => {
+    searchDataLoader.load(searchParams);
+  }, [searchDataLoader, searchParams]);
 
   return {
     rows: searchDataLoader.data?.features ?? [],

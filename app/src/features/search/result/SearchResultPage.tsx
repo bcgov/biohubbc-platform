@@ -3,6 +3,7 @@ import { PageHeader } from 'components/header/PageHeader';
 import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
 import { useCodesContext } from 'hooks/useContext';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { normalizeQueryParam } from 'utils/query-param';
 import { SearchResultOptions } from './content/option/SearchResultOptions';
 import { SearchResultToolbar } from './content/toolbar/SearchResultToolbar';
 import { SearchResultHeader } from './header/SearchResultHeader';
@@ -62,18 +63,6 @@ export const SearchResultPage = () => {
     [codesDataLoader.data]
   );
 
-  /**
-   * Normalize value to lowercase for case-insensitive comparisons
-   * @param {string | number | undefined} value - The value to normalize
-   * @returns {string | number} The normalized value
-   */
-  const normalizeValue = useCallback((value: string | number | undefined): string | number => {
-    if (value === undefined || value === null) {
-      return '';
-    }
-    return String(value).toLowerCase();
-  }, []);
-
   // Build omitList from selected filters + manually omitListed items
   const computedOmitListedRecommended = useMemo(() => {
     const omitList: OmitListedRecommendedState = {
@@ -85,19 +74,19 @@ export const SearchResultPage = () => {
     // Add currently selected filters to the omitList
     if (searchParams.has(URL_PARAMS.SPECIES)) {
       const speciesValues = searchParams.getAll(URL_PARAMS.SPECIES);
-      speciesValues.forEach((val) => omitList.species.add(normalizeValue(val)));
+      speciesValues.forEach((val) => omitList.species.add(normalizeQueryParam(val)));
     }
 
     if (searchParams.has(URL_PARAMS.FEATURE_TYPE)) {
       const featureTypeValues = searchParams.getAll(URL_PARAMS.FEATURE_TYPE);
-      featureTypeValues.forEach((val) => omitList.feature_types.add(normalizeValue(val)));
+      featureTypeValues.forEach((val) => omitList.feature_types.add(normalizeQueryParam(val)));
     }
 
     // Note: Properties are filtered by feature type, so we don't omitList them globally
     // They're handled per feature type in the sidebar
 
     return omitList;
-  }, [omitListedRecommended, searchParams, normalizeValue]);
+  }, [omitListedRecommended, searchParams]);
 
   // Refresh recommended filters when search query or filters change
   useEffect(() => {
@@ -129,7 +118,7 @@ export const SearchResultPage = () => {
    */
   const handleOmitListRecommended = useCallback(
     (type: keyof OmitListedRecommendedState, id: string | number) => {
-      const normalizedId = normalizeValue(id);
+      const normalizedId = normalizeQueryParam(id);
 
       // Map type to URL param
       const paramMap: Record<keyof OmitListedRecommendedState, UrlParamKey> = {
@@ -151,7 +140,7 @@ export const SearchResultPage = () => {
         [type]: new Set([...prev[type], normalizedId])
       }));
     },
-    [searchParams, removeSearchParam, normalizeValue]
+    [searchParams, removeSearchParam]
   );
 
   /**
@@ -159,7 +148,7 @@ export const SearchResultPage = () => {
    */
   const handleFilterChange = useCallback(
     ({ param, value, replace }: { param: UrlParamKey; value: string; replace?: boolean }) => {
-      const normalizedValue = normalizeValue(value);
+      const normalizedValue = normalizeQueryParam(value);
       hasBeenCalled.current = true;
 
       if (replace === undefined) {
@@ -170,7 +159,7 @@ export const SearchResultPage = () => {
         setSearchParams({ [param]: normalizedValue as string }, replace);
       }
     },
-    [setSearchParams, removeSearchParam, normalizeValue]
+    [setSearchParams, removeSearchParam]
   );
 
   // Sort handling

@@ -2,12 +2,15 @@ import { IDBConnection } from '../database/db';
 import { SearchSummaryResponse } from '../models/search';
 import { SearchRepository } from '../repositories/search-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { DBService } from './db-service';
 import { SearchParams, SearchResponseWithCounts } from './search-service.interface';
 
-export class SearchService {
+export class SearchService extends DBService {
   searchRepository: SearchRepository;
 
   constructor(connection: IDBConnection) {
+    super(connection);
+
     this.searchRepository = new SearchRepository(connection);
   }
 

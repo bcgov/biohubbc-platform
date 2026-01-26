@@ -95,14 +95,7 @@ export const SearchListbox = ({
           {summary && <SearchSummarySection results={summary} onItemSelect={navigateWithQuery} />}
 
           {/* Detailed records */}
-          {records && (
-            <SearchResultsSection
-              results={records}
-              onSubmissionSelect={navigateWithQuery}
-              onTaxonomySelect={navigateWithQuery}
-              onFeatureSelect={navigateWithQuery}
-            />
-          )}
+          {records && <SearchResultsSection results={records} onSelect={navigateWithQuery} />}
         </List>
       </LoadingGuard>
     </Box>

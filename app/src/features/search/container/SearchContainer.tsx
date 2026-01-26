@@ -124,7 +124,7 @@ export const SearchContainer = ({ links, isLoading = false }: ISearchContainerPr
         <Box width="100%" position="relative">
           <SearchInput
             placeholder="Enter names, keywords, or relevant terms"
-            handleChange={handleChange}
+            onChange={handleChange}
             value={searchValue}
             onFocus={handleFocus}
             onKeyDown={handleKeyDown}

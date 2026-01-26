@@ -20,7 +20,7 @@ const defaultLog = getLogger('paths/search/property');
 export const POST: Operation = [searchProperties()];
 
 POST.apiDoc = {
-  description: 'Search for propertys by keyword and optional filters.',
+  description: 'Search for properties by keyword and optional filters.',
   tags: ['search'],
   requestBody: propertySearchRequestBodySchema,
   responses: {
@@ -35,7 +35,7 @@ POST.apiDoc = {
 };
 
 /**
- * Search for propertys by keywords and/or property filters.
+ * Search for properties by keywords and/or property filters.
  *
  * @returns {RequestHandler}
  */

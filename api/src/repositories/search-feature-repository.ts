@@ -324,6 +324,18 @@ export class SearchFeatureRepository extends BaseRepository {
    * @returns {Knex.QueryBuilder} Knex query builder for keyword search CTE
    */
   private buildKeywordSearchCTE(keyword: string, knex: Knex): Knex.QueryBuilder {
+    const tsQuery = knex.raw(`plainto_tsquery('english', ?)`, [keyword]);
+
+    const tsVector = knex.raw(`
+    to_tsvector(
+      'english',
+      coalesce(ss.value, '') || ' ' ||
+      coalesce(s.name, '') || ' ' ||
+      coalesce(sf.data->>'name', '') || ' ' ||
+      coalesce(sf.data->>'description', '')
+    )
+  `);
+
     return knex('search_string as ss')
       .distinct()
       .select(
@@ -337,14 +349,13 @@ export class SearchFeatureRepository extends BaseRepository {
         's.name as submission_name',
         'security_check.is_secured',
         'sf.create_date',
-        knex.raw(`ts_rank(to_tsvector('english', ss.value), plainto_tsquery('english', ?)) as relevancy_score`, [
-          keyword
-        ])
+        knex.raw(`ts_rank(${tsVector}, ${tsQuery}) as relevancy_score`)
       )
       .join('submission_feature as sf', 'ss.submission_feature_id', 'sf.submission_feature_id')
       .join('submission as s', 'sf.submission_id', 's.submission_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
-      .crossJoin(knex.raw('LATERAL (?) as security_check', [this.buildSecurityCheck(knex)]));
+      .crossJoin(knex.raw('LATERAL (?) as security_check', [this.buildSecurityCheck(knex)]))
+      .whereRaw(`${tsVector} @@ ${tsQuery}`);
   }
 
   /**

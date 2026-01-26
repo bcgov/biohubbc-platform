@@ -1,26 +1,17 @@
 import { mdiClose, mdiMagnify } from '@mdi/js';
 import Icon from '@mdi/react';
 import { IconButton, InputAdornment, TextField, TextFieldProps } from '@mui/material';
-import { ChangeEvent, KeyboardEvent } from 'react';
+import { KeyboardEvent } from 'react';
 
 export interface ISearchInputProps extends Omit<TextFieldProps, 'value' | 'onSubmit'> {
   placeholder?: string;
   value?: string;
-  handleChange?: (e: ChangeEvent<HTMLInputElement>) => void;
   onSubmit?: (value: string) => void;
   onClear?: () => void;
   inputRef?: React.Ref<HTMLInputElement>;
 }
 
-export const SearchInput = ({
-  placeholder,
-  handleChange,
-  value,
-  onClear,
-  onSubmit,
-  inputRef,
-  ...props
-}: ISearchInputProps) => {
+export const SearchInput = ({ placeholder, value, onClear, onSubmit, inputRef, ...props }: ISearchInputProps) => {
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -35,7 +26,6 @@ export const SearchInput = ({
       size="medium"
       placeholder={placeholder}
       value={value}
-      onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange?.(e)}
       inputRef={inputRef}
       onKeyDown={handleKeyDown}
       {...props}
