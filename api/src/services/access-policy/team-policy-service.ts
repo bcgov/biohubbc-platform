@@ -1,6 +1,8 @@
 import { IDBConnection } from '../../database/db';
 import { CreateTeamPolicy, TeamPolicy, TeamPolicyDetails, UpdateTeamPolicy } from '../../models/team-policy';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
+import { makePaginationResponse } from '../../utils/pagination';
+import { ApiPaginationOptions, ApiPaginationResults } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
 
 export class TeamPolicyService extends DBService {
@@ -52,6 +54,24 @@ export class TeamPolicyService extends DBService {
    */
   getAllTeamPolicies(): Promise<TeamPolicyDetails[]> {
     return this.teamPolicyRepository.getAllTeamPolicies();
+  }
+
+  /**
+   * Get all team-policy associations with pagination support.
+   *
+   * @param {ApiPaginationOptions} options - Pagination options.
+   * @return {Promise<{ team_policies: TeamPolicyDetails[]; pagination: ApiPaginationResults }>}
+   * @memberof TeamPolicyService
+   */
+  async getAllTeamPoliciesWithPagination(
+    options: ApiPaginationOptions
+  ): Promise<{ team_policies: TeamPolicyDetails[]; pagination: ApiPaginationResults }> {
+    const { teamPolicies, total } = await this.teamPolicyRepository.getAllTeamPoliciesWithPagination(options);
+
+    return {
+      team_policies: teamPolicies,
+      pagination: makePaginationResponse(total, options)
+    };
   }
 
   /**

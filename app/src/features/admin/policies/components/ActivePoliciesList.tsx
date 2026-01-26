@@ -19,6 +19,7 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
+import { IServerPaginationProps } from 'types/pagination';
 import { useState } from 'react';
 import {
   AddPolicyForm,
@@ -31,7 +32,7 @@ import { transformApiToPolicyJson, transformPolicyJsonToApi } from '../utils/pol
 /**
  * Props for the ActivePoliciesList component.
  */
-export interface IActivePoliciesListProps {
+export interface IActivePoliciesListProps extends IServerPaginationProps {
   /** Array of policies to display in the table */
   policies: IPolicy[];
   /** Callback to refresh the policies list after create/update/delete */
@@ -61,7 +62,16 @@ export interface IActivePoliciesListProps {
  */
 export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListProps>> = (props) => {
   const biohubApi = useApi();
-  const { policies, selectedPolicyId, onSelectPolicy } = props;
+  const {
+    policies,
+    rowCount,
+    paginationModel,
+    setPaginationModel,
+    sortModel,
+    setSortModel,
+    selectedPolicyId,
+    onSelectPolicy
+  } = props;
 
   /**
    * Handle row selection changes in the DataGrid.
@@ -381,7 +391,7 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
             <Typography variant="h4" component="h2" flexGrow={1}>
               Active Policies{' '}
               <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
-                ({policies?.length || 0})
+                ({rowCount})
               </Typography>
             </Typography>
             <Stack gap={1} direction="row" alignItems="center">
@@ -419,7 +429,15 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
             rows={policies}
             columns={columns}
             getRowId={(row) => row.policy_id}
-            pageSizeOptions={[50, 100, 200]}
+            paginationMode="server"
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            pageSizeOptions={[10, 25, 50]}
+            sortingMode="server"
+            sortingOrder={['asc', 'desc']}
+            sortModel={sortModel}
+            onSortModelChange={setSortModel}
+            rowCount={rowCount}
             rowSelectionModel={rowSelectionModel}
             onRowSelectionModelChange={handleRowSelectionChange}
             checkboxSelection
@@ -427,13 +445,6 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
             disableColumnSelector
             disableColumnMenu
             localeText={{ noRowsLabel: 'No Policies' }}
-            initialState={{
-              pagination: {
-                paginationModel: {
-                  pageSize: 50
-                }
-              }
-            }}
             sx={{
               border: 'none',
               '& .MuiDataGrid-columnHeaderTitle': {

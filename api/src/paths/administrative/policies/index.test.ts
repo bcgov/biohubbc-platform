@@ -57,7 +57,7 @@ describe('paths/administrative/policies/index', () => {
             statements: []
           }
         ],
-        pagination: { total: 1, page: 0, limit: 50 }
+        pagination: { total: 1, per_page: 10, current_page: 1, last_page: 1 }
       };
 
       const getPoliciesWithStatementsStub = sinon
@@ -67,15 +67,20 @@ describe('paths/administrative/policies/index', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       mockReq.query = {
-        page: '0',
-        limit: '50'
+        page: '1',
+        limit: '10'
       };
 
       const requestHandler = getPolicies();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(getPoliciesWithStatementsStub).to.have.been.calledOnceWith({ page: 0, limit: 50, search: undefined });
+      expect(getPoliciesWithStatementsStub).to.have.been.calledOnceWith(undefined, {
+        page: 1,
+        limit: 10,
+        sort: undefined,
+        order: undefined
+      });
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql(mockPoliciesResponse);
     });
@@ -91,7 +96,50 @@ describe('paths/administrative/policies/index', () => {
 
       const mockPoliciesResponse = {
         policies: [],
-        pagination: { total: 0, page: 0, limit: 50 }
+        pagination: { total: 0, per_page: 25, current_page: 2, last_page: 1 }
+      };
+
+      const getPoliciesWithStatementsStub = sinon
+        .stub(PolicyService.prototype, 'getPoliciesWithStatements')
+        .resolves(mockPoliciesResponse);
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.query = {
+        page: '2',
+        limit: '25',
+        search: 'test'
+      };
+
+      const requestHandler = getPolicies();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(getPoliciesWithStatementsStub).to.have.been.calledOnceWith('test', {
+        page: 2,
+        limit: 25,
+        sort: undefined,
+        order: undefined
+      });
+      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.jsonValue).to.eql(mockPoliciesResponse);
+    });
+
+    it('should call service.getPoliciesWithStatements with sort ascending', async () => {
+      const dbConnectionObj = getMockDBConnection({
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+
+      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+
+      const mockPoliciesResponse = {
+        policies: [
+          { policy_id: '1', name: 'Alpha Policy', description: null, statements: [] },
+          { policy_id: '2', name: 'Beta Policy', description: null, statements: [] }
+        ],
+        pagination: { total: 2, per_page: 10, current_page: 1, last_page: 1, sort: 'name', order: 'asc' as const }
       };
 
       const getPoliciesWithStatementsStub = sinon
@@ -102,15 +150,65 @@ describe('paths/administrative/policies/index', () => {
 
       mockReq.query = {
         page: '1',
-        limit: '25',
-        search: 'test'
+        limit: '10',
+        sort: 'name',
+        order: 'asc'
       };
 
       const requestHandler = getPolicies();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(getPoliciesWithStatementsStub).to.have.been.calledOnceWith({ page: 1, limit: 25, search: 'test' });
+      expect(getPoliciesWithStatementsStub).to.have.been.calledOnceWith(undefined, {
+        page: 1,
+        limit: 10,
+        sort: 'name',
+        order: 'asc'
+      });
+      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.jsonValue).to.eql(mockPoliciesResponse);
+    });
+
+    it('should call service.getPoliciesWithStatements with sort descending', async () => {
+      const dbConnectionObj = getMockDBConnection({
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+
+      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+
+      const mockPoliciesResponse = {
+        policies: [
+          { policy_id: '2', name: 'Zebra Policy', description: null, statements: [] },
+          { policy_id: '1', name: 'Alpha Policy', description: null, statements: [] }
+        ],
+        pagination: { total: 2, per_page: 10, current_page: 1, last_page: 1, sort: 'name', order: 'desc' as const }
+      };
+
+      const getPoliciesWithStatementsStub = sinon
+        .stub(PolicyService.prototype, 'getPoliciesWithStatements')
+        .resolves(mockPoliciesResponse);
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.query = {
+        page: '1',
+        limit: '10',
+        sort: 'name',
+        order: 'desc'
+      };
+
+      const requestHandler = getPolicies();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(getPoliciesWithStatementsStub).to.have.been.calledOnceWith(undefined, {
+        page: 1,
+        limit: 10,
+        sort: 'name',
+        order: 'desc'
+      });
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql(mockPoliciesResponse);
     });
