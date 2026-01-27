@@ -196,7 +196,7 @@ export class ObjectStorageService {
    * @throws {Error} Throws if the object has no body.
    * @memberof ObjectStorageService
    */
-  async getFileStream(bucketType: BucketType, key: string, versionId?: string): Promise<NodeJS.ReadableStream> {
+  async getFileStream(bucketType: BucketType, key: string, versionId?: string): Promise<Readable> {
     const s3Object = await this.getFile(bucketType, key, versionId);
 
     if (!s3Object.Body) {
@@ -204,7 +204,7 @@ export class ObjectStorageService {
     }
 
     // S3 Body can already be a stream (Node.js Readable)
-    return s3Object.Body as NodeJS.ReadableStream;
+    return s3Object.Body as Readable;
   }
 
   /**

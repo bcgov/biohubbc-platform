@@ -30,6 +30,7 @@ queue: | build-queue run-queue ## Starts the queue worker (run after backend/web
 db-setup: | build-db-setup run-db-setup ## Performs all commands necessary to run the database migrations and seeding
 
 clamav: | build-clamav run-clamav ## Performs all commands necessary to run clamav
+minio: | run-minio ## Starts MinIO object storage for local S3
 
 fix: | lint-fix format-fix ## Performs both lint-fix and format-fix commands
 
@@ -212,6 +213,16 @@ run-clamav: ## Run clamav
 	@docker compose up -d clamav
 
 ## ------------------------------------------------------------------------------
+## MinIO commands (S3-compatible object storage for local development)
+## ------------------------------------------------------------------------------
+
+run-minio: ## Run MinIO and create buckets
+	@echo "==============================================="
+	@echo "Make: run-minio - running MinIO"
+	@echo "==============================================="
+	@docker compose up -d minio minio_setup
+
+## ------------------------------------------------------------------------------
 ## Run `npm` commands for all projects
 ## ------------------------------------------------------------------------------
 
@@ -238,6 +249,22 @@ test: ## Runs `npm test` for api, and app projects
 	@echo "Running /app tests"
 	@echo "==============================================="
 	@cd app && npm test && cd ..
+
+test-db: ## Runs DB integration tests (transaction/rollback, only needs database)
+	@echo "==============================================="
+	@echo "Running DB integration tests"
+	@echo "==============================================="
+	@docker compose exec api npm run test:db
+
+test-sys: | run-minio run-clamav run-queue ## Runs system integration tests (needs minio, clamav, queue)
+	@echo "==============================================="
+	@echo "Waiting for ClamAV to be healthy..."
+	@echo "==============================================="
+	@until docker inspect --format='{{.State.Health.Status}}' $(DOCKER_PROJECT_NAME)-clamav-$(DOCKER_NAMESPACE)-container 2>/dev/null | grep -q healthy; do sleep 5; echo "  waiting..."; done
+	@echo "==============================================="
+	@echo "Running system integration tests"
+	@echo "==============================================="
+	@docker compose exec api npm run test:sys
 
 cypress: ## Runs `npm run test:e2e` for api, and app projects
 	@echo "==============================================="

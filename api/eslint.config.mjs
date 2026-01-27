@@ -67,7 +67,7 @@ export default [
     }
   },
   {
-    files: ['**/*.test.ts', '**/*.test.js', '**/*.spec.ts', '**/*.spec.js'],
+    files: ['**/*.test.ts', '**/*.test.js', '**/*.spec.ts', '**/*.spec.js', '**/*.integration.ts', '**/*.integration.js'],
     rules: {
       '@typescript-eslint/no-unused-expressions': 'off'
     }
