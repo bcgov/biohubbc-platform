@@ -1,6 +1,6 @@
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
-import { IMalwareScanJobData, malwareScanJobHandler, malwareScanFailedHandler } from './jobs/malware-scan-job';
+import { IMalwareScanJobData, malwareScanFailedHandler, malwareScanJobHandler } from './jobs/malware-scan-job';
 import {
   IProcessSubmissionFeaturesJobData,
   processSubmissionFeaturesFailedHandler,
@@ -54,20 +54,14 @@ export const registerWorkers = async (): Promise<void> => {
   );
 
   // Register malware scan job handler
-  await boss.work<IMalwareScanJobData>(
-    JobQueues.MALWARE_SCAN,
-    malwareScanJobHandler
-  );
+  await boss.work<IMalwareScanJobData>(JobQueues.MALWARE_SCAN, malwareScanJobHandler);
 
   // Register dead letter queue handler for failed malware scan jobs
-  await boss.work<IMalwareScanJobData>(
-    JobQueues.MALWARE_SCAN_FAILED,
-    malwareScanFailedHandler
-  );
+  await boss.work<IMalwareScanJobData>(JobQueues.MALWARE_SCAN_FAILED, malwareScanFailedHandler);
 
   defaultLog.info({
     label: 'registerWorkers',
     message: 'Workers registered',
-    queues: Object.values(JobQueues),
+    queues: Object.values(JobQueues)
   });
 };

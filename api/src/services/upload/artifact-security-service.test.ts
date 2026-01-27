@@ -3,11 +3,11 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { Readable } from 'stream';
 import { IDBConnection } from '../../database/db';
-import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
 import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
+import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
-import { UploadArchive } from '../../models/upload-archive';
 import { SecurityStatusEnum } from '../../models/security-status';
+import { UploadArchive } from '../../models/upload-archive';
 import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
 import * as fileUtils from '../../utils/file-utils';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -351,7 +351,9 @@ describe('ArtifactSecurityService', () => {
         scanStream: sinon.stub().resolves({ isInfected: false })
       } as any);
 
-      const promoteStub = sinon.stub(ObjectStorageService.prototype, 'promoteFromSecurity').resolves({ key: 'test.tar' });
+      const promoteStub = sinon
+        .stub(ObjectStorageService.prototype, 'promoteFromSecurity')
+        .resolves({ key: 'test.tar' });
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchiveByArtifactId').resolves(null);
 
       await service.executeScan('security-1');
@@ -388,7 +390,9 @@ describe('ArtifactSecurityService', () => {
 
   describe('handleCleanScanResult', () => {
     it('should promote file from security bucket to main bucket', async () => {
-      const promoteStub = sinon.stub(ObjectStorageService.prototype, 'promoteFromSecurity').resolves({ key: 'test.tar' });
+      const promoteStub = sinon
+        .stub(ObjectStorageService.prototype, 'promoteFromSecurity')
+        .resolves({ key: 'test.tar' });
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchiveByArtifactId').resolves(null);
 
       await service.handleCleanScanResult('artifact-1', 'uploads/test.tar');

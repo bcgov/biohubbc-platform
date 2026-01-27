@@ -1,16 +1,16 @@
 import { IDBConnection } from '../../database/db';
+import { ArtifactStatusEnum } from '../../models/artifact';
 import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
+import { ProcessStatusStatusEnum } from '../../models/process-status';
+import { SecurityStatusEnum } from '../../models/security-status';
 import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
+import { getObjectStoreBucketName, getSecurityObjectStoreBucketName, _getClamAvScanner } from '../../utils/file-utils';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
-import { ArtifactService } from './artifact-service';
-import { UploadArchiveService } from './upload-archive-service';
 import { ArtifactSecurityScanService } from './artifact-security-scan-service';
 import { ScanExecutionResult, ScanOutcome } from './artifact-security-service.interface';
-import { SecurityStatusEnum } from '../../models/security-status';
-import { ArtifactStatusEnum } from '../../models/artifact';
-import { ProcessStatusStatusEnum } from '../../models/process-status';
-import { getObjectStoreBucketName, getSecurityObjectStoreBucketName, _getClamAvScanner } from '../../utils/file-utils';
+import { ArtifactService } from './artifact-service';
+import { UploadArchiveService } from './upload-archive-service';
 
 export class ArtifactSecurityService extends DBService {
   uploadArtifactSecurityRepository: ArtifactSecurityRepository;
@@ -75,7 +75,7 @@ export class ArtifactSecurityService extends DBService {
     return this.uploadArtifactSecurityRepository.updateArtifactSecurity(securityId, security);
   }
 
-    /**
+  /**
    * Handles post-scan actions for a clean scan result.
    * Promotes the file from security bucket to main bucket and unblocks the upload archive for extraction.
    *
@@ -233,5 +233,4 @@ export class ArtifactSecurityService extends DBService {
       results: scanResults
     };
   }
-
 }

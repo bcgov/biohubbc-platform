@@ -204,7 +204,7 @@ export class ObjectStorageService {
     }
 
     // S3 Body can already be a stream (Node.js Readable)
-    return s3Object.Body as  Readable;
+    return s3Object.Body as Readable;
   }
 
   /**

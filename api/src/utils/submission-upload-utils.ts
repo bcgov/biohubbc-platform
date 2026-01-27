@@ -1,6 +1,6 @@
 import { CreateMultipartUploadCommand, UploadPartCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { getSecurityObjectStoreBucketName, getSecurityS3Client } from './file-utils';
+import { getSecurityObjectStoreBucketName, getSecurityS3Client, getSecurityS3ClientPublic } from './file-utils';
 import { MultipartUploadParams, MultipartUploadResult } from './submission-upload-utils.interface';
 
 const MIN_PART_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -17,13 +17,13 @@ export async function generateMultipartUploadPresignedUrls(
   params: MultipartUploadParams
 ): Promise<MultipartUploadResult> {
   const { key, contentType, bytes } = params;
-
   const partSizeBytes = Math.max(MIN_PART_SIZE, Math.ceil(bytes / MAX_PARTS));
   const partCount = Math.ceil(bytes / partSizeBytes);
 
-  const s3Client = getSecurityS3Client();
+  const s3Client = getSecurityS3Client(); // Internal endpoint for backend operations
+  const s3ClientPublic = getSecurityS3ClientPublic(); // Public endpoint for presigned URLs
 
-  // Create multipart upload
+  // Create multipart upload using internal client
   const { UploadId } = await s3Client.send(
     new CreateMultipartUploadCommand({
       Bucket: getSecurityObjectStoreBucketName(),
@@ -36,7 +36,7 @@ export async function generateMultipartUploadPresignedUrls(
     throw new Error('Failed to create multipart upload');
   }
 
-  // Generate presigned URLs for all parts
+  // Generate presigned URLs for all parts using PUBLIC client
   const presignedUrls = await Promise.all(
     Array.from({ length: partCount }, async (_, i) => {
       const partNumber = i + 1;
@@ -47,7 +47,8 @@ export async function generateMultipartUploadPresignedUrls(
         PartNumber: partNumber
       });
 
-      const url = await getSignedUrl(s3Client, uploadPartCommand, {
+      // Use public client to generate URLs. Uses "localhost:<port>" for local development.
+      const url = await getSignedUrl(s3ClientPublic, uploadPartCommand, {
         expiresIn: 3600
       });
 

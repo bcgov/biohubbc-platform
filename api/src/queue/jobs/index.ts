@@ -13,11 +13,11 @@ export const JobQueues = {
    * Jobs are moved here after all retries are exhausted.
    */
   PROCESS_SUBMISSION_FEATURES_FAILED: 'process-submission-features-failed',
-   /**
+  /**
    * Malware scan queue for uploaded artifacts awaiting security scans.
    */
   MALWARE_SCAN: 'malware-scan',
-   /**
+  /**
    * Dead letter queue for failed malware jobs.
    * Jobs are moved here after all retries are exhausted.
    */
