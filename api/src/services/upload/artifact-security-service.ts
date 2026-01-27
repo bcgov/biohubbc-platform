@@ -110,7 +110,6 @@ export class ArtifactSecurityService extends DBService {
   async executeScan(artifactSecurityId: string): Promise<ScanExecutionResult> {
     const artifactService = new ArtifactService(this.connection);
     const artifactSecurityScanService = new ArtifactSecurityScanService(this.connection);
-    //TODO: may remove const artifactSecurityScanFileService = new ArtifactSecurityScanFileService(this.connection);
 
     // 1. Get artifact info and validate
     const securityRecord = await this.getArtifactSecurity(artifactSecurityId);
