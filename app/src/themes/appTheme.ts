@@ -145,6 +145,16 @@ const appTheme = createTheme({
         }
       }
     },
+    MuiListItemButton: {
+      styleOverrides: {
+        root: {
+          padding: '4px 16px',
+          '& .MuiListItemText-root': {
+            margin: '4px'
+          }
+        }
+      }
+    },
     MuiLink: {
       styleOverrides: {
         root: {

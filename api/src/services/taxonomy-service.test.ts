@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { TaxonomyRepository } from '../repositories/taxonomy-repository';
+import { TaxonomyRepository, TaxonRecord } from '../repositories/taxonomy-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ItisService, ItisSolrSearchResponse } from './itis-service';
 import { TaxonomyService } from './taxonomy-service';
@@ -37,7 +37,7 @@ describe('TaxonomyService', () => {
 
   describe('getTaxonByTsnIds', () => {
     it('if all records exist in db should return array of taxon records', async () => {
-      const getTaxonRecord = [
+      const getTaxonRecord: TaxonRecord[] = [
         {
           taxon_id: 1,
           itis_tsn: 1,
@@ -45,6 +45,7 @@ describe('TaxonomyService', () => {
           itis_scientific_name: 'itis_scientific_name',
           common_name: 'common_name',
           itis_data: {},
+          itis_update_date: new Date().toISOString(),
           record_effective_date: 'record_effective_date',
           record_end_date: 'record_end_date',
           create_date: 'create_date',
@@ -68,7 +69,7 @@ describe('TaxonomyService', () => {
     });
 
     it('if some records do not exist in db should return array of taxon records', async () => {
-      const getTaxonRecord = [
+      const getTaxonRecord: TaxonRecord[] = [
         {
           taxon_id: 1,
           itis_tsn: 1,
@@ -76,6 +77,7 @@ describe('TaxonomyService', () => {
           itis_scientific_name: 'itis_scientific_name',
           common_name: 'common_name',
           itis_data: {},
+          itis_update_date: new Date().toISOString(),
           record_effective_date: 'record_effective_date',
           record_end_date: 'record_end_date',
           create_date: 'create_date',
@@ -91,6 +93,7 @@ describe('TaxonomyService', () => {
           itis_scientific_name: 'itis_scientific_name',
           common_name: 'common_name',
           itis_data: {},
+          itis_update_date: new Date().toISOString(),
           record_effective_date: 'record_effective_date',
           record_end_date: 'record_end_date',
           create_date: 'create_date',
@@ -127,44 +130,35 @@ describe('TaxonomyService', () => {
 
   describe('addItisTaxonRecord', () => {
     it('should add a new taxon record', async () => {
+      const mockResult: TaxonRecord = {
+        taxon_id: 1,
+        itis_tsn: 1,
+        bc_taxon_code: null,
+        itis_scientific_name: 'scientificName',
+        common_name: 'commonNames',
+        itis_data: {},
+        itis_update_date: new Date().toISOString(),
+        record_effective_date: 'updateDate',
+        record_end_date: null,
+        create_date: 'now',
+        create_user: 1,
+        update_date: null,
+        update_user: null,
+        revision_count: 1
+      };
+
       const mockDBConnection = getMockDBConnection();
 
       const taxonomyService = new TaxonomyService(mockDBConnection);
 
-      const addItisTaxonRecordStub = sinon.stub(TaxonomyRepository.prototype, 'addItisTaxonRecord').resolves({
-        taxon_id: 1,
-        itis_tsn: 1,
-        bc_taxon_code: null,
-        itis_scientific_name: 'scientificName',
-        common_name: 'commonNames',
-        itis_data: {},
-        record_effective_date: 'updateDate',
-        record_end_date: null,
-        create_date: 'now',
-        create_user: 1,
-        update_date: null,
-        update_user: null,
-        revision_count: 1
-      });
+      const addItisTaxonRecordStub = sinon
+        .stub(TaxonomyRepository.prototype, 'addItisTaxonRecord')
+        .resolves(mockResult);
 
       const response = await taxonomyService.addItisTaxonRecord(getItisSolrSearchResponse[0]);
 
       expect(addItisTaxonRecordStub).to.be.calledOnce;
-      expect(response).to.be.eql({
-        taxon_id: 1,
-        itis_tsn: 1,
-        bc_taxon_code: null,
-        itis_scientific_name: 'scientificName',
-        common_name: 'commonNames',
-        itis_data: {},
-        record_effective_date: 'updateDate',
-        record_end_date: null,
-        create_date: 'now',
-        create_user: 1,
-        update_date: null,
-        update_user: null,
-        revision_count: 1
-      });
+      expect(response).to.be.eql(mockResult);
     });
   });
 

@@ -19,6 +19,11 @@ export const SearchInput = ({ placeholder, value, onClear, onSubmit, inputRef, .
     }
   };
 
+  const handleClear = () => {
+    onClear?.();
+    onSubmit?.('');
+  };
+
   return (
     <TextField
       fullWidth
@@ -37,7 +42,7 @@ export const SearchInput = ({ placeholder, value, onClear, onSubmit, inputRef, .
         ),
         endAdornment: value && (
           <InputAdornment position="end">
-            <IconButton size="small" onClick={onClear} aria-label="Clear search">
+            <IconButton size="small" onClick={handleClear} aria-label="Clear search">
               <Icon path={mdiClose} size={0.7} />
             </IconButton>
           </InputAdornment>
