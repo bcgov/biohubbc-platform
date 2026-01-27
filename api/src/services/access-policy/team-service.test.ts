@@ -132,12 +132,12 @@ describe('TeamService', () => {
       sinon.stub(TeamRepository.prototype, 'getTeamsWithPagination').resolves({ teams: mockTeams, total: 2 });
       sinon.stub(service.connection, 'knex').resolves({ rows: mockMembers } as any);
 
-      const result = await service.getTeamsWithMembers({ page: 1, limit: 50 });
+      const result = await service.getTeamsWithMembers(undefined, { page: 1, limit: 50 });
 
       expect(result.pagination).to.eql({
         total: 2,
-        page: 1,
-        limit: 50,
+        per_page: 50,
+        current_page: 1,
         last_page: 1,
         sort: undefined,
         order: undefined
@@ -149,13 +149,13 @@ describe('TeamService', () => {
     it('should return empty array when no teams exist', async () => {
       sinon.stub(TeamRepository.prototype, 'getTeamsWithPagination').resolves({ teams: [], total: 0 });
 
-      const result = await service.getTeamsWithMembers({ page: 1, limit: 50 });
+      const result = await service.getTeamsWithMembers(undefined, { page: 1, limit: 50 });
 
       expect(result.teams).to.eql([]);
       expect(result.pagination).to.eql({
         total: 0,
-        page: 1,
-        limit: 50,
+        per_page: 50,
+        current_page: 1,
         last_page: 1,
         sort: undefined,
         order: undefined

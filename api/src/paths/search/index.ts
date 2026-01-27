@@ -1,10 +1,13 @@
-import { RequestHandler } from 'express';
+import { Request, RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection } from '../../database/db';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema } from '../../openapi/schemas/pagination';
+import { searchAllResponseSchema } from '../../openapi/schemas/search/search-all';
 import { SearchService } from '../../services/search-service';
+import { SearchParams } from '../../services/search-service.interface';
 import { getLogger } from '../../utils/logger';
-import { ApiPaginationOptions } from '../../zod-schema/pagination';
+import { ensureCompletePaginationOptions, makePaginationOptionsFromRequest } from '../../utils/pagination';
 
 const defaultLog = getLogger('paths/search/index');
 
@@ -21,93 +24,24 @@ GET.apiDoc = {
   parameters: [
     {
       in: 'query',
-      name: 'search',
+      name: 'keyword',
       schema: { type: 'string' },
-      required: true,
-      description: 'Search term to match features, submissions, and taxa.'
+      description: 'Free-text keyword search across all searchable properties'
     },
     {
       in: 'query',
-      name: 'page',
-      schema: { type: 'integer', minimum: 1 },
-      required: false,
-      description: 'Page number for pagination.'
+      name: 'feature_type_name',
+      schema: { type: 'string' },
+      description: 'Filter results to a specific feature type'
     },
-    {
-      in: 'query',
-      name: 'limit',
-      schema: { type: 'integer', minimum: 1 },
-      required: false,
-      description: 'Number of items per page.'
-    }
+    ...paginationRequestQueryParamSchema
   ],
   responses: {
     200: {
       description: 'Paginated search results for features, submissions, and taxonomy.',
       content: {
         'application/json': {
-          schema: {
-            type: 'object',
-            properties: {
-              features: {
-                type: 'object',
-                properties: {
-                  data: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        submission_feature_id: { type: 'integer' },
-                        feature_type_id: { type: 'integer' },
-                        label: { type: 'string' }
-                      },
-                      required: ['submission_feature_id', 'feature_type_id', 'label']
-                    }
-                  },
-                  total: { type: 'integer' }
-                },
-                required: ['data', 'total']
-              },
-              submissions: {
-                type: 'object',
-                properties: {
-                  data: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        submission_id: { type: 'integer' },
-                        name: { type: 'string' },
-                        description: { type: 'string', nullable: true }
-                      },
-                      required: ['submission_id', 'name']
-                    }
-                  },
-                  total: { type: 'integer' }
-                },
-                required: ['data', 'total']
-              },
-              taxonomy: {
-                type: 'object',
-                properties: {
-                  data: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        taxon_id: { type: 'integer' },
-                        itis_scientific_name: { type: 'string' }
-                      },
-                      required: ['taxon_id', 'itis_scientific_name']
-                    }
-                  },
-                  total: { type: 'integer' }
-                },
-                required: ['data', 'total']
-              }
-            },
-            required: ['features', 'submissions', 'taxonomy']
-          }
+          schema: searchAllResponseSchema
         }
       }
     },
@@ -121,20 +55,15 @@ GET.apiDoc = {
 export function searchAll(): RequestHandler {
   return async (req, res) => {
     const connection = getAPIUserDBConnection();
-
     try {
       await connection.open();
 
       const searchService = new SearchService(connection);
 
-      // Extract search params from query
-      const searchTerm = req.query.search as string;
-      const page = req.query.page ? Number(req.query.page) : undefined;
-      const limit = req.query.limit ? Number(req.query.limit) : undefined;
+      const filters = parseQueryParams(req);
+      const paginationOptions = makePaginationOptionsFromRequest(req);
 
-      const pagination: ApiPaginationOptions | undefined = page && limit ? { page, limit } : undefined;
-
-      const result = await searchService.search({ search: searchTerm }, pagination);
+      const result = await searchService.search(filters, ensureCompletePaginationOptions(paginationOptions));
 
       await connection.commit();
 
@@ -149,4 +78,14 @@ export function searchAll(): RequestHandler {
       connection.release();
     }
   };
+}
+
+/**
+ * Parse query parameters from the request.
+ *
+ * @param req Express request object with query parameters
+ * @returns Keyword for search
+ */
+export function parseQueryParams(req: Request<unknown, unknown, unknown, Partial<SearchParams>>): SearchParams {
+  return { keyword: req.query.keyword ?? '', feature_type_name: req.query.feature_type_name ?? undefined };
 }

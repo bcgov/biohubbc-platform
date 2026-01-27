@@ -3,10 +3,12 @@ import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema } from '../../../openapi/schemas/pagination';
 import { CreateTeamRequestSchema, TeamsListResponseSchema, TeamWithMembersSchema } from '../../../openapi/schemas/team';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { TeamService } from '../../../services/access-policy/team-service';
 import { getLogger } from '../../../utils/logger';
+import { ApiPaginationOptions } from '../../../zod-schema/pagination';
 
 const defaultLog = getLogger('paths/administrative/teams');
 
@@ -19,37 +21,10 @@ export const GET: Operation = [
 
 GET.apiDoc = {
   description: 'Get all teams with optional pagination and search.',
-  tags: ['team'],
+  tags: ['admin'],
   security: [{ Bearer: [] }],
   parameters: [
-    {
-      in: 'query',
-      name: 'page',
-      required: false,
-      schema: { type: 'integer', minimum: 1 },
-      description: 'Page number (1-indexed, defaults to 1)'
-    },
-    {
-      in: 'query',
-      name: 'limit',
-      required: false,
-      schema: { type: 'integer', minimum: 1, maximum: 100 },
-      description: 'Items per page (defaults to 10, max 100)'
-    },
-    {
-      in: 'query',
-      name: 'sort',
-      required: false,
-      schema: { type: 'string' },
-      description: 'Column to sort by (e.g., name)'
-    },
-    {
-      in: 'query',
-      name: 'order',
-      required: false,
-      schema: { type: 'string', enum: ['asc', 'desc'] },
-      description: 'Sort direction'
-    },
+    ...paginationRequestQueryParamSchema,
     {
       in: 'query',
       name: 'search',
@@ -75,16 +50,19 @@ GET.apiDoc = {
 export function getTeams(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
-    const page = Number(req.query.page) || 1;
-    const limit = Math.min(Number(req.query.limit) || 10, 100);
-    const sort = req.query.sort as string | undefined;
-    const order = req.query.order as 'asc' | 'desc' | undefined;
+
     const search = req.query.search as string | undefined;
+    const pagination: ApiPaginationOptions = {
+      page: Number(req.query.page) || 1,
+      limit: Math.min(Number(req.query.limit) || 10, 100),
+      sort: req.query.sort as string | undefined,
+      order: req.query.order as 'asc' | 'desc' | undefined
+    };
 
     try {
       await connection.open();
       const teamService = new TeamService(connection);
-      const result = await teamService.getTeamsWithMembers({ page, limit, sort, order, search });
+      const result = await teamService.getTeamsWithMembers(search, pagination);
       await connection.commit();
       return res.status(200).json(result);
     } catch (error) {
@@ -106,7 +84,7 @@ export const POST: Operation = [
 
 POST.apiDoc = {
   description: 'Create a new team with members.',
-  tags: ['team'],
+  tags: ['admin'],
   security: [{ Bearer: [] }],
   requestBody: {
     required: true,

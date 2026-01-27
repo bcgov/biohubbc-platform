@@ -1,3 +1,5 @@
+import { ApiPaginationResponseParams } from 'types/pagination';
+
 /**
  * Team member with user details.
  */
@@ -22,14 +24,7 @@ export interface ITeamWithMembers {
  */
 export interface ITeamsResponse {
   teams: ITeamWithMembers[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    last_page: number;
-    sort?: string;
-    order?: 'asc' | 'desc';
-  };
+  pagination: ApiPaginationResponseParams;
 }
 
 /**

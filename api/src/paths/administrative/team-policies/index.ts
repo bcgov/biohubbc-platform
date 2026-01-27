@@ -3,6 +3,7 @@ import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema } from '../../../openapi/schemas/pagination';
 import {
   CreateTeamPolicyRequestSchema,
   TeamPoliciesResponseSchema,
@@ -11,6 +12,7 @@ import {
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { TeamPolicyService } from '../../../services/access-policy/team-policy-service';
 import { getLogger } from '../../../utils/logger';
+import { ApiPaginationOptions } from '../../../zod-schema/pagination';
 
 const defaultLog = getLogger('paths/administrative/team-policies');
 
@@ -36,6 +38,7 @@ GET.apiDoc = {
       Bearer: []
     }
   ],
+  parameters: [...paginationRequestQueryParamSchema],
   responses: {
     200: {
       description: 'List of team-policy associations.',
@@ -58,15 +61,22 @@ export function getTeamPolicies(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
 
+    const pagination: ApiPaginationOptions = {
+      page: Number(req.query.page) || 1,
+      limit: Math.min(Number(req.query.limit) || 10, 100),
+      sort: req.query.sort as string | undefined,
+      order: req.query.order as 'asc' | 'desc' | undefined
+    };
+
     try {
       await connection.open();
 
       const teamPolicyService = new TeamPolicyService(connection);
-      const teamPolicies = await teamPolicyService.getAllTeamPolicies();
+      const response = await teamPolicyService.getAllTeamPoliciesWithPagination(pagination);
 
       await connection.commit();
 
-      return res.status(200).json({ team_policies: teamPolicies });
+      return res.status(200).json(response);
     } catch (error) {
       defaultLog.error({ label: 'getTeamPolicies', message: 'error', error });
       await connection.rollback();

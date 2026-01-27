@@ -5,6 +5,7 @@
  */
 
 import { OpenAPIV3 } from 'openapi-types';
+import { paginationResponseSchema } from './pagination';
 
 /**
  * Schema for a team-policy association with names for display.
@@ -46,13 +47,14 @@ export const TeamPolicyDetailsSchema: OpenAPIV3.SchemaObject = {
 export const TeamPoliciesResponseSchema: OpenAPIV3.SchemaObject = {
   title: 'TeamPoliciesResponse',
   type: 'object',
-  required: ['team_policies'],
+  required: ['team_policies', 'pagination'],
   properties: {
     team_policies: {
       type: 'array',
       items: TeamPolicyDetailsSchema,
       description: 'List of team-policy associations with names'
-    }
+    },
+    pagination: paginationResponseSchema
   }
 };
 

@@ -1,14 +1,15 @@
+export interface ITaxon {
+  tsn: number;
+  commonNames: string[];
+  scientificName: string;
+  rank?: string;
+  kingdom?: string;
+}
+
 export interface ITaxonomySearchResponse {
-  searchResponse: Array<{
-    id: string;
-    code: string;
-    label: string;
-  }>;
+  searchResponse: ITaxon[];
 }
 
 export interface ITaxonomyListResponse {
-  searchResponse: Array<{
-    id: string;
-    label: string;
-  }>;
+  searchResponse: ITaxon[];
 }

@@ -1,5 +1,5 @@
+import { SearchResultPage } from 'features/search/result/SearchResultPage';
 import { SearchPage } from 'features/search/SearchPage';
-import SubmissionsListPage from 'features/submissions/list/SubmissionsListPage';
 import { SubmissionFeaturePage } from 'features/submissions/page/features/SubmissionFeaturePage';
 import BaseLayout from 'layouts/BaseLayout';
 import { Navigate, Route, Routes } from 'react-router-dom';
@@ -26,8 +26,8 @@ export const SearchRouter = () => {
         path="/list"
         element={
           <BaseLayout>
-            <PageTitle title="List Submissions" description="Browse submissions" />
-            <SubmissionsListPage />
+            <PageTitle title="Search Results" description="List of search results" />
+            <SearchResultPage />
           </BaseLayout>
         }
       />
