@@ -250,15 +250,21 @@ test: ## Runs `npm test` for api, and app projects
 	@echo "==============================================="
 	@cd app && npm test && cd ..
 
-test-int: | run-minio run-clamav run-queue ## Runs integration tests (ensures minio, clamav and queue are up)
+test-db: ## Runs DB integration tests (transaction/rollback, only needs database)
+	@echo "==============================================="
+	@echo "Running DB integration tests"
+	@echo "==============================================="
+	@docker compose exec api npm run test:db
+
+test-sys: | run-minio run-clamav run-queue ## Runs system integration tests (needs minio, clamav, queue)
 	@echo "==============================================="
 	@echo "Waiting for ClamAV to be healthy..."
 	@echo "==============================================="
 	@until docker inspect --format='{{.State.Health.Status}}' $(DOCKER_PROJECT_NAME)-clamav-$(DOCKER_NAMESPACE)-container 2>/dev/null | grep -q healthy; do sleep 5; echo "  waiting..."; done
 	@echo "==============================================="
-	@echo "Running integration tests"
+	@echo "Running system integration tests"
 	@echo "==============================================="
-	@docker compose exec api npm run test:integration
+	@docker compose exec api npm run test:sys
 
 cypress: ## Runs `npm run test:e2e` for api, and app projects
 	@echo "==============================================="

@@ -1,10 +1,10 @@
 // Integration tests for ClamAV malware scanning.
 //
-// Run: cd api && npx mocha --require ts-node/register 'src/__integration__/*.ts'
+// Run: make test-sys
 // Requires: make web && make clamav
 
 import { Readable } from 'stream';
-import { _getClamAvScanner } from '../utils/file-utils';
+import { _getClamAvScanner } from '../../utils/file-utils';
 
 // EICAR test signature - standard antivirus test string (NOT actual malware)
 const EICAR = 'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*';
