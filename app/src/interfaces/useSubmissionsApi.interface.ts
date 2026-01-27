@@ -1,4 +1,4 @@
-import { ApiPaginationResponseParams } from 'types/misc';
+import { ApiPaginationResponseParams } from 'types/pagination';
 import { SECURITY_APPLIED_STATUS } from './useDatasetApi.interface';
 
 /** NET-NEW INTERFACES FOR UPDATED SCHEMA **/

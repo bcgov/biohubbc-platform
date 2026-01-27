@@ -13,7 +13,8 @@ export const TaxonRecord = z.object({
   bc_taxon_code: z.string().nullable(),
   itis_scientific_name: z.string(),
   common_name: z.string().nullable(),
-  itis_data: z.record(z.any()),
+  itis_data: z.any(),
+  itis_update_date: z.string(),
   record_effective_date: z.string(),
   record_end_date: z.string().nullable(),
   create_date: z.string(),
@@ -83,8 +84,8 @@ export class TaxonomyRepository extends BaseRepository {
         VALUES (
           ${itisTsn},
           ${itisScientificName},
-          ${commonNames[0]},
-          ${itisData},
+          ${commonNames[0] ?? null},
+          ${JSON.stringify(itisData)}::jsonb,
           ${itisUpdateDate}
         )
         ON CONFLICT

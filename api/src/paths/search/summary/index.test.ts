@@ -11,37 +11,34 @@ import * as search from './index';
 chai.use(sinonChai);
 
 describe('searchSummary', () => {
+  const mockSummary = {
+    features: [{ feature_type_name: 'dataset', total: 5 }],
+    submissions: { total: 3 },
+    taxonomy: { total: 2, scientific_name: 'Some species' }
+  };
+
   afterEach(() => {
     sinon.restore();
   });
 
   it('should return summary data for a search term', async () => {
-    const mockSummary = {
-      features: [{ feature_type_name: 'dataset', total: 5 }],
-      submissions: { total: 3 },
-      taxonomy: { total: 2, scientific_name: 'Some species' }
-    };
-
     const dbConnectionObj = getMockDBConnection({
-      open: sinon.stub(),
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
+      open: sinon.stub().resolves(),
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves()
     });
-
     sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    mockReq.query.search = 'moose';
+    mockReq.query = { keyword: 'moose' };
 
     const mockGetSearchSummary = sinon.stub(SearchService.prototype, 'getSearchSummary').resolves(mockSummary);
 
     const requestHandler = search.searchSummary();
-
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(mockGetSearchSummary).to.have.been.calledOnceWith({ search: 'moose' });
+    expect(mockGetSearchSummary).to.have.been.calledOnceWith({ keyword: 'moose' });
     expect(dbConnectionObj.open).to.have.been.calledOnce;
     expect(dbConnectionObj.commit).to.have.been.calledOnce;
     expect(mockRes.setHeader).to.have.been.calledWith('Cache-Control', 'public, max-age=90');
@@ -51,20 +48,18 @@ describe('searchSummary', () => {
 
   it('should rollback and propagate error if getSearchSummary throws', async () => {
     const dbConnectionObj = getMockDBConnection({
-      open: sinon.stub(),
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
+      open: sinon.stub().resolves(),
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves()
     });
-
     sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.query = { keyword: 'fail' };
 
     const testError = new Error('Service failure');
     sinon.stub(SearchService.prototype, 'getSearchSummary').rejects(testError);
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    mockReq.query.search = 'fail';
 
     const requestHandler = search.searchSummary();
 
@@ -78,19 +73,17 @@ describe('searchSummary', () => {
     }
   });
 
-  it('should always release the connection even if open or commit fails', async () => {
+  it('should always release the connection even if open fails', async () => {
     const dbConnectionObj = getMockDBConnection({
-      open: sinon.stub().throws(new Error('open failed')),
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
+      open: sinon.stub().rejects(new Error('open failed')),
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves()
     });
-
     sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    mockReq.query.search = 'anything';
+    mockReq.query = { keyword: 'anything' };
 
     const requestHandler = search.searchSummary();
 

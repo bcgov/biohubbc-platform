@@ -1,5 +1,5 @@
+import { Box } from '@mui/material';
 import { grey } from '@mui/material/colors';
-import { Box } from '@mui/system';
 import DropZone, { IDropZoneConfigProps } from 'components/attachments/DropZone';
 import { UploadFileStatus } from 'components/attachments/FileUploadItem';
 import { FileUploadItemContent } from 'components/attachments/FileUploadItemContent';

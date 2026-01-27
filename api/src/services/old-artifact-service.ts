@@ -1,7 +1,7 @@
 import { IDBConnection } from '../database/db';
 import { ApiError, ApiGeneralError } from '../errors/api-error';
 import { Artifact, ArtifactRepository } from '../repositories/artifact-repository';
-import { SearchIndexRepository } from '../repositories/search-index-respository';
+import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SecurityRepository } from '../repositories/security-repository';
 import { SubmissionFeatureRecord } from '../repositories/submission-repository';
 import { deleteFileFromS3, generateSubmissionFeatureS3FileKey, uploadFileToS3 } from '../utils/file-utils';
@@ -66,10 +66,10 @@ export class ArtifactService extends DBService {
     const codeService = new CodeService(this.connection);
     const artifactFeatureProperties = await codeService.getFeaturePropertyByName('artifact_key');
 
-    const searchIndexRepository = new SearchIndexRepository(this.connection);
+    const searchFeatureRepository = new SearchFeatureRepository(this.connection);
 
     // Insert S3 key in search string table
-    await searchIndexRepository.insertSearchableStringRecords([
+    await searchFeatureRepository.insertSearchableStringRecords([
       {
         submission_feature_id: artifactFeatureSubmission.submission_feature_id,
         feature_property_id: artifactFeatureProperties.feature_property_id,

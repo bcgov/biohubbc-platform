@@ -6,7 +6,7 @@ import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { ISubmissionFeature } from '../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { RegionService } from '../../services/region-service';
-import { SearchIndexService } from '../../services/search-index-service';
+import { SearchFeatureService } from '../../services/search-feature-service';
 import { SubmissionService } from '../../services/submission-service';
 import { ValidationService } from '../../services/validation-service';
 import { getServiceClientSystemUser } from '../../utils/keycloak-utils';
@@ -149,7 +149,7 @@ export function submissionIntake(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
       const validationService = new ValidationService(connection);
-      const searchIndexService = new SearchIndexService(connection);
+      const searchFeatureService = new SearchFeatureService(connection);
       const regionService = new RegionService(connection);
 
       // validate the submission
@@ -171,7 +171,7 @@ export function submissionIntake(): RequestHandler {
       await submissionService.insertSubmissionFeatureRecords(submissionRecord.submission_id, [submissionFeature]);
 
       // Index the submission feature record properties
-      await searchIndexService.indexFeaturesBySubmissionId(submissionRecord.submission_id);
+      await searchFeatureService.indexFeaturesBySubmissionId(submissionRecord.submission_id);
 
       // Fetch all artifact submission features, if any
       const submissionArtifactFeatures = await submissionService.findSubmissionFeatures({
