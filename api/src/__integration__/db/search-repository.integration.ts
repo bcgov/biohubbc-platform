@@ -52,10 +52,7 @@ describe('SearchRepository (integration)', function () {
     });
 
     it('should return empty results for non-matching search', async () => {
-      const result = await repo.findSubmissions(
-        { keyword: 'zzz_no_match_xyz_999' },
-        { page: 1, limit: 10 }
-      );
+      const result = await repo.findSubmissions({ keyword: 'zzz_no_match_xyz_999' }, { page: 1, limit: 10 });
 
       expect(result.data).to.be.an('array').with.lengthOf(0);
       expect(result.total).to.equal(0);
@@ -97,5 +94,4 @@ describe('SearchRepository (integration)', function () {
       }
     });
   });
-
 });
