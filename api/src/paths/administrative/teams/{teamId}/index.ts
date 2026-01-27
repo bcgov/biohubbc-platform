@@ -24,7 +24,7 @@ export const GET: Operation = [
 
 GET.apiDoc = {
   description: 'Get a team by ID with its members.',
-  tags: ['team'],
+  tags: ['admin'],
   security: [{ Bearer: [] }],
   parameters: [
     {
@@ -79,7 +79,7 @@ export const PUT: Operation = [
 
 PUT.apiDoc = {
   description: 'Update an existing team and its members.',
-  tags: ['team'],
+  tags: ['admin'],
   security: [{ Bearer: [] }],
   parameters: [
     {
@@ -139,7 +139,7 @@ export const DELETE: Operation = [
 
 DELETE.apiDoc = {
   description: 'Soft delete a team by ID.',
-  tags: ['team'],
+  tags: ['admin'],
   security: [{ Bearer: [] }],
   parameters: [
     {

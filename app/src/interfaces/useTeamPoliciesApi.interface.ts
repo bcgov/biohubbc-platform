@@ -1,3 +1,5 @@
+import { ApiPaginationResponseParams } from 'types/pagination';
+
 /**
  * Team-policy association with team and policy names for display.
  */
@@ -14,6 +16,7 @@ export interface ITeamPolicyDetails {
  */
 export interface ITeamPoliciesResponse {
   team_policies: ITeamPolicyDetails[];
+  pagination: ApiPaginationResponseParams;
 }
 
 /**

@@ -1,6 +1,7 @@
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { CreateTeam, Team, UpdateTeam } from '../../models/team';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
 /**
@@ -85,28 +86,21 @@ export class TeamRepository extends BaseRepository {
   /**
    * Get teams with pagination and optional search.
    *
-   * @param {object} options - Pagination and search options.
-   * @param {number} options.page - Page number (1-indexed).
-   * @param {number} options.limit - Number of items per page.
-   * @param {string} [options.sort] - Column to sort by.
-   * @param {string} [options.order] - Sort direction ('asc' or 'desc').
-   * @param {string} [options.search] - Optional search term to filter by team name.
+   * @param {string} [search] - Optional search term to filter by team name.
+   * @param {ApiPaginationOptions} pagination - Pagination options.
    * @return {Promise<{ teams: Team[]; total: number }>}
    * @memberof TeamRepository
    */
-  async getTeamsWithPagination(options: {
-    page: number;
-    limit: number;
-    sort?: string;
-    order?: 'asc' | 'desc';
-    search?: string;
-  }): Promise<{ teams: Team[]; total: number }> {
+  async getTeamsWithPagination(
+    search: string | undefined,
+    pagination: ApiPaginationOptions
+  ): Promise<{ teams: Team[]; total: number }> {
     const knex = getKnex();
 
     let baseQuery = knex.table('team').whereNull('record_end_date');
 
-    if (options.search) {
-      baseQuery = baseQuery.whereILike('name', `%${options.search}%`);
+    if (search) {
+      baseQuery = baseQuery.whereILike('name', `%${search}%`);
     }
 
     // Build count query
@@ -116,9 +110,9 @@ export class TeamRepository extends BaseRepository {
     const paginatedQuery = baseQuery
       .clone()
       .select(['team_id', 'name', 'description'])
-      .orderBy(options.sort || 'name', options.order || 'asc')
-      .offset((options.page - 1) * options.limit)
-      .limit(options.limit);
+      .orderBy(pagination.sort || 'name', pagination.order || 'asc')
+      .offset((pagination.page - 1) * pagination.limit)
+      .limit(pagination.limit);
 
     // Execute both queries in parallel
     const [countResult, response] = await Promise.all([

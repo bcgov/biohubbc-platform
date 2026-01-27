@@ -1,6 +1,7 @@
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { CreateTeamPolicy, TeamPolicy, TeamPolicyDetails, UpdateTeamPolicy } from '../../models/team-policy';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
 /**
@@ -105,6 +106,49 @@ export class TeamPolicyRepository extends BaseRepository {
     const response = await this.connection.knex(query, TeamPolicyDetails);
 
     return response.rows;
+  }
+
+  /**
+   * Get all active team-policy associations with pagination support.
+   *
+   * @param {ApiPaginationOptions} options - Pagination options.
+   * @return {Promise<{ teamPolicies: TeamPolicyDetails[]; total: number }>}
+   * @memberof TeamPolicyRepository
+   */
+  async getAllTeamPoliciesWithPagination(
+    options: ApiPaginationOptions
+  ): Promise<{ teamPolicies: TeamPolicyDetails[]; total: number }> {
+    const knex = getKnex();
+
+    // Base query for filtering
+    const baseQuery = () =>
+      knex
+        .from('team_policy as tp')
+        .innerJoin('team as t', 'tp.team_id', 't.team_id')
+        .innerJoin('policy as p', 'tp.policy_id', 'p.policy_id')
+        .whereNull('tp.record_end_date')
+        .whereNull('t.record_end_date')
+        .whereNull('p.record_end_date');
+
+    // Get total count
+    const countQuery = baseQuery().count('* as count').first();
+    const countResult = await this.connection.knex(countQuery);
+    const total = Number(countResult.rows[0]?.count ?? 0);
+
+    // Determine sort column (map frontend field names to SQL columns)
+    const sortColumn = options.sort === 'team_name' ? 't.name' : options.sort === 'policy_name' ? 'p.name' : 't.name';
+    const sortOrder = options.order || 'asc';
+
+    // Get paginated results (page is 1-indexed, so offset = (page - 1) * limit)
+    const dataQuery = baseQuery()
+      .select(['tp.team_policy_id', 'tp.team_id', 'tp.policy_id', 't.name as team_name', 'p.name as policy_name'])
+      .orderBy(sortColumn, sortOrder)
+      .offset((options.page - 1) * options.limit)
+      .limit(options.limit);
+
+    const response = await this.connection.knex(dataQuery, TeamPolicyDetails);
+
+    return { teamPolicies: response.rows, total };
   }
 
   /**

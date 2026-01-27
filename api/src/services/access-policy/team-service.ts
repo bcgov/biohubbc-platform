@@ -2,6 +2,8 @@ import { IDBConnection } from '../../database/db';
 import { CreateTeam, Team, UpdateTeam } from '../../models/team';
 import { TeamMemberRepository, TeamMemberWithUser } from '../../repositories/authorization/team-member-repository';
 import { TeamRepository } from '../../repositories/authorization/team-repository';
+import { makePaginationResponse } from '../../utils/pagination';
+import { ApiPaginationOptions, ApiPaginationResults } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
 
 /**
@@ -79,33 +81,19 @@ export class TeamService extends DBService {
   /**
    * Get all teams with their members, with pagination and search.
    *
-   * @param {object} options - Pagination and search options.
-   * @param {number} options.page - Page number (1-indexed).
-   * @param {number} options.limit - Number of items per page.
-   * @param {string} [options.sort] - Column to sort by.
-   * @param {('asc' | 'desc')} [options.order] - Sort direction.
-   * @param {string} [options.search] - Optional search term to filter by team name.
-   * @return {Promise<{ teams: TeamWithMembers[]; pagination: { total: number; page: number; limit: number; last_page: number; sort?: string; order?: string } }>}
+   * @param {string} [search] - Optional search term to filter by team name.
+   * @param {ApiPaginationOptions} pagination - Pagination options.
+   * @return {Promise<{ teams: TeamWithMembers[]; pagination: ApiPaginationResults }>}
    * @memberof TeamService
    */
-  async getTeamsWithMembers(options: {
-    page: number;
-    limit: number;
-    sort?: string;
-    order?: 'asc' | 'desc';
-    search?: string;
-  }): Promise<{
+  async getTeamsWithMembers(
+    search: string | undefined,
+    pagination: ApiPaginationOptions
+  ): Promise<{
     teams: TeamWithMembers[];
-    pagination: {
-      total: number;
-      page: number;
-      limit: number;
-      last_page: number;
-      sort?: string;
-      order?: string;
-    };
+    pagination: ApiPaginationResults;
   }> {
-    const { teams, total } = await this.teamRepository.getTeamsWithPagination(options);
+    const { teams, total } = await this.teamRepository.getTeamsWithPagination(search, pagination);
 
     const teamsWithMembers = await Promise.all(
       teams.map(async (team) => ({
@@ -116,14 +104,7 @@ export class TeamService extends DBService {
 
     return {
       teams: teamsWithMembers,
-      pagination: {
-        total,
-        page: options.page,
-        limit: options.limit,
-        last_page: Math.max(1, Math.ceil(total / options.limit)),
-        sort: options.sort,
-        order: options.order
-      }
+      pagination: makePaginationResponse(total, pagination)
     };
   }
 

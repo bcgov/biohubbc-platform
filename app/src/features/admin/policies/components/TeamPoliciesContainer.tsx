@@ -5,7 +5,7 @@ import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
@@ -22,6 +22,16 @@ import { useState } from 'react';
 export interface ITeamPoliciesContainerProps {
   /** Array of team-policy associations to display (pre-filtered by parent) */
   teamPolicies: ITeamPolicyDetails[];
+  /** Total number of team-policy associations (for server-side pagination) */
+  rowCount: number;
+  /** Current pagination model from parent */
+  paginationModel: GridPaginationModel;
+  /** Callback when pagination changes */
+  setPaginationModel: (model: GridPaginationModel) => void;
+  /** Current sort model from parent */
+  sortModel: GridSortModel;
+  /** Callback when sort changes */
+  setSortModel: (model: GridSortModel) => void;
   /** Currently selected team from TeamsContainer (null if none selected) */
   selectedTeam: ITeamWithMembers | null;
   /** Currently selected policy from ActivePoliciesList (null if none selected) */
@@ -40,7 +50,17 @@ export interface ITeamPoliciesContainerProps {
  * @returns {React.ReactElement} The team-policies container component
  */
 export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (props) => {
-  const { teamPolicies, selectedTeam, selectedPolicy, refresh } = props;
+  const {
+    teamPolicies,
+    rowCount,
+    paginationModel,
+    setPaginationModel,
+    sortModel,
+    setSortModel,
+    selectedTeam,
+    selectedPolicy,
+    refresh
+  } = props;
 
   const biohubApi = useApi();
   const dialogContext = useDialogContext();
@@ -240,7 +260,7 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
         <Typography variant="h4" component="h2" flexGrow={1}>
           {getHeaderText()}{' '}
           <Typography sx={{ fontSize: 'inherit' }} component="span" color="textSecondary">
-            ({teamPolicies.length})
+            ({rowCount})
           </Typography>
         </Typography>
         {canAssign && (
@@ -262,18 +282,19 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
         rows={teamPolicies}
         columns={columns}
         getRowId={(row) => row.team_policy_id}
+        paginationMode="server"
+        paginationModel={paginationModel}
+        onPaginationModelChange={setPaginationModel}
         pageSizeOptions={[10, 25, 50]}
+        sortingMode="server"
+        sortingOrder={['asc', 'desc']}
+        sortModel={sortModel}
+        onSortModelChange={setSortModel}
+        rowCount={rowCount}
         disableRowSelectionOnClick
         disableColumnSelector
         disableColumnMenu
         localeText={{ noRowsLabel: 'No Team-Policy Assignments' }}
-        initialState={{
-          pagination: {
-            paginationModel: {
-              pageSize: 10
-            }
-          }
-        }}
         sx={{
           border: 'none',
           '& .MuiDataGrid-columnHeaderTitle': {

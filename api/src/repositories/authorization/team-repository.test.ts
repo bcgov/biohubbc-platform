@@ -4,6 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiExecuteSQLError } from '../../errors/api-error';
+import { Team } from '../../models/team';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { TeamRepository } from './team-repository';
 
@@ -103,9 +104,9 @@ describe('TeamRepository', () => {
 
   describe('getTeamsWithPagination', () => {
     it('returns paginated teams with total count', async () => {
-      const mockTeams = [
-        { team_id: 'uuid-1', name: 'Team Alpha', description: 'First team' },
-        { team_id: 'uuid-2', name: 'Team Beta', description: 'Second team' }
+      const mockTeams: Team[] = [
+        { team_id: '11111111-1111-1111-1111-111111111111', name: 'Team Alpha', description: 'First team' },
+        { team_id: '22222222-2222-2222-2222-222222222222', name: 'Team Beta', description: 'Second team' }
       ];
 
       // First call returns count, second returns teams
@@ -116,7 +117,7 @@ describe('TeamRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repository = new TeamRepository(mockDBConnection);
-      const result = await repository.getTeamsWithPagination({ page: 1, limit: 2 });
+      const result = await repository.getTeamsWithPagination(undefined, { page: 1, limit: 2 });
 
       expect(result.teams).to.eql(mockTeams);
       expect(result.total).to.equal(5);
@@ -132,7 +133,7 @@ describe('TeamRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repository = new TeamRepository(mockDBConnection);
-      const result = await repository.getTeamsWithPagination({ page: 1, limit: 50, search: 'Research' });
+      const result = await repository.getTeamsWithPagination('Research', { page: 1, limit: 50 });
 
       expect(result.teams).to.eql(mockTeams);
       expect(result.total).to.equal(1);
@@ -146,7 +147,7 @@ describe('TeamRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repository = new TeamRepository(mockDBConnection);
-      const result = await repository.getTeamsWithPagination({ page: 1, limit: 50 });
+      const result = await repository.getTeamsWithPagination(undefined, { page: 1, limit: 50 });
 
       expect(result.teams).to.eql([]);
       expect(result.total).to.equal(0);
@@ -162,7 +163,7 @@ describe('TeamRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repository = new TeamRepository(mockDBConnection);
-      const result = await repository.getTeamsWithPagination({ page: 2, limit: 3 });
+      const result = await repository.getTeamsWithPagination(undefined, { page: 2, limit: 3 });
 
       // Page 2 with limit 3 should offset by 3 ((2-1) * 3) for 1-indexed pagination
       expect(result.teams).to.eql(mockTeams);

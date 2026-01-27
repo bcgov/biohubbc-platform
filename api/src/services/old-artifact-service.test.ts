@@ -4,7 +4,8 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { Artifact, ArtifactRepository } from '../repositories/artifact-repository';
-import { FeaturePropertyRecord, SearchIndexRepository } from '../repositories/search-index-respository';
+import { FeaturePropertyCode } from '../repositories/code-repository';
+import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SecurityRepository } from '../repositories/security-repository';
 import { SubmissionFeatureRecord } from '../repositories/submission-repository';
 import * as fileUtils from '../utils/file-utils';
@@ -67,26 +68,17 @@ describe('ArtifactService', () => {
         .resolves(artifactSubmissionFeature);
 
       const insertSearchableStringRecordsStub = sinon
-        .stub(SearchIndexRepository.prototype, 'insertSearchableStringRecords')
+        .stub(SearchFeatureRepository.prototype, 'insertSearchableStringRecords')
         .resolves();
 
       const uploadFileToS3Stub = sinon.stub(fileUtils, 'uploadFileToS3').resolves();
 
-      const s3FeaturePropertyRecord: FeaturePropertyRecord = {
+      const s3FeaturePropertyRecord: FeaturePropertyCode = {
         feature_property_id: 1,
+        feature_property_name: 'artifact_key',
+        feature_property_display_name: 'S3 Key',
         feature_property_type_id: 1,
-        name: 'artifact_key',
-        display_name: 'S3 Key',
-        description: 'An S3 Key',
-        parent_feature_property_id: null,
-        calculated_value: false,
-        record_effective_date: '2024-01-01',
-        record_end_date: null,
-        create_date: '2024-01-01',
-        create_user: 3,
-        update_date: null,
-        update_user: null,
-        revision_count: 0
+        feature_property_type_name: 'string'
       };
 
       const getFeaturePropertyByNameStub = sinon

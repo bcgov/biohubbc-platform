@@ -6,6 +6,7 @@ import {
   IUpdateTeamRequest,
   IAvailableUsersResponse
 } from 'interfaces/useTeamsApi.interface';
+import { ApiPaginationRequestOptions, ApiSearchParams } from 'types/pagination';
 
 /**
  * Returns a set of supported api methods for working with teams.
@@ -17,16 +18,15 @@ export const useTeamsApi = (axios: AxiosInstance) => {
   /**
    * Get all teams with pagination.
    *
-   * @param {{ page: number; limit: number; sort?: string; order?: 'asc' | 'desc'; search?: string }} params
+   * @param {ApiSearchParams} [searchParams] - Optional search parameters.
+   * @param {ApiPaginationRequestOptions} [pagination] - Optional pagination parameters.
    * @return {*} {Promise<ITeamsResponse>}
    */
-  const getTeams = async (params: {
-    page: number;
-    limit: number;
-    sort?: string;
-    order?: 'asc' | 'desc';
-    search?: string;
-  }): Promise<ITeamsResponse> => {
+  const getTeams = async (
+    searchParams?: ApiSearchParams,
+    pagination?: ApiPaginationRequestOptions
+  ): Promise<ITeamsResponse> => {
+    const params = { ...searchParams, ...pagination };
     const { data } = await axios.get('/api/administrative/teams', { params });
 
     return data;

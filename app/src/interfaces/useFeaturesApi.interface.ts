@@ -1,4 +1,4 @@
-import { ApiPaginationResponseParams } from 'types/misc';
+import { ApiPaginationResponseParams } from 'types/pagination';
 
 export interface ISubmissionFeatureResponse {
   features: ISubmissionFeature[];

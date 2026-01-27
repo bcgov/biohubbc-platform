@@ -19,19 +19,18 @@ export class SearchRepository extends BaseRepository {
    * Builds a query to find features matching a search term.
    * Searches against the search_string table and joins related feature type data.
    *
-   * @private
-   * @param {string} search - The search term to match against
+   * @param {string} keyword - The search term to match against
    * @return {Knex.QueryBuilder} Query builder for finding features
    * @memberof SearchRepository
    */
-  private _makeFindFeaturesQuery(search: string): Knex.QueryBuilder {
+  private _makeFindFeaturesQuery(keyword: string): Knex.QueryBuilder {
     const knex = getKnex();
     return knex('search_string as ss')
       .join('feature_property as fp', 'fp.feature_property_id', 'ss.feature_property_id')
       .join('submission_feature as sf', 'sf.submission_feature_id', 'ss.submission_feature_id')
       .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
       .where('fp.name', 'name')
-      .andWhereILike('ss.value', `%${search}%`)
+      .andWhereILike('ss.value', `%${keyword}%`)
       .select('sf.submission_feature_id', 'sf.feature_type_id', knex.raw('MIN(ss.value) as label'))
       .groupBy('sf.submission_feature_id', 'sf.feature_type_id');
   }
@@ -40,18 +39,17 @@ export class SearchRepository extends BaseRepository {
    * Builds a query to find submissions matching a search term.
    * Searches against both submission name and associated search strings.
    *
-   * @private
-   * @param {string} search - The search term to match against
+   * @param {string} keyword - The search term to match against
    * @return {Knex.QueryBuilder} Query builder for finding submissions
    * @memberof SearchRepository
    */
-  private _makeFindSubmissionsQuery(search: string): Knex.QueryBuilder {
+  private _makeFindSubmissionsQuery(keyword: string): Knex.QueryBuilder {
     const knex = getKnex();
     return knex('submission as s')
       .leftJoin('submission_feature as sf', 'sf.submission_id', 's.submission_id')
       .leftJoin('search_string as ss', 'ss.submission_feature_id', 'sf.submission_feature_id')
       .where((qb) => {
-        qb.whereILike('s.name', `%${search}%`).orWhereILike('ss.value', `%${search}%`);
+        qb.whereILike('s.name', `%${keyword}%`).orWhereILike('ss.value', `%${keyword}%`);
       })
       .select('s.submission_id', 's.name', 's.description')
       .distinct();
@@ -61,19 +59,18 @@ export class SearchRepository extends BaseRepository {
    * Builds a query to find taxon records matching a search term.
    * Searches against scientific name, common name, BC taxon code, and ITIS TSN.
    *
-   * @private
-   * @param {string} search - The search term to match against
+   * @param {string} keyword - The search term to match against
    * @return {Knex.QueryBuilder} Query builder for finding taxon records
    * @memberof SearchRepository
    */
-  private _makeFindTaxonQuery(search: string): Knex.QueryBuilder {
+  private _makeFindTaxonQuery(keyword: string): Knex.QueryBuilder {
     const knex = getKnex();
     return knex('taxon')
       .where((qb) => {
-        qb.whereILike('itis_scientific_name', `%${search}%`)
-          .orWhereILike('common_name', `%${search}%`)
-          .orWhereILike('bc_taxon_code', `%${search}%`)
-          .orWhereRaw('CAST(itis_tsn AS TEXT) ILIKE ?', [`%${search}%`]);
+        qb.whereILike('itis_scientific_name', `%${keyword}%`)
+          .orWhereILike('common_name', `%${keyword}%`)
+          .orWhereILike('bc_taxon_code', `%${keyword}%`)
+          .orWhereRaw('CAST(itis_tsn AS TEXT) ILIKE ?', [`%${keyword}%`]);
       })
       .select('taxon_id', knex.raw('itis_scientific_name'));
   }
@@ -81,7 +78,6 @@ export class SearchRepository extends BaseRepository {
   /**
    * Wraps a query with CTE and aggregation to return paginated results in the shape { data: [...], total: number }.
    *
-   * @private
    * @param {Knex.QueryBuilder} baseQuery - The base query to paginate
    * @param {string} jsonbObjectRaw - Raw SQL for jsonb_build_object with result columns
    * @param {ApiPaginationOptions} [pagination] - Optional pagination parameters
@@ -125,7 +121,7 @@ export class SearchRepository extends BaseRepository {
    * @memberof SearchRepository
    */
   async findFeatures(params: SearchParams, pagination?: ApiPaginationOptions): Promise<WithCount<SearchFeatureResult>> {
-    const base = this._makeFindFeaturesQuery(params.search);
+    const base = this._makeFindFeaturesQuery(params.keyword);
 
     if (params.feature_type_name) {
       base.where('ft.name', params.feature_type_name);
@@ -151,7 +147,7 @@ export class SearchRepository extends BaseRepository {
     params: SearchParams,
     pagination?: ApiPaginationOptions
   ): Promise<WithCount<SearchSubmissionResult>> {
-    const base = this._makeFindSubmissionsQuery(params.search);
+    const base = this._makeFindSubmissionsQuery(params.keyword);
     const jsonbObject = `jsonb_build_object('submission_id', submission_id, 'name', name, 'description', description)`;
     const query = this._buildPaginatedQuery(base, jsonbObject, pagination);
 
@@ -169,7 +165,7 @@ export class SearchRepository extends BaseRepository {
    * @memberof SearchRepository
    */
   async findTaxon(params: SearchParams, pagination?: ApiPaginationOptions): Promise<WithCount<SearchTaxonResult>> {
-    const base = this._makeFindTaxonQuery(params.search);
+    const base = this._makeFindTaxonQuery(params.keyword);
     const jsonbObject = `jsonb_build_object('taxon_id', taxon_id, 'itis_scientific_name', itis_scientific_name)`;
     const query = this._buildPaginatedQuery(base, jsonbObject, pagination);
 
@@ -193,7 +189,7 @@ export class SearchRepository extends BaseRepository {
         SELECT DISTINCT sf.submission_feature_id, sf.feature_type_id
         FROM search_string ss
         JOIN submission_feature sf ON ss.submission_feature_id = sf.submission_feature_id
-        WHERE ss.value ILIKE ${`%${params.search}%`}
+        WHERE ss.value ILIKE ${`%${params.keyword}%`}
       ),
       priority_types AS (
         SELECT feature_type_id, name FROM feature_type WHERE name = ANY(${priorityTypes}::text[])
@@ -223,7 +219,7 @@ export class SearchRepository extends BaseRepository {
   async findSubmissionSummary(params: SearchParams): Promise<SearchSummarySubmission> {
     const knex = getKnex();
     const query = knex('submission as s')
-      .whereILike('s.name', `%${params.search}%`)
+      .whereILike('s.name', `%${params.keyword}%`)
       .select(knex.raw('COUNT(*)::int as total'));
 
     const result = await this.connection.knex(query);
@@ -240,7 +236,7 @@ export class SearchRepository extends BaseRepository {
   async findTaxonSummary(params: SearchParams): Promise<SearchSummaryTaxon> {
     const knex = getKnex();
     const query = knex('taxon')
-      .whereILike('itis_scientific_name', `%${params.search}%`)
+      .whereILike('itis_scientific_name', `%${params.keyword}%`)
       .select(knex.raw('COUNT(*)::int as total'));
 
     const result = await this.connection.knex(query);
