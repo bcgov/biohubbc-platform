@@ -427,7 +427,7 @@ export class SubmissionService extends DBService {
   /**
    * Get a submission feature record by its id
    *
-   * @param {number} submissionFeatureId
+   * @param {string} submissionFeatureId
    * @return {Promise<SubmissionFeature>}
    * @memberof SubmissionService
    */

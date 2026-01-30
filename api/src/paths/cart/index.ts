@@ -1,10 +1,10 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
-import { GetCartWithFeaturesSchema } from '../../../openapi/schemas/cart';
-import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
-import { CartService } from '../../../services/cart-service';
-import { getLogger } from '../../../utils/logger';
+import { getAPIUserDBConnection, getDBConnection } from '../../database/db';
+import { GetCartWithFeaturesSchema } from '../../openapi/schemas/cart';
+import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
+import { CartService } from '../../services/cart-service';
+import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/cart');
 
@@ -19,15 +19,15 @@ POST.apiDoc = {
     }
   ],
   requestBody: {
-    required: true,
+    required: false,
     content: {
       'application/json': {
         schema: {
           type: 'object',
-          required: ['add'],
+          required: ['features'],
           additionalProperties: false,
           properties: {
-            add: {
+            features: {
               type: 'array',
               items: { type: 'string', format: 'uuid' },
               description: 'List of submission feature UUIDs to add to the cart'
@@ -63,11 +63,11 @@ export function createCart(): RequestHandler {
       await connection.open();
 
       const systemUserId = connection.systemUserId();
-      const add = req.body.add as number[];
+      const features = (req.body?.features ?? []) as string[];
 
       const cartService = new CartService(connection);
 
-      const cart = await cartService.createCart(systemUserId, add);
+      const cart = await cartService.createCart(systemUserId, features);
 
       await connection.commit();
 

@@ -446,7 +446,7 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Update the parent reference for a submission feature.
    *
-   * @param {number} submissionFeatureId The ID of the feature to update.
+   * @param {string} submissionFeatureId The ID of the feature to update.
    * @param {number} parentSubmissionFeatureId The ID of the parent feature.
    * @return {*}  {Promise<void>}
    * @memberof SubmissionRepository
@@ -1139,7 +1139,7 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Get a submission feature record by Id.
    *
-   * @param {number} submissionFeatureId
+   * @param {string} submissionFeatureId
    * @return {Promise<SubmissionFeature>}
    * @memberof SubmissionRepository
    */

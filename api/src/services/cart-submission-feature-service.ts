@@ -29,47 +29,49 @@ export class CartSubmissionFeatureService extends DBService {
    * Adds multiple submission features to a cart.
    *
    * @param {string} cartId - The ID of the cart
-   * @param {number[]} submissionFeatureIds - The list of submission feature IDs to add
    * @param {number} systemUserId - The ID of the authenticated user
+   * @param {string[]} submissionFeatureIds - The list of submission feature IDs to add
    * @return {Promise<void>}
    * @memberof CartSubmissionFeatureService
    */
   async addSubmissionFeaturesToCart(
     cartId: string,
-    submissionFeatureIds: number[],
-    systemUserId: number
+    systemUserId: number,
+    submissionFeatureIds: string[]
   ): Promise<void> {
     defaultLog.debug({
       label: 'addSubmissionFeaturesToCart',
       cartId,
+      systemUserId,
       submissionFeatureIds
     });
-    await this.cartSubmissionFeatureRepository.addSubmissionFeaturesToCart(cartId, submissionFeatureIds, systemUserId);
+    await this.cartSubmissionFeatureRepository.addSubmissionFeaturesToCart(cartId, systemUserId, submissionFeatureIds);
   }
 
   /**
    * Removes submission features from a cart.
    *
    * @param {string} cartId - The ID of the cart
-   * @param {number[]} submissionFeatureIds - The list of submission feature IDs to remove
    * @param {number} systemUserId - The ID of the authenticated user
+   * @param {string[]} submissionFeatureIds - The list of submission feature IDs to remove
    * @return {Promise<void>}
    * @memberof CartSubmissionFeatureService
    */
   async removeSubmissionFeaturesFromCart(
     cartId: string,
-    submissionFeatureIds: number[],
-    systemUserId: number
+    systemUserId: number,
+    submissionFeatureIds: string[]
   ): Promise<void> {
     defaultLog.debug({
       label: 'removeSubmissionFeaturesFromCart',
       cartId,
+      systemUserId,
       submissionFeatureIds
     });
     await this.cartSubmissionFeatureRepository.removeSubmissionFeaturesFromCart(
       cartId,
-      submissionFeatureIds,
-      systemUserId
+      systemUserId,
+      submissionFeatureIds
     );
   }
 
@@ -82,7 +84,7 @@ export class CartSubmissionFeatureService extends DBService {
    * @memberof CartSubmissionFeatureService
    */
   async clearCart(cartId: string, systemUserId: number): Promise<void> {
-    defaultLog.debug({ label: 'clearCart', cartId });
+    defaultLog.debug({ label: 'clearCart', cartId, systemUserId });
     await this.cartSubmissionFeatureRepository.clearCart(cartId, systemUserId);
   }
 
@@ -100,7 +102,7 @@ export class CartSubmissionFeatureService extends DBService {
     systemUserId: number,
     pagination?: ApiPaginationOptions
   ): Promise<SubmissionFeature[]> {
-    defaultLog.debug({ label: 'getCartSubmissionFeatures', cartId });
+    defaultLog.debug({ label: 'getCartSubmissionFeatures', cartId, systemUserId });
     return this.cartSubmissionFeatureRepository.getCartSubmissionFeatures(cartId, systemUserId, pagination);
   }
 
@@ -113,7 +115,7 @@ export class CartSubmissionFeatureService extends DBService {
    * @memberof CartSubmissionFeatureService
    */
   async getCartSubmissionFeatureCount(cartId: string, systemUserId: number): Promise<number> {
-    defaultLog.debug({ label: 'getCartSubmissionFeatureCount', cartId });
+    defaultLog.debug({ label: 'getCartSubmissionFeatureCount', cartId, systemUserId });
     return this.cartSubmissionFeatureRepository.getCartSubmissionFeatureCount(cartId, systemUserId);
   }
 }

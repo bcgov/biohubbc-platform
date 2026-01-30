@@ -3,10 +3,10 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { postCartDownload } from '.';
-import * as db from '../../../../../database/db';
-import { HTTP500 } from '../../../../../errors/http-error';
-import { CartDownloadService } from '../../../../../services/cart-download-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
+import * as db from '../../../../database/db';
+import { HTTP500 } from '../../../../errors/http-error';
+import { CartDownloadService } from '../../../../services/cart-download-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 
 chai.use(sinonChai);
 

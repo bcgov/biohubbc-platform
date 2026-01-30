@@ -1,12 +1,12 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection, getDBConnection } from '../../../../../database/db';
-import { HTTP500 } from '../../../../../errors/http-error';
-import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
-import { CartDownloadService } from '../../../../../services/cart-download-service';
-import { getLogger } from '../../../../../utils/logger';
+import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
+import { HTTP500 } from '../../../../errors/http-error';
+import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
+import { CartDownloadService } from '../../../../services/cart-download-service';
+import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/cart/session/{cartId}/download');
+const defaultLog = getLogger('paths/cart/{cartId}/download');
 
 export const POST: Operation = [postCartDownload()];
 
@@ -23,8 +23,7 @@ POST.apiDoc = {
       in: 'path',
       name: 'cartId',
       required: true,
-      schema: { type: 'string', format: 'uuid' },
-      description: 'Session ID of the cart'
+      schema: { type: 'string', format: 'uuid' }
     }
   ],
   requestBody: {

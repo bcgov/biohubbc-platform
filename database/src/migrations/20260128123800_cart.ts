@@ -20,7 +20,7 @@ export async function up(knex: Knex): Promise<void> {
       cart_id UUID DEFAULT gen_random_uuid(),
       system_user_id integer,
       cart_status cart_status NOT NULL,
-      record_end_date timestamptz(6) NOT NULL,
+      record_end_date timestamptz(6),
       create_date timestamptz(6) DEFAULT now() NOT NULL,
       create_user integer,
       update_date timestamptz(6),
@@ -55,7 +55,7 @@ export async function up(knex: Knex): Promise<void> {
     --------------------------------------------------------------------------------
 
     CREATE TABLE cart_submission_feature (
-      cart_submission_feature_id integer GENERATED ALWAYS AS IDENTITY,
+      cart_submission_feature_id UUID DEFAULT gen_random_uuid(),
       cart_id UUID NOT NULL,
       submission_feature_id integer NOT NULL,
       quantity integer DEFAULT 1 NOT NULL,

@@ -137,7 +137,7 @@ const useSecurityApi = (axios: AxiosInstance) => {
    * Retrieves the list of all security rule IDs associated with the features belonging to the given submission.
    *
    * @param {number} submissionId
-   * @param {number[]} submissionFeatureIds
+   * @param {string[]} submissionFeatureIds
    * @return {Promise<ISubmissionFeatureSecurityRulesSummaryResponse[]>}
    */
   const getSubmissionFeatureSecuritySummary = async (

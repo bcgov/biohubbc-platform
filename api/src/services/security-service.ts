@@ -335,14 +335,14 @@ export class SecurityService extends DBService {
    * particular rule happens to belong to both `applyRuleIds` and `removeRuleIds`, it will always be
    * added.
    *
-   * @param {number[]} submissionFeatureIds IDs of the submission features whose security will be updated.
+   * @param {string[]} submissionFeatureIds IDs of the submission features whose security will be updated.
    * @param {number[]} applyRuleIds IDs of the rules which will be applied after the patch operation
    * @param {number[]} removeRuleIds IDs of the rules which will be removed after the patch operation
    * @return {*}  {Promise<void>}
    * @memberof SecurityService
    */
   async patchSecurityRulesOnSubmissionFeatures(
-    submissionFeatureIds: number[],
+    submissionFeatureIds: string[],
     applyRuleIds: number[],
     removeRuleIds: number[]
   ): Promise<void> {
@@ -399,14 +399,14 @@ export class SecurityService extends DBService {
    * no security rules ID is provided, all security rules will be removed for the given set
    * of subission features.
    *
-   * @param {number[]} submissionFeatureIds
+   * @param {string[]} submissionFeatureIds
    * @param {number[]} [removeRuleIds]
    *
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityService
    */
   async removeSecurityRulesFromSubmissionFeatures(
-    submissionFeatureIds: number[],
+    submissionFeatureIds: string[],
     removeRuleIds?: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
     if (!submissionFeatureIds.length) {
@@ -423,12 +423,12 @@ export class SecurityService extends DBService {
   /**
    * Gets Submission Feature Security Records for a given set of submission feature ids
    *
-   * @param {number[]} submissionFeatureIds
+   * @param {string[]} submissionFeatureIds
    * @return {*}  {Promise<SecurityRuleRecord[]>}
    * @memberof SecurityService
    */
   async getSecurityRulesForSubmissionFeatures(
-    submissionFeatureIds: number[]
+    submissionFeatureIds: string[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
     if (!submissionFeatureIds.length) {
       // no features, return early
@@ -442,7 +442,7 @@ export class SecurityService extends DBService {
    * Gets all Security Records for all featues belonging to the given submission.
    *
    * @param {number} submissionId
-   * @param {number[]} submissionFeatureIds
+   * @param {string[]} submissionFeatureIds
    * @return {*}  {Promise<SubmissionFeatureSecurityRulesSummary>}
    * @memberof SecurityService
    */

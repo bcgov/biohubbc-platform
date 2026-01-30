@@ -1,20 +1,18 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection, getDBConnection } from '../../../../../database/db';
-import { UpdateCartFeatures } from '../../../../../models/cart';
-import { GetCartSubmissionFeaturesSchema } from '../../../../../openapi/schemas/cart';
-import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
-import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../../../../openapi/schemas/pagination';
-import { CartService } from '../../../../../services/cart-service';
-import { CartSubmissionFeatureService } from '../../../../../services/cart-submission-feature-service';
-import { getLogger } from '../../../../../utils/logger';
+import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
+import { GetCartSubmissionFeaturesSchema } from '../../../../openapi/schemas/cart';
+import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../../../openapi/schemas/pagination';
+import { CartSubmissionFeatureService } from '../../../../services/cart-submission-feature-service';
+import { getLogger } from '../../../../utils/logger';
 import {
   ensureCompletePaginationOptions,
   makePaginationOptionsFromRequest,
   makePaginationResponse
-} from '../../../../../utils/pagination';
+} from '../../../../utils/pagination';
 
-const defaultLog = getLogger('paths/cart/session/{cartId}');
+const defaultLog = getLogger('paths/cart/{cartId}');
 
 export const GET: Operation = [getCartSubmissionFeatures()];
 
@@ -34,8 +32,7 @@ GET.apiDoc = {
       schema: {
         type: 'string',
         format: 'uuid'
-      },
-      description: 'Session ID of the cart'
+      }
     },
     ...paginationRequestQueryParamSchema
   ],
@@ -68,10 +65,10 @@ export function getCartSubmissionFeatures(): RequestHandler {
   return async (req, res) => {
     const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
-    const systemUserId = connection.systemUserId();
-
     try {
       await connection.open();
+
+      const systemUserId = connection.systemUserId();
 
       const pagination = makePaginationOptionsFromRequest(req);
 
@@ -100,9 +97,9 @@ export function getCartSubmissionFeatures(): RequestHandler {
   };
 }
 
-export const PATCH: Operation = [patchCartSubmissionFeatures()];
+export const POST: Operation = [addSubmissionFeaturesToCart()];
 
-PATCH.apiDoc = {
+POST.apiDoc = {
   description: 'Add or remove features in the cart',
   tags: ['cart'],
   security: [
@@ -115,8 +112,7 @@ PATCH.apiDoc = {
       in: 'path',
       name: 'cartId',
       required: true,
-      schema: { type: 'string', format: 'uuid' },
-      description: 'Session ID of the cart'
+      schema: { type: 'string', format: 'uuid' }
     }
   ],
   requestBody: {
@@ -125,18 +121,13 @@ PATCH.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
-          required: ['add', 'remove'],
+          required: ['features'],
           additionalProperties: false,
           properties: {
-            add: {
+            features: {
               type: 'array',
               items: { type: 'string', format: 'uuid' },
               description: 'List of submission feature UUIDs to add to the cart'
-            },
-            remove: {
-              type: 'array',
-              items: { type: 'integer' },
-              description: 'List of submission feature IDs to remove from the cart'
             }
           }
         }
@@ -156,27 +147,27 @@ PATCH.apiDoc = {
  *
  * @returns {RequestHandler}
  */
-export function patchCartSubmissionFeatures(): RequestHandler {
+export function addSubmissionFeaturesToCart(): RequestHandler {
   return async (req, res) => {
     const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
-
-    const systemUserId = connection.systemUserId();
 
     try {
       await connection.open();
 
-      const body = req.body as UpdateCartFeatures;
+      const systemUserId = connection.systemUserId();
+
+      const features = req.body.features as string[];
       const cartId = req.params.cartId;
 
-      const cartService = new CartService(connection);
+      const cartService = new CartSubmissionFeatureService(connection);
 
-      await cartService.updateCartFeatures(cartId, systemUserId, body);
+      await cartService.addSubmissionFeaturesToCart(cartId, systemUserId, features);
 
       await connection.commit();
 
       res.status(200).json();
     } catch (error) {
-      defaultLog.error({ label: 'patchCartFeatures', message: 'Error updating cart features', error });
+      defaultLog.error({ label: 'addSubmissionFeaturesToCart', message: 'Error updating cart features', error });
       await connection.rollback();
       throw error;
     } finally {
@@ -200,8 +191,7 @@ DELETE.apiDoc = {
       in: 'path',
       name: 'cartId',
       required: true,
-      schema: { type: 'string', format: 'uuid' },
-      description: 'Session ID of the cart'
+      schema: { type: 'string', format: 'uuid' }
     }
   ],
   responses: {
@@ -221,16 +211,15 @@ export function clearCartSubmissionFeatures(): RequestHandler {
   return async (req, res) => {
     const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
-    const systemUserId = connection.systemUserId();
-
     try {
       await connection.open();
+
+      const systemUserId = connection.systemUserId();
 
       const cartId = req.params.cartId;
 
       const cartSubmissionFeatureService = new CartSubmissionFeatureService(connection);
 
-      // Clear all features from the cart
       await cartSubmissionFeatureService.clearCart(cartId, systemUserId);
 
       await connection.commit();

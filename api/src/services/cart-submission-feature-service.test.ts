@@ -23,10 +23,10 @@ describe('CartSubmissionFeatureService', () => {
 
       const stub = sinon.stub(CartSubmissionFeatureRepository.prototype, 'addSubmissionFeaturesToCart').resolves();
 
-      const features: number[] = [1, 2, 3];
-      await service.addSubmissionFeaturesToCart('cart-1', features, 1);
+      const features: string[] = ['1', '2', '3'];
+      await service.addSubmissionFeaturesToCart('cart-1', 1, features);
 
-      expect(stub).to.have.been.calledOnceWith('cart-1', features, 1);
+      expect(stub).to.have.been.calledOnceWith('cart-1', 1, features);
     });
 
     it('should propagate repository errors', async () => {
@@ -38,7 +38,7 @@ describe('CartSubmissionFeatureService', () => {
         .rejects(new Error('DB error'));
 
       try {
-        await service.addSubmissionFeaturesToCart('cart-1', [1, 2], 1);
+        await service.addSubmissionFeaturesToCart('cart-1', 1, ['1', '2']);
         throw new Error('Expected to throw');
       } catch (err) {
         expect(err).to.be.instanceOf(Error);
@@ -54,9 +54,9 @@ describe('CartSubmissionFeatureService', () => {
 
       const stub = sinon.stub(CartSubmissionFeatureRepository.prototype, 'removeSubmissionFeaturesFromCart').resolves();
 
-      await service.removeSubmissionFeaturesFromCart('cart-1', [456, 789], 1);
+      await service.removeSubmissionFeaturesFromCart('cart-1', 1, ['uuid1', 'uuid2']);
 
-      expect(stub).to.have.been.calledOnceWith('cart-1', [456, 789], 1);
+      expect(stub).to.have.been.calledOnceWith('cart-1', 1, ['uuid1', 'uuid2']);
     });
 
     it('should propagate repository errors', async () => {
@@ -68,7 +68,7 @@ describe('CartSubmissionFeatureService', () => {
         .rejects(new Error('DB error'));
 
       try {
-        await service.removeSubmissionFeaturesFromCart('cart-1', [456, 789], 1);
+        await service.removeSubmissionFeaturesFromCart('cart-1', 1, ['uuid1', 'uuid2']);
         throw new Error('Expected to throw');
       } catch (err) {
         expect(err).to.be.instanceOf(Error);

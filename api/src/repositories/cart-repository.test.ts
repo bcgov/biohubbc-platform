@@ -1,9 +1,8 @@
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import { QueryResult } from 'pg';
-import Sinon from 'sinon';
+import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-
 import { ApiError, ApiExecuteSQLError } from '../errors/api-error';
 import { Cart, CartStatus } from '../models/cart';
 import { getMockDBConnection } from '../__mocks__/db';
@@ -13,53 +12,11 @@ chai.use(sinonChai);
 
 describe('CartRepository', () => {
   afterEach(() => {
-    Sinon.restore();
-  });
-
-  describe('findCartById', () => {
-    it('returns a cart when found', async () => {
-      const mockCart: Cart = {
-        cart_id: 'cart-1',
-        cart_status: CartStatus.ACTIVE,
-        system_user_id: 1
-      };
-
-      const mockQueryResponse = {
-        rowCount: 1,
-        rows: [mockCart]
-      } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
-
-      const repo = new CartRepository(mockDBConnection);
-
-      const result = await repo.findCartById('cart-1', 1);
-
-      expect(result).to.eql(mockCart);
-    });
-
-    it('returns null when cart is not found', async () => {
-      const mockQueryResponse = {
-        rowCount: 0,
-        rows: []
-      } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
-
-      const repo = new CartRepository(mockDBConnection);
-
-      const result = await repo.findCartById('non-existent-cart', 1);
-
-      expect(result).to.be.null;
-    });
+    sinon.restore();
   });
 
   describe('getCartById', () => {
-    it('returns a cart when found', async () => {
+    it('should return a cart when found', async () => {
       const mockCart: Cart = {
         cart_id: 'cart-1',
         cart_status: CartStatus.ACTIVE,
@@ -82,7 +39,7 @@ describe('CartRepository', () => {
       expect(result).to.eql(mockCart);
     });
 
-    it('throws ApiExecuteSQLError when cart not found', async () => {
+    it('should throw ApiExecuteSQLError when cart is not found', async () => {
       const mockQueryResponse = {
         rowCount: 0,
         rows: []
@@ -105,7 +62,7 @@ describe('CartRepository', () => {
   });
 
   describe('createCart', () => {
-    it('creates and returns a cart', async () => {
+    it('should create and return a new cart', async () => {
       const mockCart: Cart = {
         cart_id: 'cart-1',
         cart_status: CartStatus.ACTIVE,
@@ -128,7 +85,7 @@ describe('CartRepository', () => {
       expect(result).to.eql(mockCart);
     });
 
-    it('throws ApiExecuteSQLError when rowCount !== 1', async () => {
+    it('should throw ApiExecuteSQLError when rowCount !== 1', async () => {
       const mockQueryResponse = {
         rowCount: 0,
         rows: []
@@ -150,25 +107,27 @@ describe('CartRepository', () => {
     });
   });
 
-  describe('updateCartStatus', () => {
-    it('updates cart status successfully', async () => {
+  describe('updateCart', () => {
+    it('should update the cart status successfully', async () => {
       const mockQueryResponse = {
         rowCount: 1,
         rows: []
       } as unknown as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        knex: Sinon.stub().resolves(mockQueryResponse)
+        knex: sinon.stub().resolves(mockQueryResponse)
       });
 
       const repo = new CartRepository(mockDBConnection);
 
-      await repo.updateCartStatus('cart-1', CartStatus.CHECKED_OUT, 1);
+      const payload = { cart_status: CartStatus.CHECKED_OUT, record_end_date: null };
+
+      await repo.updateCart('cart-1', 1, payload);
 
       expect(mockDBConnection.knex).to.have.been.calledOnce;
     });
 
-    it('throws ApiExecuteSQLError when rowCount !== 1', async () => {
+    it('should throw ApiExecuteSQLError when rowCount !== 1', async () => {
       const mockQueryResponse = {
         rowCount: 0,
         rows: []
@@ -180,8 +139,10 @@ describe('CartRepository', () => {
 
       const repo = new CartRepository(mockDBConnection);
 
+      const payload = { cart_status: CartStatus.CHECKED_OUT, record_end_date: null };
+
       try {
-        await repo.updateCartStatus('cart-1', CartStatus.CHECKED_OUT, 1);
+        await repo.updateCart('cart-1', 1, payload);
         throw new Error('Expected to throw');
       } catch (err) {
         expect(err).to.be.instanceOf(ApiExecuteSQLError);
@@ -190,24 +151,15 @@ describe('CartRepository', () => {
     });
   });
 
-  describe('clearCart', () => {
-    it('calls knex to delete submission features', async () => {
-      const mockDBConnection = getMockDBConnection({
-        knex: Sinon.stub().resolves({ rowCount: 2 })
-      });
-
-      const repo = new CartRepository(mockDBConnection);
-
-      await repo.clearCart('cart-1', 1);
-
-      expect(mockDBConnection.knex).to.have.been.calledOnce;
-    });
-  });
-
   describe('deleteCart', () => {
-    it('calls knex to soft delete a cart', async () => {
+    it('should soft delete a cart successfully', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: []
+      } as unknown as Promise<QueryResult<any>>;
+
       const mockDBConnection = getMockDBConnection({
-        knex: Sinon.stub().resolves({ rowCount: 1 })
+        knex: sinon.stub().resolves(mockQueryResponse)
       });
 
       const repo = new CartRepository(mockDBConnection);

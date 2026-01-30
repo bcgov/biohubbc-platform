@@ -19,7 +19,7 @@ export type Cart = z.infer<typeof Cart>;
 export const CartWithFeatures = Cart.extend({ features: z.array(SubmissionFeature) });
 export type CartWithFeatures = z.infer<typeof CartWithFeatures>;
 
-export interface UpdateCartFeatures {
-  add: number[];
-  remove: number[];
+export interface UpdateCart {
+  cart_status?: CartStatus;
+  record_end_date?: string | null;
 }
