@@ -15,7 +15,7 @@ export const SubmissionFeaturePage = () => {
   const biohubApi = useApi();
 
   // Get submission ID and submission feature ID from the URL
-  const { submissionId, submissionFeatureId } = useParams<{ submissionId: string; submissionFeatureId: number }>();
+  const { submissionId, submissionFeatureId } = useParams<{ submissionId: string; submissionFeatureId: string }>();
 
   const featureDataLoader = useDataLoader(() =>
     biohubApi.features.getSubmissionFeatureById(Number(submissionId), Number(submissionFeatureId))

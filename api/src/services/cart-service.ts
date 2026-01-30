@@ -1,12 +1,12 @@
 import { IDBConnection } from '../database/db';
 import { Cart, CartSubmissionFeature, CartWithFeatures, UpdateCart } from '../models/cart';
 import { CartRepository } from '../repositories/cart-repository';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { CartSubmissionFeatureService } from './cart-submission-feature-service';
 import { DBService } from './db-service';
 
 /**
  * Service for managing carts and cart submission features.
- * Delegates all database operations to CartRepository and CartSubmissionFeatureService.
  */
 export class CartService extends DBService {
   cartRepository: CartRepository;
@@ -15,7 +15,7 @@ export class CartService extends DBService {
   /**
    * Initializes the CartService with a database connection.
    *
-   * @param {IDBConnection} connection - Database connection instance
+   * @param {IDBConnection} connection
    * @memberof CartService
    */
   constructor(connection: IDBConnection) {
@@ -25,17 +25,18 @@ export class CartService extends DBService {
   }
 
   /**
-   * Returns a specific cart by its ID with the first 10 features.
+   * Returns a specific cart by its ID with paginated features
    *
    * @param {string} cartId - The ID of the cart
+   * @param {pagination} pagination
    * @return {Promise<CartWithFeatures>} - The cart with features
    * @memberof CartService
    */
-  async findCartWithFeaturesById(cartId: string): Promise<CartWithFeatures> {
-    const cart = await this.cartRepository.getCartById(cartId);
-
-    const pagination = { limit: 10, page: 1 };
-    const features = await this.cartSubmissionFeatureService.getCartSubmissionFeatures(cartId, pagination);
+  async findCartWithFeaturesById(cartId: string, pagination?: ApiPaginationOptions): Promise<CartWithFeatures> {
+    const [cart, features] = await Promise.all([
+      this.cartRepository.getCartById(cartId),
+      this.cartSubmissionFeatureService.getCartSubmissionFeatures(cartId, pagination)
+    ]);
 
     return { ...cart, features };
   }

@@ -7,7 +7,6 @@ import { DBService } from './db-service';
 
 /**
  * Service for managing submission features associated with carts.
- * Delegates all database operations to CartSubmissionFeatureRepository.
  */
 export class CartSubmissionFeatureService extends DBService {
   policyService: PolicyService;
@@ -74,7 +73,7 @@ export class CartSubmissionFeatureService extends DBService {
    * Get submission features in a cart
    *
    * @param {string} cartId - The ID of the cart
-   * @param {ApiPaginationOptions} [pagination] - Optional pagination options
+   * @param {ApiPaginationOptions} pagination
    * @return {Promise<CartSubmissionFeature[]>}
    * @memberof CartSubmissionFeatureService
    */

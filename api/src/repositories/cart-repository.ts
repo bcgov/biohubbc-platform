@@ -1,6 +1,6 @@
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { Cart, UpdateCart } from '../models/cart';
+import { Cart, CartStatus, UpdateCart } from '../models/cart';
 import { BaseRepository } from './base-repository';
 
 /**
@@ -46,12 +46,12 @@ export class CartRepository extends BaseRepository {
         'rowCount !== 1, expected rowCount === 1'
       ]);
     }
+
     return response.rows[0];
   }
 
   /**
    * Create a new cart.
-   * Requires the system user ID for cart creation.
    *
    * @param {number | null} systemUserId
    * @return {Promise<Cart>}
@@ -62,7 +62,7 @@ export class CartRepository extends BaseRepository {
     const query = knex('cart')
       .insert({
         system_user_id: systemUserId,
-        cart_status: 'active'
+        cart_status: CartStatus.ACTIVE
       })
       .returning(['cart_id', 'cart_status', 'system_user_id']);
 
@@ -79,7 +79,6 @@ export class CartRepository extends BaseRepository {
 
   /**
    * Update a cart.
-   * Requires the system user ID to verify that the user is the owner of the cart.
    *
    * @param {string} cartId
    * @param {UpdateCart} payload

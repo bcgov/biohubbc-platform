@@ -3,9 +3,15 @@ import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
 import { GetCartWithFeaturesSchema } from '../../../openapi/schemas/cart';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../../openapi/schemas/pagination';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { CartService } from '../../../services/cart-service';
 import { getLogger } from '../../../utils/logger';
+import {
+  ensureCompletePaginationOptions,
+  makePaginationOptionsFromRequest,
+  makePaginationResponse
+} from '../../../utils/pagination';
 
 const defaultLog = getLogger('paths/cart/{cartId}');
 
@@ -40,14 +46,22 @@ GET.apiDoc = {
         type: 'string',
         format: 'uuid'
       }
-    }
+    },
+    ...paginationRequestQueryParamSchema
   ],
   responses: {
     200: {
       description: 'Cart retrieved successfully',
       content: {
         'application/json': {
-          schema: GetCartWithFeaturesSchema
+          schema: {
+            type: 'object',
+            required: ['cart', 'pagination'],
+            properties: {
+              cart: GetCartWithFeaturesSchema,
+              pagination: paginationResponseSchema
+            }
+          }
         }
       }
     },
@@ -74,11 +88,19 @@ export function findCartWithFeaturesById(): RequestHandler {
       const cartId = req.params.cartId;
       const cartService = new CartService(connection);
 
-      const cart = await cartService.findCartWithFeaturesById(cartId);
+      // Return first 25 features if pagination not specified
+      req.params.limit = req.params.limit || '25';
+
+      const pagination = makePaginationOptionsFromRequest(req);
+
+      const [cart, count] = await Promise.all([
+        cartService.findCartWithFeaturesById(cartId, ensureCompletePaginationOptions(pagination)),
+        cartService.cartSubmissionFeatureService.getCartSubmissionFeatureCount(cartId)
+      ]);
 
       await connection.commit();
 
-      res.status(200).json(cart);
+      res.status(200).json({ cart, pagination: makePaginationResponse(count, pagination) });
     } catch (error) {
       defaultLog.error({ label: 'findCartWithFeaturesById', message: 'Error fetching cart', error });
       await connection.rollback();
