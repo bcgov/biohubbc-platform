@@ -1,105 +1,16 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
+import { SubmissionValidationRecord } from '../models/submission-validation';
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getMockDBConnection } from '../__mocks__/db';
 import { JobQueues } from './jobs';
 import * as pgBossService from './pg-boss-service';
-import { publishProcessSubmissionFeaturesJob, publishTestJob } from './publisher';
+import { publishMalwareScanJob, publishProcessSubmissionFeaturesJob } from './publisher';
 
 describe('publisher', () => {
   afterEach(() => {
     sinon.restore();
-  });
-
-  describe('publishTestJob', () => {
-    it('publishes a job to the test queue', async () => {
-      const sendStub = sinon.stub().resolves('test-job-id');
-      const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
-
-      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
-
-      const data = { message: 'test message' };
-      const jobId = await publishTestJob(data);
-
-      expect(createQueueStub.calledOnce).to.be.true;
-      expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.TEST);
-      expect(sendStub.calledOnce).to.be.true;
-      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.TEST);
-      expect(sendStub.firstCall.args[1]).to.deep.equal(data);
-      expect(jobId).to.equal('test-job-id');
-    });
-
-    it('uses default options when none provided', async () => {
-      const sendStub = sinon.stub().resolves('test-job-id');
-      const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
-
-      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
-
-      await publishTestJob({ message: 'test' });
-
-      const options = sendStub.firstCall.args[2];
-      expect(options.retryLimit).to.equal(2);
-      expect(options.retryDelay).to.equal(60);
-      expect(options.retryBackoff).to.equal(true);
-      expect(options.expireInSeconds).to.equal(60 * 60); // 1 hour
-    });
-
-    it('merges provided options with defaults', async () => {
-      const sendStub = sinon.stub().resolves('test-job-id');
-      const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
-
-      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
-
-      await publishTestJob({ message: 'test' }, { retryLimit: 5, priority: 10 });
-
-      const options = sendStub.firstCall.args[2];
-      expect(options.retryLimit).to.equal(5);
-      expect(options.retryDelay).to.equal(60); // default
-      expect(options.priority).to.equal(10);
-    });
-
-    it('returns null when send returns null', async () => {
-      const sendStub = sinon.stub().resolves(null);
-      const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
-
-      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
-
-      const jobId = await publishTestJob({ message: 'test' });
-
-      expect(jobId).to.be.null;
-    });
-
-    it('passes singletonKey option for deduplication', async () => {
-      const sendStub = sinon.stub().resolves('test-job-id');
-      const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
-
-      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
-
-      await publishTestJob({ message: 'test' }, { singletonKey: 'unique-key' });
-
-      const options = sendStub.firstCall.args[2];
-      expect(options.singletonKey).to.equal('unique-key');
-    });
-
-    it('passes startAfter option for delayed jobs', async () => {
-      const sendStub = sinon.stub().resolves('test-job-id');
-      const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { send: sendStub, createQueue: createQueueStub };
-
-      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
-
-      const startAfter = new Date('2024-01-01T00:00:00Z');
-      await publishTestJob({ message: 'test' }, { startAfter });
-
-      const options = sendStub.firstCall.args[2];
-      expect(options.startAfter).to.equal(startAfter);
-    });
   });
 
   describe('publishProcessSubmissionFeaturesJob', () => {
@@ -228,11 +139,14 @@ describe('publisher', () => {
     it('returns blocked status when validation record exists with non-failed status', async () => {
       const mockConnection = getMockDBConnection();
 
-      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId').resolves({
+      const mockValidationRecord: SubmissionValidationRecord = {
         submission_validation_id: 1,
         job_id: 'existing-job-id',
         status: 'pending'
-      });
+      };
+      sinon
+        .stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId')
+        .resolves(mockValidationRecord);
 
       const result = await publishProcessSubmissionFeaturesJob(mockConnection, { submissionId: 123 });
 
@@ -247,11 +161,14 @@ describe('publisher', () => {
       const mockBoss = { send: sendStub, createQueue: createQueueStub };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
-      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId').resolves({
+      const mockFailedValidationRecord: SubmissionValidationRecord = {
         submission_validation_id: 1,
         job_id: 'failed-job-id',
         status: 'failed'
-      });
+      };
+      sinon
+        .stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId')
+        .resolves(mockFailedValidationRecord);
       sinon
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
         .resolves({ submission_validation_id: 2 });
@@ -260,6 +177,80 @@ describe('publisher', () => {
 
       expect(result.status).to.equal('published');
       expect((result as { status: 'published'; jobId: string }).jobId).to.equal('new-job-id');
+    });
+  });
+
+  describe('publishMalwareScanJob', () => {
+    it('publishes a malware scan job', async () => {
+      const sendStub = sinon.stub().resolves('scan-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      const data = { artifactSecurityId: 'artifact-security-123' };
+      const result = await publishMalwareScanJob(data);
+
+      expect(createQueueStub.calledOnce).to.be.true;
+      expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.MALWARE_SCAN);
+      expect(sendStub.calledOnce).to.be.true;
+      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.MALWARE_SCAN);
+      expect(sendStub.firstCall.args[1]).to.deep.equal(data);
+      expect(result.status).to.equal('published');
+      expect((result as { status: 'published'; jobId: string }).jobId).to.equal('scan-job-id');
+    });
+
+    it('uses malware scan options with 30 minute timeout', async () => {
+      const sendStub = sinon.stub().resolves('scan-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      await publishMalwareScanJob({ artifactSecurityId: 'artifact-security-456' });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.retryLimit).to.equal(3);
+      expect(options.retryDelay).to.equal(60);
+      expect(options.retryBackoff).to.equal(true);
+      expect(options.expireInSeconds).to.equal(60 * 60); // 60 minutes
+    });
+
+    it('uses singletonKey based on artifactSecurityId to prevent duplicates', async () => {
+      const sendStub = sinon.stub().resolves('scan-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      await publishMalwareScanJob({ artifactSecurityId: '123' });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.singletonKey).to.equal('artifact-security-123');
+    });
+
+    it('returns duplicate status when send returns null', async () => {
+      const sendStub = sinon.stub().resolves(null);
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      const result = await publishMalwareScanJob({ artifactSecurityId: 'artifact-security-999' });
+
+      expect(result.status).to.equal('duplicate');
+      expect((result as { status: 'duplicate'; message: string }).message).to.equal(
+        'Job already exists for this artifact security record'
+      );
+    });
+
+    it('returns error status when pg-boss throws', async () => {
+      sinon.stub(pgBossService, 'getPgBoss').throws(new Error('pg-boss not initialized'));
+
+      const result = await publishMalwareScanJob({ artifactSecurityId: 'artifact-security-000' });
+
+      expect(result.status).to.equal('error');
+      expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
     });
   });
 });

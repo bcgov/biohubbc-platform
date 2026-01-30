@@ -2,8 +2,8 @@ import { IDBConnection } from '../database/db';
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
+import { IMalwareScanJobData } from './jobs/malware-scan-job';
 import { IProcessSubmissionFeaturesJobData } from './jobs/process-submission-features-job';
-import { ITestJobData } from './jobs/test-job';
 import { getPgBoss } from './pg-boss-service';
 
 const defaultLog = getLogger('queue/publisher');
@@ -28,15 +28,8 @@ export interface IPublishOptions {
   priority?: number;
 }
 
-const DEFAULT_OPTIONS: IPublishOptions = {
-  retryLimit: 2,
-  retryDelay: 60,
-  retryBackoff: true,
-  expireInSeconds: 60 * 60 // 1 hour
-};
-
 /**
- * Result of publishing a process submission features job.
+ * Result of publishing a job.
  * Discriminated union allows caller to handle different outcomes.
  */
 export type PublishJobResult =
@@ -57,32 +50,14 @@ const PROCESS_SUBMISSION_FEATURES_OPTIONS: IPublishOptions = {
 };
 
 /**
- * Publish a test job to the queue.
- *
- * This is a template demonstrating the pattern for publishing jobs.
- * Create similar functions for each job type.
- *
- * @param {ITestJobData} data Job data
- * @param {IPublishOptions} [options={}] Job options
- * @return {*}  {(Promise<string | null>)} Job ID if successful, null otherwise
+ * Options for malware scan jobs.
+ * Scans can take longer for large tarballs.
  */
-export const publishTestJob = async (data: ITestJobData, options: IPublishOptions = {}): Promise<string | null> => {
-  const boss = getPgBoss();
-  const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
-
-  // Ensure queue exists before sending jobs
-  await boss.createQueue(JobQueues.TEST);
-
-  const jobId = await boss.send(JobQueues.TEST, data, mergedOptions);
-
-  defaultLog.info({
-    label: 'publishTestJob',
-    message: 'Job published',
-    jobId,
-    data
-  });
-
-  return jobId;
+const MALWARE_SCAN_OPTIONS: IPublishOptions = {
+  retryLimit: 3,
+  retryDelay: 60,
+  retryBackoff: true,
+  expireInSeconds: 60 * 60 // 60 minutes
 };
 
 /**
@@ -179,6 +154,63 @@ export const publishProcessSubmissionFeaturesJob = async (
       label: 'publishProcessSubmissionFeaturesJob',
       message: 'Failed to publish job',
       submissionId: data.submissionId,
+      error
+    });
+
+    return { status: 'error', message: errorMessage };
+  }
+};
+
+/**
+ * Publish a malware scan job to the queue.
+ *
+ * Queues ClamAV scanning for an uploaded artifact.
+ *
+ * @param {IMalwareScanJobData} data Job data containing artifactSecurityId
+ * @param {IPublishOptions} [options={}] Job options
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
+ */
+export const publishMalwareScanJob = async (
+  data: IMalwareScanJobData,
+  options: IPublishOptions = {}
+): Promise<PublishJobResult> => {
+  try {
+    const boss = getPgBoss();
+    const mergedOptions = { ...MALWARE_SCAN_OPTIONS, ...options };
+
+    await boss.createQueue(JobQueues.MALWARE_SCAN);
+
+    // Use singletonKey to prevent duplicate concurrent jobs for the same artifact security record
+    const jobId = await boss.send(JobQueues.MALWARE_SCAN, data, {
+      ...mergedOptions,
+      singletonKey: `artifact-security-${data.artifactSecurityId}`
+    });
+
+    if (jobId) {
+      defaultLog.info({
+        label: 'publishMalwareScanJob',
+        message: 'Malware scan job published',
+        jobId,
+        artifactSecurityId: data.artifactSecurityId
+      });
+
+      return { status: 'published', jobId };
+    }
+
+    defaultLog.warn({
+      label: 'publishMalwareScanJob',
+      message: 'Job not published (duplicate or throttled)',
+      artifactSecurityId: data.artifactSecurityId
+    });
+
+    return { status: 'duplicate', message: 'Job already exists for this artifact security record' };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    defaultLog.error({
+      label: 'publishMalwareScanJob',
+      message: 'Failed to publish job',
+      artifactSecurityId: data.artifactSecurityId,
       error
     });
 
