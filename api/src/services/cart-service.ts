@@ -1,12 +1,8 @@
 import { IDBConnection } from '../database/db';
-import { Cart, CartWithFeatures, UpdateCart } from '../models/cart';
+import { Cart, CartSubmissionFeature, CartWithFeatures, UpdateCart } from '../models/cart';
 import { CartRepository } from '../repositories/cart-repository';
-import { SubmissionFeature } from '../repositories/submission-repository';
-import { getLogger } from '../utils/logger';
 import { CartSubmissionFeatureService } from './cart-submission-feature-service';
 import { DBService } from './db-service';
-
-const defaultLog = getLogger('services/cart-service');
 
 /**
  * Service for managing carts and cart submission features.
@@ -37,8 +33,6 @@ export class CartService extends DBService {
    * @memberof CartService
    */
   async findCartWithFeaturesById(cartId: string, systemUserId: number): Promise<CartWithFeatures> {
-    defaultLog.debug({ label: 'findCartWithFeaturesById', cartId });
-
     const cart = await this.cartRepository.getCartById(cartId, systemUserId);
 
     const pagination = { limit: 10, page: 1 };
@@ -52,6 +46,17 @@ export class CartService extends DBService {
   }
 
   /**
+   * Find a cart by its ID
+   *
+   * @param {string} cartId - The ID of the cart
+   * @return {Promise<Cart | null>} - The cart
+   * @memberof CartService
+   */
+  async findCartById(cartId: string): Promise<Cart | null> {
+    return this.cartRepository.findCartById(cartId);
+  }
+
+  /**
    * Returns a specific cart by its ID.
    *
    * @param {string} cartId - The ID of the cart
@@ -60,25 +65,21 @@ export class CartService extends DBService {
    * @memberof CartService
    */
   async getCartById(cartId: string, systemUserId: number): Promise<Cart> {
-    defaultLog.debug({ label: 'getCartById', cartId });
-
     return this.cartRepository.getCartById(cartId, systemUserId);
   }
 
   /**
    * Creates a new cart for a system user with optional submission features.
    *
-   * @param {number} systemUserId - The ID of the authenticated user
-   * @param {string[]} submissionFeatureIds - The list of submission feature IDs to add to the cart
+   * @param {number | null} systemUserId - The ID of the authenticated user. Null if not authenticated.
+   * @param {number[]} submissionFeatureIds - The list of submission feature IDs to add to the cart
    * @return {Promise<CartWithFeatures>} - The newly created cart with features
    * @memberof CartService
    */
-  async createCart(systemUserId: number, submissionFeatureIds: string[]): Promise<CartWithFeatures> {
-    defaultLog.debug({ label: 'createCart', systemUserId });
-
+  async createCart(systemUserId: number | null, submissionFeatureIds: number[]): Promise<CartWithFeatures> {
     const cart = await this.cartRepository.createCart(systemUserId);
 
-    let features: SubmissionFeature[] = [];
+    let features: CartSubmissionFeature[] = [];
 
     if (submissionFeatureIds.length > 0) {
       await this.cartSubmissionFeatureService.addSubmissionFeaturesToCart(
@@ -102,8 +103,6 @@ export class CartService extends DBService {
    * @memberof CartService
    */
   async updateCart(cartId: string, systemUserId: number, payload: UpdateCart): Promise<void> {
-    defaultLog.debug({ label: 'updateCart', cartId, payload });
-
     await this.cartRepository.updateCart(cartId, systemUserId, payload);
   }
 
@@ -116,8 +115,6 @@ export class CartService extends DBService {
    * @memberof CartService
    */
   async deleteCart(cartId: string, systemUserId: number): Promise<void> {
-    defaultLog.debug({ label: 'deleteCart', cartId });
-
     await this.cartRepository.deleteCart(cartId, systemUserId);
   }
 }

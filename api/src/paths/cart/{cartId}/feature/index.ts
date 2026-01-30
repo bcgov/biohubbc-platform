@@ -57,7 +57,7 @@ GET.apiDoc = {
 };
 
 /**
- * GET cart by cartId
+ * Get features in a cart, paginated
  *
  * @returns {RequestHandler}
  */
@@ -126,8 +126,8 @@ POST.apiDoc = {
           properties: {
             features: {
               type: 'array',
-              items: { type: 'string', format: 'uuid' },
-              description: 'List of submission feature UUIDs to add to the cart'
+              items: { type: 'integer' },
+              description: 'List of submission feature IDs to add to the cart'
             }
           }
         }
@@ -143,7 +143,7 @@ POST.apiDoc = {
 };
 
 /**
- * PATCH features to cart by cartId
+ * Add new features to the cart
  *
  * @returns {RequestHandler}
  */
@@ -156,7 +156,7 @@ export function addSubmissionFeaturesToCart(): RequestHandler {
 
       const systemUserId = connection.systemUserId();
 
-      const features = req.body.features as string[];
+      const features = req.body.features.map(Number);
       const cartId = req.params.cartId;
 
       const cartService = new CartSubmissionFeatureService(connection);
@@ -203,7 +203,7 @@ DELETE.apiDoc = {
 };
 
 /**
- * DELETE cart features by cartId
+ * Delete all features from the cart
  *
  * @returns {RequestHandler}
  */

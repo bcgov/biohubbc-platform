@@ -1,9 +1,9 @@
+import SQL from 'sql-template-strings';
 import z from 'zod';
 import { getKnex } from '../database/db';
-import { CartStatus } from '../models/cart';
+import { CartStatus, CartSubmissionFeature } from '../models/cart';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
-import { SubmissionFeature } from './submission-repository';
 
 /**
  * CartSubmissionFeature repository class.
@@ -21,54 +21,42 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
    *
    * @param {string} cartId - The ID of the cart
    * @param {number} systemUserId - The ID of the authenticated user
-   * @param {string[]} submissionFeatureIds - The list of submission feature IDs to add
+   * @param {number[]} submissionFeatureIds - The list of submission feature IDs to add
    * @return {Promise<void>} - Resolves when the features are added to the cart
    * @memberof CartSubmissionFeatureRepository
    */
   async addSubmissionFeaturesToCart(
     cartId: string,
     systemUserId: number,
-    submissionFeatureIds: string[]
+    submissionFeatureIds: number[]
   ): Promise<void> {
-    if (!submissionFeatureIds || submissionFeatureIds.length === 0) {
-      return;
-    }
+    const sql = SQL`
+    WITH w_cart AS (
+      SELECT cart_id
+      FROM cart
+      WHERE cart_id = ${cartId}
+        AND system_user_id = ${systemUserId} 
+        AND cart_status = ${CartStatus.ACTIVE}
+    ),
+    w_features AS (
+      SELECT unnest(${submissionFeatureIds}::integer[]) AS submission_feature_id
+    ),
+    w_valid_features AS (
+      SELECT wf.submission_feature_id
+      FROM w_features wf
+      LEFT JOIN submission_feature_security sfs 
+        ON sfs.submission_feature_id = wf.submission_feature_id
+      WHERE sfs.record_end_date IS NULL 
+         OR sfs.record_end_date > now()
+    )
+    INSERT INTO cart_submission_feature (cart_id, submission_feature_id)
+    SELECT wc.cart_id, wvf.submission_feature_id
+    FROM w_cart wc
+    CROSS JOIN w_valid_features wvf
+    ON CONFLICT (cart_id, submission_feature_id) DO NOTHING
+  `;
 
-    const knex = getKnex();
-
-    const queryBuilder = knex
-      .with('w_cart', (qb) => {
-        qb.select('cart_id')
-          .from('cart')
-          .where('cart_id', cartId)
-          .andWhere('system_user_id', systemUserId)
-          .andWhere('cart_status', 'ACTIVE');
-      })
-      .with('w_features', (qb) => {
-        qb.select(knex.raw('unnest(?::uuid[]) AS submission_feature_id', [submissionFeatureIds]));
-      })
-      .with('w_valid_features', (qb) => {
-        qb.select('wf.submission_feature_id')
-          .from('w_features as wf')
-          .leftJoin('submission_feature_security as sfs', 'sfs.submission_feature_id', 'wf.submission_feature_id')
-          .where((qb) => {
-            qb.whereNull('sfs.record_end_date').orWhere('sfs.record_end_date', '>', knex.fn.now());
-          });
-      })
-      .insert(
-        knex.raw(
-          `
-        SELECT wc.cart_id, wvf.submission_feature_id
-        FROM w_cart wc
-        CROSS JOIN w_valid_features wvf
-        `,
-          []
-        )
-      )
-      .into('cart_submission_feature')
-      .onConflict(['cart_id', 'submission_feature_id'])
-      .ignore();
-    await this.connection.knex(queryBuilder);
+    await this.connection.sql(sql);
   }
 
   /**
@@ -77,14 +65,14 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
    *
    * @param {string} cartId - The ID of the cart
    * @param {number} systemUserId - The ID of the authenticated user
-   * @param {string[]} submissionFeatureIds - The list of submission feature IDs to remove
+   * @param {string[]} cartSubmissionFeatureIds - The list of submission feature IDs to remove
    * @return {Promise<void>} - Resolves when the features are removed from the cart
    * @memberof CartSubmissionFeatureRepository
    */
   async removeSubmissionFeaturesFromCart(
     cartId: string,
     systemUserId: number,
-    submissionFeatureIds: string[]
+    cartSubmissionFeatureIds: string[]
   ): Promise<void> {
     const knex = getKnex();
 
@@ -92,8 +80,8 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
       .join('cart as c', 'c.cart_id', 'csf.cart_id')
       .where('csf.cart_id', cartId)
       .andWhere('c.system_user_id', systemUserId)
-      .andWhere('c.cart_status', 'ACTIVE')
-      .whereIn('csf.submission_feature_id', submissionFeatureIds)
+      .andWhere('c.cart_status', CartStatus.ACTIVE)
+      .whereIn('csf.cart_submission_feature_id', cartSubmissionFeatureIds)
       .del();
 
     await this.connection.knex(query);
@@ -128,46 +116,41 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
    * @param {string} cartId - The ID of the cart
    * @param {number} systemUserId - The ID of the authenticated user
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options
-   * @return {Promise<SubmissionFeature[]>} - Paginated list of submission features
+   * @return {Promise<CartSubmissionFeature[]>} - Paginated list of submission features
    * @memberof CartSubmissionFeatureRepository
    */
   async getCartSubmissionFeatures(
     cartId: string,
     systemUserId: number,
     pagination?: ApiPaginationOptions
-  ): Promise<SubmissionFeature[]> {
+  ): Promise<CartSubmissionFeature[]> {
     const knex = getKnex();
 
-    // Base query to fetch submission features with the necessary joins
     const baseQuery = knex('submission_feature as sf')
       .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
       .join('cart_submission_feature as csf', 'csf.submission_feature_id', 'sf.submission_feature_id')
       .join('cart as c', 'c.cart_id', 'csf.cart_id')
       .where('csf.cart_id', cartId)
       .andWhere('c.system_user_id', systemUserId)
-      .andWhere('c.cart_status', 'ACTIVE')
+      .andWhere('c.cart_status', CartStatus.ACTIVE)
       .leftJoin('submission_feature_security as sfs', 'sfs.submission_feature_id', 'sf.submission_feature_id')
       .where((qb) => {
         qb.whereNull('sfs.record_end_date').orWhere('sfs.record_end_date', '>', knex.fn.now());
       })
       .select(
+        'csf.cart_submission_feature_id',
         'sf.submission_feature_id',
-        'sf.uuid',
-        'sf.urn',
         'sf.submission_id',
         'sf.feature_type_id',
-        'sf.source_id',
-        'sf.data',
         'ft.name as feature_type_name',
         knex.raw(
           'EXISTS (SELECT 1 FROM submission_feature_security sfs WHERE sfs.submission_feature_id = sf.submission_feature_id AND (sfs.record_end_date IS NULL OR sfs.record_end_date > NOW())) AS secured'
         )
       );
 
-    // Paginated query
-    const paginatedQuery = this.applyPagination(knex.from(baseQuery.as('base')), pagination);
+    const paginatedQuery = this.applyPagination(baseQuery, pagination);
 
-    const response = await this.connection.knex(paginatedQuery, SubmissionFeature);
+    const response = await this.connection.knex(paginatedQuery, CartSubmissionFeature);
 
     return response.rows;
   }
@@ -189,11 +172,11 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
       .leftJoin('submission_feature_security as sfs', 'sfs.submission_feature_id', 'csf.submission_feature_id')
       .where('csf.cart_id', cartId)
       .andWhere('c.system_user_id', systemUserId)
-      .andWhere('c.cart_status', 'ACTIVE')
+      .andWhere('c.cart_status', CartStatus.ACTIVE)
       .where((qb) => {
         qb.whereNull('sfs.record_end_date').orWhere('sfs.record_end_date', '>', knex.fn.now());
       })
-      .count('* as count');
+      .select(knex.raw('count(*)::integer as count'));
 
     const response = await this.connection.knex(query, z.object({ count: z.number() }));
 

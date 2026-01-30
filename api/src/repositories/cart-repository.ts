@@ -12,6 +12,22 @@ import { BaseRepository } from './base-repository';
  */
 export class CartRepository extends BaseRepository {
   /**
+   * Find a cart by its ID.
+   *
+   * @param {string} cartId
+   * @return {Promise<Cart | null>}
+   * @memberof CartRepository
+   */
+  async findCartById(cartId: string): Promise<Cart | null> {
+    const knex = getKnex();
+    const query = knex('cart').where('cart_id', cartId).select('cart_id', 'cart_status', 'system_user_id');
+
+    const response = await this.connection.knex(query, Cart);
+
+    return response.rows[0] ?? null;
+  }
+
+  /**
    * Get a specific cart by its ID. Throws an error if cart does not exist.
    *
    * @param {string} cartId
@@ -40,11 +56,11 @@ export class CartRepository extends BaseRepository {
   /**
    * Create a new cart.
    *
-   * @param {number} systemUserId
+   * @param {number | null} systemUserId
    * @return {Promise<Cart>}
    * @memberof CartRepository
    */
-  async createCart(systemUserId: number): Promise<Cart> {
+  async createCart(systemUserId: number | null): Promise<Cart> {
     const knex = getKnex();
     const query = knex('cart')
       .insert({
@@ -54,6 +70,7 @@ export class CartRepository extends BaseRepository {
       .returning(['cart_id', 'cart_status', 'system_user_id']);
 
     const response = await this.connection.knex(query, Cart);
+
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to create cart', [
         'CartRepository->createCart',

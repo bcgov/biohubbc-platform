@@ -28,7 +28,7 @@ describe('DELETE /cart/{cartId}/feature/{cartSubmissionFeatureId}', () => {
     const requestHandler = deleteCartSubmissionFeature();
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params.cartId = 'fake-cart-id';
-    mockReq.params.cartSubmissionFeatureId = '123'; // Mock feature ID
+    mockReq.params.cartSubmissionFeatureId = '123';
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
@@ -56,12 +56,11 @@ describe('DELETE /cart/{cartId}/feature/{cartSubmissionFeatureId}', () => {
     const requestHandler = deleteCartSubmissionFeature();
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params.cartId = 'fake-cart-id';
-    mockReq.params.cartSubmissionFeatureId = '123'; // Mock feature ID
+    mockReq.params.cartSubmissionFeatureId = '123';
 
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue.message).to.equal('Feature removed from cart successfully');
     expect(removeSubmissionFeatureStub).to.have.been.calledOnceWith('fake-cart-id', sinon.match.any, ['123']);
     expect(mockDBConnection.commit).to.have.been.calledOnce;
     expect(mockDBConnection.release).to.have.been.calledOnce;
@@ -82,7 +81,7 @@ describe('DELETE /cart/{cartId}/feature/{cartSubmissionFeatureId}', () => {
     const requestHandler = deleteCartSubmissionFeature();
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params.cartId = 'fake-cart-id';
-    mockReq.params.cartSubmissionFeatureId = '123'; // Mock feature ID
+    mockReq.params.cartSubmissionFeatureId = '123';
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
@@ -107,7 +106,7 @@ describe('DELETE /cart/{cartId}/feature/{cartSubmissionFeatureId}', () => {
     const requestHandler = deleteCartSubmissionFeature();
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params.cartId = 'fake-cart-id';
-    mockReq.params.cartSubmissionFeatureId = '123'; // Mock feature ID
+    mockReq.params.cartSubmissionFeatureId = '123';
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);

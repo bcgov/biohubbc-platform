@@ -1,11 +1,8 @@
 import { IDBConnection } from '../database/db';
+import { CartSubmissionFeature } from '../models/cart';
 import { CartSubmissionFeatureRepository } from '../repositories/cart-submission-feature-repository';
-import { SubmissionFeature } from '../repositories/submission-repository';
-import { getLogger } from '../utils/logger';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
-
-const defaultLog = getLogger('services/cart-submission-feature-service');
 
 /**
  * Service for managing submission features associated with carts.
@@ -30,21 +27,19 @@ export class CartSubmissionFeatureService extends DBService {
    *
    * @param {string} cartId - The ID of the cart
    * @param {number} systemUserId - The ID of the authenticated user
-   * @param {string[]} submissionFeatureIds - The list of submission feature IDs to add
+   * @param {number[]} submissionFeatureIds - The list of submission feature IDs to add
    * @return {Promise<void>}
    * @memberof CartSubmissionFeatureService
    */
   async addSubmissionFeaturesToCart(
     cartId: string,
     systemUserId: number,
-    submissionFeatureIds: string[]
+    submissionFeatureIds: number[]
   ): Promise<void> {
-    defaultLog.debug({
-      label: 'addSubmissionFeaturesToCart',
-      cartId,
-      systemUserId,
-      submissionFeatureIds
-    });
+    if (submissionFeatureIds.length < 1) {
+      return;
+    }
+
     await this.cartSubmissionFeatureRepository.addSubmissionFeaturesToCart(cartId, systemUserId, submissionFeatureIds);
   }
 
@@ -53,25 +48,23 @@ export class CartSubmissionFeatureService extends DBService {
    *
    * @param {string} cartId - The ID of the cart
    * @param {number} systemUserId - The ID of the authenticated user
-   * @param {string[]} submissionFeatureIds - The list of submission feature IDs to remove
+   * @param {string[]} cartSubmissionFeatureIds - The list of submission feature IDs to remove
    * @return {Promise<void>}
    * @memberof CartSubmissionFeatureService
    */
   async removeSubmissionFeaturesFromCart(
     cartId: string,
     systemUserId: number,
-    submissionFeatureIds: string[]
+    cartSubmissionFeatureIds: string[]
   ): Promise<void> {
-    defaultLog.debug({
-      label: 'removeSubmissionFeaturesFromCart',
-      cartId,
-      systemUserId,
-      submissionFeatureIds
-    });
+    if (cartSubmissionFeatureIds.length < 1) {
+      return;
+    }
+
     await this.cartSubmissionFeatureRepository.removeSubmissionFeaturesFromCart(
       cartId,
       systemUserId,
-      submissionFeatureIds
+      cartSubmissionFeatureIds
     );
   }
 
@@ -84,7 +77,6 @@ export class CartSubmissionFeatureService extends DBService {
    * @memberof CartSubmissionFeatureService
    */
   async clearCart(cartId: string, systemUserId: number): Promise<void> {
-    defaultLog.debug({ label: 'clearCart', cartId, systemUserId });
     await this.cartSubmissionFeatureRepository.clearCart(cartId, systemUserId);
   }
 
@@ -94,15 +86,14 @@ export class CartSubmissionFeatureService extends DBService {
    * @param {string} cartId - The ID of the cart
    * @param {number} systemUserId - The ID of the authenticated user
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options
-   * @return {Promise<SubmissionFeature[]>}
+   * @return {Promise<CartSubmissionFeature[]>}
    * @memberof CartSubmissionFeatureService
    */
   async getCartSubmissionFeatures(
     cartId: string,
     systemUserId: number,
     pagination?: ApiPaginationOptions
-  ): Promise<SubmissionFeature[]> {
-    defaultLog.debug({ label: 'getCartSubmissionFeatures', cartId, systemUserId });
+  ): Promise<CartSubmissionFeature[]> {
     return this.cartSubmissionFeatureRepository.getCartSubmissionFeatures(cartId, systemUserId, pagination);
   }
 
@@ -115,7 +106,6 @@ export class CartSubmissionFeatureService extends DBService {
    * @memberof CartSubmissionFeatureService
    */
   async getCartSubmissionFeatureCount(cartId: string, systemUserId: number): Promise<number> {
-    defaultLog.debug({ label: 'getCartSubmissionFeatureCount', cartId, systemUserId });
     return this.cartSubmissionFeatureRepository.getCartSubmissionFeatureCount(cartId, systemUserId);
   }
 }

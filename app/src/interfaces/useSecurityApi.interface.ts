@@ -44,7 +44,7 @@ export interface IPatchFeatureSecurityRules {
    * @type {number[]}
    * @memberof IPatchFeatureSecurityRules
    */
-  submissionFeatureIds: string[];
+  submissionFeatureIds: number[];
   /**
    * The array of the security rules that will be applied to all of the given features.
    * Note that it is possible that a particular rule ID may also belong to `stagedForRemove`.

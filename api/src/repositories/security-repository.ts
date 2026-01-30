@@ -362,13 +362,13 @@ export class SecurityRepository extends BaseRepository {
   /**
    * Attaches all of the given security rules to the given submission features.
    *
-   * @param {string[]} submissionFeatureIds
+   * @param {number[]} submissionFeatureIds
    * @param {number[]} securityRuleIds
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityRepository
    */
   async applySecurityRulesToSubmissionFeatures(
-    submissionFeatureIds: string[],
+    submissionFeatureIds: number[],
     securityRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
     const queryValues = submissionFeatureIds.flatMap((submissionFeatureId) => {
@@ -461,12 +461,12 @@ export class SecurityRepository extends BaseRepository {
   /**
    * Removes all security rules for a given set of submission features
    *
-   * @param {string[]} submissionFeatureIds
+   * @param {number[]} submissionFeatureIds
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityRepository
    */
   async removeAllSecurityRulesFromSubmissionFeatures(
-    submissionFeatureIds: string[]
+    submissionFeatureIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
     const queryBuilder = getKnex()
       .queryBuilder()
@@ -483,13 +483,13 @@ export class SecurityRepository extends BaseRepository {
   /**
    * Removes the given security rules for a given set of given submission features.
    *
-   * @param {string[]} submissionFeatureIds
+   * @param {number[]} submissionFeatureIds
    * @param {number[]} removeRuleIds
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityRepository
    */
   async removeSecurityRulesFromSubmissionFeatures(
-    submissionFeatureIds: string[],
+    submissionFeatureIds: number[],
     removeRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
     defaultLog.debug({ label: 'removeSecurityRulesFromSubmissionFeatures', submissionFeatureIds, removeRuleIds });
@@ -510,12 +510,12 @@ export class SecurityRepository extends BaseRepository {
   /**
    * Gets Submission Feature Security Records for a given set of submission features
    *
-   * @param {string[]} submissionFeatureIds
+   * @param {number[]} submissionFeatureIds
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityRepository
    */
   async getSecurityRulesForSubmissionFeatures(
-    submissionFeatureIds: string[]
+    submissionFeatureIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
     const queryBuilder = getKnex()
       .queryBuilder()

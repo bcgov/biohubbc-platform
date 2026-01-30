@@ -1,10 +1,10 @@
 import chai, { expect } from 'chai';
-import { afterEach, describe, it } from 'mocha';
+import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiError } from '../errors/api-error';
+import { CartSubmissionFeature } from '../models/cart';
 import { CartSubmissionFeatureRepository } from '../repositories/cart-submission-feature-repository';
-import { SubmissionFeature } from '../repositories/submission-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CartSubmissionFeatureService } from './cart-submission-feature-service';
@@ -23,7 +23,7 @@ describe('CartSubmissionFeatureService', () => {
 
       const stub = sinon.stub(CartSubmissionFeatureRepository.prototype, 'addSubmissionFeaturesToCart').resolves();
 
-      const features: string[] = ['1', '2', '3'];
+      const features: number[] = [1, 2, 3];
       await service.addSubmissionFeaturesToCart('cart-1', 1, features);
 
       expect(stub).to.have.been.calledOnceWith('cart-1', 1, features);
@@ -38,7 +38,7 @@ describe('CartSubmissionFeatureService', () => {
         .rejects(new Error('DB error'));
 
       try {
-        await service.addSubmissionFeaturesToCart('cart-1', 1, ['1', '2']);
+        await service.addSubmissionFeaturesToCart('cart-1', 1, [1, 2]);
         throw new Error('Expected to throw');
       } catch (err) {
         expect(err).to.be.instanceOf(Error);
@@ -110,15 +110,12 @@ describe('CartSubmissionFeatureService', () => {
       const mockDB = getMockDBConnection();
       const service = new CartSubmissionFeatureService(mockDB);
 
-      const features: SubmissionFeature[] = [
+      const features: CartSubmissionFeature[] = [
         {
+          cart_submission_feature_id: 'uuid-1',
           submission_feature_id: 1,
-          uuid: 'uuid',
-          urn: 'urn:1:1:1',
           submission_id: 1,
           feature_type_id: 1,
-          source_id: 'source',
-          data: {},
           feature_type_name: 'name',
           secured: true
         }

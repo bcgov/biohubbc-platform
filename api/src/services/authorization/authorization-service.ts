@@ -3,6 +3,7 @@ import { IDBConnection } from '../../database/db';
 import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
 import { getServiceClientSystemUser, getUserGuid } from '../../utils/keycloak-utils';
 import { PolicyService } from '../access-policy/policy-service';
+import { CartService } from '../cart-service';
 import { DBService } from '../db-service';
 import { SubmissionService } from '../submission-service';
 import { UserService } from '../user-service';
@@ -57,11 +58,23 @@ export interface AuthorizeByServiceClient {
   discriminator: 'ServiceClient';
 }
 
+/**
+ * Authorization rule that checks if the cart belongs to the system user.
+ *
+ * @export
+ * @interface AuthorizeByCart
+ */
+export interface AuthorizeByCart {
+  cart_id: string;
+  discriminator: 'Cart';
+}
+
 export type AuthorizeRule =
   | AuthorizeBySystemRoles
   | AuthorizeBySystemUser
   | AuthorizeByServiceClient
-  | AuthorizeByAccessPolicy;
+  | AuthorizeByAccessPolicy
+  | AuthorizeByCart;
 
 export type AuthorizeConfigOr = {
   [AuthorizeOperator.AND]?: never;
@@ -127,6 +140,9 @@ export class AuthorizationService extends DBService {
           break;
         case 'AccessPolicy':
           authorizeResults.push(await this.authorizeByAccessPolicy(authorizeRule));
+          break;
+        case 'Cart':
+          authorizeResults.push(await this.authorizeByCart(authorizeRule));
           break;
       }
     }
@@ -236,6 +252,43 @@ export class AuthorizationService extends DBService {
 
     // Step 6: Grant access if at least one policy authorizes it
     return policiesThatGrantAccess.length > 0;
+  }
+
+  /**
+   * Check if the user owns the cart specified by cart_id.
+   *
+   * @param {AuthorizeByCart} authorizeByCart
+   * @return {*}  {Promise<boolean>} `true` if the user owns the cart, `false` otherwise.
+   */
+  /**
+   * Check if the user owns the cart specified by cart_id.
+   *
+   * @param {AuthorizeByCart} authorizeByCart
+   * @return {*}  {Promise<boolean>} `true` if the user owns the cart, `false` otherwise.
+   */
+  async authorizeByCart(authorizeByCart: AuthorizeByCart): Promise<boolean> {
+    const { cart_id } = authorizeByCart;
+
+    // Fetch the cart based on the cart_id
+    const cartService = new CartService(this.connection);
+    const cart = await cartService.findCartById(cart_id);
+
+    // Cart does not exist
+    if (!cart) {
+      return false;
+    }
+
+    // If the cart was created by a non-authenticated user, authorize the request
+    if (!(cart.system_user_id && this._systemUser)) {
+      return true;
+    }
+
+    if (cart.system_user_id && !this._systemUser) {
+      return false; // Deny if the cart was created by an authenticated user
+    }
+
+    // Otherwise, check if the cart's system_user_id matches the authenticated user's system_user_id
+    return cart.system_user_id === this._systemUser.system_user_id;
   }
 
   /**

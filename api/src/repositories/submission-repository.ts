@@ -71,7 +71,7 @@ export const SubmissionFeature = z.object({
   submission_id: z.number(),
   feature_type_id: z.number(),
   source_id: z.string().nullable(),
-  data: z.record(z.any()),
+  data: z.object({}).passthrough(),
   feature_type_name: z.string(),
   secured: z.boolean()
 });
@@ -446,7 +446,7 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Update the parent reference for a submission feature.
    *
-   * @param {string} submissionFeatureId The ID of the feature to update.
+   * @param {number} submissionFeatureId The ID of the feature to update.
    * @param {number} parentSubmissionFeatureId The ID of the parent feature.
    * @return {*}  {Promise<void>}
    * @memberof SubmissionRepository
@@ -1139,7 +1139,7 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Get a submission feature record by Id.
    *
-   * @param {string} submissionFeatureId
+   * @param {number} submissionFeatureId
    * @return {Promise<SubmissionFeature>}
    * @memberof SubmissionRepository
    */

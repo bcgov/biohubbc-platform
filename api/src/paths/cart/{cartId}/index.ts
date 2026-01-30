@@ -46,7 +46,7 @@ GET.apiDoc = {
 };
 
 /**
- * GET cart by cartId
+ * Get a cart by ID, with the first page of features
  *
  * @returns {RequestHandler}
  */

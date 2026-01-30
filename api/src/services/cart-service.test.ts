@@ -1,11 +1,9 @@
-import { expect } from 'chai';
+import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-
-import { Cart, CartStatus } from '../models/cart';
+import { Cart, CartStatus, CartSubmissionFeature } from '../models/cart';
 import { CartRepository } from '../repositories/cart-repository';
-import { SubmissionFeature } from '../repositories/submission-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CartService } from './cart-service';
 import { CartSubmissionFeatureService } from './cart-submission-feature-service';
@@ -28,15 +26,12 @@ describe('CartService', () => {
         cart_status: CartStatus.ACTIVE
       };
 
-      const mockFeatures: SubmissionFeature[] = [
+      const mockFeatures: CartSubmissionFeature[] = [
         {
+          cart_submission_feature_id: 'uuid-1',
           submission_feature_id: 1,
-          uuid: 'uuid-1',
-          urn: 'urn-1',
           submission_id: 1,
           feature_type_id: 1,
-          source_id: null,
-          data: {},
           feature_type_name: 'type-1',
           secured: false
         }
@@ -98,15 +93,12 @@ describe('CartService', () => {
         cart_status: CartStatus.ACTIVE
       };
 
-      const mockFeatures: SubmissionFeature[] = [
+      const mockFeatures: CartSubmissionFeature[] = [
         {
+          cart_submission_feature_id: 'uuid-1',
           submission_feature_id: 1,
-          uuid: 'uuid-1',
-          urn: 'urn-1',
           submission_id: 1,
           feature_type_id: 1,
-          source_id: null,
-          data: {},
           feature_type_name: 'type-1',
           secured: false
         }
@@ -118,9 +110,9 @@ describe('CartService', () => {
         .stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures')
         .resolves(mockFeatures);
 
-      const result = await service.createCart(1, ['uuid1']);
+      const result = await service.createCart(1, [1]);
 
-      expect(addStub).to.have.been.calledOnceWith('cart-123', ['uuid1'], 1);
+      expect(addStub).to.have.been.calledOnceWith('cart-123', 1, [1]);
       expect(getStub).to.have.been.calledOnce;
       expect(result).to.deep.equal({ ...mockCart, features: mockFeatures });
     });

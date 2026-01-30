@@ -54,13 +54,10 @@ describe('cart/{cartId}', () => {
         cart_status: CartStatus.ACTIVE,
         features: [
           {
+            cart_submission_feature_id: 'uuid-1',
             submission_feature_id: 1,
-            uuid: 'uuid-1',
-            urn: 'urn-1',
             submission_id: 1,
             feature_type_id: 1,
-            source_id: null,
-            data: {},
             feature_type_name: 'type-1',
             secured: false
           }

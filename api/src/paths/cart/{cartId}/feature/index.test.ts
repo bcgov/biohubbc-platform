@@ -5,7 +5,7 @@ import sinonChai from 'sinon-chai';
 import { addSubmissionFeaturesToCart, clearCartSubmissionFeatures, getCartSubmissionFeatures } from '.';
 import * as db from '../../../../database/db';
 import { HTTP500 } from '../../../../errors/http-error';
-import { SubmissionFeature } from '../../../../repositories/submission-repository';
+import { CartSubmissionFeature } from '../../../../models/cart';
 import { CartSubmissionFeatureService } from '../../../../services/cart-submission-feature-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 
@@ -48,28 +48,22 @@ describe('cart/{cartId}', () => {
       });
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-      const fakeFeatures: SubmissionFeature[] = [
+      const fakeFeatures: CartSubmissionFeature[] = [
         {
+          cart_submission_feature_id: 'uuid-1',
           submission_feature_id: 1,
-          uuid: 'uuid-1',
-          urn: 'urn-1',
           submission_id: 1,
           feature_type_id: 1,
           feature_type_name: 'feature-1',
-          secured: true,
-          source_id: 'source',
-          data: {}
+          secured: true
         },
         {
+          cart_submission_feature_id: 'uuid-2',
           submission_feature_id: 2,
-          uuid: 'uuid-2',
-          urn: 'urn-2',
           submission_id: 1,
           feature_type_id: 2,
           feature_type_name: 'feature-2',
-          secured: false,
-          source_id: 'source',
-          data: {}
+          secured: false
         }
       ];
 
@@ -99,7 +93,7 @@ describe('cart/{cartId}', () => {
       });
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-      const fakeFeatures: SubmissionFeature[] = [];
+      const fakeFeatures: CartSubmissionFeature[] = [];
 
       sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves(fakeFeatures);
       sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureCount').resolves(0);

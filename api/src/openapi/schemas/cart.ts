@@ -6,26 +6,22 @@ export const GetCartSubmissionFeaturesSchema: OpenAPIV3.SchemaObject = {
     type: 'object',
     additionalProperties: false,
     required: [
+      'cart_submission_feature_id',
       'submission_feature_id',
-      'uuid',
-      'urn',
       'submission_id',
       'feature_type_id',
       'feature_type_name',
       'secured'
     ],
     properties: {
+      cart_submission_feature_id: {
+        type: 'string',
+        format: 'uuid',
+        description: 'Primary key of the submission feature in the cart'
+      },
       submission_feature_id: {
-        type: 'number',
+        type: 'integer',
         description: 'Unique ID of the submission feature'
-      },
-      uuid: {
-        type: 'string',
-        description: 'UUID of the submission feature'
-      },
-      urn: {
-        type: 'string',
-        description: 'URN for the submission feature'
       },
       submission_id: {
         type: 'number',
@@ -34,16 +30,6 @@ export const GetCartSubmissionFeaturesSchema: OpenAPIV3.SchemaObject = {
       feature_type_id: {
         type: 'number',
         description: 'ID of the feature type'
-      },
-      source_id: {
-        type: 'string',
-        nullable: true,
-        description: 'Optional source ID'
-      },
-      data: {
-        type: 'object',
-        additionalProperties: true,
-        description: 'Arbitrary JSON data for the submission feature'
       },
       feature_type_name: {
         type: 'string',

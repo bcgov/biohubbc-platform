@@ -1,5 +1,4 @@
 import z from 'zod';
-import { SubmissionFeature } from '../repositories/submission-repository';
 
 export enum CartStatus {
   ACTIVE = 'active',
@@ -7,6 +6,17 @@ export enum CartStatus {
   EXPIRED = 'expired',
   ABANDONED = 'abandoned'
 }
+
+export const CartSubmissionFeature = z.object({
+  cart_submission_feature_id: z.string(),
+  submission_feature_id: z.number(),
+  submission_id: z.number(),
+  feature_type_id: z.number(),
+  feature_type_name: z.string(),
+  secured: z.boolean()
+});
+
+export type CartSubmissionFeature = z.infer<typeof CartSubmissionFeature>;
 
 export const Cart = z.object({
   cart_id: z.string(),
@@ -16,7 +26,7 @@ export const Cart = z.object({
 
 export type Cart = z.infer<typeof Cart>;
 
-export const CartWithFeatures = Cart.extend({ features: z.array(SubmissionFeature) });
+export const CartWithFeatures = Cart.extend({ features: z.array(CartSubmissionFeature) });
 export type CartWithFeatures = z.infer<typeof CartWithFeatures>;
 
 export interface UpdateCart {

@@ -76,7 +76,7 @@ export function patchSecurityRulesOnSubmissionFeatures(): RequestHandler {
     const connection = getDBConnection(req['keycloak_token']);
     const service = new SecurityService(connection);
 
-    const submissionFeatureIds: string[] = req.body.submissionFeatureIds;
+    const submissionFeatureIds: number[] = req.body.submissionFeatureIds;
     const applyRuleIds: number[] = req.body.applyRuleIds;
     const removeRuleIds: number[] = req.body.removeRuleIds;
 

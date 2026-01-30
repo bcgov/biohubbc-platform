@@ -28,7 +28,7 @@ DELETE.apiDoc = {
       in: 'path',
       name: 'cartSubmissionFeatureId',
       required: true,
-      schema: { type: 'integer' },
+      schema: { type: 'string', format: 'uuid' },
       description: 'ID of the submission feature to remove from the cart'
     }
   ],
@@ -65,7 +65,7 @@ export function deleteCartSubmissionFeature(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json({ message: 'Feature removed from cart successfully' });
+      res.status(200).json();
     } catch (error) {
       defaultLog.error({ label: 'deleteCartSubmissionFeature', message: 'Error deleting cart feature', error });
       await connection.rollback();

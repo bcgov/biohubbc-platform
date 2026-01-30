@@ -15,7 +15,7 @@ POST.apiDoc = {
   tags: ['cart'],
   security: [
     {
-      OptionalBearer: []
+      Bearer: []
     }
   ],
   requestBody: {
@@ -29,8 +29,8 @@ POST.apiDoc = {
           properties: {
             features: {
               type: 'array',
-              items: { type: 'string', format: 'uuid' },
-              description: 'List of submission feature UUIDs to add to the cart'
+              items: { type: 'integer' },
+              description: 'List of submission feature IDs to add to the cart'
             }
           }
         }
@@ -62,8 +62,8 @@ export function createCart(): RequestHandler {
     try {
       await connection.open();
 
-      const systemUserId = connection.systemUserId();
-      const features = (req.body?.features ?? []) as string[];
+      const systemUserId = req.keycloak_token ? connection.systemUserId() : null;
+      const features = (req.body?.features ?? []).map(Number);
 
       const cartService = new CartService(connection);
 
