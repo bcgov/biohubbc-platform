@@ -28,19 +28,14 @@ export class CartService extends DBService {
    * Returns a specific cart by its ID with the first 10 features.
    *
    * @param {string} cartId - The ID of the cart
-   * @param {number} systemUserId - The ID of the authenticated user
    * @return {Promise<CartWithFeatures>} - The cart with features
    * @memberof CartService
    */
-  async findCartWithFeaturesById(cartId: string, systemUserId: number): Promise<CartWithFeatures> {
-    const cart = await this.cartRepository.getCartById(cartId, systemUserId);
+  async findCartWithFeaturesById(cartId: string): Promise<CartWithFeatures> {
+    const cart = await this.cartRepository.getCartById(cartId);
 
     const pagination = { limit: 10, page: 1 };
-    const features = await this.cartSubmissionFeatureService.getCartSubmissionFeatures(
-      cartId,
-      systemUserId,
-      pagination
-    );
+    const features = await this.cartSubmissionFeatureService.getCartSubmissionFeatures(cartId, pagination);
 
     return { ...cart, features };
   }
@@ -60,12 +55,11 @@ export class CartService extends DBService {
    * Returns a specific cart by its ID.
    *
    * @param {string} cartId - The ID of the cart
-   * @param {number} systemUserId - The ID of the authenticated user
    * @return {Promise<Cart>} - The cart
    * @memberof CartService
    */
-  async getCartById(cartId: string, systemUserId: number): Promise<Cart> {
-    return this.cartRepository.getCartById(cartId, systemUserId);
+  async getCartById(cartId: string): Promise<Cart> {
+    return this.cartRepository.getCartById(cartId);
   }
 
   /**
@@ -82,12 +76,8 @@ export class CartService extends DBService {
     let features: CartSubmissionFeature[] = [];
 
     if (submissionFeatureIds.length > 0) {
-      await this.cartSubmissionFeatureService.addSubmissionFeaturesToCart(
-        cart.cart_id,
-        systemUserId,
-        submissionFeatureIds
-      );
-      features = await this.cartSubmissionFeatureService.getCartSubmissionFeatures(cart.cart_id, systemUserId);
+      await this.cartSubmissionFeatureService.addSubmissionFeaturesToCart(cart.cart_id, submissionFeatureIds);
+      features = await this.cartSubmissionFeatureService.getCartSubmissionFeatures(cart.cart_id);
     }
 
     return { ...cart, features };
@@ -97,24 +87,22 @@ export class CartService extends DBService {
    * Updates a cart.
    *
    * @param {string} cartId - The ID of the cart
-   * @param {number} systemUserId - The ID of the authenticated user
    * @param {UpdateCart} payload - The new cart update payload
    * @return {Promise<void>}
    * @memberof CartService
    */
-  async updateCart(cartId: string, systemUserId: number, payload: UpdateCart): Promise<void> {
-    await this.cartRepository.updateCart(cartId, systemUserId, payload);
+  async updateCart(cartId: string, payload: UpdateCart): Promise<void> {
+    await this.cartRepository.updateCart(cartId, payload);
   }
 
   /**
    * Soft delete a cart.
    *
    * @param {string} cartId - The ID of the cart
-   * @param {number} systemUserId - The ID of the authenticated user
    * @return {Promise<void>}
    * @memberof CartService
    */
-  async deleteCart(cartId: string, systemUserId: number): Promise<void> {
-    await this.cartRepository.deleteCart(cartId, systemUserId);
+  async deleteCart(cartId: string): Promise<void> {
+    await this.cartRepository.deleteCart(cartId);
   }
 }

@@ -25,7 +25,7 @@ describe('CartSubmissionFeatureRepository', () => {
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
-      const result = await repo.addSubmissionFeaturesToCart('cart-1', 1, [1, 2, 3]);
+      const result = await repo.addSubmissionFeaturesToCart('cart-1', [1, 2, 3]);
 
       expect(result).to.be.undefined;
     });
@@ -42,7 +42,7 @@ describe('CartSubmissionFeatureRepository', () => {
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
-      const result = await repo.removeSubmissionFeaturesFromCart('cart-1', 1, ['uuid1']);
+      const result = await repo.removeSubmissionFeaturesFromCart('cart-1', ['uuid1']);
 
       expect(result).to.be.undefined;
     });
@@ -59,7 +59,7 @@ describe('CartSubmissionFeatureRepository', () => {
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
-      const result = await repo.clearCart('cart-1', 1);
+      const result = await repo.clearCart('cart-1');
 
       expect(result).to.be.undefined;
     });
@@ -95,7 +95,7 @@ describe('CartSubmissionFeatureRepository', () => {
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
-      const result = await repo.getCartSubmissionFeatures('cart-1', 1, { page: 1, limit: 25 });
+      const result = await repo.getCartSubmissionFeatures('cart-1', { page: 1, limit: 25 });
 
       expect(result).to.eql(mockRows);
     });
@@ -112,7 +112,7 @@ describe('CartSubmissionFeatureRepository', () => {
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
-      const result = await repo.getCartSubmissionFeatureCount('cart-1', 1);
+      const result = await repo.getCartSubmissionFeatureCount('cart-1');
 
       expect(result).to.eql(5);
     });

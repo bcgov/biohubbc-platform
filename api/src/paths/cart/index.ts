@@ -11,11 +11,11 @@ const defaultLog = getLogger('paths/cart');
 export const POST: Operation = [createCart()];
 
 POST.apiDoc = {
-  description: 'Create a new cart for the current user (backend generates session ID if needed)',
+  description: 'Create a new cart',
   tags: ['cart'],
   security: [
     {
-      Bearer: []
+      OptionalBearer: []
     }
   ],
   requestBody: {
@@ -57,12 +57,14 @@ POST.apiDoc = {
  */
 export function createCart(): RequestHandler {
   return async (req, res) => {
-    const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
+    const isAuthenticated = !!req.keycloak_token;
+    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     try {
       await connection.open();
 
-      const systemUserId = req.keycloak_token ? connection.systemUserId() : null;
+      // System user ID of the cart will be null for non-authenticated requests
+      const systemUserId = isAuthenticated ? connection.systemUserId() : null;
       const features = (req.body?.features ?? []).map(Number);
 
       const cartService = new CartService(connection);

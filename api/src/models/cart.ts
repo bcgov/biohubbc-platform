@@ -20,7 +20,7 @@ export type CartSubmissionFeature = z.infer<typeof CartSubmissionFeature>;
 
 export const Cart = z.object({
   cart_id: z.string(),
-  system_user_id: z.number(),
+  system_user_id: z.number().nullable(),
   cart_status: z.nativeEnum(CartStatus)
 });
 
@@ -30,6 +30,7 @@ export const CartWithFeatures = Cart.extend({ features: z.array(CartSubmissionFe
 export type CartWithFeatures = z.infer<typeof CartWithFeatures>;
 
 export interface UpdateCart {
+  system_user_id?: string | null;
   cart_status?: CartStatus;
   record_end_date?: string | null;
 }

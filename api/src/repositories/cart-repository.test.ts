@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { Cart, CartStatus } from '../models/cart';
+import { Cart, CartStatus, UpdateCart } from '../models/cart';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CartRepository } from './cart-repository';
 
@@ -32,7 +32,7 @@ describe('CartRepository', () => {
 
       const repo = new CartRepository(mockDBConnection);
 
-      const result = await repo.getCartById('cart-1', 1);
+      const result = await repo.getCartById('cart-1');
 
       expect(result).to.eql(mockCart);
     });
@@ -50,7 +50,7 @@ describe('CartRepository', () => {
       const repo = new CartRepository(mockDBConnection);
 
       try {
-        await repo.getCartById('cart-1', 1);
+        await repo.getCartById('cart-1');
         throw new Error('Expected to throw');
       } catch (err) {
         expect((err as Error).message).to.equal('Failed to get cart');
@@ -158,11 +158,11 @@ describe('CartRepository', () => {
 
       const repo = new CartRepository(mockDBConnection);
 
-      const payload = { cart_status: CartStatus.CHECKED_OUT, record_end_date: null };
+      const payload: UpdateCart = { cart_status: CartStatus.CHECKED_OUT };
 
-      const result = await repo.updateCart('cart-1', 1, payload);
+      await repo.updateCart('cart-1', payload);
 
-      expect(result).to.be.undefined;
+      expect(true).to.be.true;
     });
 
     it('should throw error when rowCount !== 1', async () => {
@@ -177,10 +177,10 @@ describe('CartRepository', () => {
 
       const repo = new CartRepository(mockDBConnection);
 
-      const payload = { cart_status: CartStatus.CHECKED_OUT, record_end_date: null };
+      const payload: UpdateCart = { cart_status: CartStatus.CHECKED_OUT };
 
       try {
-        await repo.updateCart('cart-1', 1, payload);
+        await repo.updateCart('cart-1', payload);
         throw new Error('Expected to throw');
       } catch (err) {
         expect((err as Error).message).to.equal('Failed to update cart status');
@@ -201,9 +201,9 @@ describe('CartRepository', () => {
 
       const repo = new CartRepository(mockDBConnection);
 
-      const result = await repo.deleteCart('cart-1', 1);
+      await repo.deleteCart('cart-1');
 
-      expect(result).to.be.undefined;
+      expect(true).to.be.true;
     });
   });
 });

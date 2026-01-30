@@ -61,7 +61,7 @@ describe('DELETE /cart/{cartId}/feature/{cartSubmissionFeatureId}', () => {
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(mockRes.statusValue).to.equal(200);
-    expect(removeSubmissionFeatureStub).to.have.been.calledOnceWith('fake-cart-id', sinon.match.any, ['123']);
+    expect(removeSubmissionFeatureStub).to.have.been.calledOnceWith('fake-cart-id', ['123']);
     expect(mockDBConnection.commit).to.have.been.calledOnce;
     expect(mockDBConnection.release).to.have.been.calledOnce;
   });

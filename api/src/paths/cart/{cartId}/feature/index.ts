@@ -4,6 +4,7 @@ import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db
 import { GetCartSubmissionFeaturesSchema } from '../../../../openapi/schemas/cart';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../../../openapi/schemas/pagination';
+import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { CartSubmissionFeatureService } from '../../../../services/cart-submission-feature-service';
 import { getLogger } from '../../../../utils/logger';
 import {
@@ -14,7 +15,19 @@ import {
 
 const defaultLog = getLogger('paths/cart/{cartId}');
 
-export const GET: Operation = [getCartSubmissionFeatures()];
+export const GET: Operation = [
+  authorizeRequestHandler((req) => {
+    return {
+      and: [
+        {
+          discriminator: 'Cart',
+          cartId: req.params.cartId
+        }
+      ]
+    };
+  }),
+  getCartSubmissionFeatures()
+];
 
 GET.apiDoc = {
   description: 'Get a cart by cartId',
@@ -63,12 +76,11 @@ GET.apiDoc = {
  */
 export function getCartSubmissionFeatures(): RequestHandler {
   return async (req, res) => {
-    const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
+    const isAuthenticated = !!req.keycloak_token;
+    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     try {
       await connection.open();
-
-      const systemUserId = connection.systemUserId();
 
       const pagination = makePaginationOptionsFromRequest(req);
 
@@ -76,12 +88,8 @@ export function getCartSubmissionFeatures(): RequestHandler {
       const cartSubmissionFeatureService = new CartSubmissionFeatureService(connection);
 
       const [features, count] = await Promise.all([
-        cartSubmissionFeatureService.getCartSubmissionFeatures(
-          cartId,
-          systemUserId,
-          ensureCompletePaginationOptions(pagination)
-        ),
-        cartSubmissionFeatureService.getCartSubmissionFeatureCount(cartId, systemUserId)
+        cartSubmissionFeatureService.getCartSubmissionFeatures(cartId, ensureCompletePaginationOptions(pagination)),
+        cartSubmissionFeatureService.getCartSubmissionFeatureCount(cartId)
       ]);
 
       await connection.commit();
@@ -97,7 +105,19 @@ export function getCartSubmissionFeatures(): RequestHandler {
   };
 }
 
-export const POST: Operation = [addSubmissionFeaturesToCart()];
+export const POST: Operation = [
+  authorizeRequestHandler((req) => {
+    return {
+      and: [
+        {
+          discriminator: 'Cart',
+          cartId: req.params.cartId
+        }
+      ]
+    };
+  }),
+  addSubmissionFeaturesToCart()
+];
 
 POST.apiDoc = {
   description: 'Add or remove features in the cart',
@@ -149,19 +169,18 @@ POST.apiDoc = {
  */
 export function addSubmissionFeaturesToCart(): RequestHandler {
   return async (req, res) => {
-    const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
+    const isAuthenticated = !!req.keycloak_token;
+    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     try {
       await connection.open();
-
-      const systemUserId = connection.systemUserId();
 
       const features = req.body.features.map(Number);
       const cartId = req.params.cartId;
 
       const cartService = new CartSubmissionFeatureService(connection);
 
-      await cartService.addSubmissionFeaturesToCart(cartId, systemUserId, features);
+      await cartService.addSubmissionFeaturesToCart(cartId, features);
 
       await connection.commit();
 
@@ -176,7 +195,19 @@ export function addSubmissionFeaturesToCart(): RequestHandler {
   };
 }
 
-export const DELETE: Operation = [clearCartSubmissionFeatures()];
+export const DELETE: Operation = [
+  authorizeRequestHandler((req) => {
+    return {
+      and: [
+        {
+          discriminator: 'Cart',
+          cartId: req.params.cartId
+        }
+      ]
+    };
+  }),
+  clearCartSubmissionFeatures()
+];
 
 DELETE.apiDoc = {
   description: 'Clear all features from the cart by cartId',
@@ -209,18 +240,17 @@ DELETE.apiDoc = {
  */
 export function clearCartSubmissionFeatures(): RequestHandler {
   return async (req, res) => {
-    const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
+    const isAuthenticated = !!req.keycloak_token;
+    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     try {
       await connection.open();
-
-      const systemUserId = connection.systemUserId();
 
       const cartId = req.params.cartId;
 
       const cartSubmissionFeatureService = new CartSubmissionFeatureService(connection);
 
-      await cartSubmissionFeatureService.clearCart(cartId, systemUserId);
+      await cartSubmissionFeatureService.clearCart(cartId);
 
       await connection.commit();
 

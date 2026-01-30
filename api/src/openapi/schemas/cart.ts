@@ -48,7 +48,7 @@ export const GetCartWithFeaturesSchema: OpenAPIV3.SchemaObject = {
   required: ['cart_id', 'system_user_id', 'features'],
   properties: {
     cart_id: { type: 'string' },
-    system_user_id: { type: 'number' },
+    system_user_id: { type: 'number', nullable: true },
     features: GetCartSubmissionFeaturesSchema
   }
 };

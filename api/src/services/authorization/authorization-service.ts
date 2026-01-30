@@ -65,7 +65,7 @@ export interface AuthorizeByServiceClient {
  * @interface AuthorizeByCart
  */
 export interface AuthorizeByCart {
-  cart_id: string;
+  cartId: string;
   discriminator: 'Cart';
 }
 
@@ -255,40 +255,39 @@ export class AuthorizationService extends DBService {
   }
 
   /**
-   * Check if the user owns the cart specified by cart_id.
+   * Check if the user is authorized to access the cart
    *
    * @param {AuthorizeByCart} authorizeByCart
-   * @return {*}  {Promise<boolean>} `true` if the user owns the cart, `false` otherwise.
-   */
-  /**
-   * Check if the user owns the cart specified by cart_id.
-   *
-   * @param {AuthorizeByCart} authorizeByCart
-   * @return {*}  {Promise<boolean>} `true` if the user owns the cart, `false` otherwise.
+   * @return {Promise<boolean>}
    */
   async authorizeByCart(authorizeByCart: AuthorizeByCart): Promise<boolean> {
-    const { cart_id } = authorizeByCart;
+    const { cartId } = authorizeByCart;
 
-    // Fetch the cart based on the cart_id
+    // Fetch the cart based on the cartId
     const cartService = new CartService(this.connection);
-    const cart = await cartService.findCartById(cart_id);
+    const cart = await cartService.findCartById(cartId);
 
     // Cart does not exist
     if (!cart) {
       return false;
     }
 
-    // If the cart was created by a non-authenticated user, authorize the request
-    if (!(cart.system_user_id && this._systemUser)) {
+    // Ensure we have the current system user
+    const currentUser = await this.getCachedSystemUser();
+
+    // If the cart has a system_user_id (created by an authenticated user), and the current user is authenticated
+    if (cart.system_user_id && currentUser) {
+      // Check if the authenticated user is the owner of the cart
+      return cart.system_user_id === currentUser.system_user_id;
+    }
+
+    // If the cart was created by an unauthenticated user (no system_user_id set)
+    if (!cart.system_user_id) {
+      // Allow access for both authenticated and non-authenticated users (there is no ownership to verify)
       return true;
     }
 
-    if (cart.system_user_id && !this._systemUser) {
-      return false; // Deny if the cart was created by an authenticated user
-    }
-
-    // Otherwise, check if the cart's system_user_id matches the authenticated user's system_user_id
-    return cart.system_user_id === this._systemUser.system_user_id;
+    return false;
   }
 
   /**

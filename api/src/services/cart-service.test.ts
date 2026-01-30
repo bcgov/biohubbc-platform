@@ -16,7 +16,7 @@ describe('CartService', () => {
   });
 
   describe('findCartWithFeaturesById', () => {
-    it('should return a cart with features for a given cartId and systemUserId', async () => {
+    it('should return a cart with features for a given cartId', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new CartService(mockDBConnection);
 
@@ -40,7 +40,7 @@ describe('CartService', () => {
       sinon.stub(CartRepository.prototype, 'getCartById').resolves(mockCart);
       sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves(mockFeatures);
 
-      const result = await service.findCartWithFeaturesById('cart-1', 1);
+      const result = await service.findCartWithFeaturesById('cart-1');
       expect(result).to.deep.equal({ ...mockCart, features: mockFeatures });
     });
   });
@@ -58,9 +58,9 @@ describe('CartService', () => {
 
       const stub = sinon.stub(CartRepository.prototype, 'getCartById').resolves(mockCart);
 
-      const result = await service.getCartById('cart-1', 1);
+      const result = await service.getCartById('cart-1');
 
-      expect(stub).to.have.been.calledOnceWith('cart-1', 1);
+      expect(stub).to.have.been.calledOnceWith('cart-1');
       expect(result).to.deep.equal(mockCart);
     });
   });
@@ -78,7 +78,7 @@ describe('CartService', () => {
 
       sinon.stub(CartRepository.prototype, 'createCart').resolves(mockCart);
 
-      const result = await service.createCart(1, []);
+      const result = await service.createCart(1, []); // systemUserId is now required only for createCart
 
       expect(result).to.deep.equal({ ...mockCart, features: [] });
     });
@@ -112,7 +112,7 @@ describe('CartService', () => {
 
       const result = await service.createCart(1, [1]);
 
-      expect(addStub).to.have.been.calledOnceWith('cart-123', 1, [1]);
+      expect(addStub).to.have.been.calledOnceWith('cart-123', [1]);
       expect(getStub).to.have.been.calledOnce;
       expect(result).to.deep.equal({ ...mockCart, features: mockFeatures });
     });
@@ -141,9 +141,9 @@ describe('CartService', () => {
 
       const payload = { cart_status: CartStatus.CHECKED_OUT };
 
-      await service.updateCart('cart-1', 1, payload);
+      await service.updateCart('cart-1', payload);
 
-      expect(stub).to.have.been.calledOnceWith('cart-1', 1, payload);
+      expect(stub).to.have.been.calledOnceWith('cart-1', payload);
     });
 
     it('should propagate repository errors', async () => {
@@ -153,7 +153,7 @@ describe('CartService', () => {
       sinon.stub(CartRepository.prototype, 'updateCart').rejects(new Error('DB error'));
 
       try {
-        await service.updateCart('cart-1', 1, { cart_status: CartStatus.CHECKED_OUT });
+        await service.updateCart('cart-1', { cart_status: CartStatus.CHECKED_OUT });
         throw new Error('Expected to throw');
       } catch (err: any) {
         expect(err.message).to.equal('DB error');
@@ -168,9 +168,9 @@ describe('CartService', () => {
 
       const stub = sinon.stub(CartRepository.prototype, 'deleteCart').resolves();
 
-      await service.deleteCart('cart-1', 1);
+      await service.deleteCart('cart-1');
 
-      expect(stub).to.have.been.calledOnceWith('cart-1', 1);
+      expect(stub).to.have.been.calledOnceWith('cart-1');
     });
 
     it('should propagate repository errors', async () => {
@@ -180,7 +180,7 @@ describe('CartService', () => {
       sinon.stub(CartRepository.prototype, 'deleteCart').rejects(new Error('DB error'));
 
       try {
-        await service.deleteCart('cart-1', 1);
+        await service.deleteCart('cart-1');
         throw new Error('Expected to throw');
       } catch (err: any) {
         expect(err.message).to.equal('DB error');
