@@ -6,6 +6,7 @@ import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../../openapi/schemas/pagination';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { CartService } from '../../../services/cart-service';
+import { CartSubmissionFeatureService } from '../../../services/cart-submission-feature-service';
 import { getLogger } from '../../../utils/logger';
 import {
   ensureCompletePaginationOptions,
@@ -87,15 +88,17 @@ export function findCartWithFeaturesById(): RequestHandler {
 
       const cartId = req.params.cartId;
       const cartService = new CartService(connection);
+      const cartSubmissionFeatureService = new CartSubmissionFeatureService(connection);
 
-      // Return first 25 features if pagination not specified
+      // Return first 25 features from page 1 if pagination not specified
       req.params.limit = req.params.limit || '25';
+      req.params.page = req.params.page || '1';
 
       const pagination = makePaginationOptionsFromRequest(req);
 
       const [cart, count] = await Promise.all([
         cartService.findCartWithFeaturesById(cartId, ensureCompletePaginationOptions(pagination)),
-        cartService.cartSubmissionFeatureService.getCartSubmissionFeatureCount(cartId)
+        cartSubmissionFeatureService.getCartSubmissionFeatureCount(cartId)
       ]);
 
       await connection.commit();

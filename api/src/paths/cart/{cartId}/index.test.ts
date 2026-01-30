@@ -7,6 +7,7 @@ import * as db from '../../../database/db';
 import { ApiError } from '../../../errors/api-error';
 import { CartStatus, CartWithFeatures } from '../../../models/cart';
 import { CartService } from '../../../services/cart-service';
+import { CartSubmissionFeatureService } from '../../../services/cart-submission-feature-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 
 chai.use(sinonChai);
@@ -65,6 +66,9 @@ describe('cart/{cartId}', () => {
       };
 
       sinon.stub(CartService.prototype, 'findCartWithFeaturesById').resolves(fakeCart);
+      sinon
+        .stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureCount')
+        .resolves(fakeCart.features.length);
 
       const requestHandler = findCartWithFeaturesById();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -75,7 +79,15 @@ describe('cart/{cartId}', () => {
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql(fakeCart);
+      expect(mockRes.jsonValue.cart).to.eql(fakeCart);
+
+      // Check pagination in response
+      expect(mockRes.jsonValue.pagination).to.have.property('current_page');
+      expect(mockRes.jsonValue.pagination).to.have.property('last_page');
+      expect(mockRes.jsonValue.pagination).to.have.property('order');
+      expect(mockRes.jsonValue.pagination).to.have.property('per_page');
+      expect(mockRes.jsonValue.pagination).to.have.property('sort');
+      expect(mockRes.jsonValue.pagination).to.have.property('total');
     });
 
     it('returns 200 with cart with empty features if no features exist', async () => {
@@ -94,6 +106,9 @@ describe('cart/{cartId}', () => {
       };
 
       sinon.stub(CartService.prototype, 'findCartWithFeaturesById').resolves(fakeCart);
+      sinon
+        .stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureCount')
+        .resolves(fakeCart.features.length);
 
       const requestHandler = findCartWithFeaturesById();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -104,7 +119,61 @@ describe('cart/{cartId}', () => {
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql(fakeCart);
+      expect(mockRes.jsonValue.cart).to.eql(fakeCart);
+
+      // Check pagination in response
+      expect(mockRes.jsonValue.pagination).to.have.property('current_page');
+      expect(mockRes.jsonValue.pagination).to.have.property('last_page');
+      expect(mockRes.jsonValue.pagination).to.have.property('order');
+      expect(mockRes.jsonValue.pagination).to.have.property('per_page');
+      expect(mockRes.jsonValue.pagination).to.have.property('sort');
+      expect(mockRes.jsonValue.pagination).to.have.property('total');
+    });
+
+    it('sets default pagination values when no pagination is provided', async () => {
+      const mockDBConnection = getMockDBConnection({
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+
+      const fakeCart: CartWithFeatures = {
+        cart_id: '5555-6666-7777-8888',
+        system_user_id: 1,
+        cart_status: CartStatus.ACTIVE,
+        features: [
+          {
+            cart_submission_feature_id: 'uuid-1',
+            submission_feature_id: 1,
+            submission_id: 1,
+            feature_type_id: 1,
+            feature_type_name: 'type-1',
+            secured: false
+          }
+        ]
+      };
+
+      sinon.stub(CartService.prototype, 'findCartWithFeaturesById').resolves(fakeCart);
+      sinon
+        .stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureCount')
+        .resolves(fakeCart.features.length);
+
+      const requestHandler = findCartWithFeaturesById();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params.cartId = fakeCart.cart_id;
+
+      // Simulate a request without pagination parameters
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(mockDBConnection.commit).to.have.been.calledOnce;
+      expect(mockDBConnection.release).to.have.been.calledOnce;
+      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.jsonValue.cart).to.eql(fakeCart);
+
+      // Check that the default pagination is applied
+      expect(mockReq.params.limit).to.equal('25');
+      expect(mockReq.params.page).to.equal('1');
     });
 
     it('rolls back and rethrows if CartService.findCartWithFeaturesById throws', async () => {
