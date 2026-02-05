@@ -43,7 +43,7 @@ describe('SearchRepository', () => {
 
       const repo = new SearchRepository(mockDBConnection);
 
-      const result = await repo.findFeatures({ search: 'test' });
+      const result = await repo.findFeatures({ keyword: 'test' });
 
       expect(result).to.eql(mockRows[0]);
     });
@@ -62,7 +62,7 @@ describe('SearchRepository', () => {
 
       const repo = new SearchRepository(mockDBConnection);
 
-      const result = await repo.findFeatures({ search: 'none' });
+      const result = await repo.findFeatures({ keyword: 'none' });
 
       expect(result).to.eql({ data: [], total: 0 });
     });
@@ -88,7 +88,7 @@ describe('SearchRepository', () => {
 
       const repo = new SearchRepository(mockDBConnection);
 
-      const result = await repo.findSubmissions({ search: 'test' });
+      const result = await repo.findSubmissions({ keyword: 'test' });
 
       expect(result).to.eql(mockRows[0]);
     });
@@ -107,7 +107,7 @@ describe('SearchRepository', () => {
 
       const repo = new SearchRepository(mockDBConnection);
 
-      const result = await repo.findSubmissions({ search: 'none' });
+      const result = await repo.findSubmissions({ keyword: 'none' });
 
       expect(result).to.eql({ data: [], total: 0 });
     });
@@ -133,7 +133,7 @@ describe('SearchRepository', () => {
 
       const repo = new SearchRepository(mockDBConnection);
 
-      const result = await repo.findTaxon({ search: 'test' });
+      const result = await repo.findTaxon({ keyword: 'test' });
 
       expect(result).to.eql(mockRows[0]);
     });
@@ -152,7 +152,7 @@ describe('SearchRepository', () => {
 
       const repo = new SearchRepository(mockDBConnection);
 
-      const result = await repo.findTaxon({ search: 'none' });
+      const result = await repo.findTaxon({ keyword: 'none' });
 
       expect(result).to.eql({ data: [], total: 0 });
     });
@@ -176,7 +176,7 @@ describe('SearchRepository', () => {
 
       const repo = new SearchRepository(mockDBConnection);
 
-      const result = await repo.findFeatureSummary({ search: 'test' });
+      const result = await repo.findFeatureSummary({ keyword: 'test' });
 
       expect(result).to.eql(mockRows);
     });
@@ -195,7 +195,7 @@ describe('SearchRepository', () => {
 
       const repo = new SearchRepository(mockDBConnection);
 
-      const result = await repo.findFeatureSummary({ search: 'none' });
+      const result = await repo.findFeatureSummary({ keyword: 'none' });
 
       expect(result).to.eql(mockRows);
     });
@@ -216,7 +216,7 @@ describe('SearchRepository', () => {
 
       const repo = new SearchRepository(mockDBConnection);
 
-      const result = await repo.findSubmissionSummary({ search: 'test' });
+      const result = await repo.findSubmissionSummary({ keyword: 'test' });
 
       expect(result).to.eql(mockRows[0]);
     });
@@ -235,7 +235,7 @@ describe('SearchRepository', () => {
 
       const repo = new SearchRepository(mockDBConnection);
 
-      const result = await repo.findSubmissionSummary({ search: 'none' });
+      const result = await repo.findSubmissionSummary({ keyword: 'none' });
 
       expect(result).to.eql({ total: 0 });
     });
@@ -256,7 +256,7 @@ describe('SearchRepository', () => {
 
       const repo = new SearchRepository(mockDBConnection);
 
-      const result = await repo.findTaxonSummary({ search: 'test' });
+      const result = await repo.findTaxonSummary({ keyword: 'test' });
 
       expect(result).to.eql(mockRows[0]);
     });
@@ -275,7 +275,7 @@ describe('SearchRepository', () => {
 
       const repo = new SearchRepository(mockDBConnection);
 
-      const result = await repo.findTaxonSummary({ search: 'none' });
+      const result = await repo.findTaxonSummary({ keyword: 'none' });
 
       expect(result).to.eql({ total: 0 });
     });

@@ -1,5 +1,6 @@
 import { AxiosInstance } from 'axios';
 import { ICreateTeamPolicyRequest, ITeamPoliciesResponse, ITeamPolicy } from 'interfaces/useTeamPoliciesApi.interface';
+import { ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
  * Returns a set of supported api methods for working with team-policy associations.
@@ -11,10 +12,11 @@ export const useTeamPoliciesApi = (axios: AxiosInstance) => {
   /**
    * Get all team-policy associations with team and policy names.
    *
+   * @param {ApiPaginationRequestOptions} [pagination] - Optional pagination parameters.
    * @return {*} {Promise<ITeamPoliciesResponse>}
    */
-  const getTeamPolicies = async (): Promise<ITeamPoliciesResponse> => {
-    const { data } = await axios.get('/api/administrative/team-policies');
+  const getTeamPolicies = async (pagination?: ApiPaginationRequestOptions): Promise<ITeamPoliciesResponse> => {
+    const { data } = await axios.get('/api/administrative/team-policies', { params: pagination });
 
     return data;
   };

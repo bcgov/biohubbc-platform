@@ -5,10 +5,6 @@
  */
 export const JobQueues = {
   /**
-   * Test job queue for demonstration purposes.
-   */
-  TEST: 'test',
-  /**
    * Process submission features job queue for async feature processing.
    */
   PROCESS_SUBMISSION_FEATURES: 'process-submission-features',
@@ -16,7 +12,16 @@ export const JobQueues = {
    * Dead letter queue for failed process-submission-features jobs.
    * Jobs are moved here after all retries are exhausted.
    */
-  PROCESS_SUBMISSION_FEATURES_FAILED: 'process-submission-features-failed'
+  PROCESS_SUBMISSION_FEATURES_FAILED: 'process-submission-features-failed',
+  /**
+   * Malware scan queue for uploaded artifacts awaiting security scans.
+   */
+  MALWARE_SCAN: 'malware-scan',
+  /**
+   * Dead letter queue for failed malware jobs.
+   * Jobs are moved here after all retries are exhausted.
+   */
+  MALWARE_SCAN_FAILED: 'malware-scan-failed'
 } as const;
 
 export type JobQueueName = (typeof JobQueues)[keyof typeof JobQueues];

@@ -80,6 +80,29 @@ export class UploadArchiveRepository extends BaseRepository {
   }
 
   /**
+   * Get upload archive by artifact ID
+   *
+   * @param {string} artifactId - The ID of the artifact.
+   * @returns {Promise<UploadArchive | null>} - The upload archive or null if not found.
+   */
+  async getUploadArchiveByArtifactId(artifactId: string): Promise<UploadArchive | null> {
+    const sqlStatement = SQL`
+      SELECT
+        upload_archive_id,
+        upload_id,
+        artifact_id,
+        archive_status
+      FROM
+        upload_archive
+      WHERE
+        artifact_id = ${artifactId};
+    `;
+
+    const response = await this.connection.sql(sqlStatement, UploadArchive);
+    return response.rows[0] ?? null;
+  }
+
+  /**
    * Insert a new upload archive into the database.
    *
    * @param {CreateUploadArchive} uploadArchive - The upload archive data to insert.

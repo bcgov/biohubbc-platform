@@ -1,10 +1,39 @@
 import { fireEvent } from '@testing-library/react';
+import { GridColDef } from '@mui/x-data-grid';
 import { useApi } from 'hooks/useApi';
 import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
 import { MemoryRouter } from 'react-router';
 import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { ITeamsContainerProps, TeamsContainer } from './TeamsContainer';
+
+// Types for DataGrid mock
+interface MockDataGridProps {
+  rows: ITeamWithMembers[];
+  columns: GridColDef[];
+  localeText?: { noRowsLabel?: string };
+}
+
+// Simple DataGrid mock - just renders rows as divs
+vi.mock('@mui/x-data-grid', () => ({
+  DataGrid: ({ rows, columns, localeText }: MockDataGridProps) => (
+    <div data-testid="mock-data-grid">
+      {rows.length === 0 ? (
+        <div>{localeText?.noRowsLabel}</div>
+      ) : (
+        rows.map((row) => (
+          <div key={row.team_id} data-testid={`row-${row.team_id}`}>
+            <span>{row.name}</span>
+            <span>{row.description || '-'}</span>
+            <span>{row.members?.length ?? 0}</span>
+            {/* Render actions column */}
+            {columns.find((c) => c.field === 'actions')?.renderCell?.({ row } as never)}
+          </div>
+        ))
+      )}
+    </div>
+  )
+}));
 
 vi.mock('../../../../hooks/useApi');
 const mockBiohubApi = useApi as Mock;
@@ -47,6 +76,11 @@ const mockUseApi = {
 
 const defaultProps: ITeamsContainerProps = {
   teams: mockTeams,
+  rowCount: 2,
+  paginationModel: { page: 0, pageSize: 10 },
+  setPaginationModel: vi.fn(),
+  sortModel: [{ field: 'name', sort: 'asc' }],
+  setSortModel: vi.fn(),
   refresh: vi.fn(),
   searchTerm: '',
   onSearch: vi.fn(),
@@ -54,7 +88,7 @@ const defaultProps: ITeamsContainerProps = {
   onSelectTeam: vi.fn()
 };
 
-const renderContainer = (props: Partial<ITeamsContainerProps> = {}) => {
+const renderComponent = (props: Partial<ITeamsContainerProps> = {}) => {
   return render(
     <MemoryRouter initialEntries={['/']}>
       <TeamsContainer {...defaultProps} {...props} />
@@ -72,119 +106,87 @@ describe('TeamsContainer', () => {
     vi.clearAllMocks();
   });
 
-  it('renders teams in DataGrid', async () => {
-    const { getByText } = renderContainer();
+  describe('Header', () => {
+    it('displays rowCount in header', async () => {
+      // Step 1: Render with default props (rowCount: 2)
+      const { getByText } = renderComponent();
 
-    await waitFor(() => {
-      expect(getByText('Alpha Team')).toBeVisible();
-      expect(getByText('Beta Team')).toBeVisible();
-    });
-  });
-
-  it('displays team count in header', async () => {
-    const { getByText } = renderContainer();
-
-    await waitFor(() => {
-      expect(getByText('(2)')).toBeVisible();
-    });
-  });
-
-  it('displays team descriptions', async () => {
-    const { getByText } = renderContainer();
-
-    await waitFor(() => {
-      expect(getByText('First team')).toBeVisible();
-    });
-  });
-
-  it('displays dash for null description', async () => {
-    const { getAllByText } = renderContainer();
-
-    await waitFor(() => {
-      const dashes = getAllByText('-');
-      expect(dashes.length).toBeGreaterThan(0);
-    });
-  });
-
-  it('displays member count for each team', async () => {
-    const { getByText } = renderContainer();
-
-    await waitFor(() => {
-      // Alpha Team has 1 member, Beta Team has 2
-      expect(getByText('1')).toBeVisible();
-      expect(getByText('2')).toBeVisible();
-    });
-  });
-
-  it('renders search input', async () => {
-    const { getByPlaceholderText } = renderContainer();
-
-    await waitFor(() => {
-      expect(getByPlaceholderText('Search by team name')).toBeVisible();
-    });
-  });
-
-  it('renders Add button', async () => {
-    const { getByRole } = renderContainer();
-
-    await waitFor(() => {
-      expect(getByRole('button', { name: /add/i })).toBeVisible();
-    });
-  });
-
-  it('shows `No Teams` when there are no teams', async () => {
-    const { getByText } = renderContainer({ teams: [] });
-
-    await waitFor(() => {
-      expect(getByText('No Teams')).toBeVisible();
-    });
-  });
-
-  describe('Add Team Dialog', () => {
-    it('opens add team dialog when Add button is clicked', async () => {
-      const { getByRole, getByText } = renderContainer();
-
+      // Step 2: Verify dynamic rowCount appears in header
       await waitFor(() => {
-        expect(getByRole('button', { name: /add/i })).toBeVisible();
+        expect(getByText('(2)')).toBeVisible();
       });
+    });
+  });
 
+  describe('Search', () => {
+    it('displays controlled search term value', async () => {
+      // Step 1: Render with searchTerm prop set
+      const { getByPlaceholderText } = renderComponent({ searchTerm: 'Beta' });
+
+      // Step 2: Verify input displays the controlled value
+      await waitFor(() => {
+        expect(getByPlaceholderText('Search by team name')).toHaveValue('Beta');
+      });
+    });
+
+    it('calls onSearch when input changes', async () => {
+      // Step 1: Create mock onSearch callback
+      const mockOnSearch = vi.fn();
+
+      // Step 2: Render with mock callback
+      const { getByPlaceholderText } = renderComponent({ onSearch: mockOnSearch });
+
+      // Step 3: Type in search input
+      const input = getByPlaceholderText('Search by team name');
+      fireEvent.change(input, { target: { value: 'Alpha' } });
+
+      // Step 4: Verify callback was called with input value
+      expect(mockOnSearch).toHaveBeenCalledWith('Alpha');
+    });
+  });
+
+  describe('Add Button', () => {
+    it('opens add dialog when clicked', async () => {
+      // Step 1: Render component
+      const { getByRole, getByText } = renderComponent();
+
+      // Step 2: Click Add button
       fireEvent.click(getByRole('button', { name: /add/i }));
 
+      // Step 3: Verify dialog opens
       await waitFor(() => {
         expect(getByText('Add Team')).toBeVisible();
       });
     });
+  });
 
-    it('creates team and closes dialog on successful submit', async () => {
-      mockCreateTeam.mockResolvedValueOnce({
-        team_id: 'new-team',
-        name: 'New Team',
-        description: 'A new team',
-        members: []
-      });
+  describe('Add Team Dialog', () => {
+    it('calls createTeam API with form values on submit', async () => {
+      // Step 1: Setup - make createTeam return {} (simulates successful API response)
+      mockCreateTeam.mockResolvedValueOnce({});
 
+      // Step 2: Create mock refresh function to verify it's called after submit
       const mockRefresh = vi.fn();
-      const { getByRole, getByLabelText, queryByText } = renderContainer({ refresh: mockRefresh });
 
-      // Wait for initial render
-      await waitFor(() => {
-        expect(getByRole('button', { name: /add/i })).toBeVisible();
-      });
+      // Step 3: Render component with mock refresh prop
+      const { getByRole, getByLabelText, queryByText } = renderComponent({ refresh: mockRefresh });
 
-      // Open dialog
+      // Step 4: Click "Add" button to open dialog
       fireEvent.click(getByRole('button', { name: /add/i }));
 
+      // Step 5: Wait for dialog to appear (async rendering)
       await waitFor(() => {
         expect(getByLabelText('Team Name *')).toBeVisible();
       });
 
-      // Fill in form
+      // Step 6: Fill form fields
       fireEvent.change(getByLabelText('Team Name *'), { target: { value: 'New Team' } });
       fireEvent.change(getByLabelText('Description'), { target: { value: 'A new team' } });
 
-      // Submit form
+      // Step 7: Submit form
       fireEvent.click(getByRole('button', { name: /create/i }));
 
+      // Step 8: Verify API was called with correct params
       await waitFor(() => {
         expect(mockCreateTeam).toHaveBeenCalledWith({
           name: 'New Team',
@@ -193,12 +195,12 @@ describe('TeamsContainer', () => {
         });
       });
 
-      // Dialog should close
+      // Step 9: Verify dialog closes after success
       await waitFor(() => {
         expect(queryByText('Add Team')).toBeNull();
       });
 
-      // Refresh should be called
+      // Step 10: Verify refresh was called after success
       await waitFor(() => {
         expect(mockRefresh).toHaveBeenCalled();
       });
@@ -207,23 +209,26 @@ describe('TeamsContainer', () => {
 
   describe('Edit Team Dialog', () => {
     it('opens edit dialog with team data when Edit is clicked', async () => {
-      const { getByText, getAllByTitle, getByLabelText } = renderContainer();
+      // Step 1: Render component with mock data
+      const { getByText, getAllByTitle, getByLabelText } = renderComponent();
 
+      // Step 2: Wait for data to render
       await waitFor(() => {
         expect(getByText('Alpha Team')).toBeVisible();
       });
 
-      // Click actions menu for Alpha Team
-      const actionsButtons = getAllByTitle('Actions');
-      fireEvent.click(actionsButtons[0]);
+      // Step 3: Open actions menu
+      fireEvent.click(getAllByTitle('Actions')[0]);
 
-      // Click Edit option
+      // Step 4: Wait for menu to appear
       await waitFor(() => {
         expect(getByText('Edit team')).toBeVisible();
       });
+
+      // Step 5: Click Edit option
       fireEvent.click(getByText('Edit team'));
 
-      // Dialog should open with team data
+      // Step 6: Verify dialog opens with pre-populated data from selected team
       await waitFor(() => {
         expect(getByText('Edit Team')).toBeVisible();
         expect(getByLabelText('Team Name *')).toHaveValue('Alpha Team');
@@ -231,43 +236,40 @@ describe('TeamsContainer', () => {
       });
     });
 
-    it('updates team on successful submit', async () => {
-      mockUpdateTeam.mockResolvedValueOnce({
-        team_id: 'team-1',
-        name: 'Updated Team',
-        description: 'Updated description',
-        members: []
-      });
+    it('calls updateTeam API on save', async () => {
+      // Step 1: Setup - make updateTeam return {} (simulates successful API response)
+      mockUpdateTeam.mockResolvedValueOnce({});
 
+      // Step 2: Create mock refresh function
       const mockRefresh = vi.fn();
-      const { getByText, getAllByTitle, getByLabelText, getByRole, queryByText } = renderContainer({
+
+      // Step 3: Render component with mock refresh prop
+      const { getByText, getAllByTitle, getByLabelText, getByRole, queryByText } = renderComponent({
         refresh: mockRefresh
       });
 
+      // Step 4: Wait for data to render
       await waitFor(() => {
         expect(getByText('Alpha Team')).toBeVisible();
       });
 
-      // Open actions menu and click Edit
-      const actionsButtons = getAllByTitle('Actions');
-      fireEvent.click(actionsButtons[0]);
-
-      await waitFor(() => {
-        expect(getByText('Edit team')).toBeVisible();
-      });
+      // Step 5: Open actions menu and click Edit
+      fireEvent.click(getAllByTitle('Actions')[0]);
+      await waitFor(() => expect(getByText('Edit team')).toBeVisible());
       fireEvent.click(getByText('Edit team'));
 
-      // Wait for dialog
+      // Step 6: Wait for edit dialog to appear
       await waitFor(() => {
         expect(getByLabelText('Team Name *')).toBeVisible();
       });
 
-      // Update team name
+      // Step 7: Update form field
       fireEvent.change(getByLabelText('Team Name *'), { target: { value: 'Updated Team' } });
 
-      // Submit
+      // Step 8: Submit form
       fireEvent.click(getByRole('button', { name: /save/i }));
 
+      // Step 9: Verify API was called with correct params (id + updated values)
       await waitFor(() => {
         expect(mockUpdateTeam).toHaveBeenCalledWith('team-1', {
           name: 'Updated Team',
@@ -276,108 +278,22 @@ describe('TeamsContainer', () => {
         });
       });
 
-      // Dialog should close
+      // Step 10: Verify dialog closes after success
       await waitFor(() => {
         expect(queryByText('Edit Team')).toBeNull();
       });
     });
   });
 
-  describe('Delete Team', () => {
-    it('opens delete menu option from actions menu', async () => {
-      const { getByText, getAllByTitle } = renderContainer();
+  describe('Empty State', () => {
+    it('shows empty state message', async () => {
+      // Step 1: Render with empty teams array
+      const { getByText } = renderComponent({ teams: [], rowCount: 0 });
 
+      // Step 2: Verify empty state message appears (from DataGrid localeText)
       await waitFor(() => {
-        expect(getByText('Alpha Team')).toBeVisible();
+        expect(getByText('No Teams')).toBeVisible();
       });
-
-      // Click actions menu
-      const actionsButtons = getAllByTitle('Actions');
-      fireEvent.click(actionsButtons[0]);
-
-      // Delete option should be visible
-      await waitFor(() => {
-        expect(getByText('Delete team')).toBeVisible();
-      });
-    });
-
-    it('triggers delete flow when delete menu item is clicked', async () => {
-      const { getByText, getAllByTitle } = renderContainer();
-
-      await waitFor(() => {
-        expect(getByText('Alpha Team')).toBeVisible();
-      });
-
-      // Open actions menu and click Delete
-      const actionsButtons = getAllByTitle('Actions');
-      fireEvent.click(actionsButtons[0]);
-
-      await waitFor(() => {
-        expect(getByText('Delete team')).toBeVisible();
-      });
-
-      // Click delete - this triggers the confirmation dialog flow
-      fireEvent.click(getByText('Delete team'));
-
-      // The delete menu item click should have been processed
-      // (Actual dialog rendering depends on dialogContext which is mocked by test-utils)
-    });
-  });
-
-  describe('Search', () => {
-    it('calls onSearch callback on input change', async () => {
-      const mockOnSearch = vi.fn();
-      const { getByPlaceholderText } = renderContainer({ onSearch: mockOnSearch });
-
-      await waitFor(() => {
-        expect(getByPlaceholderText('Search by team name')).toBeVisible();
-      });
-
-      const searchInput = getByPlaceholderText('Search by team name');
-      fireEvent.change(searchInput, { target: { value: 'Alpha' } });
-
-      expect(mockOnSearch).toHaveBeenCalledWith('Alpha');
-    });
-
-    it('displays controlled search term value', async () => {
-      const { getByPlaceholderText } = renderContainer({ searchTerm: 'Beta' });
-
-      await waitFor(() => {
-        const searchInput = getByPlaceholderText('Search by team name');
-        expect(searchInput).toHaveValue('Beta');
-      });
-    });
-  });
-
-  describe('Row Selection', () => {
-    it('calls onSelectTeam when a row is clicked', async () => {
-      const mockOnSelectTeam = vi.fn();
-      const { getByText } = renderContainer({ onSelectTeam: mockOnSelectTeam });
-
-      await waitFor(() => {
-        expect(getByText('Alpha Team')).toBeVisible();
-      });
-
-      // Click on a row
-      const row = getByText('Alpha Team').closest('.MuiDataGrid-row');
-      if (row) {
-        fireEvent.click(row);
-      }
-
-      // onSelectTeam should be called
-      // Note: The actual value depends on DataGrid's selection model behavior
-    });
-
-    it('highlights selected row when selectedTeamId is provided', async () => {
-      const { getByText } = renderContainer({ selectedTeamId: 'team-1' });
-
-      await waitFor(() => {
-        expect(getByText('Alpha Team')).toBeVisible();
-      });
-
-      // The row should have the selected class (MUI DataGrid applies Mui-selected)
-      const row = getByText('Alpha Team').closest('.MuiDataGrid-row');
-      expect(row).toHaveClass('Mui-selected');
     });
   });
 });

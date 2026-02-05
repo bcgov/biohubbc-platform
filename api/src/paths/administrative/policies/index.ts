@@ -3,6 +3,7 @@ import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema } from '../../../openapi/schemas/pagination';
 import {
   CreatePolicyRequestSchema,
   PoliciesListResponseSchema,
@@ -11,6 +12,7 @@ import {
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { PolicyService } from '../../../services/access-policy/policy-service';
 import { getLogger } from '../../../utils/logger';
+import { ApiPaginationOptions } from '../../../zod-schema/pagination';
 
 const defaultLog = getLogger('paths/administrative/policies');
 
@@ -37,33 +39,12 @@ GET.apiDoc = {
     }
   ],
   parameters: [
-    {
-      in: 'query',
-      name: 'page',
-      schema: {
-        type: 'integer',
-        minimum: 0,
-        default: 0
-      },
-      description: 'Page number (0-indexed)'
-    },
-    {
-      in: 'query',
-      name: 'limit',
-      schema: {
-        type: 'integer',
-        minimum: 1,
-        maximum: 100,
-        default: 50
-      },
-      description: 'Number of items per page'
-    },
+    ...paginationRequestQueryParamSchema,
     {
       in: 'query',
       name: 'search',
-      schema: {
-        type: 'string'
-      },
+      required: false,
+      schema: { type: 'string' },
       description: 'Search term to filter policies by name'
     }
   ],
@@ -89,15 +70,19 @@ export function getPolicies(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
 
-    const page = Number(req.query.page) || 0;
-    const limit = Number(req.query.limit) || 50;
     const search = req.query.search as string | undefined;
+    const pagination: ApiPaginationOptions = {
+      page: Number(req.query.page) || 1,
+      limit: Math.min(Number(req.query.limit) || 10, 100),
+      sort: req.query.sort as string | undefined,
+      order: req.query.order as 'asc' | 'desc' | undefined
+    };
 
     try {
       await connection.open();
 
       const policyService = new PolicyService(connection);
-      const response = await policyService.getPoliciesWithStatements({ page, limit, search });
+      const response = await policyService.getPoliciesWithStatements(search, pagination);
 
       await connection.commit();
 

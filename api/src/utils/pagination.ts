@@ -1,28 +1,42 @@
 import { Request } from 'express';
 import { ApiPaginationOptions, ApiPaginationResults } from '../zod-schema/pagination';
 
+const toNumber = (value: unknown): number | undefined =>
+  typeof value === 'string' || typeof value === 'number' ? Number(value) : undefined;
+
 /**
- * Generates the API pagination options object from the given request.
+ * Shared pagination extractor from a generic object.
+ * Works with query params or body params.
  *
- * Used in conjunction with a request leveraging the `paginationRequestQueryParamSchema` params.
- *
- * @param {Request} request
- * @return {*}  {Partial<ApiPaginationOptions>}
+ * @param {Record<string, unknown>} source - Object containing pagination keys
+ * @return {Partial<ApiPaginationOptions>}
+ */
+const makePaginationOptionsFromSource = (source: Record<string, unknown>): Partial<ApiPaginationOptions> => {
+  const page = toNumber(source.page);
+  const limit = toNumber(source.limit);
+
+  const order =
+    typeof source.order === 'string' && (source.order.toLowerCase() === 'asc' || source.order.toLowerCase() === 'desc')
+      ? (source.order.toLowerCase() as 'asc' | 'desc')
+      : undefined;
+
+  const sort = typeof source.sort === 'string' ? source.sort : undefined;
+
+  return { page, limit, sort, order };
+};
+
+/**
+ * Extracts pagination from query parameters
  */
 export const makePaginationOptionsFromRequest = (request: Request): Partial<ApiPaginationOptions> => {
-  const page: number | undefined = request.query.page ? Number(request.query.page) : undefined;
-  const limit: number | undefined = request.query.limit ? Number(request.query.limit) : undefined;
-  const order: 'asc' | 'desc' | undefined = request.query.order
-    ? (String(request.query.order) as 'asc' | 'desc')
-    : undefined;
-  const sort: string | undefined = request.query.sort ? String(request.query.sort) : undefined;
+  return makePaginationOptionsFromSource(request.query);
+};
 
-  return {
-    limit,
-    page,
-    sort,
-    order
-  };
+/**
+ * Extracts pagination from request body
+ */
+export const makePaginationOptionsFromBody = (request: Request): Partial<ApiPaginationOptions> => {
+  return makePaginationOptionsFromSource(request.body.pagination ?? {});
 };
 
 /**

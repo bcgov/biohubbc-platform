@@ -39,7 +39,7 @@ describe('getTeams', () => {
   it('should return 200 with paginated teams', async () => {
     const mockTeams = {
       teams: [{ team_id: 'team-1', name: 'Team Alpha', description: 'First', members: [] }],
-      pagination: { total: 1, page: 1, limit: 50, last_page: 1 }
+      pagination: { total: 1, per_page: 50, current_page: 1, last_page: 1 }
     };
 
     const mockDBConnection = getMockDBConnection();
@@ -61,7 +61,7 @@ describe('getTeams', () => {
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
     const getTeamsStub = sinon.stub(TeamService.prototype, 'getTeamsWithMembers').resolves({
       teams: [],
-      pagination: { total: 0, page: 1, limit: 50, last_page: 1 }
+      pagination: { total: 0, per_page: 50, current_page: 1, last_page: 1 }
     });
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -70,12 +70,11 @@ describe('getTeams', () => {
     const requestHandler = getTeams();
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(getTeamsStub).to.have.been.calledWith({
+    expect(getTeamsStub).to.have.been.calledWith('Research', {
       page: 1,
       limit: 50,
       sort: undefined,
-      order: undefined,
-      search: 'Research'
+      order: undefined
     });
   });
 
@@ -84,7 +83,7 @@ describe('getTeams', () => {
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
     const getTeamsStub = sinon.stub(TeamService.prototype, 'getTeamsWithMembers').resolves({
       teams: [],
-      pagination: { total: 0, page: 1, limit: 100, last_page: 1 }
+      pagination: { total: 0, per_page: 100, current_page: 1, last_page: 1 }
     });
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -93,12 +92,11 @@ describe('getTeams', () => {
     const requestHandler = getTeams();
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(getTeamsStub).to.have.been.calledWith({
+    expect(getTeamsStub).to.have.been.calledWith(undefined, {
       page: 1,
       limit: 100,
       sort: undefined,
-      order: undefined,
-      search: undefined
+      order: undefined
     });
   });
 });

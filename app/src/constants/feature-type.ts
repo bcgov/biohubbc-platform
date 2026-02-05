@@ -19,7 +19,7 @@ export const FEATURE_TYPE_CONFIG: Record<PRIORITY_FEATURE_TYPE, { label: string;
     icon: mdiDatabase
   },
   species_observation: {
-    label: 'Species Observations',
+    label: 'Species observations',
     icon: mdiMapMarker
   },
   telemetry: {

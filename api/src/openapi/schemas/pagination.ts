@@ -48,6 +48,40 @@ export const paginationRequestQueryParamSchema: OpenAPIV3.ParameterObject[] = [
 ];
 
 /**
+ * Pagination parameters for POST request bodies.
+ */
+export const paginationRequestBodySchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    page: {
+      type: 'integer',
+      minimum: 1,
+      default: 1,
+      description: 'The current page number to fetch'
+    },
+    limit: {
+      type: 'integer',
+      minimum: 1,
+      maximum: 100,
+      default: 25,
+      description: 'The number of records to return per page'
+    },
+    sort: {
+      type: 'string',
+      description: "The column to sort on, e.g. 'name'",
+      nullable: true
+    },
+    order: {
+      type: 'string',
+      enum: ['asc', 'desc'],
+      description: 'Sort order: ascending or descending',
+      nullable: true
+    }
+  }
+};
+
+/**
  * API schema to assert pagination information for paginated data
  * responses.
  */

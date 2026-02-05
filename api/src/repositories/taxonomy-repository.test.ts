@@ -15,13 +15,14 @@ describe('TaxonomyRepository', () => {
 
   describe('getTaxonByTsnIds', () => {
     it('should return array of system constants', async () => {
-      const TaxonRecord = {
+      const TaxonRecord: TaxonRecord = {
         taxon_id: 1,
         itis_tsn: 1,
         bc_taxon_code: 'string',
         itis_scientific_name: 'string',
         common_name: 'string',
         itis_data: {},
+        itis_update_date: '2020-01-01',
         record_effective_date: 'string',
         record_end_date: 'string',
         create_date: 'string',
@@ -58,6 +59,7 @@ describe('TaxonomyRepository', () => {
             itis_scientific_name: 'string',
             common_name: 'string',
             itis_data: {},
+            itis_update_date: '2020-01-01',
             record_effective_date: 'string',
             record_end_date: 'string',
             create_date: 'string',
@@ -66,7 +68,7 @@ describe('TaxonomyRepository', () => {
             update_user: 1,
             revision_count: 1
           }
-        ]
+        ] as TaxonRecord[]
       } as unknown as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
@@ -82,6 +84,7 @@ describe('TaxonomyRepository', () => {
         itis_scientific_name: 'string',
         common_name: 'string',
         itis_data: {},
+        itis_update_date: '2020-01-01',
         record_effective_date: 'string',
         record_end_date: 'string',
         create_date: 'string',
@@ -105,6 +108,7 @@ describe('TaxonomyRepository', () => {
             itis_scientific_name: 'string',
             common_name: 'string',
             itis_data: {},
+            itis_update_date: '2020-01-01',
             record_effective_date: 'string',
             record_end_date: 'string',
             create_date: 'string',
@@ -113,7 +117,7 @@ describe('TaxonomyRepository', () => {
             update_user: 1,
             revision_count: 1
           }
-        ]
+        ] as TaxonRecord[]
       } as unknown as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });

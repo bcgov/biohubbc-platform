@@ -16,13 +16,15 @@ describe('team-policies', () => {
       sinon.restore();
     });
 
-    it('should return team policies on success', async () => {
+    it('should return team policies with pagination on success', async () => {
       const mockDBConnection = getMockDBConnection();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
+      mockReq.query = { page: '1', limit: '10' };
+
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-      const mockResponse: TeamPolicyDetails[] = [
+      const mockTeamPolicies: TeamPolicyDetails[] = [
         {
           team_policy_id: '11111111-1111-1111-1111-111111111111',
           team_id: '22222222-2222-2222-2222-222222222222',
@@ -32,14 +34,46 @@ describe('team-policies', () => {
         }
       ];
 
-      sinon.stub(TeamPolicyService.prototype, 'getAllTeamPolicies').resolves(mockResponse);
+      const mockResponse = {
+        team_policies: mockTeamPolicies,
+        pagination: { total: 1, per_page: 10, current_page: 1, last_page: 1 }
+      };
+
+      sinon.stub(TeamPolicyService.prototype, 'getAllTeamPoliciesWithPagination').resolves(mockResponse);
 
       const requestHandler = teamPolicies.getTeamPolicies();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql({ team_policies: mockResponse });
+      expect(mockRes.jsonValue).to.eql(mockResponse);
+    });
+
+    it('should pass sort and order params to service', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.query = { page: '1', limit: '10', sort: 'team_name', order: 'desc' };
+
+      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+
+      const mockResponse = {
+        team_policies: [],
+        pagination: { total: 0, per_page: 10, current_page: 1, last_page: 1, sort: 'team_name', order: 'desc' as const }
+      };
+
+      const stub = sinon.stub(TeamPolicyService.prototype, 'getAllTeamPoliciesWithPagination').resolves(mockResponse);
+
+      const requestHandler = teamPolicies.getTeamPolicies();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(stub).to.have.been.calledWith({
+        page: 1,
+        limit: 10,
+        sort: 'team_name',
+        order: 'desc'
+      });
     });
   });
 

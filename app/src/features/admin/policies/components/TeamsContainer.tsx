@@ -16,13 +16,14 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
+import { IServerPaginationProps } from 'types/pagination';
 import { useState } from 'react';
 import { AddTeamForm, AddTeamFormInitialValues, AddTeamFormYupSchema, IAddTeamFormValues } from './AddTeamForm';
 
 /**
  * Props for the TeamsContainer component.
  */
-export interface ITeamsContainerProps {
+export interface ITeamsContainerProps extends IServerPaginationProps {
   /** Array of teams to display in the table */
   teams: ITeamWithMembers[];
   /** Callback to refresh the teams list after create/update/delete */
@@ -51,7 +52,19 @@ export interface ITeamsContainerProps {
  * @returns {React.ReactElement} The teams container component
  */
 export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
-  const { teams, refresh, searchTerm, onSearch, selectedTeamId, onSelectTeam } = props;
+  const {
+    teams,
+    rowCount,
+    paginationModel,
+    setPaginationModel,
+    sortModel,
+    setSortModel,
+    refresh,
+    searchTerm,
+    onSearch,
+    selectedTeamId,
+    onSelectTeam
+  } = props;
 
   const biohubApi = useApi();
   const dialogContext = useDialogContext();
@@ -349,7 +362,7 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
           <Typography variant="h4" component="h2" flexGrow={1}>
             Teams{' '}
             <Typography sx={{ fontSize: 'inherit' }} component="span" color="textSecondary">
-              ({teams.length})
+              ({rowCount})
             </Typography>
           </Typography>
           <Stack gap={1} direction="row" alignItems="center">
@@ -386,7 +399,15 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
           rows={teams}
           columns={columns}
           getRowId={(row) => row.team_id}
+          paginationMode="server"
+          paginationModel={paginationModel}
+          onPaginationModelChange={setPaginationModel}
           pageSizeOptions={[10, 25, 50]}
+          sortingMode="server"
+          sortingOrder={['asc', 'desc']}
+          sortModel={sortModel}
+          onSortModelChange={setSortModel}
+          rowCount={rowCount}
           rowSelectionModel={rowSelectionModel}
           onRowSelectionModelChange={handleRowSelectionChange}
           checkboxSelection
@@ -394,13 +415,6 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
           disableColumnSelector
           disableColumnMenu
           localeText={{ noRowsLabel: 'No Teams' }}
-          initialState={{
-            pagination: {
-              paginationModel: {
-                pageSize: 10
-              }
-            }
-          }}
           sx={{
             border: 'none',
             '& .MuiDataGrid-columnHeaderTitle': {

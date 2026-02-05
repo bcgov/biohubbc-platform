@@ -1,6 +1,5 @@
-import { Divider, Paper, Toolbar } from '@mui/material';
+import { Box, Divider, Paper, Toolbar } from '@mui/material';
 import Typography from '@mui/material/Typography';
-import { Box } from '@mui/system';
 import { DataGrid, GridRowSelectionModel } from '@mui/x-data-grid';
 import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
 import { pluralize } from 'utils/Utils';
