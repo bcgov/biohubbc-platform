@@ -138,8 +138,12 @@ export const _getLogFormat = (): winston.Logform.Format => {
     }))(),
     // Format the log timestamp
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    // Colorize the log message and limit the depth of the metadata object
-    winston.format.prettyPrint({ colorize: true, depth: 10 })
+    // Stack errors and format with printf
+    winston.format.errors({ stack: true }),
+    winston.format.printf(({ timestamp, level, message, ...meta }) => {
+      const metaStr = Object.keys(meta).length ? JSON.stringify(meta, null, 2) : '';
+      return `${timestamp} [${level}]: ${message}${metaStr ? '\n' + metaStr : ''}`;
+    })
   );
 };
 
@@ -189,7 +193,7 @@ export const _getOrCreateLoggerSingleton = function (loggerName: string): winsto
     transports.push(
       new winston.transports.Console({
         level: process.env.LOG_LEVEL || 'debug',
-        format: _getLogFormat()
+        format: winston.format.combine(winston.format.colorize(), _getLogFormat())
       })
     );
   }
