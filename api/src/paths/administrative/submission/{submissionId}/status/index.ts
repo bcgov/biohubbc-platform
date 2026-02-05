@@ -3,7 +3,7 @@ import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
-import { SubmissionStatusResponseSchema } from '../../../../../openapi/schemas/submission-status';
+import { SubmissionStatusResponseSchema } from '../../../../../openapi/schemas/submission-upload-status';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
 import { SubmissionUploadStatusService } from '../../../../../services/submission-upload-status-service';
 import { getLogger } from '../../../../../utils/logger';
@@ -26,7 +26,7 @@ export const GET: Operation = [
 
 GET.apiDoc = {
   description: 'Retrieves the submission upload and security status',
-  tags: ['meta'],
+  tags: ['admin'],
   security: [
     {
       Bearer: []

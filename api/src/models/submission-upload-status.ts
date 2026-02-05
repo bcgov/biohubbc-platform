@@ -11,11 +11,10 @@ export const SubmissionUploadStatus = z.object({
       .object({
         upload_archive_id: z.string().uuid(),
         archive_status: z.enum(['draft', 'blocked', 'pending', 'completed', 'failed']),
-        byte_size: z.number().int().nullable().optional(),
-        security: z.enum(['pending', 'clean', 'infected', 'error', 'skipped']).nullable().optional()
+        byte_size: z.number().int().nullable(),
+        security: z.enum(['pending', 'clean', 'infected', 'error', 'skipped']).nullable()
       })
       .nullable()
-      .optional()
   ),
   artifacts: z.object({
     feature: z.object({
@@ -31,9 +30,9 @@ export const SubmissionUploadStatus = z.object({
     z.object({
       artifact_security_scan_id: z.string().uuid(),
       scan_status: z.enum(['draft', 'blocked', 'pending', 'completed', 'failed']),
-      scanner_version: z.string().optional(),
-      scanned_at: z.string().optional(),
-      results: z.object({}).passthrough() // passthrough for jsonb
+      scanner_version: z.string().nullable(),
+      scanned_at: z.string().nullable(),
+      results: z.object({}).nullable()
     })
   ),
   scan_files: z.array(

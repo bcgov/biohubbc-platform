@@ -2,7 +2,7 @@ import { OpenAPIV3 } from 'openapi-types';
 
 export const SubmissionStatusResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['submission_id', 'upload', 'artifacts', 'scans', 'scan_files'],
+  required: ['submission_id', 'upload', 'upload_archives', 'artifacts', 'scans', 'scan_files'],
   properties: {
     submission_id: {
       type: 'integer',
@@ -28,7 +28,7 @@ export const SubmissionStatusResponseSchema: OpenAPIV3.SchemaObject = {
       items: {
         type: 'object',
         nullable: true,
-        required: ['upload_archive_id', 'archive_status'],
+        required: ['upload_archive_id', 'archive_status', 'byte_size', 'security'],
         properties: {
           upload_archive_id: {
             type: 'string',
@@ -55,6 +55,7 @@ export const SubmissionStatusResponseSchema: OpenAPIV3.SchemaObject = {
     artifacts: {
       type: 'object',
       description: 'Artifact counts and total byte sizes grouped by role',
+      required: ['feature', 'attachment'],
       properties: {
         feature: {
           type: 'object',
@@ -102,6 +103,7 @@ export const SubmissionStatusResponseSchema: OpenAPIV3.SchemaObject = {
             description: 'ISO 8601 timestamp or PostgreSQL format'
           },
           results: {
+            nullable: true,
             type: 'object',
             additionalProperties: true,
             description: 'Raw malware scan results'

@@ -1,11 +1,13 @@
 import { IDBConnection } from '../database/db';
 import { SubmissionUploadStatus } from '../models/submission-upload-status';
 import { SubmissionUploadStatusRepository } from '../repositories/submission-upload-status-repository';
+import { DBService } from './db-service';
 
-export class SubmissionUploadStatusService {
+export class SubmissionUploadStatusService extends DBService {
   submissionUploadStatusRepository: SubmissionUploadStatusRepository;
 
   constructor(connection: IDBConnection) {
+    super(connection);
     this.submissionUploadStatusRepository = new SubmissionUploadStatusRepository(connection);
   }
 
