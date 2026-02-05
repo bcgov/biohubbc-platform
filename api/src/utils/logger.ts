@@ -3,6 +3,12 @@ import DailyRotateFile from 'winston-daily-rotate-file';
 import { getRequestId, getRequestUser } from './async-request-storage';
 
 const DEFAULT_LOGGER = 'default';
+const MASK = '********';
+
+/**
+ * Regex used to detect sensitive keys that must be redacted.
+ */
+const SENSITIVE_KEY_REGEX = /(password|passwd|pwd|secret|token|api[_-]?key|authorization|cookie)/i;
 
 /**
  * Public logger interface exposed to consumers.
@@ -22,7 +28,7 @@ export type CustomLoggerParams = {
   label?: string;
   message?: string;
   error?: unknown;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 /**
@@ -33,7 +39,7 @@ export const WinstonLogLevels = ['silent', 'error', 'warn', 'info', 'debug', 'si
 export type WinstonLogLevel = (typeof WinstonLogLevels)[number];
 
 /**
- * Get a singleton logger wrapper.
+ * Get a singleton logger wrapper with a fixed logger label.
  *
  * @param logLabel Common label for the logger instance (class / file name).
  */
@@ -52,7 +58,7 @@ export const getLogger = (logLabel: string): CustomLogger => {
 /**
  * Normalize logger parameters to ensure a message is always present.
  *
- * Winston behaves strangely when `message` is omitted and metadata is passed alone.
+ * Winston merges metadata incorrectly when `message` is omitted.
  */
 const normalizeLoggerParams = (logLabel: string, params: CustomLoggerParams): [string, Record<string, unknown>] => {
   if (params.message) {
@@ -64,7 +70,8 @@ const normalizeLoggerParams = (logLabel: string, params: CustomLoggerParams): [s
 };
 
 /**
- * Determine which transports should be enabled.
+ * Determine which transport types should be enabled.
+ * File logging is disabled during unit tests.
  */
 const getTransportTypes = (): Array<'console' | 'file'> => {
   const transports: Array<'console' | 'file'> = ['console'];
@@ -77,11 +84,35 @@ const getTransportTypes = (): Array<'console' | 'file'> => {
 };
 
 /**
- * Base enrichment applied to all log entries.
- * Adds request context and normalizes metadata.
+ * Recursively redact sensitive values from an object or array.
+ */
+const redactSecrets = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(redactSecrets);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, val]) => {
+        if (SENSITIVE_KEY_REGEX.test(key)) {
+          return [key, MASK];
+        }
+        return [key, redactSecrets(val)];
+      })
+    );
+  }
+
+  return value;
+};
+
+/**
+ * Base format applied to all log entries.
+ * Adds request context and redacts secrets.
  */
 const baseFormat = winston.format.combine(
-  winston.format.metadata({ fillExcept: ['message', 'level', 'timestamp', 'logger', 'label'] }),
+  winston.format.metadata({
+    fillExcept: ['message', 'level', 'timestamp', 'logger', 'label']
+  }),
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
   winston.format((info) => ({
@@ -92,7 +123,7 @@ const baseFormat = winston.format.combine(
     label: info.label,
     requestId: getRequestId(),
     user: getRequestUser(),
-    metadata: info.metadata
+    metadata: redactSecrets(info.metadata)
   }))()
 );
 
@@ -103,7 +134,7 @@ const consoleFormat = winston.format.combine(
   winston.format.colorize({ all: true }),
   baseFormat,
   winston.format.printf(({ timestamp, level, message, ...meta }) => {
-    const metaStr = Object.keys(meta).length ? `\n${JSON.stringify(meta, null, 2)}` : '';
+    const metaStr = Object.keys(meta).length > 0 ? `\n${JSON.stringify(meta, null, 2)}` : '';
 
     return `${timestamp} [${level}]: ${message}${metaStr}`;
   })
@@ -111,6 +142,7 @@ const consoleFormat = winston.format.combine(
 
 /**
  * Structured, non-colorized format for file output.
+ * Intended for ingestion by log processors.
  */
 const fileFormat = winston.format.combine(baseFormat, winston.format.json());
 
