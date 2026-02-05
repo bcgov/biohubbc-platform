@@ -91,8 +91,8 @@ export function findCartWithFeaturesById(): RequestHandler {
       const cartSubmissionFeatureService = new CartSubmissionFeatureService(connection);
 
       // Return first 25 features from page 1 if pagination not specified
-      req.params.limit = req.params.limit || '25';
-      req.params.page = req.params.page || '1';
+      req.query.limit = req.query.limit || '25';
+      req.query.page = req.query.page || '1';
 
       const pagination = makePaginationOptionsFromRequest(req);
 

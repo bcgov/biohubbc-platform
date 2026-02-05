@@ -58,7 +58,6 @@ export async function up(knex: Knex): Promise<void> {
       cart_submission_feature_id UUID DEFAULT gen_random_uuid(),
       cart_id UUID NOT NULL,
       submission_feature_id integer NOT NULL,
-      quantity integer DEFAULT 1 NOT NULL,
       create_date timestamptz(6) DEFAULT now() NOT NULL,
       create_user integer NOT NULL,
       update_date timestamptz(6),
@@ -86,7 +85,6 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN cart_submission_feature.cart_submission_feature_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN cart_submission_feature.cart_id IS 'Foreign key to the cart.';
     COMMENT ON COLUMN cart_submission_feature.submission_feature_id IS 'Foreign key to the submission feature.';
-    COMMENT ON COLUMN cart_submission_feature.quantity IS 'Quantity of this submission feature in the cart.';
     COMMENT ON COLUMN cart_submission_feature.create_date IS 'The datetime the record was created.';
     COMMENT ON COLUMN cart_submission_feature.create_user IS 'The id of the user who created the record.';
     COMMENT ON COLUMN cart_submission_feature.update_date IS 'The datetime the record was last updated.';

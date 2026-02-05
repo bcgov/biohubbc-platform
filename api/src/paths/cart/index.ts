@@ -19,7 +19,6 @@ POST.apiDoc = {
     }
   ],
   requestBody: {
-    required: false,
     content: {
       'application/json': {
         schema: {
@@ -65,7 +64,7 @@ export function createCart(): RequestHandler {
 
       // System user ID of the cart will be null for non-authenticated requests
       const systemUserId = isAuthenticated ? connection.systemUserId() : null;
-      const features = (req.body?.features ?? []).map(Number);
+      const features = req.body.features.map(Number);
 
       const cartService = new CartService(connection);
 

@@ -214,7 +214,7 @@ describe('cart/{cartId}', () => {
 
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
-      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.sendStatusValue).to.equal(200);
     });
 
     it('handles empty add and remove arrays', async () => {
@@ -236,7 +236,7 @@ describe('cart/{cartId}', () => {
 
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
-      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.sendStatusValue).to.equal(200);
     });
 
     it('rolls back and rethrows if CartService.addSubmissionFeaturesToCart throws an error', async () => {
@@ -310,7 +310,7 @@ describe('cart/{cartId}', () => {
 
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
-      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.sendStatusValue).to.equal(200);
     });
 
     it('rolls back and rethrows if CartSubmissionFeatureService.clearCart throws an error', async () => {

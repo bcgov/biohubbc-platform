@@ -30,7 +30,7 @@ export const CartWithFeatures = Cart.extend({ features: z.array(CartSubmissionFe
 export type CartWithFeatures = z.infer<typeof CartWithFeatures>;
 
 export interface UpdateCart {
-  system_user_id?: string | null;
+  system_user_id?: number | null;
   cart_status?: CartStatus;
   record_end_date?: string | null;
 }

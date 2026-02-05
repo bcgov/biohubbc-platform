@@ -75,7 +75,7 @@ export function deleteCartSubmissionFeature(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json();
+      res.sendStatus(200);
     } catch (error) {
       defaultLog.error({ label: 'deleteCartSubmissionFeature', message: 'Error deleting cart feature', error });
       await connection.rollback();

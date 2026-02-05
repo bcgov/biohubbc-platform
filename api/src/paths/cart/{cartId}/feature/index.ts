@@ -184,7 +184,7 @@ export function addSubmissionFeaturesToCart(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json();
+      res.sendStatus(200);
     } catch (error) {
       defaultLog.error({ label: 'addSubmissionFeaturesToCart', message: 'Error updating cart features', error });
       await connection.rollback();
@@ -254,7 +254,7 @@ export function clearCartSubmissionFeatures(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json();
+      res.sendStatus(200);
     } catch (error) {
       defaultLog.error({ label: 'clearCartFeatures', message: 'Error clearing cart features', error });
       await connection.rollback();

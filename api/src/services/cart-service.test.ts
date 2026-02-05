@@ -78,7 +78,7 @@ describe('CartService', () => {
 
       sinon.stub(CartRepository.prototype, 'createCart').resolves(mockCart);
 
-      const result = await service.createCart(1, []); // systemUserId is now required only for createCart
+      const result = await service.createCart(1, []);
 
       expect(result).to.deep.equal({ ...mockCart, features: [] });
     });

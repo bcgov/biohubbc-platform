@@ -109,19 +109,20 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
       .join('cart as c', 'c.cart_id', 'csf.cart_id')
       .where('csf.cart_id', cartId)
       .andWhere('c.cart_status', CartStatus.ACTIVE)
-      .leftJoin('submission_feature_security as sfs', 'sfs.submission_feature_id', 'sf.submission_feature_id')
-      .where((qb) => {
-        qb.whereNull('sfs.record_end_date').orWhere('sfs.record_end_date', '>', knex.fn.now());
+      .whereNotExists((qb) => {
+        qb.select('sfs.submission_feature_id')
+          .from('submission_feature_security as sfs')
+          .whereRaw('sfs.submission_feature_id = sf.submission_feature_id')
+          .andWhere((qb) => {
+            qb.whereNull('sfs.record_end_date').orWhere('sfs.record_end_date', '>', knex.fn.now());
+          });
       })
       .select(
         'csf.cart_submission_feature_id',
         'sf.submission_feature_id',
         'sf.submission_id',
         'sf.feature_type_id',
-        'ft.name as feature_type_name',
-        knex.raw(
-          'EXISTS (SELECT 1 FROM submission_feature_security sfs WHERE sfs.submission_feature_id = sf.submission_feature_id AND (sfs.record_end_date IS NULL OR sfs.record_end_date > NOW())) AS secured'
-        )
+        'ft.name as feature_type_name'
       );
 
     const paginatedQuery = this.applyPagination(baseQuery, pagination);
@@ -141,13 +142,18 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
    */
   async getCartSubmissionFeatureCount(cartId: string): Promise<number> {
     const knex = getKnex();
+
     const query = knex('cart_submission_feature as csf')
       .join('cart as c', 'c.cart_id', 'csf.cart_id')
-      .leftJoin('submission_feature_security as sfs', 'sfs.submission_feature_id', 'csf.submission_feature_id')
       .where('csf.cart_id', cartId)
       .andWhere('c.cart_status', CartStatus.ACTIVE)
-      .where((qb) => {
-        qb.whereNull('sfs.record_end_date').orWhere('sfs.record_end_date', '>', knex.fn.now());
+      .whereNotExists((qb) => {
+        qb.select('sfs.submission_feature_id')
+          .from('submission_feature_security as sfs')
+          .whereRaw('sfs.submission_feature_id = csf.submission_feature_id')
+          .andWhere((qb) => {
+            qb.whereNull('sfs.record_end_date').orWhere('sfs.record_end_date', '>', knex.fn.now());
+          });
       })
       .select(knex.raw('count(*)::integer as count'));
 

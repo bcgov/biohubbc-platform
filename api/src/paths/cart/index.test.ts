@@ -59,6 +59,8 @@ describe('cart', () => {
       const requestHandler = createCart();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
+      mockReq.body = { features: [] };
+
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(createCartStub).to.have.been.calledOnceWith(mockDBConnection.systemUserId());
@@ -87,7 +89,9 @@ describe('cart', () => {
 
       const requestHandler = createCart();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
       mockReq.keycloak_token = null;
+      mockReq.body = { features: [] };
 
       await requestHandler(mockReq, mockRes, mockNext);
 
@@ -108,6 +112,8 @@ describe('cart', () => {
 
       const requestHandler = createCart();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.body = { features: [] };
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);

@@ -172,8 +172,8 @@ describe('cart/{cartId}', () => {
       expect(mockRes.jsonValue.cart).to.eql(fakeCart);
 
       // Check that the default pagination is applied
-      expect(mockReq.params.limit).to.equal('25');
-      expect(mockReq.params.page).to.equal('1');
+      expect(mockReq.query.limit).to.equal('25');
+      expect(mockReq.query.page).to.equal('1');
     });
 
     it('rolls back and rethrows if CartService.findCartWithFeaturesById throws', async () => {
