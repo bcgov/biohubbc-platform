@@ -51,11 +51,14 @@ describe('worker', () => {
       await registerWorkers();
 
       // createQueue is called for all queues (including dead letter queues)
-      expect(createQueueStub.callCount).to.equal(4);
+      // 6 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED
+      expect(createQueueStub.callCount).to.equal(6);
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
       expect(createQueueStub.thirdCall.args[0]).to.equal(JobQueues.MALWARE_SCAN_FAILED);
       expect(createQueueStub.getCall(3).args[0]).to.equal(JobQueues.MALWARE_SCAN);
+      expect(createQueueStub.getCall(4).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_FAILED);
+      expect(createQueueStub.getCall(5).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD);
     });
 
     it('configures dead letter queue for process-submission-features', async () => {
@@ -72,19 +75,6 @@ describe('worker', () => {
       expect(queueConfig.deadLetter).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(queueConfig.retryLimit).to.equal(2);
       expect(queueConfig.retryBackoff).to.equal(true);
-    });
-
-    it('registers all job handlers including dead letter queue handlers', async () => {
-      const workStub = sinon.stub().resolves();
-      const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
-
-      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
-
-      await registerWorkers();
-
-      // 4 handlers: PROCESS_SUBMISSION_FEATURES, PROCESS_SUBMISSION_FEATURES_FAILED, MALWARE_SCAN, MALWARE_SCAN_FAILED
-      expect(workStub.callCount).to.equal(4);
     });
 
     it('registers dead letter queue handler for failed jobs', async () => {

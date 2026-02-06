@@ -1,0 +1,643 @@
+import chai, { expect } from 'chai';
+import { describe } from 'mocha';
+import sinon from 'sinon';
+import sinonChai from 'sinon-chai';
+import { DownloadFeatureData, DownloadRecord } from '../models/download';
+import { DownloadFragmentRecord } from '../models/download-fragment';
+import { DownloadStatusEnum } from '../models/download-status';
+import { DownloadFragmentRepository } from '../repositories/download-fragment-repository';
+import { DownloadRepository } from '../repositories/download-repository';
+import { getMockDBConnection } from '../__mocks__/db';
+import { CodeService } from './code-service';
+import {
+  CSV_ROW_SIZE_ESTIMATE,
+  DownloadService,
+  FRAGMENT_SIZE_THRESHOLD,
+  SIGNED_URL_EXPIRY_FRAGMENT
+} from './download-service';
+import { BucketType, ObjectStorageService } from './object-storage/object-storage-service';
+
+chai.use(sinonChai);
+
+describe('DownloadService', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  // Helper: create a mock download record
+  const createMockDownloadRecord = (overrides?: Partial<DownloadRecord>): DownloadRecord => ({
+    download_id: 42,
+    system_user_id: 123,
+    download_status: DownloadStatusEnum.PROCESSING,
+    s3_key: null,
+    file_name: null,
+    file_size_bytes: null,
+    metadata: null,
+    started_at: null,
+    completed_at: null,
+    downloaded_at: null,
+    total_fragments: 1,
+    completed_fragments: 0,
+    estimated_total_size_bytes: null,
+    fragment_size_bytes: FRAGMENT_SIZE_THRESHOLD,
+    ...overrides
+  });
+
+  // Shared helpers for fragment-related tests
+  const createMockFragment = (overrides?: Partial<DownloadFragmentRecord>): DownloadFragmentRecord => ({
+    download_fragment_id: 1,
+    download_id: 42,
+    fragment_index: 0,
+    fragment_status: DownloadStatusEnum.PENDING,
+    s3_key: null,
+    file_name: null,
+    file_size_bytes: null,
+    estimated_size_bytes: null,
+    feature_count: 2,
+    started_at: null,
+    completed_at: null,
+    error_message: null,
+    ...overrides
+  });
+
+  async function* mockFeatureStream(features: DownloadFeatureData[]): AsyncGenerator<DownloadFeatureData[]> {
+    if (features.length > 0) {
+      yield features;
+    }
+  }
+
+  describe('planDownloadIfNeeded', () => {
+    it('throws if download not found', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(null);
+
+      try {
+        await service.planDownloadIfNeeded(42);
+        expect.fail('Expected an error');
+      } catch (error) {
+        expect((error as Error).message).to.equal('Download 42 not found');
+      }
+    });
+
+    it('skips planning when fragments already exist', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([createMockFragment()]);
+      const estimateStub = sinon.stub(service, 'estimateDownloadSize');
+
+      await service.planDownloadIfNeeded(42);
+
+      expect(estimateStub.called).to.be.false;
+    });
+
+    it('plans fragments when none exist', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([]);
+      const estimateStub = sinon.stub(service, 'estimateDownloadSize').resolves({
+        totalEstimatedBytes: 1000,
+        featureSizes: new Map(),
+        features: []
+      });
+      const planStub = sinon.stub(service, 'planFragments').resolves();
+
+      await service.planDownloadIfNeeded(42);
+
+      expect(estimateStub.calledOnce).to.be.true;
+      expect(planStub.calledOnce).to.be.true;
+    });
+  });
+
+  describe('getFragmentsToProcess', () => {
+    it('filters out READY fragments', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const readyFragment = createMockFragment({
+        download_fragment_id: 1,
+        fragment_status: DownloadStatusEnum.READY
+      });
+      const pendingFragment = createMockFragment({
+        download_fragment_id: 2,
+        fragment_status: DownloadStatusEnum.PENDING
+      });
+
+      sinon
+        .stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId')
+        .resolves([readyFragment, pendingFragment]);
+
+      const result = await service.getFragmentsToProcess(42);
+
+      expect(result).to.have.length(1);
+      expect(result[0].download_fragment_id).to.equal(2);
+    });
+  });
+
+  describe('processFragment', () => {
+    it('continues processing when file stream fails and adds error placeholder', async () => {
+      // Verifies: Graceful degradation - S3 file error doesn't fail entire fragment
+
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const mockFragment = createMockFragment();
+      const mockFeatures: DownloadFeatureData[] = [
+        {
+          submission_feature_id: 30,
+          feature_type_name: 'file',
+          data: { file: 'uploads/missing-file.jpg', description: 'Missing file' },
+          artifact_byte_size: null,
+          submission_id: 1
+        }
+      ];
+
+      sinon.stub(DownloadFragmentRepository.prototype, 'updateFragmentStatus').resolves();
+      const types = [...new Set(mockFeatures.map((f) => f.feature_type_name))];
+      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentFeatureTypes').resolves(types);
+      sinon
+        .stub(DownloadFragmentRepository.prototype, 'streamFragmentFeaturesByType')
+        .callsFake((_fragmentId: number, typeName: string) => {
+          const typeFeatures = mockFeatures.filter((f) => f.feature_type_name === typeName);
+          return mockFeatureStream(typeFeatures);
+        });
+      sinon.stub(DownloadFragmentRepository.prototype, 'getRootDatasetsByFragment').resolves(
+        new Map([[1, { dataset_name: 'Test Dataset', dataset_id: 100 }]])
+      );
+
+      sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([
+        {
+          feature_type: { feature_type_id: 1, feature_type_name: 'file', feature_type_display_name: 'File' },
+          feature_type_properties: [
+            {
+              feature_property_id: 1,
+              feature_property_name: 'artifact_key',
+              feature_property_display_name: 'Artifact Key',
+              feature_property_type_id: 1,
+              feature_property_type_name: 'artifact_key'
+            }
+          ]
+        }
+      ]);
+      sinon.stub(ObjectStorageService.prototype, 'getFileStream').rejects(new Error('NoSuchKey: File not found'));
+      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+
+      // Should NOT throw — graceful degradation
+      await service.processFragment(mockFragment, 42);
+    });
+
+    it('uses multi-fragment naming pattern for downloads with multiple fragments', async () => {
+      // Verifies: S3 key uses download-{id}-part-{n+1}.zip when total_fragments > 1
+
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const pendingFragment = createMockFragment({
+        download_fragment_id: 5,
+        fragment_index: 1
+      });
+
+      sinon.stub(DownloadFragmentRepository.prototype, 'updateFragmentStatus').resolves();
+      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentFeatureTypes').resolves(['observation']);
+      sinon.stub(DownloadFragmentRepository.prototype, 'streamFragmentFeaturesByType').callsFake(() =>
+        mockFeatureStream([
+          {
+            submission_feature_id: 10,
+            feature_type_name: 'observation',
+            data: { species: 'bear' },
+            artifact_byte_size: null,
+            submission_id: 1
+          }
+        ])
+      );
+      sinon.stub(DownloadFragmentRepository.prototype, 'getRootDatasetsByFragment').resolves(
+        new Map([[1, { dataset_name: 'Test Dataset', dataset_id: 100 }]])
+      );
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadById')
+        .resolves(createMockDownloadRecord({ total_fragments: 3 }));
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([
+        {
+          feature_type: {
+            feature_type_id: 2,
+            feature_type_name: 'observation',
+            feature_type_display_name: 'Observation'
+          },
+          feature_type_properties: [
+            {
+              feature_property_id: 1,
+              feature_property_name: 'species',
+              feature_property_display_name: 'Species',
+              feature_property_type_id: 1,
+              feature_property_type_name: 'string'
+            }
+          ]
+        }
+      ]);
+      const uploadStreamStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+
+      await service.processFragment(pendingFragment, 42);
+
+      expect(uploadStreamStub.calledOnce).to.be.true;
+      expect(uploadStreamStub.firstCall.args[3]).to.equal('downloads/42/download-42-part-2.zip');
+    });
+  });
+
+  describe('finalizeDownload', () => {
+    it('sets READY with single fragment s3_key and file_name', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const readyFragment = createMockFragment({
+        fragment_status: DownloadStatusEnum.READY,
+        s3_key: 'downloads/42/download-42.zip',
+        file_name: 'download-42.zip',
+        file_size_bytes: 512
+      });
+
+      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([readyFragment]);
+      sinon.stub(DownloadRepository.prototype, 'updateDownloadFragmentCounts').resolves();
+      const updateStatusStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
+
+      await service.finalizeDownload(42);
+
+      expect(updateStatusStub.calledOnce).to.be.true;
+      expect(updateStatusStub.firstCall.args[1]).to.equal(DownloadStatusEnum.READY);
+      expect(updateStatusStub.firstCall.args[2]).to.deep.include({ s3_key: 'downloads/42/download-42.zip' });
+    });
+
+    it('sets READY with total size for multi-fragment downloads', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const fragment1 = createMockFragment({
+        download_fragment_id: 1,
+        fragment_status: DownloadStatusEnum.READY,
+        file_size_bytes: 1000
+      });
+      const fragment2 = createMockFragment({
+        download_fragment_id: 2,
+        fragment_status: DownloadStatusEnum.READY,
+        file_size_bytes: 2000
+      });
+
+      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([fragment1, fragment2]);
+      sinon.stub(DownloadRepository.prototype, 'updateDownloadFragmentCounts').resolves();
+      const updateStatusStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
+
+      await service.finalizeDownload(42);
+
+      expect(updateStatusStub.calledOnce).to.be.true;
+      expect(updateStatusStub.firstCall.args[1]).to.equal(DownloadStatusEnum.READY);
+      expect(updateStatusStub.firstCall.args[2]).to.deep.equal({ file_size_bytes: 3000 });
+    });
+  });
+
+  describe('estimateDownloadSize', () => {
+    it('estimates size for CSV features', async () => {
+      // Verifies: CSV features estimated from JSON.stringify(data).length + CSV_ROW_SIZE_ESTIMATE
+
+      // Step 1: Setup service with mock connection
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      // Step 2: Stub getDownloadFeatureData to return small CSV features
+      const smallFeatures: DownloadFeatureData[] = [
+        {
+          submission_feature_id: 1,
+          feature_type_name: 'observation',
+          data: { species: 'bear', count: 5 },
+          artifact_byte_size: null,
+          submission_id: 1
+        },
+        {
+          submission_feature_id: 2,
+          feature_type_name: 'sample',
+          data: { type: 'soil' },
+          artifact_byte_size: null,
+          submission_id: 1
+        }
+      ];
+      sinon.stub(DownloadRepository.prototype, 'getDownloadFeatureData').resolves(smallFeatures);
+
+      // Step 3: Call estimateDownloadSize with systemUserId
+      const result = await service.estimateDownloadSize(1, 123);
+
+      // Step 4: Verify feature sizes are populated correctly
+      expect(result.featureSizes.size).to.equal(2);
+      // Each CSV feature estimated as JSON.stringify(data).length + CSV_ROW_SIZE_ESTIMATE
+      const feature1Size = JSON.stringify(smallFeatures[0].data).length + CSV_ROW_SIZE_ESTIMATE;
+      const feature2Size = JSON.stringify(smallFeatures[1].data).length + CSV_ROW_SIZE_ESTIMATE;
+      expect(result.totalEstimatedBytes).to.equal(feature1Size + feature2Size);
+      expect(result.featureSizes.get(1)).to.equal(feature1Size);
+      expect(result.featureSizes.get(2)).to.equal(feature2Size);
+    });
+
+    it('estimates size for file features using artifact byte_size', async () => {
+      // Verifies: File features use artifact_byte_size from the database instead of S3 HeadObject
+
+      // Step 1: Setup service with mock connection
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      // Step 2: Create features with artifact byte sizes from the database
+      const sixGB = 6 * 1024 * 1024 * 1024;
+      const largeFileFeatures: DownloadFeatureData[] = [
+        {
+          submission_feature_id: 1,
+          feature_type_name: 'file',
+          data: { file: 'uploads/large1.bin' },
+          artifact_byte_size: sixGB,
+          submission_id: 1
+        },
+        {
+          submission_feature_id: 2,
+          feature_type_name: 'file',
+          data: { file: 'uploads/large2.bin' },
+          artifact_byte_size: sixGB,
+          submission_id: 1
+        }
+      ];
+      sinon.stub(DownloadRepository.prototype, 'getDownloadFeatureData').resolves(largeFileFeatures);
+
+      // Step 3: Call estimateDownloadSize with systemUserId — no S3 calls needed
+      const result = await service.estimateDownloadSize(1, 123);
+
+      // Step 4: Verify sizes use artifact byte_size
+      expect(result.totalEstimatedBytes).to.equal(sixGB * 2);
+      expect(result.featureSizes.get(1)).to.equal(sixGB);
+      expect(result.featureSizes.get(2)).to.equal(sixGB);
+    });
+  });
+
+  describe('planFragments', () => {
+    it('creates multiple fragments when exceeding threshold', async () => {
+      // Verifies: Bin packing splits features across fragments based on fragment_size_bytes
+
+      // Step 1: Setup service with mock connection
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      // Step 2: Create 3 features — two fit in one bin, third needs a new bin
+      const features: DownloadFeatureData[] = [
+        {
+          submission_feature_id: 10,
+          feature_type_name: 'observation',
+          data: {},
+          artifact_byte_size: null,
+          submission_id: 1
+        },
+        {
+          submission_feature_id: 20,
+          feature_type_name: 'observation',
+          data: {},
+          artifact_byte_size: null,
+          submission_id: 1
+        },
+        {
+          submission_feature_id: 30,
+          feature_type_name: 'observation',
+          data: {},
+          artifact_byte_size: null,
+          submission_id: 1
+        }
+      ];
+      // Step 3: Stub fragment repository methods
+      const createFragmentStub = sinon.stub(DownloadFragmentRepository.prototype, 'createDownloadFragment');
+      createFragmentStub.onFirstCall().resolves({ download_fragment_id: 1 });
+      createFragmentStub.onSecondCall().resolves({ download_fragment_id: 2 });
+      const createFragmentFeaturesStub = sinon
+        .stub(DownloadFragmentRepository.prototype, 'createDownloadFragmentFeatures')
+        .resolves();
+      const updateFragmentCountsStub = sinon
+        .stub(DownloadRepository.prototype, 'updateDownloadFragmentCounts')
+        .resolves();
+      sinon.stub(DownloadRepository.prototype, 'updateEstimatedTotalSize').resolves();
+
+      // Stub getDownloadById to return record with default fragment_size_bytes
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadById')
+        .resolves(createMockDownloadRecord({ download_id: 1, fragment_size_bytes: FRAGMENT_SIZE_THRESHOLD }));
+
+      // Step 4: Call planFragments with bin packing
+      // Feature 10 = 300MB, Feature 20 = 300MB (total 600MB > 500MB threshold), Feature 30 = 200MB
+      const threeHundredMB = 300 * 1024 * 1024;
+      const twoHundredMB = 200 * 1024 * 1024;
+      const sizeEstimate = {
+        totalEstimatedBytes: threeHundredMB * 2 + twoHundredMB,
+        featureSizes: new Map([
+          [10, threeHundredMB],
+          [20, threeHundredMB],
+          [30, twoHundredMB]
+        ]),
+        features
+      };
+      await service.planFragments(1, sizeEstimate);
+
+      // Step 5: Verify 2 fragments created — first has feature 10, then flush when 10+20 > threshold
+      // Fragment 0: feature 10 (300MB) — flush when adding 20 would exceed 500MB
+      // Fragment 1: features 20+30 (300+200=500MB)
+      expect(createFragmentStub).to.have.been.calledTwice;
+      expect(createFragmentStub.firstCall.args[1]).to.equal(0); // fragment_index 0
+      expect(createFragmentStub.secondCall.args[1]).to.equal(1); // fragment_index 1
+      expect(createFragmentFeaturesStub.firstCall.args[1]).to.deep.equal([10]); // first bin: feature 10
+      expect(createFragmentFeaturesStub.secondCall.args[1]).to.deep.equal([20, 30]); // second bin: features 20, 30
+      expect(updateFragmentCountsStub).to.have.been.calledOnceWith(1, 2);
+    });
+
+    it('uses custom fragment size from download record instead of default threshold', async () => {
+      // Verifies: Bin packing reads fragment_size_bytes from the download record, not the hardcoded constant
+
+      // Step 1: Setup service with mock connection
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      // Step 2: Create 3 features — with 1 GB threshold, all 3 fit in one fragment
+      const features: DownloadFeatureData[] = [
+        {
+          submission_feature_id: 10,
+          feature_type_name: 'observation',
+          data: {},
+          artifact_byte_size: null,
+          submission_id: 1
+        },
+        {
+          submission_feature_id: 20,
+          feature_type_name: 'observation',
+          data: {},
+          artifact_byte_size: null,
+          submission_id: 1
+        },
+        {
+          submission_feature_id: 30,
+          feature_type_name: 'observation',
+          data: {},
+          artifact_byte_size: null,
+          submission_id: 1
+        }
+      ];
+      // Step 3: Stub getDownloadById with custom 1 GB fragment size
+      const oneGB = 1000 * 1024 * 1024;
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadById')
+        .resolves(createMockDownloadRecord({ download_id: 1, fragment_size_bytes: oneGB }));
+
+      // Step 4: Stub fragment repository methods
+      const createFragmentStub = sinon.stub(DownloadFragmentRepository.prototype, 'createDownloadFragment');
+      createFragmentStub.onFirstCall().resolves({ download_fragment_id: 1 });
+      const createFragmentFeaturesStub = sinon
+        .stub(DownloadFragmentRepository.prototype, 'createDownloadFragmentFeatures')
+        .resolves();
+      const updateFragmentCountsStub = sinon
+        .stub(DownloadRepository.prototype, 'updateDownloadFragmentCounts')
+        .resolves();
+      sinon.stub(DownloadRepository.prototype, 'updateEstimatedTotalSize').resolves();
+
+      // Step 5: Call planFragments — same features as previous test (300+300+200=800MB)
+      // With default 500MB threshold, this would create 2 fragments
+      // With custom 1GB threshold, all features fit in 1 fragment
+      const threeHundredMB = 300 * 1024 * 1024;
+      const twoHundredMB = 200 * 1024 * 1024;
+      const sizeEstimate = {
+        totalEstimatedBytes: threeHundredMB * 2 + twoHundredMB,
+        featureSizes: new Map([
+          [10, threeHundredMB],
+          [20, threeHundredMB],
+          [30, twoHundredMB]
+        ]),
+        features
+      };
+      await service.planFragments(1, sizeEstimate);
+
+      // Step 6: Verify only 1 fragment created — all features fit within 1 GB threshold
+      expect(createFragmentStub).to.have.been.calledOnce;
+      expect(createFragmentFeaturesStub.firstCall.args[1]).to.deep.equal([10, 20, 30]); // all features in one bin
+      expect(updateFragmentCountsStub).to.have.been.calledOnceWith(1, 1);
+    });
+  });
+
+  describe('getFragmentSignedUrl', () => {
+    it('returns signed URL for ready fragment', async () => {
+      // Verifies: Happy path - correct s3_key and expiry passed to getSignedUrl
+
+      // Step 1: Setup service with mock connection
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      // Step 2: Stub to return a READY fragment with s3_key
+      const readyFragment: DownloadFragmentRecord = {
+        download_fragment_id: 1,
+        download_id: 42,
+        fragment_index: 0,
+        fragment_status: DownloadStatusEnum.READY,
+        s3_key: 'downloads/42/download-42-part-1.zip',
+        file_name: 'download-42-part-1.zip',
+        file_size_bytes: 2048,
+        estimated_size_bytes: 2000,
+        feature_count: 3,
+        started_at: '2024-01-01T00:00:00Z',
+        completed_at: '2024-01-01T00:01:00Z',
+        error_message: null
+      };
+      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([readyFragment]);
+
+      // Step 3: Stub ObjectStorageService.getSignedUrl
+      const getSignedUrlStub = sinon
+        .stub(ObjectStorageService.prototype, 'getSignedUrl')
+        .resolves('https://s3.example.com/fragment-url');
+
+      // Step 4: Call getFragmentSignedUrl
+      const result = await service.getFragmentSignedUrl(42, 0);
+
+      // Step 5: Verify correct URL returned and correct params passed (including fragment expiry)
+      expect(result).to.equal('https://s3.example.com/fragment-url');
+      expect(getSignedUrlStub).to.have.been.calledOnceWith(
+        BucketType.MAIN,
+        'downloads/42/download-42-part-1.zip',
+        SIGNED_URL_EXPIRY_FRAGMENT
+      );
+    });
+
+    it('throws when fragment index is not found', async () => {
+      // Verifies: Error thrown when requested fragment_index doesn't exist
+
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([]);
+
+      try {
+        await service.getFragmentSignedUrl(42, 0);
+        expect.fail('Expected an error to be thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('Fragment 0 not found for download 42');
+      }
+    });
+
+    it('throws when fragment is not ready', async () => {
+      // Verifies: Error thrown when fragment exists but status is not READY
+
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const processingFragment: DownloadFragmentRecord = {
+        download_fragment_id: 1,
+        download_id: 42,
+        fragment_index: 0,
+        fragment_status: DownloadStatusEnum.PROCESSING,
+        s3_key: null,
+        file_name: null,
+        file_size_bytes: null,
+        estimated_size_bytes: 2000,
+        feature_count: 3,
+        started_at: '2024-01-01T00:00:00Z',
+        completed_at: null,
+        error_message: null
+      };
+      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([processingFragment]);
+
+      try {
+        await service.getFragmentSignedUrl(42, 0);
+        expect.fail('Expected an error to be thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('Fragment is not ready');
+      }
+    });
+
+    it('throws when fragment is ready but missing s3_key', async () => {
+      // Verifies: Error thrown when fragment is READY but s3_key is null (data integrity issue)
+
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const readyButNoKey: DownloadFragmentRecord = {
+        download_fragment_id: 1,
+        download_id: 42,
+        fragment_index: 0,
+        fragment_status: DownloadStatusEnum.READY,
+        s3_key: null,
+        file_name: 'download-42.zip',
+        file_size_bytes: 2048,
+        estimated_size_bytes: 2000,
+        feature_count: 3,
+        started_at: '2024-01-01T00:00:00Z',
+        completed_at: '2024-01-01T00:01:00Z',
+        error_message: null
+      };
+      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([readyButNoKey]);
+
+      try {
+        await service.getFragmentSignedUrl(42, 0);
+        expect.fail('Expected an error to be thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('Fragment record missing s3_key');
+      }
+    });
+  });
+});

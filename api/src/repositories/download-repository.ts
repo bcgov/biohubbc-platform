@@ -1,0 +1,290 @@
+import SQL from 'sql-template-strings';
+import { FRAGMENT_SIZE_THRESHOLD } from '../constants/download';
+import { DownloadFeatureData, DownloadFeatureRecord, DownloadId, DownloadRecord } from '../models/download';
+import { DownloadStatusEnum } from '../models/download-status';
+import { BaseRepository } from './base-repository';
+
+/**
+ * A repository class for accessing download data.
+ *
+ * @export
+ * @class DownloadRepository
+ * @extends {BaseRepository}
+ */
+export class DownloadRepository extends BaseRepository {
+  /**
+   * Create a new download record.
+   *
+   * @param {number} systemUserId - The user who initiated the download.
+   * @param {number} [fragmentSizeBytes] - Target fragment size in bytes. Defaults to FRAGMENT_SIZE_THRESHOLD (500 MB).
+   * @return {Promise<DownloadId>} The created record ID.
+   * @memberof DownloadRepository
+   */
+  async createDownload(systemUserId: number, fragmentSizeBytes?: number): Promise<DownloadId> {
+    const sizeBytes = fragmentSizeBytes ?? FRAGMENT_SIZE_THRESHOLD;
+
+    const sql = SQL`
+      INSERT INTO download (system_user_id, download_status, fragment_size_bytes)
+      VALUES (${systemUserId}, 'pending', ${sizeBytes})
+      RETURNING download_id;
+    `;
+
+    const response = await this.connection.sql(sql, DownloadId);
+
+    return response.rows[0];
+  }
+
+  /**
+   * Link submission features to a download request.
+   *
+   * @param {number} downloadId - The download ID.
+   * @param {number[]} submissionFeatureIds - The submission feature IDs to include.
+   * @return {Promise<void>}
+   * @memberof DownloadRepository
+   */
+  async createDownloadFeatures(downloadId: number, submissionFeatureIds: number[]): Promise<void> {
+    const values = submissionFeatureIds.map((id) => `(${downloadId}, ${id})`).join(', ');
+
+    const sql = SQL`
+      INSERT INTO download_feature (download_id, submission_feature_id)
+      VALUES `
+      .append(values)
+      .append(SQL`;`);
+
+    await this.connection.sql(sql);
+  }
+
+  /**
+   * Get a download record by ID.
+   *
+   * @param {number} downloadId - The download ID.
+   * @return {Promise<DownloadRecord | null>}
+   * @memberof DownloadRepository
+   */
+  async getDownloadById(downloadId: number): Promise<DownloadRecord | null> {
+    const sql = SQL`
+      SELECT
+        download_id,
+        system_user_id,
+        download_status,
+        s3_key,
+        file_name,
+        file_size_bytes,
+        metadata,
+        started_at,
+        completed_at,
+        downloaded_at,
+        total_fragments,
+        completed_fragments,
+        estimated_total_size_bytes,
+        fragment_size_bytes
+      FROM download
+      WHERE download_id = ${downloadId};
+    `;
+
+    const response = await this.connection.sql(sql, DownloadRecord);
+
+    return response.rows[0] ?? null;
+  }
+
+  /**
+   * Get all download records for a user.
+   *
+   * @param {number} systemUserId - The user ID.
+   * @return {Promise<DownloadRecord[]>}
+   * @memberof DownloadRepository
+   */
+  async getDownloadsByUserId(systemUserId: number): Promise<DownloadRecord[]> {
+    const sql = SQL`
+      SELECT
+        download_id,
+        system_user_id,
+        download_status,
+        s3_key,
+        file_name,
+        file_size_bytes,
+        metadata,
+        started_at,
+        completed_at,
+        downloaded_at,
+        total_fragments,
+        completed_fragments,
+        estimated_total_size_bytes,
+        fragment_size_bytes
+      FROM download
+      WHERE system_user_id = ${systemUserId}
+      ORDER BY create_date DESC;
+    `;
+
+    const response = await this.connection.sql(sql, DownloadRecord);
+
+    return response.rows;
+  }
+
+  /**
+   * Update download status by download ID.
+   *
+   * @param {number} downloadId - The download ID.
+   * @param {DownloadStatusEnum} downloadStatus - The new download status.
+   * @param {object} [metadata] - Optional metadata (s3_key, file_name, file_size_bytes, error details).
+   * @return {Promise<void>}
+   * @memberof DownloadRepository
+   */
+  async updateDownloadStatus(
+    downloadId: number,
+    downloadStatus: DownloadStatusEnum,
+    metadata?: { s3_key?: string; file_name?: string; file_size_bytes?: number; error?: string }
+  ): Promise<void> {
+    const sql = SQL`
+      UPDATE download
+      SET
+        download_status = ${downloadStatus},
+        s3_key = COALESCE(${metadata?.s3_key ?? null}, s3_key),
+        file_name = COALESCE(${metadata?.file_name ?? null}, file_name),
+        file_size_bytes = COALESCE(${metadata?.file_size_bytes ?? null}, file_size_bytes),
+        metadata = ${JSON.stringify(metadata ?? null)}::jsonb,
+        started_at = CASE WHEN ${downloadStatus} = 'processing' AND started_at IS NULL THEN now() ELSE started_at END,
+        completed_at = CASE WHEN ${downloadStatus} IN ('ready', 'failed') THEN now() ELSE completed_at END
+      WHERE download_id = ${downloadId};
+    `;
+
+    await this.connection.sql(sql);
+  }
+
+  /**
+   * Mark a download as downloaded (sets downloaded_at timestamp and status).
+   *
+   * @param {number} downloadId - The download ID.
+   * @return {Promise<void>}
+   * @memberof DownloadRepository
+   */
+  async markDownloadAsDownloaded(downloadId: number): Promise<void> {
+    const sql = SQL`
+      UPDATE download
+      SET
+        download_status = 'downloaded',
+        downloaded_at = now()
+      WHERE download_id = ${downloadId};
+    `;
+
+    await this.connection.sql(sql);
+  }
+
+  /**
+   * Get submission feature IDs linked to a download.
+   *
+   * @param {number} downloadId - The download ID.
+   * @return {Promise<DownloadFeatureRecord[]>}
+   * @memberof DownloadRepository
+   */
+  async getDownloadFeatures(downloadId: number): Promise<DownloadFeatureRecord[]> {
+    const sql = SQL`
+      SELECT
+        download_feature_id,
+        download_id,
+        submission_feature_id
+      FROM download_feature
+      WHERE download_id = ${downloadId};
+    `;
+
+    const response = await this.connection.sql(sql, DownloadFeatureRecord);
+
+    return response.rows;
+  }
+
+  /**
+   * Get feature data for all authorized features in a download.
+   *
+   * Returns feature data with type name for zip file naming.
+   * Filters out secured features that the user does not have an ALLOW policy for.
+   * Unsecured features (no active submission_feature_security row) are always included.
+   *
+   * @param {number} downloadId - The download ID.
+   * @param {number} systemUserId - The user requesting the download.
+   * @return {Promise<DownloadFeatureData[]>}
+   * @memberof DownloadRepository
+   */
+  async getDownloadFeatureData(downloadId: number, systemUserId: number): Promise<DownloadFeatureData[]> {
+    const sql = SQL`
+      SELECT
+        sf.submission_feature_id,
+        sf.submission_id,
+        ft.name as feature_type_name,
+        sf.data,
+        a.byte_size as artifact_byte_size
+      FROM download_feature df
+      INNER JOIN submission_feature sf ON df.submission_feature_id = sf.submission_feature_id
+      INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
+      LEFT JOIN artifact a ON a.object_key = sf.data->>'file'
+      WHERE df.download_id = ${downloadId}
+        AND (
+          -- Unsecured features: no active security rule
+          NOT EXISTS (
+            SELECT 1
+            FROM submission_feature_security sfs
+            WHERE sfs.submission_feature_id = sf.submission_feature_id
+              AND sfs.record_end_date IS NULL
+          )
+          OR
+          -- Secured features: user has a matching ALLOW policy via team membership
+          EXISTS (
+            SELECT 1
+            FROM policy_statement ps
+            INNER JOIN team_policy tp ON tp.policy_id = ps.policy_id AND tp.record_end_date IS NULL
+            INNER JOIN team_member tm ON tm.team_id = tp.team_id AND tm.record_end_date IS NULL
+            WHERE tm.system_user_id = ${systemUserId}
+              AND ps.record_end_date IS NULL
+              AND ps.effect = 'allow'
+              AND (split_part(ps.submission_feature_urn, ':', 2) = split_part(sf.urn, ':', 2) OR split_part(ps.submission_feature_urn, ':', 2) = '*')
+              AND (split_part(ps.submission_feature_urn, ':', 3) = split_part(sf.urn, ':', 3) OR split_part(ps.submission_feature_urn, ':', 3) = '*')
+              AND (split_part(ps.submission_feature_urn, ':', 4) = split_part(sf.urn, ':', 4) OR split_part(ps.submission_feature_urn, ':', 4) = '*')
+          )
+        );
+    `;
+
+    const response = await this.connection.sql(sql, DownloadFeatureData);
+
+    return response.rows;
+  }
+
+  /**
+   * Update fragment counts on a download record.
+   *
+   * @param {number} downloadId - The download ID.
+   * @param {number} totalFragments - Total number of fragments.
+   * @param {number} completedFragments - Number of completed fragments.
+   * @return {Promise<void>}
+   * @memberof DownloadRepository
+   */
+  async updateDownloadFragmentCounts(
+    downloadId: number,
+    totalFragments: number,
+    completedFragments: number
+  ): Promise<void> {
+    const sql = SQL`
+      UPDATE download
+      SET total_fragments = ${totalFragments}, completed_fragments = ${completedFragments}
+      WHERE download_id = ${downloadId};
+    `;
+
+    await this.connection.sql(sql);
+  }
+
+  /**
+   * Update estimated total size on a download record.
+   *
+   * @param {number} downloadId - The download ID.
+   * @param {number} bytes - Estimated total size in bytes.
+   * @return {Promise<void>}
+   * @memberof DownloadRepository
+   */
+  async updateEstimatedTotalSize(downloadId: number, bytes: number): Promise<void> {
+    const sql = SQL`
+      UPDATE download
+      SET estimated_total_size_bytes = ${bytes}
+      WHERE download_id = ${downloadId};
+    `;
+
+    await this.connection.sql(sql);
+  }
+}
