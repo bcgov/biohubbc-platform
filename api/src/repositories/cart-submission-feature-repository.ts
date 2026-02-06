@@ -103,18 +103,12 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
   async getCartSubmissionFeatures(cartId: string, pagination?: ApiPaginationOptions): Promise<CartSubmissionFeature[]> {
     const knex = getKnex();
 
-    const baseQuery = knex('submission_feature as sf')
-      .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
-      .join('cart_submission_feature as csf', 'csf.submission_feature_id', 'sf.submission_feature_id')
-      .join('cart as c', 'c.cart_id', 'csf.cart_id')
-      .where('csf.cart_id', cartId)
-      .andWhere('c.cart_status', CartStatus.ACTIVE)
-      .whereNotExists((qb) => {
-        qb.select('sfs.submission_feature_id')
-          .from('submission_feature_security as sfs')
-          .whereRaw('sfs.submission_feature_id = sf.submission_feature_id')
-          .andWhere((qb) => {
-            qb.whereNull('sfs.record_end_date').orWhere('sfs.record_end_date', '>', knex.fn.now());
+    const baseQuery = knex
+      .with('secured_features', (qb) => {
+        qb.select('submission_feature_id')
+          .from('submission_feature_security')
+          .where((qb) => {
+            qb.whereNull('record_end_date').orWhere('record_end_date', '>', knex.fn.now());
           });
       })
       .select(
@@ -122,8 +116,18 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
         'sf.submission_feature_id',
         'sf.submission_id',
         'sf.feature_type_id',
-        'ft.name as feature_type_name'
-      );
+        'ft.name as feature_type_name',
+        knex.raw('CASE WHEN sf_sec.submission_feature_id IS NOT NULL THEN TRUE ELSE FALSE END AS secured')
+      )
+      .from('submission_feature as sf')
+      .leftJoin('secured_features as sf_sec', 'sf_sec.submission_feature_id', 'sf.submission_feature_id')
+      .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
+      .join('cart_submission_feature as csf', 'csf.submission_feature_id', 'sf.submission_feature_id')
+      .join('cart as c', 'c.cart_id', 'csf.cart_id')
+      .where('csf.cart_id', cartId)
+      .andWhere('c.cart_status', CartStatus.ACTIVE)
+      // Filter out secured features
+      .whereNull('sf_sec.submission_feature_id');
 
     const paginatedQuery = this.applyPagination(baseQuery, pagination);
 
