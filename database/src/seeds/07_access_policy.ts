@@ -109,7 +109,7 @@ export async function seed(knex: Knex): Promise<void> {
   await knex.raw(
     `
     INSERT INTO team_member (system_user_id, team_id, create_user)
-    SELECT su.system_user_id, $1::uuid, (SELECT system_user_id FROM "system_user" WHERE record_end_date IS NULL LIMIT 1)
+    SELECT su.system_user_id, ?, (SELECT system_user_id FROM "system_user" WHERE record_end_date IS NULL LIMIT 1)
     FROM "system_user" su
     WHERE su.user_identity_source_id IN (
       SELECT user_identity_source_id
@@ -118,7 +118,7 @@ export async function seed(knex: Knex): Promise<void> {
     )
     AND NOT EXISTS (
       SELECT 1 FROM team_member tm
-      WHERE tm.system_user_id = su.system_user_id AND tm.team_id = $2::uuid
+      WHERE tm.system_user_id = su.system_user_id AND tm.team_id = ?
     );
   `,
     [telemetryTeam.team_id, telemetryTeam.team_id]
