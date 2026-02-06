@@ -15,19 +15,13 @@ export async function seed(knex: Knex): Promise<void> {
   `);
 
   // Resolve create_user for inserts (audit trigger may set it; fallback for environments where it does not)
-  const createUserRow = await knex('system_user')
-    .whereNull('record_end_date')
-    .select('system_user_id')
-    .first();
+  const createUserRow = await knex('system_user').whereNull('record_end_date').select('system_user_id').first();
   const createUser = createUserRow?.system_user_id ?? 1;
 
   /** ------------------------------------------------------------------
    * 1. TELEMETRY POLICY + TEAM
    * ------------------------------------------------------------------ */
-  let telemetryPolicy = await knex('policy')
-    .where({ name: 'Telemetry Access' })
-    .whereNull('record_end_date')
-    .first();
+  let telemetryPolicy = await knex('policy').where({ name: 'Telemetry Access' }).whereNull('record_end_date').first();
 
   if (!telemetryPolicy) {
     const [inserted] = await knex('policy')
@@ -40,10 +34,7 @@ export async function seed(knex: Knex): Promise<void> {
     telemetryPolicy = inserted;
   }
 
-  let telemetryTeam = await knex('team')
-    .where({ name: 'Telemetry Team' })
-    .whereNull('record_end_date')
-    .first();
+  let telemetryTeam = await knex('team').where({ name: 'Telemetry Team' }).whereNull('record_end_date').first();
 
   if (!telemetryTeam) {
     const [inserted] = await knex('team')
@@ -152,10 +143,7 @@ export async function seed(knex: Knex): Promise<void> {
     adminPolicy = inserted;
   }
 
-  let adminTeam = await knex('team')
-    .where({ name: 'Secret Sampling Sites Team' })
-    .whereNull('record_end_date')
-    .first();
+  let adminTeam = await knex('team').where({ name: 'Secret Sampling Sites Team' }).whereNull('record_end_date').first();
 
   if (!adminTeam) {
     const [inserted] = await knex('team')
