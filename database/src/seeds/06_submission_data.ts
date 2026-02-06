@@ -3,23 +3,25 @@ import { Knex } from 'knex';
 import {
   insertDatasetRecord,
   insertSampleSiteRecord,
-  insertSubmissionFeature,
   insertSubmissionRecord,
   insertTelemetryRecord
 } from './04_mock_test_data';
 
-const ENABLE_MOCK_FEATURE_SEEDING = Boolean(process.env.ENABLE_MOCK_FEATURE_SEEDING === 'true' || false);
+const ENABLE_MOCK_FEATURE_SEEDING = process.env.ENABLE_MOCK_FEATURE_SEEDING === 'true';
 
-/**
- * Inserts mock submission data
- *
- * @export
- * @param {Knex} knex
- * @return {*}  {Promise<void>}
- */
+type SecurityLevel = 'SECURE' | 'PARTIALLY_SECURE' | 'UNSECURE';
+type ScanStatus = 'pending' | 'completed' | 'failed';
+type SecurityStatus = 'clean' | 'pending' | 'infected' | 'error' | 'skipped';
+
+interface SeedContext {
+  submission_id: number;
+  upload_id: string;
+  artifacts: { artifact_id: string; role: string }[];
+}
+
 export async function seed(knex: Knex): Promise<void> {
   if (!ENABLE_MOCK_FEATURE_SEEDING) {
-    return knex.raw(`SELECT null;`); // dummy query to appease knex
+    return knex.raw('SELECT null;'); // dummy query to appease knex
   }
 
   await knex.raw(`
@@ -27,74 +29,324 @@ export async function seed(knex: Knex): Promise<void> {
     SET SEARCH_PATH = 'biohub','public';
   `);
 
-  // 1. SECURE (all submission features secure) and published_timestamp
-  await createSubmissionWithSecurity(knex, 'SECURE');
+  // Create realistic test scenarios
+  const scenarios: { level: SecurityLevel; reviewed: boolean; withArchive: boolean }[] = [
+    { level: 'SECURE', reviewed: true, withArchive: true },
+    { level: 'SECURE', reviewed: true, withArchive: true },
+    { level: 'PARTIALLY_SECURE', reviewed: true, withArchive: true },
+    { level: 'UNSECURE', reviewed: true, withArchive: false },
+    { level: 'UNSECURE', reviewed: false, withArchive: false }
+  ];
 
-  // 2. PARTIALLY SECURE (some submission features secure) and published_timestamp
-  await createSubmissionWithSecurity(knex, 'PARTIALLY SECURE');
-
-  // 3. UNSECURE (zero submission features secure) and published_timestamp
-  await createSubmissionWithSecurity(knex, 'UNSECURE');
-
-  // 4. UNSECURE (zero submission features secure) and not published and not reviewed
-  await createSubmissionWithSecurity(knex, 'UNSECURE', false);
-  await createSubmissionWithSecurity(knex, 'UNSECURE', false);
+  for (const scenario of scenarios) {
+    await createSubmissionWithUploads(knex, scenario.level, scenario.reviewed, scenario.withArchive);
+  }
 }
 
-const insertFeatureSecurity = async (knex: Knex, submission_feature_id: number, security_rule_id: number) => {
-  await knex.raw(`
-  INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date)
-  VALUES($$${submission_feature_id}$$, $$${security_rule_id}$$, $$${faker.date.past().toISOString()}$$);`);
-};
-
-const insertArtifactRecord = async (
+/**
+ * Creates a complete submission with realistic upload, artifact, and security data
+ */
+const createSubmissionWithUploads = async (
   knex: Knex,
-  row: { submission_id: number; parent_submission_feature_id: number }
-) => {
-  const S3_KEY = 'dev-artifacts/artifact.txt';
-
-  const sql = insertSubmissionFeature({
-    submission_id: row.submission_id,
-    parent_submission_feature_id: row.parent_submission_feature_id,
-    feature_type: 'file',
-    data: { file: S3_KEY }
+  securityLevel: SecurityLevel,
+  reviewed: boolean,
+  withArchive: boolean
+): Promise<SeedContext> => {
+  // --- 1. Create submission & features ---
+  const submission_id = await insertSubmissionRecord(knex, reviewed, reviewed);
+  const parent_feature_id = await insertDatasetRecord(knex, { submission_id });
+  await insertSampleSiteRecord(knex, {
+    submission_id,
+    parent_submission_feature_id: parent_feature_id
+  });
+  await insertTelemetryRecord(knex, {
+    submission_id,
+    parent_submission_feature_id: parent_feature_id
   });
 
-  const submission_feature = await knex.raw(sql);
+  // --- 2. Create upload session ---
+  const { upload_id } = (
+    await knex('upload')
+      .insert({
+        upload_status: 'completed',
+        create_user: 1,
+        record_end_date: new Date()
+      })
+      .returning('upload_id')
+  )[0];
 
-  const submission_feature_id = submission_feature.rows[0].submission_feature_id;
+  // --- 3. Create artifacts and security scans ---
+  const artifacts: { artifact_id: string; role: string }[] = [];
 
-  await knex.raw(`
-    INSERT INTO search_string (submission_feature_id, feature_property_id, value)
-    VALUES
-    (
-      ${submission_feature_id},
-      (select feature_property_id from feature_property where name = 'artifact_key'),
-      $$${S3_KEY}$$
-    );`);
-};
-
-const createSubmissionWithSecurity = async (
-  knex: Knex,
-  securityLevel: 'PARTIALLY SECURE' | 'SECURE' | 'UNSECURE',
-  reviewed = true
-) => {
-  const submission_id = await insertSubmissionRecord(knex, reviewed, reviewed);
-  const parent_submission_feature_id = await insertDatasetRecord(knex, { submission_id });
-  const submission_feature_id = await insertSampleSiteRecord(knex, { submission_id, parent_submission_feature_id });
-  const telemetry_feature_id = await insertTelemetryRecord(knex, { submission_id, parent_submission_feature_id });
-
-  await insertArtifactRecord(knex, { submission_id, parent_submission_feature_id });
-
-  if (securityLevel === 'PARTIALLY SECURE') {
-    await insertFeatureSecurity(knex, submission_feature_id, 1);
-    return;
+  if (withArchive) {
+    await createArchiveUpload(knex, upload_id, submission_id, securityLevel, artifacts);
+  } else {
+    await createDirectUpload(knex, upload_id, submission_id, securityLevel, artifacts);
   }
 
-  if (securityLevel === 'SECURE') {
-    await insertFeatureSecurity(knex, parent_submission_feature_id, 2);
-    await insertFeatureSecurity(knex, submission_feature_id, 3);
-    await insertFeatureSecurity(knex, telemetry_feature_id, 2);
-    return;
+  // --- 4. Link submission to upload ---
+  await knex('submission_upload').insert({
+    submission_id,
+    upload_id,
+    create_user: 1
+  });
+
+  return { submission_id, upload_id, artifacts };
+};
+
+/**
+ * Creates direct artifacts with individual scans (no archive)
+ */
+const createDirectUpload = async (
+  knex: Knex,
+  upload_id: string,
+  submission_id: number,
+  securityLevel: SecurityLevel,
+  artifacts: { artifact_id: string; role: string }[]
+): Promise<void> => {
+  // Define file types and their characteristics
+  const fileSpecs = [
+    { name: 'feature.csv', role: 'feature', size: faker.number.int({ min: 5000, max: 500000 }) },
+    { name: 'metadata.json', role: 'attachment', size: faker.number.int({ min: 1000, max: 50000 }) },
+    { name: 'readme.txt', role: 'attachment', size: faker.number.int({ min: 500, max: 10000 }) }
+  ];
+
+  for (const fileSpec of fileSpecs) {
+    // --- Create artifact ---
+    const artifact_result = await knex('artifact')
+      .insert({
+        bucket: 'biohub-submissions',
+        object_key: `submissions/${submission_id}/${faker.string.uuid()}/${fileSpec.name}`,
+        byte_size: fileSpec.size,
+        checksum_sha256: faker.string.hexadecimal({ length: 64, casing: 'lower' }).substring(0, 64),
+        artifact_status: 'uploaded',
+        uploaded_at: new Date(),
+        create_user: 1
+      })
+      .returning('artifact_id');
+    const { artifact_id } = artifact_result[0];
+
+    artifacts.push({ artifact_id, role: fileSpec.role });
+
+    // --- Link artifact to upload ---
+    await knex('upload_artifact').insert({
+      upload_id,
+      artifact_id,
+      role: fileSpec.role,
+      create_user: 1
+    });
+
+    // --- Create security record ---
+    const { security, scanStatus } = getSecurityConfig(securityLevel);
+
+    const artifact_security_result = await knex('artifact_security')
+      .insert({
+        artifact_id,
+        security: security,
+        create_user: 1
+      })
+      .returning('artifact_security_id');
+    const { artifact_security_id } = artifact_security_result[0];
+
+    // --- Create security scan ---
+    const scan_result = await knex('artifact_security_scan')
+      .insert({
+        artifact_security_id,
+        scan_status: scanStatus,
+        scanner_version: 'ClamAV-1.2.3',
+        scanned_at: scanStatus === 'completed' ? new Date() : null,
+        results: generateScanResults(security),
+        create_user: 1
+      })
+      .returning('artifact_security_scan_id');
+    const { artifact_security_scan_id: scan_id } = scan_result[0];
+
+    // --- Create per-file scan results ---
+    await knex('artifact_security_scan_file').insert({
+      artifact_security_scan_id: scan_id,
+      file_path: fileSpec.name,
+      result: security === 'pending' ? 'pending' : security,
+      create_user: 1
+    });
+  }
+};
+
+/**
+ * Creates an archive upload with multiple files inside
+ */
+const createArchiveUpload = async (
+  knex: Knex,
+  upload_id: string,
+  submission_id: number,
+  securityLevel: SecurityLevel,
+  artifacts: { artifact_id: string; role: string }[]
+): Promise<void> => {
+  // --- 1. Create archive artifact ---
+  const archive_result = await knex('artifact')
+    .insert({
+      bucket: 'biohub-submissions',
+      object_key: `submissions/${submission_id}/archive-${faker.string.uuid()}.zip`,
+      byte_size: faker.number.int({ min: 10000, max: 5000000 }),
+      checksum_sha256: faker.string.hexadecimal({ length: 64, casing: 'lower' }).substring(0, 64),
+      artifact_status: 'uploaded',
+      uploaded_at: new Date(),
+      create_user: 1
+    })
+    .returning('artifact_id');
+  const { artifact_id: archive_artifact_id } = archive_result[0];
+
+  artifacts.push({ artifact_id: archive_artifact_id, role: 'archive' });
+
+  // --- 2. Create upload_archive record ---
+  const upload_archive_result = await knex('upload_archive')
+    .insert({
+      upload_id,
+      artifact_id: archive_artifact_id,
+      archive_status: 'completed',
+      create_user: 1
+    })
+    .returning('upload_archive_id');
+  const { upload_archive_id } = upload_archive_result[0];
+
+  // --- 3. Create archive security record ---
+  const { security: archiveSecurity, scanStatus } = getSecurityConfig(securityLevel);
+
+  const archive_security_result = await knex('artifact_security')
+    .insert({
+      artifact_id: archive_artifact_id,
+      security: archiveSecurity,
+      create_user: 1
+    })
+    .returning('artifact_security_id');
+  const { artifact_security_id: archive_security_id } = archive_security_result[0];
+
+  // --- 4. Create archive scan ---
+  const archive_scan_result = await knex('artifact_security_scan')
+    .insert({
+      artifact_security_id: archive_security_id,
+      scan_status: scanStatus,
+      scanner_version: 'ClamAV-1.2.3',
+      scanned_at: scanStatus === 'completed' ? new Date() : null,
+      results: generateScanResults(archiveSecurity),
+      create_user: 1
+    })
+    .returning('artifact_security_scan_id');
+  const { artifact_security_scan_id: archive_scan_id } = archive_scan_result[0];
+
+  // --- 5. Create files inside archive ---
+  const archiveFiles = [
+    { path: 'data/feature.csv', role: 'feature', infected: false },
+    { path: 'data/metadata.json', role: 'attachment', infected: securityLevel === 'UNSECURE' },
+    { path: 'docs/readme.md', role: 'attachment', infected: false },
+    { path: 'docs/notes.txt', role: 'attachment', infected: false }
+  ];
+
+  for (const file of archiveFiles) {
+    // --- Create extracted artifact ---
+    const artifact_result = await knex('artifact')
+      .insert({
+        bucket: 'biohub-submissions',
+        object_key: `submissions/${submission_id}/${file.path}`,
+        byte_size: faker.number.int({ min: 1000, max: 500000 }),
+        checksum_sha256: faker.string.hexadecimal({ length: 64, casing: 'lower' }).substring(0, 64),
+        artifact_status: 'uploaded',
+        uploaded_at: new Date(),
+        create_user: 1
+      })
+      .returning('artifact_id');
+    const { artifact_id } = artifact_result[0];
+
+    artifacts.push({ artifact_id, role: file.role });
+
+    // --- Link to upload and archive ---
+    await knex('upload_artifact').insert({
+      upload_id,
+      artifact_id,
+      upload_archive_id,
+      role: file.role,
+      create_user: 1
+    });
+
+    // --- Create security record for extracted file ---
+    const fileSecurity = file.infected ? 'infected' : archiveSecurity;
+
+    await knex('artifact_security')
+      .insert({
+        artifact_id,
+        security: fileSecurity,
+        create_user: 1
+      })
+      .returning('artifact_security_id');
+
+    // --- Reuse archive scan for all extracted files ---
+    await knex('artifact_security_scan_file').insert({
+      artifact_security_scan_id: archive_scan_id,
+      file_path: file.path,
+      result: fileSecurity === 'pending' ? 'pending' : fileSecurity,
+      create_user: 1
+    });
+  }
+};
+
+/**
+ * Determines security and scan status based on security level
+ */
+const getSecurityConfig = (level: SecurityLevel): { security: SecurityStatus; scanStatus: ScanStatus } => {
+  switch (level) {
+    case 'SECURE':
+      return { security: 'clean', scanStatus: 'completed' };
+    case 'PARTIALLY_SECURE':
+      return { security: 'pending', scanStatus: 'completed' };
+    case 'UNSECURE':
+      return { security: 'infected', scanStatus: 'completed' };
+    default:
+      return { security: 'pending', scanStatus: 'pending' };
+  }
+};
+
+/**
+ * Generates realistic scan results based on security status
+ */
+const generateScanResults = (security: SecurityStatus): object => {
+  const baseResults = {
+    scanner: 'ClamAV',
+    timestamp: new Date().toISOString(),
+    scan_time: `${faker.number.int({ min: 100, max: 5000 })}ms`
+  };
+
+  switch (security) {
+    case 'clean':
+      return {
+        ...baseResults,
+        threat_count: 0,
+        status: 'OK',
+        summary: 'No threats detected'
+      };
+    case 'infected':
+      return {
+        ...baseResults,
+        threat_count: faker.number.int({ min: 1, max: 5 }),
+        status: 'INFECTED',
+        summary: 'Malware detected',
+        threats: [
+          { name: 'Trojan.Generic', file: 'metadata.json', severity: 'high' },
+          { name: 'PUA.Adware', file: 'script.exe', severity: 'medium' }
+        ]
+      };
+    case 'pending':
+      return {
+        ...baseResults,
+        status: 'PENDING',
+        summary: 'Scan in progress or queued'
+      };
+    case 'error':
+      return {
+        ...baseResults,
+        status: 'ERROR',
+        summary: 'Scan failed',
+        error: 'Timeout during scan'
+      };
+    default:
+      return { ...baseResults, status: 'UNKNOWN' };
   }
 };

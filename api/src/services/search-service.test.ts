@@ -31,12 +31,10 @@ describe('SearchService', () => {
         data: [{ submission_feature_id: 1, feature_type_id: 1, label: 'Feature1' }],
         total: 1
       };
-
       const submissions: WithCount<SearchSubmissionResult> = {
         data: [{ submission_id: 10, name: 'Sub1', description: 'Desc1' }],
         total: 1
       };
-
       const taxonomy: WithCount<SearchTaxonResult> = {
         data: [{ taxon_id: 100, itis_scientific_name: 'TaxonA' }],
         total: 1
@@ -47,7 +45,7 @@ describe('SearchService', () => {
       sinon.stub(SearchRepository.prototype, 'findTaxon').resolves(taxonomy);
 
       const pagination: ApiPaginationOptions = { page: 1, limit: 10 };
-      const result = await searchService.search({ search: 'test' }, pagination);
+      const result = await searchService.search({ keyword: 'test' }, pagination);
 
       expect(result.features).to.eql(features);
       expect(result.submissions).to.eql(submissions);
@@ -61,11 +59,113 @@ describe('SearchService', () => {
       sinon.stub(SearchRepository.prototype, 'findSubmissions').resolves(emptyPaginated);
       sinon.stub(SearchRepository.prototype, 'findTaxon').resolves(emptyPaginated);
 
-      const result = await searchService.search({ search: 'none' });
+      const result = await searchService.search({ keyword: 'none' });
 
       expect(result.features).to.eql(emptyPaginated);
       expect(result.submissions).to.eql(emptyPaginated);
       expect(result.taxonomy).to.eql(emptyPaginated);
+    });
+
+    it('should propagate error if findFeatures throws', async () => {
+      const error = new Error('Feature search failed');
+      sinon.stub(SearchRepository.prototype, 'findFeatures').rejects(error);
+      sinon.stub(SearchRepository.prototype, 'findSubmissions').resolves({ data: [], total: 0 });
+      sinon.stub(SearchRepository.prototype, 'findTaxon').resolves({ data: [], total: 0 });
+
+      try {
+        await searchService.search({ keyword: 'fail' });
+        expect.fail('Expected error to be thrown');
+      } catch (err) {
+        expect(err).to.equal(error);
+      }
+    });
+
+    it('should propagate error if findSubmissions throws', async () => {
+      const error = new Error('Submission search failed');
+      sinon.stub(SearchRepository.prototype, 'findFeatures').resolves({ data: [], total: 0 });
+      sinon.stub(SearchRepository.prototype, 'findSubmissions').rejects(error);
+      sinon.stub(SearchRepository.prototype, 'findTaxon').resolves({ data: [], total: 0 });
+
+      try {
+        await searchService.search({ keyword: 'fail' });
+        expect.fail('Expected error to be thrown');
+      } catch (err) {
+        expect(err).to.equal(error);
+      }
+    });
+
+    it('should propagate error if findTaxon throws', async () => {
+      const error = new Error('Taxon search failed');
+      sinon.stub(SearchRepository.prototype, 'findFeatures').resolves({ data: [], total: 0 });
+      sinon.stub(SearchRepository.prototype, 'findSubmissions').resolves({ data: [], total: 0 });
+      sinon.stub(SearchRepository.prototype, 'findTaxon').rejects(error);
+
+      try {
+        await searchService.search({ keyword: 'fail' });
+        expect.fail('Expected error to be thrown');
+      } catch (err) {
+        expect(err).to.equal(error);
+      }
+    });
+  });
+
+  describe('getSearchSummary', () => {
+    it('should return summary counts for features, submissions, and taxonomy', async () => {
+      const featureSummary = [{ feature_type_name: 'dataset', total: 5 }];
+      const submissionSummary = { total: 3 };
+      const taxonomySummary = { total: 5 };
+
+      sinon.stub(SearchRepository.prototype, 'findFeatureSummary').resolves(featureSummary);
+      sinon.stub(SearchRepository.prototype, 'findSubmissionSummary').resolves(submissionSummary);
+      sinon.stub(SearchRepository.prototype, 'findTaxonSummary').resolves(taxonomySummary);
+
+      const result = await searchService.getSearchSummary({ keyword: 'summary' });
+
+      expect(result.features).to.eql(featureSummary);
+      expect(result.submissions).to.eql(submissionSummary);
+      expect(result.taxonomy).to.eql(taxonomySummary);
+    });
+
+    it('should propagate error if findFeatureSummary throws', async () => {
+      const error = new Error('Feature summary failed');
+      sinon.stub(SearchRepository.prototype, 'findFeatureSummary').rejects(error);
+      sinon.stub(SearchRepository.prototype, 'findSubmissionSummary').resolves({});
+      sinon.stub(SearchRepository.prototype, 'findTaxonSummary').resolves({});
+
+      try {
+        await searchService.getSearchSummary({ keyword: 'fail' });
+        expect.fail('Expected error to be thrown');
+      } catch (err) {
+        expect(err).to.equal(error);
+      }
+    });
+
+    it('should propagate error if findSubmissionSummary throws', async () => {
+      const error = new Error('Submission summary failed');
+      sinon.stub(SearchRepository.prototype, 'findFeatureSummary').resolves([]);
+      sinon.stub(SearchRepository.prototype, 'findSubmissionSummary').rejects(error);
+      sinon.stub(SearchRepository.prototype, 'findTaxonSummary').resolves({});
+
+      try {
+        await searchService.getSearchSummary({ keyword: 'fail' });
+        expect.fail('Expected error to be thrown');
+      } catch (err) {
+        expect(err).to.equal(error);
+      }
+    });
+
+    it('should propagate error if findTaxonSummary throws', async () => {
+      const error = new Error('Taxon summary failed');
+      sinon.stub(SearchRepository.prototype, 'findFeatureSummary').resolves([]);
+      sinon.stub(SearchRepository.prototype, 'findSubmissionSummary').resolves({});
+      sinon.stub(SearchRepository.prototype, 'findTaxonSummary').rejects(error);
+
+      try {
+        await searchService.getSearchSummary({ keyword: 'fail' });
+        expect.fail('Expected error to be thrown');
+      } catch (err) {
+        expect(err).to.equal(error);
+      }
     });
   });
 });

@@ -1,3 +1,5 @@
+import { ApiPaginationResponseParams } from 'types/pagination';
+
 /**
  * Policy with statements and conditions (API response).
  */
@@ -35,11 +37,7 @@ export interface IPolicyStatementCondition {
  */
 export interface IPoliciesResponse {
   policies: IPolicy[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-  };
+  pagination: ApiPaginationResponseParams;
 }
 
 /**

@@ -4,6 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiExecuteSQLError } from '../../errors/api-error';
+import { Policy } from '../../models/policy';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { PolicyRepository } from './policy-repository';
 
@@ -103,9 +104,9 @@ describe('PolicyRepository', () => {
 
   describe('getPoliciesWithPagination', () => {
     it('returns paginated policies with total count', async () => {
-      const mockPolicies = [
-        { policy_id: '1', name: 'Policy1', description: 'Test1' },
-        { policy_id: '2', name: 'Policy2', description: 'Test2' }
+      const mockPolicies: Policy[] = [
+        { policy_id: '11111111-1111-1111-1111-111111111111', name: 'Policy1', description: 'Test1' },
+        { policy_id: '22222222-2222-2222-2222-222222222222', name: 'Policy2', description: 'Test2' }
       ];
 
       const knexStub = sinon.stub();
@@ -115,7 +116,7 @@ describe('PolicyRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repository = new PolicyRepository(mockDBConnection);
-      const result = await repository.getPoliciesWithPagination({ page: 0, limit: 2 });
+      const result = await repository.getPoliciesWithPagination(undefined, { page: 1, limit: 2 });
 
       expect(result.policies).to.eql(mockPolicies);
       expect(result.total).to.equal(5);
@@ -131,7 +132,7 @@ describe('PolicyRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repository = new PolicyRepository(mockDBConnection);
-      const result = await repository.getPoliciesWithPagination({ page: 0, limit: 50, search: 'Telemetry' });
+      const result = await repository.getPoliciesWithPagination('Telemetry', { page: 1, limit: 50 });
 
       expect(result.policies).to.eql(mockPolicies);
       expect(result.total).to.equal(1);
@@ -145,7 +146,7 @@ describe('PolicyRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repository = new PolicyRepository(mockDBConnection);
-      const result = await repository.getPoliciesWithPagination({ page: 0, limit: 50 });
+      const result = await repository.getPoliciesWithPagination(undefined, { page: 1, limit: 50 });
 
       expect(result.policies).to.eql([]);
       expect(result.total).to.equal(0);

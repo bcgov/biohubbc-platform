@@ -1,4 +1,11 @@
 /**
+ * Defines the supported search parameters for API requests.
+ */
+export interface ApiSearchParams {
+  search?: string;
+}
+
+/**
  * Defines the supported server-side pagination options.
  */
 export type ApiPaginationRequestOptions = {
@@ -39,3 +46,20 @@ export type ApiPaginationResponseParams = {
   sort?: string;
   order?: 'asc' | 'desc';
 };
+
+/**
+ * Props for components using MUI DataGrid with server-side pagination.
+ * Components should extend this interface for their props.
+ */
+export interface IServerPaginationProps {
+  /** Total number of rows (for server-side pagination) */
+  rowCount: number;
+  /** Current pagination model from parent */
+  paginationModel: import('@mui/x-data-grid').GridPaginationModel;
+  /** Callback when pagination changes */
+  setPaginationModel: (model: import('@mui/x-data-grid').GridPaginationModel) => void;
+  /** Current sort model from parent */
+  sortModel: import('@mui/x-data-grid').GridSortModel;
+  /** Callback when sort changes */
+  setSortModel: (model: import('@mui/x-data-grid').GridSortModel) => void;
+}

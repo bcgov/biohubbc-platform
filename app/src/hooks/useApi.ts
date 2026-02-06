@@ -8,6 +8,7 @@ import usePoliciesApi from './api/usePoliciesApi';
 import { useSearchApi } from './api/useSearchApi';
 import useSecurityApi from './api/useSecurityApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
+import { useSubmissionsStatusApi } from './api/useSubmissionStatusApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
 import { useTeamPoliciesApi } from './api/useTeamPoliciesApi';
 import { useTeamsApi } from './api/useTeamsApi';
@@ -28,6 +29,8 @@ export const useApi = () => {
   const admin = useAdminApi(apiAxios);
 
   const submissions = useSubmissionsApi(apiAxios);
+
+  const submissionStatus = useSubmissionsStatusApi(apiAxios);
 
   const features = useFeaturesApi(apiAxios);
 
@@ -51,6 +54,7 @@ export const useApi = () => {
     user,
     admin,
     submissions,
+    submissionStatus,
     features,
     taxonomy,
     security,

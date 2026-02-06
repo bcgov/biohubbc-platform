@@ -1,8 +1,8 @@
 import { mdiAlertCircleOutline, mdiLock, mdiLockAlertOutline } from '@mdi/js';
 import Icon from '@mdi/react';
+import { Box } from '@mui/material';
 import Alert from '@mui/material/Alert';
 import AlertTitle from '@mui/material/AlertTitle';
-import { Box } from '@mui/system';
 import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import { SubmissionRecordWithSecurity } from 'interfaces/useSubmissionsApi.interface';
 

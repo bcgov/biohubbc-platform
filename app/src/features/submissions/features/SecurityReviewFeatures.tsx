@@ -1,5 +1,4 @@
-import { Typography } from '@mui/material';
-import { Box, Stack } from '@mui/system';
+import { Box, Stack, Typography } from '@mui/material';
 import { GridPaginationModel, GridRowParams, GridRowSelectionModel, GridSortModel } from '@mui/x-data-grid';
 import { SecurityReviewFeaturesTable } from './table/SecurityReviewFeaturesTable';
 import { FeatureRow } from './table/SecurityReviewFeaturesTable.interface';

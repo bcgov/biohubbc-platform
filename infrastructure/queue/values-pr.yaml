@@ -11,6 +11,12 @@ app:
   # Object Store (S3)
   # objectStore.keyPrefix will be dynamically set: "local/1234/biohub"
 
+  # Clamav
+  clamav:
+    enabled: true
+    host: clamav
+    port: 3310
+
   # Logging
   logging:
     level: debug

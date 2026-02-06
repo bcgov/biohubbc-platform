@@ -51,6 +51,46 @@ export const _getClamAvScanner = async (): Promise<NodeClam> => {
 };
 
 /**
+ * Local getter for retrieving the internal object store URL (for backend operations).
+ *
+ * @returns {*} {string} The internal object store URL
+ */
+export const getObjectStoreUrl = (): string => {
+  const url = process.env.OBJECT_STORE_URL || 'https://nrs.objectstore.gov.bc.ca';
+  if (!['https://', 'http://'].some((protocol) => url.toLowerCase().startsWith(protocol))) {
+    return `https://${url}`;
+  }
+  return url;
+};
+
+/**
+ * Local getter for retrieving the internal quarantine object store URL (for backend operations).
+ *
+ * @returns {*} {string} The quarantine object store URL
+ */
+export const getQuarantineObjectStoreUrl = (): string => {
+  const url = process.env.QUARANTINE_OBJECT_STORE_URL || getObjectStoreUrl();
+  if (!['https://', 'http://'].some((protocol) => url.toLowerCase().startsWith(protocol))) {
+    return `https://${url}`;
+  }
+  return url;
+};
+
+/**
+ * Local getter for retrieving the public quarantine object store URL (for presigned URLs).
+ *
+ * @returns {*} {string} The public quarantine object store URL
+ */
+export const getQuarantineObjectStoreUrlPublic = (): string => {
+  const url =
+    process.env.QUARANTINE_OBJECT_STORE_URL_PUBLIC || process.env.QUARANTINE_OBJECT_STORE_URL || getObjectStoreUrl();
+  if (!['https://', 'http://'].some((protocol) => url.toLowerCase().startsWith(protocol))) {
+    return `https://${url}`;
+  }
+  return url;
+};
+
+/**
  * Local getter for retrieving the S3 client.
  *
  * @return {*}  {S3Client} The S3 client
@@ -74,7 +114,7 @@ export const _getS3Client = (): S3Client => {
  */
 export const getSecurityS3Client = (): S3Client => {
   return new S3Client({
-    endpoint: getObjectStoreUrl(),
+    endpoint: getQuarantineObjectStoreUrl(),
     credentials: {
       accessKeyId: process.env.QUARANTINE_OBJECT_STORE_ACCESS_KEY_ID!,
       secretAccessKey: process.env.QUARANTINE_OBJECT_STORE_SECRET_KEY_ID!
@@ -82,21 +122,6 @@ export const getSecurityS3Client = (): S3Client => {
     forcePathStyle: true,
     region: 'ca-central-1'
   });
-};
-
-/**
- * Local getter for retrieving the S3 object store URL.
- *
- * @returns {*} {string} The object store URL
- */
-export const getObjectStoreUrl = (): string => {
-  const url = process.env.OBJECT_STORE_URL || 'https://nrs.objectstore.gov.bc.ca';
-
-  if (!['https://', 'http://'].some((protocol) => url.toLowerCase().startsWith(protocol))) {
-    return `https://${url}`;
-  }
-
-  return url;
 };
 
 /**
@@ -115,6 +140,23 @@ export const getObjectStoreBucketName = (): string => {
  */
 export const getSecurityObjectStoreBucketName = (): string => {
   return process.env.QUARANTINE_OBJECT_STORE_BUCKET_NAME || '';
+};
+
+/**
+ * Local getter for retrieving the S3 security client with public endpoint (for presigned URLs).
+ *
+ * @return {*}  {S3Client} The S3 security client with public endpoint
+ */
+export const getSecurityS3ClientPublic = (): S3Client => {
+  return new S3Client({
+    endpoint: getQuarantineObjectStoreUrlPublic(),
+    credentials: {
+      accessKeyId: process.env.QUARANTINE_OBJECT_STORE_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.QUARANTINE_OBJECT_STORE_SECRET_KEY_ID!
+    },
+    forcePathStyle: true,
+    region: 'ca-central-1'
+  });
 };
 
 /**

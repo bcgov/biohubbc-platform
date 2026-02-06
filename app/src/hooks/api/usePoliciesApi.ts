@@ -5,6 +5,7 @@ import {
   ICreatePolicyRequest,
   IUpdatePolicyRequest
 } from 'interfaces/usePoliciesApi.interface';
+import { ApiPaginationRequestOptions, ApiSearchParams } from 'types/pagination';
 
 /**
  * Returns a set of supported api methods for working with policies.
@@ -16,14 +17,15 @@ const usePoliciesApi = (axios: AxiosInstance) => {
   /**
    * Get all policies with pagination.
    *
-   * @param {object} [params]
+   * @param {ApiSearchParams} [searchParams] - Optional search parameters.
+   * @param {ApiPaginationRequestOptions} [pagination] - Optional pagination parameters.
    * @return {*} {Promise<IPoliciesResponse>}
    */
-  const getPolicies = async (params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-  }): Promise<IPoliciesResponse> => {
+  const getPolicies = async (
+    searchParams?: ApiSearchParams,
+    pagination?: ApiPaginationRequestOptions
+  ): Promise<IPoliciesResponse> => {
+    const params = { ...searchParams, ...pagination };
     const { data } = await axios.get('/api/administrative/policies', { params });
 
     return data;
