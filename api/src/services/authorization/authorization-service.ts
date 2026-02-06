@@ -3,6 +3,7 @@ import { IDBConnection } from '../../database/db';
 import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
 import { getServiceClientSystemUser, getUserGuid } from '../../utils/keycloak-utils';
 import { PolicyService } from '../access-policy/policy-service';
+import { CartService } from '../cart-service';
 import { DBService } from '../db-service';
 import { SubmissionService } from '../submission-service';
 import { UserService } from '../user-service';
@@ -57,11 +58,23 @@ export interface AuthorizeByServiceClient {
   discriminator: 'ServiceClient';
 }
 
+/**
+ * Authorization rule that checks if the cart belongs to the system user.
+ *
+ * @export
+ * @interface AuthorizeByCart
+ */
+export interface AuthorizeByCart {
+  cartId: string;
+  discriminator: 'Cart';
+}
+
 export type AuthorizeRule =
   | AuthorizeBySystemRoles
   | AuthorizeBySystemUser
   | AuthorizeByServiceClient
-  | AuthorizeByAccessPolicy;
+  | AuthorizeByAccessPolicy
+  | AuthorizeByCart;
 
 export type AuthorizeConfigOr = {
   [AuthorizeOperator.AND]?: never;
@@ -127,6 +140,9 @@ export class AuthorizationService extends DBService {
           break;
         case 'AccessPolicy':
           authorizeResults.push(await this.authorizeByAccessPolicy(authorizeRule));
+          break;
+        case 'Cart':
+          authorizeResults.push(await this.authorizeByCart(authorizeRule));
           break;
       }
     }
@@ -236,6 +252,42 @@ export class AuthorizationService extends DBService {
 
     // Step 6: Grant access if at least one policy authorizes it
     return policiesThatGrantAccess.length > 0;
+  }
+
+  /**
+   * Check if the user is authorized to access the cart
+   *
+   * @param {AuthorizeByCart} authorizeByCart
+   * @return {Promise<boolean>}
+   */
+  async authorizeByCart(authorizeByCart: AuthorizeByCart): Promise<boolean> {
+    const { cartId } = authorizeByCart;
+
+    // Fetch the cart based on the cartId
+    const cartService = new CartService(this.connection);
+    const cart = await cartService.findCartById(cartId);
+
+    // Cart does not exist
+    if (!cart) {
+      return false;
+    }
+
+    // Ensure we have the current system user
+    const currentUser = await this.getCachedSystemUser();
+
+    // If the cart has a system_user_id (created by an authenticated user), and the current user is authenticated
+    if (cart.system_user_id && currentUser) {
+      // Check if the authenticated user is the owner of the cart
+      return cart.system_user_id === currentUser.system_user_id;
+    }
+
+    // If the cart was created by an unauthenticated user (no system_user_id set)
+    if (!cart.system_user_id) {
+      // Allow access for both authenticated and non-authenticated users (there is no ownership to verify)
+      return true;
+    }
+
+    return false;
   }
 
   /**
