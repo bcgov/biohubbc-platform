@@ -76,6 +76,12 @@ describe('csv-utils', () => {
 
       expect(result).to.equal('1;;3;');
     });
+
+    it('should preserve special characters in values', () => {
+      const result = flattenArray(['hello, world', 'say "hi"', 'line\nnew']);
+
+      expect(result).to.equal('hello, world;say "hi";line\nnew');
+    });
   });
 
   describe('escapeCsvField', () => {
@@ -93,6 +99,33 @@ describe('csv-utils', () => {
 
     it('should wrap values with newlines in quotes', () => {
       expect(escapeCsvField('line1\nline2')).to.equal('"line1\nline2"');
+    });
+
+    it('should wrap values with carriage returns in quotes', () => {
+      expect(escapeCsvField('line1\r\nline2')).to.equal('"line1\r\nline2"');
+      expect(escapeCsvField('line1\rline2')).to.equal('"line1\rline2"');
+    });
+
+    it('should handle combined commas and quotes', () => {
+      expect(escapeCsvField('value "A", value "B"')).to.equal('"value ""A"", value ""B"""');
+    });
+
+    it('should handle combined newlines and commas', () => {
+      expect(escapeCsvField('line1, continued\nline2')).to.equal('"line1, continued\nline2"');
+    });
+
+    it('should pass through unicode characters without quoting', () => {
+      expect(escapeCsvField('Grizzly résumé')).to.equal('Grizzly résumé');
+      expect(escapeCsvField('北极熊')).to.equal('北极熊');
+      expect(escapeCsvField('élévation')).to.equal('élévation');
+    });
+
+    it('should quote unicode values that also contain delimiters', () => {
+      expect(escapeCsvField('ours, résumé')).to.equal('"ours, résumé"');
+    });
+
+    it('should return empty string unchanged', () => {
+      expect(escapeCsvField('')).to.equal('');
     });
   });
 
@@ -138,6 +171,22 @@ describe('csv-utils', () => {
       const lines = result.split('\n');
 
       expect(lines[0]).to.equal('a,name,z');
+    });
+
+    it('should escape special characters in data values', () => {
+      const records = [
+        { description: 'Rocky streambed, gravel substrate', name: 'Site "Alpha"' },
+        { description: 'Line 1\nLine 2', name: 'Normal' }
+      ];
+
+      const result = generateCsv(records);
+      const lines = result.split('\n');
+
+      expect(lines[0]).to.equal('description,name');
+      expect(lines[1]).to.equal('"Rocky streambed, gravel substrate","Site ""Alpha"""');
+      // Newline in value means the raw CSV has 4 lines (header + row1 + row2-part1 + row2-part2)
+      // but the logical row is: "Line 1\nLine 2",Normal
+      expect(result).to.include('"Line 1\nLine 2",Normal');
     });
   });
 
@@ -186,6 +235,14 @@ describe('csv-utils', () => {
       ];
 
       expect(buildSchemaHeaders(properties)).to.deep.equal(['decimalLatitude', 'decimalLongitude']);
+    });
+
+    it('should map artifact_key type to filePath header', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'artifact_key', feature_property_type_name: 'artifact_key' }
+      ];
+
+      expect(buildSchemaHeaders(properties)).to.deep.equal(['filePath']);
     });
 
     it('should return empty array for empty input', () => {
@@ -420,7 +477,7 @@ describe('csv-utils', () => {
       expect(result).to.deep.equal({ focal_species: '180703;12345' });
     });
 
-    it('should generate zip-relative path for artifact_key', () => {
+    it('should generate zip-relative path for artifact_key mapped to filePath column', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'artifact_key', feature_property_type_name: 'artifact_key' }
       ];
@@ -428,7 +485,7 @@ describe('csv-utils', () => {
 
       const result = flattenFeatureBySchema(data, properties, 42);
 
-      expect(result).to.deep.equal({ artifact_key: 'files/42_photo.jpg' });
+      expect(result).to.deep.equal({ filePath: 'files/42_photo.jpg' });
     });
 
     it('should fall back to data.file for artifact_key value', () => {
@@ -439,7 +496,7 @@ describe('csv-utils', () => {
 
       const result = flattenFeatureBySchema(data, properties, 42);
 
-      expect(result).to.deep.equal({ artifact_key: 'files/42_photo.jpg' });
+      expect(result).to.deep.equal({ filePath: 'files/42_photo.jpg' });
     });
 
     it('should stringify objects', () => {
@@ -462,6 +519,36 @@ describe('csv-utils', () => {
       const result = flattenFeatureBySchema({}, properties, 100);
 
       expect(result).to.deep.equal({ name: '', count: '' });
+    });
+
+    it('should preserve special characters in string values for downstream escaping', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'description', feature_property_type_name: 'string' },
+        { feature_property_name: 'name', feature_property_type_name: 'string' },
+        { feature_property_name: 'comment', feature_property_type_name: 'string' }
+      ];
+      const data = {
+        description: 'Rocky streambed, with gravel substrate',
+        name: 'Site "Alpha"',
+        comment: 'Line 1\nLine 2'
+      };
+
+      const result = flattenFeatureBySchema(data, properties, 100);
+
+      // flattenFeatureBySchema preserves raw strings; escapeCsvField handles quoting later
+      expect(result.description).to.equal('Rocky streambed, with gravel substrate');
+      expect(result.name).to.equal('Site "Alpha"');
+      expect(result.comment).to.equal('Line 1\nLine 2');
+    });
+
+    it('should preserve unicode characters in string values', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'name', feature_property_type_name: 'string' }
+      ];
+
+      const result = flattenFeatureBySchema({ name: 'Réseau élévation 北极' }, properties, 100);
+
+      expect(result.name).to.equal('Réseau élévation 北极');
     });
   });
 });

@@ -22,6 +22,8 @@ export function buildSchemaHeaders(properties: CsvPropertyDefinition[]): string[
   for (const prop of properties) {
     if (prop.feature_property_type_name === 'spatial') {
       headers.push('decimalLatitude', 'decimalLongitude');
+    } else if (prop.feature_property_type_name === 'artifact_key') {
+      headers.push('filePath');
     } else {
       headers.push(prop.feature_property_name);
     }
@@ -70,18 +72,19 @@ export function flattenFeatureWithParent(
   childProperties: CsvPropertyDefinition[],
   parentData: Record<string, unknown> | null,
   parentProperties: CsvPropertyDefinition[] | null,
-  submissionFeatureId: number
+  submissionFeatureId: number,
+  filesFolderName = 'files'
 ): Record<string, string> {
   const result: Record<string, string> = {};
 
   // Flatten parent first (if exists)
   if (parentData && parentProperties) {
-    const parentFlattened = flattenFeatureBySchema(parentData, parentProperties, submissionFeatureId);
+    const parentFlattened = flattenFeatureBySchema(parentData, parentProperties, submissionFeatureId, filesFolderName);
     Object.assign(result, parentFlattened);
   }
 
   // Flatten child (overwrites any collisions, though schemas should be distinct)
-  const childFlattened = flattenFeatureBySchema(childData, childProperties, submissionFeatureId);
+  const childFlattened = flattenFeatureBySchema(childData, childProperties, submissionFeatureId, filesFolderName);
   Object.assign(result, childFlattened);
 
   return result;
@@ -106,7 +109,8 @@ export function flattenFeatureWithParent(
 export function flattenFeatureBySchema(
   data: Record<string, unknown>,
   properties: CsvPropertyDefinition[],
-  submissionFeatureId: number
+  submissionFeatureId: number,
+  filesFolderName = 'files'
 ): Record<string, string> {
   const result: Record<string, string> = {};
 
@@ -130,9 +134,9 @@ export function flattenFeatureBySchema(
         const rawValue = (value ?? data['file']) as string | undefined;
         if (rawValue) {
           const fileName = rawValue.split('/').pop() || 'file';
-          result[feature_property_name] = `files/${submissionFeatureId}_${fileName}`;
+          result['filePath'] = `${filesFolderName}/${submissionFeatureId}_${fileName}`;
         } else {
-          result[feature_property_name] = '';
+          result['filePath'] = '';
         }
         break;
       }

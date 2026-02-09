@@ -2,7 +2,7 @@ import archiver from 'archiver';
 import { PassThrough } from 'stream';
 import { FRAGMENT_SIZE_THRESHOLD } from '../constants/download';
 import { IDBConnection } from '../database/db';
-import { DownloadFeatureData, DownloadId, DownloadRecord } from '../models/download';
+import { DownloadFeatureSummary, DownloadId, DownloadRecord } from '../models/download';
 import { DownloadFragmentRecord } from '../models/download-fragment';
 import { DownloadStatusEnum } from '../models/download-status';
 import { DownloadFragmentRepository } from '../repositories/download-fragment-repository';
@@ -22,20 +22,19 @@ import { BucketType, ObjectStorageService } from './object-storage/object-storag
 const defaultLog = getLogger('services/download-service');
 
 export { FRAGMENT_SIZE_THRESHOLD } from '../constants/download';
-export const CSV_ROW_SIZE_ESTIMATE = 500; // bytes per CSV row estimate
 export const SIGNED_URL_EXPIRY_FRAGMENT = 3600; // 1 hour for fragment URLs
 
 /**
  * Result of estimating a download's total size before processing.
  * Used by planFragments to decide how to split features across zip files.
+ *
+ * Per-feature and total sizes are computed inline in the SQL query.
  */
 interface DownloadSizeEstimate {
-  /** Total estimated bytes across all features (CSV rows * CSV_ROW_SIZE_ESTIMATE). */
+  /** Total estimated bytes across all features. */
   totalEstimatedBytes: number;
-  /** Per-feature size estimates, keyed by submission_feature_id. */
-  featureSizes: Map<number, number>;
-  /** The features included in this download, reused by planFragments to avoid re-fetching. */
-  features: DownloadFeatureData[];
+  /** The features included in this download with per-feature estimated_byte_size. */
+  features: DownloadFeatureSummary[];
 }
 
 /**
@@ -132,15 +131,15 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * Get feature data for all authorized features in a download.
+   * Get lightweight summaries for all authorized features in a download.
    *
    * @param {number} downloadId - The download ID.
    * @param {number} systemUserId - The user requesting the download.
-   * @return {Promise<DownloadFeatureData[]>}
+   * @return {Promise<DownloadFeatureSummary[]>}
    * @memberof DownloadService
    */
-  async getDownloadFeatureData(downloadId: number, systemUserId: number): Promise<DownloadFeatureData[]> {
-    return this.downloadRepository.getDownloadFeatureData(downloadId, systemUserId);
+  async getDownloadFeatureSummaries(downloadId: number, systemUserId: number): Promise<DownloadFeatureSummary[]> {
+    return this.downloadRepository.getDownloadFeatureSummaries(downloadId, systemUserId);
   }
 
   /**
@@ -155,10 +154,9 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * Estimate the total download size and determine the fragmentation strategy.
+   * Estimate the total download size and plan fragmentation.
    *
-   * For file features: calls S3 HeadObject to get actual file size.
-   * For CSV features: estimates from JSON.stringify(data).length + CSV_ROW_SIZE_ESTIMATE.
+   * Uses pre-computed data_byte_size which includes JSONB size + CSV overhead + artifact file size.
    *
    * @param {number} downloadId - The download ID.
    * @param {number} systemUserId - The user requesting the download.
@@ -166,26 +164,10 @@ export class DownloadService extends DBService {
    * @memberof DownloadService
    */
   async estimateDownloadSize(downloadId: number, systemUserId: number): Promise<DownloadSizeEstimate> {
-    const features = await this.getDownloadFeatureData(downloadId, systemUserId);
-    const featureSizes = new Map<number, number>();
-    let totalEstimatedBytes = 0;
+    const features = await this.getDownloadFeatureSummaries(downloadId, systemUserId);
+    const totalEstimatedBytes = features.reduce((sum, f) => sum + f.estimated_byte_size, 0);
 
-    for (const feature of features) {
-      let estimatedBytes: number;
-
-      if (feature.feature_type_name === 'file' && feature.data.file) {
-        // For file features, use artifact byte_size from the database
-        estimatedBytes = feature.artifact_byte_size ?? CSV_ROW_SIZE_ESTIMATE;
-      } else {
-        // For CSV features, estimate from data size
-        estimatedBytes = JSON.stringify(feature.data).length + CSV_ROW_SIZE_ESTIMATE;
-      }
-
-      featureSizes.set(feature.submission_feature_id, estimatedBytes);
-      totalEstimatedBytes += estimatedBytes;
-    }
-
-    return { totalEstimatedBytes, featureSizes, features };
+    return { totalEstimatedBytes, features };
   }
 
   /**
@@ -229,7 +211,7 @@ export class DownloadService extends DBService {
     };
 
     for (const feature of features) {
-      const featureSize = sizeEstimate.featureSizes.get(feature.submission_feature_id) ?? CSV_ROW_SIZE_ESTIMATE;
+      const featureSize = feature.estimated_byte_size;
 
       // Oversized file: give it its own dedicated fragment
       if (featureSize > fragmentThreshold) {
@@ -379,11 +361,14 @@ export class DownloadService extends DBService {
 
       const uploadPromise = objectStorageService.uploadStream(BucketType.MAIN, passThrough, 'application/zip', s3Key);
 
+      // Index files folder for multi-fragment downloads so extracted parts combine cleanly
+      const filesFolderName = isSingleFragment ? 'files' : `files${fragment.fragment_index + 1}`;
+
       // Stream features via cursor, append each type's CSV as it completes
-      const fileRefs = await this.streamFeaturesIntoArchive(fragmentId, archive);
+      const fileRefs = await this.streamFeaturesIntoArchive(fragmentId, archive, filesFolderName);
 
       // Stream binary files into archive
-      await this.streamFilesToArchive(archive, fileRefs, objectStorageService);
+      await this.streamFilesToArchive(archive, fileRefs, objectStorageService, filesFolderName);
 
       await archive.finalize();
       await uploadPromise;
@@ -411,7 +396,11 @@ export class DownloadService extends DBService {
    * @param {archiver.Archiver} archive - The zip archive to append CSVs to.
    * @return {Promise<FileFeatureRef[]>} References to features with associated binary files.
    */
-  private async streamFeaturesIntoArchive(fragmentId: number, archive: archiver.Archiver): Promise<FileFeatureRef[]> {
+  private async streamFeaturesIntoArchive(
+    fragmentId: number,
+    archive: archiver.Archiver,
+    filesFolderName: string
+  ): Promise<FileFeatureRef[]> {
     const featureTypes = await this.fragmentRepository.getFragmentFeatureTypes(fragmentId);
 
     if (featureTypes.length === 0) {
@@ -439,10 +428,13 @@ export class DownloadService extends DBService {
 
     const fileRefs: FileFeatureRef[] = [];
 
-    // System columns prepended to every CSV
-    const systemHeaders = ['dataset_name', 'dataset_id'];
+    // System columns: core file (dataset) gets uuid only; extensions get uuid + dataset context
+    const coreSystemHeaders = ['uuid'];
+    const extensionSystemHeaders = ['uuid', 'dataset_name', 'dataset_uuid'];
 
     for (const featureType of featureTypes) {
+      const isCore = featureType === 'dataset';
+      const systemHeaders = isCore ? coreSystemHeaders : extensionSystemHeaders;
       const childProperties = schemaLookup.get(featureType) ?? [];
 
       const csvStream = new PassThrough();
@@ -471,13 +463,17 @@ export class DownloadService extends DBService {
             childProperties,
             (feature.parent_data as Record<string, unknown>) ?? null,
             parentProperties,
-            feature.submission_feature_id
+            feature.submission_feature_id,
+            filesFolderName
           );
 
-          // Prepend dataset context columns from cache (lookup by submission_id)
-          const rootDataset = rootDatasetCache.get(feature.submission_id);
-          flattened['dataset_name'] = rootDataset?.dataset_name ?? '';
-          flattened['dataset_id'] = rootDataset?.dataset_id != null ? String(rootDataset.dataset_id) : '';
+          // Prepend system columns: row UUID + dataset context (extensions only)
+          flattened['uuid'] = feature.uuid;
+          if (!isCore) {
+            const rootDataset = rootDatasetCache.get(feature.submission_id);
+            flattened['dataset_name'] = rootDataset?.dataset_name ?? '';
+            flattened['dataset_uuid'] = rootDataset?.dataset_uuid ?? '';
+          }
 
           const line = headers.map((h) => escapeCsvField(flattened[h] ?? '')).join(',');
           csvStream.write(line + '\n');
@@ -522,11 +518,12 @@ export class DownloadService extends DBService {
   private async streamFilesToArchive(
     archive: archiver.Archiver,
     fileRefs: FileFeatureRef[],
-    objectStorageService: ObjectStorageService
+    objectStorageService: ObjectStorageService,
+    filesFolderName: string
   ): Promise<void> {
     for (const ref of fileRefs) {
       const fileName = ref.filePath.split('/').pop() || 'file';
-      const outputPath = `files/${ref.submissionFeatureId}_${fileName}`;
+      const outputPath = `${filesFolderName}/${ref.submissionFeatureId}_${fileName}`;
 
       const entryProcessed = new Promise<void>((resolve) => archive.once('entry', () => resolve()));
 

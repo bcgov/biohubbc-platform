@@ -2,19 +2,14 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { DownloadFeatureData, DownloadRecord } from '../models/download';
+import { DownloadFeatureData, DownloadFeatureSummary, DownloadRecord } from '../models/download';
 import { DownloadFragmentRecord } from '../models/download-fragment';
 import { DownloadStatusEnum } from '../models/download-status';
 import { DownloadFragmentRepository } from '../repositories/download-fragment-repository';
 import { DownloadRepository } from '../repositories/download-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CodeService } from './code-service';
-import {
-  CSV_ROW_SIZE_ESTIMATE,
-  DownloadService,
-  FRAGMENT_SIZE_THRESHOLD,
-  SIGNED_URL_EXPIRY_FRAGMENT
-} from './download-service';
+import { DownloadService, FRAGMENT_SIZE_THRESHOLD, SIGNED_URL_EXPIRY_FRAGMENT } from './download-service';
 import { BucketType, ObjectStorageService } from './object-storage/object-storage-service';
 
 chai.use(sinonChai);
@@ -102,7 +97,6 @@ describe('DownloadService', () => {
       sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([]);
       const estimateStub = sinon.stub(service, 'estimateDownloadSize').resolves({
         totalEstimatedBytes: 1000,
-        featureSizes: new Map(),
         features: []
       });
       const planStub = sinon.stub(service, 'planFragments').resolves();
@@ -150,9 +144,9 @@ describe('DownloadService', () => {
       const mockFeatures: DownloadFeatureData[] = [
         {
           submission_feature_id: 30,
+          uuid: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
           feature_type_name: 'file',
           data: { file: 'uploads/missing-file.jpg', description: 'Missing file' },
-          artifact_byte_size: null,
           submission_id: 1
         }
       ];
@@ -166,9 +160,9 @@ describe('DownloadService', () => {
           const typeFeatures = mockFeatures.filter((f) => f.feature_type_name === typeName);
           return mockFeatureStream(typeFeatures);
         });
-      sinon.stub(DownloadFragmentRepository.prototype, 'getRootDatasetsByFragment').resolves(
-        new Map([[1, { dataset_name: 'Test Dataset', dataset_id: 100 }]])
-      );
+      sinon
+        .stub(DownloadFragmentRepository.prototype, 'getRootDatasetsByFragment')
+        .resolves(new Map([[1, { dataset_name: 'Test Dataset', dataset_uuid: '11111111-2222-3333-4444-555555555555' }]]));
 
       sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([
@@ -209,16 +203,16 @@ describe('DownloadService', () => {
         mockFeatureStream([
           {
             submission_feature_id: 10,
+            uuid: 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff',
             feature_type_name: 'observation',
             data: { species: 'bear' },
-            artifact_byte_size: null,
-            submission_id: 1
+              submission_id: 1
           }
         ])
       );
-      sinon.stub(DownloadFragmentRepository.prototype, 'getRootDatasetsByFragment').resolves(
-        new Map([[1, { dataset_name: 'Test Dataset', dataset_id: 100 }]])
-      );
+      sinon
+        .stub(DownloadFragmentRepository.prototype, 'getRootDatasetsByFragment')
+        .resolves(new Map([[1, { dataset_name: 'Test Dataset', dataset_uuid: '11111111-2222-3333-4444-555555555555' }]]));
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadById')
         .resolves(createMockDownloadRecord({ total_fragments: 3 }));
@@ -300,79 +294,42 @@ describe('DownloadService', () => {
   });
 
   describe('estimateDownloadSize', () => {
-    it('estimates size for CSV features', async () => {
-      // Verifies: CSV features estimated from JSON.stringify(data).length + CSV_ROW_SIZE_ESTIMATE
+    it('sums per-feature sizes for totalEstimatedBytes', async () => {
+      // Verifies: totalEstimatedBytes is the sum of per-feature estimated_byte_size
 
       // Step 1: Setup service with mock connection
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
-      // Step 2: Stub getDownloadFeatureData to return small CSV features
-      const smallFeatures: DownloadFeatureData[] = [
-        {
-          submission_feature_id: 1,
-          feature_type_name: 'observation',
-          data: { species: 'bear', count: 5 },
-          artifact_byte_size: null,
-          submission_id: 1
-        },
-        {
-          submission_feature_id: 2,
-          feature_type_name: 'sample',
-          data: { type: 'soil' },
-          artifact_byte_size: null,
-          submission_id: 1
-        }
+      // Step 2: Stub per-feature query
+      const features: DownloadFeatureSummary[] = [
+        { submission_feature_id: 1, feature_type_name: 'observation', estimated_byte_size: 120, submission_id: 1 },
+        { submission_feature_id: 2, feature_type_name: 'sample', estimated_byte_size: 80, submission_id: 1 }
       ];
-      sinon.stub(DownloadRepository.prototype, 'getDownloadFeatureData').resolves(smallFeatures);
+      sinon.stub(DownloadRepository.prototype, 'getDownloadFeatureSummaries').resolves(features);
 
-      // Step 3: Call estimateDownloadSize with systemUserId
+      // Step 3: Call estimateDownloadSize
       const result = await service.estimateDownloadSize(1, 123);
 
-      // Step 4: Verify feature sizes are populated correctly
-      expect(result.featureSizes.size).to.equal(2);
-      // Each CSV feature estimated as JSON.stringify(data).length + CSV_ROW_SIZE_ESTIMATE
-      const feature1Size = JSON.stringify(smallFeatures[0].data).length + CSV_ROW_SIZE_ESTIMATE;
-      const feature2Size = JSON.stringify(smallFeatures[1].data).length + CSV_ROW_SIZE_ESTIMATE;
-      expect(result.totalEstimatedBytes).to.equal(feature1Size + feature2Size);
-      expect(result.featureSizes.get(1)).to.equal(feature1Size);
-      expect(result.featureSizes.get(2)).to.equal(feature2Size);
+      // Step 4: Verify total is sum of per-feature sizes
+      expect(result.totalEstimatedBytes).to.equal(200);
+      expect(result.features).to.have.length(2);
+      expect(result.features[0].estimated_byte_size).to.equal(120);
+      expect(result.features[1].estimated_byte_size).to.equal(80);
     });
 
-    it('estimates size for file features using artifact byte_size', async () => {
-      // Verifies: File features use artifact_byte_size from the database instead of S3 HeadObject
+    it('returns zero total for empty downloads', async () => {
+      // Verifies: No features → totalEstimatedBytes defaults to 0
 
-      // Step 1: Setup service with mock connection
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
-      // Step 2: Create features with artifact byte sizes from the database
-      const sixGB = 6 * 1024 * 1024 * 1024;
-      const largeFileFeatures: DownloadFeatureData[] = [
-        {
-          submission_feature_id: 1,
-          feature_type_name: 'file',
-          data: { file: 'uploads/large1.bin' },
-          artifact_byte_size: sixGB,
-          submission_id: 1
-        },
-        {
-          submission_feature_id: 2,
-          feature_type_name: 'file',
-          data: { file: 'uploads/large2.bin' },
-          artifact_byte_size: sixGB,
-          submission_id: 1
-        }
-      ];
-      sinon.stub(DownloadRepository.prototype, 'getDownloadFeatureData').resolves(largeFileFeatures);
+      sinon.stub(DownloadRepository.prototype, 'getDownloadFeatureSummaries').resolves([]);
 
-      // Step 3: Call estimateDownloadSize with systemUserId — no S3 calls needed
       const result = await service.estimateDownloadSize(1, 123);
 
-      // Step 4: Verify sizes use artifact byte_size
-      expect(result.totalEstimatedBytes).to.equal(sixGB * 2);
-      expect(result.featureSizes.get(1)).to.equal(sixGB);
-      expect(result.featureSizes.get(2)).to.equal(sixGB);
+      expect(result.totalEstimatedBytes).to.equal(0);
+      expect(result.features).to.have.length(0);
     });
   });
 
@@ -385,26 +342,23 @@ describe('DownloadService', () => {
       const service = new DownloadService(mockDBConnection);
 
       // Step 2: Create 3 features — two fit in one bin, third needs a new bin
-      const features: DownloadFeatureData[] = [
+      const features: DownloadFeatureSummary[] = [
         {
           submission_feature_id: 10,
           feature_type_name: 'observation',
-          data: {},
-          artifact_byte_size: null,
+          estimated_byte_size: 100,
           submission_id: 1
         },
         {
           submission_feature_id: 20,
           feature_type_name: 'observation',
-          data: {},
-          artifact_byte_size: null,
+          estimated_byte_size: 100,
           submission_id: 1
         },
         {
           submission_feature_id: 30,
           feature_type_name: 'observation',
-          data: {},
-          artifact_byte_size: null,
+          estimated_byte_size: 100,
           submission_id: 1
         }
       ];
@@ -429,13 +383,12 @@ describe('DownloadService', () => {
       // Feature 10 = 300MB, Feature 20 = 300MB (total 600MB > 500MB threshold), Feature 30 = 200MB
       const threeHundredMB = 300 * 1024 * 1024;
       const twoHundredMB = 200 * 1024 * 1024;
+      // Override estimated_byte_size on features for bin packing test
+      features[0].estimated_byte_size = threeHundredMB;
+      features[1].estimated_byte_size = threeHundredMB;
+      features[2].estimated_byte_size = twoHundredMB;
       const sizeEstimate = {
         totalEstimatedBytes: threeHundredMB * 2 + twoHundredMB,
-        featureSizes: new Map([
-          [10, threeHundredMB],
-          [20, threeHundredMB],
-          [30, twoHundredMB]
-        ]),
         features
       };
       await service.planFragments(1, sizeEstimate);
@@ -459,26 +412,23 @@ describe('DownloadService', () => {
       const service = new DownloadService(mockDBConnection);
 
       // Step 2: Create 3 features — with 1 GB threshold, all 3 fit in one fragment
-      const features: DownloadFeatureData[] = [
+      const features: DownloadFeatureSummary[] = [
         {
           submission_feature_id: 10,
           feature_type_name: 'observation',
-          data: {},
-          artifact_byte_size: null,
+          estimated_byte_size: 100,
           submission_id: 1
         },
         {
           submission_feature_id: 20,
           feature_type_name: 'observation',
-          data: {},
-          artifact_byte_size: null,
+          estimated_byte_size: 100,
           submission_id: 1
         },
         {
           submission_feature_id: 30,
           feature_type_name: 'observation',
-          data: {},
-          artifact_byte_size: null,
+          estimated_byte_size: 100,
           submission_id: 1
         }
       ];
@@ -504,13 +454,11 @@ describe('DownloadService', () => {
       // With custom 1GB threshold, all features fit in 1 fragment
       const threeHundredMB = 300 * 1024 * 1024;
       const twoHundredMB = 200 * 1024 * 1024;
+      features[0].estimated_byte_size = threeHundredMB;
+      features[1].estimated_byte_size = threeHundredMB;
+      features[2].estimated_byte_size = twoHundredMB;
       const sizeEstimate = {
         totalEstimatedBytes: threeHundredMB * 2 + twoHundredMB,
-        featureSizes: new Map([
-          [10, threeHundredMB],
-          [20, threeHundredMB],
-          [30, twoHundredMB]
-        ]),
         features
       };
       await service.planFragments(1, sizeEstimate);

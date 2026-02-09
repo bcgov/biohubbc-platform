@@ -32,11 +32,19 @@ export type DownloadFeatureRecord = z.infer<typeof DownloadFeatureRecord>;
 export const DownloadFeatureData = z.object({
   submission_feature_id: z.number(),
   submission_id: z.number(),
+  uuid: z.string(),
   feature_type_name: z.string(),
   data: z.record(z.any()),
-  artifact_byte_size: z.number().nullable(),
   // Parent denormalization columns - present when feature has a parent
   parent_data: z.record(z.any()).nullable().optional(),
   parent_feature_type_name: z.string().nullable().optional()
 });
 export type DownloadFeatureData = z.infer<typeof DownloadFeatureData>;
+
+export const DownloadFeatureSummary = z.object({
+  submission_feature_id: z.number(),
+  submission_id: z.number(),
+  feature_type_name: z.string(),
+  estimated_byte_size: z.number()
+});
+export type DownloadFeatureSummary = z.infer<typeof DownloadFeatureSummary>;

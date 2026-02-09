@@ -101,4 +101,41 @@ describe('DownloadRepository', () => {
       expect(sqlValues).to.include(DownloadStatusEnum.FAILED);
     });
   });
+
+  describe('getDownloadFeatureSummaries', () => {
+    it('uses pre-computed data_byte_size directly', async () => {
+      // Verifies: SQL uses data_byte_size column directly (no artifact JOIN needed)
+
+      // Step 1: Setup sql stub
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      // Step 2: Call method
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.getDownloadFeatureSummaries(1, 10);
+
+      // Step 3: Verify SQL uses pre-computed column directly
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('data_byte_size');
+      expect(sqlText).to.include('estimated_byte_size');
+    });
+
+    it('passes downloadId and systemUserId as parameters', async () => {
+      // Verifies: Correct parameters are passed to the SQL query
+
+      // Step 1: Setup sql stub
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      // Step 2: Call method
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.getDownloadFeatureSummaries(5, 42);
+
+      // Step 3: Verify parameters
+      const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlValues).to.include(5);
+      expect(sqlValues).to.include(42);
+    });
+  });
 });

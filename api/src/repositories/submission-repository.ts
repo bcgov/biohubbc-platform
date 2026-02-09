@@ -418,6 +418,7 @@ export class SubmissionRepository extends BaseRepository {
         source_id,
         feature_type_id,
         data,
+        data_byte_size,
         record_effective_date
       ) VALUES (
         ${submissionId},
@@ -425,6 +426,10 @@ export class SubmissionRepository extends BaseRepository {
         ${featureSourceId},
         (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}),
         ${featureProperties},
+        octet_length((${featureProperties})::jsonb::text) + 500 + COALESCE(
+          (SELECT a.byte_size FROM artifact a WHERE a.object_key = (${featureProperties})::jsonb->>'artifact_key'),
+          0
+        ),
         now()
       )
       RETURNING

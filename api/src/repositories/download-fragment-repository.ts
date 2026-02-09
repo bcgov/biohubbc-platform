@@ -140,6 +140,7 @@ export class DownloadFragmentRepository extends BaseRepository {
         SELECT
           sf.submission_feature_id,
           sf.submission_id,
+          sf.uuid,
           ft.name as feature_type_name,
           sf.data,
           parent_sf.data as parent_data,
@@ -182,12 +183,12 @@ export class DownloadFragmentRepository extends BaseRepository {
    */
   async getRootDatasetsByFragment(
     downloadFragmentId: number
-  ): Promise<Map<number, { dataset_id: number; dataset_name: string | null }>> {
+  ): Promise<Map<number, { dataset_uuid: string; dataset_name: string | null }>> {
     // Get distinct submission_ids, then find each submission's root dataset
     // using a recursive CTE that walks up the parent chain
     const result = await this.connection.query<{
       submission_id: number;
-      dataset_id: number;
+      dataset_uuid: string;
       dataset_name: string | null;
     }>(
       `WITH DISTINCT_SUBMISSIONS AS (
@@ -199,7 +200,7 @@ export class DownloadFragmentRepository extends BaseRepository {
       ROOT_DATASETS AS (
         SELECT
           sf.submission_id,
-          sf.submission_feature_id as dataset_id,
+          sf.uuid as dataset_uuid,
           sf.data->>'name' as dataset_name
         FROM submission_feature sf
         INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
@@ -211,9 +212,9 @@ export class DownloadFragmentRepository extends BaseRepository {
       [downloadFragmentId]
     );
 
-    const map = new Map<number, { dataset_id: number; dataset_name: string | null }>();
+    const map = new Map<number, { dataset_uuid: string; dataset_name: string | null }>();
     for (const row of result.rows) {
-      map.set(row.submission_id, { dataset_id: row.dataset_id, dataset_name: row.dataset_name });
+      map.set(row.submission_id, { dataset_uuid: row.dataset_uuid, dataset_name: row.dataset_name });
     }
     return map;
   }

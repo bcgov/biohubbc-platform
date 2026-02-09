@@ -1,6 +1,11 @@
 import SQL from 'sql-template-strings';
 import { FRAGMENT_SIZE_THRESHOLD } from '../constants/download';
-import { DownloadFeatureData, DownloadFeatureRecord, DownloadId, DownloadRecord } from '../models/download';
+import {
+  DownloadFeatureRecord,
+  DownloadFeatureSummary,
+  DownloadId,
+  DownloadRecord
+} from '../models/download';
 import { DownloadStatusEnum } from '../models/download-status';
 import { BaseRepository } from './base-repository';
 
@@ -193,29 +198,26 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Get feature data for all authorized features in a download.
+   * Get lightweight summaries for all authorized features in a download.
    *
-   * Returns feature data with type name for zip file naming.
-   * Filters out secured features that the user does not have an ALLOW policy for.
-   * Unsecured features (no active submission_feature_security row) are always included.
+   * Returns feature metadata and pre-computed data_byte_size (no JSONB data column).
+   * Used by estimateDownloadSize and planFragments for bin packing.
    *
    * @param {number} downloadId - The download ID.
    * @param {number} systemUserId - The user requesting the download.
-   * @return {Promise<DownloadFeatureData[]>}
+   * @return {Promise<DownloadFeatureSummary[]>}
    * @memberof DownloadRepository
    */
-  async getDownloadFeatureData(downloadId: number, systemUserId: number): Promise<DownloadFeatureData[]> {
+  async getDownloadFeatureSummaries(downloadId: number, systemUserId: number): Promise<DownloadFeatureSummary[]> {
     const sql = SQL`
       SELECT
         sf.submission_feature_id,
         sf.submission_id,
         ft.name as feature_type_name,
-        sf.data,
-        a.byte_size as artifact_byte_size
+        sf.data_byte_size as estimated_byte_size
       FROM download_feature df
       INNER JOIN submission_feature sf ON df.submission_feature_id = sf.submission_feature_id
       INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
-      LEFT JOIN artifact a ON a.object_key = sf.data->>'file'
       WHERE df.download_id = ${downloadId}
         AND (
           -- Unsecured features: no active security rule
@@ -235,14 +237,14 @@ export class DownloadRepository extends BaseRepository {
             WHERE tm.system_user_id = ${systemUserId}
               AND ps.record_end_date IS NULL
               AND ps.effect = 'allow'
-              AND (split_part(ps.submission_feature_urn, ':', 2) = split_part(sf.urn, ':', 2) OR split_part(ps.submission_feature_urn, ':', 2) = '*')
-              AND (split_part(ps.submission_feature_urn, ':', 3) = split_part(sf.urn, ':', 3) OR split_part(ps.submission_feature_urn, ':', 3) = '*')
-              AND (split_part(ps.submission_feature_urn, ':', 4) = split_part(sf.urn, ':', 4) OR split_part(ps.submission_feature_urn, ':', 4) = '*')
+              AND (ps.urn_submission_id = sf.submission_id::text OR ps.urn_submission_id = '*')
+              AND (ps.urn_feature_type = ft.name OR ps.urn_feature_type = '*')
+              AND (ps.urn_feature_id = sf.submission_feature_id::text OR ps.urn_feature_id = '*')
           )
         );
     `;
 
-    const response = await this.connection.sql(sql, DownloadFeatureData);
+    const response = await this.connection.sql(sql, DownloadFeatureSummary);
 
     return response.rows;
   }
