@@ -2,6 +2,7 @@ import { useConfigContext } from 'hooks/useContext';
 import useAdminApi from './api/useAdminApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
+import { useCartApi } from './api/useCartApi';
 import useCodesApi from './api/useCodesApi';
 import { useFeaturesApi } from './api/useFeaturesApi';
 import usePoliciesApi from './api/usePoliciesApi';
@@ -48,6 +49,8 @@ export const useApi = () => {
 
   const teams = useTeamsApi(apiAxios);
 
+  const cart = useCartApi(apiAxios);
+
   const teamPolicies = useTeamPoliciesApi(apiAxios);
 
   return {
@@ -63,6 +66,7 @@ export const useApi = () => {
     policies,
     search,
     teams,
+    cart,
     teamPolicies
   };
 };

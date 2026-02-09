@@ -1,3 +1,4 @@
+import { CartContextProvider } from 'contexts/cartContext';
 import { SearchResultPage } from 'features/search/result/SearchResultPage';
 import { SearchPage } from 'features/search/SearchPage';
 import { SubmissionFeaturePage } from 'features/submissions/page/features/SubmissionFeaturePage';
@@ -26,8 +27,10 @@ export const SearchRouter = () => {
         path="/list"
         element={
           <BaseLayout>
-            <PageTitle title="Search Results" description="List of search results" />
-            <SearchResultPage />
+            <CartContextProvider>
+              <PageTitle title="Search Results" description="List of search results" />
+              <SearchResultPage />
+            </CartContextProvider>
           </BaseLayout>
         }
       />

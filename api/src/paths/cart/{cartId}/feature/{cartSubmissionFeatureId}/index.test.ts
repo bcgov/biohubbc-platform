@@ -52,6 +52,8 @@ describe('DELETE /cart/{cartId}/feature/{cartSubmissionFeatureId}', () => {
     const removeSubmissionFeatureStub = sinon
       .stub(CartSubmissionFeatureService.prototype, 'removeSubmissionFeaturesFromCart')
       .resolves();
+    sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves([]);
+    sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureCount').resolves(0);
 
     const requestHandler = deleteCartSubmissionFeature();
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -60,7 +62,9 @@ describe('DELETE /cart/{cartId}/feature/{cartSubmissionFeatureId}', () => {
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(mockRes.sendStatusValue).to.equal(200);
+    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.jsonValue).to.have.property('features');
+    expect(mockRes.jsonValue).to.have.property('pagination');
     expect(removeSubmissionFeatureStub).to.have.been.calledOnceWith('fake-cart-id', ['123']);
     expect(mockDBConnection.commit).to.have.been.calledOnce;
     expect(mockDBConnection.release).to.have.been.calledOnce;

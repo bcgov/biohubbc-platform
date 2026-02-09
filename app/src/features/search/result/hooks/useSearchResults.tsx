@@ -163,7 +163,7 @@ export const useSearchResults = () => {
   // Load on mount
   useEffect(() => {
     searchDataLoader.load(searchParams);
-  }, [searchDataLoader, searchParams]);
+  }, [searchParams, searchDataLoader]);
 
   return {
     rows: searchDataLoader.data?.features ?? [],

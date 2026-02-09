@@ -37,10 +37,15 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
       w_valid_features AS (
         SELECT wf.submission_feature_id
         FROM w_features wf
-        LEFT JOIN submission_feature_security sfs 
-          ON sfs.submission_feature_id = wf.submission_feature_id
-        WHERE sfs.record_end_date IS NULL 
-           OR sfs.record_end_date > now()
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM submission_feature_security sfs
+          WHERE sfs.submission_feature_id = wf.submission_feature_id
+            AND (
+              sfs.record_end_date IS NULL
+              OR sfs.record_end_date > now()
+            )
+        )
       )
       INSERT INTO cart_submission_feature (cart_id, submission_feature_id)
       SELECT wc.cart_id, wvf.submission_feature_id
@@ -117,7 +122,7 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
         'sf.submission_id',
         'sf.feature_type_id',
         'ft.name as feature_type_name',
-        knex.raw('CASE WHEN sf_sec.submission_feature_id IS NOT NULL THEN TRUE ELSE FALSE END AS secured')
+        knex.raw('FALSE AS secured')
       )
       .from('submission_feature as sf')
       .leftJoin('secured_features as sf_sec', 'sf_sec.submission_feature_id', 'sf.submission_feature_id')

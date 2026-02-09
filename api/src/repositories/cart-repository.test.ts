@@ -24,7 +24,7 @@ describe('CartRepository', () => {
       const mockQueryResponse = {
         rowCount: 1,
         rows: [mockCart]
-      } as unknown as Promise<QueryResult<any>>;
+      } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({
         knex: async () => mockQueryResponse
@@ -41,7 +41,7 @@ describe('CartRepository', () => {
       const mockQueryResponse = {
         rowCount: 0,
         rows: []
-      } as unknown as Promise<QueryResult<any>>;
+      } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({
         knex: async () => mockQueryResponse
@@ -69,7 +69,7 @@ describe('CartRepository', () => {
       const mockQueryResponse = {
         rowCount: 1,
         rows: [mockCart]
-      } as unknown as Promise<QueryResult<any>>;
+      } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({
         knex: async () => mockQueryResponse
@@ -86,7 +86,7 @@ describe('CartRepository', () => {
       const mockQueryResponse = {
         rowCount: 0,
         rows: []
-      } as unknown as Promise<QueryResult<any>>;
+      } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({
         knex: async () => mockQueryResponse
@@ -111,7 +111,7 @@ describe('CartRepository', () => {
       const mockQueryResponse = {
         rowCount: 1,
         rows: [mockCart]
-      } as unknown as Promise<QueryResult<any>>;
+      } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({
         knex: async () => mockQueryResponse
@@ -128,7 +128,7 @@ describe('CartRepository', () => {
       const mockQueryResponse = {
         rowCount: 0,
         rows: []
-      } as unknown as Promise<QueryResult<any>>;
+      } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({
         knex: async () => mockQueryResponse
@@ -150,7 +150,7 @@ describe('CartRepository', () => {
       const mockQueryResponse = {
         rowCount: 1,
         rows: []
-      } as unknown as Promise<QueryResult<any>>;
+      } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({
         knex: async () => mockQueryResponse
@@ -169,7 +169,7 @@ describe('CartRepository', () => {
       const mockQueryResponse = {
         rowCount: 0,
         rows: []
-      } as unknown as Promise<QueryResult<any>>;
+      } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({
         knex: async () => mockQueryResponse
@@ -193,7 +193,7 @@ describe('CartRepository', () => {
       const mockQueryResponse = {
         rowCount: 1,
         rows: []
-      } as unknown as Promise<QueryResult<any>>;
+      } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({
         knex: async () => mockQueryResponse

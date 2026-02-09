@@ -119,6 +119,10 @@ const appTheme = createTheme({
         sizeLarge: {
           fontSize: '1rem'
         },
+        sizeSmall: {
+          padding: '8px 12px',
+          fontSize: '0.75rem'
+        },
         containedPrimary: {
           fontWeight: 700,
           letterSpacing: '0.02rem'
@@ -300,8 +304,10 @@ const appTheme = createTheme({
           display: 'flex',
           flexWrap: 'wrap',
           borderRadius: 0,
+          gap: 1,
           '& .MuiToggleButton-root': {
             textTransform: 'none',
+            border: 'none',
             fontWeight: 700,
             fontSize: '0.875rem',
             padding: '6px 12px'

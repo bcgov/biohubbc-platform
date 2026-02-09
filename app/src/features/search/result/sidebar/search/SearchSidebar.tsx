@@ -1,7 +1,6 @@
 import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
 import { TypedURLSearchParams } from 'hooks/useSearchQuery';
 import { useMemo } from 'react';
-import { SidebarHeader } from './components/header/SearchSidebarHeader';
 import { SidebarOption } from './components/section/option/SearchSidebarOption';
 import { SearchSidebarFeatureTypes } from './feature-type/SearchSidebarFeatureType';
 import { OmitListedRecommendedState, RecommendedFiltersState } from './hooks/useRecommendedFilters';
@@ -10,27 +9,27 @@ import { SearchSidebarSpecies } from './species/SearchSidebarSpecies';
 
 interface SearchSidebarProps {
   /**
-   * {@type RecommendedFiltersState} recommended - Recommended filter options for all sections
+   * Recommended filter options for all sections
    */
   recommended: RecommendedFiltersState;
   /**
-   * {@type SidebarOption[]} featureTypeOptions - Available feature type options
+   * Available feature type options
    */
   featureTypeOptions: SidebarOption[];
   /**
-   * {@type TypedURLSearchParams} queryParams - Current query parameters
+   * Current query parameters
    */
   queryParams: TypedURLSearchParams<Record<string, string>>;
   /**
-   * {@type OmitListedRecommendedState} omitListedRecommended - Omitted recommended items per session
+   * Omitted recommended items per session
    */
   omitListedRecommended: OmitListedRecommendedState;
   /**
-   * {@type (update: {param: UrlParamKey; value: string; replace?: boolean}) => void} onFilterChange - Callback for filter changes
+   * Callback for filter changes
    */
   onFilterChange: (update: { param: UrlParamKey; value: string; replace?: boolean }) => void;
   /**
-   * {@type (type: keyof OmitListedRecommendedState, id: string | number) => void} onOmitListRecommended - Callback for omitting recommended items
+   * Callback for omitting recommended items
    */
   onOmitListRecommended: (type: keyof OmitListedRecommendedState, id: string | number) => void;
 }
@@ -55,8 +54,6 @@ export const SearchSidebar = ({
 
   return (
     <>
-      <SidebarHeader title="Filters" />
-
       <SearchSidebarFeatureTypes
         recommended={recommended}
         featureTypeOptions={featureTypeOptions}

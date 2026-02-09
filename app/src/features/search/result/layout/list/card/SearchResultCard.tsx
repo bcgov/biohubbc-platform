@@ -1,12 +1,17 @@
-import { Button, Card, CardActions, CardContent, CardHeader, Chip, Typography } from '@mui/material';
+import { mdiCheck, mdiPlus } from '@mdi/js';
+import Icon from '@mdi/react';
+import { Card, CardActions, CardContent, CardHeader, Chip, IconButton, Typography } from '@mui/material';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 
 interface SearchResultCardProps {
   result: SearchFeatureResultWithRelevancy;
-  onClick?: (result: SearchFeatureResultWithRelevancy) => void;
+  isInCart: boolean;
+  onDownload?: (result: SearchFeatureResultWithRelevancy) => void;
+  onAddToCart?: (result: SearchFeatureResultWithRelevancy) => void;
+  onRemoveFromCart?: (featureId: number) => void;
 }
 
-export const SearchResultCard = ({ result, onClick }: SearchResultCardProps) => {
+export const SearchResultCard = ({ result, isInCart, onAddToCart, onRemoveFromCart }: SearchResultCardProps) => {
   return (
     <Card elevation={0} key={result.uuid}>
       <CardHeader
@@ -58,16 +63,26 @@ export const SearchResultCard = ({ result, onClick }: SearchResultCardProps) => 
           {result.feature_description}
         </Typography>
       </CardContent>
-      <CardActions sx={{ px: 2, py: 1.5 }}>
-        <Button
-          variant="outlined"
-          onClick={() => {
-            if (onClick) {
-              onClick(result);
-            }
-          }}>
-          View Details
-        </Button>
+      <CardActions sx={{ px: 2, py: 1.5, gap: 0.5, display: 'flex', justifyContent: 'flex-end' }}>
+        {isInCart ? (
+          <IconButton
+            size="small"
+            title="Remove from Cart"
+            onClick={() => {
+              onRemoveFromCart?.(result.submission_feature_id);
+            }}>
+            <Icon path={mdiCheck} size={1} />
+          </IconButton>
+        ) : (
+          <IconButton
+            size="small"
+            title="Add to Cart"
+            onClick={() => {
+              onAddToCart?.(result);
+            }}>
+            <Icon path={mdiPlus} size={1} />
+          </IconButton>
+        )}
       </CardActions>
     </Card>
   );
