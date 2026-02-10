@@ -7,7 +7,7 @@ import { CodesContextProvider } from 'contexts/codesContext';
 import { DialogContextProvider } from 'contexts/dialogContext';
 import React, { PropsWithChildren } from 'react';
 
-const BaseLayout = (props: PropsWithChildren) => {
+const SearchLayout = (props: PropsWithChildren) => {
   function isSupportedBrowser() {
     if (
       navigator.userAgent.indexOf('Chrome') !== -1 ||
@@ -17,32 +17,30 @@ const BaseLayout = (props: PropsWithChildren) => {
     ) {
       return true;
     }
-
     return false;
   }
-
   return (
     <Box display="flex" flexDirection="column" height="100vh">
-      <CssBaseline />
+      {' '}
+      <CssBaseline />{' '}
       <DialogContextProvider>
+        {' '}
         <CodesContextProvider>
+          {' '}
           {!isSupportedBrowser() && (
             <Alert severity="error">This is an unsupported browser. Some functionality may not work as expected.</Alert>
-          )}
-
-          <Header />
-
-          <Box component="main" flex="1 1 auto">
+          )}{' '}
+          <Header />{' '}
+          <Box component="main" flex="1 1 auto" display="flex" flexDirection="column" minHeight={0}>
+            {' '}
             {React.Children.map(props.children, (child: any) => {
               return React.cloneElement(child);
-            })}
-          </Box>
-
-          <Footer />
-        </CodesContextProvider>
-      </DialogContextProvider>
+            })}{' '}
+          </Box>{' '}
+          <Footer />{' '}
+        </CodesContextProvider>{' '}
+      </DialogContextProvider>{' '}
     </Box>
   );
 };
-
-export default BaseLayout;
+export default SearchLayout;

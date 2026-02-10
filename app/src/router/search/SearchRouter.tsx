@@ -3,6 +3,7 @@ import { SearchResultPage } from 'features/search/result/SearchResultPage';
 import { SearchPage } from 'features/search/SearchPage';
 import { SubmissionFeaturePage } from 'features/submissions/page/features/SubmissionFeaturePage';
 import BaseLayout from 'layouts/BaseLayout';
+import SearchLayout from 'layouts/SearchLayout';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
 
@@ -26,12 +27,12 @@ export const SearchRouter = () => {
       <Route
         path="/list"
         element={
-          <BaseLayout>
+          <SearchLayout>
             <CartContextProvider>
               <PageTitle title="Search Results" description="List of search results" />
               <SearchResultPage />
             </CartContextProvider>
-          </BaseLayout>
+          </SearchLayout>
         }
       />
 

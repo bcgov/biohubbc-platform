@@ -3,10 +3,10 @@ import { ManagePoliciesPage } from 'features/admin/policies/ManagePoliciesPage';
 import ManageUsersPage from 'features/admin/users/ManageUsersPage';
 import { SystemRoleGuard } from 'guards/Guards';
 import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
-import BaseLayout from 'layouts/BaseLayout';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
 import { SubmissionsRouter } from './submission/SubmissionRouter';
+import BaseLayout from 'layouts/BaseLayout';
 
 /**
  * Returns routes for system administrators

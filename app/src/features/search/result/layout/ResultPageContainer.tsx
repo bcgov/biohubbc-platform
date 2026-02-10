@@ -5,7 +5,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { Box, IconButton, Paper, Stack, Typography } from '@mui/material';
 import { useState } from 'react';
 
-interface ResultPageLayoutProps {
+interface ResultPageContainerProps {
   leftSidebar?: React.ReactNode;
   rightSidebar?: React.ReactNode;
   leftSidebarWidth?: number;
@@ -13,24 +13,18 @@ interface ResultPageLayoutProps {
   children: React.ReactNode;
 }
 
-export const ResultPageLayout = ({
+export const ResultPageContainer = ({
   leftSidebar,
   rightSidebar,
   leftSidebarWidth = 350,
   rightSidebarWidth = 350,
   children
-}: ResultPageLayoutProps) => {
+}: ResultPageContainerProps) => {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        height: '100%', // fill parent container
-        maxHeight: '100%', // allow max height constraint from parent
-        overflow: 'hidden'
-      }}>
+    <Box sx={{ display: 'flex', height: '100%', maxHeight: '100%', overflow: 'hidden' }}>
       {/* Left Sidebar */}
       <Box
         sx={{
