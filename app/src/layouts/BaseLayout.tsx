@@ -6,21 +6,9 @@ import Header from 'components/layout/header/Header';
 import { CodesContextProvider } from 'contexts/codesContext';
 import { DialogContextProvider } from 'contexts/dialogContext';
 import React, { PropsWithChildren } from 'react';
+import { isSupportedBrowser } from 'utils/browser';
 
 const BaseLayout = (props: PropsWithChildren) => {
-  function isSupportedBrowser() {
-    if (
-      navigator.userAgent.indexOf('Chrome') !== -1 ||
-      navigator.userAgent.indexOf('Firefox') !== -1 ||
-      navigator.userAgent.indexOf('Safari') !== -1 ||
-      navigator.userAgent.indexOf('Edge') !== -1
-    ) {
-      return true;
-    }
-
-    return false;
-  }
-
   return (
     <Box display="flex" flexDirection="column" height="100vh">
       <CssBaseline />
