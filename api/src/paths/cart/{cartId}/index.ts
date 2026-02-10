@@ -1,18 +1,14 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
-import { GetCartWithFeaturesSchema } from '../../../openapi/schemas/cart';
+import { CartWithFeaturesResponseSchema } from '../../../openapi/schemas/cart';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
-import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../../openapi/schemas/pagination';
+import { paginationRequestQueryParamSchema } from '../../../openapi/schemas/pagination';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { CartService } from '../../../services/cart-service';
 import { CartSubmissionFeatureService } from '../../../services/cart-submission-feature-service';
 import { getLogger } from '../../../utils/logger';
-import {
-  ensureCompletePaginationOptions,
-  makePaginationOptionsFromRequest,
-  makePaginationResponse
-} from '../../../utils/pagination';
+import { makePaginationOptionsFromRequest } from '../../../utils/pagination';
 
 const defaultLog = getLogger('paths/cart/{cartId}');
 
@@ -27,7 +23,21 @@ export const GET: Operation = [
       ]
     };
   }),
-  findCartWithFeaturesById()
+  getCartWithFeaturesById()
+];
+
+export const PUT: Operation = [
+  authorizeRequestHandler((req) => {
+    return {
+      and: [
+        {
+          discriminator: 'Cart',
+          cartId: req.params.cartId
+        }
+      ]
+    };
+  }),
+  claimCartForCurrentUser()
 ];
 
 GET.apiDoc = {
@@ -55,14 +65,7 @@ GET.apiDoc = {
       description: 'Cart retrieved successfully',
       content: {
         'application/json': {
-          schema: {
-            type: 'object',
-            required: ['cart', 'pagination'],
-            properties: {
-              cart: GetCartWithFeaturesSchema,
-              pagination: paginationResponseSchema
-            }
-          }
+          schema: CartWithFeaturesResponseSchema
         }
       }
     },
@@ -73,12 +76,39 @@ GET.apiDoc = {
   }
 };
 
+PUT.apiDoc = {
+  description: 'Assign a cart to the currently authenticated user',
+  tags: ['cart'],
+  security: [
+    {
+      Bearer: []
+    }
+  ],
+  parameters: [
+    {
+      in: 'path',
+      name: 'cartId',
+      required: true,
+      schema: {
+        type: 'string',
+        format: 'uuid'
+      }
+    }
+  ],
+  responses: {
+    200: {
+      description: 'Cart assigned successfully'
+    },
+    ...defaultErrorResponses
+  }
+};
+
 /**
  * Get a cart by ID, with the first page of features
  *
  * @returns {RequestHandler}
  */
-export function findCartWithFeaturesById(): RequestHandler {
+export function getCartWithFeaturesById(): RequestHandler {
   return async (req, res) => {
     const isAuthenticated = !!req.keycloak_token;
     const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
@@ -96,16 +126,50 @@ export function findCartWithFeaturesById(): RequestHandler {
 
       const pagination = makePaginationOptionsFromRequest(req);
 
-      const [cart, count] = await Promise.all([
-        cartService.findCartWithFeaturesById(cartId, ensureCompletePaginationOptions(pagination)),
-        cartSubmissionFeatureService.getCartSubmissionFeatureCount(cartId)
-      ]);
+      const cart = await cartService.getCartById(cartId);
+
+      const paginatedFeatures = await cartSubmissionFeatureService.getPaginatedCartFeaturesResponse(cartId, pagination);
 
       await connection.commit();
 
-      res.status(200).json({ cart, pagination: makePaginationResponse(count, pagination) });
+      res.status(200).json({
+        ...paginatedFeatures,
+        cart
+      });
     } catch (error) {
       defaultLog.error({ label: 'findCartWithFeaturesById', message: 'Error fetching cart', error });
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  };
+}
+
+/**
+ * Assign an existing cart to the currently authenticated user.
+ *
+ * @returns {RequestHandler}
+ */
+export function claimCartForCurrentUser(): RequestHandler {
+  return async (req, res) => {
+    const connection = getDBConnection(req.keycloak_token);
+
+    try {
+      await connection.open();
+
+      const systemUserId = connection.systemUserId();
+
+      const cartId = req.params.cartId;
+      const cartService = new CartService(connection);
+
+      await cartService.updateCart(cartId, { system_user_id: systemUserId });
+
+      await connection.commit();
+
+      return res.sendStatus(200);
+    } catch (error) {
+      defaultLog.error({ label: 'claimCartForCurrentUser', message: 'Error claiming cart', error });
       await connection.rollback();
       throw error;
     } finally {

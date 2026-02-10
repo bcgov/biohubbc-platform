@@ -32,7 +32,7 @@ const BaseLayout: React.FC<React.PropsWithChildren> = (props) => {
 
           <Header />
 
-          <Box component="main" flex="1 1 auto">
+          <Box component="main" flex="1 1 auto" display="flex" flexDirection="column" minHeight={0}>
             {React.Children.map(props.children, (child: any) => {
               return React.cloneElement(child);
             })}

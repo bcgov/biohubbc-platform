@@ -2,7 +2,7 @@ import { mdiClose, mdiMagnify } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Autocomplete, IconButton, InputAdornment, TextField } from '@mui/material';
 import { AutocompleteProps as MuiAutocompleteProps } from '@mui/material/Autocomplete';
-import { SidebarOption } from 'features/search/result/sidebar/components/section/option/SearchSidebarOption';
+import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
 import { useState } from 'react';
 
 // Omit the props we handle ourselves

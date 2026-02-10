@@ -119,6 +119,10 @@ const appTheme = createTheme({
         sizeLarge: {
           fontSize: '1rem'
         },
+        sizeSmall: {
+          padding: '8px 12px',
+          fontSize: '0.75rem'
+        },
         containedPrimary: {
           fontWeight: 700,
           letterSpacing: '0.02rem'
@@ -203,7 +207,7 @@ const appTheme = createTheme({
             }
           },
           '& .MuiAutocomplete-inputRoot': {
-            padding: 0 // optional, adjust to match your input padding
+            padding: 0
           }
         }
       }
@@ -251,7 +255,7 @@ const appTheme = createTheme({
           backgroundColor: 'transparent',
           borderWidth: 0,
           width: '100%',
-          overflowX: 'auto', // <— allow horizontal scroll
+          overflowX: 'auto',
           '& .MuiDataGrid-columnHeaders': {
             fontSize: '0.875rem',
             fontWeight: 700,
@@ -288,7 +292,7 @@ const appTheme = createTheme({
               outline: 'none'
             },
           '& .MuiDataGrid-virtualScroller': {
-            overflowX: 'auto' // <— ensure the virtual scroller also scrolls horizontally
+            overflowX: 'auto'
           }
         }
       }
@@ -300,8 +304,10 @@ const appTheme = createTheme({
           display: 'flex',
           flexWrap: 'wrap',
           borderRadius: 0,
+          gap: 1,
           '& .MuiToggleButton-root': {
             textTransform: 'none',
+            border: 'none',
             fontWeight: 700,
             fontSize: '0.875rem',
             padding: '6px 12px'

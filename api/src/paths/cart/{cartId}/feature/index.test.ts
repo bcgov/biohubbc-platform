@@ -204,6 +204,8 @@ describe('cart/{cartId}', () => {
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
       sinon.stub(CartSubmissionFeatureService.prototype, 'addSubmissionFeaturesToCart').resolves();
+      sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves([]);
+      sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureCount').resolves(0);
 
       const requestHandler = addSubmissionFeaturesToCart();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -214,7 +216,9 @@ describe('cart/{cartId}', () => {
 
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
-      expect(mockRes.sendStatusValue).to.equal(200);
+      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.jsonValue).to.have.property('features');
+      expect(mockRes.jsonValue).to.have.property('pagination');
     });
 
     it('handles empty add and remove arrays', async () => {
@@ -226,6 +230,8 @@ describe('cart/{cartId}', () => {
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
       sinon.stub(CartSubmissionFeatureService.prototype, 'addSubmissionFeaturesToCart').resolves();
+      sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves([]);
+      sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureCount').resolves(0);
 
       const requestHandler = addSubmissionFeaturesToCart();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -236,7 +242,9 @@ describe('cart/{cartId}', () => {
 
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
-      expect(mockRes.sendStatusValue).to.equal(200);
+      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.jsonValue).to.have.property('features');
+      expect(mockRes.jsonValue).to.have.property('pagination');
     });
 
     it('rolls back and rethrows if CartService.addSubmissionFeaturesToCart throws an error', async () => {
@@ -301,6 +309,8 @@ describe('cart/{cartId}', () => {
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
       sinon.stub(CartSubmissionFeatureService.prototype, 'clearCart').resolves();
+      sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves([]);
+      sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureCount').resolves(0);
 
       const requestHandler = clearCartSubmissionFeatures();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -310,7 +320,9 @@ describe('cart/{cartId}', () => {
 
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
-      expect(mockRes.sendStatusValue).to.equal(200);
+      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.jsonValue).to.have.property('features');
+      expect(mockRes.jsonValue).to.have.property('pagination');
     });
 
     it('rolls back and rethrows if CartSubmissionFeatureService.clearCart throws an error', async () => {

@@ -19,7 +19,7 @@ describe('CartSubmissionFeatureRepository', () => {
       const mockQueryResponse = {
         rowCount: 3,
         rows: []
-      } as unknown as Promise<QueryResult<any>>;
+      } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
 
@@ -29,6 +29,27 @@ describe('CartSubmissionFeatureRepository', () => {
 
       expect(result).to.be.undefined;
     });
+
+    it('should exclude actively secured features in the insert SQL', async () => {
+      const sqlStub = sinon.stub().resolves({
+        rowCount: 1,
+        rows: []
+      } as unknown as QueryResult<any>);
+
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new CartSubmissionFeatureRepository(mockDBConnection);
+
+      await repo.addSubmissionFeaturesToCart('cart-1', [1, 2, 3]);
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlArg = sqlStub.firstCall.args[0] as { text?: string };
+      const sqlText = sqlArg.text || '';
+
+      expect(sqlText).to.contain('WHERE NOT EXISTS');
+      expect(sqlText).to.contain('submission_feature_security');
+      expect(sqlText).to.contain('sfs.record_end_date IS NULL');
+    });
   });
 
   describe('removeSubmissionFeaturesFromCart', () => {
@@ -36,7 +57,7 @@ describe('CartSubmissionFeatureRepository', () => {
       const mockQueryResponse = {
         rowCount: 1,
         rows: []
-      } as unknown as Promise<QueryResult<any>>;
+      } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({ knex: async () => mockQueryResponse });
 
@@ -53,7 +74,7 @@ describe('CartSubmissionFeatureRepository', () => {
       const mockQueryResponse = {
         rowCount: 2,
         rows: []
-      } as unknown as Promise<QueryResult<any>>;
+      } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({ knex: async () => mockQueryResponse });
 
@@ -89,7 +110,7 @@ describe('CartSubmissionFeatureRepository', () => {
       const mockQueryResponse = {
         rowCount: mockRows.length,
         rows: mockRows
-      } as unknown as Promise<QueryResult<any>>;
+      } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({ knex: async () => mockQueryResponse });
 
@@ -106,7 +127,7 @@ describe('CartSubmissionFeatureRepository', () => {
       const mockQueryResponse = {
         rowCount: 1,
         rows: [{ count: 5 }]
-      } as unknown as Promise<QueryResult<any>>;
+      } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({ knex: async () => mockQueryResponse });
 

@@ -1,5 +1,5 @@
 import { IDBConnection } from '../database/db';
-import { Cart, CartSubmissionFeature, CartWithFeatures, UpdateCart } from '../models/cart';
+import { Cart, CartWithFeatures, CartWithFeaturesResponse, UpdateCart } from '../models/cart';
 import { CartRepository } from '../repositories/cart-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { CartSubmissionFeatureService } from './cart-submission-feature-service';
@@ -37,7 +37,6 @@ export class CartService extends DBService {
       this.cartRepository.getCartById(cartId),
       this.cartSubmissionFeatureService.getCartSubmissionFeatures(cartId, pagination)
     ]);
-
     return { ...cart, features };
   }
 
@@ -66,22 +65,37 @@ export class CartService extends DBService {
   /**
    * Creates a new cart for a system user with optional submission features.
    *
+   * Returns the newly created cart with features and pagination information.
+   *
    * @param {number | null} systemUserId - The ID of the authenticated user. Null if not authenticated.
    * @param {number[]} submissionFeatureIds - The list of submission feature IDs to add to the cart
-   * @return {Promise<CartWithFeatures>} - The newly created cart with features
+   * @param {ApiPaginationOptions} pagination - Pagination options for the response. Defaults to {page: 1, limit: 25}
+   * @return {Promise<CartWithFeaturesResponse>} - The newly created cart with features and pagination
    * @memberof CartService
    */
-  async createCart(systemUserId: number | null, submissionFeatureIds: number[]): Promise<CartWithFeatures> {
+  async createCart(
+    systemUserId: number | null,
+    submissionFeatureIds: number[],
+    pagination?: ApiPaginationOptions
+  ): Promise<CartWithFeaturesResponse> {
     const cart = await this.cartRepository.createCart(systemUserId);
-
-    let features: CartSubmissionFeature[] = [];
 
     if (submissionFeatureIds.length > 0) {
       await this.cartSubmissionFeatureService.addSubmissionFeaturesToCart(cart.cart_id, submissionFeatureIds);
-      features = await this.cartSubmissionFeatureService.getCartSubmissionFeatures(cart.cart_id);
     }
 
-    return { ...cart, features };
+    // Fetch paginated features with provided pagination or defaults
+    const { features, pagination: paginationResult } =
+      await this.cartSubmissionFeatureService.getPaginatedCartFeaturesResponse(
+        cart.cart_id,
+        pagination ?? { page: 1, limit: 25 }
+      );
+
+    return {
+      cart,
+      features,
+      pagination: paginationResult
+    };
   }
 
   /**
