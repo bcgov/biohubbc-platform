@@ -28,8 +28,9 @@ export const useSessionStorage = <T>(sessionStorageId: string, initialValue: T):
     try {
       // attempt to parse storage value
       return JSON.parse(storageValue);
-    } catch (_error) {
-      // unable to parse just return the value
+    } catch (error) {
+      console.error(`Failed to parse session storage value for key: ${prefixedKey}`, error);
+      // unable to parse, return the raw stored value
       return storageValue;
     }
   });
