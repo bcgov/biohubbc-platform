@@ -9,7 +9,7 @@ import { SearchResultOptions } from './content/option/SearchResultOptions';
 import { SearchResultToolbar } from './content/toolbar/SearchResultToolbar';
 import { SearchResultHeader } from './header/SearchResultHeader';
 import { useSearchResults } from './hooks/useSearchResults';
-import { ResultPageLayout } from './layout/SearchResultLayout';
+import { ResultPageContainer } from './layout/ResultPageContainer';
 import { DownloadSidebar } from './sidebar/download/DownloadSidebar';
 import { SearchSidebar } from './sidebar/search/SearchSidebar';
 import {
@@ -198,7 +198,7 @@ export const SearchResultPage = () => {
   }, [rows, addToCart, dialogContext]);
 
   return (
-    <ResultPageLayout
+    <ResultPageContainer
       leftSidebar={
         <SearchSidebar
           recommended={recommended}
@@ -239,6 +239,6 @@ export const SearchResultPage = () => {
           </Box>
         </Paper>
       </Box>
-    </ResultPageLayout>
+    </ResultPageContainer>
   );
 };

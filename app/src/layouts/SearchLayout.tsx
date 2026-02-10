@@ -8,7 +8,7 @@ import { DialogContextProvider } from 'contexts/dialogContext';
 import React, { PropsWithChildren } from 'react';
 import { isSupportedBrowser } from 'utils/browser';
 
-const BaseLayout = (props: PropsWithChildren) => {
+const SearchLayout = (props: PropsWithChildren) => {
   return (
     <Box display="flex" flexDirection="column" height="100vh">
       <CssBaseline />
@@ -19,13 +19,11 @@ const BaseLayout = (props: PropsWithChildren) => {
           )}
 
           <Header />
-
-          <Box component="main" flex="1 1 auto">
+          <Box component="main" flex="1 1 auto" display="flex" flexDirection="column" minHeight={0}>
             {React.Children.map(props.children, (child: any) => {
               return React.cloneElement(child);
             })}
           </Box>
-
           <Footer />
         </CodesContextProvider>
       </DialogContextProvider>
@@ -33,4 +31,4 @@ const BaseLayout = (props: PropsWithChildren) => {
   );
 };
 
-export default BaseLayout;
+export default SearchLayout;
