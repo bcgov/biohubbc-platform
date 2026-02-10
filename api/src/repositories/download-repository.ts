@@ -1,5 +1,6 @@
 import SQL from 'sql-template-strings';
 import { FRAGMENT_SIZE_THRESHOLD } from '../constants/download';
+import { ApiExecuteSQLError } from '../errors/api-error';
 import { DownloadFeatureRecord, DownloadFeatureSummary, DownloadId, DownloadRecord } from '../models/download';
 import { DownloadStatusEnum } from '../models/download-status';
 import { BaseRepository } from './base-repository';
@@ -31,6 +32,13 @@ export class DownloadRepository extends BaseRepository {
 
     const response = await this.connection.sql(sql, DownloadId);
 
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert download record', [
+        'DownloadRepository->createDownload',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
     return response.rows[0];
   }
 
@@ -43,13 +51,14 @@ export class DownloadRepository extends BaseRepository {
    * @memberof DownloadRepository
    */
   async createDownloadFeatures(downloadId: number, submissionFeatureIds: number[]): Promise<void> {
-    const values = submissionFeatureIds.map((id) => `(${downloadId}, ${id})`).join(', ');
+    if (submissionFeatureIds.length === 0) {
+      return;
+    }
 
     const sql = SQL`
       INSERT INTO download_feature (download_id, submission_feature_id)
-      VALUES `
-      .append(values)
-      .append(SQL`;`);
+      SELECT ${downloadId}, unnest(${submissionFeatureIds}::integer[]);
+    `;
 
     await this.connection.sql(sql);
   }
@@ -61,7 +70,7 @@ export class DownloadRepository extends BaseRepository {
    * @return {Promise<DownloadRecord | null>}
    * @memberof DownloadRepository
    */
-  async getDownloadById(downloadId: number): Promise<DownloadRecord | null> {
+  async findDownloadById(downloadId: number): Promise<DownloadRecord | null> {
     const sql = SQL`
       SELECT
         download_id,
@@ -133,7 +142,14 @@ export class DownloadRepository extends BaseRepository {
   async updateDownloadStatus(
     downloadId: number,
     downloadStatus: DownloadStatusEnum,
-    metadata?: { s3_key?: string; file_name?: string; file_size_bytes?: number; error?: string }
+    metadata?: {
+      s3_key?: string;
+      file_name?: string;
+      file_size_bytes?: string | number;
+      error?: string;
+      started_at?: string;
+      completed_at?: string;
+    }
   ): Promise<void> {
     const sql = SQL`
       UPDATE download
@@ -143,12 +159,19 @@ export class DownloadRepository extends BaseRepository {
         file_name = COALESCE(${metadata?.file_name ?? null}, file_name),
         file_size_bytes = COALESCE(${metadata?.file_size_bytes ?? null}, file_size_bytes),
         metadata = ${JSON.stringify(metadata ?? null)}::jsonb,
-        started_at = CASE WHEN ${downloadStatus} = 'processing' AND started_at IS NULL THEN now() ELSE started_at END,
-        completed_at = CASE WHEN ${downloadStatus} IN ('ready', 'failed') THEN now() ELSE completed_at END
+        started_at = COALESCE(${metadata?.started_at ?? null}::timestamptz, started_at),
+        completed_at = COALESCE(${metadata?.completed_at ?? null}::timestamptz, completed_at)
       WHERE download_id = ${downloadId};
     `;
 
-    await this.connection.sql(sql);
+    const response = await this.connection.sql(sql);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update download status', [
+        'DownloadRepository->updateDownloadStatus',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
   }
 
   /**
@@ -167,7 +190,14 @@ export class DownloadRepository extends BaseRepository {
       WHERE download_id = ${downloadId};
     `;
 
-    await this.connection.sql(sql);
+    const response = await this.connection.sql(sql);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to mark download as downloaded', [
+        'DownloadRepository->markDownloadAsDownloaded',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
   }
 
   /**
@@ -264,7 +294,14 @@ export class DownloadRepository extends BaseRepository {
       WHERE download_id = ${downloadId};
     `;
 
-    await this.connection.sql(sql);
+    const response = await this.connection.sql(sql);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update download fragment counts', [
+        'DownloadRepository->updateDownloadFragmentCounts',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
   }
 
   /**
@@ -282,6 +319,13 @@ export class DownloadRepository extends BaseRepository {
       WHERE download_id = ${downloadId};
     `;
 
-    await this.connection.sql(sql);
+    const response = await this.connection.sql(sql);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update estimated total size', [
+        'DownloadRepository->updateEstimatedTotalSize',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
   }
 }

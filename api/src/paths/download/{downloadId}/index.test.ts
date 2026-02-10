@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getDownloadById } from '.';
+import { findDownloadById } from '.';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
 import { DownloadService } from '../../../services/download-service';
@@ -15,7 +15,7 @@ describe('paths/download/{downloadId}/index', () => {
     sinon.restore();
   });
 
-  describe('getDownloadById', () => {
+  describe('findDownloadById', () => {
     it('should return 200 with download details and fragments when user owns download', async () => {
       const dbConnectionObj = getMockDBConnection();
 
@@ -49,7 +49,7 @@ describe('paths/download/{downloadId}/index', () => {
         }
       ];
 
-      sinon.stub(DownloadService.prototype, 'getDownloadById').resolves(mockDownload as any);
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(mockDownload as any);
       sinon.stub(DownloadService.prototype, 'getFragmentsByDownloadId').resolves(mockFragments as any);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -57,7 +57,7 @@ describe('paths/download/{downloadId}/index', () => {
       mockReq.system_user = { system_user_id: 5 } as any;
       mockReq.params = { downloadId: '1' };
 
-      const requestHandler = getDownloadById();
+      const requestHandler = findDownloadById();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
@@ -93,14 +93,14 @@ describe('paths/download/{downloadId}/index', () => {
       const dbConnectionObj = getMockDBConnection();
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(DownloadService.prototype, 'getDownloadById').resolves(null);
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(null);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       mockReq.system_user = { system_user_id: 5 } as any;
       mockReq.params = { downloadId: '999' };
 
-      const requestHandler = getDownloadById();
+      const requestHandler = findDownloadById();
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
@@ -121,14 +121,14 @@ describe('paths/download/{downloadId}/index', () => {
         system_user_id: 99
       };
 
-      sinon.stub(DownloadService.prototype, 'getDownloadById').resolves(mockDownload as any);
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(mockDownload as any);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       mockReq.system_user = { system_user_id: 5 } as any;
       mockReq.params = { downloadId: '1' };
 
-      const requestHandler = getDownloadById();
+      const requestHandler = findDownloadById();
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);

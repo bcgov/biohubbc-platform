@@ -253,7 +253,7 @@ export const publishProcessDownloadJob = async (
     const downloadService = new DownloadService(connection);
 
     // Check if download exists
-    const download = await downloadService.getDownloadById(data.downloadId);
+    const download = await downloadService.findDownloadById(data.downloadId);
 
     if (!download) {
       return { status: 'error', message: 'Download not found' };

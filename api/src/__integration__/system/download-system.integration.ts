@@ -25,6 +25,16 @@ function parseCsvLines(csv: string): string[] {
   return csv.trim().split('\n');
 }
 
+/** Download a zip file from S3 and return it as an AdmZip instance. */
+async function downloadZipFromS3(storageService: ObjectStorageService, s3Key: string): Promise<AdmZip> {
+  const fileStream = await storageService.getFileStream(BucketType.MAIN, s3Key);
+  const chunks: Buffer[] = [];
+  for await (const chunk of fileStream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return new AdmZip(Buffer.concat(chunks));
+}
+
 /**
  * Poll the download table until the status matches the target or times out.
  */
@@ -209,18 +219,6 @@ describe('Download Worker', function () {
     return download.download_id;
   }
 
-  /**
-   * Download a zip file from S3 and return an AdmZip instance.
-   */
-  async function downloadZipFromS3(s3Key: string): Promise<AdmZip> {
-    const fileStream = await storageService.getFileStream(BucketType.MAIN, s3Key);
-    const chunks: Buffer[] = [];
-    for await (const chunk of fileStream) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    return new AdmZip(Buffer.concat(chunks));
-  }
-
   it('should process a download job and upload zip to S3', async () => {
     // 1. Create test data: submission with parent dataset and child features
     const submissionId = await createTestSubmission();
@@ -299,7 +297,7 @@ describe('Download Worker', function () {
     expect(metadata.ContentLength).to.be.greaterThan(0);
 
     // 5. Download and inspect zip contents
-    const zip = await downloadZipFromS3(finalDownload.s3_key);
+    const zip = await downloadZipFromS3(storageService, finalDownload.s3_key);
     const entries = zip.getEntries().map((e) => e.entryName);
 
     // Should contain one CSV per feature type (file features become multimedia.csv)
@@ -402,7 +400,7 @@ describe('Download Worker', function () {
       expect(frag.fragment_status).to.equal('ready');
       expect(frag.s3_key).to.be.a('string');
       // Each fragment S3 key uses part naming: download-{id}-part-{n}.zip
-      expect(frag.s3_key).to.match(new RegExp(`download-${downloadId}-part-\\d+\\.zip`));
+      expect(frag.s3_key).to.match(new RegExp(String.raw`download-${downloadId}-part-\d+\.zip`));
       s3Keys.add(frag.s3_key);
       createdS3Keys.push(frag.s3_key);
     }
@@ -415,7 +413,7 @@ describe('Download Worker', function () {
     const allCsvContent: Record<string, string> = {};
 
     for (const frag of fragments) {
-      const zip = await downloadZipFromS3(frag.s3_key);
+      const zip = await downloadZipFromS3(storageService, frag.s3_key);
       const entries = zip.getEntries().map((e) => e.entryName);
 
       // Each fragment should contain at least one CSV
@@ -460,7 +458,7 @@ describe('Download Worker', function () {
     // Collect all file entries across all fragment zips
     const allFileEntries: string[] = [];
     for (const frag of fragments) {
-      const zip = await downloadZipFromS3(frag.s3_key);
+      const zip = await downloadZipFromS3(storageService, frag.s3_key);
       const entries = zip.getEntries().map((e) => e.entryName);
       allFileEntries.push(...entries.filter((e) => e.match(/^files\d+\//)));
     }
@@ -569,17 +567,11 @@ describe('DownloadService download pipeline (system)', function () {
   }
 
   /**
-   * Download a zip from S3 and return an AdmZip instance.
-   * Tracks the S3 key for cleanup.
+   * Download a zip from S3, track the key for cleanup, and return an AdmZip instance.
    */
-  async function downloadZipFromS3(s3Key: string): Promise<AdmZip> {
+  async function downloadAndTrackZip(s3Key: string): Promise<AdmZip> {
     s3KeysToCleanup.push(s3Key);
-    const fileStream = await storageService.getFileStream(BucketType.MAIN, s3Key);
-    const chunks: Buffer[] = [];
-    for await (const chunk of fileStream) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    return new AdmZip(Buffer.concat(chunks));
+    return downloadZipFromS3(storageService, s3Key);
   }
 
   /**
@@ -597,20 +589,20 @@ describe('DownloadService download pipeline (system)', function () {
     }
     await service.finalizeDownload(download_id);
 
-    const download = await service.getDownloadById(download_id);
+    const download = await service.findDownloadById(download_id);
     expect(download).to.not.be.null;
     expect(download!.download_status).to.equal(DownloadStatusEnum.READY);
 
     // Single-fragment downloads have s3_key on the parent record
     if (download!.s3_key) {
-      const zip = await downloadZipFromS3(download!.s3_key);
+      const zip = await downloadAndTrackZip(download!.s3_key);
       return { zip, downloadId: download_id };
     }
 
     // Multi-fragment: download first fragment
     const allFragments = await service.getFragmentsByDownloadId(download_id);
     expect(allFragments.length).to.be.greaterThanOrEqual(1);
-    const zip = await downloadZipFromS3(allFragments[0].s3_key!);
+    const zip = await downloadAndTrackZip(allFragments[0].s3_key!);
     return { zip, downloadId: download_id };
   }
 
@@ -730,7 +722,7 @@ describe('DownloadService download pipeline (system)', function () {
     expect(fragments[0].fragment_index).to.equal(0);
     expect(fragments[0].s3_key).to.be.a('string');
     expect(fragments[0].file_name).to.include(`download-${downloadId}`);
-    expect(fragments[0].file_size_bytes).to.be.greaterThan(0);
+    expect(Number(fragments[0].file_size_bytes)).to.be.greaterThan(0);
     expect(fragments[0].feature_count).to.equal(2);
 
     // Verify signed URL

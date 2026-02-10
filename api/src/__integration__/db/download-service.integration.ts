@@ -164,7 +164,7 @@ describe('DownloadService (integration)', function () {
       // Step 3: Verify download record was created with correct initial state
       expect(result).to.have.property('download_id').that.is.a('number');
 
-      const download = await service.getDownloadById(result.download_id);
+      const download = await service.findDownloadById(result.download_id);
       expect(download).to.not.be.null;
       expect(download!.download_status).to.equal(DownloadStatusEnum.PENDING);
       expect(download!.system_user_id).to.equal(systemUserId);
@@ -195,8 +195,9 @@ describe('DownloadService (integration)', function () {
       try {
         await service.createDownloadRequest(systemUserId, [999999]);
         expect.fail('Should have thrown a foreign key violation');
-      } catch (_error) {
+      } catch (error) {
         // Expected: FK constraint violation on download_feature.submission_feature_id
+        expect(error).to.exist;
       }
 
       // Step 3: Restore to savepoint so the transaction is usable again
@@ -221,7 +222,7 @@ describe('DownloadService (integration)', function () {
       await service.updateDownloadStatus(download_id, DownloadStatusEnum.PROCESSING);
 
       // Step 3: Verify started_at is set, completed_at is still null
-      const afterProcessing = await service.getDownloadById(download_id);
+      const afterProcessing = await service.findDownloadById(download_id);
       expect(afterProcessing!.download_status).to.equal(DownloadStatusEnum.PROCESSING);
       expect(afterProcessing!.started_at).to.not.be.null;
       expect(afterProcessing!.completed_at).to.be.null;
@@ -236,13 +237,13 @@ describe('DownloadService (integration)', function () {
       });
 
       // Step 5: Verify started_at is preserved (not overwritten), completed_at is set
-      const afterReady = await service.getDownloadById(download_id);
+      const afterReady = await service.findDownloadById(download_id);
       expect(afterReady!.download_status).to.equal(DownloadStatusEnum.READY);
       expect(afterReady!.started_at).to.equal(firstStartedAt);
       expect(afterReady!.completed_at).to.not.be.null;
       expect(afterReady!.s3_key).to.equal('downloads/test/test.zip');
       expect(afterReady!.file_name).to.equal('test.zip');
-      expect(afterReady!.file_size_bytes).to.equal(1024);
+      expect(afterReady!.file_size_bytes).to.equal('1024');
     });
   });
 
@@ -264,7 +265,7 @@ describe('DownloadService (integration)', function () {
       const { download_id } = await service.createDownloadRequest(systemUserId, [featureId1, featureId2]);
 
       // Step 2: Verify initial state
-      const initial = await service.getDownloadById(download_id);
+      const initial = await service.findDownloadById(download_id);
       expect(initial!.download_status).to.equal(DownloadStatusEnum.PENDING);
       expect(initial!.started_at).to.be.null;
       expect(initial!.completed_at).to.be.null;
@@ -272,7 +273,7 @@ describe('DownloadService (integration)', function () {
 
       // Step 3: Transition to processing and verify
       await service.updateDownloadStatus(download_id, DownloadStatusEnum.PROCESSING);
-      const processing = await service.getDownloadById(download_id);
+      const processing = await service.findDownloadById(download_id);
       expect(processing!.download_status).to.equal(DownloadStatusEnum.PROCESSING);
       expect(processing!.started_at).to.not.be.null;
 
@@ -282,7 +283,7 @@ describe('DownloadService (integration)', function () {
         file_name: `download-${download_id}.zip`,
         file_size_bytes: 2048
       });
-      const ready = await service.getDownloadById(download_id);
+      const ready = await service.findDownloadById(download_id);
       expect(ready!.download_status).to.equal(DownloadStatusEnum.READY);
       expect(ready!.completed_at).to.not.be.null;
       expect(ready!.s3_key).to.equal(`downloads/${download_id}/download-${download_id}.zip`);
@@ -309,8 +310,8 @@ describe('DownloadService (integration)', function () {
 
       expect(sizeData).to.have.length(1);
       expect(sizeData[0].submission_feature_id).to.equal(featureId);
-      expect(sizeData[0].estimated_byte_size).to.be.a('number');
-      expect(sizeData[0].estimated_byte_size).to.be.greaterThan(0);
+      expect(sizeData[0].estimated_byte_size).to.be.a('string');
+      expect(Number(sizeData[0].estimated_byte_size)).to.be.greaterThan(0);
       expect(sizeData[0].feature_type_name).to.equal('dataset');
       expect(sizeData[0]).to.not.have.property('data');
     });

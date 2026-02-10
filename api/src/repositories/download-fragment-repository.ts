@@ -1,4 +1,5 @@
 import SQL from 'sql-template-strings';
+import { ApiExecuteSQLError } from '../errors/api-error';
 import { DownloadFeatureData } from '../models/download';
 import { DownloadFragmentId, DownloadFragmentRecord } from '../models/download-fragment';
 import { DownloadStatusEnum } from '../models/download-status';
@@ -36,6 +37,13 @@ export class DownloadFragmentRepository extends BaseRepository {
 
     const response = await this.connection.sql(sql, DownloadFragmentId);
 
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert download fragment record', [
+        'DownloadFragmentRepository->createDownloadFragment',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
     return response.rows[0];
   }
 
@@ -52,13 +60,10 @@ export class DownloadFragmentRepository extends BaseRepository {
       return;
     }
 
-    const values = submissionFeatureIds.map((id) => `(${downloadFragmentId}, ${id})`).join(', ');
-
     const sql = SQL`
       INSERT INTO download_fragment_feature (download_fragment_id, submission_feature_id)
-      VALUES `
-      .append(values)
-      .append(SQL`;`);
+      SELECT ${downloadFragmentId}, unnest(${submissionFeatureIds}::integer[]);
+    `;
 
     await this.connection.sql(sql);
   }
@@ -231,7 +236,14 @@ export class DownloadFragmentRepository extends BaseRepository {
   async updateFragmentStatus(
     downloadFragmentId: number,
     status: DownloadStatusEnum,
-    metadata?: { s3_key?: string; file_name?: string; file_size_bytes?: number; error_message?: string }
+    metadata?: {
+      s3_key?: string;
+      file_name?: string;
+      file_size_bytes?: string | number;
+      error_message?: string;
+      started_at?: string;
+      completed_at?: string;
+    }
   ): Promise<void> {
     const sql = SQL`
       UPDATE download_fragment
@@ -241,11 +253,18 @@ export class DownloadFragmentRepository extends BaseRepository {
         file_name = COALESCE(${metadata?.file_name ?? null}, file_name),
         file_size_bytes = COALESCE(${metadata?.file_size_bytes ?? null}, file_size_bytes),
         error_message = COALESCE(${metadata?.error_message ?? null}, error_message),
-        started_at = CASE WHEN ${status} = 'processing' AND started_at IS NULL THEN now() ELSE started_at END,
-        completed_at = CASE WHEN ${status} IN ('ready', 'failed') THEN now() ELSE completed_at END
+        started_at = COALESCE(${metadata?.started_at ?? null}::timestamptz, started_at),
+        completed_at = COALESCE(${metadata?.completed_at ?? null}::timestamptz, completed_at)
       WHERE download_fragment_id = ${downloadFragmentId};
     `;
 
-    await this.connection.sql(sql);
+    const response = await this.connection.sql(sql);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update fragment status', [
+        'DownloadFragmentRepository->updateFragmentStatus',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
   }
 }

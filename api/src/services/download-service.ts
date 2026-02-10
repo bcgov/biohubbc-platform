@@ -1,5 +1,5 @@
 import archiver from 'archiver';
-import { PassThrough } from 'stream';
+import { PassThrough } from 'node:stream';
 import { FRAGMENT_SIZE_THRESHOLD } from '../constants/download';
 import { IDBConnection } from '../database/db';
 import { DownloadFeatureSummary, DownloadId, DownloadRecord } from '../models/download';
@@ -98,8 +98,8 @@ export class DownloadService extends DBService {
    * @return {Promise<DownloadRecord | null>}
    * @memberof DownloadService
    */
-  async getDownloadById(downloadId: number): Promise<DownloadRecord | null> {
-    return this.downloadRepository.getDownloadById(downloadId);
+  async findDownloadById(downloadId: number): Promise<DownloadRecord | null> {
+    return this.downloadRepository.findDownloadById(downloadId);
   }
 
   /**
@@ -125,9 +125,19 @@ export class DownloadService extends DBService {
   async updateDownloadStatus(
     downloadId: number,
     status: DownloadStatusEnum,
-    metadata?: { s3_key?: string; file_name?: string; file_size_bytes?: number; error?: string }
+    metadata?: { s3_key?: string; file_name?: string; file_size_bytes?: string | number; error?: string }
   ): Promise<void> {
-    return this.downloadRepository.updateDownloadStatus(downloadId, status, metadata);
+    const now = new Date().toISOString();
+    const timestamps: { started_at?: string; completed_at?: string } = {};
+
+    if (status === DownloadStatusEnum.PROCESSING) {
+      timestamps.started_at = now;
+    }
+    if (status === DownloadStatusEnum.READY || status === DownloadStatusEnum.FAILED) {
+      timestamps.completed_at = now;
+    }
+
+    return this.downloadRepository.updateDownloadStatus(downloadId, status, { ...metadata, ...timestamps });
   }
 
   /**
@@ -165,7 +175,7 @@ export class DownloadService extends DBService {
    */
   async estimateDownloadSize(downloadId: number, systemUserId: number): Promise<DownloadSizeEstimate> {
     const features = await this.getDownloadFeatureSummaries(downloadId, systemUserId);
-    const totalEstimatedBytes = features.reduce((sum, f) => sum + f.estimated_byte_size, 0);
+    const totalEstimatedBytes = features.reduce((sum, f) => sum + Number(f.estimated_byte_size), 0);
 
     return { totalEstimatedBytes, features };
   }
@@ -186,8 +196,8 @@ export class DownloadService extends DBService {
     const features = sizeEstimate.features;
 
     // Read configurable fragment size from the download record
-    const download = await this.downloadRepository.getDownloadById(downloadId);
-    const fragmentThreshold = download?.fragment_size_bytes ?? FRAGMENT_SIZE_THRESHOLD;
+    const download = await this.downloadRepository.findDownloadById(downloadId);
+    const fragmentThreshold = Number(download?.fragment_size_bytes ?? FRAGMENT_SIZE_THRESHOLD);
 
     // Greedy bin packing using fragment_size_bytes as the bin capacity
     let fragmentIndex = 0;
@@ -211,7 +221,7 @@ export class DownloadService extends DBService {
     };
 
     for (const feature of features) {
-      const featureSize = feature.estimated_byte_size;
+      const featureSize = Number(feature.estimated_byte_size);
 
       // Oversized file: give it its own dedicated fragment
       if (featureSize > fragmentThreshold) {
@@ -259,7 +269,7 @@ export class DownloadService extends DBService {
    * @memberof DownloadService
    */
   async planDownloadIfNeeded(downloadId: number): Promise<void> {
-    const download = await this.downloadRepository.getDownloadById(downloadId);
+    const download = await this.downloadRepository.findDownloadById(downloadId);
 
     if (!download) {
       throw new Error(`Download ${downloadId} not found`);
@@ -302,7 +312,7 @@ export class DownloadService extends DBService {
     const readyCount = fragments.filter((f) => f.fragment_status === DownloadStatusEnum.READY).length;
     await this.downloadRepository.updateDownloadFragmentCounts(downloadId, fragments.length, readyCount);
 
-    const totalSizeBytes = fragments.reduce((sum, f) => sum + (f.file_size_bytes ?? 0), 0);
+    const totalSizeBytes = fragments.reduce((sum, f) => sum + Number(f.file_size_bytes ?? 0), 0);
 
     if (fragments.length === 1) {
       const singleFragment = fragments[0];
@@ -319,7 +329,10 @@ export class DownloadService extends DBService {
   }
 
   async markFragmentProcessing(fragmentId: number): Promise<void> {
-    await this.fragmentRepository.updateFragmentStatus(fragmentId, DownloadStatusEnum.PROCESSING);
+    const now = new Date().toISOString();
+    await this.fragmentRepository.updateFragmentStatus(fragmentId, DownloadStatusEnum.PROCESSING, {
+      started_at: now
+    });
   }
 
   /**
@@ -340,8 +353,11 @@ export class DownloadService extends DBService {
 
     try {
       // Determine file naming: single fragment vs multi fragment
-      const download = await this.downloadRepository.getDownloadById(downloadId);
-      const isSingleFragment = (download?.total_fragments ?? 1) === 1;
+      const download = await this.downloadRepository.findDownloadById(downloadId);
+      if (!download) {
+        throw new Error(`Download ${downloadId} not found`);
+      }
+      const isSingleFragment = download.total_fragments === 1;
       const zipFileName = isSingleFragment
         ? `download-${downloadId}.zip`
         : `download-${downloadId}-part-${fragment.fragment_index + 1}.zip`;
@@ -355,6 +371,10 @@ export class DownloadService extends DBService {
       let totalBytes = 0;
       archive.on('data', (chunk: Buffer) => {
         totalBytes += chunk.length;
+      });
+
+      archive.on('error', (err) => {
+        passThrough.destroy(err);
       });
 
       archive.pipe(passThrough);
@@ -373,14 +393,18 @@ export class DownloadService extends DBService {
       await archive.finalize();
       await uploadPromise;
 
+      const now = new Date().toISOString();
       await this.fragmentRepository.updateFragmentStatus(fragmentId, DownloadStatusEnum.READY, {
         s3_key: s3Key,
         file_name: zipFileName,
-        file_size_bytes: totalBytes
+        file_size_bytes: totalBytes,
+        completed_at: now
       });
     } catch (error) {
+      const now = new Date().toISOString();
       await this.fragmentRepository.updateFragmentStatus(fragmentId, DownloadStatusEnum.FAILED, {
-        error_message: error instanceof Error ? error.message : 'Unknown error'
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+        completed_at: now
       });
       throw error;
     }
@@ -411,13 +435,35 @@ export class DownloadService extends DBService {
     const rootDatasetCache = await this.fragmentRepository.getRootDatasetsByFragment(fragmentId);
 
     // Load schema once for all feature types
+    const schemaLookup = await this.buildSchemaLookup();
+
+    const fileRefs: FileFeatureRef[] = [];
+
+    for (const featureType of featureTypes) {
+      const refs = await this.streamFeatureTypeCsv(
+        fragmentId,
+        featureType,
+        archive,
+        schemaLookup,
+        rootDatasetCache,
+        filesFolderName
+      );
+      fileRefs.push(...refs);
+    }
+
+    return fileRefs;
+  }
+
+  /**
+   * Build a lookup map from feature type name to property definitions.
+   */
+  private async buildSchemaLookup(): Promise<Map<string, CsvPropertyDefinition[]>> {
     const codeService = new CodeService(this.connection);
     const allFeatureTypeCodes = await codeService.getFeatureTypePropertyCodes();
 
-    // Build lookup: featureTypeName → CsvPropertyDefinition[]
-    const schemaLookup = new Map<string, CsvPropertyDefinition[]>();
+    const lookup = new Map<string, CsvPropertyDefinition[]>();
     for (const ftCode of allFeatureTypeCodes) {
-      schemaLookup.set(
+      lookup.set(
         ftCode.feature_type.feature_type_name,
         ftCode.feature_type_properties.map((p) => ({
           feature_property_name: p.feature_property_name,
@@ -425,84 +471,104 @@ export class DownloadService extends DBService {
         }))
       );
     }
+    return lookup;
+  }
 
+  /**
+   * Stream a single feature type's data as a CSV into the archive.
+   *
+   * Returns file references for any artifact_key properties encountered.
+   */
+  private async streamFeatureTypeCsv(
+    fragmentId: number,
+    featureType: string,
+    archive: archiver.Archiver,
+    schemaLookup: Map<string, CsvPropertyDefinition[]>,
+    rootDatasetCache: Map<number, { dataset_uuid: string; dataset_name: string | null }>,
+    filesFolderName: string
+  ): Promise<FileFeatureRef[]> {
+    const isCore = featureType === 'dataset';
+    const systemHeaders = isCore ? ['uuid'] : ['uuid', 'dataset_name', 'dataset_uuid'];
+    const childProperties = schemaLookup.get(featureType) ?? [];
+
+    const csvStream = new PassThrough();
+    archive.append(csvStream, { name: getOutputFilename(featureType) });
+
+    let headersWritten = false;
+    let parentProperties: CsvPropertyDefinition[] | null = null;
+    let headers: string[] = [];
     const fileRefs: FileFeatureRef[] = [];
 
-    // System columns: core file (dataset) gets uuid only; extensions get uuid + dataset context
-    const coreSystemHeaders = ['uuid'];
-    const extensionSystemHeaders = ['uuid', 'dataset_name', 'dataset_uuid'];
-
-    for (const featureType of featureTypes) {
-      const isCore = featureType === 'dataset';
-      const systemHeaders = isCore ? coreSystemHeaders : extensionSystemHeaders;
-      const childProperties = schemaLookup.get(featureType) ?? [];
-
-      const csvStream = new PassThrough();
-      archive.append(csvStream, { name: getOutputFilename(featureType) });
-
-      let headersWritten = false;
-      let parentProperties: CsvPropertyDefinition[] | null = null;
-      let headers: string[] = [];
-
-      for await (const batch of this.fragmentRepository.streamFragmentFeaturesByType(fragmentId, featureType)) {
-        for (const feature of batch) {
-          // Determine parent schema on first row (all rows of same type have same parent type)
-          if (!headersWritten) {
-            const parentTypeName = feature.parent_feature_type_name;
-            if (parentTypeName) {
-              parentProperties = schemaLookup.get(parentTypeName) ?? null;
-            }
-
-            headers = buildCombinedHeaders(parentProperties, childProperties, systemHeaders);
-            csvStream.write(headers.map(escapeCsvField).join(',') + '\n');
-            headersWritten = true;
-          }
-
-          const flattened = flattenFeatureWithParent(
-            feature.data as Record<string, unknown>,
-            childProperties,
-            (feature.parent_data as Record<string, unknown>) ?? null,
-            parentProperties,
-            feature.submission_feature_id,
-            filesFolderName
-          );
-
-          // Prepend system columns: row UUID + dataset context (extensions only)
-          flattened['uuid'] = feature.uuid;
-          if (!isCore) {
-            const rootDataset = rootDatasetCache.get(feature.submission_id);
-            flattened['dataset_name'] = rootDataset?.dataset_name ?? '';
-            flattened['dataset_uuid'] = rootDataset?.dataset_uuid ?? '';
-          }
-
-          const line = headers.map((h) => escapeCsvField(flattened[h] ?? '')).join(',');
-          csvStream.write(line + '\n');
-
-          // Collect file references for artifact_key typed properties
-          for (const prop of childProperties) {
-            if (prop.feature_property_type_name === 'artifact_key') {
-              const rawValue = (feature.data[prop.feature_property_name] ?? feature.data['file']) as string | undefined;
-              if (rawValue) {
-                fileRefs.push({
-                  submissionFeatureId: feature.submission_feature_id,
-                  filePath: rawValue
-                });
-              }
-            }
-          }
+    for await (const batch of this.fragmentRepository.streamFragmentFeaturesByType(fragmentId, featureType)) {
+      for (const feature of batch) {
+        if (!headersWritten) {
+          parentProperties = this.resolveParentProperties(feature.parent_feature_type_name, schemaLookup);
+          headers = buildCombinedHeaders(parentProperties, childProperties, systemHeaders);
+          csvStream.write(headers.map(escapeCsvField).join(',') + '\n');
+          headersWritten = true;
         }
-      }
 
-      // Handle empty feature type - write headers only
-      if (!headersWritten) {
-        headers = buildCombinedHeaders(null, childProperties, systemHeaders);
-        csvStream.write(headers.map(escapeCsvField).join(',') + '\n');
-      }
+        const flattened = flattenFeatureWithParent(
+          feature.data as Record<string, unknown>,
+          childProperties,
+          (feature.parent_data as Record<string, unknown>) ?? null,
+          parentProperties,
+          feature.submission_feature_id,
+          filesFolderName
+        );
 
-      csvStream.end();
+        flattened['uuid'] = feature.uuid;
+        if (!isCore) {
+          const rootDataset = rootDatasetCache.get(feature.submission_id);
+          flattened['dataset_name'] = rootDataset?.dataset_name ?? '';
+          flattened['dataset_uuid'] = rootDataset?.dataset_uuid ?? '';
+        }
+
+        csvStream.write(headers.map((h) => escapeCsvField(flattened[h] ?? '')).join(',') + '\n');
+
+        this.collectFileRefs(feature, childProperties, fileRefs);
+      }
     }
 
+    if (!headersWritten) {
+      headers = buildCombinedHeaders(null, childProperties, systemHeaders);
+      csvStream.write(headers.map(escapeCsvField).join(',') + '\n');
+    }
+
+    csvStream.end();
     return fileRefs;
+  }
+
+  /**
+   * Resolve parent property definitions from the schema lookup.
+   */
+  private resolveParentProperties(
+    parentTypeName: string | null | undefined,
+    schemaLookup: Map<string, CsvPropertyDefinition[]>
+  ): CsvPropertyDefinition[] | null {
+    if (!parentTypeName) {
+      return null;
+    }
+    return schemaLookup.get(parentTypeName) ?? null;
+  }
+
+  /**
+   * Collect file references from artifact_key typed properties on a feature.
+   */
+  private collectFileRefs(
+    feature: { submission_feature_id: number; data: Record<string, unknown> },
+    childProperties: CsvPropertyDefinition[],
+    fileRefs: FileFeatureRef[]
+  ): void {
+    for (const prop of childProperties) {
+      if (prop.feature_property_type_name !== 'artifact_key') {
+        continue;
+      }
+      const rawValue = (feature.data[prop.feature_property_name] ?? feature.data['file']) as string | undefined;
+      if (rawValue) {
+        fileRefs.push({ submissionFeatureId: feature.submission_feature_id, filePath: rawValue });
+      }
+    }
   }
 
   /**

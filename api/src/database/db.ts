@@ -56,11 +56,6 @@ pg.types.setTypeParser(pg.types.builtins.TIMESTAMPTZ, (stringValue: string) => {
 pg.types.setTypeParser(pg.types.builtins.NUMERIC, (stringValue: string) => {
   return parseFloat(stringValue);
 });
-// INT8 (bigint) column types return as strings because JS numbers can't represent all 64-bit integers.
-// Our bigint columns store byte sizes which fit safely within Number.MAX_SAFE_INTEGER, so parse as number.
-pg.types.setTypeParser(pg.types.builtins.INT8, (stringValue: string) => {
-  return parseInt(stringValue, 10);
-});
 
 // singleton pg pool instance used by the api
 let DBPool: pg.Pool | undefined;

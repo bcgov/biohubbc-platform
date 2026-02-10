@@ -34,7 +34,7 @@ describe('DownloadService', () => {
     total_fragments: 1,
     completed_fragments: 0,
     estimated_total_size_bytes: null,
-    fragment_size_bytes: FRAGMENT_SIZE_THRESHOLD,
+    fragment_size_bytes: String(FRAGMENT_SIZE_THRESHOLD),
     ...overrides
   });
 
@@ -66,7 +66,7 @@ describe('DownloadService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
-      sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(null);
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(null);
 
       try {
         await service.planDownloadIfNeeded(42);
@@ -80,7 +80,7 @@ describe('DownloadService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
-      sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
       sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([createMockFragment()]);
       const estimateStub = sinon.stub(service, 'estimateDownloadSize');
 
@@ -93,7 +93,7 @@ describe('DownloadService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
-      sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
       sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([]);
       const estimateStub = sinon.stub(service, 'estimateDownloadSize').resolves({
         totalEstimatedBytes: 1000,
@@ -151,7 +151,7 @@ describe('DownloadService', () => {
         }
       ];
 
-      sinon.stub(DownloadFragmentRepository.prototype, 'updateFragmentStatus').resolves();
+      const updateStatusStub = sinon.stub(DownloadFragmentRepository.prototype, 'updateFragmentStatus').resolves();
       const types = [...new Set(mockFeatures.map((f) => f.feature_type_name))];
       sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentFeatureTypes').resolves(types);
       sinon
@@ -166,7 +166,7 @@ describe('DownloadService', () => {
           new Map([[1, { dataset_name: 'Test Dataset', dataset_uuid: '11111111-2222-3333-4444-555555555555' }]])
         );
 
-      sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([
         {
           feature_type: { feature_type_id: 1, feature_type_name: 'file', feature_type_display_name: 'File' },
@@ -182,10 +182,15 @@ describe('DownloadService', () => {
         }
       ]);
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').rejects(new Error('NoSuchKey: File not found'));
-      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+      const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
 
       // Should NOT throw — graceful degradation
       await service.processFragment(mockFragment, 42);
+
+      // Verify: fragment was uploaded and marked READY despite file stream failure
+      expect(uploadStub.calledOnce).to.be.true;
+      expect(updateStatusStub.calledOnce).to.be.true;
+      expect(updateStatusStub.firstCall.args[1]).to.equal(DownloadStatusEnum.READY);
     });
 
     it('uses multi-fragment naming pattern for downloads with multiple fragments', async () => {
@@ -218,7 +223,7 @@ describe('DownloadService', () => {
           new Map([[1, { dataset_name: 'Test Dataset', dataset_uuid: '11111111-2222-3333-4444-555555555555' }]])
         );
       sinon
-        .stub(DownloadRepository.prototype, 'getDownloadById')
+        .stub(DownloadRepository.prototype, 'findDownloadById')
         .resolves(createMockDownloadRecord({ total_fragments: 3 }));
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([
         {
@@ -256,7 +261,7 @@ describe('DownloadService', () => {
         fragment_status: DownloadStatusEnum.READY,
         s3_key: 'downloads/42/download-42.zip',
         file_name: 'download-42.zip',
-        file_size_bytes: 512
+        file_size_bytes: '512'
       });
 
       sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([readyFragment]);
@@ -277,12 +282,12 @@ describe('DownloadService', () => {
       const fragment1 = createMockFragment({
         download_fragment_id: 1,
         fragment_status: DownloadStatusEnum.READY,
-        file_size_bytes: 1000
+        file_size_bytes: '1000'
       });
       const fragment2 = createMockFragment({
         download_fragment_id: 2,
         fragment_status: DownloadStatusEnum.READY,
-        file_size_bytes: 2000
+        file_size_bytes: '2000'
       });
 
       sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([fragment1, fragment2]);
@@ -293,7 +298,8 @@ describe('DownloadService', () => {
 
       expect(updateStatusStub.calledOnce).to.be.true;
       expect(updateStatusStub.firstCall.args[1]).to.equal(DownloadStatusEnum.READY);
-      expect(updateStatusStub.firstCall.args[2]).to.deep.equal({ file_size_bytes: 3000 });
+      expect(updateStatusStub.firstCall.args[2]).to.deep.include({ file_size_bytes: 3000 });
+      expect(updateStatusStub.firstCall.args[2]).to.have.property('completed_at').that.is.a('string');
     });
   });
 
@@ -307,8 +313,8 @@ describe('DownloadService', () => {
 
       // Step 2: Stub per-feature query
       const features: DownloadFeatureSummary[] = [
-        { submission_feature_id: 1, feature_type_name: 'observation', estimated_byte_size: 120, submission_id: 1 },
-        { submission_feature_id: 2, feature_type_name: 'sample', estimated_byte_size: 80, submission_id: 1 }
+        { submission_feature_id: 1, feature_type_name: 'observation', estimated_byte_size: '120', submission_id: 1 },
+        { submission_feature_id: 2, feature_type_name: 'sample', estimated_byte_size: '80', submission_id: 1 }
       ];
       sinon.stub(DownloadRepository.prototype, 'getDownloadFeatureSummaries').resolves(features);
 
@@ -318,8 +324,8 @@ describe('DownloadService', () => {
       // Step 4: Verify total is sum of per-feature sizes
       expect(result.totalEstimatedBytes).to.equal(200);
       expect(result.features).to.have.length(2);
-      expect(result.features[0].estimated_byte_size).to.equal(120);
-      expect(result.features[1].estimated_byte_size).to.equal(80);
+      expect(result.features[0].estimated_byte_size).to.equal('120');
+      expect(result.features[1].estimated_byte_size).to.equal('80');
     });
 
     it('returns zero total for empty downloads', async () => {
@@ -350,19 +356,19 @@ describe('DownloadService', () => {
         {
           submission_feature_id: 10,
           feature_type_name: 'observation',
-          estimated_byte_size: 100,
+          estimated_byte_size: '100',
           submission_id: 1
         },
         {
           submission_feature_id: 20,
           feature_type_name: 'observation',
-          estimated_byte_size: 100,
+          estimated_byte_size: '100',
           submission_id: 1
         },
         {
           submission_feature_id: 30,
           feature_type_name: 'observation',
-          estimated_byte_size: 100,
+          estimated_byte_size: '100',
           submission_id: 1
         }
       ];
@@ -378,19 +384,19 @@ describe('DownloadService', () => {
         .resolves();
       sinon.stub(DownloadRepository.prototype, 'updateEstimatedTotalSize').resolves();
 
-      // Stub getDownloadById to return record with default fragment_size_bytes
+      // Stub findDownloadById to return record with default fragment_size_bytes
       sinon
-        .stub(DownloadRepository.prototype, 'getDownloadById')
-        .resolves(createMockDownloadRecord({ download_id: 1, fragment_size_bytes: FRAGMENT_SIZE_THRESHOLD }));
+        .stub(DownloadRepository.prototype, 'findDownloadById')
+        .resolves(createMockDownloadRecord({ download_id: 1, fragment_size_bytes: String(FRAGMENT_SIZE_THRESHOLD) }));
 
       // Step 4: Call planFragments with bin packing
       // Feature 10 = 300MB, Feature 20 = 300MB (total 600MB > 500MB threshold), Feature 30 = 200MB
       const threeHundredMB = 300 * 1024 * 1024;
       const twoHundredMB = 200 * 1024 * 1024;
       // Override estimated_byte_size on features for bin packing test
-      features[0].estimated_byte_size = threeHundredMB;
-      features[1].estimated_byte_size = threeHundredMB;
-      features[2].estimated_byte_size = twoHundredMB;
+      features[0].estimated_byte_size = String(threeHundredMB);
+      features[1].estimated_byte_size = String(threeHundredMB);
+      features[2].estimated_byte_size = String(twoHundredMB);
       const sizeEstimate = {
         totalEstimatedBytes: threeHundredMB * 2 + twoHundredMB,
         features
@@ -420,27 +426,27 @@ describe('DownloadService', () => {
         {
           submission_feature_id: 10,
           feature_type_name: 'observation',
-          estimated_byte_size: 100,
+          estimated_byte_size: '100',
           submission_id: 1
         },
         {
           submission_feature_id: 20,
           feature_type_name: 'observation',
-          estimated_byte_size: 100,
+          estimated_byte_size: '100',
           submission_id: 1
         },
         {
           submission_feature_id: 30,
           feature_type_name: 'observation',
-          estimated_byte_size: 100,
+          estimated_byte_size: '100',
           submission_id: 1
         }
       ];
-      // Step 3: Stub getDownloadById with custom 1 GB fragment size
+      // Step 3: Stub findDownloadById with custom 1 GB fragment size
       const oneGB = 1000 * 1024 * 1024;
       sinon
-        .stub(DownloadRepository.prototype, 'getDownloadById')
-        .resolves(createMockDownloadRecord({ download_id: 1, fragment_size_bytes: oneGB }));
+        .stub(DownloadRepository.prototype, 'findDownloadById')
+        .resolves(createMockDownloadRecord({ download_id: 1, fragment_size_bytes: String(oneGB) }));
 
       // Step 4: Stub fragment repository methods
       const createFragmentStub = sinon.stub(DownloadFragmentRepository.prototype, 'createDownloadFragment');
@@ -458,9 +464,9 @@ describe('DownloadService', () => {
       // With custom 1GB threshold, all features fit in 1 fragment
       const threeHundredMB = 300 * 1024 * 1024;
       const twoHundredMB = 200 * 1024 * 1024;
-      features[0].estimated_byte_size = threeHundredMB;
-      features[1].estimated_byte_size = threeHundredMB;
-      features[2].estimated_byte_size = twoHundredMB;
+      features[0].estimated_byte_size = String(threeHundredMB);
+      features[1].estimated_byte_size = String(threeHundredMB);
+      features[2].estimated_byte_size = String(twoHundredMB);
       const sizeEstimate = {
         totalEstimatedBytes: threeHundredMB * 2 + twoHundredMB,
         features
@@ -490,8 +496,8 @@ describe('DownloadService', () => {
         fragment_status: DownloadStatusEnum.READY,
         s3_key: 'downloads/42/download-42-part-1.zip',
         file_name: 'download-42-part-1.zip',
-        file_size_bytes: 2048,
-        estimated_size_bytes: 2000,
+        file_size_bytes: '2048',
+        estimated_size_bytes: '2000',
         feature_count: 3,
         started_at: '2024-01-01T00:00:00Z',
         completed_at: '2024-01-01T00:01:00Z',
@@ -546,7 +552,7 @@ describe('DownloadService', () => {
         s3_key: null,
         file_name: null,
         file_size_bytes: null,
-        estimated_size_bytes: 2000,
+        estimated_size_bytes: '2000',
         feature_count: 3,
         started_at: '2024-01-01T00:00:00Z',
         completed_at: null,
@@ -575,8 +581,8 @@ describe('DownloadService', () => {
         fragment_status: DownloadStatusEnum.READY,
         s3_key: null,
         file_name: 'download-42.zip',
-        file_size_bytes: 2048,
-        estimated_size_bytes: 2000,
+        file_size_bytes: '2048',
+        estimated_size_bytes: '2000',
         feature_count: 3,
         started_at: '2024-01-01T00:00:00Z',
         completed_at: '2024-01-01T00:01:00Z',

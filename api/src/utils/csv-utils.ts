@@ -115,56 +115,69 @@ export function flattenFeatureBySchema(
   const result: Record<string, string> = {};
 
   for (const prop of properties) {
-    const { feature_property_name, feature_property_type_name } = prop;
-    const value = data[feature_property_name];
+    const value = data[prop.feature_property_name];
 
-    switch (feature_property_type_name) {
-      case 'spatial': {
-        const coords = extractFirstPointCoordinates(value);
-        if (coords) {
-          result['decimalLatitude'] = String(coords[1]);
-          result['decimalLongitude'] = String(coords[0]);
-        } else {
-          result['decimalLatitude'] = '';
-          result['decimalLongitude'] = '';
-        }
+    switch (prop.feature_property_type_name) {
+      case 'spatial':
+        Object.assign(result, flattenSpatialValue(value));
         break;
-      }
-      case 'artifact_key': {
-        const rawValue = (value ?? data['file']) as string | undefined;
-        if (rawValue) {
-          const fileName = rawValue.split('/').pop() || 'file';
-          result['filePath'] = `${filesFolderName}/${submissionFeatureId}_${fileName}`;
-        } else {
-          result['filePath'] = '';
-        }
+      case 'artifact_key':
+        result['filePath'] = flattenArtifactKeyValue(value, data, submissionFeatureId, filesFolderName);
         break;
-      }
-      case 'array': {
-        if (Array.isArray(value)) {
-          result[feature_property_name] = flattenArray(value);
-        } else {
-          result[feature_property_name] = value != null ? String(value) : '';
-        }
+      case 'array':
+        result[prop.feature_property_name] = Array.isArray(value) ? flattenArray(value) : toStringOrEmpty(value);
         break;
-      }
-      case 'object': {
-        if (value != null) {
-          result[feature_property_name] = JSON.stringify(value);
-        } else {
-          result[feature_property_name] = '';
-        }
+      case 'object':
+        result[prop.feature_property_name] = value == null ? '' : JSON.stringify(value);
         break;
-      }
-      default: {
-        // string, number, datetime, boolean
-        result[feature_property_name] = value != null ? String(value) : '';
+      default:
+        result[prop.feature_property_name] = toStringOrEmpty(value);
         break;
-      }
     }
   }
 
   return result;
+}
+
+/**
+ * Convert a value to string, or empty string if null/undefined.
+ */
+function toStringOrEmpty(value: unknown): string {
+  if (value == null) {
+    return '';
+  }
+  if (typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
+/**
+ * Flatten a spatial property to decimalLatitude/decimalLongitude.
+ */
+function flattenSpatialValue(value: unknown): Record<string, string> {
+  const coords = extractFirstPointCoordinates(value);
+  if (coords) {
+    return { decimalLatitude: String(coords[1]), decimalLongitude: String(coords[0]) };
+  }
+  return { decimalLatitude: '', decimalLongitude: '' };
+}
+
+/**
+ * Flatten an artifact_key property to a zip-relative file path.
+ */
+function flattenArtifactKeyValue(
+  value: unknown,
+  data: Record<string, unknown>,
+  submissionFeatureId: number,
+  filesFolderName: string
+): string {
+  const rawValue = (value ?? data['file']) as string | undefined;
+  if (!rawValue) {
+    return '';
+  }
+  const fileName = rawValue.split('/').pop() || 'file';
+  return `${filesFolderName}/${submissionFeatureId}_${fileName}`;
 }
 
 /**
@@ -230,7 +243,7 @@ export function flattenObject(obj: Record<string, unknown>, prefix = ''): Record
       Object.assign(result, nested);
     } else {
       // Primitive value
-      result[newKey] = String(value);
+      result[newKey] = toStringOrEmpty(value);
     }
   }
 
@@ -250,7 +263,7 @@ export function flattenObject(obj: Record<string, unknown>, prefix = ''): Record
  */
 export function flattenArray(arr: unknown[]): string {
   const values = arr.map((item) => {
-    if (item === null || item === undefined) {
+    if (item == null) {
       return '';
     }
     if (typeof item === 'object' && !Array.isArray(item)) {
@@ -258,10 +271,10 @@ export function flattenArray(arr: unknown[]): string {
       const objValues = Object.values(item as Record<string, unknown>);
       if (objValues.length === 1) {
         // Single property object like { taxon_id: 100 } -> '100'
-        return String(objValues[0] ?? '');
+        return toStringOrEmpty(objValues[0]);
       }
       // Multiple properties: join with colon
-      return objValues.map((v) => String(v ?? '')).join(':');
+      return objValues.map((v) => toStringOrEmpty(v)).join(':');
     }
     return String(item);
   });
@@ -279,7 +292,7 @@ export function flattenArray(arr: unknown[]): string {
 export function escapeCsvField(value: string): string {
   if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes('\r')) {
     // Escape quotes by doubling them, then wrap in quotes
-    return `"${value.replace(/"/g, '""')}"`;
+    return `"${value.replaceAll('"', '""')}"`;
   }
   return value;
 }

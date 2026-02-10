@@ -271,7 +271,7 @@ describe('publisher', () => {
       total_fragments: 1,
       completed_fragments: 0,
       estimated_total_size_bytes: null,
-      fragment_size_bytes: 524288000,
+      fragment_size_bytes: '524288000',
       ...overrides
     });
 
@@ -285,7 +285,7 @@ describe('publisher', () => {
       const mockBoss = { send: sendStub, createQueue: createQueueStub };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
-      sinon.stub(DownloadService.prototype, 'getDownloadById').resolves(createMockDownload());
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
 
       // Step 2: Call publisher
       const data = { downloadId: 1, systemUserId: 123 };
@@ -307,7 +307,7 @@ describe('publisher', () => {
       // Step 1: Setup mock with download that is already processing
       const mockConnection = getMockDBConnection();
       sinon
-        .stub(DownloadService.prototype, 'getDownloadById')
+        .stub(DownloadService.prototype, 'findDownloadById')
         .resolves(createMockDownload({ download_status: 'processing' }));
 
       // Step 2: Call publisher
@@ -326,7 +326,7 @@ describe('publisher', () => {
 
       // Step 1: Setup mock to return null (not found)
       const mockConnection = getMockDBConnection();
-      sinon.stub(DownloadService.prototype, 'getDownloadById').resolves(null);
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(null);
 
       // Step 2: Call publisher
       const data = { downloadId: 999, systemUserId: 123 };
@@ -347,7 +347,7 @@ describe('publisher', () => {
       const mockBoss = { send: sendStub, createQueue: createQueueStub };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
-      sinon.stub(DownloadService.prototype, 'getDownloadById').resolves(createMockDownload({ download_id: 456 }));
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload({ download_id: 456 }));
 
       // Step 2: Call publisher
       await publishProcessDownloadJob(mockConnection, { downloadId: 456, systemUserId: 123 });
@@ -367,7 +367,7 @@ describe('publisher', () => {
       const mockBoss = { send: sendStub, createQueue: createQueueStub };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
-      sinon.stub(DownloadService.prototype, 'getDownloadById').resolves(createMockDownload());
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
 
       // Step 2: Call publisher
       const result = await publishProcessDownloadJob(mockConnection, { downloadId: 1, systemUserId: 123 });
@@ -385,7 +385,7 @@ describe('publisher', () => {
       // Step 1: Setup mock that throws
       const mockConnection = getMockDBConnection();
 
-      sinon.stub(DownloadService.prototype, 'getDownloadById').resolves(createMockDownload());
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
       sinon.stub(pgBossService, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
       // Step 2: Call publisher

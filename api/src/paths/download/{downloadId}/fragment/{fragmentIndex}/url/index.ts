@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../../../../database/db';
 import { HTTP403, HTTP404, HTTP409 } from '../../../../../../errors/http-error';
+import { DownloadStatusEnum } from '../../../../../../models/download-status';
 import { defaultErrorResponses } from '../../../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../../../request-handlers/security/authorization';
 import { DownloadService } from '../../../../../../services/download-service';
@@ -93,7 +94,7 @@ export function getFragmentUrl(): RequestHandler {
       await connection.open();
 
       const downloadService = new DownloadService(connection);
-      const download = await downloadService.getDownloadById(downloadId);
+      const download = await downloadService.findDownloadById(downloadId);
 
       if (!download) {
         throw new HTTP404('Download not found');
@@ -103,7 +104,7 @@ export function getFragmentUrl(): RequestHandler {
         throw new HTTP403('Access denied');
       }
 
-      if (download.download_status !== 'ready') {
+      if (download.download_status !== DownloadStatusEnum.READY) {
         throw new HTTP409('Download is not ready');
       }
 

@@ -7,15 +7,15 @@ export const DownloadRecord = z.object({
   download_status: DownloadStatusZod,
   s3_key: z.string().nullable(),
   file_name: z.string().nullable(),
-  file_size_bytes: z.number().nullable(),
-  metadata: z.record(z.unknown()).nullable(),
+  file_size_bytes: z.string().nullable(),
+  metadata: z.object({}).passthrough().nullable(),
   started_at: z.string().nullable(),
   completed_at: z.string().nullable(),
   downloaded_at: z.string().nullable(),
   total_fragments: z.number(),
   completed_fragments: z.number(),
-  estimated_total_size_bytes: z.number().nullable(),
-  fragment_size_bytes: z.number()
+  estimated_total_size_bytes: z.string().nullable(),
+  fragment_size_bytes: z.string()
 });
 export type DownloadRecord = z.infer<typeof DownloadRecord>;
 
@@ -45,6 +45,6 @@ export const DownloadFeatureSummary = z.object({
   submission_feature_id: z.number(),
   submission_id: z.number(),
   feature_type_name: z.string(),
-  estimated_byte_size: z.number()
+  estimated_byte_size: z.string()
 });
 export type DownloadFeatureSummary = z.infer<typeof DownloadFeatureSummary>;

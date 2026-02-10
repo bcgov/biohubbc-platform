@@ -19,7 +19,7 @@ export const GET: Operation = [
       ]
     };
   }),
-  getDownloadById()
+  findDownloadById()
 ];
 
 GET.apiDoc = {
@@ -147,7 +147,7 @@ GET.apiDoc = {
  *
  * @returns {RequestHandler}
  */
-export function getDownloadById(): RequestHandler {
+export function findDownloadById(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
 
@@ -158,7 +158,7 @@ export function getDownloadById(): RequestHandler {
       await connection.open();
 
       const downloadService = new DownloadService(connection);
-      const download = await downloadService.getDownloadById(downloadId);
+      const download = await downloadService.findDownloadById(downloadId);
 
       if (!download) {
         throw new HTTP404('Download not found');
@@ -197,7 +197,7 @@ export function getDownloadById(): RequestHandler {
         }))
       });
     } catch (error) {
-      defaultLog.error({ label: 'getDownloadById', message: 'error', error });
+      defaultLog.error({ label: 'findDownloadById', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

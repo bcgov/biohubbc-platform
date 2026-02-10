@@ -27,7 +27,7 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
         download_status: 'ready'
       };
 
-      sinon.stub(DownloadService.prototype, 'getDownloadById').resolves(mockDownload as any);
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(mockDownload as any);
       sinon.stub(DownloadService.prototype, 'getFragmentSignedUrl').resolves('https://s3.example.com/signed-url');
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -47,7 +47,7 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
       const dbConnectionObj = getMockDBConnection();
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(DownloadService.prototype, 'getDownloadById').resolves(null);
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(null);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -75,7 +75,7 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
         system_user_id: 99
       };
 
-      sinon.stub(DownloadService.prototype, 'getDownloadById').resolves(mockDownload as any);
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(mockDownload as any);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -104,7 +104,7 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
         download_status: 'processing'
       };
 
-      sinon.stub(DownloadService.prototype, 'getDownloadById').resolves(mockDownload as any);
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(mockDownload as any);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
