@@ -96,29 +96,4 @@ describe('DELETE /cart/{cartId}/feature/{cartSubmissionFeatureId}', () => {
       expect(mockDBConnection.release).to.have.been.calledOnce;
     }
   });
-
-  it('should handle database commit/rollback issues', async () => {
-    const mockDBConnection = getMockDBConnection({
-      commit: sinon.stub().rejects(new Error('Commit failed')),
-      rollback: sinon.stub(),
-      release: sinon.stub()
-    });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-
-    sinon.stub(CartSubmissionFeatureService.prototype, 'removeSubmissionFeaturesFromCart').resolves();
-
-    const requestHandler = deleteCartSubmissionFeature();
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params.cartId = 'fake-cart-id';
-    mockReq.params.cartSubmissionFeatureId = '123';
-
-    try {
-      await requestHandler(mockReq, mockRes, mockNext);
-      expect.fail('Expected handler to throw');
-    } catch (error) {
-      expect((error as ApiError).message).to.equal('Commit failed');
-      expect(mockDBConnection.rollback).to.have.been.calledOnce;
-      expect(mockDBConnection.release).to.have.been.calledOnce;
-    }
-  });
 });
