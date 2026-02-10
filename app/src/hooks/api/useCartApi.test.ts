@@ -15,8 +15,13 @@ describe('useCartApi', () => {
   });
 
   describe('getCartById', () => {
-    it('returns cart features with pagination', async () => {
-      const mockResponse: CartFeatureListResponse = {
+    it('returns cart with features and pagination', async () => {
+      const mockResponse: CartWithFeaturesResponse = {
+        cart: {
+          cart_id: '123',
+          system_user_id: null,
+          cart_status: 'active'
+        },
         features: [],
         pagination: {
           total: 0,
@@ -26,7 +31,7 @@ describe('useCartApi', () => {
         }
       };
 
-      mock.onGet('/api/cart/123/feature').reply(200, mockResponse);
+      mock.onGet('/api/cart/123').reply(200, mockResponse);
 
       const result = await useCartApi(axios).getCartById('123');
 
@@ -34,7 +39,12 @@ describe('useCartApi', () => {
     });
 
     it('passes query params for pagination', async () => {
-      const mockResponse: CartFeatureListResponse = {
+      const mockResponse: CartWithFeaturesResponse = {
+        cart: {
+          cart_id: '123',
+          system_user_id: null,
+          cart_status: 'active'
+        },
         features: [],
         pagination: {
           total: 0,
@@ -44,11 +54,12 @@ describe('useCartApi', () => {
         }
       };
 
-      mock.onGet('/api/cart/123/feature').reply(200, mockResponse);
+      mock.onGet('/api/cart/123').reply(200, mockResponse);
 
       const result = await useCartApi(axios).getCartById('123', { page: 2, limit: 20 });
 
       expect(result.pagination.current_page).toEqual(2);
+      expect(result.cart.cart_id).toEqual('123');
     });
   });
 

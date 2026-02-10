@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { claimCartForCurrentUser, findCartWithFeaturesById } from '.';
+import { claimCartForCurrentUser, getCartWithFeaturesById } from '.';
 import * as db from '../../../database/db';
 import { ApiError } from '../../../errors/api-error';
 import { CartStatus } from '../../../models/cart';
@@ -17,7 +17,7 @@ describe('cart/{cartId}', () => {
     sinon.restore();
   });
 
-  describe('findCartWithFeaturesById', () => {
+  describe('getCartWithFeaturesById', () => {
     it('throws error if DB connection fails to open', async () => {
       const mockDBConnection = getMockDBConnection({
         commit: sinon.stub(),
@@ -27,7 +27,7 @@ describe('cart/{cartId}', () => {
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
 
-      const requestHandler = findCartWithFeaturesById();
+      const requestHandler = getCartWithFeaturesById();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params.cartId = 'fake-cart-id';
       mockReq.keycloak_token = null;
@@ -78,12 +78,12 @@ describe('cart/{cartId}', () => {
         }
       };
 
-      sinon.stub(CartService.prototype, 'findCartById').resolves(fakeCart);
+      sinon.stub(CartService.prototype, 'getCartById').resolves(fakeCart);
       sinon
         .stub(CartSubmissionFeatureService.prototype, 'getPaginatedCartFeaturesResponse')
         .resolves(fakePaginatedResponse);
 
-      const requestHandler = findCartWithFeaturesById();
+      const requestHandler = getCartWithFeaturesById();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params.cartId = 'cart-123';
       mockReq.keycloak_token = null;
@@ -127,12 +127,12 @@ describe('cart/{cartId}', () => {
         }
       };
 
-      sinon.stub(CartService.prototype, 'findCartById').resolves(fakeCart);
+      sinon.stub(CartService.prototype, 'getCartById').resolves(fakeCart);
       sinon
         .stub(CartSubmissionFeatureService.prototype, 'getPaginatedCartFeaturesResponse')
         .resolves(fakePaginatedResponse);
 
-      const requestHandler = findCartWithFeaturesById();
+      const requestHandler = getCartWithFeaturesById();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params.cartId = 'cart-123';
       mockReq.keycloak_token = null;
@@ -176,12 +176,12 @@ describe('cart/{cartId}', () => {
         }
       };
 
-      sinon.stub(CartService.prototype, 'findCartById').resolves(fakeCart);
+      sinon.stub(CartService.prototype, 'getCartById').resolves(fakeCart);
       sinon
         .stub(CartSubmissionFeatureService.prototype, 'getPaginatedCartFeaturesResponse')
         .resolves(fakePaginatedResponse);
 
-      const requestHandler = findCartWithFeaturesById();
+      const requestHandler = getCartWithFeaturesById();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params.cartId = 'cart-123';
       mockReq.keycloak_token = null;
@@ -197,16 +197,16 @@ describe('cart/{cartId}', () => {
       expect(mockRes.statusValue).to.equal(200);
     });
 
-    it('rolls back and rethrows if CartService.findCartById throws', async () => {
+    it('rolls back and rethrows if CartService.getCartById throws', async () => {
       const mockDBConnection = getMockDBConnection({
         commit: sinon.stub(),
         rollback: sinon.stub(),
         release: sinon.stub()
       });
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
-      sinon.stub(CartService.prototype, 'findCartById').rejects(new Error('Service error'));
+      sinon.stub(CartService.prototype, 'getCartById').rejects(new Error('Service error'));
 
-      const requestHandler = findCartWithFeaturesById();
+      const requestHandler = getCartWithFeaturesById();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params.cartId = 'cart-123';
       mockReq.keycloak_token = null;
@@ -236,12 +236,12 @@ describe('cart/{cartId}', () => {
         cart_status: CartStatus.ACTIVE
       };
 
-      sinon.stub(CartService.prototype, 'findCartById').resolves(fakeCart);
+      sinon.stub(CartService.prototype, 'getCartById').resolves(fakeCart);
       sinon
         .stub(CartSubmissionFeatureService.prototype, 'getPaginatedCartFeaturesResponse')
         .rejects(new Error('Service error'));
 
-      const requestHandler = findCartWithFeaturesById();
+      const requestHandler = getCartWithFeaturesById();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params.cartId = 'cart-123';
       mockReq.keycloak_token = null;
@@ -252,6 +252,33 @@ describe('cart/{cartId}', () => {
         expect.fail('Expected handler to throw');
       } catch (error) {
         expect((error as ApiError).message).to.equal('Service error');
+        expect(mockDBConnection.rollback).to.have.been.calledOnce;
+        expect(mockDBConnection.release).to.have.been.calledOnce;
+      }
+    });
+
+    it('rolls back and rethrows if cart does not exist', async () => {
+      const mockDBConnection = getMockDBConnection({
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+      sinon.stub(CartService.prototype, 'getCartById').rejects(new Error('Cart not found'));
+      const featureStub = sinon.stub(CartSubmissionFeatureService.prototype, 'getPaginatedCartFeaturesResponse');
+
+      const requestHandler = getCartWithFeaturesById();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params.cartId = 'missing-cart';
+      mockReq.keycloak_token = null;
+      mockReq.query = {};
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail('Expected handler to throw');
+      } catch (error) {
+        expect((error as ApiError).message).to.equal('Cart not found');
+        expect(featureStub).to.not.have.been.called;
         expect(mockDBConnection.rollback).to.have.been.calledOnce;
         expect(mockDBConnection.release).to.have.been.calledOnce;
       }

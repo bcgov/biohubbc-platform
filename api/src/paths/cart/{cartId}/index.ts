@@ -23,7 +23,7 @@ export const GET: Operation = [
       ]
     };
   }),
-  findCartWithFeaturesById()
+  getCartWithFeaturesById()
 ];
 
 export const PUT: Operation = [
@@ -93,8 +93,7 @@ PUT.apiDoc = {
         type: 'string',
         format: 'uuid'
       }
-    },
-    ...paginationRequestQueryParamSchema
+    }
   ],
   responses: {
     200: {
@@ -109,7 +108,7 @@ PUT.apiDoc = {
  *
  * @returns {RequestHandler}
  */
-export function findCartWithFeaturesById(): RequestHandler {
+export function getCartWithFeaturesById(): RequestHandler {
   return async (req, res) => {
     const isAuthenticated = !!req.keycloak_token;
     const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
@@ -127,10 +126,9 @@ export function findCartWithFeaturesById(): RequestHandler {
 
       const pagination = makePaginationOptionsFromRequest(req);
 
-      const [cart, paginatedFeatures] = await Promise.all([
-        cartService.findCartById(cartId),
-        cartSubmissionFeatureService.getPaginatedCartFeaturesResponse(cartId, pagination)
-      ]);
+      const cart = await cartService.getCartById(cartId);
+
+      const paginatedFeatures = await cartSubmissionFeatureService.getPaginatedCartFeaturesResponse(cartId, pagination);
 
       await connection.commit();
 

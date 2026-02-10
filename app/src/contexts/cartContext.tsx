@@ -278,58 +278,6 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
   }, [storedCartId]);
 
   /**
-   * Effect: Claim anonymous carts when user authenticates
-   *
-   * This effect handles the user authentication → cart ownership flow:
-   *
-   * Scenario:
-   * 1. User browses the site unauthenticated and adds items to cart
-   * 2. Cart is created but has no owner (anonymous cart)
-   * 3. User decides to log in
-   * 4. This effect detects authentication and existing cart
-   * 5. Calls API to assign the anonymous cart to the now-authenticated user
-   * 6. User keeps their cart and all items in it
-   *
-   * Benefits:
-   * - Seamless UX: Users don't lose their cart when logging in
-   * - No need to re-add items after authentication
-   * - Cart syncs across devices once claimed
-   *
-   * The backend handles idempotency, so claiming an already-owned cart is safe.
-   */
-  useEffect(() => {
-    const cartId = state.cartId;
-
-    // Don't attempt to claim if:
-    // - User is not authenticated
-    // - No cart exists to claim
-    // - We've already tried claiming this cart
-    if (!authStateContext.auth.isAuthenticated || !cartId || hasClaimedCurrentCart.current) {
-      return;
-    }
-
-    const claimCart = async () => {
-      try {
-        // Mark as claimed to prevent duplicate attempts
-        hasClaimedCurrentCart.current = true;
-
-        await cartApiRef.current.assignCartToCurrentUser(cartId);
-
-        // Success - cart is now owned by the authenticated user
-        // The cart will now persist across sessions and devices
-      } catch (error) {
-        // Failed to claim - allow retry on next relevant state change
-        hasClaimedCurrentCart.current = false;
-
-        // Log error for debugging but don't disrupt user experience
-        console.error('Failed to claim cart for authenticated user:', error);
-      }
-    };
-
-    claimCart();
-  }, [authStateContext.auth.isAuthenticated, state.cartId]);
-
-  /**
    * Effect: Reset claim flag when cart changes
    *
    * When the user gets a new cart (different ID), we should allow
@@ -364,6 +312,23 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
         }
 
         dispatch({ type: 'LOAD_SUCCESS', payload: response });
+
+        // Claim anonymous carts for authenticated users after a successful load.
+        // Keeping this in the load-success path avoids claim/load request races.
+        // Only claim carts that are currently unowned.
+        if (
+          authStateContext.auth.isAuthenticated &&
+          response.cart.system_user_id === null &&
+          !hasClaimedCurrentCart.current
+        ) {
+          try {
+            hasClaimedCurrentCart.current = true;
+            await cartApiRef.current.assignCartToCurrentUser(cartId);
+          } catch (error) {
+            hasClaimedCurrentCart.current = false;
+            console.error('Failed to claim cart for authenticated user:', error);
+          }
+        }
       } catch (error) {
         if (!isMounted) {
           return;
@@ -378,7 +343,7 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
     return () => {
       isMounted = false;
     };
-  }, [state.cartId]);
+  }, [authStateContext.auth.isAuthenticated, state.cartId]);
 
   /**
    * Updates the cart ID in both session storage and local state.

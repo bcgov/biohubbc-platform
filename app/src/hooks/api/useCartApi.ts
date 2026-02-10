@@ -27,13 +27,13 @@ export const useCartApi = (axios: AxiosInstance) => {
    *
    * @param {string} cartId - The cart ID to fetch details for.
    * @param {ApiPaginationRequestOptions} pagination - Optional pagination parameters for the features.
-   * @return {Promise<CartFeatureListResponse>} The cart feature list with pagination.
+   * @return {Promise<CartWithFeaturesResponse>} Cart metadata with feature list and pagination.
    */
   const getCartById = async (
     cartId: string,
     pagination?: ApiPaginationRequestOptions
-  ): Promise<CartFeatureListResponse> => {
-    const { data } = await axios.get<CartFeatureListResponse>(`/api/cart/${cartId}/feature`, {
+  ): Promise<CartWithFeaturesResponse> => {
+    const { data } = await axios.get<CartWithFeaturesResponse>(`/api/cart/${cartId}`, {
       params: pagination,
       paramsSerializer: (params) => qs.stringify(params)
     });

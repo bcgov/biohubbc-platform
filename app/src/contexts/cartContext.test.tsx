@@ -433,13 +433,39 @@ describe('CartContextProvider', () => {
 
   it('assigns stored cart to authenticated users', async () => {
     setStoredCartId('cart-claim');
-    mockCartApi.getCartById.mockResolvedValueOnce(buildCartResponse('cart-claim', []));
+    mockCartApi.getCartById.mockResolvedValueOnce({
+      ...buildCartResponse('cart-claim', []),
+      cart: {
+        cart_id: 'cart-claim',
+        system_user_id: null,
+        cart_status: 'active'
+      }
+    });
 
     await renderProvider(getMockAuthState({ base: SystemUserAuthState }));
 
     await waitFor(() => {
       expect(mockCartApi.assignCartToCurrentUser).toHaveBeenCalledTimes(1);
       expect(mockCartApi.assignCartToCurrentUser).toHaveBeenCalledWith('cart-claim');
+    });
+  });
+
+  it('does not assign cart when authenticated user already owns cart', async () => {
+    setStoredCartId('cart-owned');
+    mockCartApi.getCartById.mockResolvedValueOnce({
+      ...buildCartResponse('cart-owned', []),
+      cart: {
+        cart_id: 'cart-owned',
+        system_user_id: 1,
+        cart_status: 'active'
+      }
+    });
+
+    await renderProvider(getMockAuthState({ base: SystemUserAuthState }));
+
+    await waitFor(() => {
+      expect(mockCartApi.assignCartToCurrentUser).not.toHaveBeenCalled();
+      expect(mockCartApi.getCartById).toHaveBeenCalledWith('cart-owned');
     });
   });
 
