@@ -8,81 +8,6 @@ import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/download');
 
-export const POST: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          discriminator: 'SystemUser'
-        }
-      ]
-    };
-  }),
-  createDownload()
-];
-
-POST.apiDoc = {
-  description:
-    'Create a download request. Request body TBD — will be shaped by cart checkout or query-based download ticket.',
-  tags: ['download'],
-  security: [
-    {
-      Bearer: []
-    }
-  ],
-  requestBody: {
-    required: true,
-    content: {
-      'application/json': {
-        schema: {
-          type: 'object'
-        }
-      }
-    }
-  },
-  responses: {
-    201: {
-      description: 'Download request created successfully',
-      content: {
-        'application/json': {
-          schema: {
-            type: 'object',
-            required: ['download_id', 'status'],
-            properties: {
-              download_id: {
-                type: 'integer',
-                minimum: 1
-              },
-              status: {
-                type: 'string',
-                enum: ['pending']
-              }
-            }
-          }
-        }
-      }
-    },
-    ...defaultErrorResponses
-  }
-};
-
-/**
- * Create a download request and queue the processing job.
- *
- * TODO: Request body will be defined by whichever ticket lands first:
- * - Cart checkout: accepts a cart_id, resolves features from the cart
- * - Query-based bulk download: accepts query parameters, resolves features from a search
- *
- * Both flows end up calling DownloadService.createDownloadRequest() + publishProcessDownloadJob().
- *
- * @returns {RequestHandler}
- */
-export function createDownload(): RequestHandler {
-  return async (_req, res) => {
-    return res.status(501).json({ message: 'Not implemented' });
-  };
-}
-
 export const GET: Operation = [
   authorizeRequestHandler(() => {
     return {
@@ -154,11 +79,6 @@ GET.apiDoc = {
   }
 };
 
-/**
- * Get all download requests for the current user.
- *
- * @returns {RequestHandler}
- */
 export function getDownloads(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);

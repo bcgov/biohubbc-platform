@@ -162,7 +162,9 @@ describe('DownloadService', () => {
         });
       sinon
         .stub(DownloadFragmentRepository.prototype, 'getRootDatasetsByFragment')
-        .resolves(new Map([[1, { dataset_name: 'Test Dataset', dataset_uuid: '11111111-2222-3333-4444-555555555555' }]]));
+        .resolves(
+          new Map([[1, { dataset_name: 'Test Dataset', dataset_uuid: '11111111-2222-3333-4444-555555555555' }]])
+        );
 
       sinon.stub(DownloadRepository.prototype, 'getDownloadById').resolves(createMockDownloadRecord());
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([
@@ -206,13 +208,15 @@ describe('DownloadService', () => {
             uuid: 'bbbbbbbb-cccc-dddd-eeee-ffffffffffff',
             feature_type_name: 'observation',
             data: { species: 'bear' },
-              submission_id: 1
+            submission_id: 1
           }
         ])
       );
       sinon
         .stub(DownloadFragmentRepository.prototype, 'getRootDatasetsByFragment')
-        .resolves(new Map([[1, { dataset_name: 'Test Dataset', dataset_uuid: '11111111-2222-3333-4444-555555555555' }]]));
+        .resolves(
+          new Map([[1, { dataset_name: 'Test Dataset', dataset_uuid: '11111111-2222-3333-4444-555555555555' }]])
+        );
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadById')
         .resolves(createMockDownloadRecord({ total_fragments: 3 }));

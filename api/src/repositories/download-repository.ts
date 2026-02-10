@@ -1,11 +1,6 @@
 import SQL from 'sql-template-strings';
 import { FRAGMENT_SIZE_THRESHOLD } from '../constants/download';
-import {
-  DownloadFeatureRecord,
-  DownloadFeatureSummary,
-  DownloadId,
-  DownloadRecord
-} from '../models/download';
+import { DownloadFeatureRecord, DownloadFeatureSummary, DownloadId, DownloadRecord } from '../models/download';
 import { DownloadStatusEnum } from '../models/download-status';
 import { BaseRepository } from './base-repository';
 
