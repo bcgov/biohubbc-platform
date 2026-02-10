@@ -103,7 +103,10 @@ export const useCartApi = (axios: AxiosInstance) => {
    * @param {ApiPaginationRequestOptions} pagination - Optional pagination parameters for returned features.
    * @return {Promise<CartFeatureListResponse>} Updated cart features with pagination.
    */
-  const clearCart = async (cartId: string, pagination?: ApiPaginationRequestOptions): Promise<CartFeatureListResponse> => {
+  const clearCart = async (
+    cartId: string,
+    pagination?: ApiPaginationRequestOptions
+  ): Promise<CartFeatureListResponse> => {
     const { data } = await axios.delete<CartFeatureListResponse>(`/api/cart/${cartId}/feature`, {
       params: pagination,
       paramsSerializer: (params) => qs.stringify(params)

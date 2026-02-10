@@ -207,7 +207,7 @@ const appTheme = createTheme({
             }
           },
           '& .MuiAutocomplete-inputRoot': {
-            padding: 0 // optional, adjust to match your input padding
+            padding: 0
           }
         }
       }
@@ -255,7 +255,7 @@ const appTheme = createTheme({
           backgroundColor: 'transparent',
           borderWidth: 0,
           width: '100%',
-          overflowX: 'auto', // <— allow horizontal scroll
+          overflowX: 'auto',
           '& .MuiDataGrid-columnHeaders': {
             fontSize: '0.875rem',
             fontWeight: 700,
@@ -292,7 +292,7 @@ const appTheme = createTheme({
               outline: 'none'
             },
           '& .MuiDataGrid-virtualScroller': {
-            overflowX: 'auto' // <— ensure the virtual scroller also scrolls horizontally
+            overflowX: 'auto'
           }
         }
       }

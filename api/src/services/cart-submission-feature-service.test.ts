@@ -91,9 +91,7 @@ describe('CartSubmissionFeatureService', () => {
       const mockDB = getMockDBConnection();
       const service = new CartSubmissionFeatureService(mockDB);
 
-      const stub = sinon
-        .stub(CartSubmissionFeatureRepository.prototype, 'removeSubmissionFeaturesFromCart')
-        .resolves();
+      const stub = sinon.stub(CartSubmissionFeatureRepository.prototype, 'removeSubmissionFeaturesFromCart').resolves();
 
       await service.removeSubmissionFeaturesFromCart('cart-1', []);
 
