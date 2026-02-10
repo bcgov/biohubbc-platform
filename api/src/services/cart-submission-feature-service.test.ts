@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiError } from '../errors/api-error';
-import { CartSubmissionFeature } from '../models/cart';
+import { CartFeatureListResponse, CartSubmissionFeature } from '../models/cart';
 import { CartSubmissionFeatureRepository } from '../repositories/cart-submission-feature-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { getMockDBConnection } from '../__mocks__/db';
@@ -45,6 +45,17 @@ describe('CartSubmissionFeatureService', () => {
         expect((err as ApiError).message).to.equal('DB error');
       }
     });
+
+    it('should not call repository when feature list is empty', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new CartSubmissionFeatureService(mockDB);
+
+      const stub = sinon.stub(CartSubmissionFeatureRepository.prototype, 'addSubmissionFeaturesToCart').resolves();
+
+      await service.addSubmissionFeaturesToCart('cart-1', []);
+
+      expect(stub).not.to.have.been.called;
+    });
   });
 
   describe('removeSubmissionFeaturesFromCart', () => {
@@ -74,6 +85,17 @@ describe('CartSubmissionFeatureService', () => {
         expect(err).to.be.instanceOf(Error);
         expect((err as ApiError).message).to.equal('DB error');
       }
+    });
+
+    it('should not call repository when cart submission feature list is empty', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new CartSubmissionFeatureService(mockDB);
+
+      const stub = sinon.stub(CartSubmissionFeatureRepository.prototype, 'removeSubmissionFeaturesFromCart').resolves();
+
+      await service.removeSubmissionFeaturesFromCart('cart-1', []);
+
+      expect(stub).not.to.have.been.called;
     });
   });
 
@@ -186,6 +208,37 @@ describe('CartSubmissionFeatureService', () => {
         expect(err).to.be.instanceOf(Error);
         expect((err as ApiError).message).to.equal('DB error');
       }
+    });
+  });
+
+  describe('getPaginatedCartFeaturesResponse', () => {
+    it('should return features and pagination response', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new CartSubmissionFeatureService(mockDB);
+
+      const features: CartSubmissionFeature[] = [
+        {
+          cart_submission_feature_id: 'uuid-1',
+          submission_feature_id: 1,
+          submission_id: 1,
+          feature_type_id: 1,
+          feature_type_name: 'name',
+          secured: false
+        }
+      ];
+
+      sinon.stub(CartSubmissionFeatureRepository.prototype, 'getCartSubmissionFeatures').resolves(features);
+      sinon.stub(CartSubmissionFeatureRepository.prototype, 'getCartSubmissionFeatureCount').resolves(1);
+
+      const result: CartFeatureListResponse = await service.getPaginatedCartFeaturesResponse('cart-1', {
+        page: 1,
+        limit: 10
+      });
+
+      expect(result.features).to.deep.equal(features);
+      expect(result.pagination.total).to.equal(1);
+      expect(result.pagination.current_page).to.equal(1);
+      expect(result.pagination.per_page).to.equal(10);
     });
   });
 });

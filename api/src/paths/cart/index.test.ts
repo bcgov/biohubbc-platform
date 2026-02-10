@@ -5,7 +5,7 @@ import sinonChai from 'sinon-chai';
 import { createCart } from '.';
 import * as db from '../../database/db';
 import { ApiError } from '../../errors/api-error';
-import { CartStatus, CartWithFeatures } from '../../models/cart';
+import { CartStatus, CartWithFeaturesResponse } from '../../models/cart';
 import { CartService } from '../../services/cart-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 
@@ -47,11 +47,19 @@ describe('cart', () => {
       });
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-      const fakeCart: CartWithFeatures = {
-        cart_id: '1111-2222-3333-4444',
-        system_user_id: 1,
-        cart_status: CartStatus.ACTIVE,
-        features: []
+      const fakeCart: CartWithFeaturesResponse = {
+        cart: {
+          cart_id: '1111-2222-3333-4444',
+          system_user_id: 1,
+          cart_status: CartStatus.ACTIVE
+        },
+        features: [],
+        pagination: {
+          total: 0,
+          per_page: 25,
+          current_page: 1,
+          last_page: 1
+        }
       };
 
       const createCartStub = sinon.stub(CartService.prototype, 'createCart').resolves(fakeCart);
@@ -78,11 +86,19 @@ describe('cart', () => {
       });
       const apiDBStub = sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
-      const fakeCart: CartWithFeatures = {
-        cart_id: '1111-2222-3333-4444',
-        system_user_id: null,
-        cart_status: CartStatus.ACTIVE,
-        features: []
+      const fakeCart: CartWithFeaturesResponse = {
+        cart: {
+          cart_id: '1111-2222-3333-4444',
+          system_user_id: null,
+          cart_status: CartStatus.ACTIVE
+        },
+        features: [],
+        pagination: {
+          total: 0,
+          per_page: 25,
+          current_page: 1,
+          last_page: 1
+        }
       };
 
       sinon.stub(CartService.prototype, 'createCart').resolves(fakeCart);

@@ -1,6 +1,7 @@
 import { IDBConnection } from '../database/db';
-import { CartSubmissionFeature } from '../models/cart';
+import { CartFeatureListResponse, CartSubmissionFeature } from '../models/cart';
 import { CartSubmissionFeatureRepository } from '../repositories/cart-submission-feature-repository';
+import { ensureCompletePaginationOptions, makePaginationResponse } from '../utils/pagination';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { PolicyService } from './access-policy/policy-service';
 import { DBService } from './db-service';
@@ -90,5 +91,28 @@ export class CartSubmissionFeatureService extends DBService {
    */
   async getCartSubmissionFeatureCount(cartId: string): Promise<number> {
     return this.cartSubmissionFeatureRepository.getCartSubmissionFeatureCount(cartId);
+  }
+
+  /**
+   * Returns cart features and pagination payload in the same shape used by cart feature endpoints.
+   *
+   * @param {string} cartId - The ID of the cart
+   * @param {Partial<ApiPaginationOptions>} pagination - Requested pagination parameters
+   * @return {Promise<CartFeatureListResponse>}
+   * @memberof CartSubmissionFeatureService
+   */
+  async getPaginatedCartFeaturesResponse(
+    cartId: string,
+    pagination: Partial<ApiPaginationOptions>
+  ): Promise<CartFeatureListResponse> {
+    const [features, count] = await Promise.all([
+      this.getCartSubmissionFeatures(cartId, ensureCompletePaginationOptions(pagination)),
+      this.getCartSubmissionFeatureCount(cartId)
+    ]);
+
+    return {
+      features,
+      pagination: makePaginationResponse(count, pagination)
+    };
   }
 }

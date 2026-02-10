@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../database/db';
-import { GetCartWithFeaturesSchema } from '../../openapi/schemas/cart';
+import { CartFeatureIdsRequestSchema, CartWithFeaturesResponseSchema } from '../../openapi/schemas/cart';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { CartService } from '../../services/cart-service';
 import { getLogger } from '../../utils/logger';
@@ -21,18 +21,7 @@ POST.apiDoc = {
   requestBody: {
     content: {
       'application/json': {
-        schema: {
-          type: 'object',
-          required: ['features'],
-          additionalProperties: false,
-          properties: {
-            features: {
-              type: 'array',
-              items: { type: 'integer' },
-              description: 'List of submission feature IDs to add to the cart'
-            }
-          }
-        }
+        schema: CartFeatureIdsRequestSchema
       }
     }
   },
@@ -41,7 +30,7 @@ POST.apiDoc = {
       description: 'Cart created successfully',
       content: {
         'application/json': {
-          schema: GetCartWithFeaturesSchema
+          schema: CartWithFeaturesResponseSchema
         }
       }
     },

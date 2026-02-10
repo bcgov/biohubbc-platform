@@ -180,7 +180,7 @@ export const SearchSidebarSection = (props: FilterSectionProps) => {
         />
       </Box>
 
-      <Box sx={{ maxHeight: '250px', overflowY: 'auto' }}>
+      <Box>
         {mergedOptions.map(({ option, isSelected, isRecommended }) => {
           const id = normalizeQueryParam(option.value);
           return (

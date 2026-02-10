@@ -1,25 +1,100 @@
-import { DataGrid, GridRowSelectionModel } from '@mui/x-data-grid';
+import { Button, Stack } from '@mui/material';
+import { DataGrid, GridCellParams, GridRowSelectionModel } from '@mui/x-data-grid';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useMemo } from 'react';
 
 interface SearchResultTableLayoutProps {
   results: SearchFeatureResultWithRelevancy[];
+  cartFeatureIds: Set<number>;
   onRowSelectionModelChange: (rowSelectionModel: GridRowSelectionModel) => void;
+  onDownload?: (result: SearchFeatureResultWithRelevancy) => void;
+  onAddToCart?: (result: SearchFeatureResultWithRelevancy) => void;
+  onRemoveFromCart?: (featureId: number) => void;
 }
 
-export const SearchResultTableLayout = ({ results, onRowSelectionModelChange }: SearchResultTableLayoutProps) => {
+export const SearchResultTableLayout = ({
+  results,
+  cartFeatureIds,
+  onRowSelectionModelChange,
+  onDownload,
+  onAddToCart,
+  onRemoveFromCart
+}: SearchResultTableLayoutProps) => {
   const columns = useMemo(() => {
     if (results.length === 0) {
       return [];
     }
-    const firstRow = results[0];
-    return Object.keys(firstRow).map((key) => ({
-      field: key,
-      headerName: key.charAt(0).toUpperCase() + key.slice(1),
-      width: 150,
-      sortable: true
-    }));
-  }, [results]);
+
+    return [
+      {
+        field: 'feature_type_name',
+        headerName: 'Feature Type',
+        width: 150,
+        sortable: true
+      },
+      {
+        field: 'submission_name',
+        headerName: 'Submission',
+        width: 150,
+        sortable: true
+      },
+      {
+        field: 'feature_description',
+        headerName: 'Description',
+        width: 250,
+        sortable: true
+      },
+      {
+        field: 'relevancy_score',
+        headerName: 'Relevance',
+        width: 120,
+        sortable: true
+      },
+      {
+        field: 'actions',
+        headerName: 'Actions',
+        width: 220,
+        sortable: false,
+        renderCell: (params: GridCellParams) => {
+          const result = params.row as SearchFeatureResultWithRelevancy;
+          const isInCart = cartFeatureIds.has(result.submission_feature_id);
+
+          return (
+            <Stack direction="row" gap={1} height="100%" alignItems="center">
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => {
+                  onDownload?.(result);
+                }}>
+                View
+              </Button>
+              {isInCart ? (
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="error"
+                  onClick={() => {
+                    onRemoveFromCart?.(result.submission_feature_id);
+                  }}>
+                  Remove
+                </Button>
+              ) : (
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={() => {
+                    onAddToCart?.(result);
+                  }}>
+                  Add
+                </Button>
+              )}
+            </Stack>
+          );
+        }
+      }
+    ];
+  }, [results, cartFeatureIds, onDownload, onAddToCart, onRemoveFromCart]);
 
   return (
     <DataGrid
@@ -34,7 +109,7 @@ export const SearchResultTableLayout = ({ results, onRowSelectionModelChange }: 
       disableColumnMenu
       sortingOrder={['asc', 'desc']}
       initialState={{
-        sorting: { sortModel: [{ field: columns[0]?.field, sort: 'asc' }] },
+        sorting: { sortModel: [{ field: 'relevancy_score', sort: 'desc' }] },
         pagination: { paginationModel: { pageSize: 10 } }
       }}
       sx={{
