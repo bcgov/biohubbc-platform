@@ -981,7 +981,6 @@ describe('SubmissionRepository', () => {
 
       expect(response).to.eql(mockResponse);
     });
-
   });
 
   describe('getFeatureTypeIdByName', () => {

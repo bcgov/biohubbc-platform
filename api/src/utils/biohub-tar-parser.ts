@@ -37,10 +37,14 @@ export interface IUploadedMediaFile {
  */
 function stripArchivePrefix(entryName: string): string {
   const slashIndex = entryName.indexOf('/');
-  if (slashIndex === -1) return entryName;
+  if (slashIndex === -1) {
+    return entryName;
+  }
 
   const firstSegment = entryName.substring(0, slashIndex);
-  if (firstSegment === 'files') return entryName;
+  if (firstSegment === 'files') {
+    return entryName;
+  }
 
   return entryName.substring(slashIndex + 1);
 }

@@ -40,7 +40,14 @@ describe('FeatureIngestionService', () => {
     const mockFeatureTypeWithProperties: FeatureTypeWithProperties = {
       featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
       properties: [
-        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true, calculated_value: false },
+        {
+          name: 'name',
+          display_name: 'Name',
+          description: '',
+          type_name: 'string',
+          required_value: true,
+          calculated_value: false
+        },
         {
           name: 'focal_species',
           display_name: 'Focal Species',
@@ -430,9 +437,30 @@ describe('FeatureIngestionService', () => {
 
   describe('validateFeaturePropertyFlat', () => {
     const mockAllowedProperties: FeatureProperty[] = [
-      { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true, calculated_value: false },
-      { name: 'count', display_name: 'Count', description: '', type_name: 'number', required_value: false, calculated_value: false },
-      { name: 'active', display_name: 'Active', description: '', type_name: 'boolean', required_value: false, calculated_value: false }
+      {
+        name: 'name',
+        display_name: 'Name',
+        description: '',
+        type_name: 'string',
+        required_value: true,
+        calculated_value: false
+      },
+      {
+        name: 'count',
+        display_name: 'Count',
+        description: '',
+        type_name: 'number',
+        required_value: false,
+        calculated_value: false
+      },
+      {
+        name: 'active',
+        display_name: 'Active',
+        description: '',
+        type_name: 'boolean',
+        required_value: false,
+        calculated_value: false
+      }
     ];
 
     it('returns empty array for valid properties', () => {
@@ -558,8 +586,22 @@ describe('FeatureIngestionService', () => {
       const service = new FeatureIngestionService(mockDBConnection);
 
       const propertiesWithCalculated: FeatureProperty[] = [
-        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true, calculated_value: false },
-        { name: 'filename', display_name: 'Filename', description: '', type_name: 'string', required_value: true, calculated_value: true }
+        {
+          name: 'name',
+          display_name: 'Name',
+          description: '',
+          type_name: 'string',
+          required_value: true,
+          calculated_value: false
+        },
+        {
+          name: 'filename',
+          display_name: 'Filename',
+          description: '',
+          type_name: 'string',
+          required_value: true,
+          calculated_value: true
+        }
       ];
 
       const feature: IFlattenedBlock = {
@@ -583,7 +625,16 @@ describe('FeatureIngestionService', () => {
 
       const mockResult: FeatureTypeWithProperties = {
         featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
-        properties: [{ name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true, calculated_value: false }]
+        properties: [
+          {
+            name: 'name',
+            display_name: 'Name',
+            description: '',
+            type_name: 'string',
+            required_value: true,
+            calculated_value: false
+          }
+        ]
       };
 
       const getFeatureTypeStub = sinon
@@ -661,7 +712,14 @@ describe('FeatureIngestionService', () => {
     const mockFeatureTypeWithProperties: FeatureTypeWithProperties = {
       featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
       properties: [
-        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true, calculated_value: false },
+        {
+          name: 'name',
+          display_name: 'Name',
+          description: '',
+          type_name: 'string',
+          required_value: true,
+          calculated_value: false
+        },
         {
           name: 'focal_species',
           display_name: 'Focal Species',
@@ -1002,7 +1060,14 @@ describe('FeatureIngestionService', () => {
       const mockFeatureTypeWithMultipleProps: FeatureTypeWithProperties = {
         featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
         properties: [
-          { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true, calculated_value: false },
+          {
+            name: 'name',
+            display_name: 'Name',
+            description: '',
+            type_name: 'string',
+            required_value: true,
+            calculated_value: false
+          },
           {
             name: 'focal_species',
             display_name: 'Focal Species',
@@ -1027,7 +1092,14 @@ describe('FeatureIngestionService', () => {
             required_value: false,
             calculated_value: false
           },
-          { name: 'count', display_name: 'Count', description: '', type_name: 'number', required_value: false, calculated_value: false }
+          {
+            name: 'count',
+            display_name: 'Count',
+            description: '',
+            type_name: 'number',
+            required_value: false,
+            calculated_value: false
+          }
         ]
       };
 
