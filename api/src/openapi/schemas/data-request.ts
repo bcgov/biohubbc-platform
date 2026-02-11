@@ -36,6 +36,16 @@ export const CreateDataRequestSchema: OpenAPIV3.SchemaObject = {
   }
 };
 
+export const CreateDataRequestRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['team_id', 'reason'],
+  additionalProperties: false,
+  properties: {
+    team_id: { type: 'string', format: 'uuid', description: 'Team ID for the data request' },
+    reason: { type: 'string', description: 'Reason for the data request' }
+  }
+};
+
 export const UpdateDataRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
@@ -95,4 +105,32 @@ export const DataRequestStatusResponseSchema: OpenAPIV3.SchemaObject = {
 export const DataRequestStatusListResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'array',
   items: DataRequestStatusResponseSchema
+};
+
+export const DataRequestWithStatusResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: [
+    'data_request_id',
+    'reason',
+    'team_id',
+    'requested_by',
+    'create_date',
+    'create_user',
+    'revision_count',
+    'data_request_status'
+  ],
+  additionalProperties: false,
+  properties: {
+    data_request_id: { type: 'string', format: 'uuid' },
+    reason: { type: 'string' },
+    team_id: { type: 'string', format: 'uuid' },
+    requested_by: { type: 'integer' },
+    record_end_date: { type: 'string', nullable: true },
+    create_date: { type: 'string' },
+    create_user: { type: 'integer' },
+    update_date: { type: 'string', nullable: true },
+    update_user: { type: 'integer', nullable: true },
+    revision_count: { type: 'integer' },
+    data_request_status: DataRequestStatusResponseSchema
+  }
 };
