@@ -44,7 +44,11 @@ export class FeatureIngestionService extends DBService {
    * @returns {Promise<IValidationResult>} Validation result with valid flag and any errors
    * @memberof FeatureIngestionService
    */
-  async ingestFeatures(submissionId: number, features: IFlattenedBlock[]): Promise<IValidationResult> {
+  async ingestFeatures(
+    submissionId: number,
+    features: IFlattenedBlock[],
+    dataByteSizeMap: Map<string, number> = new Map()
+  ): Promise<IValidationResult> {
     // 1. Validate all features
     const validationResult = await this.validateFlatSubmissionFeatures(features);
 
@@ -57,7 +61,7 @@ export class FeatureIngestionService extends DBService {
     await submissionRepository.deleteSubmissionFeatures(submissionId);
 
     // 3. Insert features (two-pass for parent references)
-    await this.insertFlatFeatures(submissionId, features);
+    await this.insertFlatFeatures(submissionId, features, dataByteSizeMap);
 
     return { valid: true, errors: [] };
   }
@@ -72,7 +76,11 @@ export class FeatureIngestionService extends DBService {
    * @param {IFlattenedBlock[]} features - Features to insert
    * @memberof FeatureIngestionService
    */
-  private async insertFlatFeatures(submissionId: number, features: IFlattenedBlock[]): Promise<void> {
+  private async insertFlatFeatures(
+    submissionId: number,
+    features: IFlattenedBlock[],
+    dataByteSizeMap: Map<string, number>
+  ): Promise<void> {
     const submissionRepository = new SubmissionRepository(this.connection);
     const uuidToDbId = new Map<string, number>();
 
@@ -83,7 +91,8 @@ export class FeatureIngestionService extends DBService {
         null, // parent set in pass 2
         feature.id,
         feature.type,
-        feature.properties
+        feature.properties,
+        dataByteSizeMap.get(feature.id) ?? 0
       );
       uuidToDbId.set(feature.id, result.submission_feature_id);
     }
@@ -292,7 +301,7 @@ export class FeatureIngestionService extends DBService {
       const value = feature.properties[prop.name];
 
       // Check if required property is missing
-      if (prop.required_value && (value === undefined || value === null)) {
+      if (prop.required_value && !prop.calculated_value && (value === undefined || value === null)) {
         errors.push({
           type: ValidationErrorType.MISSING_REQUIRED_PROPERTY,
           featureId: feature.id,

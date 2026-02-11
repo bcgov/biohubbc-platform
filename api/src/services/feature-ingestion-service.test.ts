@@ -40,27 +40,30 @@ describe('FeatureIngestionService', () => {
     const mockFeatureTypeWithProperties: FeatureTypeWithProperties = {
       featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
       properties: [
-        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true },
+        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true, calculated_value: false },
         {
           name: 'focal_species',
           display_name: 'Focal Species',
           description: '',
           type_name: 'array',
-          required_value: true
+          required_value: true,
+          calculated_value: false
         },
         {
           name: 'start_date',
           display_name: 'Start Date',
           description: '',
           type_name: 'datetime',
-          required_value: true
+          required_value: true,
+          calculated_value: false
         },
         {
           name: 'description',
           display_name: 'Description',
           description: '',
           type_name: 'string',
-          required_value: false
+          required_value: false,
+          calculated_value: false
         }
       ]
     };
@@ -427,9 +430,9 @@ describe('FeatureIngestionService', () => {
 
   describe('validateFeaturePropertyFlat', () => {
     const mockAllowedProperties: FeatureProperty[] = [
-      { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true },
-      { name: 'count', display_name: 'Count', description: '', type_name: 'number', required_value: false },
-      { name: 'active', display_name: 'Active', description: '', type_name: 'boolean', required_value: false }
+      { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true, calculated_value: false },
+      { name: 'count', display_name: 'Count', description: '', type_name: 'number', required_value: false, calculated_value: false },
+      { name: 'active', display_name: 'Active', description: '', type_name: 'boolean', required_value: false, calculated_value: false }
     ];
 
     it('returns empty array for valid properties', () => {
@@ -549,6 +552,28 @@ describe('FeatureIngestionService', () => {
       expect(errors.some((e: IValidationError) => e.type === ValidationErrorType.INVALID_PROPERTY_TYPE)).to.be.true;
       expect(errors.some((e: IValidationError) => e.type === ValidationErrorType.INVALID_PROPERTY)).to.be.true;
     });
+
+    it('should skip required check for calculated properties', () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new FeatureIngestionService(mockDBConnection);
+
+      const propertiesWithCalculated: FeatureProperty[] = [
+        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true, calculated_value: false },
+        { name: 'filename', display_name: 'Filename', description: '', type_name: 'string', required_value: true, calculated_value: true }
+      ];
+
+      const feature: IFlattenedBlock = {
+        id: '14ebb420-4cfa-4be1-99db-8122253e3106',
+        type: 'artifact',
+        properties: { name: 'Test' }, // filename omitted — calculated, so no error
+        content: [],
+        parent: null
+      };
+
+      const errors = service.validateFeaturePropertyFlat(feature, propertiesWithCalculated);
+
+      expect(errors).to.have.length(0);
+    });
   });
 
   describe('getFeatureTypeWithPropertiesCached', () => {
@@ -558,7 +583,7 @@ describe('FeatureIngestionService', () => {
 
       const mockResult: FeatureTypeWithProperties = {
         featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
-        properties: [{ name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true }]
+        properties: [{ name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true, calculated_value: false }]
       };
 
       const getFeatureTypeStub = sinon
@@ -636,27 +661,30 @@ describe('FeatureIngestionService', () => {
     const mockFeatureTypeWithProperties: FeatureTypeWithProperties = {
       featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
       properties: [
-        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true },
+        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true, calculated_value: false },
         {
           name: 'focal_species',
           display_name: 'Focal Species',
           description: '',
           type_name: 'array',
-          required_value: true
+          required_value: true,
+          calculated_value: false
         },
         {
           name: 'start_date',
           display_name: 'Start Date',
           description: '',
           type_name: 'datetime',
-          required_value: true
+          required_value: true,
+          calculated_value: false
         },
         {
           name: 'description',
           display_name: 'Description',
           description: '',
           type_name: 'string',
-          required_value: false
+          required_value: false,
+          calculated_value: false
         }
       ]
     };
@@ -847,7 +875,8 @@ describe('FeatureIngestionService', () => {
         null, // parent (null in pass 1)
         'test-uuid-123', // feature.id
         'dataset', // feature.type
-        { name: 'My Dataset', focal_species: [{ taxon_id: 1234 }], start_date: '2024-01-01T00:00:00Z' }
+        { name: 'My Dataset', focal_species: [{ taxon_id: 1234 }], start_date: '2024-01-01T00:00:00Z' },
+        0 // dataByteSizeBytes (default, no map entry)
       );
     });
 
@@ -973,29 +1002,32 @@ describe('FeatureIngestionService', () => {
       const mockFeatureTypeWithMultipleProps: FeatureTypeWithProperties = {
         featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
         properties: [
-          { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true },
+          { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true, calculated_value: false },
           {
             name: 'focal_species',
             display_name: 'Focal Species',
             description: '',
             type_name: 'array',
-            required_value: true
+            required_value: true,
+            calculated_value: false
           },
           {
             name: 'start_date',
             display_name: 'Start Date',
             description: '',
             type_name: 'datetime',
-            required_value: true
+            required_value: true,
+            calculated_value: false
           },
           {
             name: 'description',
             display_name: 'Description',
             description: '',
             type_name: 'string',
-            required_value: false
+            required_value: false,
+            calculated_value: false
           },
-          { name: 'count', display_name: 'Count', description: '', type_name: 'number', required_value: false }
+          { name: 'count', display_name: 'Count', description: '', type_name: 'number', required_value: false, calculated_value: false }
         ]
       };
 
@@ -1106,6 +1138,65 @@ describe('FeatureIngestionService', () => {
       expect(callOrder).to.deep.equal(['insert', 'insert', 'insert', 'updateParent', 'updateParent']);
       expect(insertStub).to.have.been.calledThrice;
       expect(updateParentStub).to.have.been.calledTwice;
+    });
+
+    it('should pass byte size from dataByteSizeMap to insertSubmissionFeatureRecord', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new FeatureIngestionService(mockDBConnection);
+
+      sinon
+        .stub(ValidationRepository.prototype, 'getFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
+
+      sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
+
+      const insertStub = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord');
+      insertStub.onCall(0).resolves({ submission_feature_id: 1 });
+      insertStub.onCall(1).resolves({ submission_feature_id: 2 });
+
+      sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent').resolves();
+
+      const features: IFlattenedBlock[] = [createValidFeature({ id: 'uuid-1' }), createValidFeature({ id: 'uuid-2' })];
+
+      const byteSizeMap = new Map([
+        ['uuid-1', 500],
+        ['uuid-2', 1200]
+      ]);
+
+      await service.ingestFeatures(1, features, byteSizeMap);
+
+      // Verify 6th arg (dataByteSizeBytes) passed correctly
+      expect(insertStub.getCall(0).args[5]).to.equal(500);
+      expect(insertStub.getCall(1).args[5]).to.equal(1200);
+    });
+
+    it('should default to 0 for features not in dataByteSizeMap', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new FeatureIngestionService(mockDBConnection);
+
+      sinon
+        .stub(ValidationRepository.prototype, 'getFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
+
+      sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
+
+      const insertStub = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord');
+      insertStub.onCall(0).resolves({ submission_feature_id: 1 });
+      insertStub.onCall(1).resolves({ submission_feature_id: 2 });
+
+      sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent').resolves();
+
+      const features: IFlattenedBlock[] = [
+        createValidFeature({ id: 'uuid-1' }),
+        createValidFeature({ id: 'uuid-missing' })
+      ];
+
+      const byteSizeMap = new Map([['uuid-1', 800]]);
+
+      await service.ingestFeatures(1, features, byteSizeMap);
+
+      expect(insertStub.getCall(0).args[5]).to.equal(800);
+      expect(insertStub.getCall(1).args[5]).to.equal(0); // missing entry defaults to 0
     });
   });
 });

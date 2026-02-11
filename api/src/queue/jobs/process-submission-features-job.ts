@@ -1,6 +1,6 @@
 import PgBoss from 'pg-boss';
 import { getAPIUserDBConnection } from '../../database/db';
-//import { SubmissionProcessService } from '../../services/submission-process-service';
+import { SubmissionIngestionService } from '../../services/submission-ingestion-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { getLogger } from '../../utils/logger';
 
@@ -52,8 +52,27 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IProcessSub
       await submissionValidationService.updateSubmissionValidationStatus(job.id, 'started');
       await connection.commit();
 
-      // Process the submission (download, validate, insert, index, regions)
-      //TODO: call submission feature validation service;
+      // Process the submission (two-pass: validate → ingest)
+      const submissionIngestionService = new SubmissionIngestionService(connection);
+      const result = await submissionIngestionService.processSubmission(submissionId);
+
+      if (!result.valid) {
+        // Validation failure — permanent condition, don't retry
+        await submissionValidationService.updateSubmissionValidationStatus(job.id, 'invalid', {
+          errors: result.errors
+        });
+        await connection.commit();
+
+        defaultLog.info({
+          label: 'processSubmissionFeaturesJobHandler',
+          message: 'Submission validation failed (invalid data)',
+          jobId: job.id,
+          submissionId,
+          errorCount: result.errors.length
+        });
+
+        return;
+      }
 
       // Update validation status to completed
       await submissionValidationService.updateSubmissionValidationStatus(job.id, 'completed');

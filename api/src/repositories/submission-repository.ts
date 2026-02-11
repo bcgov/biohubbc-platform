@@ -409,7 +409,8 @@ export class SubmissionRepository extends BaseRepository {
     parentSubmissionFeatureId: number | null,
     featureSourceId: string | null,
     featureTypeName: string,
-    featureProperties: ISubmissionFeature['properties']
+    featureProperties: ISubmissionFeature['properties'],
+    dataByteSizeBytes: number
   ): Promise<{ submission_feature_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_feature (
@@ -418,6 +419,7 @@ export class SubmissionRepository extends BaseRepository {
         source_id,
         feature_type_id,
         data,
+        data_byte_size,
         record_effective_date
       ) VALUES (
         ${submissionId},
@@ -425,6 +427,7 @@ export class SubmissionRepository extends BaseRepository {
         ${featureSourceId},
         (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}),
         ${featureProperties},
+        ${dataByteSizeBytes},
         now()
       )
       RETURNING

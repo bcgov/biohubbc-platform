@@ -86,7 +86,8 @@ export class ValidationRepository extends BaseRepository {
         fp.display_name as property_display_name,
         fp.description as property_description,
         fpt.name as property_type_name,
-        ftp.required_value
+        ftp.required_value,
+        fp.calculated_value
       FROM
         feature_type ft
       LEFT JOIN
@@ -94,7 +95,6 @@ export class ValidationRepository extends BaseRepository {
         AND ftp.record_end_date IS NULL
       LEFT JOIN
         feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-        AND fp.calculated_value = false
         AND fp.record_end_date IS NULL
       LEFT JOIN
         feature_property_type fpt ON fp.feature_property_type_id = fpt.feature_property_type_id
@@ -127,7 +127,8 @@ export class ValidationRepository extends BaseRepository {
         display_name: row.property_display_name as string,
         description: row.property_description as string,
         type_name: row.property_type_name as string,
-        required_value: row.required_value as boolean
+        required_value: row.required_value as boolean,
+        calculated_value: row.calculated_value as boolean
       }));
 
     return {

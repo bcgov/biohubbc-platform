@@ -36,7 +36,7 @@ describe('ArtifactRepository', () => {
         bucket: 'test-bucket',
         artifact_status: ArtifactStatusEnum.UPLOADED,
         object_key: 'key.txt',
-        byte_size: 1234,
+        byte_size: '1234',
         checksum_sha256: 'checksum',
         uploaded_at: '2025-12-31T12:00:00Z'
       };
@@ -62,7 +62,7 @@ describe('ArtifactRepository', () => {
           bucket: 'bucket1',
           artifact_status: ArtifactStatusEnum.UPLOADED,
           object_key: 'key1.txt',
-          byte_size: 123,
+          byte_size: '123',
           checksum_sha256: 'abc',
           uploaded_at: '2025-12-31T12:00:00Z'
         },
@@ -71,7 +71,7 @@ describe('ArtifactRepository', () => {
           bucket: 'bucket2',
           artifact_status: ArtifactStatusEnum.ARCHIVED,
           object_key: 'key2.txt',
-          byte_size: 456,
+          byte_size: '456',
           checksum_sha256: 'def',
           uploaded_at: '2025-12-31T12:10:00Z'
         }

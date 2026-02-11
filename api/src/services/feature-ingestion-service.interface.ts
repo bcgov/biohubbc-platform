@@ -25,7 +25,11 @@ export enum ValidationErrorType {
   /** Parent or content UUID does not resolve to a feature in the submission */
   UNRESOLVED_REFERENCE = 'Unresolved Reference',
   /** Feature references itself in parent or content */
-  SELF_REFERENCE = 'Self Reference'
+  SELF_REFERENCE = 'Self Reference',
+
+  // Media errors
+  /** A file/report block references a media file not found in the archive */
+  MISSING_MEDIA_FILE = 'Missing Media File'
 }
 
 /**

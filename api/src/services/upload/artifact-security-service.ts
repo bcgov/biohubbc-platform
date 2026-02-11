@@ -3,6 +3,7 @@ import { ArtifactStatusEnum } from '../../models/artifact';
 import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
+import { publishProcessSubmissionFeaturesJob } from '../../queue/publisher';
 import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
 import { getObjectStoreBucketName, getSecurityObjectStoreBucketName, _getClamAvScanner } from '../../utils/file-utils';
 import { DBService } from '../db-service';
@@ -10,6 +11,7 @@ import { BucketType, ObjectStorageService } from '../object-storage/object-stora
 import { ArtifactSecurityScanService } from './artifact-security-scan-service';
 import { ScanExecutionResult, ScanOutcome } from './artifact-security-service.interface';
 import { ArtifactService } from './artifact-service';
+import { SubmissionUploadService } from './submission-upload-service';
 import { UploadArchiveService } from './upload-archive-service';
 
 export class ArtifactSecurityService extends DBService {
@@ -96,6 +98,16 @@ export class ArtifactSecurityService extends DBService {
       await uploadArchiveService.updateUploadArchive(uploadArchive.upload_archive_id, {
         archive_status: ProcessStatusStatusEnum.PENDING
       });
+
+      // Look up submissionId and publish the process-submission-features job
+      const submissionUploadService = new SubmissionUploadService(this.connection);
+      const submissionUpload = await submissionUploadService.findSubmissionUploadByUploadId(uploadArchive.upload_id);
+
+      if (submissionUpload) {
+        await publishProcessSubmissionFeaturesJob(this.connection, {
+          submissionId: submissionUpload.submission_id
+        });
+      }
     }
   }
 

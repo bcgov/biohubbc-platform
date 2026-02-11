@@ -54,7 +54,7 @@ describe('ValidationRepository', () => {
     it('should succeed with valid data', async () => {
       // Type mock data with Zod-inferred type - TypeScript will catch field name errors
       const mockData: FeatureProperty[] = [
-        { name: 'dataset', display_name: 'Dataset', description: 'asd', type_name: 'string', required_value: true }
+        { name: 'dataset', display_name: 'Dataset', description: 'asd', type_name: 'string', required_value: true, calculated_value: false }
       ];
       const mockQueryResponse = mockQueryResult(mockData);
 
@@ -86,7 +86,8 @@ describe('ValidationRepository', () => {
           property_display_name: 'Name',
           property_description: 'The name of the dataset',
           property_type_name: 'string',
-          required_value: true
+          required_value: true,
+          calculated_value: false
         },
         {
           feature_type_id: 1,
@@ -96,7 +97,8 @@ describe('ValidationRepository', () => {
           property_display_name: 'Description',
           property_description: 'The description of the dataset',
           property_type_name: 'string',
-          required_value: false
+          required_value: false,
+          calculated_value: false
         }
       ];
       const mockQueryResponse = mockQueryResult(mockRows);
@@ -121,14 +123,16 @@ describe('ValidationRepository', () => {
             display_name: 'Name',
             description: 'The name of the dataset',
             type_name: 'string',
-            required_value: true
+            required_value: true,
+            calculated_value: false
           },
           {
             name: 'description',
             display_name: 'Description',
             description: 'The description of the dataset',
             type_name: 'string',
-            required_value: false
+            required_value: false,
+            calculated_value: false
           }
         ]
       };
@@ -160,7 +164,8 @@ describe('ValidationRepository', () => {
           property_display_name: null,
           property_description: null,
           property_type_name: null,
-          required_value: null
+          required_value: null,
+          calculated_value: null
         }
       ];
       const mockQueryResponse = mockQueryResult(mockRows);

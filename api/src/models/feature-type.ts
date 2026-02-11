@@ -9,7 +9,8 @@ export const FeatureProperty = z.object({
   display_name: z.string(),
   description: z.string(),
   type_name: z.string(),
-  required_value: z.boolean()
+  required_value: z.boolean(),
+  calculated_value: z.boolean()
 });
 
 export type FeatureProperty = z.infer<typeof FeatureProperty>;
@@ -38,7 +39,8 @@ export const FeatureTypeWithPropertiesRow = z.object({
   property_display_name: z.string().nullable(),
   property_description: z.string().nullable(),
   property_type_name: z.string().nullable(),
-  required_value: z.boolean().nullable()
+  required_value: z.boolean().nullable(),
+  calculated_value: z.boolean().nullable()
 });
 
 export type FeatureTypeWithPropertiesRow = z.infer<typeof FeatureTypeWithPropertiesRow>;

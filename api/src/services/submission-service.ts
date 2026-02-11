@@ -127,7 +127,8 @@ export class SubmissionService extends DBService {
           parentSubmissionFeatureId,
           featureNode.id,
           featureNode.type,
-          featureNode.properties
+          featureNode.properties,
+          0
         );
 
         // Cache the submission_feature_id for the current jsonPath

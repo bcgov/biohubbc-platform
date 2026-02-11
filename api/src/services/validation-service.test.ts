@@ -213,7 +213,8 @@ describe('ValidationService', () => {
           display_name: 'Field 1',
           description: 'A Field 1',
           type_name: 'string',
-          required_value: true
+          required_value: true,
+          calculated_value: false
         }
       ];
 
@@ -249,12 +250,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
-        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
-        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
-        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
-        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
-        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true, calculated_value: false },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true, calculated_value: false },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true, calculated_value: false },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true, calculated_value: false },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true, calculated_value: false },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true, calculated_value: false }
       ];
 
       const dataProperties = {
@@ -290,12 +291,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
-        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
-        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
-        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
-        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
-        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true, calculated_value: false },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true, calculated_value: false },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true, calculated_value: false },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true, calculated_value: false },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true, calculated_value: false },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true, calculated_value: false }
       ];
 
       const dataProperties = {
@@ -332,12 +333,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
-        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
-        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
-        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
-        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
-        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true, calculated_value: false },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true, calculated_value: false },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true, calculated_value: false },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true, calculated_value: false },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true, calculated_value: false },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true, calculated_value: false }
       ];
 
       const dataProperties = {
@@ -374,12 +375,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
-        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
-        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
-        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
-        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
-        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true, calculated_value: false },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true, calculated_value: false },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true, calculated_value: false },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true, calculated_value: false },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true, calculated_value: false },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true, calculated_value: false }
       ];
 
       const dataProperties = {
@@ -416,12 +417,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
-        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
-        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
-        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
-        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
-        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true, calculated_value: false },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true, calculated_value: false },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true, calculated_value: false },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true, calculated_value: false },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true, calculated_value: false },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true, calculated_value: false }
       ];
 
       const dataProperties = {
@@ -458,12 +459,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
-        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
-        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
-        { name: 'tags', display_name: '', description: '', type_name: 'array', required_value: true },
-        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
-        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true, calculated_value: false },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true, calculated_value: false },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true, calculated_value: false },
+        { name: 'tags', display_name: '', description: '', type_name: 'array', required_value: true, calculated_value: false },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true, calculated_value: false },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true, calculated_value: false }
       ];
 
       const dataProperties = {
@@ -500,7 +501,7 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'tags', display_name: '', description: '', type_name: 'array', required_value: true }
+        { name: 'tags', display_name: '', description: '', type_name: 'array', required_value: true, calculated_value: false }
       ];
 
       const dataProperties = {
@@ -518,12 +519,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
-        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
-        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
-        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
-        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
-        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true, calculated_value: false },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true, calculated_value: false },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true, calculated_value: false },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true, calculated_value: false },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true, calculated_value: false },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true, calculated_value: false }
       ];
 
       const dataProperties = {
@@ -548,12 +549,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
-        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
-        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
-        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
-        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
-        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true, calculated_value: false },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true, calculated_value: false },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true, calculated_value: false },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true, calculated_value: false },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true, calculated_value: false },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true, calculated_value: false }
       ];
 
       const dataProperties = {
@@ -590,12 +591,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
-        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
-        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
-        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
-        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
-        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true, calculated_value: false },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true, calculated_value: false },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true, calculated_value: false },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true, calculated_value: false },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true, calculated_value: false },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true, calculated_value: false }
       ];
 
       const dataProperties = {
@@ -632,13 +633,13 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
-        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
-        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
-        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
-        { name: 'tags', display_name: '', description: '', type_name: 'array', required_value: true },
-        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
-        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true, calculated_value: false },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true, calculated_value: false },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true, calculated_value: false },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true, calculated_value: false },
+        { name: 'tags', display_name: '', description: '', type_name: 'array', required_value: true, calculated_value: false },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true, calculated_value: false },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true, calculated_value: false }
       ];
 
       const dataProperties = {
@@ -676,8 +677,8 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const mockValidationProperties = [
-        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true },
-        { name: 'description', display_name: 'Description', description: '', type_name: 'string', required_value: true }
+        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true, calculated_value: false },
+        { name: 'description', display_name: 'Description', description: '', type_name: 'string', required_value: true, calculated_value: false }
       ];
 
       const getFeatureValidationPropertiesStub = sinon
@@ -698,8 +699,8 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const mockValidationProperties = [
-        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true },
-        { name: 'description', display_name: 'Description', description: '', type_name: 'string', required_value: true }
+        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true, calculated_value: false },
+        { name: 'description', display_name: 'Description', description: '', type_name: 'string', required_value: true, calculated_value: false }
       ];
 
       const getFeatureValidationPropertiesStub = sinon
@@ -712,7 +713,7 @@ describe('ValidationService', () => {
 
       // Set cache for non-matching type
       validationService.validationPropertiesCache.set('observation', [
-        { name: 'count', display_name: 'Count', description: '', type_name: 'number', required_value: true }
+        { name: 'count', display_name: 'Count', description: '', type_name: 'number', required_value: true, calculated_value: false }
       ]);
 
       const properties = await validationService.getFeatureValidationProperties(featureType);
@@ -725,8 +726,8 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const mockValidationProperties = [
-        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true },
-        { name: 'description', display_name: 'Description', description: '', type_name: 'string', required_value: true }
+        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true, calculated_value: false },
+        { name: 'description', display_name: 'Description', description: '', type_name: 'string', required_value: true, calculated_value: false }
       ];
 
       const getFeatureValidationPropertiesStub = sinon
