@@ -93,63 +93,6 @@ describe('DownloadService (integration)', function () {
     `);
   }
 
-  /**
-   * Helper: create a policy that grants access to a feature URN, and assign it to the current user
-   * via a team. Sets up the full chain: team → team_member, policy → policy_statement, team_policy.
-   *
-   * @param urn - The feature URN to grant access to (supports wildcards, e.g. 'urn:*:*:*').
-   * @returns The policy_id for further assertions if needed.
-   */
-  async function grantAccessViaPolicy(urn: string): Promise<string> {
-    const systemUserId = connection.systemUserId();
-
-    // Create policy
-    const policyResult = await connection.sql(SQL`
-      INSERT INTO policy (name, description, create_user)
-      VALUES (${'test-policy-' + Date.now()}, 'Integration test policy', ${systemUserId})
-      RETURNING policy_id;
-    `);
-    const policyId = policyResult.rows[0].policy_id;
-
-    // Create policy statement with the target URN
-    await connection.sql(SQL`
-      INSERT INTO policy_statement (policy_id, effect, submission_feature_urn, create_user)
-      VALUES (${policyId}, 'allow', ${urn}, ${systemUserId});
-    `);
-
-    // Create team
-    const teamResult = await connection.sql(SQL`
-      INSERT INTO team (name, description, create_user)
-      VALUES (${'test-team-' + Date.now()}, 'Integration test team', ${systemUserId})
-      RETURNING team_id;
-    `);
-    const teamId = teamResult.rows[0].team_id;
-
-    // Link team to policy
-    await connection.sql(SQL`
-      INSERT INTO team_policy (team_id, policy_id, create_user)
-      VALUES (${teamId}, ${policyId}, ${systemUserId});
-    `);
-
-    // Add current user to team
-    await connection.sql(SQL`
-      INSERT INTO team_member (system_user_id, team_id, create_user)
-      VALUES (${systemUserId}, ${teamId}, ${systemUserId});
-    `);
-
-    return policyId;
-  }
-
-  /**
-   * Helper: look up the auto-generated URN for a submission feature.
-   */
-  async function getFeatureUrn(submissionFeatureId: number): Promise<string> {
-    const result = await connection.sql(SQL`
-      SELECT urn FROM submission_feature WHERE submission_feature_id = ${submissionFeatureId};
-    `);
-    return result.rows[0].urn;
-  }
-
   describe('createDownloadRequest', () => {
     it('should create a download record and link submission features', async () => {
       // Step 1: Create a submission with two features

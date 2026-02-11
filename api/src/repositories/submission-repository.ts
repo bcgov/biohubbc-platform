@@ -8,12 +8,6 @@ import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
 
-/**
- * Estimated overhead per feature row in CSV export (headers, delimiters, extra columns).
- * Used when computing `data_byte_size` for download size estimation.
- */
-const CSV_ROW_OVERHEAD_BYTES = 500;
-
 export interface ISubmissionFeature {
   id: string | null;
   type: string;
