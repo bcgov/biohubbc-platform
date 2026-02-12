@@ -1,5 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { SYSTEM_ROLE } from '../../constants/roles';
 import { getAPIUserDBConnection, getDBConnection } from '../../database/db';
 import {
   CreateDataRequestRequestSchema,
@@ -7,10 +8,9 @@ import {
   DataRequestWithStatusResponseSchema
 } from '../../openapi/schemas/data-request';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
+import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { DataRequestService } from '../../services/data-request-service';
 import { getLogger } from '../../utils/logger';
-import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
-import { SYSTEM_ROLE } from '../../constants/roles';
 
 const defaultLog = getLogger('paths/data-request');
 
