@@ -3,30 +3,54 @@ import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
 import { DataRequestResponseSchema, UpdateDataRequestSchema } from '../../../openapi/schemas/data-request';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { DataRequestService } from '../../../services/data-request-service';
 import { getLogger } from '../../../utils/logger';
+import { SYSTEM_ROLE } from '../../../constants/roles';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 
 const defaultLog = getLogger('paths/data-request/{dataRequestId}');
 
 export const GET: Operation = [
-  authorizeRequestHandler(() => ({
-    and: []
-  })),
+  authorizeRequestHandler(() => {
+    return {
+      or: [
+        {
+          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+          discriminator: 'SystemRole'
+        },
+        // TODO: must be a system user that is part of the team making the data_request
+      ]
+    };
+  }),
   getDataRequestById()
 ];
 
 export const PUT: Operation = [
-  authorizeRequestHandler(() => ({
-    and: []
-  })),
+  authorizeRequestHandler(() => {
+    return {
+      or: [
+        {
+          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+          discriminator: 'SystemRole'
+        },
+        // TODO: must be a system user that is part of the team making the data_request
+      ]
+    };
+  }),
   updateDataRequest()
 ];
-
 export const DELETE: Operation = [
-  authorizeRequestHandler(() => ({
-    and: []
-  })),
+  authorizeRequestHandler(() => {
+    return {
+      or: [
+        {
+          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+          discriminator: 'SystemRole'
+        },
+        // TODO: must be a system user that is part of the team making the data_request
+      ]
+    };
+  }),
   deleteDataRequest()
 ];
 
@@ -35,7 +59,7 @@ GET.apiDoc = {
   tags: ['data-request'],
   security: [
     {
-      OptionalBearer: []
+      Bearer: []
     }
   ],
   parameters: [
@@ -154,6 +178,8 @@ export function getDataRequestById(): RequestHandler {
       const dataRequestService = new DataRequestService(connection);
 
       const dataRequest = await dataRequestService.getDataRequestById(dataRequestId);
+      // do a lookup to see if the user is in the team 
+      // if not return 403
 
       await connection.commit();
 
