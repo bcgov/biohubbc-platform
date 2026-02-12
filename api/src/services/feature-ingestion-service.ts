@@ -52,20 +52,22 @@ export class FeatureIngestionService extends DBService {
       return validationResult;
     }
 
-    // 2. Delete existing features (idempotency for job retries)
+    // 2. Delete existing features and relationships (idempotency for job retries)
     const submissionRepository = new SubmissionRepository(this.connection);
     await submissionRepository.deleteSubmissionFeatures(submissionId);
+    await submissionRepository.deleteSubmissionFeatureRelationships(submissionId);
 
-    // 3. Insert features (two-pass for parent references)
+    // 3. Insert features (two-pass for parent references, Pass 3 for content relationships)
     await this.insertFlatFeatures(submissionId, features);
 
     return { valid: true, errors: [] };
   }
 
   /**
-   * Insert flat features using two-pass approach.
+   * Insert flat features using three-pass approach.
    * Pass 1: Insert all features with parent = NULL
    * Pass 2: Update parent references using UUID → ID mapping
+   * Pass 3: Insert content relationships (parent-child from content array)
    *
    * @private
    * @param {number} submissionId - The submission ID
@@ -97,6 +99,31 @@ export class FeatureIngestionService extends DBService {
           await submissionRepository.updateSubmissionFeatureParent(featureDbId, parentDbId);
         }
       }
+    }
+
+    // Pass 3: Insert content relationships (many-to-many)
+    const relationshipPairs: Array<{
+      parent_submission_feature_id: number;
+      child_submission_feature_id: number;
+    }> = [];
+    for (const feature of features) {
+      if (feature.content && feature.content.length > 0) {
+        const parentDbId = uuidToDbId.get(feature.id);
+        if (parentDbId) {
+          for (const childId of feature.content) {
+            const childDbId = uuidToDbId.get(childId);
+            if (childDbId) {
+              relationshipPairs.push({
+                parent_submission_feature_id: parentDbId,
+                child_submission_feature_id: childDbId
+              });
+            }
+          }
+        }
+      }
+    }
+    if (relationshipPairs.length > 0) {
+      await submissionRepository.insertSubmissionFeatureRelationships(relationshipPairs);
     }
   }
 

@@ -481,6 +481,91 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Delete all submission feature relationships for features belonging to a submission.
+   * Used for idempotency - allows job retries to start fresh.
+   *
+   * @param {number} submissionId The submission ID.
+   * @return {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async deleteSubmissionFeatureRelationships(submissionId: number): Promise<void> {
+    const sqlStatement = SQL`
+      DELETE FROM submission_feature__feature
+      WHERE parent_submission_feature_id IN (
+        SELECT submission_feature_id FROM submission_feature WHERE submission_id = ${submissionId}
+      )
+      OR child_submission_feature_id IN (
+        SELECT submission_feature_id FROM submission_feature WHERE submission_id = ${submissionId}
+      );
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Insert submission feature relationships (parent-child from content array).
+   * Uses ON CONFLICT DO NOTHING to avoid failures on duplicate pairs.
+   *
+   * @param {Array<{ parent_submission_feature_id: number; child_submission_feature_id: number }>} pairs The pairs to insert.
+   * @return {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async insertSubmissionFeatureRelationships(
+    pairs: Array<{ parent_submission_feature_id: number; child_submission_feature_id: number }>
+  ): Promise<void> {
+    if (pairs.length === 0) {
+      return;
+    }
+
+    const parentIds = pairs.map((p) => p.parent_submission_feature_id);
+    const childIds = pairs.map((p) => p.child_submission_feature_id);
+
+    const sqlStatement = SQL`
+      INSERT INTO submission_feature__feature (parent_submission_feature_id, child_submission_feature_id)
+      SELECT parent_id, child_id FROM unnest(
+        ${parentIds}::integer[],
+        ${childIds}::integer[]
+      ) AS t(parent_id, child_id)
+      ON CONFLICT (parent_submission_feature_id, child_submission_feature_id) DO NOTHING;
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Get all related submission feature IDs for a given feature (parents and children).
+   *
+   * @param {number} submissionFeatureId The submission feature ID.
+   * @return {Promise<{ parentIds: number[]; childIds: number[] }>}
+   * @memberof SubmissionRepository
+   */
+  async getRelatedSubmissionFeatureIds(
+    submissionFeatureId: number
+  ): Promise<{ parentIds: number[]; childIds: number[] }> {
+    const parentSqlStatement = SQL`
+      SELECT parent_submission_feature_id
+      FROM submission_feature__feature
+      WHERE child_submission_feature_id = ${submissionFeatureId};
+    `;
+
+    const childSqlStatement = SQL`
+      SELECT child_submission_feature_id
+      FROM submission_feature__feature
+      WHERE parent_submission_feature_id = ${submissionFeatureId};
+    `;
+
+    const [parentResult, childResult] = await Promise.all([
+      this.connection.sql<{ parent_submission_feature_id: number }>(parentSqlStatement),
+      this.connection.sql<{ child_submission_feature_id: number }>(childSqlStatement)
+    ]);
+
+    return {
+      parentIds: parentResult.rows.map((r) => r.parent_submission_feature_id),
+      childIds: childResult.rows.map((r) => r.child_submission_feature_id)
+    };
+  }
+
+  /**
    * Get feature type id by name.
    *
    * @param {string} name
