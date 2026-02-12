@@ -16,7 +16,7 @@ export class DownloadFragmentRepository extends BaseRepository {
   /**
    * Create a new download fragment record.
    *
-   * @param {number} downloadId - The parent download ID.
+   * @param {string} downloadId - The parent download ID.
    * @param {number} fragmentIndex - Zero-based fragment ordering index.
    * @param {number} estimatedSizeBytes - Estimated size of this fragment in bytes.
    * @param {number} featureCount - Number of features assigned to this fragment.
@@ -24,7 +24,7 @@ export class DownloadFragmentRepository extends BaseRepository {
    * @memberof DownloadFragmentRepository
    */
   async createDownloadFragment(
-    downloadId: number,
+    downloadId: string,
     fragmentIndex: number,
     estimatedSizeBytes: number,
     featureCount: number
@@ -71,11 +71,11 @@ export class DownloadFragmentRepository extends BaseRepository {
   /**
    * Get all fragments for a download, ordered by index.
    *
-   * @param {number} downloadId - The download ID.
+   * @param {string} downloadId - The download ID.
    * @return {Promise<DownloadFragmentRecord[]>}
    * @memberof DownloadFragmentRepository
    */
-  async getFragmentsByDownloadId(downloadId: number): Promise<DownloadFragmentRecord[]> {
+  async getFragmentsByDownloadId(downloadId: string): Promise<DownloadFragmentRecord[]> {
     const sql = SQL`
       SELECT
         download_fragment_id,

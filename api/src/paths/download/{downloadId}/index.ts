@@ -36,8 +36,8 @@ GET.apiDoc = {
       in: 'path',
       name: 'downloadId',
       schema: {
-        type: 'integer',
-        minimum: 1
+        type: 'string',
+        format: 'uuid'
       },
       required: true
     }
@@ -52,7 +52,8 @@ GET.apiDoc = {
             required: ['download_id', 'status', 'total_fragments', 'completed_fragments'],
             properties: {
               download_id: {
-                type: 'integer'
+                type: 'string',
+                format: 'uuid'
               },
               status: {
                 type: 'string',
@@ -153,7 +154,7 @@ export function findDownloadById(): RequestHandler {
 
     try {
       const { system_user_id } = req.system_user;
-      const downloadId = Number(req.params.downloadId);
+      const downloadId = req.params.downloadId;
 
       await connection.open();
 

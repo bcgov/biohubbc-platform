@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { DownloadStatusZod } from './download-status';
 
 export const DownloadRecord = z.object({
-  download_id: z.number(),
-  system_user_id: z.number(),
+  download_id: z.string(),
+  system_user_id: z.number().nullable(),
   download_status: DownloadStatusZod,
   s3_key: z.string().nullable(),
   file_name: z.string().nullable(),
@@ -24,7 +24,7 @@ export type DownloadId = z.infer<typeof DownloadId>;
 
 export const DownloadFeatureRecord = z.object({
   download_feature_id: z.number(),
-  download_id: z.number(),
+  download_id: z.string(),
   submission_feature_id: z.number()
 });
 export type DownloadFeatureRecord = z.infer<typeof DownloadFeatureRecord>;

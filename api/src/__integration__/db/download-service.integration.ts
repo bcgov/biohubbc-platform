@@ -105,8 +105,6 @@ describe('DownloadService (integration)', function () {
       const result = await service.createDownloadRequest(systemUserId, [featureId1, featureId2]);
 
       // Step 3: Verify download record was created with correct initial state
-      expect(result).to.have.property('download_id').that.is.a('number');
-
       const download = await service.findDownloadById(result.download_id);
       expect(download).to.not.be.null;
       expect(download!.download_status).to.equal(DownloadStatusEnum.PENDING);

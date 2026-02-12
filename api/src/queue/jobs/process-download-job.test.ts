@@ -18,7 +18,7 @@ describe('process-download-job', () => {
   });
 
   describe('processDownloadJobHandler', () => {
-    const createMockJob = (downloadId: number, systemUserId: number, jobId = 'test-job-id') =>
+    const createMockJob = (downloadId: string, systemUserId: number | null, jobId = 'test-job-id') =>
       ({
         id: jobId,
         name: 'process-download',
@@ -39,13 +39,13 @@ describe('process-download-job', () => {
       sinon.stub(DownloadService.prototype, 'getFragmentsToProcess').resolves([]);
       const finalizeStub = sinon.stub(DownloadService.prototype, 'finalizeDownload').resolves();
 
-      const mockJobs = [createMockJob(123, 456, 'job-abc')];
+      const mockJobs = [createMockJob('aaaa0000-0000-0000-0000-000000000123', 456, 'job-abc')];
       await processDownloadJobHandler(mockJobs);
 
       expect(planStub.calledOnce).to.be.true;
-      expect(planStub.firstCall.args[0]).to.equal(123);
+      expect(planStub.firstCall.args[0]).to.equal('aaaa0000-0000-0000-0000-000000000123');
       expect(finalizeStub.calledOnce).to.be.true;
-      expect(finalizeStub.firstCall.args[0]).to.equal(123);
+      expect(finalizeStub.firstCall.args[0]).to.equal('aaaa0000-0000-0000-0000-000000000123');
     });
 
     it('rolls back and throws error on failure without updating status to failed', async () => {
@@ -68,7 +68,7 @@ describe('process-download-job', () => {
 
       const updateStatusStub = sinon.stub(DownloadService.prototype, 'updateDownloadStatus').resolves();
 
-      const mockJobs = [createMockJob(123, 456)];
+      const mockJobs = [createMockJob('aaaa0000-0000-0000-0000-000000000123', 456)];
 
       try {
         await processDownloadJobHandler(mockJobs);
@@ -83,7 +83,12 @@ describe('process-download-job', () => {
   });
 
   describe('processDownloadFailedHandler', () => {
-    const createMockFailedJob = (downloadId: number, systemUserId: number, jobId = 'dlq-job-id', output?: unknown) =>
+    const createMockFailedJob = (
+      downloadId: string,
+      systemUserId: number | null,
+      jobId = 'dlq-job-id',
+      output?: unknown
+    ) =>
       ({
         id: jobId,
         name: '__state__completed__process-download',
@@ -106,12 +111,12 @@ describe('process-download-job', () => {
       const updateStatusByIdStub = sinon.stub(DownloadService.prototype, 'updateDownloadStatus').resolves();
 
       // Step 3: Call handler with failed job
-      const mockJobs = [createMockFailedJob(123, 456, 'dlq-job-id')];
+      const mockJobs = [createMockFailedJob('aaaa0000-0000-0000-0000-000000000123', 456, 'dlq-job-id')];
       await processDownloadFailedHandler(mockJobs);
 
       // Step 4: Verify updateDownloadStatus was called with correct args
       expect(updateStatusByIdStub.calledOnce).to.be.true;
-      expect(updateStatusByIdStub.firstCall.args[0]).to.equal(123); // downloadId
+      expect(updateStatusByIdStub.firstCall.args[0]).to.equal('aaaa0000-0000-0000-0000-000000000123'); // downloadId
       expect(updateStatusByIdStub.firstCall.args[1]).to.equal(DownloadStatusEnum.FAILED);
     });
 
@@ -131,7 +136,7 @@ describe('process-download-job', () => {
 
       // Step 3: Call handler with job that has string output
       const errorOutput = 'Database connection failed';
-      const mockJobs = [createMockFailedJob(123, 456, 'dlq-job-id', errorOutput)];
+      const mockJobs = [createMockFailedJob('aaaa0000-0000-0000-0000-000000000123', 456, 'dlq-job-id', errorOutput)];
       await processDownloadFailedHandler(mockJobs);
 
       // Step 4: Verify error was passed in metadata
@@ -153,7 +158,9 @@ describe('process-download-job', () => {
       const updateStatusByIdStub = sinon.stub(DownloadService.prototype, 'updateDownloadStatus').resolves();
 
       // Step 3: Call handler with job that has non-string output
-      const mockJobs = [createMockFailedJob(123, 456, 'dlq-job-id', { some: 'object' })];
+      const mockJobs = [
+        createMockFailedJob('aaaa0000-0000-0000-0000-000000000123', 456, 'dlq-job-id', { some: 'object' })
+      ];
       await processDownloadFailedHandler(mockJobs);
 
       // Step 4: Verify default error message was used

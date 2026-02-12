@@ -1,34 +1,22 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getDBConnection } from '../../../../../../database/db';
+import { getAPIUserDBConnection, getDBConnection } from '../../../../../../database/db';
 import { HTTP403, HTTP404, HTTP409 } from '../../../../../../errors/http-error';
 import { DownloadStatusEnum } from '../../../../../../models/download-status';
 import { defaultErrorResponses } from '../../../../../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../../../../../request-handlers/security/authorization';
 import { DownloadService } from '../../../../../../services/download-service';
 import { getLogger } from '../../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/download/{downloadId}/fragment/{fragmentIndex}/url');
 
-export const GET: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          discriminator: 'SystemUser'
-        }
-      ]
-    };
-  }),
-  getFragmentUrl()
-];
+export const GET: Operation = [getFragmentUrl()];
 
 GET.apiDoc = {
   description: 'Get a signed URL to download a specific fragment',
   tags: ['download'],
   security: [
     {
-      Bearer: []
+      OptionalBearer: []
     }
   ],
   parameters: [
@@ -37,8 +25,8 @@ GET.apiDoc = {
       in: 'path',
       name: 'downloadId',
       schema: {
-        type: 'integer',
-        minimum: 1
+        type: 'string',
+        format: 'uuid'
       },
       required: true
     },
@@ -78,17 +66,18 @@ GET.apiDoc = {
 /**
  * Get a signed URL for downloading a specific fragment of a completed download.
  *
- * Verifies the requesting user owns the download and that the fragment is ready.
+ * Unauthenticated downloads (system_user_id is null) are accessible to anyone.
+ * Authenticated downloads are restricted to the requesting user.
  *
  * @returns {RequestHandler}
  */
 export function getFragmentUrl(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req.keycloak_token);
+    const isAuthenticated = !!req.keycloak_token;
+    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     try {
-      const { system_user_id } = req.system_user;
-      const downloadId = Number(req.params.downloadId);
+      const downloadId = req.params.downloadId;
       const fragmentIndex = Number(req.params.fragmentIndex);
 
       await connection.open();
@@ -100,8 +89,13 @@ export function getFragmentUrl(): RequestHandler {
         throw new HTTP404('Download not found');
       }
 
-      if (download.system_user_id !== system_user_id) {
-        throw new HTTP403('Access denied');
+      // Owned downloads can only be accessed by the user who created them
+      if (download.system_user_id !== null) {
+        const systemUserId = isAuthenticated ? connection.systemUserId() : null;
+
+        if (download.system_user_id !== systemUserId) {
+          throw new HTTP403('Access denied');
+        }
       }
 
       if (download.download_status !== DownloadStatusEnum.READY) {

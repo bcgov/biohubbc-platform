@@ -577,7 +577,7 @@ describe('DownloadService download pipeline (system)', function () {
   /**
    * Helper: run the full download pipeline and return the resulting zip.
    */
-  async function executeAndGetZip(featureIds: number[]): Promise<{ zip: AdmZip; downloadId: number }> {
+  async function executeAndGetZip(featureIds: number[]): Promise<{ zip: AdmZip; downloadId: string }> {
     const systemUserId = connection.systemUserId();
     const { download_id } = await service.createDownloadRequest(systemUserId, featureIds);
 

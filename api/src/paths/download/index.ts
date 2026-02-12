@@ -45,7 +45,8 @@ GET.apiDoc = {
                   required: ['download_id', 'status'],
                   properties: {
                     download_id: {
-                      type: 'integer'
+                      type: 'string',
+                      format: 'uuid'
                     },
                     status: {
                       type: 'string',

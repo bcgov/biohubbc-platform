@@ -17,12 +17,12 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
 
   describe('getFragmentUrl', () => {
     it('should return 200 with signed URL when download is ready and user owns it', async () => {
-      const dbConnectionObj = getMockDBConnection();
+      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 5 });
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
       const mockDownload = {
-        download_id: 1,
+        download_id: 'aaaa0000-0000-0000-0000-000000000001',
         system_user_id: 5,
         download_status: 'ready'
       };
@@ -32,8 +32,8 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.system_user = { system_user_id: 5 } as any;
-      mockReq.params = { downloadId: '1', fragmentIndex: '0' };
+      mockReq.keycloak_token = {} as any;
+      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001', fragmentIndex: '0' };
 
       const requestHandler = getFragmentUrl();
 
@@ -66,12 +66,12 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
     });
 
     it('should throw HTTP403 when user does not own the download', async () => {
-      const dbConnectionObj = getMockDBConnection();
+      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 5 });
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
       const mockDownload = {
-        download_id: 1,
+        download_id: 'aaaa0000-0000-0000-0000-000000000001',
         system_user_id: 99
       };
 
@@ -79,8 +79,8 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.system_user = { system_user_id: 5 } as any;
-      mockReq.params = { downloadId: '1', fragmentIndex: '0' };
+      mockReq.keycloak_token = {} as any;
+      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001', fragmentIndex: '0' };
 
       const requestHandler = getFragmentUrl();
 
@@ -94,12 +94,12 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
     });
 
     it('should throw HTTP409 when download is not ready', async () => {
-      const dbConnectionObj = getMockDBConnection();
+      const dbConnectionObj = getMockDBConnection({ systemUserId: () => 5 });
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
       const mockDownload = {
-        download_id: 1,
+        download_id: 'aaaa0000-0000-0000-0000-000000000001',
         system_user_id: 5,
         download_status: 'processing'
       };
@@ -108,8 +108,8 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.system_user = { system_user_id: 5 } as any;
-      mockReq.params = { downloadId: '1', fragmentIndex: '0' };
+      mockReq.keycloak_token = {} as any;
+      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001', fragmentIndex: '0' };
 
       const requestHandler = getFragmentUrl();
 

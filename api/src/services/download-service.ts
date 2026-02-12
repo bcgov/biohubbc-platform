@@ -71,14 +71,14 @@ export class DownloadService extends DBService {
    * Creates a download record and links the specified submission features.
    * Caller must validate that submissionFeatureIds is non-empty.
    *
-   * @param {number} systemUserId - The user initiating the download.
+   * @param {number | null} systemUserId - The user initiating the download. Null for anonymous downloads.
    * @param {number[]} submissionFeatureIds - The submission feature IDs to include.
    * @param {number} [fragmentSizeMb] - Target fragment size in MB (500, 1000, or 5000). Defaults to 500.
    * @return {Promise<DownloadId>} The created download record ID.
    * @memberof DownloadService
    */
   async createDownloadRequest(
-    systemUserId: number,
+    systemUserId: number | null,
     submissionFeatureIds: number[],
     fragmentSizeMb?: number
   ): Promise<DownloadId> {
@@ -94,11 +94,11 @@ export class DownloadService extends DBService {
   /**
    * Get a download record by ID.
    *
-   * @param {number} downloadId - The download ID.
+   * @param {string} downloadId - The download ID.
    * @return {Promise<DownloadRecord | null>}
    * @memberof DownloadService
    */
-  async findDownloadById(downloadId: number): Promise<DownloadRecord | null> {
+  async findDownloadById(downloadId: string): Promise<DownloadRecord | null> {
     return this.downloadRepository.findDownloadById(downloadId);
   }
 
@@ -116,14 +116,14 @@ export class DownloadService extends DBService {
   /**
    * Update download status by download ID.
    *
-   * @param {number} downloadId - The download ID.
+   * @param {string} downloadId - The download ID.
    * @param {DownloadStatusEnum} status - The new status.
    * @param {object} [metadata] - Optional metadata (s3_key, file_name, file_size_bytes, error).
    * @return {Promise<void>}
    * @memberof DownloadService
    */
   async updateDownloadStatus(
-    downloadId: number,
+    downloadId: string,
     status: DownloadStatusEnum,
     metadata?: { s3_key?: string; file_name?: string; file_size_bytes?: string | number; error?: string }
   ): Promise<void> {
@@ -143,23 +143,26 @@ export class DownloadService extends DBService {
   /**
    * Get lightweight summaries for all authorized features in a download.
    *
-   * @param {number} downloadId - The download ID.
-   * @param {number} systemUserId - The user requesting the download.
+   * @param {string} downloadId - The download ID.
+   * @param {number | null} systemUserId - The user requesting the download. Null for anonymous downloads.
    * @return {Promise<DownloadFeatureSummary[]>}
    * @memberof DownloadService
    */
-  async getDownloadFeatureSummaries(downloadId: number, systemUserId: number): Promise<DownloadFeatureSummary[]> {
+  async getDownloadFeatureSummaries(
+    downloadId: string,
+    systemUserId: number | null
+  ): Promise<DownloadFeatureSummary[]> {
     return this.downloadRepository.getDownloadFeatureSummaries(downloadId, systemUserId);
   }
 
   /**
    * Get all fragments for a download.
    *
-   * @param {number} downloadId - The download ID.
+   * @param {string} downloadId - The download ID.
    * @return {Promise<DownloadFragmentRecord[]>}
    * @memberof DownloadService
    */
-  async getFragmentsByDownloadId(downloadId: number): Promise<DownloadFragmentRecord[]> {
+  async getFragmentsByDownloadId(downloadId: string): Promise<DownloadFragmentRecord[]> {
     return this.fragmentRepository.getFragmentsByDownloadId(downloadId);
   }
 
@@ -168,12 +171,12 @@ export class DownloadService extends DBService {
    *
    * Uses pre-computed data_byte_size which includes JSONB size + CSV overhead + artifact file size.
    *
-   * @param {number} downloadId - The download ID.
-   * @param {number} systemUserId - The user requesting the download.
+   * @param {string} downloadId - The download ID.
+   * @param {number | null} systemUserId - The user requesting the download. Null for anonymous downloads.
    * @return {Promise<DownloadSizeEstimate>}
    * @memberof DownloadService
    */
-  async estimateDownloadSize(downloadId: number, systemUserId: number): Promise<DownloadSizeEstimate> {
+  async estimateDownloadSize(downloadId: string, systemUserId: number | null): Promise<DownloadSizeEstimate> {
     const features = await this.getDownloadFeatureSummaries(downloadId, systemUserId);
     const totalEstimatedBytes = features.reduce((sum, f) => sum + Number(f.estimated_byte_size), 0);
 
@@ -187,12 +190,12 @@ export class DownloadService extends DBService {
    * When total bytes fit within one bin, a single fragment is naturally created.
    * Oversized files get their own dedicated fragment.
    *
-   * @param {number} downloadId - The download ID.
+   * @param {string} downloadId - The download ID.
    * @param {DownloadSizeEstimate} sizeEstimate - The size estimation result.
    * @return {Promise<void>}
    * @memberof DownloadService
    */
-  async planFragments(downloadId: number, sizeEstimate: DownloadSizeEstimate): Promise<void> {
+  async planFragments(downloadId: string, sizeEstimate: DownloadSizeEstimate): Promise<void> {
     const features = sizeEstimate.features;
 
     // Read configurable fragment size from the download record
@@ -264,11 +267,11 @@ export class DownloadService extends DBService {
    * Note: These methods are orchestrated by processDownloadJobHandler with per-fragment
    * transactions so that completed fragments survive retries. Do not call directly.
    *
-   * @param {number} downloadId - The download ID to plan.
+   * @param {string} downloadId - The download ID to plan.
    * @return {Promise<void>}
    * @memberof DownloadService
    */
-  async planDownloadIfNeeded(downloadId: number): Promise<void> {
+  async planDownloadIfNeeded(downloadId: string): Promise<void> {
     const download = await this.downloadRepository.findDownloadById(downloadId);
 
     if (!download) {
@@ -288,11 +291,11 @@ export class DownloadService extends DBService {
   /**
    * Get fragments that still need processing (not yet READY).
    *
-   * @param {number} downloadId - The download ID.
+   * @param {string} downloadId - The download ID.
    * @return {Promise<DownloadFragmentRecord[]>} Fragments that need processing.
    * @memberof DownloadService
    */
-  async getFragmentsToProcess(downloadId: number): Promise<DownloadFragmentRecord[]> {
+  async getFragmentsToProcess(downloadId: string): Promise<DownloadFragmentRecord[]> {
     const fragments = await this.fragmentRepository.getFragmentsByDownloadId(downloadId);
     return fragments.filter((f) => f.fragment_status !== DownloadStatusEnum.READY);
   }
@@ -302,11 +305,11 @@ export class DownloadService extends DBService {
    *
    * Updates fragment counts and sets the parent download status to READY.
    *
-   * @param {number} downloadId - The download ID to finalize.
+   * @param {string} downloadId - The download ID to finalize.
    * @return {Promise<void>}
    * @memberof DownloadService
    */
-  async finalizeDownload(downloadId: number): Promise<void> {
+  async finalizeDownload(downloadId: string): Promise<void> {
     const fragments = await this.fragmentRepository.getFragmentsByDownloadId(downloadId);
 
     const readyCount = fragments.filter((f) => f.fragment_status === DownloadStatusEnum.READY).length;
@@ -344,11 +347,11 @@ export class DownloadService extends DBService {
    * fragments are not lost on retry. See processDownloadJobHandler for orchestration.
    *
    * @param {DownloadFragmentRecord} fragment - The fragment to process.
-   * @param {number} downloadId - The parent download ID.
+   * @param {string} downloadId - The parent download ID.
    * @return {Promise<void>}
    * @memberof DownloadService
    */
-  async processFragment(fragment: DownloadFragmentRecord, downloadId: number): Promise<void> {
+  async processFragment(fragment: DownloadFragmentRecord, downloadId: string): Promise<void> {
     const fragmentId = fragment.download_fragment_id;
 
     try {
@@ -478,6 +481,13 @@ export class DownloadService extends DBService {
    * Stream a single feature type's data as a CSV into the archive.
    *
    * Returns file references for any artifact_key properties encountered.
+   *
+   * @param fragmentId - The download fragment to stream features from.
+   * @param featureType - The feature type name (e.g. 'dataset', 'observation').
+   * @param archive - The archiver instance to append the CSV stream to.
+   * @param schemaLookup - Map of feature type names to their property definitions.
+   * @param rootDatasetCache - Map of submission IDs to their root dataset info (uuid, name).
+   * @param filesFolderName - Folder name within the archive for file artifacts.
    */
   private async streamFeatureTypeCsv(
     fragmentId: number,
@@ -617,12 +627,12 @@ export class DownloadService extends DBService {
    *
    * Validates the fragment exists and is ready before generating the URL.
    *
-   * @param {number} downloadId - The download ID.
+   * @param {string} downloadId - The download ID.
    * @param {number} fragmentIndex - The zero-based fragment index.
    * @return {Promise<string>} The signed download URL.
    * @memberof DownloadService
    */
-  async getFragmentSignedUrl(downloadId: number, fragmentIndex: number): Promise<string> {
+  async getFragmentSignedUrl(downloadId: string, fragmentIndex: number): Promise<string> {
     const fragments = await this.fragmentRepository.getFragmentsByDownloadId(downloadId);
     const fragment = fragments.find((f) => f.fragment_index === fragmentIndex);
 

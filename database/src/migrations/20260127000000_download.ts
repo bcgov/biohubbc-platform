@@ -30,8 +30,8 @@ export async function up(knex: Knex): Promise<void> {
     -- Create download table
     --------------------------------------------------------------------------------
     CREATE TABLE download (
-      download_id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-      system_user_id      INTEGER NOT NULL,
+      download_id         UUID DEFAULT gen_random_uuid(),
+      system_user_id      INTEGER,
       download_status     download_status NOT NULL DEFAULT 'pending',
       s3_key              VARCHAR(500),
       file_name           VARCHAR(255),
@@ -42,9 +42,12 @@ export async function up(knex: Knex): Promise<void> {
       downloaded_at       TIMESTAMPTZ,
       create_date         TIMESTAMPTZ NOT NULL DEFAULT now(),
       create_user         INTEGER NOT NULL,
+      record_end_date     TIMESTAMPTZ,
       update_date         TIMESTAMPTZ,
       update_user         INTEGER,
       revision_count      INTEGER NOT NULL DEFAULT 0,
+
+      CONSTRAINT download_pk PRIMARY KEY (download_id),
 
       CONSTRAINT download_fk1
         FOREIGN KEY (system_user_id) REFERENCES "system_user"(system_user_id)
@@ -75,7 +78,7 @@ export async function up(knex: Knex): Promise<void> {
     --------------------------------------------------------------------------------
     COMMENT ON TABLE download IS 'Tracks background job status for download packaging requests.';
     COMMENT ON COLUMN download.download_id IS 'Primary key.';
-    COMMENT ON COLUMN download.system_user_id IS 'Foreign key to system_user table. The user who initiated the download.';
+    COMMENT ON COLUMN download.system_user_id IS 'Foreign key to system_user table. The user who initiated the download. Null for anonymous downloads.';
     COMMENT ON COLUMN download.download_status IS 'Download status: pending, ready, downloaded, or failed.';
     COMMENT ON COLUMN download.s3_key IS 'Object storage key for the generated zip file.';
     COMMENT ON COLUMN download.file_name IS 'Name of the generated zip file.';
@@ -84,13 +87,14 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN download.started_at IS 'Timestamp when download packaging began.';
     COMMENT ON COLUMN download.completed_at IS 'Timestamp when download packaging completed.';
     COMMENT ON COLUMN download.downloaded_at IS 'Timestamp when the client downloaded the file.';
+    COMMENT ON COLUMN download.record_end_date IS 'The date the record was soft-deleted.';
 
     --------------------------------------------------------------------------------
     -- Create download_feature table
     --------------------------------------------------------------------------------
     CREATE TABLE download_feature (
       download_feature_id       INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-      download_id               INTEGER NOT NULL,
+      download_id               UUID NOT NULL,
       submission_feature_id     INTEGER NOT NULL,
       create_date               TIMESTAMPTZ NOT NULL DEFAULT now(),
       create_user               INTEGER NOT NULL,

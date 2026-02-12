@@ -258,7 +258,7 @@ describe('publisher', () => {
 
   describe('publishProcessDownloadJob', () => {
     const createMockDownload = (overrides: Partial<DownloadRecord> = {}): DownloadRecord => ({
-      download_id: 1,
+      download_id: 'aaaa0000-0000-0000-0000-000000000001',
       system_user_id: 123,
       download_status: 'pending',
       s3_key: null,
@@ -288,7 +288,7 @@ describe('publisher', () => {
       sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
 
       // Step 2: Call publisher
-      const data = { downloadId: 1, systemUserId: 123 };
+      const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000001', systemUserId: 123 };
       const result = await publishProcessDownloadJob(mockConnection, data);
 
       // Step 3: Verify job was sent to correct queue with correct data
@@ -311,7 +311,7 @@ describe('publisher', () => {
         .resolves(createMockDownload({ download_status: 'processing' }));
 
       // Step 2: Call publisher
-      const data = { downloadId: 1, systemUserId: 123 };
+      const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000001', systemUserId: 123 };
       const result = await publishProcessDownloadJob(mockConnection, data);
 
       // Step 3: Verify duplicate status returned
@@ -329,7 +329,7 @@ describe('publisher', () => {
       sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(null);
 
       // Step 2: Call publisher
-      const data = { downloadId: 999, systemUserId: 123 };
+      const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000999', systemUserId: 123 };
       const result = await publishProcessDownloadJob(mockConnection, data);
 
       // Step 3: Verify error status returned
@@ -347,14 +347,19 @@ describe('publisher', () => {
       const mockBoss = { send: sendStub, createQueue: createQueueStub };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
-      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload({ download_id: 456 }));
+      sinon
+        .stub(DownloadService.prototype, 'findDownloadById')
+        .resolves(createMockDownload({ download_id: 'aaaa0000-0000-0000-0000-000000000456' }));
 
       // Step 2: Call publisher
-      await publishProcessDownloadJob(mockConnection, { downloadId: 456, systemUserId: 123 });
+      await publishProcessDownloadJob(mockConnection, {
+        downloadId: 'aaaa0000-0000-0000-0000-000000000456',
+        systemUserId: 123
+      });
 
       // Step 3: Verify singletonKey passed to pg-boss
       const options = sendStub.firstCall.args[2];
-      expect(options.singletonKey).to.equal('download-456');
+      expect(options.singletonKey).to.equal('download-aaaa0000-0000-0000-0000-000000000456');
     });
 
     it('returns duplicate status when send returns null (singleton conflict)', async () => {
@@ -370,7 +375,10 @@ describe('publisher', () => {
       sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
 
       // Step 2: Call publisher
-      const result = await publishProcessDownloadJob(mockConnection, { downloadId: 1, systemUserId: 123 });
+      const result = await publishProcessDownloadJob(mockConnection, {
+        downloadId: 'aaaa0000-0000-0000-0000-000000000001',
+        systemUserId: 123
+      });
 
       // Step 3: Verify duplicate status
       expect(result.status).to.equal('duplicate');
@@ -389,7 +397,10 @@ describe('publisher', () => {
       sinon.stub(pgBossService, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
       // Step 2: Call publisher
-      const result = await publishProcessDownloadJob(mockConnection, { downloadId: 1, systemUserId: 123 });
+      const result = await publishProcessDownloadJob(mockConnection, {
+        downloadId: 'aaaa0000-0000-0000-0000-000000000001',
+        systemUserId: 123
+      });
 
       // Step 3: Verify error status
       expect(result.status).to.equal('error');

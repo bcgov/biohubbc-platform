@@ -25,14 +25,14 @@ describe('DownloadRepository', () => {
       const repo = new DownloadRepository(mockDBConnection);
 
       // Step 3: Call with multiple feature IDs
-      await repo.createDownloadFeatures(1, [10, 20, 30]);
+      await repo.createDownloadFeatures('aaaa0000-0000-0000-0000-000000000001', [10, 20, 30]);
 
       // Step 4: Verify sql uses unnest and passes parameters correctly
       expect(sqlStub).to.have.been.calledOnce;
       const sqlText = sqlStub.firstCall.args[0].text;
       expect(sqlText).to.include('unnest');
       const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include(1);
+      expect(sqlValues).to.include('aaaa0000-0000-0000-0000-000000000001');
       expect(sqlValues).to.deep.include([10, 20, 30]);
     });
 
@@ -47,12 +47,12 @@ describe('DownloadRepository', () => {
       const repo = new DownloadRepository(mockDBConnection);
 
       // Step 3: Call with a single feature ID
-      await repo.createDownloadFeatures(1, [10]);
+      await repo.createDownloadFeatures('aaaa0000-0000-0000-0000-000000000001', [10]);
 
       // Step 4: Verify sql was called with the single value
       expect(sqlStub).to.have.been.calledOnce;
       const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include(1);
+      expect(sqlValues).to.include('aaaa0000-0000-0000-0000-000000000001');
       expect(sqlValues).to.deep.include([10]);
     });
   });
@@ -69,7 +69,7 @@ describe('DownloadRepository', () => {
       const repo = new DownloadRepository(mockDBConnection);
 
       // Step 3: Call updateDownloadStatus with metadata
-      await repo.updateDownloadStatus(1, DownloadStatusEnum.READY, {
+      await repo.updateDownloadStatus('aaaa0000-0000-0000-0000-000000000001', DownloadStatusEnum.READY, {
         s3_key: 'downloads/file.zip',
         file_name: 'file.zip',
         file_size_bytes: '2048'
@@ -95,7 +95,7 @@ describe('DownloadRepository', () => {
       const repo = new DownloadRepository(mockDBConnection);
 
       // Step 3: Call updateDownloadStatus without metadata
-      await repo.updateDownloadStatus(1, DownloadStatusEnum.FAILED);
+      await repo.updateDownloadStatus('aaaa0000-0000-0000-0000-000000000001', DownloadStatusEnum.FAILED);
 
       // Step 4: Verify sql was called with the correct status
       expect(sqlStub).to.have.been.calledOnce;
@@ -114,7 +114,7 @@ describe('DownloadRepository', () => {
 
       // Step 2: Call method
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.getDownloadFeatureSummaries(1, 10);
+      await repo.getDownloadFeatureSummaries('aaaa0000-0000-0000-0000-000000000001', 10);
 
       // Step 3: Verify SQL uses pre-computed column directly
       expect(sqlStub).to.have.been.calledOnce;
@@ -132,11 +132,11 @@ describe('DownloadRepository', () => {
 
       // Step 2: Call method
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.getDownloadFeatureSummaries(5, 42);
+      await repo.getDownloadFeatureSummaries('aaaa0000-0000-0000-0000-000000000005', 42);
 
       // Step 3: Verify parameters
       const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include(5);
+      expect(sqlValues).to.include('aaaa0000-0000-0000-0000-000000000005');
       expect(sqlValues).to.include(42);
     });
   });

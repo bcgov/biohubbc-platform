@@ -22,10 +22,10 @@ describe('paths/download/{downloadId}/index', () => {
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
       const mockDownload = {
-        download_id: 1,
+        download_id: 'aaaa0000-0000-0000-0000-000000000001',
         system_user_id: 5,
         download_status: 'ready',
-        file_name: 'download-1.zip',
+        file_name: 'download-aaaa0000-0000-0000-0000-000000000001.zip',
         file_size_bytes: 12345,
         total_fragments: 1,
         completed_fragments: 1,
@@ -39,7 +39,7 @@ describe('paths/download/{downloadId}/index', () => {
         {
           fragment_index: 0,
           fragment_status: 'ready',
-          file_name: 'download-1.zip',
+          file_name: 'download-aaaa0000-0000-0000-0000-000000000001.zip',
           file_size_bytes: 12345,
           estimated_size_bytes: 12000,
           feature_count: 3,
@@ -63,9 +63,9 @@ describe('paths/download/{downloadId}/index', () => {
 
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql({
-        download_id: 1,
+        download_id: 'aaaa0000-0000-0000-0000-000000000001',
         status: 'ready',
-        file_name: 'download-1.zip',
+        file_name: 'download-aaaa0000-0000-0000-0000-000000000001.zip',
         file_size_bytes: 12345,
         total_fragments: 1,
         completed_fragments: 1,
@@ -77,7 +77,7 @@ describe('paths/download/{downloadId}/index', () => {
           {
             fragment_index: 0,
             status: 'ready',
-            file_name: 'download-1.zip',
+            file_name: 'download-aaaa0000-0000-0000-0000-000000000001.zip',
             file_size_bytes: 12345,
             estimated_size_bytes: 12000,
             feature_count: 3,
@@ -117,7 +117,7 @@ describe('paths/download/{downloadId}/index', () => {
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
       const mockDownload = {
-        download_id: 1,
+        download_id: 'aaaa0000-0000-0000-0000-000000000001',
         system_user_id: 99
       };
 
@@ -126,7 +126,7 @@ describe('paths/download/{downloadId}/index', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       mockReq.system_user = { system_user_id: 5 } as any;
-      mockReq.params = { downloadId: '1' };
+      mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
 
       const requestHandler = findDownloadById();
 

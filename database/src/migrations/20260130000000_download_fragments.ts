@@ -36,7 +36,7 @@ export async function up(knex: Knex): Promise<void> {
     --------------------------------------------------------------------------------
     CREATE TABLE download_fragment (
       download_fragment_id    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-      download_id             INTEGER NOT NULL,
+      download_id             UUID NOT NULL,
       fragment_index          INTEGER NOT NULL,
       fragment_status         download_status NOT NULL DEFAULT 'pending',
       s3_key                  VARCHAR(500),

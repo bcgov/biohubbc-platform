@@ -16,12 +16,12 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Create a new download record.
    *
-   * @param {number} systemUserId - The user who initiated the download.
+   * @param {number | null} systemUserId - The user who initiated the download. Null for anonymous downloads.
    * @param {number} [fragmentSizeBytes] - Target fragment size in bytes. Defaults to FRAGMENT_SIZE_THRESHOLD (500 MB).
    * @return {Promise<DownloadId>} The created record ID.
    * @memberof DownloadRepository
    */
-  async createDownload(systemUserId: number, fragmentSizeBytes?: number): Promise<DownloadId> {
+  async createDownload(systemUserId: number | null, fragmentSizeBytes?: number): Promise<DownloadId> {
     const sizeBytes = fragmentSizeBytes ?? FRAGMENT_SIZE_THRESHOLD;
 
     const sql = SQL`
@@ -45,12 +45,12 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Link submission features to a download request.
    *
-   * @param {number} downloadId - The download ID.
+   * @param {string} downloadId - The download ID.
    * @param {number[]} submissionFeatureIds - The submission feature IDs to include.
    * @return {Promise<void>}
    * @memberof DownloadRepository
    */
-  async createDownloadFeatures(downloadId: number, submissionFeatureIds: number[]): Promise<void> {
+  async createDownloadFeatures(downloadId: string, submissionFeatureIds: number[]): Promise<void> {
     if (submissionFeatureIds.length === 0) {
       return;
     }
@@ -66,11 +66,11 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Get a download record by ID.
    *
-   * @param {number} downloadId - The download ID.
+   * @param {string} downloadId - The download ID.
    * @return {Promise<DownloadRecord | null>}
    * @memberof DownloadRepository
    */
-  async findDownloadById(downloadId: number): Promise<DownloadRecord | null> {
+  async findDownloadById(downloadId: string): Promise<DownloadRecord | null> {
     const sql = SQL`
       SELECT
         download_id,
@@ -133,14 +133,14 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Update download status by download ID.
    *
-   * @param {number} downloadId - The download ID.
+   * @param {string} downloadId - The download ID.
    * @param {DownloadStatusEnum} downloadStatus - The new download status.
    * @param {object} [metadata] - Optional metadata (s3_key, file_name, file_size_bytes, error details).
    * @return {Promise<void>}
    * @memberof DownloadRepository
    */
   async updateDownloadStatus(
-    downloadId: number,
+    downloadId: string,
     downloadStatus: DownloadStatusEnum,
     metadata?: {
       s3_key?: string;
@@ -177,11 +177,11 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Mark a download as downloaded (sets downloaded_at timestamp and status).
    *
-   * @param {number} downloadId - The download ID.
+   * @param {string} downloadId - The download ID.
    * @return {Promise<void>}
    * @memberof DownloadRepository
    */
-  async markDownloadAsDownloaded(downloadId: number): Promise<void> {
+  async markDownloadAsDownloaded(downloadId: string): Promise<void> {
     const sql = SQL`
       UPDATE download
       SET
@@ -203,11 +203,11 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Get submission feature IDs linked to a download.
    *
-   * @param {number} downloadId - The download ID.
+   * @param {string} downloadId - The download ID.
    * @return {Promise<DownloadFeatureRecord[]>}
    * @memberof DownloadRepository
    */
-  async getDownloadFeatures(downloadId: number): Promise<DownloadFeatureRecord[]> {
+  async getDownloadFeatures(downloadId: string): Promise<DownloadFeatureRecord[]> {
     const sql = SQL`
       SELECT
         download_feature_id,
@@ -228,12 +228,15 @@ export class DownloadRepository extends BaseRepository {
    * Returns feature metadata and pre-computed data_byte_size (no JSONB data column).
    * Used by estimateDownloadSize and planFragments for bin packing.
    *
-   * @param {number} downloadId - The download ID.
-   * @param {number} systemUserId - The user requesting the download.
+   * @param {string} downloadId - The download ID.
+   * @param {number | null} systemUserId - The user requesting the download. Null for anonymous downloads (only unsecured features returned).
    * @return {Promise<DownloadFeatureSummary[]>}
    * @memberof DownloadRepository
    */
-  async getDownloadFeatureSummaries(downloadId: number, systemUserId: number): Promise<DownloadFeatureSummary[]> {
+  async getDownloadFeatureSummaries(
+    downloadId: string,
+    systemUserId: number | null
+  ): Promise<DownloadFeatureSummary[]> {
     const sql = SQL`
       SELECT
         sf.submission_feature_id,
@@ -277,14 +280,14 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Update fragment counts on a download record.
    *
-   * @param {number} downloadId - The download ID.
+   * @param {string} downloadId - The download ID.
    * @param {number} totalFragments - Total number of fragments.
    * @param {number} completedFragments - Number of completed fragments.
    * @return {Promise<void>}
    * @memberof DownloadRepository
    */
   async updateDownloadFragmentCounts(
-    downloadId: number,
+    downloadId: string,
     totalFragments: number,
     completedFragments: number
   ): Promise<void> {
@@ -307,12 +310,12 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Update estimated total size on a download record.
    *
-   * @param {number} downloadId - The download ID.
+   * @param {string} downloadId - The download ID.
    * @param {number} bytes - Estimated total size in bytes.
    * @return {Promise<void>}
    * @memberof DownloadRepository
    */
-  async updateEstimatedTotalSize(downloadId: number, bytes: number): Promise<void> {
+  async updateEstimatedTotalSize(downloadId: string, bytes: number): Promise<void> {
     const sql = SQL`
       UPDATE download
       SET estimated_total_size_bytes = ${bytes}

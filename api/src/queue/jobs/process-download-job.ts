@@ -12,9 +12,9 @@ const defaultLog = getLogger('queue/jobs/process-download-job');
  */
 export interface IProcessDownloadJobData {
   /** The download ID to process */
-  downloadId: number;
+  downloadId: string;
   /** The user who initiated the download */
-  systemUserId: number;
+  systemUserId: number | null;
 }
 
 /**

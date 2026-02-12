@@ -21,7 +21,7 @@ describe('DownloadService', () => {
 
   // Helper: create a mock download record
   const createMockDownloadRecord = (overrides?: Partial<DownloadRecord>): DownloadRecord => ({
-    download_id: 42,
+    download_id: 'aaaa0000-0000-0000-0000-000000000042',
     system_user_id: 123,
     download_status: DownloadStatusEnum.PROCESSING,
     s3_key: null,
@@ -41,7 +41,7 @@ describe('DownloadService', () => {
   // Shared helpers for fragment-related tests
   const createMockFragment = (overrides?: Partial<DownloadFragmentRecord>): DownloadFragmentRecord => ({
     download_fragment_id: 1,
-    download_id: 42,
+    download_id: 'aaaa0000-0000-0000-0000-000000000042',
     fragment_index: 0,
     fragment_status: DownloadStatusEnum.PENDING,
     s3_key: null,
@@ -69,10 +69,10 @@ describe('DownloadService', () => {
       sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(null);
 
       try {
-        await service.planDownloadIfNeeded(42);
+        await service.planDownloadIfNeeded('aaaa0000-0000-0000-0000-000000000042');
         expect.fail('Expected an error');
       } catch (error) {
-        expect((error as Error).message).to.equal('Download 42 not found');
+        expect((error as Error).message).to.equal('Download aaaa0000-0000-0000-0000-000000000042 not found');
       }
     });
 
@@ -84,7 +84,7 @@ describe('DownloadService', () => {
       sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([createMockFragment()]);
       const estimateStub = sinon.stub(service, 'estimateDownloadSize');
 
-      await service.planDownloadIfNeeded(42);
+      await service.planDownloadIfNeeded('aaaa0000-0000-0000-0000-000000000042');
 
       expect(estimateStub.called).to.be.false;
     });
@@ -101,7 +101,7 @@ describe('DownloadService', () => {
       });
       const planStub = sinon.stub(service, 'planFragments').resolves();
 
-      await service.planDownloadIfNeeded(42);
+      await service.planDownloadIfNeeded('aaaa0000-0000-0000-0000-000000000042');
 
       expect(estimateStub.calledOnce).to.be.true;
       expect(planStub.calledOnce).to.be.true;
@@ -126,7 +126,7 @@ describe('DownloadService', () => {
         .stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId')
         .resolves([readyFragment, pendingFragment]);
 
-      const result = await service.getFragmentsToProcess(42);
+      const result = await service.getFragmentsToProcess('aaaa0000-0000-0000-0000-000000000042');
 
       expect(result).to.have.length(1);
       expect(result[0].download_fragment_id).to.equal(2);
@@ -185,7 +185,7 @@ describe('DownloadService', () => {
       const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
 
       // Should NOT throw — graceful degradation
-      await service.processFragment(mockFragment, 42);
+      await service.processFragment(mockFragment, 'aaaa0000-0000-0000-0000-000000000042');
 
       // Verify: fragment was uploaded and marked READY despite file stream failure
       expect(uploadStub.calledOnce).to.be.true;
@@ -245,10 +245,12 @@ describe('DownloadService', () => {
       ]);
       const uploadStreamStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
 
-      await service.processFragment(pendingFragment, 42);
+      await service.processFragment(pendingFragment, 'aaaa0000-0000-0000-0000-000000000042');
 
       expect(uploadStreamStub.calledOnce).to.be.true;
-      expect(uploadStreamStub.firstCall.args[3]).to.equal('downloads/42/download-42-part-2.zip');
+      expect(uploadStreamStub.firstCall.args[3]).to.equal(
+        'downloads/aaaa0000-0000-0000-0000-000000000042/download-aaaa0000-0000-0000-0000-000000000042-part-2.zip'
+      );
     });
   });
 
@@ -259,8 +261,8 @@ describe('DownloadService', () => {
 
       const readyFragment = createMockFragment({
         fragment_status: DownloadStatusEnum.READY,
-        s3_key: 'downloads/42/download-42.zip',
-        file_name: 'download-42.zip',
+        s3_key: 'downloads/aaaa0000-0000-0000-0000-000000000042/download-aaaa0000-0000-0000-0000-000000000042.zip',
+        file_name: 'download-aaaa0000-0000-0000-0000-000000000042.zip',
         file_size_bytes: '512'
       });
 
@@ -268,11 +270,13 @@ describe('DownloadService', () => {
       sinon.stub(DownloadRepository.prototype, 'updateDownloadFragmentCounts').resolves();
       const updateStatusStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
 
-      await service.finalizeDownload(42);
+      await service.finalizeDownload('aaaa0000-0000-0000-0000-000000000042');
 
       expect(updateStatusStub.calledOnce).to.be.true;
       expect(updateStatusStub.firstCall.args[1]).to.equal(DownloadStatusEnum.READY);
-      expect(updateStatusStub.firstCall.args[2]).to.deep.include({ s3_key: 'downloads/42/download-42.zip' });
+      expect(updateStatusStub.firstCall.args[2]).to.deep.include({
+        s3_key: 'downloads/aaaa0000-0000-0000-0000-000000000042/download-aaaa0000-0000-0000-0000-000000000042.zip'
+      });
     });
 
     it('sets READY with total size for multi-fragment downloads', async () => {
@@ -294,7 +298,7 @@ describe('DownloadService', () => {
       sinon.stub(DownloadRepository.prototype, 'updateDownloadFragmentCounts').resolves();
       const updateStatusStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
 
-      await service.finalizeDownload(42);
+      await service.finalizeDownload('aaaa0000-0000-0000-0000-000000000042');
 
       expect(updateStatusStub.calledOnce).to.be.true;
       expect(updateStatusStub.firstCall.args[1]).to.equal(DownloadStatusEnum.READY);
@@ -319,7 +323,7 @@ describe('DownloadService', () => {
       sinon.stub(DownloadRepository.prototype, 'getDownloadFeatureSummaries').resolves(features);
 
       // Step 3: Call estimateDownloadSize
-      const result = await service.estimateDownloadSize(1, 123);
+      const result = await service.estimateDownloadSize('aaaa0000-0000-0000-0000-000000000001', 123);
 
       // Step 4: Verify total is sum of per-feature sizes
       expect(result.totalEstimatedBytes).to.equal(200);
@@ -336,7 +340,7 @@ describe('DownloadService', () => {
 
       sinon.stub(DownloadRepository.prototype, 'getDownloadFeatureSummaries').resolves([]);
 
-      const result = await service.estimateDownloadSize(1, 123);
+      const result = await service.estimateDownloadSize('aaaa0000-0000-0000-0000-000000000001', 123);
 
       expect(result.totalEstimatedBytes).to.equal(0);
       expect(result.features).to.have.length(0);
@@ -385,9 +389,12 @@ describe('DownloadService', () => {
       sinon.stub(DownloadRepository.prototype, 'updateEstimatedTotalSize').resolves();
 
       // Stub findDownloadById to return record with default fragment_size_bytes
-      sinon
-        .stub(DownloadRepository.prototype, 'findDownloadById')
-        .resolves(createMockDownloadRecord({ download_id: 1, fragment_size_bytes: String(FRAGMENT_SIZE_THRESHOLD) }));
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(
+        createMockDownloadRecord({
+          download_id: 'aaaa0000-0000-0000-0000-000000000001',
+          fragment_size_bytes: String(FRAGMENT_SIZE_THRESHOLD)
+        })
+      );
 
       // Step 4: Call planFragments with bin packing
       // Feature 10 = 300MB, Feature 20 = 300MB (total 600MB > 500MB threshold), Feature 30 = 200MB
@@ -401,7 +408,7 @@ describe('DownloadService', () => {
         totalEstimatedBytes: threeHundredMB * 2 + twoHundredMB,
         features
       };
-      await service.planFragments(1, sizeEstimate);
+      await service.planFragments('aaaa0000-0000-0000-0000-000000000001', sizeEstimate);
 
       // Step 5: Verify 2 fragments created — first has feature 10, then flush when 10+20 > threshold
       // Fragment 0: feature 10 (300MB) — flush when adding 20 would exceed 500MB
@@ -411,7 +418,7 @@ describe('DownloadService', () => {
       expect(createFragmentStub.secondCall.args[1]).to.equal(1); // fragment_index 1
       expect(createFragmentFeaturesStub.firstCall.args[1]).to.deep.equal([10]); // first bin: feature 10
       expect(createFragmentFeaturesStub.secondCall.args[1]).to.deep.equal([20, 30]); // second bin: features 20, 30
-      expect(updateFragmentCountsStub).to.have.been.calledOnceWith(1, 2);
+      expect(updateFragmentCountsStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001', 2);
     });
 
     it('uses custom fragment size from download record instead of default threshold', async () => {
@@ -444,9 +451,12 @@ describe('DownloadService', () => {
       ];
       // Step 3: Stub findDownloadById with custom 1 GB fragment size
       const oneGB = 1000 * 1024 * 1024;
-      sinon
-        .stub(DownloadRepository.prototype, 'findDownloadById')
-        .resolves(createMockDownloadRecord({ download_id: 1, fragment_size_bytes: String(oneGB) }));
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(
+        createMockDownloadRecord({
+          download_id: 'aaaa0000-0000-0000-0000-000000000001',
+          fragment_size_bytes: String(oneGB)
+        })
+      );
 
       // Step 4: Stub fragment repository methods
       const createFragmentStub = sinon.stub(DownloadFragmentRepository.prototype, 'createDownloadFragment');
@@ -471,12 +481,12 @@ describe('DownloadService', () => {
         totalEstimatedBytes: threeHundredMB * 2 + twoHundredMB,
         features
       };
-      await service.planFragments(1, sizeEstimate);
+      await service.planFragments('aaaa0000-0000-0000-0000-000000000001', sizeEstimate);
 
       // Step 6: Verify only 1 fragment created — all features fit within 1 GB threshold
       expect(createFragmentStub).to.have.been.calledOnce;
       expect(createFragmentFeaturesStub.firstCall.args[1]).to.deep.equal([10, 20, 30]); // all features in one bin
-      expect(updateFragmentCountsStub).to.have.been.calledOnceWith(1, 1);
+      expect(updateFragmentCountsStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001', 1);
     });
   });
 
@@ -491,11 +501,12 @@ describe('DownloadService', () => {
       // Step 2: Stub to return a READY fragment with s3_key
       const readyFragment: DownloadFragmentRecord = {
         download_fragment_id: 1,
-        download_id: 42,
+        download_id: 'aaaa0000-0000-0000-0000-000000000042',
         fragment_index: 0,
         fragment_status: DownloadStatusEnum.READY,
-        s3_key: 'downloads/42/download-42-part-1.zip',
-        file_name: 'download-42-part-1.zip',
+        s3_key:
+          'downloads/aaaa0000-0000-0000-0000-000000000042/download-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
+        file_name: 'download-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
         file_size_bytes: '2048',
         estimated_size_bytes: '2000',
         feature_count: 3,
@@ -511,13 +522,13 @@ describe('DownloadService', () => {
         .resolves('https://s3.example.com/fragment-url');
 
       // Step 4: Call getFragmentSignedUrl
-      const result = await service.getFragmentSignedUrl(42, 0);
+      const result = await service.getFragmentSignedUrl('aaaa0000-0000-0000-0000-000000000042', 0);
 
       // Step 5: Verify correct URL returned and correct params passed (including fragment expiry)
       expect(result).to.equal('https://s3.example.com/fragment-url');
       expect(getSignedUrlStub).to.have.been.calledOnceWith(
         BucketType.MAIN,
-        'downloads/42/download-42-part-1.zip',
+        'downloads/aaaa0000-0000-0000-0000-000000000042/download-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
         SIGNED_URL_EXPIRY_FRAGMENT
       );
     });
@@ -531,10 +542,12 @@ describe('DownloadService', () => {
       sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([]);
 
       try {
-        await service.getFragmentSignedUrl(42, 0);
+        await service.getFragmentSignedUrl('aaaa0000-0000-0000-0000-000000000042', 0);
         expect.fail('Expected an error to be thrown');
       } catch (error) {
-        expect((error as Error).message).to.equal('Fragment 0 not found for download 42');
+        expect((error as Error).message).to.equal(
+          'Fragment 0 not found for download aaaa0000-0000-0000-0000-000000000042'
+        );
       }
     });
 
@@ -546,7 +559,7 @@ describe('DownloadService', () => {
 
       const processingFragment: DownloadFragmentRecord = {
         download_fragment_id: 1,
-        download_id: 42,
+        download_id: 'aaaa0000-0000-0000-0000-000000000042',
         fragment_index: 0,
         fragment_status: DownloadStatusEnum.PROCESSING,
         s3_key: null,
@@ -561,7 +574,7 @@ describe('DownloadService', () => {
       sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([processingFragment]);
 
       try {
-        await service.getFragmentSignedUrl(42, 0);
+        await service.getFragmentSignedUrl('aaaa0000-0000-0000-0000-000000000042', 0);
         expect.fail('Expected an error to be thrown');
       } catch (error) {
         expect((error as Error).message).to.equal('Fragment is not ready');
@@ -576,11 +589,11 @@ describe('DownloadService', () => {
 
       const readyButNoKey: DownloadFragmentRecord = {
         download_fragment_id: 1,
-        download_id: 42,
+        download_id: 'aaaa0000-0000-0000-0000-000000000042',
         fragment_index: 0,
         fragment_status: DownloadStatusEnum.READY,
         s3_key: null,
-        file_name: 'download-42.zip',
+        file_name: 'download-aaaa0000-0000-0000-0000-000000000042.zip',
         file_size_bytes: '2048',
         estimated_size_bytes: '2000',
         feature_count: 3,
@@ -591,7 +604,7 @@ describe('DownloadService', () => {
       sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([readyButNoKey]);
 
       try {
-        await service.getFragmentSignedUrl(42, 0);
+        await service.getFragmentSignedUrl('aaaa0000-0000-0000-0000-000000000042', 0);
         expect.fail('Expected an error to be thrown');
       } catch (error) {
         expect((error as Error).message).to.equal('Fragment record missing s3_key');

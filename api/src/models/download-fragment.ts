@@ -3,7 +3,7 @@ import { DownloadStatusZod } from './download-status';
 
 export const DownloadFragmentRecord = z.object({
   download_fragment_id: z.number(),
-  download_id: z.number(),
+  download_id: z.string(),
   fragment_index: z.number(),
   fragment_status: DownloadStatusZod,
   s3_key: z.string().nullable(),
