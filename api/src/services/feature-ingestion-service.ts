@@ -102,29 +102,48 @@ export class FeatureIngestionService extends DBService {
     }
 
     // Pass 3: Insert content relationships (many-to-many)
-    const relationshipPairs: Array<{
+    const relationshipPairs = this.buildContentRelationshipPairs(features, uuidToDbId);
+    if (relationshipPairs.length > 0) {
+      await submissionRepository.insertSubmissionFeatureRelationships(relationshipPairs);
+    }
+  }
+
+  /**
+   * Build parent-child relationship pairs from features' content arrays.
+   *
+   * @private
+   * @param {IFlattenedBlock[]} features - Features with content references
+   * @param {Map<string, number>} uuidToDbId - UUID to submission_feature_id mapping
+   * @return {Array<{ parent_submission_feature_id: number; child_submission_feature_id: number }>}
+   * @memberof FeatureIngestionService
+   */
+  private buildContentRelationshipPairs(
+    features: IFlattenedBlock[],
+    uuidToDbId: Map<string, number>
+  ): Array<{ parent_submission_feature_id: number; child_submission_feature_id: number }> {
+    const pairs: Array<{
       parent_submission_feature_id: number;
       child_submission_feature_id: number;
     }> = [];
     for (const feature of features) {
-      if (feature.content && feature.content.length > 0) {
-        const parentDbId = uuidToDbId.get(feature.id);
-        if (parentDbId) {
-          for (const childId of feature.content) {
-            const childDbId = uuidToDbId.get(childId);
-            if (childDbId) {
-              relationshipPairs.push({
-                parent_submission_feature_id: parentDbId,
-                child_submission_feature_id: childDbId
-              });
-            }
-          }
+      if (!feature.content?.length) {
+        continue;
+      }
+      const parentDbId = uuidToDbId.get(feature.id);
+      if (parentDbId === undefined) {
+        continue;
+      }
+      for (const childId of feature.content) {
+        const childDbId = uuidToDbId.get(childId);
+        if (childDbId !== undefined) {
+          pairs.push({
+            parent_submission_feature_id: parentDbId,
+            child_submission_feature_id: childDbId
+          });
         }
       }
     }
-    if (relationshipPairs.length > 0) {
-      await submissionRepository.insertSubmissionFeatureRelationships(relationshipPairs);
-    }
+    return pairs;
   }
 
   // ============================================================================
