@@ -1087,6 +1087,7 @@ describe('FeatureIngestionService', () => {
       expect(callOrder[2]).to.equal('insert');
       expect(deleteStub).to.have.been.calledOnceWith(1);
       expect(deleteRelationshipsStub).to.have.been.calledOnceWith(1);
+      expect(insertStub).to.have.been.calledOnce;
     });
 
     it('should not call insertSubmissionFeatureRelationships when all features have empty content', async () => {
@@ -1117,6 +1118,7 @@ describe('FeatureIngestionService', () => {
 
       await service.ingestFeatures(1, features);
 
+      expect(insertStub).to.have.been.calledTwice;
       expect(insertRelationshipsStub).to.not.have.been.called;
     });
 
