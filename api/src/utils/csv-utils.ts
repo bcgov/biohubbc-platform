@@ -149,7 +149,7 @@ function toStringOrEmpty(value: unknown): string {
   if (typeof value === 'object') {
     return JSON.stringify(value);
   }
-  return String(value);
+  return String(value as string | number | boolean);
 }
 
 /**
@@ -276,7 +276,7 @@ export function flattenArray(arr: unknown[]): string {
       // Multiple properties: join with colon
       return objValues.map((v) => toStringOrEmpty(v)).join(':');
     }
-    return String(item);
+    return String(item as string | number | boolean);
   });
 
   return values.join(';');

@@ -25,6 +25,11 @@ function parseCsvLines(csv: string): string[] {
   return csv.trim().split('\n');
 }
 
+/** Read a zip entry as a UTF-8 string. */
+function zipEntryText(zip: AdmZip, entry: string): string {
+  return zip.readFile(entry)?.toString('utf-8') ?? '';
+}
+
 /** Download a zip file from S3 and return it as an AdmZip instance. */
 async function downloadZipFromS3(storageService: ObjectStorageService, s3Key: string): Promise<AdmZip> {
   const fileStream = await storageService.getFileStream(BucketType.MAIN, s3Key);
@@ -421,7 +426,7 @@ describe('Download Worker', function () {
 
       for (const entry of entries) {
         allCsvEntries.push(entry);
-        const content = zip.readAsText(entry);
+        const content = zipEntryText(zip, entry);
         const parsed = content.trim();
         // Accumulate CSV content (append rows, skip duplicate headers)
         if (allCsvContent[entry]) {
@@ -602,7 +607,7 @@ describe('DownloadService download pipeline (system)', function () {
     // Multi-fragment: download first fragment
     const allFragments = await service.getFragmentsByDownloadId(download_id);
     expect(allFragments.length).to.be.greaterThanOrEqual(1);
-    const zip = await downloadAndTrackZip(allFragments[0].s3_key!);
+    const zip = await downloadAndTrackZip(allFragments[0].s3_key as string);
     return { zip, downloadId: download_id };
   }
 
@@ -622,7 +627,7 @@ describe('DownloadService download pipeline (system)', function () {
     expect(entries).to.include('dataset.csv');
     expect(entries).to.have.lengthOf(1);
 
-    const csv = zip.readAsText('dataset.csv');
+    const csv = zipEntryText(zip, 'dataset.csv');
     const lines = parseCsvLines(csv);
     expect(lines).to.have.lengthOf(3); // header + 2 data rows
 
@@ -682,7 +687,7 @@ describe('DownloadService download pipeline (system)', function () {
     expect(entries).to.include('telemetry.csv');
     expect(entries).to.have.lengthOf(1);
 
-    const csv = zip.readAsText('telemetry.csv');
+    const csv = zipEntryText(zip, 'telemetry.csv');
     const lines = parseCsvLines(csv);
     expect(lines).to.have.lengthOf(3);
 
@@ -743,15 +748,15 @@ describe('DownloadService download pipeline (system)', function () {
 
     expect(entries).to.include('multimedia.csv');
 
-    const errorEntry = entries.find((e) => e.endsWith('.error.txt'));
+    const errorEntry = entries.find((e) => e.endsWith('.error.txt')) as string;
     expect(errorEntry).to.not.be.undefined;
     expect(errorEntry).to.include(`files/${featureId}_missing-image.png.error.txt`);
 
-    const errorContent = zip.readAsText(errorEntry!);
+    const errorContent = zipEntryText(zip, errorEntry);
     expect(errorContent).to.include('Error');
     expect(errorContent).to.include('non-existent/missing-image.png');
 
-    const multimediaCsv = zip.readAsText('multimedia.csv');
+    const multimediaCsv = zipEntryText(zip, 'multimedia.csv');
     console.log('\n--- multimedia.csv (error placeholder) ---');
     console.log(multimediaCsv);
     console.log('--- end ---\n');
@@ -796,7 +801,7 @@ describe('DownloadService download pipeline (system)', function () {
 
     // multimedia.csv should list all 3 files
     expect(entries).to.include('multimedia.csv');
-    const multimediaCsv = zip.readAsText('multimedia.csv');
+    const multimediaCsv = zipEntryText(zip, 'multimedia.csv');
     const lines = parseCsvLines(multimediaCsv);
     expect(lines).to.have.lengthOf(4); // header + 3 data rows
     const multiFileHeaders = lines[0].split(',');
@@ -853,7 +858,7 @@ describe('DownloadService download pipeline (system)', function () {
 
     const { zip } = await executeAndGetZip([telemetryId]);
 
-    const csv = zip.readAsText('telemetry.csv');
+    const csv = zipEntryText(zip, 'telemetry.csv');
     const lines = parseCsvLines(csv);
     const headers = lines[0].split(',');
 
