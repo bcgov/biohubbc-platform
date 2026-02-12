@@ -9,10 +9,24 @@ import {
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { DataRequestService } from '../../services/data-request-service';
 import { getLogger } from '../../utils/logger';
+import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
+import { SYSTEM_ROLE } from '../../constants/roles';
 
 const defaultLog = getLogger('paths/data-request');
 
-export const GET: Operation = [findDataRequests()];
+export const GET: Operation = [
+  authorizeRequestHandler(() => {
+    return {
+      and: [
+        {
+          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+          discriminator: 'SystemRole'
+        }
+      ]
+    };
+  }),
+  findDataRequests()
+];
 export const POST: Operation = [createDataRequest()];
 
 GET.apiDoc = {
@@ -20,7 +34,7 @@ GET.apiDoc = {
   tags: ['data-request'],
   security: [
     {
-      OptionalBearer: []
+      Bearer: []
     }
   ],
   parameters: [
