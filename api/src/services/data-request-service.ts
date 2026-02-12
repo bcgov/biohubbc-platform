@@ -28,6 +28,10 @@ export interface IModelWithTeamMemberService {
   isCurrentUserATeamMember(modelId: string, userId: number): Promise<boolean>;
 }
 
+type ModelTeamMemberRecord = {
+  team_id: string;
+};
+
 /**
  * Service for managing data requests.
  */
