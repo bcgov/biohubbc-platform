@@ -1694,10 +1694,7 @@ describe('SubmissionRepository', () => {
         rowCount: 1
       };
       const mockChildResponse = {
-        rows: [
-          { child_submission_feature_id: 2 },
-          { child_submission_feature_id: 3 }
-        ],
+        rows: [{ child_submission_feature_id: 2 }, { child_submission_feature_id: 3 }],
         rowCount: 2
       };
 
