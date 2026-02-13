@@ -31,14 +31,11 @@ export class DataRequestRepository extends BaseRepository {
    * @return {Promise<DataRequest[]>}
    * @memberof DataRequestRepository
    */
-  async findDataRequests(filters?: {
-    date_from?: string;
-    date_to?: string;
-    requested_by?: number;
-    team_id?: string;
-  }): Promise<DataRequest[]> {
+  async findDataRequests(filters?: DataRequestFilters): Promise<DataRequest[]> {
     const knex = getKnex();
-    const query = knex('data_request').whereNull('record_end_date').select('*');
+    const query = knex('data_request')
+      .select('requested_by', 'team_id', 'data_request_id', 'reason')
+      .whereNull('record_end_date');
 
     if (filters?.date_from) {
       query.where('create_date', '>=', filters.date_from);
@@ -66,7 +63,10 @@ export class DataRequestRepository extends BaseRepository {
    */
   async getDataRequestById(dataRequestId: string): Promise<DataRequest> {
     const knex = getKnex();
-    const query = knex('data_request').where('data_request_id', dataRequestId).whereNull('record_end_date').select('*');
+    const query = knex('data_request')
+      .select('requested_by', 'team_id', 'data_request_id', 'reason')
+      .where('data_request_id', dataRequestId)
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, DataRequest);
 
@@ -88,7 +88,10 @@ export class DataRequestRepository extends BaseRepository {
    */
   async findDataRequestById(dataRequestId: string): Promise<DataRequest> {
     const knex = getKnex();
-    const query = knex('data_request').where('data_request_id', dataRequestId).whereNull('record_end_date').select('*');
+    const query = knex('data_request')
+      .select('requested_by', 'team_id', 'data_request_id', 'reason')
+      .where('data_request_id', dataRequestId)
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, DataRequest);
 
@@ -113,33 +116,21 @@ export class DataRequestRepository extends BaseRepository {
   }): Promise<DataRequestWithStatus[]> {
     const knex = getKnex();
     const query = knex('data_request as dr')
-      .join('data_request_status as drs', function () {
-        this.on('dr.data_request_id', '=', 'drs.data_request_id').onNull('drs.record_end_date');
-      })
-      .whereNull('dr.record_end_date')
-      .where('drs.request_status', status)
       .select(
         'dr.data_request_id',
         'dr.reason',
         'dr.team_id',
         'dr.requested_by',
-        'dr.record_end_date',
-        'dr.create_date',
-        'dr.create_user',
-        'dr.update_date',
-        'dr.update_user',
-        'dr.revision_count',
         'drs.data_request_status_id',
         'drs.data_request_id as drs_data_request_id',
         'drs.comment_id as drs_comment_id',
         'drs.request_status as drs_request_status',
-        'drs.record_end_date as drs_record_end_date',
-        'drs.create_date as drs_create_date',
-        'drs.create_user as drs_create_user',
-        'drs.update_date as drs_update_date',
-        'drs.update_user as drs_update_user',
-        'drs.revision_count as drs_revision_count'
-      );
+      )
+      .join('data_request_status as drs', function () {
+        this.on('dr.data_request_id', '=', 'drs.data_request_id').onNull('drs.record_end_date');
+      })
+      .where('drs.request_status', status)
+      .whereNull('dr.record_end_date');
 
     if (filters?.date_from) {
       query.where('dr.create_date', '>=', filters.date_from);
@@ -156,55 +147,7 @@ export class DataRequestRepository extends BaseRepository {
 
     const response = await this.connection.knex(query);
 
-    const rows = response.rows as Array<{
-      data_request_id: string;
-      reason: string;
-      team_id: string;
-      requested_by: number;
-      record_end_date: string | null;
-      create_date: string;
-      create_user: number;
-      update_date: string | null;
-      update_user: number | null;
-      revision_count: number;
-      data_request_status_id: string;
-      drs_data_request_id: string;
-      drs_comment_id: string | null;
-      drs_request_status: DataRequestStatusEnum;
-      drs_record_end_date: string | null;
-      drs_create_date: string;
-      drs_create_user: number;
-      drs_update_date: string | null;
-      drs_update_user: number | null;
-      drs_revision_count: number;
-    }>;
-
-    return rows.map(
-      (row): DataRequestWithStatus => ({
-        data_request_id: row.data_request_id,
-        reason: row.reason,
-        team_id: row.team_id,
-        requested_by: row.requested_by,
-        record_end_date: row.record_end_date,
-        create_date: row.create_date,
-        create_user: row.create_user,
-        update_date: row.update_date,
-        update_user: row.update_user,
-        revision_count: row.revision_count,
-        data_request_status: {
-          data_request_status_id: row.data_request_status_id,
-          data_request_id: row.drs_data_request_id,
-          comment_id: row.drs_comment_id,
-          request_status: row.drs_request_status,
-          record_end_date: row.drs_record_end_date,
-          create_date: row.drs_create_date,
-          create_user: row.drs_create_user,
-          update_date: row.drs_update_date,
-          update_user: row.drs_update_user,
-          revision_count: row.drs_revision_count
-        }
-      })
-    );
+    return response.rows;
   }
 
   /**
@@ -224,7 +167,7 @@ export class DataRequestRepository extends BaseRepository {
         requested_by: requestedBy,
         reason: payload.reason
       })
-      .returning('*');
+      .returning(['requested_by', 'team_id', 'data_request_id', 'reason']);
 
     const response = await this.connection.knex(query, DataRequest);
 
@@ -252,7 +195,7 @@ export class DataRequestRepository extends BaseRepository {
       .where('data_request_id', dataRequestId)
       .whereNull('record_end_date')
       .update(payload)
-      .returning('*');
+      .returning('data_request_id');
 
     const response = await this.connection.knex(query, DataRequest);
 
@@ -302,9 +245,9 @@ export class DataRequestRepository extends BaseRepository {
   async getDataRequestStatuses(dataRequestId: string): Promise<DataRequestStatus[]> {
     const knex = getKnex();
     const query = knex('data_request_status')
+      .select('data_request_id', 'data_request_status_id', 'comment_id', 'request_status')
       .where('data_request_id', dataRequestId)
-      .whereNull('record_end_date')
-      .select('*');
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, DataRequestStatus);
     return response.rows;
@@ -331,7 +274,7 @@ export class DataRequestRepository extends BaseRepository {
         request_status: requestStatus,
         comment_id: commentId
       })
-      .returning('*');
+      .returning(['data_request_id', 'data_request_status_id', 'comment_id', 'request_status']);
 
     const response = await this.connection.knex(query, DataRequestStatus);
 
@@ -357,7 +300,7 @@ export class DataRequestRepository extends BaseRepository {
    */
   async createComment(comment: string): Promise<Comment> {
     const knex = getKnex();
-    const query = knex('comment').insert({ comment }).returning('*');
+    const query = knex('comment').insert({ comment }).returning(['comment', 'comment_id']);
 
     const response = await this.connection.knex(query, Comment);
 
