@@ -17,8 +17,7 @@ export const GET: Operation = [
         {
           validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
           discriminator: 'SystemRole'
-        },
-        // TODO: must be a system user that is part of the team making the data_request
+        }
       ]
     };
   }),
@@ -32,8 +31,7 @@ export const PUT: Operation = [
         {
           validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
           discriminator: 'SystemRole'
-        },
-        // TODO: must be a system user that is part of the team making the data_request
+        }
       ]
     };
   }),
@@ -46,8 +44,7 @@ export const DELETE: Operation = [
         {
           validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
           discriminator: 'SystemRole'
-        },
-        // TODO: must be a system user that is part of the team making the data_request
+        }
       ]
     };
   }),
@@ -183,7 +180,7 @@ export function getDataRequestById(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json(dataRequest);
+      return res.status(200).json(dataRequest);
     } catch (error) {
       defaultLog.error({ label: 'getDataRequestById', message: 'Error fetching data request', error });
       await connection.rollback();
@@ -213,7 +210,7 @@ export function updateDataRequest(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json(dataRequest);
+      return res.status(200).json(dataRequest);
     } catch (error) {
       defaultLog.error({ label: 'updateDataRequest', message: 'Error updating data request', error });
       await connection.rollback();
