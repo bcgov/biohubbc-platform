@@ -697,9 +697,7 @@ describe('FeatureIngestionService', () => {
       expect(deleteRelationshipsStub).to.have.been.calledOnceWith(1);
       expect(insertStub).to.have.been.calledTwice;
       expect(updateParentStub).to.have.been.calledOnceWith(101, 100);
-      expect(insertRelationshipsStub).to.have.been.calledOnceWith([
-        { parent_feature_id: 100, child_feature_id: 101 }
-      ]);
+      expect(insertRelationshipsStub).to.have.been.calledOnceWith([{ parent_feature_id: 100, child_feature_id: 101 }]);
     });
 
     it('should return all errors when validation fails', async () => {
