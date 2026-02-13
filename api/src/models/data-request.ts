@@ -3,6 +3,10 @@ import { z } from 'zod';
 export const DataRequestStatusEnum = z.enum(['REQUESTED', 'APPROVED', 'DENIED']);
 export type DataRequestStatusEnum = z.infer<typeof DataRequestStatusEnum>;
 
+export type ModelTeamMemberRecord = {
+  team_id: string;
+};
+
 export const DataRequest = z.object({
   data_request_id: z.string().uuid(),
   reason: z.string(),

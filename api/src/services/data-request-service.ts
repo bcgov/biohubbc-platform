@@ -2,17 +2,16 @@ import { IDBConnection } from '../database/db';
 import {
   CreateDataRequest,
   DataRequest,
+  DataRequestFilters,
   DataRequestStatusEnum,
   DataRequestWithStatus,
-  UpdateDataRequest
+  UpdateDataRequest,
+  ModelTeamMemberRecord
 } from '../models/data-request';
-import { DataRequestFilters, DataRequestRepository } from '../repositories/data-request-repository';
+import { DataRequestRepository } from '../repositories/data-request-repository';
 import { TeamMemberService } from './access-policy/team-member-service';
+import { TeamService } from './access-policy/team-service';
 import { DBService } from './db-service';
-
-type ModelTeamMemberRecord = {
-  team_id: string;
-};
 
 /**
  * Service for managing data requests.
@@ -127,19 +126,40 @@ export class DataRequestService extends DBService {
 
   /**
    * Create a new data request.
+   * If teamId is undefined, a new team is created first and its id is used for the data request.
    *
-   * @param {string} teamId
    * @param {number} requestedBy
    * @param {CreateDataRequest} payload
+   * @param {string} [teamId]
    * @return {Promise<DataRequestWithStatus>}
-   * @memberof DataRequestRepository
+   * @memberof DataRequestService
    */
   async createDataRequest(
-    teamId: string,
     requestedBy: number,
-    payload: CreateDataRequest
+    payload: CreateDataRequest,
+    teamId?: string
   ): Promise<DataRequestWithStatus> {
-    return this.dataRequestRepository.createDataRequest(teamId, requestedBy, payload);
+    let resolvedTeamId = teamId;
+    if (resolvedTeamId === undefined) {
+      const teamService = new TeamService(this.connection);
+      // TODO: What should we name this team?
+      const team = await teamService.createTeam({ name: 'Data request team' });
+      resolvedTeamId = team.team_id;
+    }
+
+    const dataRequest = await this.dataRequestRepository.createDataRequest(resolvedTeamId, requestedBy, payload);
+    const dataRequestStatus = await this.dataRequestRepository.createDataRequestStatus(
+      dataRequest.data_request_id,
+      DataRequestStatusEnum.enum.REQUESTED,
+      null
+    );
+
+    const response = {
+      ...dataRequest,
+      data_request_status: dataRequestStatus
+    };
+
+    return response;
   }
 
   /**
