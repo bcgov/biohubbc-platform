@@ -1,4 +1,4 @@
-import { RequestHandler } from 'express';
+import { Request, RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { getAPIUserDBConnection, getDBConnection } from '../../database/db';
@@ -11,6 +11,7 @@ import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { DataRequestService } from '../../services/data-request-service';
 import { getLogger } from '../../utils/logger';
+import { DataRequestFilters } from '../../models/data-request';
 
 const defaultLog = getLogger('paths/data-request');
 
@@ -117,18 +118,10 @@ export function findDataRequests(): RequestHandler {
     try {
       await connection.open();
 
-      const { date_from, date_to, requested_by, team_id } = req.query;
-      const filters = {
-        ...(date_from && { date_from: String(date_from) }),
-        ...(date_to && { date_to: String(date_to) }),
-        ...(requested_by !== undefined && { requested_by: Number(requested_by) }),
-        ...(team_id && { team_id: String(team_id) })
-      };
+      const filters = parseQueryParams(req);
 
       const dataRequestService = new DataRequestService(connection);
-      const dataRequests = await dataRequestService.findDataRequests(
-        Object.keys(filters).length > 0 ? filters : undefined
-      );
+      const dataRequests = await dataRequestService.findDataRequests(filters);
 
       await connection.commit();
 
@@ -173,4 +166,19 @@ export function createDataRequest(): RequestHandler {
       connection.release();
     }
   };
+}
+
+/**
+ * Parses query params from the request into a filters object for data request list.
+ * Returns empty object when no filter params are present.
+ */
+function parseQueryParams(req: Request<unknown, unknown, unknown, DataRequestFilters>): DataRequestFilters {
+  const { date_from, date_to, requested_by, team_id } = req.query;
+  const filters = {
+    ...(date_from && { date_from: String(date_from) }),
+    ...(date_to && { date_to: String(date_to) }),
+    ...(requested_by !== undefined && { requested_by: Number(requested_by) }),
+    ...(team_id && { team_id: String(team_id) })
+  };
+  return filters;
 }
