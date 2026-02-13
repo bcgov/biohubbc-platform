@@ -59,17 +59,5 @@ export type UpdateDataRequest = z.infer<typeof UpdateDataRequest>;
 // data_request CRUD Responses
 // ──────────────────────────────────────────────────────────────────────────────
 
-export const DataRequestWithStatus = z.object({
-  data_request_id: z.string().uuid(),
-  reason: z.string(),
-  team_id: z.string().uuid(),
-  requested_by: z.number(),
-  record_end_date: z.string().nullable(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number(),
-  data_request_status: DataRequestStatus
-});
+export const DataRequestWithStatus = DataRequest.extend(DataRequestStatus.shape);
 export type DataRequestWithStatus = z.infer<typeof DataRequestWithStatus>;
