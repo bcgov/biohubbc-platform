@@ -15,13 +15,7 @@ export const DataRequest = z.object({
   data_request_id: z.string().uuid(),
   reason: z.string(),
   team_id: z.string().uuid(),
-  requested_by: z.number(),
-  record_end_date: z.string().nullable(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number()
+  requested_by: z.number()
 });
 export type DataRequest = z.infer<typeof DataRequest>;
 
@@ -31,12 +25,7 @@ export type DataRequest = z.infer<typeof DataRequest>;
 
 export const Comment = z.object({
   comment_id: z.string().uuid(),
-  comment: z.string(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number()
+  comment: z.string()
 });
 export type Comment = z.infer<typeof Comment>;
 
@@ -48,13 +37,7 @@ export const DataRequestStatus = z.object({
   data_request_status_id: z.string().uuid(),
   data_request_id: z.string().uuid(),
   comment_id: z.string().uuid().nullable(),
-  request_status: DataRequestStatusEnum,
-  record_end_date: z.string().nullable(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number()
+  request_status: DataRequestStatusEnum
 });
 export type DataRequestStatus = z.infer<typeof DataRequestStatus>;
 
