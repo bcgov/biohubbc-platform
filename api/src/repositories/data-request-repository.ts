@@ -4,19 +4,13 @@ import {
   Comment,
   CreateDataRequest,
   DataRequest,
+  DataRequestFilters,
   DataRequestStatus,
   DataRequestStatusEnum,
   DataRequestWithStatus,
   UpdateDataRequest
 } from '../models/data-request';
 import { BaseRepository } from './base-repository';
-
-export type DataRequestFilters = {
-  date_from?: string;
-  date_to?: string;
-  requested_by?: number;
-  team_id?: string;
-};
 
 /**
  * Data request repository class.

@@ -1,15 +1,7 @@
 import { z } from 'zod';
 
-// ──────────────────────────────────────────────────────────────────────────────
-// request_status enum
-// ──────────────────────────────────────────────────────────────────────────────
-
 export const DataRequestStatusEnum = z.enum(['REQUESTED', 'APPROVED', 'DENIED']);
 export type DataRequestStatusEnum = z.infer<typeof DataRequestStatusEnum>;
-
-// ──────────────────────────────────────────────────────────────────────────────
-// data_request table
-// ──────────────────────────────────────────────────────────────────────────────
 
 export const DataRequest = z.object({
   data_request_id: z.string().uuid(),
@@ -19,19 +11,11 @@ export const DataRequest = z.object({
 });
 export type DataRequest = z.infer<typeof DataRequest>;
 
-// ──────────────────────────────────────────────────────────────────────────────
-// comment table
-// ──────────────────────────────────────────────────────────────────────────────
-
 export const Comment = z.object({
   comment_id: z.string().uuid(),
   comment: z.string()
 });
 export type Comment = z.infer<typeof Comment>;
-
-// ──────────────────────────────────────────────────────────────────────────────
-// data_request_status table
-// ──────────────────────────────────────────────────────────────────────────────
 
 export const DataRequestStatus = z.object({
   data_request_status_id: z.string().uuid(),
@@ -41,9 +25,15 @@ export const DataRequestStatus = z.object({
 });
 export type DataRequestStatus = z.infer<typeof DataRequestStatus>;
 
-// ──────────────────────────────────────────────────────────────────────────────
-// data_request CRUD Requests
-// ──────────────────────────────────────────────────────────────────────────────
+export const DataRequestFilters = z.object({
+  date_from: z.string().optional(),
+  date_to: z.string().optional(),
+  requested_by: z.number().int().optional(),
+  team_id: z.string().optional()
+});
+export type DataRequestFilters = z.infer<typeof DataRequestFilters>;
+
+export const DataRequestWithFilters = DataRequest.extend(DataRequestFilters.shape);
 
 export const CreateDataRequest = z.object({
   reason: z.string()
