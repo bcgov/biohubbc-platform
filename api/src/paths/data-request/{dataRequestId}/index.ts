@@ -1,12 +1,12 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
+import { SYSTEM_ROLE } from '../../../constants/roles';
+import { getDBConnection } from '../../../database/db';
 import { DataRequestResponseSchema, UpdateDataRequestSchema } from '../../../openapi/schemas/data-request';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { DataRequestService } from '../../../services/data-request-service';
 import { getLogger } from '../../../utils/logger';
-import { SYSTEM_ROLE } from '../../../constants/roles';
-import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 
 const defaultLog = getLogger('paths/data-request/{dataRequestId}');
 
@@ -165,8 +165,7 @@ DELETE.apiDoc = {
  */
 export function getDataRequestById(): RequestHandler {
   return async (req, res) => {
-    const isAuthenticated = !!req.keycloak_token;
-    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
+    const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();
@@ -175,8 +174,6 @@ export function getDataRequestById(): RequestHandler {
       const dataRequestService = new DataRequestService(connection);
 
       const dataRequest = await dataRequestService.getDataRequestById(dataRequestId);
-      // do a lookup to see if the user is in the team 
-      // if not return 403
 
       await connection.commit();
 
