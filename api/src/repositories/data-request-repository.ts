@@ -210,17 +210,13 @@ export class DataRequestRepository extends BaseRepository {
   /**
    * Create a new data request.
    *
-   * @param {string} teamId
+   * @param {string} [teamId] - Optional. If omitted, caller must create a team first and pass its id.
    * @param {number} requestedBy
    * @param {CreateDataRequest} payload
    * @return {Promise<DataRequestWithStatus>}
    * @memberof DataRequestRepository
    */
-  async createDataRequest(
-    teamId: string,
-    requestedBy: number,
-    payload: CreateDataRequest
-  ): Promise<DataRequestWithStatus> {
+  async createDataRequest(teamId: string, requestedBy: number, payload: CreateDataRequest): Promise<DataRequest> {
     const knex = getKnex();
     const query = knex('data_request')
       .insert({
@@ -230,26 +226,16 @@ export class DataRequestRepository extends BaseRepository {
       })
       .returning('*');
 
-    const createDataRequestResponse = await this.connection.knex(query, DataRequest);
+    const response = await this.connection.knex(query, DataRequest);
 
-    if (createDataRequestResponse.rowCount !== 1) {
+    if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to create data request', [
         'DataRequestRepository->createDataRequest',
         'rowCount !== 1'
       ]);
     }
 
-    const dataRequest = createDataRequestResponse.rows[0];
-    const dataRequestStatusResponse = await this.createDataRequestStatus(
-      dataRequest.data_request_id,
-      DataRequestStatusEnum.enum.REQUESTED,
-      null
-    );
-
-    return {
-      ...dataRequest,
-      data_request_status: dataRequestStatusResponse
-    };
+    return response.rows[0];
   }
 
   /**
