@@ -10,24 +10,6 @@ import { DataRequestFilters, DataRequestRepository } from '../repositories/data-
 import { TeamMemberService } from './access-policy/team-member-service';
 import { DBService } from './db-service';
 
-/**
- * Service interface for models that are associated with a team. Used by authorizeByModelTeamMember to
- * determine if the current user is a member of the team for the given model record.
- *
- * @export
- */
-export interface IModelWithTeamMemberService {
-  /**
-   * Returns the true if the given user is a member of the team associated with the model
-   * record identified by modelId; otherwise returns false.
-   *
-   * @param {string} modelId - The id of the model record (e.g. data request id).
-   * @param {number} systemUserId - The system user id to check for team membership.
-   * @return {Promise<boolean>}
-   */
-  isCurrentUserATeamMember(modelId: string, userId: number): Promise<boolean>;
-}
-
 type ModelTeamMemberRecord = {
   team_id: string;
 };
@@ -35,7 +17,7 @@ type ModelTeamMemberRecord = {
 /**
  * Service for managing data requests.
  */
-export class DataRequestService extends DBService implements IModelWithTeamMemberService {
+export class DataRequestService extends DBService {
   dataRequestRepository: DataRequestRepository;
 
   /**
