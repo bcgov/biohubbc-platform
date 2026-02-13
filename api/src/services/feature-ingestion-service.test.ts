@@ -698,7 +698,7 @@ describe('FeatureIngestionService', () => {
       expect(insertStub).to.have.been.calledTwice;
       expect(updateParentStub).to.have.been.calledOnceWith(101, 100);
       expect(insertRelationshipsStub).to.have.been.calledOnceWith([
-        { parent_submission_feature_id: 100, child_submission_feature_id: 101 }
+        { parent_feature_id: 100, child_feature_id: 101 }
       ]);
     });
 
@@ -1155,9 +1155,9 @@ describe('FeatureIngestionService', () => {
       await service.ingestFeatures(1, features);
 
       expect(insertRelationshipsStub).to.have.been.calledOnceWith([
-        { parent_submission_feature_id: 10, child_submission_feature_id: 20 },
-        { parent_submission_feature_id: 10, child_submission_feature_id: 30 },
-        { parent_submission_feature_id: 10, child_submission_feature_id: 40 }
+        { parent_feature_id: 10, child_feature_id: 20 },
+        { parent_feature_id: 10, child_feature_id: 30 },
+        { parent_feature_id: 10, child_feature_id: 40 }
       ]);
     });
 

@@ -114,16 +114,16 @@ export class FeatureIngestionService extends DBService {
    * @private
    * @param {IFlattenedBlock[]} features - Features with content references
    * @param {Map<string, number>} uuidToDbId - UUID to submission_feature_id mapping
-   * @return {Array<{ parent_submission_feature_id: number; child_submission_feature_id: number }>}
+   * @return {Array<{ parent_feature_id: number; child_feature_id: number }>}
    * @memberof FeatureIngestionService
    */
   private buildContentRelationshipPairs(
     features: IFlattenedBlock[],
     uuidToDbId: Map<string, number>
-  ): Array<{ parent_submission_feature_id: number; child_submission_feature_id: number }> {
+  ): Array<{ parent_feature_id: number; child_feature_id: number }> {
     const pairs: Array<{
-      parent_submission_feature_id: number;
-      child_submission_feature_id: number;
+      parent_feature_id: number;
+      child_feature_id: number;
     }> = [];
     for (const feature of features) {
       if (!feature.content?.length) {
@@ -137,8 +137,8 @@ export class FeatureIngestionService extends DBService {
         const childDbId = uuidToDbId.get(childId);
         if (childDbId !== undefined) {
           pairs.push({
-            parent_submission_feature_id: parentDbId,
-            child_submission_feature_id: childDbId
+            parent_feature_id: parentDbId,
+            child_feature_id: childDbId
           });
         }
       }

@@ -1661,8 +1661,8 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       await submissionRepository.insertSubmissionFeatureRelationships([
-        { parent_submission_feature_id: 1, child_submission_feature_id: 2 },
-        { parent_submission_feature_id: 1, child_submission_feature_id: 3 }
+        { parent_feature_id: 1, child_feature_id: 2 },
+        { parent_feature_id: 1, child_feature_id: 3 }
       ]);
 
       expect(sqlStub).to.have.been.calledOnce;
@@ -1690,11 +1690,11 @@ describe('SubmissionRepository', () => {
 
     it('should return parent and child IDs for a feature', async () => {
       const mockParentResponse = {
-        rows: [{ parent_submission_feature_id: 10 }],
+        rows: [{ parent_feature_id: 10 }],
         rowCount: 1
       };
       const mockChildResponse = {
-        rows: [{ child_submission_feature_id: 2 }, { child_submission_feature_id: 3 }],
+        rows: [{ child_feature_id: 2 }, { child_feature_id: 3 }],
         rowCount: 2
       };
 

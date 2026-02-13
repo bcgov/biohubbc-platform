@@ -17,36 +17,36 @@ export async function up(knex: Knex): Promise<void> {
     --------------------------------------------------------------------------------
 
     CREATE TABLE submission_feature__feature (
-      parent_submission_feature_id integer NOT NULL,
-      child_submission_feature_id integer NOT NULL,
+      parent_feature_id integer NOT NULL,
+      child_feature_id integer NOT NULL,
       create_date timestamptz(6) DEFAULT now() NOT NULL,
       create_user integer NOT NULL,
       update_date timestamptz(6),
       update_user integer,
       revision_count integer DEFAULT 0 NOT NULL,
       CONSTRAINT submission_feature__feature_pk
-        PRIMARY KEY (parent_submission_feature_id, child_submission_feature_id),
+        PRIMARY KEY (parent_feature_id, child_feature_id),
       CONSTRAINT submission_feature__feature_parent_fk
-        FOREIGN KEY (parent_submission_feature_id)
+        FOREIGN KEY (parent_feature_id)
         REFERENCES submission_feature(submission_feature_id)
         ON DELETE CASCADE,
       CONSTRAINT submission_feature__feature_child_fk
-        FOREIGN KEY (child_submission_feature_id)
+        FOREIGN KEY (child_feature_id)
         REFERENCES submission_feature(submission_feature_id)
         ON DELETE CASCADE,
       CONSTRAINT submission_feature__feature_no_self_loop
-        CHECK (parent_submission_feature_id != child_submission_feature_id)
+        CHECK (parent_feature_id != child_feature_id)
     );
 
     CREATE INDEX submission_feature__feature_parent_idx
-      ON submission_feature__feature(parent_submission_feature_id);
+      ON submission_feature__feature(parent_feature_id);
 
     CREATE INDEX submission_feature__feature_child_idx
-      ON submission_feature__feature(child_submission_feature_id);
+      ON submission_feature__feature(child_feature_id);
 
     COMMENT ON TABLE submission_feature__feature IS 'Many-to-many relationships between submission features (from content array in flat ingestion).';
-    COMMENT ON COLUMN submission_feature__feature.parent_submission_feature_id IS 'Foreign key to the parent submission feature.';
-    COMMENT ON COLUMN submission_feature__feature.child_submission_feature_id IS 'Foreign key to the child submission feature.';
+    COMMENT ON COLUMN submission_feature__feature.parent_feature_id IS 'Foreign key to the parent submission feature.';
+    COMMENT ON COLUMN submission_feature__feature.child_feature_id IS 'Foreign key to the child submission feature.';
     COMMENT ON COLUMN submission_feature__feature.create_date IS 'The datetime the record was created.';
     COMMENT ON COLUMN submission_feature__feature.create_user IS 'The id of the user who created the record.';
     COMMENT ON COLUMN submission_feature__feature.update_date IS 'The datetime the record was updated.';
