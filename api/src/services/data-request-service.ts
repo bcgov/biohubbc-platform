@@ -175,4 +175,21 @@ export class DataRequestService extends DBService {
   async deleteDataRequest(dataRequestId: string): Promise<void> {
     return this.dataRequestRepository.deleteDataRequest(dataRequestId);
   }
+
+  /**
+   * Returns true if the current user may act on this data request (system admin or team member); otherwise false.
+   *
+   * @param dataRequestId - Data request id to check team membership for.
+   */
+  async canAccessDataRequest(dataRequestId: string): Promise<boolean> {
+    const userService = new UserService(this.connection);
+    const isSystemAdmin = await userService.isSystemUserAdmin();
+    if (isSystemAdmin) {
+      return true;
+    }
+
+    const userId = this.connection.systemUserId();
+    const dataRequestTeamMember = await this.findTeamMember(dataRequestId, userId);
+    return dataRequestTeamMember !== null;
+  }
 }
