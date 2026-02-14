@@ -5,13 +5,14 @@ import {
   DataRequestFilters,
   DataRequestStatusEnum,
   DataRequestWithStatus,
-  UpdateDataRequest,
-  ModelTeamMemberRecord
+  UpdateDataRequest
 } from '../models/data-request';
+import { TeamMember } from '../models/team-member';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamService } from './access-policy/team-service';
 import { DBService } from './db-service';
+import { UserService } from './user-service';
 
 /**
  * Service for managing data requests.
@@ -31,36 +32,26 @@ export class DataRequestService extends DBService {
   }
 
   /**
-   * Returns the team record if the given user is a member of the team associated with the data
-   * request; otherwise returns null. Used by authorizeByModelTeamMember.
+   * Returns the team_member record if the given user is a member of the team associated with the data
+   * request; otherwise returns null.
    *
    * @param {string} dataRequestId - The data request id.
    * @param {number} userId - The system user id to check for team membership.
-   * @return {Promise<ModelTeamMemberRecord | null>}
+   * @return {Promise<TeamMember | null>}
    */
-  async findTeamMember(dataRequestId: string, userId: number): Promise<ModelTeamMemberRecord | null> {
-    const dataRequest = await this.findDataRequestById(dataRequestId);
-    if (!dataRequest) {
+  async findTeamMember(dataRequestId: string, userId: number): Promise<TeamMember | null> {
+    const dataRequest = await this.getDataRequestById(dataRequestId);
+
+    const teamMemberService = new TeamMemberService(this.connection);
+    const members = await teamMemberService.getTeamMembers(dataRequest.team_id);
+
+    const member = members.find((member) => member.system_user_id === userId);
+
+    if (!member) {
       return null;
     }
 
-    const teamMemberService = new TeamMemberService(this.connection);
-    const teamMembers = await teamMemberService.getTeamMembers(dataRequest.team_id);
-    const isMember = teamMembers.some((member) => member.system_user_id === userId);
-
-    return isMember ? { team_id: dataRequest.team_id } : null;
-  }
-
-  /**
-   * Checks if the provided user is a member of the team associated with the given data request.
-   *
-   * @param {string} dataRequestId - The data request id to check.
-   * @param {number} userId - The system user id to check for team membership.
-   * @returns {Promise<boolean>} - True if the user is a team member, false otherwise.
-   */
-  async isCurrentUserATeamMember(dataRequestId: string, userId: number): Promise<boolean> {
-    const teamMemberRecord = await this.findTeamMember(dataRequestId, userId);
-    return teamMemberRecord !== null;
+    return member;
   }
 
   /**
