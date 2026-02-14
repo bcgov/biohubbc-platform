@@ -1,55 +1,17 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
+import { HTTP403 } from '../../../errors/http-error';
 import { DataRequestResponseSchema, UpdateDataRequestSchema } from '../../../openapi/schemas/data-request';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { DataRequestService } from '../../../services/data-request-service';
 import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/data-request/{dataRequestId}');
 
-export const GET: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      or: [
-        {
-          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
-          discriminator: 'SystemRole'
-        }
-      ]
-    };
-  }),
-  getDataRequestById()
-];
-
-export const PUT: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      or: [
-        {
-          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
-          discriminator: 'SystemRole'
-        }
-      ]
-    };
-  }),
-  updateDataRequest()
-];
-export const DELETE: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      or: [
-        {
-          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
-          discriminator: 'SystemRole'
-        }
-      ]
-    };
-  }),
-  deleteDataRequest()
-];
+export const GET: Operation = [getDataRequestById()];
+export const PUT: Operation = [updateDataRequest()];
+export const DELETE: Operation = [deleteDataRequest()];
 
 GET.apiDoc = {
   description: 'Get a data request by dataRequestId',
@@ -173,9 +135,12 @@ export function getDataRequestById(): RequestHandler {
       const dataRequestId = req.params.dataRequestId;
       const dataRequestService = new DataRequestService(connection);
 
-      const dataRequest = await dataRequestService.getDataRequestById(dataRequestId);
+      const canAccess = await dataRequestService.canAccessDataRequest(dataRequestId);
+      if (!canAccess) {
+        throw new HTTP403('Access denied');
+      }
 
-      await connection.commit();
+      const dataRequest = await dataRequestService.getDataRequestById(dataRequestId);
 
       return res.status(200).json(dataRequest);
     } catch (error) {
@@ -200,8 +165,14 @@ export function updateDataRequest(): RequestHandler {
     try {
       await connection.open();
 
-      const dataRequestId = req.params.dataRequestId;
       const dataRequestService = new DataRequestService(connection);
+
+      const dataRequestId = req.params.dataRequestId;
+
+      const canAccess = await dataRequestService.canAccessDataRequest(dataRequestId);
+      if (!canAccess) {
+        throw new HTTP403('Access denied');
+      }
 
       const dataRequest = await dataRequestService.updateDataRequest(dataRequestId, req.body);
 
@@ -232,6 +203,11 @@ export function deleteDataRequest(): RequestHandler {
 
       const dataRequestId = req.params.dataRequestId;
       const dataRequestService = new DataRequestService(connection);
+
+      const canAccess = await dataRequestService.canAccessDataRequest(dataRequestId);
+      if (!canAccess) {
+        throw new HTTP403('Access denied');
+      }
 
       await dataRequestService.deleteDataRequest(dataRequestId);
 

@@ -1,33 +1,20 @@
 import { Request, RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../constants/roles';
 import { getAPIUserDBConnection, getDBConnection } from '../../database/db';
+import { DataRequestFilters } from '../../models/data-request';
 import {
   CreateDataRequestRequestSchema,
   DataRequestListResponseSchema,
   DataRequestWithStatusResponseSchema
 } from '../../openapi/schemas/data-request';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { DataRequestService } from '../../services/data-request-service';
 import { getLogger } from '../../utils/logger';
-import { DataRequestFilters } from '../../models/data-request';
+import { HTTP403 } from '../../errors/http-error';
 
 const defaultLog = getLogger('paths/data-request');
 
-export const GET: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
-          discriminator: 'SystemRole'
-        }
-      ]
-    };
-  }),
-  findDataRequests()
-];
+export const GET: Operation = [findDataRequests()];
 export const POST: Operation = [createDataRequest()];
 
 GET.apiDoc = {
@@ -123,7 +110,13 @@ export function findDataRequests(): RequestHandler {
       const dataRequestService = new DataRequestService(connection);
       const dataRequests = await dataRequestService.findDataRequests(filters);
 
-      await connection.commit();
+      const allCanAccess = await Promise.all(
+        dataRequests.map((dr) => dataRequestService.canAccessDataRequest(dr.data_request_id))
+      ).then((results) => results.every(Boolean));
+
+      if (!allCanAccess) {
+        throw new HTTP403('Access denied');
+      }
 
       res.status(200).json(dataRequests);
     } catch (error) {
