@@ -129,7 +129,8 @@ export async function up(knex: Knex): Promise<void> {
       CONSTRAINT ticket_reference_pk PRIMARY KEY (ticket_reference_id),
       CONSTRAINT ticket_reference_source_fk FOREIGN KEY (source_ticket_id) REFERENCES ticket(ticket_id),
       CONSTRAINT ticket_reference_target_fk FOREIGN KEY (target_ticket_id) REFERENCES ticket(ticket_id),
-      CONSTRAINT ticket_reference_unique UNIQUE (source_ticket_id, target_ticket_id, relationship)
+      CONSTRAINT ticket_reference_unique UNIQUE (source_ticket_id, target_ticket_id, relationship),
+      CONSTRAINT ticket_reference_no_self_reference CHECK (source_ticket_id <> target_ticket_id)
     );
 
     CREATE INDEX ticket_reference_source_idx ON ticket_reference(source_ticket_id);
