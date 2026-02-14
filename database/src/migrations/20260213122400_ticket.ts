@@ -63,7 +63,7 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX ticket_priority_idx ON ticket(priority);
     CREATE INDEX ticket_number_idx ON ticket(ticket_number);
 
-    COMMENT ON TABLE ticket IS 'Coordination ticket for admin actions requiring review. Each ticket has a unique number and URL. Access controlled by team membership - team members and system admins can view. Current status is derived from the most recent ticket_status_history record.';
+    COMMENT ON TABLE ticket IS 'Coordination ticket for admin actions requiring review. Each ticket has a unique number and URL. Access controlled by team membership - team members and system admins can view. Current status is derived from the most recent ticket_decision record.';
     COMMENT ON COLUMN ticket.ticket_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN ticket.ticket_number IS 'Human-readable sequential ticket number for URLs (e.g., /tickets/123).';
     COMMENT ON COLUMN ticket.title IS 'Brief title describing the ticket purpose.';
@@ -129,13 +129,15 @@ export async function up(knex: Knex): Promise<void> {
       CONSTRAINT ticket_reference_pk PRIMARY KEY (ticket_reference_id),
       CONSTRAINT ticket_reference_source_fk FOREIGN KEY (source_ticket_id) REFERENCES ticket(ticket_id),
       CONSTRAINT ticket_reference_target_fk FOREIGN KEY (target_ticket_id) REFERENCES ticket(ticket_id),
-      CONSTRAINT ticket_reference_unique UNIQUE (source_ticket_id, target_ticket_id, relationship),
       CONSTRAINT ticket_reference_no_self_reference CHECK (source_ticket_id <> target_ticket_id)
     );
 
     CREATE INDEX ticket_reference_source_idx ON ticket_reference(source_ticket_id);
     CREATE INDEX ticket_reference_target_idx ON ticket_reference(target_ticket_id);
     CREATE INDEX ticket_reference_relationship_idx ON ticket_reference(relationship);
+    CREATE UNIQUE INDEX ticket_reference_active_unique_idx
+      ON ticket_reference(source_ticket_id, target_ticket_id, relationship)
+      WHERE record_end_date IS NULL;
 
     COMMENT ON TABLE ticket_reference IS 'Directional relationships between tickets showing how tickets relate to each other.';
     COMMENT ON COLUMN ticket_reference.ticket_reference_id IS 'System generated surrogate primary key identifier.';
@@ -203,6 +205,12 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX ticket_decision_ticket_idx ON ticket_decision(ticket_id);
     CREATE INDEX ticket_decision_decision_idx ON ticket_decision(decision_id);
     CREATE INDEX ticket_decision_create_date_idx ON ticket_decision(create_date);
+    CREATE UNIQUE INDEX ticket_decision_active_unique_idx
+      ON ticket_decision(ticket_id, decision_id)
+      WHERE record_end_date IS NULL;
+    CREATE INDEX ticket_decision_ticket_active_latest_idx
+      ON ticket_decision(ticket_id, create_date DESC)
+      WHERE record_end_date IS NULL;
 
     COMMENT ON TABLE ticket_decision IS 'Links tickets to admin decisions. Provides history of all decisions made on a ticket. Most commonly used for final ticket resolution decisions.';
     COMMENT ON COLUMN ticket_decision.ticket_decision_id IS 'System generated surrogate primary key identifier.';
@@ -253,6 +261,12 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX data_request_decision_data_request_idx ON data_request_decision(data_request_id);
     CREATE INDEX data_request_decision_decision_idx ON data_request_decision(decision_id);
     CREATE INDEX data_request_decision_create_date_idx ON data_request_decision(create_date);
+    CREATE UNIQUE INDEX data_request_decision_active_unique_idx
+      ON data_request_decision(data_request_id, decision_id)
+      WHERE record_end_date IS NULL;
+    CREATE INDEX data_request_decision_active_latest_idx
+      ON data_request_decision(data_request_id, create_date DESC)
+      WHERE record_end_date IS NULL;
 
     COMMENT ON TABLE data_request_decision IS 'Links data requests to admin decisions. Provides history of all decisions made on a data request. Status is derived from the most recent decision.';
     COMMENT ON COLUMN data_request_decision.data_request_decision_id IS 'System generated surrogate primary key identifier.';
@@ -303,6 +317,12 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX submission_upload_decision_submission_upload_idx ON submission_upload_decision(submission_upload_id);
     CREATE INDEX submission_upload_decision_decision_idx ON submission_upload_decision(decision_id);
     CREATE INDEX submission_upload_decision_create_date_idx ON submission_upload_decision(create_date);
+    CREATE UNIQUE INDEX submission_upload_decision_active_unique_idx
+      ON submission_upload_decision(submission_upload_id, decision_id)
+      WHERE record_end_date IS NULL;
+    CREATE INDEX submission_upload_decision_active_latest_idx
+      ON submission_upload_decision(submission_upload_id, create_date DESC)
+      WHERE record_end_date IS NULL;
 
     COMMENT ON TABLE submission_upload_decision IS 'Links submission uploads to admin decisions. Provides history of all decisions made on a submission upload. Status is derived from the most recent decision.';
     COMMENT ON COLUMN submission_upload_decision.submission_upload_decision_id IS 'System generated surrogate primary key identifier.';
