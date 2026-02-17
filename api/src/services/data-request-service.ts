@@ -86,22 +86,13 @@ export class DataRequestService extends DBService {
   }
 
   /**
-   * Find all data requests, optionally filtered by date range, requested_by, or team_id.
+   * Find all data requests, optionally filtered by date range, requested_by, team_id, or status.
    *
-   * @param {object} [filters]
-   * @param {string} [filters.date_from]
-   * @param {string} [filters.date_to]
-   * @param {number} [filters.requested_by]
-   * @param {string} [filters.team_id]
+   * @param {DataRequestFilters} [filters]
    * @return {Promise<DataRequest[]>}
-   * @memberof DataRequestRepository
+   * @memberof DataRequestService
    */
-  async findDataRequests(filters?: {
-    date_from?: string;
-    date_to?: string;
-    requested_by?: number;
-    team_id?: string;
-  }): Promise<DataRequest[]> {
+  async findDataRequests(filters?: DataRequestFilters): Promise<DataRequest[]> {
     const dataRequests = await this.dataRequestRepository.findDataRequests(filters);
 
     const allAuthorized = await Promise.all(
@@ -113,23 +104,6 @@ export class DataRequestService extends DBService {
     }
 
     return dataRequests;
-  }
-
-  /**
-   * Find all data requests, optionally by status (will default to REQUESTED).
-   *
-   * @param {string} [status]
-   * @return {Promise<DataRequestWithStatus[]>}
-   * @memberof DataRequestRepository
-   */
-  async findDataRequestsByStatus({
-    status,
-    filters
-  }: {
-    status: DataRequestStatusEnum;
-    filters?: DataRequestFilters;
-  }): Promise<DataRequest[]> {
-    return this.dataRequestRepository.findDataRequestsByStatus({ status, filters });
   }
 
   /**

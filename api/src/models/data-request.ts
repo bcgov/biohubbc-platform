@@ -29,7 +29,8 @@ export const DataRequestFilters = z.object({
   date_from: z.string().optional(),
   date_to: z.string().optional(),
   requested_by: z.number().int().optional(),
-  team_id: z.string().optional()
+  team_id: z.string().optional(),
+  status: DataRequestStatusEnum.optional()
 });
 export type DataRequestFilters = z.infer<typeof DataRequestFilters>;
 

@@ -166,51 +166,33 @@ describe('DataRequestService', () => {
     });
   });
 
-  describe('findDataRequestsByStatus', () => {
-    it('should return data requests for the given status', async () => {
+  describe('findDataRequests with status filter', () => {
+    it('should pass status in filters to repository', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DataRequestService(mockDBConnection);
 
-      const mockRequests = [mockDataRequestWithStatus];
-      const stub = sinon.stub(DataRequestRepository.prototype, 'findDataRequestsByStatus').resolves(mockRequests);
+      const filters = { status: 'REQUESTED' as const };
+      const mockRequests = [mockDataRequest];
+      const stub = sinon.stub(DataRequestRepository.prototype, 'findDataRequests').resolves(mockRequests);
 
-      const result = await service.findDataRequestsByStatus({
-        status: 'REQUESTED'
-      });
+      const result = await service.findDataRequests(filters);
 
-      expect(stub).to.have.been.calledOnceWith({ status: 'REQUESTED', filters: undefined });
+      expect(stub).to.have.been.calledOnceWith(filters);
       expect(result).to.deep.equal(mockRequests);
     });
 
-    it('should pass filters to repository when provided', async () => {
+    it('should pass filters including status to repository', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DataRequestService(mockDBConnection);
 
-      const filters = { team_id: mockDataRequest.team_id };
-      const mockRequests = [mockDataRequestWithStatus];
-      const stub = sinon.stub(DataRequestRepository.prototype, 'findDataRequestsByStatus').resolves(mockRequests);
+      const filters = { status: 'APPROVED' as const, team_id: mockDataRequest.team_id };
+      const mockRequests = [mockDataRequest];
+      const stub = sinon.stub(DataRequestRepository.prototype, 'findDataRequests').resolves(mockRequests);
 
-      const result = await service.findDataRequestsByStatus({
-        status: 'APPROVED',
-        filters
-      });
+      const result = await service.findDataRequests(filters);
 
-      expect(stub).to.have.been.calledOnceWith({ status: 'APPROVED', filters });
+      expect(stub).to.have.been.calledOnceWith(filters);
       expect(result).to.deep.equal(mockRequests);
-    });
-
-    it('should propagate repository errors', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DataRequestService(mockDBConnection);
-
-      sinon.stub(DataRequestRepository.prototype, 'findDataRequestsByStatus').rejects(new Error('DB error'));
-
-      try {
-        await service.findDataRequestsByStatus({ status: 'REQUESTED' });
-        throw new Error('Expected to throw');
-      } catch (err: any) {
-        expect(err.message).to.equal('DB error');
-      }
     });
   });
 

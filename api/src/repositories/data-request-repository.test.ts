@@ -161,34 +161,11 @@ describe('DataRequestRepository', () => {
     });
   });
 
-  describe('findDataRequestsByStatus', () => {
-    it('should return mapped data requests with status when found', async () => {
-      const rawRow = {
-        data_request_id: mockDataRequest.data_request_id,
-        reason: mockDataRequest.reason,
-        team_id: mockDataRequest.team_id,
-        requested_by: mockDataRequest.requested_by,
-        record_end_date: mockDataRequest.record_end_date,
-        create_date: mockDataRequest.create_date,
-        create_user: mockDataRequest.create_user,
-        update_date: mockDataRequest.update_date,
-        update_user: mockDataRequest.update_user,
-        revision_count: mockDataRequest.revision_count,
-        data_request_status_id: mockDataRequestStatus.data_request_status_id,
-        drs_data_request_id: mockDataRequestStatus.data_request_id,
-        drs_comment_id: mockDataRequestStatus.comment_id,
-        drs_request_status: mockDataRequestStatus.request_status,
-        drs_record_end_date: mockDataRequestStatus.record_end_date,
-        drs_create_date: mockDataRequestStatus.create_date,
-        drs_create_user: mockDataRequestStatus.create_user,
-        drs_update_date: mockDataRequestStatus.update_date,
-        drs_update_user: mockDataRequestStatus.update_user,
-        drs_revision_count: mockDataRequestStatus.revision_count
-      };
-
+  describe('findDataRequests with status filter', () => {
+    it('should return data requests when filtering by status', async () => {
       const mockQueryResponse = {
         rowCount: 1,
-        rows: [rawRow]
+        rows: [mockDataRequest]
       } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({
@@ -197,12 +174,12 @@ describe('DataRequestRepository', () => {
 
       const repo = new DataRequestRepository(mockDBConnection);
 
-      const result = await repo.findDataRequestsByStatus({ status: 'REQUESTED' });
+      const result = await repo.findDataRequests({ status: 'REQUESTED' });
 
-      expect(result).to.eql([mockDataRequestWithStatus]);
+      expect(result).to.eql([mockDataRequest]);
     });
 
-    it('should return empty array when no data requests found', async () => {
+    it('should return empty array when no data requests match status', async () => {
       const mockQueryResponse = {
         rowCount: 0,
         rows: []
@@ -214,7 +191,7 @@ describe('DataRequestRepository', () => {
 
       const repo = new DataRequestRepository(mockDBConnection);
 
-      const result = await repo.findDataRequestsByStatus({ status: 'APPROVED' });
+      const result = await repo.findDataRequests({ status: 'APPROVED' });
 
       expect(result).to.eql([]);
     });

@@ -10,7 +10,6 @@ import {
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { DataRequestService } from '../../services/data-request-service';
 import { getLogger } from '../../utils/logger';
-import { HTTP403 } from '../../errors/http-error';
 
 const defaultLog = getLogger('paths/data-request');
 
@@ -18,7 +17,7 @@ export const GET: Operation = [findDataRequests()];
 export const POST: Operation = [createDataRequest()];
 
 GET.apiDoc = {
-  description: 'Find all data request records, optionally filtered by date range, requested_by, or team_id',
+  description: 'Find all data request records, optionally filtered by date range, requested_by, team_id, or status',
   tags: ['data-request'],
   security: [
     {
@@ -49,6 +48,16 @@ GET.apiDoc = {
       name: 'team_id',
       required: false,
       schema: { type: 'string', format: 'uuid', description: 'Filter by team ID' }
+    },
+    {
+      in: 'query',
+      name: 'status',
+      required: false,
+      schema: {
+        type: 'string',
+        enum: ['REQUESTED', 'APPROVED', 'DENIED'],
+        description: 'Filter by request status'
+      }
     }
   ],
   responses: {
@@ -158,12 +167,13 @@ export function createDataRequest(): RequestHandler {
  * Returns empty object when no filter params are present.
  */
 function parseQueryParams(req: Request<unknown, unknown, unknown, DataRequestFilters>): DataRequestFilters {
-  const { date_from, date_to, requested_by, team_id } = req.query;
-  const filters = {
+  const { date_from, date_to, requested_by, team_id, status } = req.query;
+  const filters: DataRequestFilters = {
     ...(date_from && { date_from: String(date_from) }),
     ...(date_to && { date_to: String(date_to) }),
     ...(requested_by !== undefined && { requested_by: Number(requested_by) }),
-    ...(team_id && { team_id: String(team_id) })
+    ...(team_id && { team_id: String(team_id) }),
+    ...(status && { status: String(status) as DataRequestFilters['status'] })
   };
   return filters;
 }

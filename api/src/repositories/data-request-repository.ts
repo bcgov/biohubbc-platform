@@ -7,7 +7,6 @@ import {
   DataRequestFilters,
   DataRequestStatus,
   DataRequestStatusEnum,
-  DataRequestWithStatus,
   UpdateDataRequest
 } from '../models/data-request';
 import { BaseRepository } from './base-repository';
@@ -21,18 +20,41 @@ import { BaseRepository } from './base-repository';
  */
 export class DataRequestRepository extends BaseRepository {
   /**
-   * Find all data requests, optionally filtered by date range, requested_by, or team_id.
+   * Find all data requests, optionally filtered by date range, requested_by, team_id, or status.
    *
-   * @param {object} [filters]
-   * @param {string} [filters.date_from]
-   * @param {string} [filters.date_to]
-   * @param {number} [filters.requested_by]
-   * @param {string} [filters.team_id]
+   * @param {DataRequestFilters} [filters] - Optional filters (date_from, date_to, requested_by, team_id, status).
    * @return {Promise<DataRequest[]>}
    * @memberof DataRequestRepository
    */
   async findDataRequests(filters?: DataRequestFilters): Promise<DataRequest[]> {
     const knex = getKnex();
+
+    if (filters?.status) {
+      const query = knex('data_request as dr')
+        .select('dr.requested_by', 'dr.team_id', 'dr.data_request_id', 'dr.reason')
+        .join('data_request_status as drs', function () {
+          this.on('dr.data_request_id', '=', 'drs.data_request_id').onNull('drs.record_end_date');
+        })
+        .where('drs.request_status', filters.status)
+        .whereNull('dr.record_end_date');
+
+      if (filters?.date_from) {
+        query.where('dr.create_date', '>=', filters.date_from);
+      }
+      if (filters?.date_to) {
+        query.where('dr.create_date', '<=', filters.date_to);
+      }
+      if (filters?.requested_by !== undefined) {
+        query.where('dr.requested_by', filters.requested_by);
+      }
+      if (filters?.team_id) {
+        query.where('dr.team_id', filters.team_id);
+      }
+
+      const response = await this.connection.knex(query, DataRequest);
+      return response.rows;
+    }
+
     const query = knex('data_request')
       .select('requested_by', 'team_id', 'data_request_id', 'reason')
       .whereNull('record_end_date');
@@ -96,58 +118,6 @@ export class DataRequestRepository extends BaseRepository {
     const response = await this.connection.knex(query, DataRequest);
 
     return response.rows[0] ?? null;
-  }
-
-  /**
-   * Find a list of data_requests by status and optional filters.
-   *
-   * @param {object} params
-   * @param {RequestStatus} params.status - Status to filter by (REQUESTED, APPROVED, DENIED).
-   * @param {DataRequestFilters} [params.filters] - Optional filters (date_from, date_to, requested_by, team_id).
-   * @return {Promise<DataRequestWithStatus[]>}
-   * @memberof DataRequestRepository
-   */
-  async findDataRequestsByStatus({
-    status,
-    filters
-  }: {
-    status: DataRequestStatusEnum;
-    filters?: DataRequestFilters;
-  }): Promise<DataRequestWithStatus[]> {
-    const knex = getKnex();
-    const query = knex('data_request as dr')
-      .select(
-        'dr.data_request_id',
-        'dr.reason',
-        'dr.team_id',
-        'dr.requested_by',
-        'drs.data_request_status_id',
-        'drs.data_request_id as drs_data_request_id',
-        'drs.comment_id as drs_comment_id',
-        'drs.request_status as drs_request_status',
-      )
-      .join('data_request_status as drs', function () {
-        this.on('dr.data_request_id', '=', 'drs.data_request_id').onNull('drs.record_end_date');
-      })
-      .where('drs.request_status', status)
-      .whereNull('dr.record_end_date');
-
-    if (filters?.date_from) {
-      query.where('dr.create_date', '>=', filters.date_from);
-    }
-    if (filters?.date_to) {
-      query.where('dr.create_date', '<=', filters.date_to);
-    }
-    if (filters?.requested_by !== undefined) {
-      query.where('dr.requested_by', filters.requested_by);
-    }
-    if (filters?.team_id) {
-      query.where('dr.team_id', filters.team_id);
-    }
-
-    const response = await this.connection.knex(query);
-
-    return response.rows;
   }
 
   /**
