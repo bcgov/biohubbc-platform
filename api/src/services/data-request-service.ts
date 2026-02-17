@@ -10,12 +10,12 @@ import {
   UpdateDataRequest
 } from '../models/data-request';
 import { TeamMember } from '../models/team-member';
+import { TeamMemberRepository } from '../repositories/authorization/team-member-repository';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamService } from './access-policy/team-service';
 import { DBService } from './db-service';
 import { UserService } from './user-service';
-import { TeamMemberRepository } from '../repositories/authorization/team-member-repository';
 
 /**
  * Service for managing data requests.
