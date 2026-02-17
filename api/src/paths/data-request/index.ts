@@ -10,11 +10,36 @@ import {
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { DataRequestService } from '../../services/data-request-service';
 import { getLogger } from '../../utils/logger';
+import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
+import { SYSTEM_ROLE } from '../../constants/roles';
 
 const defaultLog = getLogger('paths/data-request');
 
-export const GET: Operation = [findDataRequests()];
-export const POST: Operation = [createDataRequest()];
+export const GET: Operation = [
+  authorizeRequestHandler(() => {
+    return {
+      and: [
+        {
+          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+          discriminator: 'SystemRole'
+        }
+      ]
+    };
+  }),
+  findDataRequests()
+];
+export const POST: Operation = [
+  authorizeRequestHandler(() => {
+    return {
+      and: [
+        {
+          discriminator: 'SystemUser'
+        }
+      ]
+    };
+  }),
+  createDataRequest()
+];
 
 GET.apiDoc = {
   description: 'Find all data request records, optionally filtered by date range, requested_by, team_id, or status',
