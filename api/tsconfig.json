@@ -25,7 +25,6 @@
   },
   "include": ["src"],
   "ts-node": {
-    "files": true,
-    "transpileOnly": true
+    "files": true
   }
 }

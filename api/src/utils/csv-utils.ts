@@ -292,7 +292,7 @@ export function flattenArray(arr: unknown[]): string {
 export function escapeCsvField(value: string): string {
   if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes('\r')) {
     // Escape quotes by doubling them, then wrap in quotes
-    return `"${value.replaceAll('"', '""')}"`;
+    return `"${value.replace(/"/g, '""')}"`;
   }
   return value;
 }
