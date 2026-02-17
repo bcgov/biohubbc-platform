@@ -109,36 +109,36 @@ export class FeatureIngestionService extends DBService {
   }
 
   /**
-   * Build parent-child relationship pairs from features' content arrays.
+   * Build source-target relationship pairs from features' content arrays.
    *
    * @private
    * @param {IFlattenedBlock[]} features - Features with content references
    * @param {Map<string, number>} uuidToDbId - UUID to submission_feature_id mapping
-   * @return {Array<{ parent_feature_id: number; child_feature_id: number }>}
+   * @return {Array<{ source_feature_id: number; target_feature_id: number }>}
    * @memberof FeatureIngestionService
    */
   private buildContentRelationshipPairs(
     features: IFlattenedBlock[],
     uuidToDbId: Map<string, number>
-  ): Array<{ parent_feature_id: number; child_feature_id: number }> {
+  ): Array<{ source_feature_id: number; target_feature_id: number }> {
     const pairs: Array<{
-      parent_feature_id: number;
-      child_feature_id: number;
+      source_feature_id: number;
+      target_feature_id: number;
     }> = [];
     for (const feature of features) {
       if (!feature.content?.length) {
         continue;
       }
-      const parentDbId = uuidToDbId.get(feature.id);
-      if (parentDbId === undefined) {
+      const sourceDbId = uuidToDbId.get(feature.id);
+      if (sourceDbId === undefined) {
         continue;
       }
-      for (const childId of feature.content) {
-        const childDbId = uuidToDbId.get(childId);
-        if (childDbId !== undefined) {
+      for (const targetId of feature.content) {
+        const targetDbId = uuidToDbId.get(targetId);
+        if (targetDbId !== undefined) {
           pairs.push({
-            parent_feature_id: parentDbId,
-            child_feature_id: childDbId
+            source_feature_id: sourceDbId,
+            target_feature_id: targetDbId
           });
         }
       }

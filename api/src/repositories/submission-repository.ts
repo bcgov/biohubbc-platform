@@ -490,11 +490,11 @@ export class SubmissionRepository extends BaseRepository {
    */
   async deleteSubmissionFeatureRelationships(submissionId: number): Promise<void> {
     const sqlStatement = SQL`
-      DELETE FROM submission_feature__feature
-      WHERE parent_feature_id IN (
+      DELETE FROM submission_feature_feature
+      WHERE source_feature_id IN (
         SELECT submission_feature_id FROM submission_feature WHERE submission_id = ${submissionId}
       )
-      OR child_feature_id IN (
+      OR target_feature_id IN (
         SELECT submission_feature_id FROM submission_feature WHERE submission_id = ${submissionId}
       );
     `;
@@ -503,65 +503,66 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Insert submission feature relationships (parent-child from content array).
+   * Insert submission feature relationships (source-target from content array).
    * Uses ON CONFLICT DO NOTHING to avoid failures on duplicate pairs.
    *
-   * @param {Array<{ parent_feature_id: number; child_feature_id: number }>} pairs The pairs to insert.
+   * @param {Array<{ source_feature_id: number; target_feature_id: number }>} pairs The pairs to insert.
    * @return {Promise<void>}
    * @memberof SubmissionRepository
    */
   async insertSubmissionFeatureRelationships(
-    pairs: Array<{ parent_feature_id: number; child_feature_id: number }>
+    pairs: Array<{ source_feature_id: number; target_feature_id: number }>
   ): Promise<void> {
     if (pairs.length === 0) {
       return;
     }
 
-    const parentIds = pairs.map((p) => p.parent_feature_id);
-    const childIds = pairs.map((p) => p.child_feature_id);
+    const sourceIds = pairs.map((p) => p.source_feature_id);
+    const targetIds = pairs.map((p) => p.target_feature_id);
 
     const sqlStatement = SQL`
-      INSERT INTO submission_feature__feature (parent_feature_id, child_feature_id)
-      SELECT parent_id, child_id FROM unnest(
-        ${parentIds}::integer[],
-        ${childIds}::integer[]
-      ) AS t(parent_id, child_id)
-      ON CONFLICT (parent_feature_id, child_feature_id) DO NOTHING;
+      INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
+      SELECT source_id, target_id FROM unnest(
+        ${sourceIds}::integer[],
+        ${targetIds}::integer[]
+      ) AS t(source_id, target_id)
+      ON CONFLICT (source_feature_id, target_feature_id) DO NOTHING;
     `;
 
     await this.connection.sql(sqlStatement);
   }
 
   /**
-   * Get all related submission feature IDs for a given feature (parents and children).
+   * Get all related submission feature IDs for a given feature (sources and targets).
+   * sourceIds = features that reference this one; targetIds = features this one references.
    *
    * @param {number} submissionFeatureId The submission feature ID.
-   * @return {Promise<{ parentIds: number[]; childIds: number[] }>}
+   * @return {Promise<{ sourceIds: number[]; targetIds: number[] }>}
    * @memberof SubmissionRepository
    */
   async getRelatedSubmissionFeatureIds(
     submissionFeatureId: number
-  ): Promise<{ parentIds: number[]; childIds: number[] }> {
+  ): Promise<{ sourceIds: number[]; targetIds: number[] }> {
     const parentSqlStatement = SQL`
-      SELECT parent_feature_id
-      FROM submission_feature__feature
-      WHERE child_feature_id = ${submissionFeatureId};
+      SELECT source_feature_id
+      FROM submission_feature_feature
+      WHERE target_feature_id = ${submissionFeatureId};
     `;
 
     const childSqlStatement = SQL`
-      SELECT child_feature_id
-      FROM submission_feature__feature
-      WHERE parent_feature_id = ${submissionFeatureId};
+      SELECT target_feature_id
+      FROM submission_feature_feature
+      WHERE source_feature_id = ${submissionFeatureId};
     `;
 
     const [parentResult, childResult] = await Promise.all([
-      this.connection.sql<{ parent_feature_id: number }>(parentSqlStatement),
-      this.connection.sql<{ child_feature_id: number }>(childSqlStatement)
+      this.connection.sql<{ source_feature_id: number }>(parentSqlStatement),
+      this.connection.sql<{ target_feature_id: number }>(childSqlStatement)
     ]);
 
     return {
-      parentIds: parentResult.rows.map((r) => r.parent_feature_id),
-      childIds: childResult.rows.map((r) => r.child_feature_id)
+      sourceIds: parentResult.rows.map((r) => r.source_feature_id),
+      targetIds: childResult.rows.map((r) => r.target_feature_id)
     };
   }
 

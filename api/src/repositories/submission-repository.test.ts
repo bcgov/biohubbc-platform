@@ -1644,7 +1644,7 @@ describe('SubmissionRepository', () => {
 
       expect(sqlStub).to.have.been.calledOnce;
       const calledSql = sqlStub.args[0][0];
-      expect(calledSql.text).to.include('submission_feature__feature');
+      expect(calledSql.text).to.include('submission_feature_feature');
       expect(calledSql.text).to.include('submission_id');
     });
   });
@@ -1661,13 +1661,13 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       await submissionRepository.insertSubmissionFeatureRelationships([
-        { parent_feature_id: 1, child_feature_id: 2 },
-        { parent_feature_id: 1, child_feature_id: 3 }
+        { source_feature_id: 1, target_feature_id: 2 },
+        { source_feature_id: 1, target_feature_id: 3 }
       ]);
 
       expect(sqlStub).to.have.been.calledOnce;
       const calledSql = sqlStub.args[0][0];
-      expect(calledSql.text).to.include('submission_feature__feature');
+      expect(calledSql.text).to.include('submission_feature_feature');
       expect(calledSql.text).to.include('ON CONFLICT');
     });
 
@@ -1688,13 +1688,13 @@ describe('SubmissionRepository', () => {
       sinon.restore();
     });
 
-    it('should return parent and child IDs for a feature', async () => {
+    it('should return source and target IDs for a feature', async () => {
       const mockParentResponse = {
-        rows: [{ parent_feature_id: 10 }],
+        rows: [{ source_feature_id: 10 }],
         rowCount: 1
       };
       const mockChildResponse = {
-        rows: [{ child_feature_id: 2 }, { child_feature_id: 3 }],
+        rows: [{ target_feature_id: 2 }, { target_feature_id: 3 }],
         rowCount: 2
       };
 
@@ -1711,8 +1711,8 @@ describe('SubmissionRepository', () => {
 
       const result = await submissionRepository.getRelatedSubmissionFeatureIds(1);
 
-      expect(result.parentIds).to.deep.equal([10]);
-      expect(result.childIds).to.deep.equal([2, 3]);
+      expect(result.sourceIds).to.deep.equal([10]);
+      expect(result.targetIds).to.deep.equal([2, 3]);
       expect(sqlStub).to.have.been.calledTwice;
     });
   });
