@@ -463,7 +463,7 @@ describe('getCachedSystemUser', function () {
   });
 });
 
-describe('authorizeByAccessPolicy', function () {
+describe('authorizeByTeam', function () {
   afterEach(() => {
     sinon.restore();
   });
@@ -508,10 +508,11 @@ describe('authorizeByAccessPolicy', function () {
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
-    const result = await authorizationService.authorizeByAccessPolicy({
-      submissionFeatureId: 1,
-      submissionId: 1,
-      discriminator: 'AccessPolicy'
+    const result = await authorizationService.authorizeByTeam({
+      discriminator: 'Team',
+      entity: 'submission_feature',
+      id: 1,
+      submissionId: 1
     });
 
     expect(result).to.be.true;
@@ -523,10 +524,11 @@ describe('authorizeByAccessPolicy', function () {
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
-    const result = await authorizationService.authorizeByAccessPolicy({
-      submissionFeatureId: 1,
-      submissionId: 999,
-      discriminator: 'AccessPolicy'
+    const result = await authorizationService.authorizeByTeam({
+      discriminator: 'Team',
+      entity: 'submission_feature',
+      id: 1,
+      submissionId: 999
     });
 
     expect(result).to.be.false;
@@ -539,10 +541,11 @@ describe('authorizeByAccessPolicy', function () {
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
-    const result = await authorizationService.authorizeByAccessPolicy({
-      submissionFeatureId: 1,
-      submissionId: 1,
-      discriminator: 'AccessPolicy'
+    const result = await authorizationService.authorizeByTeam({
+      discriminator: 'Team',
+      entity: 'submission_feature',
+      id: 1,
+      submissionId: 1
     });
 
     expect(result).to.be.false;
@@ -556,10 +559,11 @@ describe('authorizeByAccessPolicy', function () {
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
-    const result = await authorizationService.authorizeByAccessPolicy({
-      submissionFeatureId: 1,
-      submissionId: 1,
-      discriminator: 'AccessPolicy'
+    const result = await authorizationService.authorizeByTeam({
+      discriminator: 'Team',
+      entity: 'submission_feature',
+      id: 1,
+      submissionId: 1
     });
 
     expect(result).to.be.true;
@@ -573,10 +577,11 @@ describe('authorizeByAccessPolicy', function () {
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
-    const result = await authorizationService.authorizeByAccessPolicy({
-      submissionFeatureId: 1,
-      submissionId: 1,
-      discriminator: 'AccessPolicy'
+    const result = await authorizationService.authorizeByTeam({
+      discriminator: 'Team',
+      entity: 'submission_feature',
+      id: 1,
+      submissionId: 1
     });
 
     expect(result).to.be.false;

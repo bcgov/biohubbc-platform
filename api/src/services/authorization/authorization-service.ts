@@ -1,5 +1,5 @@
 import { SYSTEM_ROLE } from '../../constants/roles';
-import { IDBConnection } from '../../database/db';
+import { getKnex, IDBConnection } from '../../database/db';
 import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
 import { getServiceClientSystemUser, getUserGuid } from '../../utils/keycloak-utils';
 import { PolicyService } from '../access-policy/policy-service';
@@ -35,16 +35,36 @@ export interface AuthorizeBySystemUser {
 }
 
 /**
- * Authorization rule that checks if the user can access the resource through an access policy
+ * Team-scoped entity reference used by Team authorization checks.
  *
  * @export
- * @interface AuthorizeByAccessPolicy
  */
-export interface AuthorizeByAccessPolicy {
-  submissionId: number;
-  submissionFeatureId: number;
-  discriminator: 'AccessPolicy';
-}
+export type TeamAuthorizationEntity =
+  | {
+      entity: 'team';
+      id: string;
+    }
+  | {
+      entity: 'policy';
+      id: string;
+    }
+  | {
+      entity: 'ticket';
+      id: string;
+    }
+  | {
+      entity: 'data_request';
+      id: string;
+    }
+  | {
+      entity: 'submission_feature';
+      id: number;
+      submissionId?: number;
+    };
+
+export type AuthorizeByTeam = TeamAuthorizationEntity & {
+  discriminator: 'Team';
+};
 
 /**
  * Authorization rule that checks if a jwt token's client id matches at least one of the required client ids.
@@ -73,7 +93,7 @@ export type AuthorizeRule =
   | AuthorizeBySystemRoles
   | AuthorizeBySystemUser
   | AuthorizeByServiceClient
-  | AuthorizeByAccessPolicy
+  | AuthorizeByTeam
   | AuthorizeByCart;
 
 export type AuthorizeConfigOr = {
@@ -138,8 +158,8 @@ export class AuthorizationService extends DBService {
         case 'ServiceClient':
           authorizeResults.push(await this.authorizeByServiceClient());
           break;
-        case 'AccessPolicy':
-          authorizeResults.push(await this.authorizeByAccessPolicy(authorizeRule));
+        case 'Team':
+          authorizeResults.push(await this.authorizeByTeam(authorizeRule));
           break;
         case 'Cart':
           authorizeResults.push(await this.authorizeByCart(authorizeRule));
@@ -216,42 +236,112 @@ export class AuthorizationService extends DBService {
   }
 
   /**
-   * Check whether the user is authorized to access the requested resource through an access policy
+   * Check whether the user is authorized to access a team-scoped entity.
    *
-   * @param {AuthorizeByAccessPolicy} authorizeRule - The access rule containing submissionFeatureId and submissionId
-   * @returns {Promise<boolean>} Resolves with `true` if the user is authorized, otherwise `false`.
+   * @param {AuthorizeByTeam} authorizeRule
+   * @returns {Promise<boolean>}
    */
-  async authorizeByAccessPolicy(authorizeRule: AuthorizeByAccessPolicy): Promise<boolean> {
-    const submissionService = new SubmissionService(this.connection);
-
-    // Step 1: Fetch the feature by ID to get URN and security status
-    const feature = await submissionService.getSubmissionFeatureById(authorizeRule.submissionFeatureId);
-
-    // Step 2: If the feature is not secured (open-access), grant access immediately
-    if (!feature.secured) {
-      return true;
+  async authorizeByTeam(authorizeRule: AuthorizeByTeam): Promise<boolean> {
+    if (!authorizeRule) {
+      return false;
     }
 
-    // Step 3: Ensure the feature belongs to the requested submission
-    if (feature.submission_id !== authorizeRule.submissionId) {
-      return false; // Deny access if submission IDs do not match
-    }
-
-    // Step 4: Fetch and cache the system user
     const user = await this.getCachedSystemUser();
     if (!user) {
-      return false; // Deny access if we cannot verify the user's identity
+      return false;
     }
 
-    // Step 5: Use the PolicyService to check if any policies grant access to this feature
-    const policyService = new PolicyService(this.connection);
-    const policiesThatGrantAccess = await policyService.getPoliciesThatAuthorizeFeatureAccessByUrn(
-      feature.urn,
-      user.system_user_id
-    );
+    return this.authorizeByTeamEntity(user.system_user_id, authorizeRule);
+  }
 
-    // Step 6: Grant access if at least one policy authorizes it
-    return policiesThatGrantAccess.length > 0;
+  /**
+   * Resolve and authorize access to a single team-scoped entity.
+   *
+   * @param {number} systemUserId
+   * @param {TeamAuthorizationEntity} entity
+   * @returns {Promise<boolean>}
+   */
+  private async authorizeByTeamEntity(systemUserId: number, entity: TeamAuthorizationEntity): Promise<boolean> {
+    const knex = getKnex();
+
+    switch (entity.entity) {
+      case 'team': {
+        const query = knex('team_member as tm')
+          .select('tm.team_member_id')
+          .where('tm.team_id', entity.id)
+          .where('tm.system_user_id', systemUserId)
+          .whereNull('tm.record_end_date')
+          .limit(1);
+
+        const response = await this.connection.knex(query);
+        return !!response.rowCount && response.rowCount > 0;
+      }
+
+      case 'policy': {
+        const query = knex('team_policy as tp')
+          .select('tp.team_policy_id')
+          .innerJoin('team_member as tm', 'tm.team_id', 'tp.team_id')
+          .where('tp.policy_id', entity.id)
+          .where('tm.system_user_id', systemUserId)
+          .whereNull('tp.record_end_date')
+          .whereNull('tm.record_end_date')
+          .limit(1);
+
+        const response = await this.connection.knex(query);
+        return !!response.rowCount && response.rowCount > 0;
+      }
+
+      case 'ticket': {
+        const query = knex('ticket as t')
+          .select('t.ticket_id')
+          .innerJoin('team_member as tm', 'tm.team_id', 't.team_id')
+          .where('t.ticket_id', entity.id)
+          .where('tm.system_user_id', systemUserId)
+          .whereNull('t.record_end_date')
+          .whereNull('tm.record_end_date')
+          .limit(1);
+
+        const response = await this.connection.knex(query);
+        return !!response.rowCount && response.rowCount > 0;
+      }
+
+      case 'data_request': {
+        const query = knex('data_request as dr')
+          .select('dr.data_request_id')
+          .innerJoin('team_member as tm', 'tm.team_id', 'dr.team_id')
+          .where('dr.data_request_id', entity.id)
+          .where('tm.system_user_id', systemUserId)
+          .whereNull('dr.record_end_date')
+          .whereNull('tm.record_end_date')
+          .limit(1);
+
+        const response = await this.connection.knex(query);
+        return !!response.rowCount && response.rowCount > 0;
+      }
+
+      case 'submission_feature': {
+        const submissionService = new SubmissionService(this.connection);
+        const feature = await submissionService.getSubmissionFeatureById(entity.id);
+
+        if (!feature.secured) {
+          return true;
+        }
+
+        if (entity.submissionId !== undefined && feature.submission_id !== entity.submissionId) {
+          return false;
+        }
+
+        const policyService = new PolicyService(this.connection);
+        const policiesThatGrantAccess = await policyService.getPoliciesThatAuthorizeFeatureAccessByUrn(
+          feature.urn,
+          systemUserId
+        );
+
+        return policiesThatGrantAccess.length > 0;
+      }
+    }
+
+    return false;
   }
 
   /**

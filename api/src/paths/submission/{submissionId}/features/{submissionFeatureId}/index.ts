@@ -14,9 +14,10 @@ export const GET: Operation = [
     return {
       and: [
         {
-          submissionId: Number(req.params.submissionId),
-          submissionFeatureId: Number(req.params.submissionFeatureId),
-          discriminator: 'AccessPolicy'
+          discriminator: 'Team',
+          entity: 'submission_feature',
+          id: Number(req.params.submissionFeatureId),
+          submissionId: Number(req.params.submissionId)
         }
       ]
     };
