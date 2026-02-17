@@ -4,7 +4,7 @@ import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import * as db from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { DownloadService } from '../../services/download-service';
+import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { getMockDBConnection } from '../../__mocks__/db';
 import {
   IProcessDownloadJobData,
@@ -18,11 +18,11 @@ describe('process-download-job', () => {
   });
 
   describe('processDownloadJobHandler', () => {
-    const createMockJob = (downloadId: string, systemUserId: number | null, jobId = 'test-job-id') =>
+    const createMockJob = (downloadId: string, jobId = 'test-job-id') =>
       ({
         id: jobId,
         name: 'process-download',
-        data: { downloadId, systemUserId }
+        data: { downloadId }
       } as PgBoss.Job<IProcessDownloadJobData>);
 
     it('calls each phase with correct downloadId', async () => {
@@ -35,11 +35,11 @@ describe('process-download-job', () => {
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
-      const planStub = sinon.stub(DownloadService.prototype, 'planDownloadIfNeeded').resolves();
-      sinon.stub(DownloadService.prototype, 'getFragmentsToProcess').resolves([]);
-      const finalizeStub = sinon.stub(DownloadService.prototype, 'finalizeDownload').resolves();
+      const planStub = sinon.stub(DownloadPipelineService.prototype, 'planDownloadIfNeeded').resolves();
+      sinon.stub(DownloadPipelineService.prototype, 'getFragmentsToProcess').resolves([]);
+      const finalizeStub = sinon.stub(DownloadPipelineService.prototype, 'finalizeDownload').resolves();
 
-      const mockJobs = [createMockJob('aaaa0000-0000-0000-0000-000000000123', 456, 'job-abc')];
+      const mockJobs = [createMockJob('aaaa0000-0000-0000-0000-000000000123', 'job-abc')];
       await processDownloadJobHandler(mockJobs);
 
       expect(planStub.calledOnce).to.be.true;
@@ -64,11 +64,11 @@ describe('process-download-job', () => {
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
       // Fail during planning phase
-      sinon.stub(DownloadService.prototype, 'planDownloadIfNeeded').rejects(testError);
+      sinon.stub(DownloadPipelineService.prototype, 'planDownloadIfNeeded').rejects(testError);
 
-      const updateStatusStub = sinon.stub(DownloadService.prototype, 'updateDownloadStatus').resolves();
+      const updateStatusStub = sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
 
-      const mockJobs = [createMockJob('aaaa0000-0000-0000-0000-000000000123', 456)];
+      const mockJobs = [createMockJob('aaaa0000-0000-0000-0000-000000000123')];
 
       try {
         await processDownloadJobHandler(mockJobs);
@@ -83,16 +83,11 @@ describe('process-download-job', () => {
   });
 
   describe('processDownloadFailedHandler', () => {
-    const createMockFailedJob = (
-      downloadId: string,
-      systemUserId: number | null,
-      jobId = 'dlq-job-id',
-      output?: unknown
-    ) =>
+    const createMockFailedJob = (downloadId: string, jobId = 'dlq-job-id', output?: unknown) =>
       ({
         id: jobId,
         name: '__state__completed__process-download',
-        data: { downloadId, systemUserId },
+        data: { downloadId },
         output
       } as PgBoss.JobWithMetadata<IProcessDownloadJobData>);
 
@@ -108,10 +103,10 @@ describe('process-download-job', () => {
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
       // Step 2: Stub updateDownloadStatus
-      const updateStatusByIdStub = sinon.stub(DownloadService.prototype, 'updateDownloadStatus').resolves();
+      const updateStatusByIdStub = sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
 
       // Step 3: Call handler with failed job
-      const mockJobs = [createMockFailedJob('aaaa0000-0000-0000-0000-000000000123', 456, 'dlq-job-id')];
+      const mockJobs = [createMockFailedJob('aaaa0000-0000-0000-0000-000000000123', 'dlq-job-id')];
       await processDownloadFailedHandler(mockJobs);
 
       // Step 4: Verify updateDownloadStatus was called with correct args
@@ -132,11 +127,11 @@ describe('process-download-job', () => {
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
       // Step 2: Stub updateDownloadStatus
-      const updateStatusByIdStub = sinon.stub(DownloadService.prototype, 'updateDownloadStatus').resolves();
+      const updateStatusByIdStub = sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
 
       // Step 3: Call handler with job that has string output
       const errorOutput = 'Database connection failed';
-      const mockJobs = [createMockFailedJob('aaaa0000-0000-0000-0000-000000000123', 456, 'dlq-job-id', errorOutput)];
+      const mockJobs = [createMockFailedJob('aaaa0000-0000-0000-0000-000000000123', 'dlq-job-id', errorOutput)];
       await processDownloadFailedHandler(mockJobs);
 
       // Step 4: Verify error was passed in metadata
@@ -155,11 +150,11 @@ describe('process-download-job', () => {
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
       // Step 2: Stub updateDownloadStatus
-      const updateStatusByIdStub = sinon.stub(DownloadService.prototype, 'updateDownloadStatus').resolves();
+      const updateStatusByIdStub = sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
 
       // Step 3: Call handler with job that has non-string output
       const mockJobs = [
-        createMockFailedJob('aaaa0000-0000-0000-0000-000000000123', 456, 'dlq-job-id', { some: 'object' })
+        createMockFailedJob('aaaa0000-0000-0000-0000-000000000123', 'dlq-job-id', { some: 'object' })
       ];
       await processDownloadFailedHandler(mockJobs);
 

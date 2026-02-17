@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import { DownloadRecord } from '../models/download';
 import { SubmissionValidationRecord } from '../models/submission-validation';
-import { DownloadService } from '../services/download-service';
+import { DownloadService } from '../services/download/download-service';
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getMockDBConnection } from '../__mocks__/db';
 import { JobQueues } from './jobs';
@@ -259,11 +259,9 @@ describe('publisher', () => {
   describe('publishProcessDownloadJob', () => {
     const createMockDownload = (overrides: Partial<DownloadRecord> = {}): DownloadRecord => ({
       download_id: 'aaaa0000-0000-0000-0000-000000000001',
-      system_user_id: 123,
+      team_id: null,
+      data_request_id: null,
       download_status: 'pending',
-      s3_key: null,
-      file_name: null,
-      file_size_bytes: null,
       metadata: null,
       started_at: null,
       completed_at: null,
@@ -288,7 +286,7 @@ describe('publisher', () => {
       sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
 
       // Step 2: Call publisher
-      const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000001', systemUserId: 123 };
+      const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
       const result = await publishProcessDownloadJob(mockConnection, data);
 
       // Step 3: Verify job was sent to correct queue with correct data
@@ -311,7 +309,7 @@ describe('publisher', () => {
         .resolves(createMockDownload({ download_status: 'processing' }));
 
       // Step 2: Call publisher
-      const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000001', systemUserId: 123 };
+      const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
       const result = await publishProcessDownloadJob(mockConnection, data);
 
       // Step 3: Verify duplicate status returned
@@ -329,7 +327,7 @@ describe('publisher', () => {
       sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(null);
 
       // Step 2: Call publisher
-      const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000999', systemUserId: 123 };
+      const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000999' };
       const result = await publishProcessDownloadJob(mockConnection, data);
 
       // Step 3: Verify error status returned
@@ -354,7 +352,7 @@ describe('publisher', () => {
       // Step 2: Call publisher
       await publishProcessDownloadJob(mockConnection, {
         downloadId: 'aaaa0000-0000-0000-0000-000000000456',
-        systemUserId: 123
+        teamId: null as string | null
       });
 
       // Step 3: Verify singletonKey passed to pg-boss
@@ -377,7 +375,7 @@ describe('publisher', () => {
       // Step 2: Call publisher
       const result = await publishProcessDownloadJob(mockConnection, {
         downloadId: 'aaaa0000-0000-0000-0000-000000000001',
-        systemUserId: 123
+        teamId: null as string | null
       });
 
       // Step 3: Verify duplicate status
@@ -399,7 +397,7 @@ describe('publisher', () => {
       // Step 2: Call publisher
       const result = await publishProcessDownloadJob(mockConnection, {
         downloadId: 'aaaa0000-0000-0000-0000-000000000001',
-        systemUserId: 123
+        teamId: null as string | null
       });
 
       // Step 3: Verify error status

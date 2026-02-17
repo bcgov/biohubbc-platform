@@ -1,9 +1,13 @@
 import SQL from 'sql-template-strings';
-import { FRAGMENT_SIZE_THRESHOLD } from '../constants/download';
-import { ApiExecuteSQLError } from '../errors/api-error';
-import { DownloadFeatureRecord, DownloadFeatureSummary, DownloadId, DownloadRecord } from '../models/download';
-import { DownloadStatusEnum } from '../models/download-status';
-import { BaseRepository } from './base-repository';
+import { z } from 'zod';
+import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
+import { ApiExecuteSQLError } from '../../errors/api-error';
+import { DownloadFeatureSummary, DownloadId, DownloadRecord } from '../../models/download';
+import { DownloadStatusEnum } from '../../models/download-status';
+import { BaseRepository } from '../base-repository';
+
+const IsAuthorized = z.object({ authorized: z.boolean() });
+type IsAuthorized = z.infer<typeof IsAuthorized>;
 
 /**
  * A repository class for accessing download data.
@@ -16,17 +20,24 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Create a new download record.
    *
-   * @param {number | null} systemUserId - The user who initiated the download. Null for anonymous downloads.
+   * @param {string | null} teamId - The team that owns this download. Null for anonymous downloads.
+   * @param {string | null} dataRequestId - The data request that originated this download. Null for non-request downloads.
    * @param {number} [fragmentSizeBytes] - Target fragment size in bytes. Defaults to FRAGMENT_SIZE_THRESHOLD (500 MB).
+   * @param {number | null} [systemUserId] - The user who created this download. Null for anonymous downloads.
    * @return {Promise<DownloadId>} The created record ID.
    * @memberof DownloadRepository
    */
-  async createDownload(systemUserId: number | null, fragmentSizeBytes?: number): Promise<DownloadId> {
+  async createDownload(
+    teamId: string | null,
+    dataRequestId: string | null,
+    fragmentSizeBytes?: number,
+    systemUserId?: number | null
+  ): Promise<DownloadId> {
     const sizeBytes = fragmentSizeBytes ?? FRAGMENT_SIZE_THRESHOLD;
 
     const sql = SQL`
-      INSERT INTO download (system_user_id, download_status, fragment_size_bytes)
-      VALUES (${systemUserId}, 'pending', ${sizeBytes})
+      INSERT INTO download (team_id, data_request_id, download_status, fragment_size_bytes, system_user_id)
+      VALUES (${teamId}, ${dataRequestId}, 'pending', ${sizeBytes}, ${systemUserId ?? null})
       RETURNING download_id;
     `;
 
@@ -75,10 +86,9 @@ export class DownloadRepository extends BaseRepository {
       SELECT
         download_id,
         system_user_id,
+        team_id,
+        data_request_id,
         download_status,
-        s3_key,
-        file_name,
-        file_size_bytes,
         metadata,
         started_at,
         completed_at,
@@ -97,32 +107,54 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Get all download records for a user.
+   * Get all download records accessible to a user.
+   *
+   * Three authorization paths:
+   * - Owner: user created or claimed the download (system_user_id matches).
+   * - Shared: user has a direct entry in download_share.
+   * - Data request: user is a member of the data request's approved team.
    *
    * @param {number} systemUserId - The user ID.
    * @return {Promise<DownloadRecord[]>}
    * @memberof DownloadRepository
    */
-  async getDownloadsByUserId(systemUserId: number): Promise<DownloadRecord[]> {
+  async getDownloadsByTeamMembership(systemUserId: number): Promise<DownloadRecord[]> {
     const sql = SQL`
       SELECT
-        download_id,
-        system_user_id,
-        download_status,
-        s3_key,
-        file_name,
-        file_size_bytes,
-        metadata,
-        started_at,
-        completed_at,
-        downloaded_at,
-        total_fragments,
-        completed_fragments,
-        estimated_total_size_bytes,
-        fragment_size_bytes
-      FROM download
-      WHERE system_user_id = ${systemUserId}
-      ORDER BY create_date DESC;
+        d.download_id,
+        d.system_user_id,
+        d.team_id,
+        d.data_request_id,
+        d.download_status,
+        d.metadata,
+        d.started_at,
+        d.completed_at,
+        d.downloaded_at,
+        d.total_fragments,
+        d.completed_fragments,
+        d.estimated_total_size_bytes,
+        d.fragment_size_bytes
+      FROM download d
+      WHERE
+        -- Downloads I created or claimed
+        d.system_user_id = ${systemUserId}
+        OR
+        -- Downloads shared with me
+        d.download_id IN (
+          SELECT ds.download_id FROM download_share ds
+          WHERE ds.system_user_id = ${systemUserId}
+            AND ds.record_end_date IS NULL
+        )
+        OR
+        -- Downloads via approved data requests
+        d.download_id IN (
+          SELECT d2.download_id FROM download d2
+          JOIN data_request dr ON dr.data_request_id = d2.data_request_id
+          JOIN team_member tm ON tm.team_id = dr.team_id
+          WHERE tm.system_user_id = ${systemUserId}
+            AND tm.record_end_date IS NULL
+        )
+      ORDER BY d.create_date DESC;
     `;
 
     const response = await this.connection.sql(sql, DownloadRecord);
@@ -135,7 +167,7 @@ export class DownloadRepository extends BaseRepository {
    *
    * @param {string} downloadId - The download ID.
    * @param {DownloadStatusEnum} downloadStatus - The new download status.
-   * @param {object} [metadata] - Optional metadata (s3_key, file_name, file_size_bytes, error details).
+   * @param {object} [metadata] - Optional metadata (error details, timestamps).
    * @return {Promise<void>}
    * @memberof DownloadRepository
    */
@@ -143,9 +175,6 @@ export class DownloadRepository extends BaseRepository {
     downloadId: string,
     downloadStatus: DownloadStatusEnum,
     metadata?: {
-      s3_key?: string;
-      file_name?: string;
-      file_size_bytes?: string | number;
       error?: string;
       started_at?: string;
       completed_at?: string;
@@ -155,9 +184,6 @@ export class DownloadRepository extends BaseRepository {
       UPDATE download
       SET
         download_status = ${downloadStatus},
-        s3_key = COALESCE(${metadata?.s3_key ?? null}, s3_key),
-        file_name = COALESCE(${metadata?.file_name ?? null}, file_name),
-        file_size_bytes = COALESCE(${metadata?.file_size_bytes ?? null}, file_size_bytes),
         metadata = ${JSON.stringify(metadata ?? null)}::jsonb,
         started_at = COALESCE(${metadata?.started_at ?? null}::timestamptz, started_at),
         completed_at = COALESCE(${metadata?.completed_at ?? null}::timestamptz, completed_at)
@@ -201,42 +227,17 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Get submission feature IDs linked to a download.
-   *
-   * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadFeatureRecord[]>}
-   * @memberof DownloadRepository
-   */
-  async getDownloadFeatures(downloadId: string): Promise<DownloadFeatureRecord[]> {
-    const sql = SQL`
-      SELECT
-        download_feature_id,
-        download_id,
-        submission_feature_id
-      FROM download_feature
-      WHERE download_id = ${downloadId};
-    `;
-
-    const response = await this.connection.sql(sql, DownloadFeatureRecord);
-
-    return response.rows;
-  }
-
-  /**
    * Get lightweight summaries for all authorized features in a download.
    *
    * Returns feature metadata and pre-computed data_byte_size (no JSONB data column).
    * Used by estimateDownloadSize and planFragments for bin packing.
    *
    * @param {string} downloadId - The download ID.
-   * @param {number | null} systemUserId - The user requesting the download. Null for anonymous downloads (only unsecured features returned).
+   * @param {string | null} teamId - The team that owns the download. Null for anonymous downloads (only unsecured features returned).
    * @return {Promise<DownloadFeatureSummary[]>}
    * @memberof DownloadRepository
    */
-  async getDownloadFeatureSummaries(
-    downloadId: string,
-    systemUserId: number | null
-  ): Promise<DownloadFeatureSummary[]> {
+  async getDownloadFeatureSummaries(downloadId: string, teamId: string | null): Promise<DownloadFeatureSummary[]> {
     const sql = SQL`
       SELECT
         sf.submission_feature_id,
@@ -256,13 +257,12 @@ export class DownloadRepository extends BaseRepository {
               AND sfs.record_end_date IS NULL
           )
           OR
-          -- Secured features: user has a matching ALLOW policy via team membership
+          -- Secured features: team has a matching ALLOW policy
           EXISTS (
             SELECT 1
             FROM policy_statement ps
             INNER JOIN team_policy tp ON tp.policy_id = ps.policy_id AND tp.record_end_date IS NULL
-            INNER JOIN team_member tm ON tm.team_id = tp.team_id AND tm.record_end_date IS NULL
-            WHERE tm.system_user_id = ${systemUserId}
+            WHERE tp.team_id = ${teamId}
               AND ps.record_end_date IS NULL
               AND ps.effect = 'allow'
               AND (ps.urn_submission_id = sf.submission_id::text OR ps.urn_submission_id = '*')
@@ -330,5 +330,74 @@ export class DownloadRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
+  }
+
+  /**
+   * Check if a user is authorized to access a specific download.
+   *
+   * Three authorization paths:
+   * - Owner: user created or claimed the download (system_user_id matches).
+   * - Shared: user has a direct entry in download_share.
+   * - Data request: user is a member of the data request's approved team.
+   *
+   * Anonymous downloads (system_user_id IS NULL AND team_id IS NULL) are not checked here —
+   * callers handle that separately.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {number} systemUserId - The user ID.
+   * @return {Promise<boolean>}
+   * @memberof DownloadRepository
+   */
+  async isUserAuthorizedForDownload(downloadId: string, systemUserId: number): Promise<boolean> {
+    const sql = SQL`
+      SELECT EXISTS (
+        -- Owner: user created or claimed this download
+        SELECT 1 FROM download d
+        WHERE d.download_id = ${downloadId}
+          AND d.system_user_id = ${systemUserId}
+        UNION ALL
+        -- Shared: user has a direct entry in download_share
+        SELECT 1 FROM download_share ds
+        WHERE ds.download_id = ${downloadId}
+          AND ds.system_user_id = ${systemUserId}
+          AND ds.record_end_date IS NULL
+        UNION ALL
+        -- Data request: user is a member of the data request's approved team
+        SELECT 1 FROM download d
+        JOIN data_request dr ON dr.data_request_id = d.data_request_id
+        JOIN team_member tm ON tm.team_id = dr.team_id
+        WHERE d.download_id = ${downloadId}
+          AND tm.system_user_id = ${systemUserId}
+          AND tm.record_end_date IS NULL
+      ) AS authorized;
+    `;
+
+    const response = await this.connection.sql(sql, IsAuthorized);
+
+    return response.rows[0]?.authorized ?? false;
+  }
+
+  /**
+   * Claim an anonymous download by setting the owner.
+   *
+   * Only succeeds if the download has no existing owner and no team association.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {number} systemUserId - The user ID to set as owner.
+   * @return {Promise<boolean>} True if claimed, false if already owned or not found.
+   * @memberof DownloadRepository
+   */
+  async claimDownload(downloadId: string, systemUserId: number): Promise<boolean> {
+    const sql = SQL`
+      UPDATE download
+      SET system_user_id = ${systemUserId}
+      WHERE download_id = ${downloadId}
+        AND system_user_id IS NULL
+        AND team_id IS NULL;
+    `;
+
+    const response = await this.connection.sql(sql);
+
+    return response.rowCount === 1;
   }
 }

@@ -1,10 +1,10 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../../../../database/db';
-import { HTTP403, HTTP404, HTTP409 } from '../../../../../../errors/http-error';
+import { HTTP400, HTTP409 } from '../../../../../../errors/http-error';
 import { DownloadStatusEnum } from '../../../../../../models/download-status';
 import { defaultErrorResponses } from '../../../../../../openapi/schemas/http-responses';
-import { DownloadService } from '../../../../../../services/download-service';
+import { DownloadPipelineService } from '../../../../../../services/download/download-pipeline-service';
 import { getLogger } from '../../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/download/{downloadId}/fragment/{fragmentIndex}/url');
@@ -79,30 +79,21 @@ export function getFragmentUrl(): RequestHandler {
     try {
       const downloadId = req.params.downloadId;
       const fragmentIndex = Number(req.params.fragmentIndex);
+      if (isNaN(fragmentIndex) || fragmentIndex < 0 || !Number.isInteger(fragmentIndex)) {
+        throw new HTTP400('Invalid fragment index');
+      }
 
       await connection.open();
 
-      const downloadService = new DownloadService(connection);
-      const download = await downloadService.findDownloadById(downloadId);
-
-      if (!download) {
-        throw new HTTP404('Download not found');
-      }
-
-      // Owned downloads can only be accessed by the user who created them
-      if (download.system_user_id !== null) {
-        const systemUserId = isAuthenticated ? connection.systemUserId() : null;
-
-        if (download.system_user_id !== systemUserId) {
-          throw new HTTP403('Access denied');
-        }
-      }
+      const pipelineService = new DownloadPipelineService(connection);
+      const systemUserId = isAuthenticated ? connection.systemUserId() : null;
+      const download = await pipelineService.getAuthorizedDownload(downloadId, systemUserId);
 
       if (download.download_status !== DownloadStatusEnum.READY) {
         throw new HTTP409('Download is not ready');
       }
 
-      const url = await downloadService.getFragmentSignedUrl(downloadId, fragmentIndex);
+      const url = await pipelineService.getFragmentSignedUrl(downloadId, fragmentIndex);
 
       await connection.commit();
 

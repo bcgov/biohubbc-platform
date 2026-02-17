@@ -1,33 +1,56 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getDBConnection } from '../../../database/db';
-import { HTTP403, HTTP404 } from '../../../errors/http-error';
+import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
-import { DownloadService } from '../../../services/download-service';
+import { DownloadPipelineService } from '../../../services/download/download-pipeline-service';
 import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/download/{downloadId}');
 
-export const GET: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          discriminator: 'SystemUser'
-        }
-      ]
-    };
-  }),
-  findDownloadById()
+export const GET: Operation = [findDownloadById()];
+
+export const PUT: Operation = [
+  authorizeRequestHandler(() => ({
+    and: [{ discriminator: 'SystemUser' }]
+  })),
+  claimDownloadForCurrentUser()
 ];
+
+PUT.apiDoc = {
+  description: 'Claim an anonymous download for the current user',
+  tags: ['download'],
+  security: [
+    {
+      Bearer: []
+    }
+  ],
+  parameters: [
+    {
+      description: 'Download ID',
+      in: 'path',
+      name: 'downloadId',
+      schema: {
+        type: 'string',
+        format: 'uuid'
+      },
+      required: true
+    }
+  ],
+  responses: {
+    200: {
+      description: 'Download claimed successfully'
+    },
+    ...defaultErrorResponses
+  }
+};
 
 GET.apiDoc = {
   description: 'Get a download request by ID',
   tags: ['download'],
   security: [
     {
-      Bearer: []
+      OptionalBearer: []
     }
   ],
   parameters: [
@@ -58,14 +81,6 @@ GET.apiDoc = {
               status: {
                 type: 'string',
                 enum: ['pending', 'processing', 'ready', 'failed', 'downloaded']
-              },
-              file_name: {
-                type: 'string',
-                nullable: true
-              },
-              file_size_bytes: {
-                type: 'integer',
-                nullable: true
               },
               total_fragments: {
                 type: 'integer'
@@ -144,41 +159,33 @@ GET.apiDoc = {
 /**
  * Get a download request by ID.
  *
- * Verifies the requesting user owns the download.
+ * Unauthenticated requests can access anonymous downloads (team_id IS NULL).
+ * Authenticated requests can also access downloads they are authorized for.
  *
  * @returns {RequestHandler}
  */
 export function findDownloadById(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req.keycloak_token);
+    const isAuthenticated = !!req.keycloak_token;
+    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     try {
-      const { system_user_id } = req.system_user;
       const downloadId = req.params.downloadId;
 
       await connection.open();
 
-      const downloadService = new DownloadService(connection);
-      const download = await downloadService.findDownloadById(downloadId);
-
-      if (!download) {
-        throw new HTTP404('Download not found');
-      }
-
-      if (download.system_user_id !== system_user_id) {
-        throw new HTTP403('Access denied');
-      }
+      const pipelineService = new DownloadPipelineService(connection);
+      const systemUserId = isAuthenticated ? connection.systemUserId() : null;
+      const download = await pipelineService.getAuthorizedDownload(downloadId, systemUserId);
 
       // Query fragments before commit (all DB calls inside transaction)
-      const fragments = await downloadService.getFragmentsByDownloadId(downloadId);
+      const fragments = await pipelineService.getFragmentsByDownloadId(downloadId);
 
       await connection.commit();
 
       return res.status(200).json({
         download_id: download.download_id,
         status: download.download_status,
-        file_name: download.file_name,
-        file_size_bytes: download.file_size_bytes,
         total_fragments: download.total_fragments,
         completed_fragments: download.completed_fragments,
         estimated_total_size_bytes: download.estimated_total_size_bytes,
@@ -199,6 +206,36 @@ export function findDownloadById(): RequestHandler {
       });
     } catch (error) {
       defaultLog.error({ label: 'findDownloadById', message: 'error', error });
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  };
+}
+
+/**
+ * Claim an anonymous download for the current authenticated user.
+ *
+ * @returns {RequestHandler}
+ */
+export function claimDownloadForCurrentUser(): RequestHandler {
+  return async (req, res) => {
+    const connection = getDBConnection(req.keycloak_token);
+
+    try {
+      await connection.open();
+
+      const downloadId = req.params.downloadId;
+
+      const pipelineService = new DownloadPipelineService(connection);
+      await pipelineService.claimDownload(downloadId);
+
+      await connection.commit();
+
+      return res.sendStatus(200);
+    } catch (error) {
+      defaultLog.error({ label: 'claimDownloadForCurrentUser', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

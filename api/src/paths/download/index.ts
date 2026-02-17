@@ -3,21 +3,15 @@ import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../database/db';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
-import { DownloadService } from '../../services/download-service';
+import { DownloadService } from '../../services/download/download-service';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/download');
 
 export const GET: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          discriminator: 'SystemUser'
-        }
-      ]
-    };
-  }),
+  authorizeRequestHandler(() => ({
+    and: [{ discriminator: 'SystemUser' }]
+  })),
   getDownloads()
 ];
 
@@ -52,14 +46,6 @@ GET.apiDoc = {
                       type: 'string',
                       enum: ['pending', 'processing', 'ready', 'failed', 'downloaded']
                     },
-                    file_name: {
-                      type: 'string',
-                      nullable: true
-                    },
-                    file_size_bytes: {
-                      type: 'integer',
-                      nullable: true
-                    },
                     started_at: {
                       type: 'string',
                       nullable: true
@@ -80,17 +66,25 @@ GET.apiDoc = {
   }
 };
 
+/**
+ * Get the current user's download requests.
+ *
+ * Requires Bearer authentication. Anonymous downloads are accessed by their specific
+ * download_id (UUID), not through this listing endpoint. Without a user identity there
+ * is no way to scope "my downloads", so allowing unauthenticated access would return
+ * every anonymous download in the system.
+ */
 export function getDownloads(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
 
     try {
-      const { system_user_id } = req.system_user;
-
       await connection.open();
 
+      const systemUserId = connection.systemUserId();
+
       const downloadService = new DownloadService(connection);
-      const downloads = await downloadService.getDownloadsByUserId(system_user_id);
+      const downloads = await downloadService.getDownloadsByTeamMembership(systemUserId);
 
       await connection.commit();
 

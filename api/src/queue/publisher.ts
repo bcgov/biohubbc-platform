@@ -1,6 +1,6 @@
 import { IDBConnection } from '../database/db';
 import { DownloadStatusEnum } from '../models/download-status';
-import { DownloadService } from '../services/download-service';
+import { DownloadService } from '../services/download/download-service';
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
@@ -240,7 +240,7 @@ export const publishMalwareScanJob = async (
  * Updates the download record with the job_id for tracking.
  *
  * @param {IDBConnection} connection Database connection for download record updates
- * @param {IProcessDownloadJobData} data Job data containing downloadId and systemUserId
+ * @param {IProcessDownloadJobData} data Job data containing downloadId
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
  */

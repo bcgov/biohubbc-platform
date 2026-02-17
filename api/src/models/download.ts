@@ -4,10 +4,9 @@ import { DownloadStatusZod } from './download-status';
 export const DownloadRecord = z.object({
   download_id: z.string(),
   system_user_id: z.number().nullable(),
+  team_id: z.string().nullable(),
+  data_request_id: z.string().nullable(),
   download_status: DownloadStatusZod,
-  s3_key: z.string().nullable(),
-  file_name: z.string().nullable(),
-  file_size_bytes: z.string().nullable(),
   metadata: z.object({}).passthrough().nullable(),
   started_at: z.string().nullable(),
   completed_at: z.string().nullable(),
@@ -21,13 +20,6 @@ export type DownloadRecord = z.infer<typeof DownloadRecord>;
 
 export const DownloadId = DownloadRecord.pick({ download_id: true });
 export type DownloadId = z.infer<typeof DownloadId>;
-
-export const DownloadFeatureRecord = z.object({
-  download_feature_id: z.number(),
-  download_id: z.string(),
-  submission_feature_id: z.number()
-});
-export type DownloadFeatureRecord = z.infer<typeof DownloadFeatureRecord>;
 
 export const DownloadFeatureData = z.object({
   submission_feature_id: z.number(),

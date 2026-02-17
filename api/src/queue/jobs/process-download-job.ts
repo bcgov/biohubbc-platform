@@ -1,7 +1,7 @@
 import PgBoss from 'pg-boss';
 import { getAPIUserDBConnection, IDBConnection } from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { DownloadService } from '../../services/download-service';
+import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('queue/jobs/process-download-job');
@@ -13,8 +13,6 @@ const defaultLog = getLogger('queue/jobs/process-download-job');
 export interface IProcessDownloadJobData {
   /** The download ID to process */
   downloadId: string;
-  /** The user who initiated the download */
-  systemUserId: number | null;
 }
 
 /**
@@ -64,29 +62,29 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
 
     // Plan fragments and get the list of work to do
     const fragments = await withConnection(async (connection) => {
-      const downloadService = new DownloadService(connection);
-      await downloadService.planDownloadIfNeeded(downloadId);
-      return downloadService.getFragmentsToProcess(downloadId);
+      const pipelineService = new DownloadPipelineService(connection);
+      await pipelineService.planDownloadIfNeeded(downloadId);
+      return pipelineService.getFragmentsToProcess(downloadId);
     });
 
     // Process each fragment
     for (const fragment of fragments) {
       //Mark fragment as PROCESSING for UI
       await withConnection(async (connection) => {
-        const downloadService = new DownloadService(connection);
-        await downloadService.markFragmentProcessing(fragment.download_fragment_id);
+        const pipelineService = new DownloadPipelineService(connection);
+        await pipelineService.markFragmentProcessing(fragment.download_fragment_id);
       });
 
       await withConnection(async (connection) => {
-        const downloadService = new DownloadService(connection);
-        await downloadService.processFragment(fragment, downloadId);
+        const pipelineService = new DownloadPipelineService(connection);
+        await pipelineService.processFragment(fragment, downloadId);
       });
     }
 
     // Finalize the parent download record
     await withConnection(async (connection) => {
-      const downloadService = new DownloadService(connection);
-      await downloadService.finalizeDownload(downloadId);
+      const pipelineService = new DownloadPipelineService(connection);
+      await pipelineService.finalizeDownload(downloadId);
     });
 
     defaultLog.info({
@@ -127,10 +125,10 @@ export const processDownloadFailedHandler: PgBoss.WorkHandler<IProcessDownloadJo
     try {
       await connection.open();
 
-      const downloadService = new DownloadService(connection);
+      const pipelineService = new DownloadPipelineService(connection);
 
       // Update download status to failed (all retries exhausted)
-      await downloadService.updateDownloadStatus(downloadId, DownloadStatusEnum.FAILED, {
+      await pipelineService.updateDownloadStatus(downloadId, DownloadStatusEnum.FAILED, {
         error: typeof jobOutput === 'string' ? jobOutput : 'Job failed after all retries'
       });
 

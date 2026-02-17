@@ -1,12 +1,11 @@
 import { Knex } from 'knex';
 
 /**
- * Migration to add download fragmentation support.
+ * Migration to add download fragmentation tables.
  *
- * Adds fragment tracking for large downloads (Google Takeout pattern):
- * - Columns on download table for fragment count tracking
- * - download_fragment table for per-fragment status tracking
- * - download_fragment_feature join table linking fragments to features
+ * Fragment tracking for large downloads (Google Takeout pattern):
+ * - download_fragment: per-fragment status tracking
+ * - download_fragment_feature: links fragments to their assigned features
  *
  * Downloads > 1GB are split into multiple ~500MB zip fragments.
  * Small downloads still create a single fragment (same code path).
@@ -17,19 +16,6 @@ import { Knex } from 'knex';
 export async function up(knex: Knex): Promise<void> {
   await knex.raw(`
     SET SEARCH_PATH = biohub, public;
-
-    --------------------------------------------------------------------------------
-    -- Alter download table: add fragment tracking columns
-    --------------------------------------------------------------------------------
-    ALTER TABLE download ADD COLUMN total_fragments INTEGER NOT NULL DEFAULT 1;
-    ALTER TABLE download ADD COLUMN completed_fragments INTEGER NOT NULL DEFAULT 0;
-    ALTER TABLE download ADD COLUMN estimated_total_size_bytes BIGINT;
-    ALTER TABLE download ADD COLUMN fragment_size_bytes BIGINT NOT NULL DEFAULT 524288000;
-
-    COMMENT ON COLUMN download.total_fragments IS 'Total number of zip fragments for this download.';
-    COMMENT ON COLUMN download.completed_fragments IS 'Number of fragments that have completed processing.';
-    COMMENT ON COLUMN download.estimated_total_size_bytes IS 'Estimated total size in bytes, calculated before processing.';
-    COMMENT ON COLUMN download.fragment_size_bytes IS 'Target fragment size in bytes. Default 500 MB (524288000). Users may choose 500 MB, 1 GB, or 5 GB.';
 
     --------------------------------------------------------------------------------
     -- Create download_fragment table
@@ -66,15 +52,12 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX download_fragment_idx1 ON download_fragment(download_id);
 
     --------------------------------------------------------------------------------
-    -- Add download_fragment audit trigger
+    -- Add download_fragment triggers
     --------------------------------------------------------------------------------
     CREATE TRIGGER audit_download_fragment
       BEFORE INSERT OR UPDATE OR DELETE ON download_fragment
       FOR EACH ROW EXECUTE PROCEDURE tr_audit_trigger();
 
-    --------------------------------------------------------------------------------
-    -- Add download_fragment journal trigger
-    --------------------------------------------------------------------------------
     CREATE TRIGGER journal_download_fragment
       AFTER INSERT OR UPDATE OR DELETE ON download_fragment
       FOR EACH ROW EXECUTE PROCEDURE tr_journal_trigger();
@@ -120,17 +103,15 @@ export async function up(knex: Knex): Promise<void> {
     -- Create download_fragment_feature indexes
     --------------------------------------------------------------------------------
     CREATE INDEX download_fragment_feature_idx1 ON download_fragment_feature(download_fragment_id);
+    CREATE INDEX download_fragment_feature_idx2 ON download_fragment_feature(submission_feature_id);
 
     --------------------------------------------------------------------------------
-    -- Add download_fragment_feature audit trigger
+    -- Add download_fragment_feature triggers
     --------------------------------------------------------------------------------
     CREATE TRIGGER audit_download_fragment_feature
       BEFORE INSERT OR UPDATE OR DELETE ON download_fragment_feature
       FOR EACH ROW EXECUTE PROCEDURE tr_audit_trigger();
 
-    --------------------------------------------------------------------------------
-    -- Add download_fragment_feature journal trigger
-    --------------------------------------------------------------------------------
     CREATE TRIGGER journal_download_fragment_feature
       AFTER INSERT OR UPDATE OR DELETE ON download_fragment_feature
       FOR EACH ROW EXECUTE PROCEDURE tr_journal_trigger();
@@ -151,10 +132,5 @@ export async function down(knex: Knex): Promise<void> {
 
     DROP TABLE IF EXISTS download_fragment_feature CASCADE;
     DROP TABLE IF EXISTS download_fragment CASCADE;
-
-    ALTER TABLE download DROP COLUMN IF EXISTS total_fragments;
-    ALTER TABLE download DROP COLUMN IF EXISTS completed_fragments;
-    ALTER TABLE download DROP COLUMN IF EXISTS estimated_total_size_bytes;
-    ALTER TABLE download DROP COLUMN IF EXISTS fragment_size_bytes;
   `);
 }

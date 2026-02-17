@@ -1,9 +1,9 @@
 import SQL from 'sql-template-strings';
-import { ApiExecuteSQLError } from '../errors/api-error';
-import { DownloadFeatureData } from '../models/download';
-import { DownloadFragmentId, DownloadFragmentRecord } from '../models/download-fragment';
-import { DownloadStatusEnum } from '../models/download-status';
-import { BaseRepository } from './base-repository';
+import { ApiExecuteSQLError } from '../../errors/api-error';
+import { DownloadFeatureData } from '../../models/download';
+import { DownloadFragmentId, DownloadFragmentRecord } from '../../models/download-fragment';
+import { DownloadStatusEnum } from '../../models/download-status';
+import { BaseRepository } from '../base-repository';
 
 /**
  * A repository class for accessing download fragment data.
@@ -138,7 +138,7 @@ export class DownloadFragmentRepository extends BaseRepository {
     featureTypeName: string,
     batchSize = 5000
   ): AsyncGenerator<DownloadFeatureData[]> {
-    const cursorName = 'fragment_feature_cursor';
+    const cursorName = `frag_cursor_${downloadFragmentId}_${featureTypeName.replace(/[^a-z0-9_]/gi, '_')}`;
 
     await this.connection.query(
       `DECLARE ${cursorName} CURSOR FOR

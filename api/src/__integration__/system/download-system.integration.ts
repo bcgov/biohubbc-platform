@@ -1,7 +1,7 @@
 // System integration tests for the download pipeline. Requires MinIO (S3) to be running.
 //
 // 1. Download Worker — full flow via pg-boss (publish job → worker picks up → zip → S3 → status ready)
-// 2. DownloadService planDownloadIfNeeded/processFragment/finalizeDownload — calls service methods directly to verify
+// 2. DownloadPipelineService planDownloadIfNeeded/processFragment/finalizeDownload — calls service methods directly to verify
 //    CSV generation, zip packaging, column union, empty data, file features, and error placeholders.
 //
 // Run: make test-sys
@@ -14,7 +14,8 @@ import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { initPgBoss, stopPgBoss } from '../../queue/pg-boss-service';
-import { DownloadService } from '../../services/download-service';
+import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
+import { DownloadService } from '../../services/download/download-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
 
 const TEST_PREFIX = 'dev-artifacts';
@@ -195,7 +196,6 @@ describe('Download Worker', function () {
   ): Promise<number> {
     const [download] = await db('biohub.download')
       .insert({
-        system_user_id: SYSTEM_USER_ID,
         download_status: 'pending',
         create_user: SYSTEM_USER_ID,
         ...downloadOverrides
@@ -215,7 +215,7 @@ describe('Download Worker', function () {
     await boss.createQueue('process-download');
     const jobId = await boss.send('process-download', {
       downloadId: download.download_id,
-      systemUserId: SYSTEM_USER_ID
+      teamId: null
     });
     expect(jobId).to.be.a('string');
 
@@ -284,25 +284,28 @@ describe('Download Worker', function () {
     const [finalDownload] = await db('biohub.download').where('download_id', downloadId).select('*');
 
     expect(finalDownload.download_status).to.equal('ready');
-    expect(finalDownload.s3_key).to.be.a('string');
-    expect(finalDownload.file_name).to.include(`download-${downloadId}`);
-    expect(Number(finalDownload.file_size_bytes)).to.be.greaterThan(0);
     // Note: started_at on the parent download is null because the download pipeline
     // transitions the parent directly from 'pending' to 'ready' (only fragments get 'processing' status)
     expect(finalDownload.completed_at).to.not.be.null;
     expect(finalDownload.total_fragments).to.be.greaterThanOrEqual(1);
     expect(finalDownload.completed_fragments).to.equal(finalDownload.total_fragments);
 
+    // File info now lives on the fragment, not the download record
+    const [fragment] = await db('biohub.download_fragment').where('download_id', downloadId).select('*');
+    expect(fragment.s3_key).to.be.a('string');
+    expect(fragment.file_name).to.include(`download-${downloadId}`);
+    expect(Number(fragment.file_size_bytes)).to.be.greaterThan(0);
+
     // Track S3 key for cleanup
-    createdS3Keys.push(finalDownload.s3_key);
+    createdS3Keys.push(fragment.s3_key);
 
     // 4. Verify S3 object exists and has content
-    const metadata = await storageService.getMetadata(BucketType.MAIN, finalDownload.s3_key);
+    const metadata = await storageService.getMetadata(BucketType.MAIN, fragment.s3_key);
     expect(metadata).to.exist;
     expect(metadata.ContentLength).to.be.greaterThan(0);
 
     // 5. Download and inspect zip contents
-    const zip = await downloadZipFromS3(storageService, finalDownload.s3_key);
+    const zip = await downloadZipFromS3(storageService, fragment.s3_key);
     const entries = zip.getEntries().map((e) => e.entryName);
 
     // Should contain one CSV per feature type (file features become multimedia.csv)
@@ -324,9 +327,9 @@ describe('Download Worker', function () {
     expect(fragments[0].fragment_status).to.equal('ready');
     expect(fragments[0].s3_key).to.be.a('string');
 
-    // Track fragment S3 keys for cleanup (fragment keys may differ from parent)
+    // Track fragment S3 keys for cleanup
     for (const frag of fragments) {
-      if (frag.s3_key && frag.s3_key !== finalDownload.s3_key) {
+      if (frag.s3_key) {
         createdS3Keys.push(frag.s3_key);
       }
     }
@@ -385,15 +388,12 @@ describe('Download Worker', function () {
       { fragment_size_bytes: 1 }
     );
 
-    // 3. Verify download record: multi-fragment parent has no s3_key
+    // 3. Verify download record
     const [finalDownload] = await db('biohub.download').where('download_id', downloadId).select('*');
 
     expect(finalDownload.download_status).to.equal('ready');
     expect(finalDownload.total_fragments).to.be.greaterThanOrEqual(2);
     expect(finalDownload.completed_fragments).to.equal(finalDownload.total_fragments);
-    // Multi-fragment parent should NOT have an s3_key (no single zip)
-    expect(finalDownload.s3_key).to.be.null;
-    expect(Number(finalDownload.file_size_bytes)).to.be.greaterThan(0);
 
     // 4. Verify fragment records
     const fragments = await db('biohub.download_fragment').where('download_id', downloadId).orderBy('fragment_index');
@@ -488,11 +488,12 @@ describe('Download Worker', function () {
  * Run: make test-sys
  * Requires: make web (database + MinIO must be running)
  */
-describe('DownloadService download pipeline (system)', function () {
+describe('DownloadPipelineService download pipeline (system)', function () {
   this.timeout(30000);
 
   let connection: IDBConnection;
-  let service: DownloadService;
+  let service: DownloadPipelineService;
+  let crudService: DownloadService;
   const storageService = new ObjectStorageService();
   const s3KeysToCleanup: string[] = [];
 
@@ -503,7 +504,8 @@ describe('DownloadService download pipeline (system)', function () {
   beforeEach(async () => {
     connection = getAPIUserDBConnection();
     await connection.open();
-    service = new DownloadService(connection);
+    service = new DownloadPipelineService(connection);
+    crudService = new DownloadService(connection);
   });
 
   afterEach(async () => {
@@ -583,8 +585,7 @@ describe('DownloadService download pipeline (system)', function () {
    * Helper: run the full download pipeline and return the resulting zip.
    */
   async function executeAndGetZip(featureIds: number[]): Promise<{ zip: AdmZip; downloadId: string }> {
-    const systemUserId = connection.systemUserId();
-    const { download_id } = await service.createDownloadRequest(systemUserId, featureIds);
+    const { download_id } = await service.createDownloadRequest(null, featureIds);
 
     // Run the three-phase pipeline within the test transaction
     await service.planDownloadIfNeeded(download_id);
@@ -594,17 +595,11 @@ describe('DownloadService download pipeline (system)', function () {
     }
     await service.finalizeDownload(download_id);
 
-    const download = await service.findDownloadById(download_id);
+    const download = await crudService.findDownloadById(download_id);
     expect(download).to.not.be.null;
     expect(download!.download_status).to.equal(DownloadStatusEnum.READY);
 
-    // Single-fragment downloads have s3_key on the parent record
-    if (download!.s3_key) {
-      const zip = await downloadAndTrackZip(download!.s3_key);
-      return { zip, downloadId: download_id };
-    }
-
-    // Multi-fragment: download first fragment
+    // s3_key lives on the fragment, not the download record
     const allFragments = await service.getFragmentsByDownloadId(download_id);
     expect(allFragments.length).to.be.greaterThanOrEqual(1);
     const zip = await downloadAndTrackZip(allFragments[0].s3_key as string);

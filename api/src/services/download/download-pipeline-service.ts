@@ -1,28 +1,27 @@
 import archiver from 'archiver';
 import { PassThrough } from 'node:stream';
-import { FRAGMENT_SIZE_THRESHOLD } from '../constants/download';
-import { IDBConnection } from '../database/db';
-import { DownloadFeatureSummary, DownloadId, DownloadRecord } from '../models/download';
-import { DownloadFragmentRecord } from '../models/download-fragment';
-import { DownloadStatusEnum } from '../models/download-status';
-import { DownloadFragmentRepository } from '../repositories/download-fragment-repository';
-import { DownloadRepository } from '../repositories/download-repository';
+import { FRAGMENT_SIZE_THRESHOLD, SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
+import { IDBConnection } from '../../database/db';
+import { ApiConflictError } from '../../errors/api-error';
+import { HTTP403, HTTP404, HTTP409, HTTP500 } from '../../errors/http-error';
+import { DownloadFeatureSummary, DownloadId, DownloadRecord } from '../../models/download';
+import { DownloadFragmentRecord } from '../../models/download-fragment';
+import { DownloadStatusEnum } from '../../models/download-status';
+import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
+import { DownloadRepository } from '../../repositories/download/download-repository';
 import {
   buildCombinedHeaders,
   CsvPropertyDefinition,
   escapeCsvField,
   flattenFeatureWithParent,
   getOutputFilename
-} from '../utils/csv-utils';
-import { getLogger } from '../utils/logger';
-import { CodeService } from './code-service';
-import { DBService } from './db-service';
-import { BucketType, ObjectStorageService } from './object-storage/object-storage-service';
+} from '../../utils/csv-utils';
+import { getLogger } from '../../utils/logger';
+import { CodeService } from '../code-service';
+import { DBService } from '../db-service';
+import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 
-const defaultLog = getLogger('services/download-service');
-
-export { FRAGMENT_SIZE_THRESHOLD } from '../constants/download';
-export const SIGNED_URL_EXPIRY_FRAGMENT = 3600; // 1 hour for fragment URLs
+const defaultLog = getLogger('services/download-pipeline-service');
 
 /**
  * Result of estimating a download's total size before processing.
@@ -49,13 +48,18 @@ interface FileFeatureRef {
 }
 
 /**
- * Service for download pipeline operations.
+ * Orchestrator service for download pipeline operations.
+ *
+ * Composes CRUD services and holds direct repository references for low-level
+ * operations (streaming cursors, fragment management). All multi-step workflows
+ * — creating downloads, authorization, fragment planning, streaming, and S3
+ * upload — live here.
  *
  * @export
- * @class DownloadService
+ * @class DownloadPipelineService
  * @extends {DBService}
  */
-export class DownloadService extends DBService {
+export class DownloadPipelineService extends DBService {
   downloadRepository: DownloadRepository;
   fragmentRepository: DownloadFragmentRepository;
 
@@ -71,20 +75,31 @@ export class DownloadService extends DBService {
    * Creates a download record and links the specified submission features.
    * Caller must validate that submissionFeatureIds is non-empty.
    *
-   * @param {number | null} systemUserId - The user initiating the download. Null for anonymous downloads.
+   * For authenticated users, `system_user_id` is set on the download record directly.
+   * For anonymous users, `system_user_id` is null (UUID is the credential).
+   *
+   * @param {string | null} teamId - The team that owns this download. Null for anonymous downloads.
    * @param {number[]} submissionFeatureIds - The submission feature IDs to include.
+   * @param {string} [dataRequestId] - The data request that originated this download.
    * @param {number} [fragmentSizeMb] - Target fragment size in MB (500, 1000, or 5000). Defaults to 500.
    * @return {Promise<DownloadId>} The created download record ID.
-   * @memberof DownloadService
+   * @memberof DownloadPipelineService
    */
   async createDownloadRequest(
-    systemUserId: number | null,
+    teamId: string | null,
     submissionFeatureIds: number[],
+    dataRequestId?: string,
     fragmentSizeMb?: number
   ): Promise<DownloadId> {
     const fragmentSizeBytes = fragmentSizeMb ? fragmentSizeMb * 1024 * 1024 : undefined;
+    const systemUserId = this.connection.systemUserId() || null;
 
-    const downloadId = await this.downloadRepository.createDownload(systemUserId, fragmentSizeBytes);
+    const downloadId = await this.downloadRepository.createDownload(
+      teamId,
+      dataRequestId ?? null,
+      fragmentSizeBytes,
+      systemUserId
+    );
 
     await this.downloadRepository.createDownloadFeatures(downloadId.download_id, submissionFeatureIds);
 
@@ -92,25 +107,56 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * Get a download record by ID.
+   * Authorize a user's access to a specific download.
+   *
+   * Downloads have three access paths, each serving a different use case:
+   *
+   * 1. **Anonymous** (`system_user_id` and `team_id` are both NULL):
+   *    Public access — the download UUID itself is the credential. Anyone with the link
+   *    can access it. This supports unauthenticated "download now" flows where users
+   *    don't have an account yet. The user can later claim the download (see `claimDownload`).
+   *
+   * 2. **User-owned** (`system_user_id` is set):
+   *    The user who created or claimed the download. Only this specific authenticated user
+   *    can access it. Downloads start anonymous and become user-owned when claimed, or are
+   *    created as user-owned when the request originates from an authenticated session.
+   *
+   * 3. **Team / data request** (`team_id` is set via a `data_request`):
+   *    Any authenticated member of the team that was granted access through an approved
+   *    data request. This supports the collaborative workflow where a team submits a data
+   *    request, it gets approved, and all team members can then access the resulting download.
+   *
+   * Throws HTTP403 if none of the above paths grant access.
    *
    * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadRecord | null>}
-   * @memberof DownloadService
+   * @param {number | null} systemUserId - The authenticated user's ID, or null if unauthenticated.
+   * @return {Promise<DownloadRecord>} The download record (avoids a second fetch by the caller).
+   * @memberof DownloadPipelineService
    */
-  async findDownloadById(downloadId: string): Promise<DownloadRecord | null> {
-    return this.downloadRepository.findDownloadById(downloadId);
-  }
+  async getAuthorizedDownload(downloadId: string, systemUserId: number | null): Promise<DownloadRecord> {
+    const download = await this.downloadRepository.findDownloadById(downloadId);
 
-  /**
-   * Get all download records for a user.
-   *
-   * @param {number} systemUserId - The user ID.
-   * @return {Promise<DownloadRecord[]>}
-   * @memberof DownloadService
-   */
-  async getDownloadsByUserId(systemUserId: number): Promise<DownloadRecord[]> {
-    return this.downloadRepository.getDownloadsByUserId(systemUserId);
+    if (!download) {
+      throw new HTTP404('Download not found');
+    }
+
+    // Anonymous downloads are public — the UUID is the credential
+    if (download.system_user_id === null && download.team_id === null) {
+      return download;
+    }
+
+    // Owned or team downloads require an authenticated user
+    if (systemUserId === null) {
+      throw new HTTP403('Access denied');
+    }
+
+    // Check all authenticated access paths: owner, shared, or team membership
+    const authorized = await this.downloadRepository.isUserAuthorizedForDownload(downloadId, systemUserId);
+    if (!authorized) {
+      throw new HTTP403('Access denied');
+    }
+
+    return download;
   }
 
   /**
@@ -118,14 +164,14 @@ export class DownloadService extends DBService {
    *
    * @param {string} downloadId - The download ID.
    * @param {DownloadStatusEnum} status - The new status.
-   * @param {object} [metadata] - Optional metadata (s3_key, file_name, file_size_bytes, error).
+   * @param {object} [metadata] - Optional metadata (error).
    * @return {Promise<void>}
-   * @memberof DownloadService
+   * @memberof DownloadPipelineService
    */
   async updateDownloadStatus(
     downloadId: string,
     status: DownloadStatusEnum,
-    metadata?: { s3_key?: string; file_name?: string; file_size_bytes?: string | number; error?: string }
+    metadata?: { error?: string }
   ): Promise<void> {
     const now = new Date().toISOString();
     const timestamps: { started_at?: string; completed_at?: string } = {};
@@ -141,26 +187,14 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * Get lightweight summaries for all authorized features in a download.
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {number | null} systemUserId - The user requesting the download. Null for anonymous downloads.
-   * @return {Promise<DownloadFeatureSummary[]>}
-   * @memberof DownloadService
-   */
-  async getDownloadFeatureSummaries(
-    downloadId: string,
-    systemUserId: number | null
-  ): Promise<DownloadFeatureSummary[]> {
-    return this.downloadRepository.getDownloadFeatureSummaries(downloadId, systemUserId);
-  }
-
-  /**
    * Get all fragments for a download.
+   *
+   * Convenience method so route handlers that already use the pipeline service
+   * don't need to instantiate a separate DownloadFragmentService.
    *
    * @param {string} downloadId - The download ID.
    * @return {Promise<DownloadFragmentRecord[]>}
-   * @memberof DownloadService
+   * @memberof DownloadPipelineService
    */
   async getFragmentsByDownloadId(downloadId: string): Promise<DownloadFragmentRecord[]> {
     return this.fragmentRepository.getFragmentsByDownloadId(downloadId);
@@ -172,12 +206,12 @@ export class DownloadService extends DBService {
    * Uses pre-computed data_byte_size which includes JSONB size + CSV overhead + artifact file size.
    *
    * @param {string} downloadId - The download ID.
-   * @param {number | null} systemUserId - The user requesting the download. Null for anonymous downloads.
+   * @param {string | null} teamId - The team that owns the download. Null for anonymous downloads.
    * @return {Promise<DownloadSizeEstimate>}
-   * @memberof DownloadService
+   * @memberof DownloadPipelineService
    */
-  async estimateDownloadSize(downloadId: string, systemUserId: number | null): Promise<DownloadSizeEstimate> {
-    const features = await this.getDownloadFeatureSummaries(downloadId, systemUserId);
+  async estimateDownloadSize(downloadId: string, teamId: string | null): Promise<DownloadSizeEstimate> {
+    const features = await this.downloadRepository.getDownloadFeatureSummaries(downloadId, teamId);
     const totalEstimatedBytes = features.reduce((sum, f) => sum + Number(f.estimated_byte_size), 0);
 
     return { totalEstimatedBytes, features };
@@ -193,7 +227,7 @@ export class DownloadService extends DBService {
    * @param {string} downloadId - The download ID.
    * @param {DownloadSizeEstimate} sizeEstimate - The size estimation result.
    * @return {Promise<void>}
-   * @memberof DownloadService
+   * @memberof DownloadPipelineService
    */
   async planFragments(downloadId: string, sizeEstimate: DownloadSizeEstimate): Promise<void> {
     const features = sizeEstimate.features;
@@ -269,7 +303,7 @@ export class DownloadService extends DBService {
    *
    * @param {string} downloadId - The download ID to plan.
    * @return {Promise<void>}
-   * @memberof DownloadService
+   * @memberof DownloadPipelineService
    */
   async planDownloadIfNeeded(downloadId: string): Promise<void> {
     const download = await this.downloadRepository.findDownloadById(downloadId);
@@ -284,7 +318,7 @@ export class DownloadService extends DBService {
       return;
     }
 
-    const sizeEstimate = await this.estimateDownloadSize(downloadId, download.system_user_id);
+    const sizeEstimate = await this.estimateDownloadSize(downloadId, download.team_id);
     await this.planFragments(downloadId, sizeEstimate);
   }
 
@@ -293,7 +327,7 @@ export class DownloadService extends DBService {
    *
    * @param {string} downloadId - The download ID.
    * @return {Promise<DownloadFragmentRecord[]>} Fragments that need processing.
-   * @memberof DownloadService
+   * @memberof DownloadPipelineService
    */
   async getFragmentsToProcess(downloadId: string): Promise<DownloadFragmentRecord[]> {
     const fragments = await this.fragmentRepository.getFragmentsByDownloadId(downloadId);
@@ -307,7 +341,7 @@ export class DownloadService extends DBService {
    *
    * @param {string} downloadId - The download ID to finalize.
    * @return {Promise<void>}
-   * @memberof DownloadService
+   * @memberof DownloadPipelineService
    */
   async finalizeDownload(downloadId: string): Promise<void> {
     const fragments = await this.fragmentRepository.getFragmentsByDownloadId(downloadId);
@@ -315,20 +349,7 @@ export class DownloadService extends DBService {
     const readyCount = fragments.filter((f) => f.fragment_status === DownloadStatusEnum.READY).length;
     await this.downloadRepository.updateDownloadFragmentCounts(downloadId, fragments.length, readyCount);
 
-    const totalSizeBytes = fragments.reduce((sum, f) => sum + Number(f.file_size_bytes ?? 0), 0);
-
-    if (fragments.length === 1) {
-      const singleFragment = fragments[0];
-      await this.updateDownloadStatus(downloadId, DownloadStatusEnum.READY, {
-        s3_key: singleFragment.s3_key ?? undefined,
-        file_name: singleFragment.file_name ?? undefined,
-        file_size_bytes: singleFragment.file_size_bytes ?? undefined
-      });
-    } else {
-      await this.updateDownloadStatus(downloadId, DownloadStatusEnum.READY, {
-        file_size_bytes: totalSizeBytes
-      });
-    }
+    await this.updateDownloadStatus(downloadId, DownloadStatusEnum.READY);
   }
 
   async markFragmentProcessing(fragmentId: number): Promise<void> {
@@ -349,7 +370,7 @@ export class DownloadService extends DBService {
    * @param {DownloadFragmentRecord} fragment - The fragment to process.
    * @param {string} downloadId - The parent download ID.
    * @return {Promise<void>}
-   * @memberof DownloadService
+   * @memberof DownloadPipelineService
    */
   async processFragment(fragment: DownloadFragmentRecord, downloadId: string): Promise<void> {
     const fragmentId = fragment.download_fragment_id;
@@ -411,6 +432,55 @@ export class DownloadService extends DBService {
       });
       throw error;
     }
+  }
+
+  /**
+   * Claim an anonymous download for the current user.
+   *
+   * @param {string} downloadId - The download ID to claim.
+   * @return {Promise<void>}
+   * @memberof DownloadPipelineService
+   */
+  async claimDownload(downloadId: string): Promise<void> {
+    const systemUserId = this.connection.systemUserId();
+    const claimed = await this.downloadRepository.claimDownload(downloadId, systemUserId);
+
+    if (!claimed) {
+      throw new ApiConflictError('Unable to claim download', [
+        'DownloadPipelineService->claimDownload',
+        'Download is not anonymous or does not exist'
+      ]);
+    }
+  }
+
+  /**
+   * Get a signed URL for downloading a specific fragment.
+   *
+   * Validates the fragment exists and is ready before generating the URL.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {number} fragmentIndex - The zero-based fragment index.
+   * @return {Promise<string>} The signed download URL.
+   * @memberof DownloadPipelineService
+   */
+  async getFragmentSignedUrl(downloadId: string, fragmentIndex: number): Promise<string> {
+    const fragments = await this.fragmentRepository.getFragmentsByDownloadId(downloadId);
+    const fragment = fragments.find((f) => f.fragment_index === fragmentIndex);
+
+    if (!fragment) {
+      throw new HTTP404(`Fragment ${fragmentIndex} not found for download ${downloadId}`);
+    }
+
+    if (fragment.fragment_status !== DownloadStatusEnum.READY) {
+      throw new HTTP409('Fragment is not ready');
+    }
+
+    if (!fragment.s3_key) {
+      throw new HTTP500('Fragment record missing s3_key');
+    }
+
+    const objectStorageService = new ObjectStorageService();
+    return objectStorageService.getSignedUrl(BucketType.MAIN, fragment.s3_key, SIGNED_URL_EXPIRY_FRAGMENT);
   }
 
   /**
@@ -601,7 +671,18 @@ export class DownloadService extends DBService {
       const fileName = ref.filePath.split('/').pop() || 'file';
       const outputPath = `${filesFolderName}/${ref.submissionFeatureId}_${fileName}`;
 
-      const entryProcessed = new Promise<void>((resolve) => archive.once('entry', () => resolve()));
+      const entryProcessed = new Promise<void>((resolve, reject) => {
+        const onEntry = () => {
+          archive.removeListener('error', onError);
+          resolve();
+        };
+        const onError = (err: Error) => {
+          archive.removeListener('entry', onEntry);
+          reject(err);
+        };
+        archive.once('entry', onEntry);
+        archive.once('error', onError);
+      });
 
       try {
         const fileStream = await objectStorageService.getFileStream(BucketType.MAIN, ref.filePath);
@@ -620,35 +701,5 @@ export class DownloadService extends DBService {
       // Keep process memory bound by handling one file stream a time
       await entryProcessed;
     }
-  }
-
-  /**
-   * Get a signed URL for downloading a specific fragment.
-   *
-   * Validates the fragment exists and is ready before generating the URL.
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {number} fragmentIndex - The zero-based fragment index.
-   * @return {Promise<string>} The signed download URL.
-   * @memberof DownloadService
-   */
-  async getFragmentSignedUrl(downloadId: string, fragmentIndex: number): Promise<string> {
-    const fragments = await this.fragmentRepository.getFragmentsByDownloadId(downloadId);
-    const fragment = fragments.find((f) => f.fragment_index === fragmentIndex);
-
-    if (!fragment) {
-      throw new Error(`Fragment ${fragmentIndex} not found for download ${downloadId}`);
-    }
-
-    if (fragment.fragment_status !== DownloadStatusEnum.READY) {
-      throw new Error('Fragment is not ready');
-    }
-
-    if (!fragment.s3_key) {
-      throw new Error('Fragment record missing s3_key');
-    }
-
-    const objectStorageService = new ObjectStorageService();
-    return objectStorageService.getSignedUrl(BucketType.MAIN, fragment.s3_key, SIGNED_URL_EXPIRY_FRAGMENT);
   }
 }

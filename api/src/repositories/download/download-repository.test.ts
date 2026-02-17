@@ -2,8 +2,8 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { DownloadStatusEnum } from '../models/download-status';
-import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
+import { DownloadStatusEnum } from '../../models/download-status';
+import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
 import { DownloadRepository } from './download-repository';
 
 chai.use(sinonChai);
@@ -70,18 +70,14 @@ describe('DownloadRepository', () => {
 
       // Step 3: Call updateDownloadStatus with metadata
       await repo.updateDownloadStatus('aaaa0000-0000-0000-0000-000000000001', DownloadStatusEnum.READY, {
-        s3_key: 'downloads/file.zip',
-        file_name: 'file.zip',
-        file_size_bytes: '2048'
+        completed_at: '2025-01-01T00:01:00Z'
       });
 
       // Step 4: Verify sql was called with the correct parameters
       expect(sqlStub).to.have.been.calledOnce;
       const sqlValues = sqlStub.firstCall.args[0].values;
       expect(sqlValues).to.include(DownloadStatusEnum.READY);
-      expect(sqlValues).to.include('downloads/file.zip');
-      expect(sqlValues).to.include('file.zip');
-      expect(sqlValues).to.include('2048');
+      expect(sqlValues).to.include('2025-01-01T00:01:00Z');
     });
 
     it('updates status without metadata', async () => {
@@ -104,6 +100,96 @@ describe('DownloadRepository', () => {
     });
   });
 
+  describe('createDownload', () => {
+    it('includes system_user_id in INSERT SQL', async () => {
+      const sqlStub = sinon
+        .stub()
+        .resolves(mockQueryResult([{ download_id: 'aaaa0000-0000-0000-0000-000000000001' }], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.createDownload(null, null, undefined, 42);
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('system_user_id');
+      const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlValues).to.include(42);
+    });
+
+    it('passes null system_user_id for anonymous downloads', async () => {
+      const sqlStub = sinon
+        .stub()
+        .resolves(mockQueryResult([{ download_id: 'aaaa0000-0000-0000-0000-000000000001' }], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.createDownload(null, null, undefined, null);
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlValues).to.include(null);
+    });
+  });
+
+  describe('getDownloadsByTeamMembership', () => {
+    it('includes owner path checking system_user_id', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.getDownloadsByTeamMembership(123);
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('system_user_id');
+      const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlValues).to.include(123);
+    });
+  });
+
+  describe('isUserAuthorizedForDownload', () => {
+    it('includes owner check for system_user_id', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([{ authorized: true }], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.isUserAuthorizedForDownload('aaaa0000-0000-0000-0000-000000000001', 42);
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlText = sqlStub.firstCall.args[0].text;
+      // Should check owner path (system_user_id on download table itself)
+      expect(sqlText).to.include('d.system_user_id');
+    });
+  });
+
+  describe('claimDownload', () => {
+    it('returns true when claim succeeds (rowCount = 1)', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.claimDownload('aaaa0000-0000-0000-0000-000000000001', 42);
+
+      expect(result).to.be.true;
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('system_user_id');
+      expect(sqlText).to.include('system_user_id IS NULL');
+      expect(sqlText).to.include('team_id IS NULL');
+    });
+
+    it('returns false when download is already claimed (rowCount = 0)', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.claimDownload('aaaa0000-0000-0000-0000-000000000001', 42);
+
+      expect(result).to.be.false;
+    });
+  });
+
   describe('getDownloadFeatureSummaries', () => {
     it('uses pre-computed data_byte_size directly', async () => {
       // Verifies: SQL uses data_byte_size column directly (no artifact JOIN needed)
@@ -114,7 +200,10 @@ describe('DownloadRepository', () => {
 
       // Step 2: Call method
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.getDownloadFeatureSummaries('aaaa0000-0000-0000-0000-000000000001', 10);
+      await repo.getDownloadFeatureSummaries(
+        'aaaa0000-0000-0000-0000-000000000001',
+        'bbbb0000-0000-0000-0000-000000000010'
+      );
 
       // Step 3: Verify SQL uses pre-computed column directly
       expect(sqlStub).to.have.been.calledOnce;
@@ -123,7 +212,7 @@ describe('DownloadRepository', () => {
       expect(sqlText).to.include('estimated_byte_size');
     });
 
-    it('passes downloadId and systemUserId as parameters', async () => {
+    it('passes downloadId and teamId as parameters', async () => {
       // Verifies: Correct parameters are passed to the SQL query
 
       // Step 1: Setup sql stub
@@ -132,12 +221,15 @@ describe('DownloadRepository', () => {
 
       // Step 2: Call method
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.getDownloadFeatureSummaries('aaaa0000-0000-0000-0000-000000000005', 42);
+      await repo.getDownloadFeatureSummaries(
+        'aaaa0000-0000-0000-0000-000000000005',
+        'bbbb0000-0000-0000-0000-000000000042'
+      );
 
       // Step 3: Verify parameters
       const sqlValues = sqlStub.firstCall.args[0].values;
       expect(sqlValues).to.include('aaaa0000-0000-0000-0000-000000000005');
-      expect(sqlValues).to.include(42);
+      expect(sqlValues).to.include('bbbb0000-0000-0000-0000-000000000042');
     });
   });
 });
