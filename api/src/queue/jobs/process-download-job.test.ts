@@ -153,9 +153,7 @@ describe('process-download-job', () => {
       const updateStatusByIdStub = sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
 
       // Step 3: Call handler with job that has non-string output
-      const mockJobs = [
-        createMockFailedJob('aaaa0000-0000-0000-0000-000000000123', 'dlq-job-id', { some: 'object' })
-      ];
+      const mockJobs = [createMockFailedJob('aaaa0000-0000-0000-0000-000000000123', 'dlq-job-id', { some: 'object' })];
       await processDownloadFailedHandler(mockJobs);
 
       // Step 4: Verify default error message was used
