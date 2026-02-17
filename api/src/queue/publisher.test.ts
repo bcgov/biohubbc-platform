@@ -352,8 +352,7 @@ describe('publisher', () => {
 
       // Step 2: Call publisher
       await publishProcessDownloadJob(mockConnection, {
-        downloadId: 'aaaa0000-0000-0000-0000-000000000456',
-
+        downloadId: 'aaaa0000-0000-0000-0000-000000000456'
       });
 
       // Step 3: Verify singletonKey passed to pg-boss
@@ -375,8 +374,7 @@ describe('publisher', () => {
 
       // Step 2: Call publisher
       const result = await publishProcessDownloadJob(mockConnection, {
-        downloadId: 'aaaa0000-0000-0000-0000-000000000001',
-
+        downloadId: 'aaaa0000-0000-0000-0000-000000000001'
       });
 
       // Step 3: Verify duplicate status
@@ -397,8 +395,7 @@ describe('publisher', () => {
 
       // Step 2: Call publisher
       const result = await publishProcessDownloadJob(mockConnection, {
-        downloadId: 'aaaa0000-0000-0000-0000-000000000001',
-
+        downloadId: 'aaaa0000-0000-0000-0000-000000000001'
       });
 
       // Step 3: Verify error status
