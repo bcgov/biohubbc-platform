@@ -670,12 +670,19 @@ describe('FeatureIngestionService', () => {
         .resolves(mockFeatureTypeWithProperties);
 
       const deleteStub = sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
+      const deleteRelationshipsStub = sinon
+        .stub(SubmissionRepository.prototype, 'deleteSubmissionFeatureRelationships')
+        .resolves();
 
       const insertStub = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord');
       insertStub.onFirstCall().resolves({ submission_feature_id: 100 });
       insertStub.onSecondCall().resolves({ submission_feature_id: 101 });
 
       const updateParentStub = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent').resolves();
+
+      const insertRelationshipsStub = sinon
+        .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRelationships')
+        .resolves();
 
       const features: IFlattenedBlock[] = [
         createValidFeature({ id: 'uuid-1', content: ['uuid-2'] }),
@@ -687,8 +694,10 @@ describe('FeatureIngestionService', () => {
       expect(result.valid).to.be.true;
       expect(result.errors).to.have.length(0);
       expect(deleteStub).to.have.been.calledOnceWith(1);
+      expect(deleteRelationshipsStub).to.have.been.calledOnceWith(1);
       expect(insertStub).to.have.been.calledTwice;
       expect(updateParentStub).to.have.been.calledOnceWith(101, 100);
+      expect(insertRelationshipsStub).to.have.been.calledOnceWith([{ source_feature_id: 100, target_feature_id: 101 }]);
     });
 
     it('should return all errors when validation fails', async () => {
@@ -1037,7 +1046,7 @@ describe('FeatureIngestionService', () => {
       expect(insertStub.secondCall.args[4]).to.deep.equal(propsMinimal);
     });
 
-    it('should call deleteSubmissionFeatures before inserting', async () => {
+    it('should call deleteSubmissionFeatures and deleteSubmissionFeatureRelationships before inserting', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
@@ -1051,6 +1060,12 @@ describe('FeatureIngestionService', () => {
         callOrder.push('delete');
       });
 
+      const deleteRelationshipsStub = sinon
+        .stub(SubmissionRepository.prototype, 'deleteSubmissionFeatureRelationships')
+        .callsFake(async () => {
+          callOrder.push('deleteRelationships');
+        });
+
       const insertStub = sinon
         .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord')
         .callsFake(async () => {
@@ -1059,14 +1074,89 @@ describe('FeatureIngestionService', () => {
         });
 
       sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent').resolves();
+      sinon.stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRelationships').resolves();
 
       const features: IFlattenedBlock[] = [createValidFeature()];
 
       await service.ingestFeatures(1, features);
 
       expect(callOrder[0]).to.equal('delete');
-      expect(callOrder[1]).to.equal('insert');
-      expect(deleteStub).to.have.been.calledBefore(insertStub);
+      expect(callOrder[1]).to.equal('deleteRelationships');
+      expect(callOrder[2]).to.equal('insert');
+      expect(deleteStub).to.have.been.calledOnceWith(1);
+      expect(deleteRelationshipsStub).to.have.been.calledOnceWith(1);
+      expect(insertStub).to.have.been.calledOnce;
+    });
+
+    it('should not call insertSubmissionFeatureRelationships when all features have empty content', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new FeatureIngestionService(mockDBConnection);
+
+      sinon
+        .stub(ValidationRepository.prototype, 'getFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
+
+      sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
+      sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatureRelationships').resolves();
+
+      const insertStub = sinon
+        .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord')
+        .resolves({ submission_feature_id: 1 });
+
+      sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent').resolves();
+
+      const insertRelationshipsStub = sinon
+        .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRelationships')
+        .resolves();
+
+      const features: IFlattenedBlock[] = [
+        createValidFeature({ id: 'uuid-1', content: [], parent: null }),
+        createValidFeature({ id: 'uuid-2', content: [], parent: 'uuid-1' })
+      ];
+
+      await service.ingestFeatures(1, features);
+
+      expect(insertStub).to.have.been.calledTwice;
+      expect(insertRelationshipsStub).to.not.have.been.called;
+    });
+
+    it('should insert relationship rows for parent with multiple children', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new FeatureIngestionService(mockDBConnection);
+
+      sinon
+        .stub(ValidationRepository.prototype, 'getFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
+
+      sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
+      sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatureRelationships').resolves();
+
+      const insertStub = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord');
+      insertStub.onFirstCall().resolves({ submission_feature_id: 10 });
+      insertStub.onSecondCall().resolves({ submission_feature_id: 20 });
+      insertStub.onThirdCall().resolves({ submission_feature_id: 30 });
+      insertStub.onCall(3).resolves({ submission_feature_id: 40 });
+
+      sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent').resolves();
+
+      const insertRelationshipsStub = sinon
+        .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRelationships')
+        .resolves();
+
+      const features: IFlattenedBlock[] = [
+        createValidFeature({ id: 'parent', parent: null, content: ['child-1', 'child-2', 'child-3'] }),
+        createValidFeature({ id: 'child-1', parent: 'parent', content: [] }),
+        createValidFeature({ id: 'child-2', parent: 'parent', content: [] }),
+        createValidFeature({ id: 'child-3', parent: 'parent', content: [] })
+      ];
+
+      await service.ingestFeatures(1, features);
+
+      expect(insertRelationshipsStub).to.have.been.calledOnceWith([
+        { source_feature_id: 10, target_feature_id: 20 },
+        { source_feature_id: 10, target_feature_id: 30 },
+        { source_feature_id: 10, target_feature_id: 40 }
+      ]);
     });
 
     it('should insert all features before updating any parent references', async () => {

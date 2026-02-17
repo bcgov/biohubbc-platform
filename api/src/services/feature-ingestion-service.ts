@@ -52,20 +52,22 @@ export class FeatureIngestionService extends DBService {
       return validationResult;
     }
 
-    // 2. Delete existing features (idempotency for job retries)
+    // 2. Delete existing features and relationships (idempotency for job retries)
     const submissionRepository = new SubmissionRepository(this.connection);
     await submissionRepository.deleteSubmissionFeatures(submissionId);
+    await submissionRepository.deleteSubmissionFeatureRelationships(submissionId);
 
-    // 3. Insert features (two-pass for parent references)
+    // 3. Insert features (two-pass for parent references, Pass 3 for content relationships)
     await this.insertFlatFeatures(submissionId, features);
 
     return { valid: true, errors: [] };
   }
 
   /**
-   * Insert flat features using two-pass approach.
+   * Insert flat features using three-pass approach.
    * Pass 1: Insert all features with parent = NULL
    * Pass 2: Update parent references using UUID → ID mapping
+   * Pass 3: Insert content relationships (parent-child from content array)
    *
    * @private
    * @param {number} submissionId - The submission ID
@@ -98,6 +100,50 @@ export class FeatureIngestionService extends DBService {
         }
       }
     }
+
+    // Pass 3: Insert content relationships (many-to-many)
+    const relationshipPairs = this.buildContentRelationshipPairs(features, uuidToDbId);
+    if (relationshipPairs.length > 0) {
+      await submissionRepository.insertSubmissionFeatureRelationships(relationshipPairs);
+    }
+  }
+
+  /**
+   * Build source-target relationship pairs from features' content arrays.
+   *
+   * @private
+   * @param {IFlattenedBlock[]} features - Features with content references
+   * @param {Map<string, number>} uuidToDbId - UUID to submission_feature_id mapping
+   * @return {Array<{ source_feature_id: number; target_feature_id: number }>}
+   * @memberof FeatureIngestionService
+   */
+  private buildContentRelationshipPairs(
+    features: IFlattenedBlock[],
+    uuidToDbId: Map<string, number>
+  ): Array<{ source_feature_id: number; target_feature_id: number }> {
+    const pairs: Array<{
+      source_feature_id: number;
+      target_feature_id: number;
+    }> = [];
+    for (const feature of features) {
+      if (!feature.content?.length) {
+        continue;
+      }
+      const sourceDbId = uuidToDbId.get(feature.id);
+      if (sourceDbId === undefined) {
+        continue;
+      }
+      for (const targetId of feature.content) {
+        const targetDbId = uuidToDbId.get(targetId);
+        if (targetDbId !== undefined) {
+          pairs.push({
+            source_feature_id: sourceDbId,
+            target_feature_id: targetDbId
+          });
+        }
+      }
+    }
+    return pairs;
   }
 
   // ============================================================================
