@@ -1,4 +1,6 @@
+import { v4 as uuidv4 } from 'uuid';
 import { IDBConnection } from '../database/db';
+import { HTTP401 } from '../errors/http-error';
 import {
   CreateDataRequest,
   DataRequest,
@@ -35,15 +37,13 @@ export class DataRequestService extends DBService {
    * Returns the team_member record if the given user is a member of the team associated with the data
    * request; otherwise returns null.
    *
-   * @param {string} dataRequestId - The data request id.
+   * @param {string} teamId - The team id.
    * @param {number} userId - The system user id to check for team membership.
    * @return {Promise<TeamMember | null>}
    */
-  async findTeamMember(dataRequestId: string, userId: number): Promise<TeamMember | null> {
-    const dataRequest = await this.getDataRequestById(dataRequestId);
-
+  async findTeamMember(teamId: string, userId: number): Promise<TeamMember | null> {
     const teamMemberService = new TeamMemberService(this.connection);
-    const members = await teamMemberService.getTeamMembers(dataRequest.team_id);
+    const members = await teamMemberService.getTeamMembers(teamId);
 
     const member = members.find((member) => member.system_user_id === userId);
 
@@ -55,7 +55,7 @@ export class DataRequestService extends DBService {
   }
 
   /**
-   * Returns a specific data_request by its ID
+   * Returns a specific data_request by its ID without an authorization check
    *
    * @param {string} dataRequestId
    * @return {Promise<DataRequest | null>}
@@ -67,7 +67,7 @@ export class DataRequestService extends DBService {
   }
 
   /**
-   * Returns a specific data_request by its ID
+   * Returns a specific data_request and user must be authorized
    *
    * @param {string} dataRequestId
    * @return {Promise<DataRequest>}
@@ -75,6 +75,13 @@ export class DataRequestService extends DBService {
    */
   async getDataRequestById(dataRequestId: string): Promise<DataRequest> {
     const dataRequest = await this.dataRequestRepository.getDataRequestById(dataRequestId);
+
+    const authorized = await this._authorizeAccessForDataRequest(dataRequest.team_id);
+
+    if (!authorized) {
+      throw new HTTP401('Access Denied');
+    }
+
     return dataRequest;
   }
 
@@ -95,7 +102,17 @@ export class DataRequestService extends DBService {
     requested_by?: number;
     team_id?: string;
   }): Promise<DataRequest[]> {
-    return this.dataRequestRepository.findDataRequests(filters);
+    const dataRequests = await this.dataRequestRepository.findDataRequests(filters);
+
+    const allAuthorized = await Promise.all(
+      dataRequests.map((dr) => this._authorizeAccessForDataRequest(dr.data_request_id))
+    ).then((results) => results.every(Boolean));
+
+    if (!allAuthorized) {
+      throw new HTTP401('Access Denied');
+    }
+
+    return dataRequests;
   }
 
   /**
@@ -133,8 +150,7 @@ export class DataRequestService extends DBService {
     let resolvedTeamId = teamId;
     if (resolvedTeamId === undefined) {
       const teamService = new TeamService(this.connection);
-      // TODO: What should we name this team?
-      const team = await teamService.createTeam({ name: 'Data request team' });
+      const team = await teamService.createTeam({ name: _generateDataRequestTeamName() });
       resolvedTeamId = team.team_id;
     }
 
@@ -162,6 +178,13 @@ export class DataRequestService extends DBService {
    * @memberof DataRequestRepository
    */
   async updateDataRequest(dataRequestId: string, payload: UpdateDataRequest): Promise<DataRequest> {
+    const dataRequest = await this.dataRequestRepository.findDataRequestById(dataRequestId);
+    const authorized = await this._authorizeAccessForDataRequest(dataRequest.team_id);
+
+    if (!authorized) {
+      throw new HTTP401('Access Denied');
+    }
+
     return this.dataRequestRepository.updateDataRequest(dataRequestId, payload);
   }
 
@@ -173,15 +196,22 @@ export class DataRequestService extends DBService {
    * @memberof DataRequestRepository
    */
   async deleteDataRequest(dataRequestId: string): Promise<void> {
+    const dataRequest = await this.dataRequestRepository.findDataRequestById(dataRequestId);
+    const authorized = await this._authorizeAccessForDataRequest(dataRequest.team_id);
+
+    if (!authorized) {
+      throw new HTTP401('Access Denied');
+    }
+
     return this.dataRequestRepository.deleteDataRequest(dataRequestId);
   }
 
   /**
    * Returns true if the current user may act on this data request (system admin or team member); otherwise false.
    *
-   * @param dataRequestId - Data request id to check team membership for.
+   * @param teamId
    */
-  async canAccessDataRequest(dataRequestId: string): Promise<boolean> {
+  async _authorizeAccessForDataRequest(teamId: string): Promise<boolean> {
     const userService = new UserService(this.connection);
     const isSystemAdmin = await userService.isSystemUserAdmin();
     if (isSystemAdmin) {
@@ -189,7 +219,17 @@ export class DataRequestService extends DBService {
     }
 
     const userId = this.connection.systemUserId();
-    const dataRequestTeamMember = await this.findTeamMember(dataRequestId, userId);
+    const dataRequestTeamMember = await this.findTeamMember(teamId, userId);
+
     return dataRequestTeamMember !== null;
   }
+}
+
+/**
+ * Generates a unique team name for auto-created data request teams.
+ *
+ * @returns {string} A unique team name.
+ */
+function _generateDataRequestTeamName(): string {
+  return `Data request team - ${uuidv4()}`;
 }

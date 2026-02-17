@@ -1,7 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../database/db';
-import { HTTP403 } from '../../../errors/http-error';
 import { DataRequestResponseSchema, UpdateDataRequestSchema } from '../../../openapi/schemas/data-request';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { DataRequestService } from '../../../services/data-request-service';
@@ -135,11 +134,6 @@ export function getDataRequestById(): RequestHandler {
       const dataRequestId = req.params.dataRequestId;
       const dataRequestService = new DataRequestService(connection);
 
-      const canAccess = await dataRequestService.canAccessDataRequest(dataRequestId);
-      if (!canAccess) {
-        throw new HTTP403('Access denied');
-      }
-
       const dataRequest = await dataRequestService.getDataRequestById(dataRequestId);
 
       return res.status(200).json(dataRequest);
@@ -168,12 +162,6 @@ export function updateDataRequest(): RequestHandler {
       const dataRequestService = new DataRequestService(connection);
 
       const dataRequestId = req.params.dataRequestId;
-
-      const canAccess = await dataRequestService.canAccessDataRequest(dataRequestId);
-      if (!canAccess) {
-        throw new HTTP403('Access denied');
-      }
-
       const dataRequest = await dataRequestService.updateDataRequest(dataRequestId, req.body);
 
       await connection.commit();
@@ -203,11 +191,6 @@ export function deleteDataRequest(): RequestHandler {
 
       const dataRequestId = req.params.dataRequestId;
       const dataRequestService = new DataRequestService(connection);
-
-      const canAccess = await dataRequestService.canAccessDataRequest(dataRequestId);
-      if (!canAccess) {
-        throw new HTTP403('Access denied');
-      }
 
       await dataRequestService.deleteDataRequest(dataRequestId);
 

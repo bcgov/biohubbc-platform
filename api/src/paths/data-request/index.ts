@@ -110,14 +110,6 @@ export function findDataRequests(): RequestHandler {
       const dataRequestService = new DataRequestService(connection);
       const dataRequests = await dataRequestService.findDataRequests(filters);
 
-      const allCanAccess = await Promise.all(
-        dataRequests.map((dr) => dataRequestService.canAccessDataRequest(dr.data_request_id))
-      ).then((results) => results.every(Boolean));
-
-      if (!allCanAccess) {
-        throw new HTTP403('Access denied');
-      }
-
       res.status(200).json(dataRequests);
     } catch (error) {
       defaultLog.error({ label: 'findDataRequests', message: 'error', error });
