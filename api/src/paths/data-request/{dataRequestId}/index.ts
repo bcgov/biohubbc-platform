@@ -3,14 +3,48 @@ import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../database/db';
 import { DataRequestResponseSchema, UpdateDataRequestSchema } from '../../../openapi/schemas/data-request';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { DataRequestService } from '../../../services/data-request-service';
 import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/data-request/{dataRequestId}');
 
-export const GET: Operation = [getDataRequestById()];
-export const PUT: Operation = [updateDataRequest()];
-export const DELETE: Operation = [deleteDataRequest()];
+export const GET: Operation = [
+  authorizeRequestHandler(() => {
+    return {
+      and: [
+        {
+          discriminator: 'SystemUser'
+        }
+      ]
+    };
+  }),
+  getDataRequestById()
+];
+export const PUT: Operation = [
+  authorizeRequestHandler(() => {
+    return {
+      and: [
+        {
+          discriminator: 'SystemUser'
+        }
+      ]
+    };
+  }),
+  updateDataRequest()
+];
+export const DELETE: Operation = [
+  authorizeRequestHandler(() => {
+    return {
+      and: [
+        {
+          discriminator: 'SystemUser'
+        }
+      ]
+    };
+  }),
+  deleteDataRequest()
+];
 
 GET.apiDoc = {
   description: 'Get a data request by dataRequestId',
