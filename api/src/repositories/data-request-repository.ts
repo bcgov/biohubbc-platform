@@ -44,7 +44,7 @@ export class DataRequestRepository extends BaseRepository {
       if (filters?.date_to) {
         query.where('dr.create_date', '<=', filters.date_to);
       }
-      if (filters?.requested_by !== undefined) {
+      if (filters?.requested_by) {
         query.where('dr.requested_by', filters.requested_by);
       }
       if (filters?.team_id) {
@@ -108,7 +108,7 @@ export class DataRequestRepository extends BaseRepository {
    * @return {Promise<DataRequest | null>}
    * @memberof DataRequestRepository
    */
-  async findDataRequestById(dataRequestId: string): Promise<DataRequest> {
+  async findDataRequestById(dataRequestId: string): Promise<DataRequest | null> {
     const knex = getKnex();
     const query = knex('data_request')
       .select('requested_by', 'team_id', 'data_request_id', 'reason')
@@ -165,7 +165,7 @@ export class DataRequestRepository extends BaseRepository {
       .where('data_request_id', dataRequestId)
       .whereNull('record_end_date')
       .update(payload)
-      .returning('data_request_id');
+      .returning(['data_request_id', 'reason', 'requested_by', 'team_id']);
 
     const response = await this.connection.knex(query, DataRequest);
 

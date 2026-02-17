@@ -1,7 +1,7 @@
 import { Request, RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../constants/roles';
-import { getAPIUserDBConnection, getDBConnection } from '../../database/db';
+import { getDBConnection } from '../../database/db';
 import { DataRequestFilters } from '../../models/data-request';
 import {
   CreateDataRequestRequestSchema,
@@ -133,8 +133,7 @@ POST.apiDoc = {
  */
 export function findDataRequests(): RequestHandler {
   return async (req, res) => {
-    const isAuthenticated = !!req.keycloak_token;
-    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
+    const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();

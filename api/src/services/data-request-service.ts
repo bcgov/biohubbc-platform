@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { IDBConnection } from '../database/db';
-import { HTTP403 } from '../errors/http-error';
+import { HTTP403, HTTP404 } from '../errors/http-error';
 import {
   CreateDataRequest,
   DataRequest,
@@ -149,6 +149,11 @@ export class DataRequestService extends DBService {
    */
   async updateDataRequest(dataRequestId: string, payload: UpdateDataRequest): Promise<DataRequest> {
     const dataRequest = await this.dataRequestRepository.findDataRequestById(dataRequestId);
+
+    if (!dataRequest) {
+      throw new HTTP404('Data request not found');
+    }
+
     const authorized = await this._authorizeAccessForDataRequest(dataRequest.team_id);
 
     if (!authorized) {
@@ -167,6 +172,11 @@ export class DataRequestService extends DBService {
    */
   async deleteDataRequest(dataRequestId: string): Promise<void> {
     const dataRequest = await this.dataRequestRepository.findDataRequestById(dataRequestId);
+
+    if (!dataRequest) {
+      throw new HTTP404('Data request not found');
+    }
+
     const authorized = await this._authorizeAccessForDataRequest(dataRequest.team_id);
 
     if (!authorized) {
