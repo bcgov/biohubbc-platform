@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { IDBConnection } from '../database/db';
-import { HTTP401 } from '../errors/http-error';
+import { HTTP403 } from '../errors/http-error';
 import {
   CreateDataRequest,
   DataRequest,
@@ -15,6 +15,7 @@ import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamService } from './access-policy/team-service';
 import { DBService } from './db-service';
 import { UserService } from './user-service';
+import { TeamMemberRepository } from '../repositories/authorization/team-member-repository';
 
 /**
  * Service for managing data requests.
@@ -79,7 +80,7 @@ export class DataRequestService extends DBService {
     const authorized = await this._authorizeAccessForDataRequest(dataRequest.team_id);
 
     if (!authorized) {
-      throw new HTTP401('Access Denied');
+      throw new HTTP403('Access Denied');
     }
 
     return dataRequest;
@@ -95,14 +96,6 @@ export class DataRequestService extends DBService {
   async findDataRequests(filters?: DataRequestFilters): Promise<DataRequest[]> {
     const dataRequests = await this.dataRequestRepository.findDataRequests(filters);
 
-    const allAuthorized = await Promise.all(
-      dataRequests.map((dr) => this._authorizeAccessForDataRequest(dr.data_request_id))
-    ).then((results) => results.every(Boolean));
-
-    if (!allAuthorized) {
-      throw new HTTP401('Access Denied');
-    }
-
     return dataRequests;
   }
 
@@ -110,7 +103,7 @@ export class DataRequestService extends DBService {
    * Create a new data request.
    * If teamId is undefined, a new team is created first and its id is used for the data request.
    *
-   * @param {number} requestedBy
+   * @param {number} requestedBy - system user id
    * @param {CreateDataRequest} payload
    * @param {string} [teamId]
    * @return {Promise<DataRequestWithStatus>}
@@ -126,6 +119,9 @@ export class DataRequestService extends DBService {
       const teamService = new TeamService(this.connection);
       const team = await teamService.createTeam({ name: _generateDataRequestTeamName() });
       resolvedTeamId = team.team_id;
+
+      const teamMemberService = new TeamMemberRepository(this.connection);
+      await teamMemberService.insertTeamMember({ system_user_id: requestedBy, team_id: resolvedTeamId });
     }
 
     const dataRequest = await this.dataRequestRepository.createDataRequest(resolvedTeamId, requestedBy, payload);
@@ -156,7 +152,7 @@ export class DataRequestService extends DBService {
     const authorized = await this._authorizeAccessForDataRequest(dataRequest.team_id);
 
     if (!authorized) {
-      throw new HTTP401('Access Denied');
+      throw new HTTP403('Access Denied');
     }
 
     return this.dataRequestRepository.updateDataRequest(dataRequestId, payload);
@@ -174,7 +170,7 @@ export class DataRequestService extends DBService {
     const authorized = await this._authorizeAccessForDataRequest(dataRequest.team_id);
 
     if (!authorized) {
-      throw new HTTP401('Access Denied');
+      throw new HTTP403('Access Denied');
     }
 
     return this.dataRequestRepository.deleteDataRequest(dataRequestId);
