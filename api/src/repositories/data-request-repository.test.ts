@@ -2,13 +2,7 @@ import chai, { expect } from 'chai';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import {
-  CreateDataRequest,
-  DataRequest,
-  DataRequestStatus,
-  DataRequestWithStatus,
-  UpdateDataRequest
-} from '../models/data-request';
+import { CreateDataRequest, DataRequest, UpdateDataRequest } from '../models/data-request';
 import { getMockDBConnection } from '../__mocks__/db';
 import { DataRequestRepository } from './data-request-repository';
 
@@ -23,31 +17,7 @@ describe('DataRequestRepository', () => {
     data_request_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
     reason: 'Research purposes',
     team_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
-    requested_by: 1,
-    record_end_date: null,
-    create_date: '2025-01-01T00:00:00.000Z',
-    create_user: 1,
-    update_date: null,
-    update_user: null,
-    revision_count: 0
-  };
-
-  const mockDataRequestStatus: DataRequestStatus = {
-    data_request_status_id: 'c3d4e5f6-a7b8-9012-cdef-123456789012',
-    data_request_id: mockDataRequest.data_request_id,
-    comment_id: null,
-    request_status: 'REQUESTED',
-    record_end_date: null,
-    create_date: '2025-01-01T00:00:00.000Z',
-    create_user: 1,
-    update_date: null,
-    update_user: null,
-    revision_count: 0
-  };
-
-  const mockDataRequestWithStatus: DataRequestWithStatus = {
-    ...mockDataRequest,
-    data_request_status: mockDataRequestStatus
+    requested_by: 1
   };
 
   describe('findDataRequests', () => {
@@ -198,16 +168,15 @@ describe('DataRequestRepository', () => {
   });
 
   describe('createDataRequest', () => {
-    it('should create and return a new data request with status', async () => {
-      let knexCallCount = 0;
-      const mockKnex = async () => {
-        if (knexCallCount++ === 0) {
-          return { rowCount: 1, rows: [mockDataRequest] } as unknown as QueryResult<any>;
-        }
-        return { rowCount: 1, rows: [mockDataRequestStatus] } as unknown as QueryResult<any>;
-      };
+    it('should create and return a new data request', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [mockDataRequest]
+      } as unknown as QueryResult<any>;
 
-      const mockDBConnection = getMockDBConnection({ knex: mockKnex });
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => mockQueryResponse
+      });
 
       const repo = new DataRequestRepository(mockDBConnection);
 
@@ -215,7 +184,7 @@ describe('DataRequestRepository', () => {
 
       const result = await repo.createDataRequest(mockDataRequest.team_id, mockDataRequest.requested_by, payload);
 
-      expect(result).to.eql(mockDataRequestWithStatus);
+      expect(result).to.eql(mockDataRequest);
     });
 
     it('should throw error when rowCount !== 1 on data request insert', async () => {
