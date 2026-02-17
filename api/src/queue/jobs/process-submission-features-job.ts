@@ -1,6 +1,6 @@
 import PgBoss from 'pg-boss';
 import { getAPIUserDBConnection } from '../../database/db';
-import { SubmissionIngestionService } from '../../services/submission-ingestion-service';
+import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { getLogger } from '../../utils/logger';
 

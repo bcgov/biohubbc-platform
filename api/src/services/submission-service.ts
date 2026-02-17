@@ -2,6 +2,7 @@ import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
 import { SubmissionFeatureForReview } from '../models/submission';
+import { IngestionRepository } from '../repositories/ingestion/ingestion-repository';
 import {
   ICreateSubmission,
   ISubmissionFeature,
@@ -30,11 +31,13 @@ const defaultLog = getLogger('submission-service');
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
+  ingestionRepository: IngestionRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.submissionRepository = new SubmissionRepository(connection);
+    this.ingestionRepository = new IngestionRepository(connection);
   }
 
   /**
@@ -122,13 +125,13 @@ export class SubmissionService extends DBService {
         const parentSubmissionFeatureId = parentSubmissionFeatureIdMap.get(parentJsonPath) || null;
 
         // Validate the submissionFeature object
-        const response = await this.submissionRepository.insertSubmissionFeatureRecord(
+        const response = await this.ingestionRepository.insertSubmissionFeatureRecord(
           submissionId,
           parentSubmissionFeatureId,
           featureNode.id,
           featureNode.type,
           featureNode.properties,
-          0
+          0 // Legacy tree path — byte size not computed
         );
 
         // Cache the submission_feature_id for the current jsonPath

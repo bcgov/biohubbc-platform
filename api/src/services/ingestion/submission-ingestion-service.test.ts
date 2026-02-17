@@ -2,21 +2,22 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import { Readable } from 'node:stream';
 import sinon from 'sinon';
-import { Artifact, ArtifactStatusEnum } from '../models/artifact';
-import { IFlattenedBlock } from '../models/submission-feature';
-import { SubmissionUpload } from '../models/submission-upload';
-import { UploadArchive } from '../models/upload-archive';
-import * as biohubTarParser from '../utils/biohub-tar-parser';
-import { IUploadedMediaFile } from '../utils/biohub-tar-parser';
-import * as fileUtils from '../utils/file-utils';
-import { getMockDBConnection } from '../__mocks__/db';
-import { FeatureIngestionService } from './feature-ingestion-service';
-import { IValidationError, ValidationErrorType } from './feature-ingestion-service.interface';
-import { BucketType, ObjectStorageService } from './object-storage/object-storage-service';
+import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
+import { IFlattenedBlock } from '../../models/submission-feature';
+import { SubmissionUpload } from '../../models/submission-upload';
+import { UploadArchive } from '../../models/upload-archive';
+import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
+import * as biohubTarParser from '../../utils/biohub-tar-parser';
+import { IUploadedMediaFile } from '../../utils/biohub-tar-parser';
+import * as fileUtils from '../../utils/file-utils';
+import { getMockDBConnection } from '../../__mocks__/db';
+import { FeatureValidationService } from '../feature-ingestion-service';
+import { IValidationError, ValidationErrorType } from '../feature-ingestion-service.interface';
+import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { ArtifactService } from '../upload/artifact-service';
+import { SubmissionUploadService } from '../upload/submission-upload-service';
+import { UploadArchiveService } from '../upload/upload-archive-service';
 import { SubmissionIngestionService, validateMediaReferences } from './submission-ingestion-service';
-import { ArtifactService } from './upload/artifact-service';
-import { SubmissionUploadService } from './upload/submission-upload-service';
-import { UploadArchiveService } from './upload/upload-archive-service';
 
 describe('SubmissionIngestionService', () => {
   afterEach(() => {
@@ -164,12 +165,20 @@ describe('SubmissionIngestionService', () => {
         .resolves(mockUploadedMedia);
 
       const validateStub = sinon
-        .stub(FeatureIngestionService.prototype, 'validateFlatSubmissionFeatures')
+        .stub(FeatureValidationService.prototype, 'validateFlatSubmissionFeatures')
         .resolves({ valid: true, errors: [] });
 
-      const ingestFeaturesStub = sinon
-        .stub(FeatureIngestionService.prototype, 'ingestFeatures')
-        .resolves({ valid: true, errors: [] });
+      const deleteSubmissionFeaturesStub = sinon
+        .stub(IngestionRepository.prototype, 'deleteSubmissionFeatures')
+        .resolves();
+
+      const insertSubmissionFeatureRecordStub = sinon
+        .stub(IngestionRepository.prototype, 'insertSubmissionFeatureRecord')
+        .resolves({ submission_feature_id: 1 });
+
+      const updateSubmissionFeatureParentStub = sinon
+        .stub(IngestionRepository.prototype, 'updateSubmissionFeatureParent')
+        .resolves();
 
       const insertArtifactStub = sinon
         .stub(ArtifactService.prototype, 'insertArtifact')
@@ -185,7 +194,9 @@ describe('SubmissionIngestionService', () => {
         extractBlocksStub,
         extractAndUploadMediaStub,
         validateStub,
-        ingestFeaturesStub,
+        deleteSubmissionFeaturesStub,
+        insertSubmissionFeatureRecordStub,
+        updateSubmissionFeatureParentStub,
         insertArtifactStub,
         getBucketNameStub
       };
@@ -218,11 +229,10 @@ describe('SubmissionIngestionService', () => {
       // insertArtifact called once (one media file)
       expect(stubs.insertArtifactStub.calledOnce).to.be.true;
 
-      // ingestFeatures called with submissionId, blocks, and a Map
-      expect(stubs.ingestFeaturesStub.calledOnce).to.be.true;
-      expect(stubs.ingestFeaturesStub.getCall(0).args[0]).to.equal(submissionId);
-      expect(stubs.ingestFeaturesStub.getCall(0).args[1]).to.be.an('array');
-      expect(stubs.ingestFeaturesStub.getCall(0).args[2]).to.be.instanceOf(Map);
+      // Features deleted and inserted
+      expect(stubs.deleteSubmissionFeaturesStub.calledOnce).to.be.true;
+      expect(stubs.deleteSubmissionFeaturesStub.getCall(0).args[0]).to.equal(submissionId);
+      expect(stubs.insertSubmissionFeatureRecordStub.callCount).to.equal(2);
     });
 
     it('validation failure: returns errors, no pass 2', async () => {
@@ -247,7 +257,8 @@ describe('SubmissionIngestionService', () => {
       // Pass 2 methods should NOT be called
       expect(stubs.extractAndUploadMediaStub.called).to.be.false;
       expect(stubs.insertArtifactStub.called).to.be.false;
-      expect(stubs.ingestFeaturesStub.called).to.be.false;
+      expect(stubs.deleteSubmissionFeaturesStub.called).to.be.false;
+      expect(stubs.insertSubmissionFeatureRecordStub.called).to.be.false;
     });
 
     it('media reference failure: returns errors, no pass 2', async () => {
@@ -335,7 +346,7 @@ describe('SubmissionIngestionService', () => {
       expect(stubs.getFileStreamStub.getCall(1).args[1]).to.equal(mockObjectKey);
     });
 
-    it('enrichArtifactKeys sets artifact_key on file blocks', async () => {
+    it('setArtifactKeys sets artifact_key on file blocks', async () => {
       // Use blocks that are the SAME object references so mutation is visible
       const blocks: IFlattenedBlock[] = [
         { id: 'obs-1', type: 'observation', properties: { species: 'bear' }, content: [], parent: null },
@@ -355,16 +366,15 @@ describe('SubmissionIngestionService', () => {
 
       await service.processSubmission(submissionId);
 
-      // ingestFeatures should be called with the mutated blocks
-      expect(stubs.ingestFeaturesStub.calledOnce).to.be.true;
-      const ingestedBlocks = stubs.ingestFeaturesStub.getCall(0).args[1] as IFlattenedBlock[];
+      // Find the insertSubmissionFeatureRecord call for file-1
+      const fileInsertCall = Array.from({ length: stubs.insertSubmissionFeatureRecordStub.callCount }, (_, i) =>
+        stubs.insertSubmissionFeatureRecordStub.getCall(i)
+      ).find((call) => call.args[2] === 'file-1');
 
-      // Find the file block in the ingested blocks
-      const fileBlock = ingestedBlocks.find((b) => b.id === 'file-1');
-      expect(fileBlock).to.not.be.undefined;
-      expect(fileBlock!.properties.artifact_key).to.equal('submissions/123/media/photo.jpg');
-      // artifact_id should have been removed by enrichArtifactKeys
-      expect(fileBlock!.properties).to.not.have.property('artifact_id');
+      expect(fileInsertCall).to.not.be.undefined;
+      const insertedProps = fileInsertCall!.args[4];
+      expect(insertedProps.artifact_key).to.equal('submissions/123/media/photo.jpg');
+      expect(insertedProps).to.not.have.property('artifact_id');
     });
 
     it('computeDataByteSizeMap includes JSONB + overhead + artifact size', async () => {
@@ -380,21 +390,25 @@ describe('SubmissionIngestionService', () => {
 
       await service.processSubmission(submissionId);
 
-      expect(stubs.ingestFeaturesStub.calledOnce).to.be.true;
-      const dataByteSizeMap = stubs.ingestFeaturesStub.getCall(0).args[2] as Map<string, number>;
+      // Find insert calls by feature UUID (3rd arg)
+      const obsInsertCall = Array.from({ length: stubs.insertSubmissionFeatureRecordStub.callCount }, (_, i) =>
+        stubs.insertSubmissionFeatureRecordStub.getCall(i)
+      ).find((call) => call.args[2] === 'obs-1');
 
-      // After enrichArtifactKeys, the file block's properties will have artifact_key set.
-      // computeDataByteSizeMap runs after enrichArtifactKeys, so the properties will reflect the mutation.
+      const fileInsertCall = Array.from({ length: stubs.insertSubmissionFeatureRecordStub.callCount }, (_, i) =>
+        stubs.insertSubmissionFeatureRecordStub.getCall(i)
+      ).find((call) => call.args[2] === 'file-1');
+
       // For the observation block: JSONB size + 500 overhead, no artifact
       const obsProps = blocks.find((b) => b.id === 'obs-1')!.properties;
       const expectedObsSize = Buffer.byteLength(JSON.stringify(obsProps)) + 500;
-      expect(dataByteSizeMap.get('obs-1')).to.equal(expectedObsSize);
+      expect(obsInsertCall!.args[5]).to.equal(expectedObsSize);
 
       // For the file block: JSONB size + 500 overhead + 5000 artifact byte size
       // Note: properties will have been enriched with artifact_key by this point
       const fileBlock = blocks.find((b) => b.id === 'file-1')!;
       const expectedFileSize = Buffer.byteLength(JSON.stringify(fileBlock.properties)) + 500 + 5000;
-      expect(dataByteSizeMap.get('file-1')).to.equal(expectedFileSize);
+      expect(fileInsertCall!.args[5]).to.equal(expectedFileSize);
     });
 
     it('getTarballObjectKey failure throws', async () => {
@@ -405,8 +419,8 @@ describe('SubmissionIngestionService', () => {
       // Stub methods that should NOT be called
       const extractBlocksStub = sinon.stub(biohubTarParser, 'extractBlocksFromArchive');
       const extractAndUploadMediaStub = sinon.stub(biohubTarParser, 'extractAndUploadMedia');
-      const validateStub = sinon.stub(FeatureIngestionService.prototype, 'validateFlatSubmissionFeatures');
-      const ingestFeaturesStub = sinon.stub(FeatureIngestionService.prototype, 'ingestFeatures');
+      const validateStub = sinon.stub(FeatureValidationService.prototype, 'validateFlatSubmissionFeatures');
+      const deleteStub = sinon.stub(IngestionRepository.prototype, 'deleteSubmissionFeatures');
 
       const dbConnection = getMockDBConnection();
       const service = new SubmissionIngestionService(dbConnection);
@@ -422,7 +436,38 @@ describe('SubmissionIngestionService', () => {
       expect(extractBlocksStub.called).to.be.false;
       expect(extractAndUploadMediaStub.called).to.be.false;
       expect(validateStub.called).to.be.false;
-      expect(ingestFeaturesStub.called).to.be.false;
+      expect(deleteStub.called).to.be.false;
+    });
+
+    it('throws when submission has no uploads', async () => {
+      sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadsBySubmissionId').resolves([]);
+
+      const dbConnection = getMockDBConnection();
+      const service = new SubmissionIngestionService(dbConnection);
+
+      try {
+        await service.processSubmission(submissionId);
+        expect.fail('Expected processSubmission to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal(`No uploads found for submission ${submissionId}`);
+      }
+    });
+
+    it('throws when upload has no archives', async () => {
+      sinon
+        .stub(SubmissionUploadService.prototype, 'getSubmissionUploadsBySubmissionId')
+        .resolves([{ submission_upload_id: 'su-1', submission_id: submissionId, upload_id: 'upload-1' }]);
+      sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([]);
+
+      const dbConnection = getMockDBConnection();
+      const service = new SubmissionIngestionService(dbConnection);
+
+      try {
+        await service.processSubmission(submissionId);
+        expect.fail('Expected processSubmission to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('No archives found for upload upload-1');
+      }
     });
 
     it('re-run after failure works cleanly', async () => {
@@ -440,7 +485,8 @@ describe('SubmissionIngestionService', () => {
       expect(stubs.validateStub.calledOnce).to.be.true;
       expect(stubs.extractAndUploadMediaStub.calledOnce).to.be.true;
       expect(stubs.insertArtifactStub.calledOnce).to.be.true;
-      expect(stubs.ingestFeaturesStub.calledOnce).to.be.true;
+      expect(stubs.deleteSubmissionFeaturesStub.calledOnce).to.be.true;
+      expect(stubs.insertSubmissionFeatureRecordStub.callCount).to.equal(2);
 
       // getFileStream called twice (pass 1 and pass 2)
       expect(stubs.getFileStreamStub.callCount).to.equal(2);

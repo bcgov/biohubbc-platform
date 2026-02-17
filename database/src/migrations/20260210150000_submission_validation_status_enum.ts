@@ -21,14 +21,22 @@ export async function up(knex: Knex): Promise<void> {
     -- CONVERT COLUMN TYPE
     --------------------------------------------------------------------------------
 
+    -- Drop DEFAULT before type conversion (DEFAULT 'pending' can't auto-cast to ENUM)
+    ALTER TABLE submission_validation
+      ALTER COLUMN status DROP DEFAULT;
+
     -- Convert status from VARCHAR to ENUM
     ALTER TABLE submission_validation
       ALTER COLUMN status TYPE submission_validation_status
       USING status::submission_validation_status;
 
+    -- Re-add DEFAULT using ENUM value
+    ALTER TABLE submission_validation
+      ALTER COLUMN status SET DEFAULT 'pending'::submission_validation_status;
+
     -- Drop CHECK constraint (ENUM provides type safety)
     ALTER TABLE submission_validation
-      DROP CONSTRAINT submission_validation_status_check;
+      DROP CONSTRAINT IF EXISTS submission_validation_status_check;
   `);
 }
 
@@ -43,7 +51,7 @@ export async function down(knex: Knex): Promise<void> {
 
     ALTER TABLE submission_validation
       ADD CONSTRAINT submission_validation_status_check
-        CHECK (status IN ('pending', 'started', 'completed', 'invalid', 'failed'));
+        CHECK (status IN ('pending', 'started', 'completed', 'failed'));
 
     DROP TYPE IF EXISTS submission_validation_status;
   `);

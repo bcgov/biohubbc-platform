@@ -935,54 +935,6 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('insertSubmissionFeatureRecord', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const feature = {
-        id: '',
-        type: '',
-        properties: {}
-      };
-      try {
-        await submissionRepository.insertSubmissionFeatureRecord(1, 2, '321', 'type', feature, 0);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission feature record');
-      }
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockResponse = {
-        id: 1
-      };
-
-      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const feature = {
-        id: '',
-        type: '',
-        properties: {}
-      };
-
-      const response = await submissionRepository.insertSubmissionFeatureRecord(1, 2, '321', 'type', feature, 0);
-
-      expect(response).to.eql(mockResponse);
-    });
-  });
-
   describe('getFeatureTypeIdByName', () => {
     afterEach(() => {
       sinon.restore();
@@ -1548,76 +1500,6 @@ describe('SubmissionRepository', () => {
       } catch (error) {
         expect((error as ApiExecuteSQLError).message).to.equal('Failed to get submission feature count');
       }
-    });
-  });
-
-  describe('updateSubmissionFeatureParent', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should update the parent submission feature id successfully', async () => {
-      const mockQueryResponse: QueryResult<never> = {
-        rowCount: 1,
-        rows: [],
-        command: '',
-        oid: 0,
-        fields: []
-      };
-
-      const sqlStub = sinon.stub().resolves(mockQueryResponse);
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      await submissionRepository.updateSubmissionFeatureParent(10, 5);
-
-      expect(sqlStub).to.have.been.calledOnce;
-    });
-  });
-
-  describe('deleteSubmissionFeatures', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should soft delete all submission features for a submission', async () => {
-      const mockQueryResponse: QueryResult<never> = {
-        rowCount: 3,
-        rows: [],
-        command: '',
-        oid: 0,
-        fields: []
-      };
-
-      const sqlStub = sinon.stub().resolves(mockQueryResponse);
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      await submissionRepository.deleteSubmissionFeatures(1);
-
-      expect(sqlStub).to.have.been.calledOnce;
-    });
-
-    it('should complete successfully even when no features exist to delete', async () => {
-      const mockQueryResponse: QueryResult<never> = {
-        rowCount: 0,
-        rows: [],
-        command: '',
-        oid: 0,
-        fields: []
-      };
-
-      const sqlStub = sinon.stub().resolves(mockQueryResponse);
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      // Should not throw even when rowCount is 0
-      await submissionRepository.deleteSubmissionFeatures(999);
-
-      expect(sqlStub).to.have.been.calledOnce;
     });
   });
 });

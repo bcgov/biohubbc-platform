@@ -83,7 +83,11 @@ export async function extractBlocksFromArchive(inputStream: Readable): Promise<I
   const blocksByType = new Map<string, IFlattenedBlock[]>();
   const mediaFileNames = new Set<string>();
 
+  let rejectEntryPromise: (err: unknown) => void;
+
   const entryPromise = new Promise<void>((resolve, reject) => {
+    rejectEntryPromise = reject;
+
     extract.on('entry', async (header, stream, next) => {
       try {
         // Skip directory entries
@@ -123,9 +127,11 @@ export async function extractBlocksFromArchive(inputStream: Readable): Promise<I
     extract.on('error', reject);
   });
 
-  // Pipe input into the tar extractor
-  pipeline(inputStream, extract).catch(() => {
-    // Error handled by extract 'error' event
+  // Pipe input into the tar extractor. Forward pipeline errors to the entry
+  // promise — if inputStream fails before any entries are emitted, the extract
+  // 'error' event may not fire and entryPromise would hang indefinitely.
+  pipeline(inputStream, extract).catch((err) => {
+    rejectEntryPromise(err);
   });
 
   await entryPromise;
@@ -155,7 +161,11 @@ export async function extractAndUploadMedia(
   const extract = tar.extract();
   const uploadedFiles = new Map<string, IUploadedMediaFile>();
 
+  let rejectEntryPromise: (err: unknown) => void;
+
   const entryPromise = new Promise<void>((resolve, reject) => {
+    rejectEntryPromise = reject;
+
     extract.on('entry', async (header, stream, next) => {
       try {
         const entryName = stripArchivePrefix(header.name);
@@ -197,9 +207,11 @@ export async function extractAndUploadMedia(
     extract.on('error', reject);
   });
 
-  // Pipe input into the tar extractor
-  pipeline(inputStream, extract).catch(() => {
-    // Error handled by extract 'error' event
+  // Pipe input into the tar extractor. Forward pipeline errors to the entry
+  // promise — if inputStream fails before any entries are emitted, the extract
+  // 'error' event may not fire and entryPromise would hang indefinitely.
+  pipeline(inputStream, extract).catch((err) => {
+    rejectEntryPromise(err);
   });
 
   await entryPromise;

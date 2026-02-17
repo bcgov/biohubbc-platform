@@ -91,30 +91,7 @@ describe('ArtifactRepository', () => {
       sinon.restore();
     });
 
-    it('throws an error if insert fails', async () => {
-      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-      const repo = new ArtifactRepository(mockDBConnection);
-
-      const payload: CreateArtifact = {
-        bucket: 'bucket',
-        artifact_status: ArtifactStatusEnum.UPLOADED,
-        object_key: 'key.txt',
-        byte_size: 100,
-        checksum_sha256: 'abc',
-        uploaded_at: '2025-12-31T12:00:00Z'
-      };
-
-      try {
-        await repo.insertArtifact(payload);
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiExecuteSQLError);
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to insert artifact record');
-      }
-    });
-
-    it('returns the inserted artifact ID if successful', async () => {
+    it('returns the inserted artifact ID on new insert', async () => {
       const mockRow = { artifact_id: 'artifact-uuid-1' };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
@@ -131,6 +108,36 @@ describe('ArtifactRepository', () => {
 
       const result = await repo.insertArtifact(payload);
       expect(result).to.eql(mockRow);
+    });
+
+    it('returns the existing artifact ID on conflict', async () => {
+      const existingRow = { artifact_id: 'existing-uuid' };
+      let callCount = 0;
+      const mockDBConnection = getMockDBConnection({
+        sql: () => {
+          callCount++;
+          if (callCount === 1) {
+            // INSERT with DO NOTHING — conflict, no rows returned
+            return { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+          }
+          // Follow-up SELECT returns existing row
+          return { rowCount: 1, rows: [existingRow] } as any as Promise<QueryResult<any>>;
+        }
+      });
+      const repo = new ArtifactRepository(mockDBConnection);
+
+      const payload: CreateArtifact = {
+        bucket: 'bucket',
+        artifact_status: ArtifactStatusEnum.UPLOADED,
+        object_key: 'key.txt',
+        byte_size: 100,
+        checksum_sha256: 'abc',
+        uploaded_at: '2025-12-31T12:00:00Z'
+      };
+
+      const result = await repo.insertArtifact(payload);
+      expect(result).to.eql(existingRow);
+      expect(callCount).to.equal(2);
     });
   });
 

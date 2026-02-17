@@ -12,8 +12,6 @@ export enum ValidationErrorType {
   INVALID_FEATURE_TYPE = 'Invalid Feature Type',
 
   // Property errors
-  /** Property is not allowed for this feature type */
-  INVALID_PROPERTY = 'Invalid Property',
   /** A required property for this feature type is missing */
   MISSING_REQUIRED_PROPERTY = 'Missing Required Property',
   /** Property value has wrong type (e.g., string instead of number) */
