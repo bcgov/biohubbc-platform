@@ -391,11 +391,58 @@ const appTheme = createTheme({
         })
       }
     },
+    MuiDialog: {
+      defaultProps: {
+        fullWidth: true,
+        maxWidth: 'md'
+      },
+      styleOverrides: {
+        paper: ({ theme }) => ({
+          borderRadius: 4,
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: theme.palette.background.paper
+        })
+      }
+    },
+    MuiDialogTitle: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          padding: theme.spacing(2.5, 3),
+          fontWeight: 700,
+          borderBottom: `1px solid ${theme.palette.divider}`
+        })
+      }
+    },
+    MuiDialogContent: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          padding: theme.spacing(3),
+          '.MuiDialogTitle-root + &': {
+            paddingTop: theme.spacing(3)
+          }
+        })
+      }
+    },
+    MuiDialogContentText: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          marginBottom: theme.spacing(2),
+          color: theme.palette.text.primary,
+          fontSize: '0.875rem',
+          '&:last-child': {
+            marginBottom: 0
+          }
+        })
+      }
+    },
     MuiDialogActions: {
       styleOverrides: {
-        root: {
-          padding: '20px 24px'
-        }
+        root: ({ theme }) => ({
+          padding: theme.spacing(2.5, 3),
+          borderTop: `1px solid ${theme.palette.divider}`,
+          justifyContent: 'flex-end'
+        })
       }
     },
     MuiTable: {
