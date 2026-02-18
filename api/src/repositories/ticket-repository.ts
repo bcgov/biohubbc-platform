@@ -6,18 +6,27 @@ import { TicketStatusHistory } from '../models/ticket-status-history';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 
-const TICKET_COLUMNS = ['ticket_id', 'ticket_number', 'title', 'description', 'team_id', 'priority', 'status'] as const;
+const TICKET_COLUMNS = [
+  'ticket_id',
+  'ticket_number',
+  'ticket_short_id',
+  'title',
+  'description',
+  'team_id',
+  'priority',
+  'status'
+] as const;
 
 export class TicketRepository extends BaseRepository {
   /**
    * Insert a new ticket record.
    *
-   * @param {(CreateTicketRequest & { team_id: string })} ticket - Ticket payload to persist with resolved team ID.
+   * @param {(CreateTicketRequest & { team_id: string; ticket_short_id: string })} ticket - Ticket payload to persist with resolved team ID and generated short ID.
    * @return {Promise<Ticket>} The created ticket record.
    * @throws {ApiExecuteSQLError} If the insert does not affect exactly one row.
    * @memberof TicketRepository
    */
-  async insertTicket(ticket: CreateTicketRequest & { team_id: string }): Promise<Ticket> {
+  async insertTicket(ticket: CreateTicketRequest & { team_id: string; ticket_short_id: string }): Promise<Ticket> {
     const knex = getKnex();
     const query = knex
       .table('ticket')
@@ -25,6 +34,7 @@ export class TicketRepository extends BaseRepository {
         title: ticket.title,
         description: ticket.description ?? null,
         team_id: ticket.team_id,
+        ticket_short_id: ticket.ticket_short_id,
         priority: ticket.priority ?? 'MEDIUM'
       })
       .returning(TICKET_COLUMNS);
@@ -86,6 +96,34 @@ export class TicketRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get ticket record', [
         'TicketRepository->getTicketByNumber',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get a single active ticket by short reference identifier.
+   *
+   * @param {string} ticketShortId - 8-digit ticket short ID.
+   * @return {Promise<Ticket>} Matching ticket record.
+   * @throws {ApiExecuteSQLError} If exactly one active ticket is not found.
+   * @memberof TicketRepository
+   */
+  async getTicketByShortId(ticketShortId: string): Promise<Ticket> {
+    const knex = getKnex();
+    const query = knex
+      .table('ticket')
+      .select(TICKET_COLUMNS)
+      .where('ticket_short_id', ticketShortId)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query, Ticket);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get ticket record', [
+        'TicketRepository->getTicketByShortId',
         `rowCount was ${response.rowCount}, expected 1`
       ]);
     }

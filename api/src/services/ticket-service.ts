@@ -1,5 +1,6 @@
-import { randomUUID } from 'crypto';
+import { randomInt, randomUUID } from 'crypto';
 import { IDBConnection } from '../database/db';
+import { HTTP400 } from '../errors/http-error';
 import { CreateTicketRequest, Ticket, TicketStatus, TicketWithHistory, UpdateTicketRequest } from '../models/ticket';
 import { TicketRepository } from '../repositories/ticket-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
@@ -31,11 +32,51 @@ export class TicketService extends DBService {
    */
   async createTicket(ticket: CreateTicketRequest): Promise<Ticket> {
     const ticketTeamId = ticket.team_id ?? (await this.createTicketTeam()).team_id;
-    const createdTicket = await this.ticketRepository.insertTicket({ ...ticket, team_id: ticketTeamId });
+    const maxShortIdAttempts = 20;
+    let createdTicket: Ticket | null = null;
+
+    for (let attempt = 0; attempt < maxShortIdAttempts; attempt++) {
+      const ticketShortId = this.generateTicketShortId();
+
+      try {
+        createdTicket = await this.ticketRepository.insertTicket({
+          ...ticket,
+          team_id: ticketTeamId,
+          ticket_short_id: ticketShortId
+        });
+        break;
+      } catch (error: any) {
+        if (error?.code === '23505' && error?.constraint === 'ticket_short_id_unique') {
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    if (!createdTicket) {
+      throw new Error('Failed to generate a unique ticket short ID');
+    }
 
     await this.ticketRepository.insertTicketStatusHistory(createdTicket.ticket_id, createdTicket.status);
 
     return createdTicket;
+  }
+
+  /**
+   * Generate an 8-digit ticket short ID in DDDNNNNN format using UTC day-of-year plus random digits.
+   *
+   * @return {string} The generated ticket short ID.
+   * @memberof TicketService
+   */
+  private generateTicketShortId(): string {
+    const now = new Date();
+    const utcYearStart = Date.UTC(now.getUTCFullYear(), 0, 0);
+    const utcToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const dayOfYear = Math.floor((utcToday - utcYearStart) / (1000 * 60 * 60 * 24));
+    const randomSequence = randomInt(0, 100000);
+
+    return `${dayOfYear.toString().padStart(3, '0')}${randomSequence.toString().padStart(5, '0')}`;
   }
 
   /**
@@ -46,10 +87,13 @@ export class TicketService extends DBService {
    */
   private async createTicketTeam(): Promise<{ team_id: string }> {
     const teamService = new TeamService(this.connection);
-    const createdTeam = await teamService.createTeam({
-      name: `Ticket Team ${randomUUID()}`,
-      description: 'Auto-generated team for ticket ownership.'
-    });
+    const createdTeam = await teamService.createTeamWithMembers(
+      {
+        name: `Ticket Team ${randomUUID()}`,
+        description: 'Auto-generated team for ticket ownership.'
+      },
+      []
+    );
 
     return { team_id: createdTeam.team_id };
   }
@@ -57,14 +101,15 @@ export class TicketService extends DBService {
   /**
    * Get a ticket by its identifier.
    *
-   * @param {string} ticketId - Ticket UUID.
+   * @param {string} ticketRef - Ticket UUID or short ID.
    * @return {Promise<TicketWithHistory>} The requested ticket including status history.
    * @memberof TicketService
    */
-  async getTicket(ticketId: string): Promise<TicketWithHistory> {
+  async getTicket(ticketRef: string): Promise<TicketWithHistory> {
+    const resolvedTicket = await this.resolveTicketByRef(ticketRef);
     const [ticket, history] = await Promise.all([
-      this.ticketRepository.getTicketById(ticketId),
-      this.ticketRepository.getTicketStatusHistory(ticketId)
+      this.ticketRepository.getTicketById(resolvedTicket.ticket_id),
+      this.ticketRepository.getTicketStatusHistory(resolvedTicket.ticket_id)
     ]);
 
     return { ...ticket, history };
@@ -115,24 +160,47 @@ export class TicketService extends DBService {
    *
    * When status changes, an immutable status history row is appended.
    *
-   * @param {string} ticketId - Ticket UUID.
+   * @param {string} ticketRef - Ticket UUID or short ID.
    * @param {UpdateTicketRequest} ticket - Partial ticket update payload.
    * @return {Promise<Ticket>} Updated ticket record.
    * @memberof TicketService
    */
-  async updateTicket(ticketId: string, ticket: UpdateTicketRequest): Promise<Ticket> {
-    const currentTicket = await this.ticketRepository.getTicketById(ticketId);
+  async updateTicket(ticketRef: string, ticket: UpdateTicketRequest): Promise<Ticket> {
+    const currentTicket = await this.resolveTicketByRef(ticketRef);
 
     if (ticket.status && currentTicket.status === ticket.status) {
       return currentTicket;
     }
 
-    const updatedTicket = await this.ticketRepository.updateTicket(ticketId, ticket);
+    const updatedTicket = await this.ticketRepository.updateTicket(currentTicket.ticket_id, ticket);
 
     if (ticket.status && currentTicket.status !== ticket.status) {
-      await this.ticketRepository.insertTicketStatusHistory(ticketId, ticket.status);
+      await this.ticketRepository.insertTicketStatusHistory(currentTicket.ticket_id, ticket.status);
     }
 
     return updatedTicket;
+  }
+
+  /**
+   * Resolve a ticket reference that may be either a UUID or an 8-digit short ID.
+   *
+   * @param {string} ticketRef - UUID or DDDNNNNN short identifier.
+   * @return {Promise<Ticket>} Ticket matching the reference.
+   * @throws {HTTP400} If the reference format is invalid.
+   * @memberof TicketService
+   */
+  private async resolveTicketByRef(ticketRef: string): Promise<Ticket> {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const shortIdRegex = /^[0-9]{8}$/;
+
+    if (uuidRegex.test(ticketRef)) {
+      return this.ticketRepository.getTicketById(ticketRef);
+    }
+
+    if (shortIdRegex.test(ticketRef)) {
+      return this.ticketRepository.getTicketByShortId(ticketRef);
+    }
+
+    throw new HTTP400('Invalid ticket reference', ['Expected ticket UUID or 8-digit short ID']);
   }
 }

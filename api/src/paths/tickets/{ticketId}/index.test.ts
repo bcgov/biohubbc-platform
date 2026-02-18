@@ -12,6 +12,7 @@ describe('paths/tickets/{ticketId}', () => {
   const mockTicket = {
     ticket_id: '11111111-1111-1111-1111-111111111111',
     ticket_number: 1,
+    ticket_short_id: '04900001',
     title: 'A ticket',
     description: 'desc',
     team_id: '22222222-2222-2222-2222-222222222222',
@@ -47,6 +48,25 @@ describe('paths/tickets/{ticketId}', () => {
 
     await getTicket()(mockReq, mockRes, mockNext);
 
+    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.jsonValue).to.eql(mockTicketWithHistory);
+  });
+
+  it('GET returns ticket by short id reference', async () => {
+    const mockDBConnection = getMockDBConnection({
+      commit: sinon.stub(),
+      rollback: sinon.stub(),
+      release: sinon.stub()
+    });
+    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    const getStub = sinon.stub(TicketService.prototype, 'getTicket').resolves(mockTicketWithHistory as any);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.params = { ticketId: mockTicket.ticket_short_id };
+
+    await getTicket()(mockReq, mockRes, mockNext);
+
+    expect(getStub).to.have.been.calledWith(mockTicket.ticket_short_id);
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql(mockTicketWithHistory);
   });

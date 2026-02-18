@@ -77,7 +77,7 @@ export const TicketsDashboardPage = () => {
         order: 'desc'
       });
 
-      navigate(`/admin/tickets/${createdTicket.ticket_id}`);
+      navigate(`/admin/tickets/${createdTicket.ticket_short_id}`);
     } catch (caughtError) {
       const apiError = caughtError as APIError;
       setCreateError(apiError.message || 'Failed to create ticket.');
@@ -131,7 +131,7 @@ export const TicketsDashboardPage = () => {
           <TicketsList
             tickets={tickets}
             isLoading={ticketsLoader.isLoading}
-            onTicketClick={(ticketId) => navigate(`/admin/tickets/${ticketId}`)}
+            onTicketClick={(ticketRef) => navigate(`/admin/tickets/${ticketRef}`)}
             emptyTitle="No tickets"
             emptyMessage="There are no tickets matching your filters."
           />

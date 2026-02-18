@@ -1,0 +1,54 @@
+import Box from '@mui/material/Box';
+import Divider from '@mui/material/Divider';
+import Paper from '@mui/material/Paper';
+import Skeleton from '@mui/material/Skeleton';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
+
+interface ITicketSidebarProps {
+  isLoading: boolean;
+  team?: ITeamWithMembers;
+}
+
+/**
+ * Renders the team sidebar for ticket context.
+ *
+ * @param {ITicketSidebarProps} props
+ * @return {*}
+ */
+export const TicketSidebar = (props: ITicketSidebarProps) => {
+  const { isLoading, team } = props;
+
+  return (
+    <Paper variant="outlined">
+      <Box sx={{ px: 2.5, py: 2 }}>
+        <Typography component="h3" sx={{ fontWeight: 700 }}>
+          Team
+        </Typography>
+      </Box>
+      <Divider />
+      <Box sx={{ px: 2.5, py: 2 }}>
+        {isLoading ? (
+          <Stack spacing={1}>
+            <Skeleton variant="text" width="75%" />
+            <Skeleton variant="text" width="60%" />
+          </Stack>
+        ) : (
+          <Stack spacing={0.75}>
+            {(team?.members ?? []).map((member) => (
+              <Typography key={member.team_member_id} variant="body2" color="text.secondary">
+                {member.user_identifier}
+              </Typography>
+            ))}
+            {!team?.members?.length && (
+              <Typography variant="body2" color="text.secondary">
+                No team members
+              </Typography>
+            )}
+          </Stack>
+        )}
+      </Box>
+    </Paper>
+  );
+};

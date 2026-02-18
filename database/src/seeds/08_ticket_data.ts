@@ -128,6 +128,7 @@ const ensureTicket = async (
 
   const [created] = await knex('ticket')
     .insert({
+      ticket_short_id: await generateUniqueTicketShortId(knex),
       title: input.title,
       description: input.description,
       team_id: input.teamId,
@@ -138,6 +139,32 @@ const ensureTicket = async (
     .returning(['ticket_id', 'status']);
 
   return created;
+};
+
+/**
+ * Generate an unused DDDNNNNN ticket short ID.
+ */
+const generateUniqueTicketShortId = async (knex: Knex): Promise<string> => {
+  const now = new Date();
+  const utcYearStart = Date.UTC(now.getUTCFullYear(), 0, 0);
+  const utcToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const dayOfYear = Math.floor((utcToday - utcYearStart) / (1000 * 60 * 60 * 24));
+  const dayPrefix = dayOfYear.toString().padStart(3, '0');
+
+  for (let attempts = 0; attempts < 50; attempts++) {
+    const randomDigits = Math.floor(Math.random() * 100000)
+      .toString()
+      .padStart(5, '0');
+    const candidate = `${dayPrefix}${randomDigits}`;
+
+    const existing = await knex('ticket').where({ ticket_short_id: candidate }).first();
+
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  throw new Error('Unable to generate a unique ticket_short_id for seed data');
 };
 
 /**

@@ -9,6 +9,7 @@ export type TicketStatus = z.infer<typeof TicketStatus>;
 export const Ticket = z.object({
   ticket_id: z.string().uuid(),
   ticket_number: z.number(),
+  ticket_short_id: z.string().regex(/^[0-9]{8}$/),
   title: z.string(),
   description: z.string().nullable(),
   team_id: z.string().uuid(),

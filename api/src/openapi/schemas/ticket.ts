@@ -6,10 +6,11 @@ const TicketStatusEnum = ['OPEN', 'CLOSED'];
 
 export const TicketSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['ticket_id', 'ticket_number', 'title', 'team_id', 'priority', 'status'],
+  required: ['ticket_id', 'ticket_number', 'ticket_short_id', 'title', 'team_id', 'priority', 'status'],
   properties: {
     ticket_id: { type: 'string', format: 'uuid' },
     ticket_number: { type: 'integer' },
+    ticket_short_id: { type: 'string', minLength: 8, maxLength: 8, pattern: '^[0-9]{8}$' },
     title: { type: 'string', maxLength: 100 },
     description: { type: 'string', maxLength: 2000, nullable: true },
     team_id: { type: 'string', format: 'uuid' },
@@ -20,10 +21,11 @@ export const TicketSchema: OpenAPIV3.SchemaObject = {
 
 export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['ticket_id', 'ticket_number', 'title', 'team_id', 'priority', 'status', 'history'],
+  required: ['ticket_id', 'ticket_number', 'ticket_short_id', 'title', 'team_id', 'priority', 'status', 'history'],
   properties: {
     ticket_id: { type: 'string', format: 'uuid' },
     ticket_number: { type: 'integer' },
+    ticket_short_id: { type: 'string', minLength: 8, maxLength: 8, pattern: '^[0-9]{8}$' },
     title: { type: 'string', maxLength: 100 },
     description: { type: 'string', maxLength: 2000, nullable: true },
     team_id: { type: 'string', format: 'uuid' },

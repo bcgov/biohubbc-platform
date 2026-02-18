@@ -1,22 +1,19 @@
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
-import Breadcrumbs from '@mui/material/Breadcrumbs';
-import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
 import Container from '@mui/material/Container';
-import Divider from '@mui/material/Divider';
-import Link from '@mui/material/Link';
-import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
-import TextField from '@mui/material/TextField';
-import Typography from '@mui/material/Typography';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { ITicketWithHistory, TicketStatus } from 'interfaces/useTicketsApi.interface';
+import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
 import { useEffect, useState } from 'react';
-import { Link as RouterLink, useParams } from 'react-router-dom';
-import { TicketStatusTimeline } from './components/TicketStatusTimeline';
+import { useParams } from 'react-router-dom';
+import { TicketComment } from './detail/TicketComment';
+import { TicketFooter } from './detail/TicketFooter';
+import { TicketHeader } from './detail/TicketHeader';
+import { TicketSidebar } from './detail/TicketSidebar';
+import { TicketTimeline } from './detail/TicketTimeline';
 
 /**
  * Admin ticket detail page for viewing timeline activity and changing ticket status.
@@ -25,34 +22,44 @@ import { TicketStatusTimeline } from './components/TicketStatusTimeline';
  */
 export const TicketDetailPage = () => {
   const api = useApi();
-  const { ticketId } = useParams<{ ticketId: string }>();
+  const { ticketId: ticketRef } = useParams<{ ticketId: string }>();
 
   const ticketLoader = useDataLoader((ticketId: string) => api.tickets.getTicket(ticketId));
+  const teamLoader = useDataLoader((teamId: string) => api.teams.getTeam(teamId));
 
   const [comment, setComment] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
   useEffect(() => {
-    if (!ticketId) {
+    if (!ticketRef) {
       return;
     }
 
-    ticketLoader.load(ticketId);
-  }, [ticketId, ticketLoader]);
+    ticketLoader.load(ticketRef);
+  }, [ticketRef, ticketLoader]);
 
   const ticket: ITicketWithHistory | undefined = ticketLoader.data;
+  const ticketTeam: ITeamWithMembers | undefined = teamLoader.data;
 
-  const refreshTicketData = async () => {
-    if (!ticketId) {
+  useEffect(() => {
+    if (!ticket?.team_id) {
       return;
     }
 
-    await ticketLoader.refresh(ticketId);
+    teamLoader.load(ticket.team_id);
+  }, [ticket?.team_id, teamLoader]);
+
+  const refreshTicketData = async () => {
+    if (!ticketRef) {
+      return;
+    }
+
+    await ticketLoader.refresh(ticketRef);
   };
 
   const handleUpdateStatus = async (status: TicketStatus) => {
-    if (!ticket) {
+    if (!ticket || !ticketRef) {
       return;
     }
 
@@ -60,7 +67,7 @@ export const TicketDetailPage = () => {
       setIsSaving(true);
       setError(undefined);
 
-      await api.tickets.updateTicketStatus(ticket.ticket_id, status);
+      await api.tickets.updateTicketStatus(ticketRef, status);
 
       await refreshTicketData();
     } catch (caughtError) {
@@ -71,85 +78,37 @@ export const TicketDetailPage = () => {
     }
   };
 
-  if (!ticketId) {
+  if (!ticketRef) {
     return null;
   }
 
   return (
     <>
-      <Paper square elevation={0}>
-        <Container maxWidth="xl" sx={{ py: 4 }}>
-          <Breadcrumbs aria-label="ticket breadcrumb" sx={{ mb: 1.5 }}>
-            <Link component={RouterLink} to="/admin/tickets" underline="hover" color="inherit">
-              Tickets
-            </Link>
-            <Typography color="text.primary">{ticket ? `Ticket #${ticket.ticket_number}` : 'Ticket'}</Typography>
-          </Breadcrumbs>
-
-          <Stack direction="row" spacing={2} alignItems="center">
-            <Typography variant="h1">{ticket ? `Ticket #${ticket.ticket_number}` : 'Ticket'}</Typography>
-            {ticket?.status && (
-              <Chip
-                label={ticket.status === 'OPEN' ? 'Open' : 'Closed'}
-                color="primary"
-                sx={{ height: 40, px: 1.25, borderRadius: 5, '& .MuiChip-label': { fontSize: '1.5rem', fontWeight: 700 } }}
-              />
-            )}
-          </Stack>
-          <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
-            {ticket?.description || 'No description has been added to this ticket.'}
-          </Typography>
-        </Container>
-      </Paper>
+      <TicketHeader ticket={ticket} />
 
       <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Stack spacing={4}>
-          {error && <Alert severity="error">{error}</Alert>}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 280px' },
+            gap: 3,
+            alignItems: 'start'
+          }}>
+          <Stack spacing={4}>
+            {error && <Alert severity="error">{error}</Alert>}
 
-          <TicketStatusTimeline history={ticket?.history ?? []} isLoading={ticketLoader.isLoading} />
-
-          <Paper variant="outlined">
-            <Box sx={{ px: 3, py: 2 }}>
-              <Typography variant="h3" component="h3">
-                Comment
-              </Typography>
-            </Box>
-            <Divider />
-            <Box sx={{ p: 3 }}>
-              <TextField
-                fullWidth
-                multiline
-                minRows={3}
-                placeholder="Type your comment..."
-                value={comment}
-                onChange={(event) => setComment(event.target.value)}
-              />
-            </Box>
-          </Paper>
-
-          <Stack direction="row" justifyContent="flex-end" spacing={2} alignItems="center">
-            {ticket?.status === 'OPEN' ? (
-              <Button
-                variant="contained"
-                onClick={() => handleUpdateStatus('CLOSED')}
-                disabled={isSaving}
-                data-testid="close-ticket-button">
-                Close Ticket
-              </Button>
-            ) : (
-              <Button
-                variant="contained"
-                onClick={() => handleUpdateStatus('OPEN')}
-                disabled={isSaving}
-                data-testid="open-ticket-button">
-                Reopen Ticket
-              </Button>
-            )}
-            <Button variant="text" disabled={!comment.trim()}>
-              Comment
-            </Button>
+            <TicketTimeline history={ticket?.history ?? []} isLoading={ticketLoader.isLoading} />
+            <TicketComment comment={comment} setComment={setComment} />
+            <TicketFooter
+              comment={comment}
+              isSaving={isSaving}
+              status={ticket?.status}
+              onUpdateStatus={handleUpdateStatus}
+            />
           </Stack>
-        </Stack>
+
+          <TicketSidebar isLoading={teamLoader.isLoading} team={ticketTeam} />
+        </Box>
       </Container>
     </>
   );

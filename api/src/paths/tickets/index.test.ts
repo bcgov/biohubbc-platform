@@ -2,8 +2,8 @@ import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../database/db';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import { TicketService } from '../../services/ticket-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import { createTicket, getTickets } from './index';
 
 chai.use(sinonChai);
@@ -12,6 +12,7 @@ describe('paths/tickets', () => {
   const mockTicket = {
     ticket_id: '11111111-1111-1111-1111-111111111111',
     ticket_number: 1,
+    ticket_short_id: '04900001',
     title: 'A ticket',
     description: 'desc',
     team_id: '22222222-2222-2222-2222-222222222222',
@@ -24,7 +25,11 @@ describe('paths/tickets', () => {
   });
 
   it('POST createTicket returns 201 with created ticket', async () => {
-    const mockDBConnection = getMockDBConnection({ commit: sinon.stub(), rollback: sinon.stub(), release: sinon.stub() });
+    const mockDBConnection = getMockDBConnection({
+      commit: sinon.stub(),
+      rollback: sinon.stub(),
+      release: sinon.stub()
+    });
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
     sinon.stub(TicketService.prototype, 'createTicket').resolves(mockTicket as any);
 
@@ -38,7 +43,11 @@ describe('paths/tickets', () => {
   });
 
   it('GET getTickets returns paginated response', async () => {
-    const mockDBConnection = getMockDBConnection({ commit: sinon.stub(), rollback: sinon.stub(), release: sinon.stub() });
+    const mockDBConnection = getMockDBConnection({
+      commit: sinon.stub(),
+      rollback: sinon.stub(),
+      release: sinon.stub()
+    });
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
     const listStub = sinon.stub(TicketService.prototype, 'getTicketsByTeamId').resolves([mockTicket as any]);
     const countStub = sinon.stub(TicketService.prototype, 'getTicketsByTeamIdCount').resolves(21);
@@ -70,7 +79,11 @@ describe('paths/tickets', () => {
   });
 
   it('GET getTickets returns all tickets when team_id is omitted', async () => {
-    const mockDBConnection = getMockDBConnection({ commit: sinon.stub(), rollback: sinon.stub(), release: sinon.stub() });
+    const mockDBConnection = getMockDBConnection({
+      commit: sinon.stub(),
+      rollback: sinon.stub(),
+      release: sinon.stub()
+    });
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
     const listStub = sinon.stub(TicketService.prototype, 'getTicketsByTeamId').resolves([mockTicket as any]);
     const countStub = sinon.stub(TicketService.prototype, 'getTicketsByTeamIdCount').resolves(1);

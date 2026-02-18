@@ -12,6 +12,7 @@ const mockUseApi = useApi as Mock;
 const ticket = {
   ticket_id: '11111111-1111-1111-1111-111111111111',
   ticket_number: 42,
+  ticket_short_id: '04900042',
   title: 'Test Ticket',
   description: 'Test description',
   team_id: '22222222-2222-2222-2222-222222222222',
@@ -39,25 +40,35 @@ const ticketWithHistory = {
 
 describe('TicketDetailPage', () => {
   const mockGetTicket = vi.fn();
+  const mockGetTeam = vi.fn();
   const mockUpdateTicketStatus = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     mockGetTicket.mockResolvedValue(ticketWithHistory);
+    mockGetTeam.mockResolvedValue({
+      team_id: ticket.team_id,
+      name: 'Team 1',
+      description: null,
+      members: [{ team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' }]
+    });
     mockUpdateTicketStatus.mockResolvedValue({ ...ticket, status: 'CLOSED' });
 
     mockUseApi.mockImplementation(() => ({
       tickets: {
         getTicket: mockGetTicket,
         updateTicketStatus: mockUpdateTicketStatus
+      },
+      teams: {
+        getTeam: mockGetTeam
       }
     }));
   });
 
   const renderPage = () =>
     render(
-      <MemoryRouter initialEntries={[`/admin/tickets/${ticket.ticket_id}`]}>
+      <MemoryRouter initialEntries={[`/admin/tickets/${ticket.ticket_short_id}`]}>
         <Routes>
           <Route path="/admin/tickets/:ticketId" element={<TicketDetailPage />} />
         </Routes>
@@ -68,7 +79,8 @@ describe('TicketDetailPage', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(mockGetTicket).toHaveBeenCalledWith(ticket.ticket_id);
+      expect(mockGetTicket).toHaveBeenCalledWith(ticket.ticket_short_id);
+      expect(mockGetTeam).toHaveBeenCalledWith(ticket.team_id);
     });
   });
 
@@ -76,9 +88,11 @@ describe('TicketDetailPage', () => {
     const { getByText, getByPlaceholderText, getByRole } = renderPage();
 
     await waitFor(() => {
-      expect(getByText('Ticket #42')).toBeVisible();
+      expect(getByText('Ticket #04900042')).toBeVisible();
       expect(getByText('Ticket was opened')).toBeVisible();
       expect(getByText('Ticket was closed')).toBeVisible();
+      expect(getByText('Team')).toBeVisible();
+      expect(getByText('alice')).toBeVisible();
       expect(getByPlaceholderText('Type your comment...')).toBeVisible();
       expect(getByRole('link', { name: 'Tickets' })).toHaveAttribute('href', '/admin/tickets');
     });
@@ -94,7 +108,7 @@ describe('TicketDetailPage', () => {
     fireEvent.click(getByTestId('close-ticket-button'));
 
     await waitFor(() => {
-      expect(mockUpdateTicketStatus).toHaveBeenCalledWith(ticket.ticket_id, 'CLOSED');
+      expect(mockUpdateTicketStatus).toHaveBeenCalledWith(ticket.ticket_short_id, 'CLOSED');
     });
   });
 });

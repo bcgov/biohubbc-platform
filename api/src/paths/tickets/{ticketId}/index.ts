@@ -33,9 +33,9 @@ GET.apiDoc = {
       name: 'ticketId',
       required: true,
       schema: {
-        type: 'string',
-        format: 'uuid'
-      }
+        type: 'string'
+      },
+      description: 'Ticket UUID or 8-digit short ID.'
     }
   ],
   responses: {
@@ -61,9 +61,9 @@ PATCH.apiDoc = {
       name: 'ticketId',
       required: true,
       schema: {
-        type: 'string',
-        format: 'uuid'
-      }
+        type: 'string'
+      },
+      description: 'Ticket UUID or 8-digit short ID.'
     }
   ],
   requestBody: {

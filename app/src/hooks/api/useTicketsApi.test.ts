@@ -38,6 +38,7 @@ describe('useTicketsApi', () => {
     const ticket = {
       ticket_id: '11111111-1111-1111-1111-111111111111',
       ticket_number: 5,
+      ticket_short_id: '04900001',
       title: 'Test ticket',
       description: null,
       team_id: '22222222-2222-2222-2222-222222222222',
@@ -62,6 +63,7 @@ describe('useTicketsApi', () => {
     const ticket = {
       ticket_id: '11111111-1111-1111-1111-111111111111',
       ticket_number: 5,
+      ticket_short_id: '04900001',
       title: 'New ticket',
       description: 'desc',
       team_id: '22222222-2222-2222-2222-222222222222',
@@ -82,6 +84,7 @@ describe('useTicketsApi', () => {
     const ticket = {
       ticket_id: ticketId,
       ticket_number: 5,
+      ticket_short_id: '04900001',
       title: 'Updated title',
       description: null,
       team_id: '22222222-2222-2222-2222-222222222222',
@@ -101,6 +104,7 @@ describe('useTicketsApi', () => {
     const ticket = {
       ticket_id: ticketId,
       ticket_number: 5,
+      ticket_short_id: '04900001',
       title: 'Status changed',
       description: null,
       team_id: '22222222-2222-2222-2222-222222222222',

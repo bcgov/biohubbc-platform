@@ -58,7 +58,7 @@ export const TicketStatusTimeline = (props: ITicketStatusTimelineProps) => {
             <Box sx={{ width: 32, height: 32, borderRadius: 1.25, bgcolor: 'grey.300', mt: 0.25 }} />
           </Box>
 
-          <Typography variant="h4" component="p" sx={{ pt: 0.75 }}>
+          <Typography sx={{ pt: 0.75 }}>
             {getStatusMessage(item.status, index, history.length)}
           </Typography>
         </Box>

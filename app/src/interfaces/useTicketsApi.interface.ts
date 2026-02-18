@@ -6,6 +6,7 @@ export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export interface ITicket {
   ticket_id: string;
   ticket_number: number;
+  ticket_short_id: string;
   title: string;
   description: string | null;
   team_id: string;
