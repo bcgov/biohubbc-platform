@@ -33,8 +33,6 @@ export const CreateSubmissionForm = () => {
     return Promise.resolve();
   };
 
-  console.log(errors);
-
   return (
     <Box component="form" display="flex" flexDirection="column" gap={3}>
       {/* Name Field */}

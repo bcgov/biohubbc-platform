@@ -42,7 +42,6 @@ export const CreateSubmissionPage = () => {
    * NOTE: The logic in creating the .tar file should be improved, where possible
    */
   const handleSubmit = async (values: ICreateSubmissionForm) => {
-    console.log('Submitting with values:', values);
     setIsSubmitting(true);
 
     const { file, ...submission } = values;
