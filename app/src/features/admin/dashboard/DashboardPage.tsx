@@ -4,9 +4,8 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
-import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
+import { TabGroup } from 'components/tabs/TabGroup';
 import ReviewedSubmissionsTable from 'features/admin/dashboard/components/ReviewedSubmissionsTable';
 import UnreviewedSubmissionsTable from 'features/admin/dashboard/components/UnreviewedSubmissionsTable';
 import { useState } from 'react';
@@ -34,33 +33,34 @@ const DashboardPage = () => {
             </Button>
           </Box>
 
-          <Tabs
-            value={activeTab}
-            onChange={(_, value) => setActiveTab(value)}
-            aria-label="basic tabs example"
-            sx={{
-              mt: 1.5,
-              mx: -2
-            }}>
-            <Tab
-              value="pending"
-              label="Pending Review"
-              id="submission-pending-tab"
-              aria-controls="submission-pending-tabpanel"
+          <Box mx={2}>
+            <TabGroup
+              value={activeTab}
+              onChange={setActiveTab}
+              ariaLabel="submission dashboard tabs"
+              sx={{ mt: 1.5, mx: -2 }}
+              tabs={[
+                {
+                  value: 'pending',
+                  label: 'Pending Review',
+                  id: 'submission-pending-tab',
+                  ariaControls: 'submission-pending-tabpanel'
+                },
+                {
+                  value: 'complete',
+                  label: 'Completed',
+                  id: 'submission-complete-tab',
+                  ariaControls: 'submission-complete-tabpanel'
+                },
+                {
+                  value: 'published',
+                  label: 'Published',
+                  id: 'submission-published-tab',
+                  ariaControls: 'submission-published-tabpanel'
+                }
+              ]}
             />
-            <Tab
-              value="complete"
-              label="Completed"
-              id="submission-complete-tab"
-              aria-controls="submission-complete-tabpanel"
-            />
-            <Tab
-              value="published"
-              label="Published"
-              id="submission-published-tab"
-              aria-controls="submission-published-tabpanel"
-            />
-          </Tabs>
+          </Box>
         </Container>
       </Paper>
       <Container

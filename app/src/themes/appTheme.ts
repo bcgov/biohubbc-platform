@@ -391,17 +391,24 @@ const appTheme = createTheme({
     },
     MuiTab: {
       styleOverrides: {
-        root: {
-          fontWeight: 700
-        }
+        root: ({ theme }) => ({
+          fontWeight: 700,
+          color: theme.palette.text.secondary,
+          opacity: 0.75,
+          padding: theme.spacing(0, 2),
+          '&.Mui-selected': {
+            color: theme.palette.primary.main,
+            opacity: 1
+          }
+        })
       }
     },
     MuiTabs: {
       styleOverrides: {
-        indicator: {
-          borderLeft: '16px solid #fff',
-          borderRight: '16px solid #fff'
-        }
+        indicator: ({ theme }) => ({
+          height: 3,
+          backgroundColor: theme.palette.primary.main
+        })
       }
     }
   }
