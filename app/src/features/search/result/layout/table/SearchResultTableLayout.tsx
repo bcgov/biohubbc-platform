@@ -1,5 +1,6 @@
 import { Button, Stack } from '@mui/material';
-import { DataGrid, GridCellParams, GridRowSelectionModel } from '@mui/x-data-grid';
+import { GridCellParams, GridRowSelectionModel } from '@mui/x-data-grid';
+import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useMemo } from 'react';
 
@@ -97,7 +98,7 @@ export const SearchResultTableLayout = ({
   }, [results, cartFeatureIds, onDownload, onAddToCart, onRemoveFromCart]);
 
   return (
-    <DataGrid
+    <CustomDataGrid
       rows={results}
       columns={columns}
       getRowId={(row) => row.uuid}

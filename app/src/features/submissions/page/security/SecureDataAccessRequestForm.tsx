@@ -2,7 +2,8 @@ import { DialogContentText, FormControl, FormControlLabel, FormHelperText, Radio
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
-import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
+import { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
+import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import CustomTextFieldFormik from 'components/fields/CustomTextFieldFormik';
 import { useFormikContext } from 'formik';
 import { IArtifact } from 'interfaces/useDatasetApi.interface';
@@ -148,7 +149,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
         </Typography>
         <Box py={2}>
           <Box mb={1}>
-            <DataGrid
+            <CustomDataGrid
               sx={classes.dataGrid}
               getRowId={(row) => row.artifact_id}
               autoHeight
