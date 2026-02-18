@@ -21,7 +21,16 @@ export const JobQueues = {
    * Dead letter queue for failed malware jobs.
    * Jobs are moved here after all retries are exhausted.
    */
-  MALWARE_SCAN_FAILED: 'malware-scan-failed'
+  MALWARE_SCAN_FAILED: 'malware-scan-failed',
+  /**
+   * Process download job queue for async download packaging.
+   */
+  PROCESS_DOWNLOAD: 'process-download',
+  /**
+   * Dead letter queue for failed download jobs.
+   * Jobs are moved here after all retries are exhausted.
+   */
+  PROCESS_DOWNLOAD_FAILED: 'process-download-failed'
 } as const;
 
 export type JobQueueName = (typeof JobQueues)[keyof typeof JobQueues];

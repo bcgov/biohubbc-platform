@@ -143,12 +143,20 @@ export async function up(knex: Knex): Promise<void> {
     CREATE TRIGGER journal_data_request_status
       AFTER INSERT OR UPDATE OR DELETE ON data_request_status
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
+
+    --------------------------------------------------------------------------------
+    -- Add deferred FK from download → data_request (download table created earlier)
+    --------------------------------------------------------------------------------
+    ALTER TABLE download ADD CONSTRAINT download_data_request_fk
+      FOREIGN KEY (data_request_id) REFERENCES data_request(data_request_id);
   `);
 }
 
 export async function down(knex: Knex): Promise<void> {
   await knex.raw(`
     SET SEARCH_PATH = biohub, public;
+
+    ALTER TABLE download DROP CONSTRAINT IF EXISTS download_data_request_fk;
 
     DROP TRIGGER IF EXISTS journal_data_request_status ON data_request_status;
     DROP TRIGGER IF EXISTS audit_data_request_status ON data_request_status;
