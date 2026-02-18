@@ -95,6 +95,13 @@ spec:
               value: {{ .Values.app.nodeEnv }}
             - name: NODE_OPTIONS
               value: {{ .Values.app.nodeOptions }}
+            # Clamav
+            - name: ENABLE_FILE_VIRUS_SCAN
+              value: {{ .Values.app.clamav.enabled | quote }}
+            - name: CLAMAV_HOST
+              value: {{ .Values.app.clamav.host }}
+            - name: CLAMAV_PORT
+              value: {{ .Values.app.clamav.port | quote }}
             # Database
             - name: TZ
               value: {{ .Values.app.timezone }}
@@ -140,6 +147,27 @@ spec:
                   name: {{ .Values.app.objectStore.secretName }}
             - name: S3_KEY_PREFIX
               value: {{ if .Values.app.objectStore.keyPrefix }}{{ .Values.app.objectStore.keyPrefix }}{{ else }}local/{{ .Values.environment.changeId }}/biohub{{ end }}
+            # Quarantine Object Store (S3)
+            - name: QUARANTINE_OBJECT_STORE_URL
+              valueFrom:
+                secretKeyRef:
+                  key: endpoint
+                  name: {{ .Values.app.quarantineObjectStore.secretName }}
+            - name: QUARANTINE_OBJECT_STORE_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: access_key
+                  name: {{ .Values.app.quarantineObjectStore.secretName }}
+            - name: QUARANTINE_OBJECT_STORE_SECRET_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: secret_key
+                  name: {{ .Values.app.quarantineObjectStore.secretName }}
+            - name: QUARANTINE_OBJECT_STORE_BUCKET_NAME
+              valueFrom:
+                secretKeyRef:
+                  key: bucket
+                  name: {{ .Values.app.quarantineObjectStore.secretName }}
             # Logging
             - name: LOG_LEVEL
               value: {{ .Values.app.logging.level }}

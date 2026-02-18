@@ -1,0 +1,59 @@
+# Clean PR artifacts and image tags.
+# Runs when a PR is closed (merged or not), or when a PR is converted back to draft.
+# Deletes PR Helm release in dev and the four PR image tags (build-1.0.0-{PR}) in -tools.
+name: Clean PR Artifacts
+
+on:
+  pull_request:
+    types: [closed, converted_to_draft]
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_TAG: build-1.0.0-${{ github.event.number }}
+
+jobs:
+  clean:
+    name: Clean PR Artifacts for API, App, DB, and DB Setup in Dev and Tools environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PR_NUMBER: ${{ github.event.number }}
+    steps:
+      # Install oc, which was removed from the ubuntu-latest image in v24.04
+      - name: Install OpenShift CLI tools
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.16"
+
+      # Log in to OpenShift
+      # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
+      # PR's must originate from a branch off the original repo or else all openshift `oc` commands will fail.
+      - name: Log in to OpenShift
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: https://api.silver.devops.gov.bc.ca:6443
+          openshift_token: ${{ secrets.TOOLS_SA_TOKEN }}
+
+      # Clean all PR artifacts for the PR using Helm
+      - name: Clean PR Artifacts
+        run: |
+          echo "Cleaning PR artifacts for PR $PR_NUMBER"
+          
+          echo "Uninstalling Helm release from ${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev namespace..."
+          helm uninstall "pr-$PR_NUMBER" --namespace ${{ vars.OPENSHIFT_LICENSE_PLATE }}-dev || echo "No Helm release found in dev namespace for PR $PR_NUMBER"
+
+          echo "Removing App image tag from ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools namespace..."
+          oc tag -d biohub-platform-app:${{ env.IMAGE_TAG }} --namespace ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools || echo "No image found for PR $PR_NUMBER"
+
+          echo "Removing API image tag from ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools namespace..."
+          oc tag -d biohub-platform-api:${{ env.IMAGE_TAG }} --namespace ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools || echo "No image found for PR $PR_NUMBER"
+
+          echo "Removing DB image tag from ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools namespace..."
+          oc tag -d biohub-platform-db:${{ env.IMAGE_TAG }} --namespace ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools || echo "No image found for PR $PR_NUMBER"
+
+          echo "Removing DB Setup image tag from ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools namespace..."
+          oc tag -d biohub-platform-db-setup:${{ env.IMAGE_TAG }}  --namespace ${{ vars.OPENSHIFT_LICENSE_PLATE }}-tools || echo "No image found for PR $PR_NUMBER"
+          
+          echo "Cleanup completed for PR $PR_NUMBER"

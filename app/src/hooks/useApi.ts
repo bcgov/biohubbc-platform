@@ -2,12 +2,14 @@ import { useConfigContext } from 'hooks/useContext';
 import useAdminApi from './api/useAdminApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
+import { useCartApi } from './api/useCartApi';
 import useCodesApi from './api/useCodesApi';
 import { useFeaturesApi } from './api/useFeaturesApi';
 import usePoliciesApi from './api/usePoliciesApi';
 import { useSearchApi } from './api/useSearchApi';
 import useSecurityApi from './api/useSecurityApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
+import { useSubmissionsStatusApi } from './api/useSubmissionStatusApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
 import { useTeamPoliciesApi } from './api/useTeamPoliciesApi';
 import { useTeamsApi } from './api/useTeamsApi';
@@ -29,6 +31,8 @@ export const useApi = () => {
 
   const submissions = useSubmissionsApi(apiAxios);
 
+  const submissionStatus = useSubmissionsStatusApi(apiAxios);
+
   const features = useFeaturesApi(apiAxios);
 
   const taxonomy = useTaxonomyApi(apiAxios);
@@ -45,12 +49,15 @@ export const useApi = () => {
 
   const teams = useTeamsApi(apiAxios);
 
+  const cart = useCartApi(apiAxios);
+
   const teamPolicies = useTeamPoliciesApi(apiAxios);
 
   return {
     user,
     admin,
     submissions,
+    submissionStatus,
     features,
     taxonomy,
     security,
@@ -59,6 +66,7 @@ export const useApi = () => {
     policies,
     search,
     teams,
+    cart,
     teamPolicies
   };
 };

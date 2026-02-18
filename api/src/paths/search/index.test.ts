@@ -5,130 +5,154 @@ import sinonChai from 'sinon-chai';
 import * as db from '../../database/db';
 import { SearchService } from '../../services/search-service';
 import { SearchResponseWithCounts } from '../../services/search-service.interface';
+import { ensureCompletePaginationOptions } from '../../utils/pagination';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as search from './index';
 
 chai.use(sinonChai);
 
 describe('search', () => {
+  const mockPaginationTotal = 1;
+  const mockSubmissionRow = { name: 'name', submission_id: 1, description: null };
+  const mockFeatureRows = [
+    { feature_type_id: 1, label: 'label', submission_feature_id: 1 },
+    { feature_type_id: 2, label: 'label2', submission_feature_id: 2 }
+  ];
+
+  const mockResultsWithData: SearchResponseWithCounts = {
+    submissions: { data: [mockSubmissionRow], total: mockPaginationTotal },
+    features: { data: mockFeatureRows, total: mockFeatureRows.length },
+    taxonomy: { data: [], total: 0 }
+  };
+
+  const mockResultsEmpty: SearchResponseWithCounts = {
+    submissions: { data: [], total: 0 },
+    features: { data: [], total: 0 },
+    taxonomy: { data: [], total: 0 }
+  };
+
+  const defaultPaginationNumbers = { page: 1, limit: 2 };
+
   afterEach(() => {
     sinon.restore();
   });
 
   it('should return search results for keyword search', async () => {
-    const mockResults: SearchResponseWithCounts = {
-      submissions: { data: [{ name: 'name', submission_id: 1, description: null }], total: 1 },
-      features: {
-        data: [
-          { feature_type_id: 1, label: 'label', submission_feature_id: 1 },
-          { feature_type_id: 2, label: 'label2', submission_feature_id: 2 }
-        ],
-        total: 2
-      },
-      taxonomy: { data: [], total: 0 }
-    };
-
     const dbConnectionObj = getMockDBConnection({
       open: sinon.stub().resolves(),
       commit: sinon.stub().resolves(),
       rollback: sinon.stub().resolves(),
-      release: sinon.stub()
+      release: sinon.stub().resolves()
     });
-
     sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
-    const { mockReq, mockRes } = getRequestHandlerMocks();
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.query = { keyword: 'moose habitat', page: '1', limit: '2' };
 
-    mockReq.query = { search: 'moose habitat' };
-
-    const mockSearch = sinon.stub(SearchService.prototype, 'search').resolves(mockResults);
+    const mockSearch = sinon.stub(SearchService.prototype, 'search').resolves(mockResultsWithData);
 
     const requestHandler = search.searchAll();
-    await requestHandler(mockReq, mockRes, {} as any);
+    await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(mockSearch).to.have.been.calledOnceWith({ search: 'moose habitat' }, undefined);
+    expect(mockSearch).to.have.been.calledOnceWith(
+      { keyword: 'moose habitat', feature_type_name: undefined },
+      ensureCompletePaginationOptions(defaultPaginationNumbers)
+    );
+
     expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql(mockResults);
+    expect(mockRes.jsonValue).to.eql(mockResultsWithData);
   });
 
-  it('should return search results with pagination', async () => {
-    const mockResults: SearchResponseWithCounts = {
-      submissions: { data: [{ name: 'name', submission_id: 1, description: null }], total: 1 },
-      features: {
-        data: [
-          { feature_type_id: 1, label: 'label', submission_feature_id: 1 },
-          { feature_type_id: 2, label: 'label2', submission_feature_id: 2 }
-        ],
-        total: 2
-      },
-      taxonomy: { data: [], total: 0 }
-    };
-
+  it('should return search results with feature_type_name filter', async () => {
     const dbConnectionObj = getMockDBConnection({
       open: sinon.stub().resolves(),
       commit: sinon.stub().resolves(),
       rollback: sinon.stub().resolves(),
-      release: sinon.stub()
+      release: sinon.stub().resolves()
     });
-
     sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
-    const { mockReq, mockRes } = getRequestHandlerMocks();
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.query = { keyword: 'moose', feature_type_name: 'dataset', page: '1', limit: '2' };
 
-    mockReq.query = { search: 'wildlife', page: '2', limit: '10' };
-
-    const mockSearch = sinon.stub(SearchService.prototype, 'search').resolves(mockResults);
+    const mockSearch = sinon.stub(SearchService.prototype, 'search').resolves(mockResultsWithData);
 
     const requestHandler = search.searchAll();
-    await requestHandler(mockReq, mockRes, {} as any);
+    await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(mockSearch).to.have.been.calledOnceWith({ search: 'wildlife' }, { page: 2, limit: 10 });
+    expect(mockSearch).to.have.been.calledOnceWith(
+      { keyword: 'moose', feature_type_name: 'dataset' },
+      ensureCompletePaginationOptions(defaultPaginationNumbers)
+    );
+
     expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql(mockResults);
+    expect(mockRes.jsonValue).to.eql(mockResultsWithData);
   });
 
-  it('should return empty results when no search criteria provided', async () => {
-    const mockResults: SearchResponseWithCounts = {
-      submissions: { data: [], total: 0 },
-      features: { data: [], total: 0 },
-      taxonomy: { data: [], total: 0 }
-    };
-
+  it('should return search results with custom pagination', async () => {
+    const customNumbers = { page: 2, limit: 5 };
     const dbConnectionObj = getMockDBConnection({
       open: sinon.stub().resolves(),
       commit: sinon.stub().resolves(),
       rollback: sinon.stub().resolves(),
-      release: sinon.stub()
+      release: sinon.stub().resolves()
     });
-
     sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
-    const { mockReq, mockRes } = getRequestHandlerMocks();
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.query = { keyword: 'wildlife', page: '2', limit: '5' };
 
-    mockReq.query = {};
-
-    const mockSearch = sinon.stub(SearchService.prototype, 'search').resolves(mockResults);
+    const mockSearch = sinon.stub(SearchService.prototype, 'search').resolves(mockResultsWithData);
 
     const requestHandler = search.searchAll();
-    await requestHandler(mockReq, mockRes, {} as any);
+    await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(mockSearch).to.have.been.calledOnceWith({ search: undefined }, undefined);
+    expect(mockSearch).to.have.been.calledOnceWith(
+      { keyword: 'wildlife', feature_type_name: undefined },
+      ensureCompletePaginationOptions(customNumbers)
+    );
+
     expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql(mockResults);
+    expect(mockRes.jsonValue).to.eql(mockResultsWithData);
+  });
+
+  it('should return empty results when no keyword provided', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      open: sinon.stub().resolves(),
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves()
+    });
+    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    mockReq.query = { page: '1', limit: '2' };
+
+    const mockSearch = sinon.stub(SearchService.prototype, 'search').resolves(mockResultsEmpty);
+
+    const requestHandler = search.searchAll();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(mockSearch).to.have.been.calledOnceWith(
+      { keyword: '', feature_type_name: undefined },
+      ensureCompletePaginationOptions(defaultPaginationNumbers)
+    );
+
+    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.jsonValue).to.eql(mockResultsEmpty);
   });
 
   it('should handle errors and rollback', async () => {
     const dbConnectionObj = getMockDBConnection({
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
+      open: sinon.stub().resolves(),
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves()
     });
-
     sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    mockReq.body = { keywords: 'test' };
+    mockReq.query = { keyword: 'test', page: '1', limit: '2' };
 
     const testError = new Error('Test error');
     sinon.stub(SearchService.prototype, 'search').rejects(testError);

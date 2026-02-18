@@ -1,10 +1,10 @@
 import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
-import BaseLayout from 'layouts/BaseLayout';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
 import { AdminRouter } from './admin/AdminRouter';
 import { SearchRouter } from './search/SearchRouter';
+import BaseLayout from 'layouts/BaseLayout';
 
 export const AppRouter = () => {
   return (

@@ -3,7 +3,16 @@ import DailyRotateFile from 'winston-daily-rotate-file';
 import { getRequestId, getRequestUser } from './async-request-storage';
 
 const DEFAULT_LOGGER = 'default';
+const MASK = '********';
 
+/**
+ * Regex used to detect sensitive keys that must be redacted.
+ */
+const SENSITIVE_KEY_REGEX = /(password|passwd|pwd|secret|token|api[_-]?key|authorization|cookie)/i;
+
+/**
+ * Public logger interface exposed to consumers.
+ */
 export type CustomLogger = {
   error: (params: CustomLoggerParams) => void;
   warn: (params: CustomLoggerParams) => void;
@@ -12,157 +21,143 @@ export type CustomLogger = {
   silly: (params: CustomLoggerParams) => void;
 };
 
+/**
+ * Parameters accepted by all log methods.
+ */
 export type CustomLoggerParams = {
   label?: string;
   message?: string;
-  error?: any;
-  [key: string]: any;
+  error?: unknown;
+  [key: string]: unknown;
 };
 
+/**
+ * Supported Winston log levels.
+ */
 export const WinstonLogLevels = ['silent', 'error', 'warn', 'info', 'debug', 'silly'] as const;
 
 export type WinstonLogLevel = (typeof WinstonLogLevels)[number];
 
 /**
- * Get a singleton logger.
+ * Get a singleton logger wrapper with a fixed logger label.
  *
- * Wraps the winston logger to provide a common interface for logging.
- *
- * @example
- *
- * Initialization:
- *
- * import { getLogger } from './logger';
- *
- * const defaultLog = getLogger('class-or-file-name');
- *
- * Usage:
- *
- * log.info({ message: 'A basic log message!' })
- *
- * log.info({ label: 'functionName', message: 'A message with a label!' })
- *
- * log.error({ label: 'functionName', message: 'An error message!:', error })
- *
- * log.debug({ label: 'functionName', message: 'A debug message!:', debugInfo1, debugInfo2 })
- *
- * Example Output:
- *
- * {
- *    requestId: '46d544ed-9d70-499a-888c-1a1c67fb095',
- *    timestamp: '2025-02-21 16:54:18',
- *    requestUser: 'SBRULE',
- *    level: 'info',
- *    logger: 'class-logger',
- *    label: 'functionName',
- *    message: 'Log message!',
- *    metadata: {
- *      id: '123',
- *    }
- * }
- *
- * @param {string} logLabel common label for the instance of the logger.
- * @return {*}  {CustomLogger}
+ * @param logLabel Common label for the logger instance (class / file name).
  */
 export const getLogger = (logLabel: string): CustomLogger => {
-  const logger = _getOrCreateLoggerSingleton(DEFAULT_LOGGER);
+  const logger = getOrCreateLoggerSingleton(DEFAULT_LOGGER);
 
   return {
-    error: (params: CustomLoggerParams) => logger.error(..._getLoggerParameters(logLabel, params)),
-    warn: (params: CustomLoggerParams) => logger.warn(..._getLoggerParameters(logLabel, params)),
-    info: (params: CustomLoggerParams) => logger.info(..._getLoggerParameters(logLabel, params)),
-    debug: (params: CustomLoggerParams) => logger.debug(..._getLoggerParameters(logLabel, params)),
-    silly: (params: CustomLoggerParams) => logger.silly(..._getLoggerParameters(logLabel, params))
+    error: (params) => logger.error(...normalizeLoggerParams(logLabel, params)),
+    warn: (params) => logger.warn(...normalizeLoggerParams(logLabel, params)),
+    info: (params) => logger.info(...normalizeLoggerParams(logLabel, params)),
+    debug: (params) => logger.debug(...normalizeLoggerParams(logLabel, params)),
+    silly: (params) => logger.silly(...normalizeLoggerParams(logLabel, params))
   };
 };
 
 /**
- * Helper function for `getLogger` to normalize the logger parameters to ensure 'message' is defined.
+ * Normalize logger parameters to ensure a message is always present.
  *
- * Note: This fixes a strange issue with winston combining the message and metadata into a single object,
- * when the message is NOT included in the params.
- *
- * @param {string} logLabel The common label for the logger instance.
- * @param {CustomLoggerParams} params The logger parameters.
- * @return {*}  {[string, CustomLoggerParams]} The normalized logger parameters.
+ * Winston merges metadata incorrectly when `message` is omitted.
  */
-export const _getLoggerParameters = (logLabel: string, params: CustomLoggerParams): [string, CustomLoggerParams] => {
+const normalizeLoggerParams = (logLabel: string, params: CustomLoggerParams): [string, Record<string, unknown>] => {
   if (params.message) {
-    // Remove 'message' from params and return it as the first element
-    const { message, ...restParams } = params;
-
-    return [message, { logger: logLabel, ...restParams }];
+    const { message, ...rest } = params;
+    return [message, { logger: logLabel, ...rest }];
   }
 
-  // Return 'unknown' as log message when 'message' is not provided
   return ['unknown', { logger: logLabel, ...params }];
 };
 
 /**
- * Get the transport types to use for the logger.
- *
- * @return {*}  {string[]}
+ * Determine which transport types should be enabled.
+ * File logging is disabled during unit tests.
  */
-const _getLoggerTransportTypes = (): string[] => {
-  const transportTypes = ['console'];
+const getTransportTypes = (): Array<'console' | 'file'> => {
+  const transports: Array<'console' | 'file'> = ['console'];
 
-  // Do not output logs to file when running unit tests
-  // Note: Both lifecycle events are needed to prevent log files ie: `npm run test` or `npm run test-watch`
   if (process.env.npm_lifecycle_event !== 'test' && process.env.npm_lifecycle_event !== 'test-watch') {
-    transportTypes.push('file');
+    transports.push('file');
   }
 
-  return transportTypes;
+  return transports;
 };
 
 /**
- * Get the log format for the winston logger.
- *
- * @return {*}  {winston.Logform.Format}
+ * Recursively redact sensitive values from an object or array.
  */
-export const _getLogFormat = (): winston.Logform.Format => {
-  return winston.format.combine(
-    // Fill the metadata with all the properties except the ones listed
-    winston.format.metadata({ fillExcept: ['message', 'level', 'logger', 'label'] }),
-    // Organize the log message structure
-    winston.format((info) => ({
-      // NOTE: Would adding a unique log id be useful? Different from the request id which is shared across async requests
-      requestId: getRequestId(), // 'd3d3b4d3-7b3d-4b3d-8b3d-3d3b4d3b3d3b'
-      timestamp: info.timestamp, // '2025-02-04 14:05:24'
-      user: getRequestUser(), // 'SBRULE'
-      level: info.level, // 'DEBUG'
-      logger: info.logger, // 'app-logger'
-      label: info.label, // 'label/function name/etc.'
-      message: info.message, // 'A log message!'
-      metadata: info.metadata // { ... }
-    }))(),
-    // Format the log timestamp
-    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    // Colorize the log message and limit the depth of the metadata object
-    winston.format.prettyPrint({ colorize: true, depth: 10 })
-  );
+const redactSecrets = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(redactSecrets);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, val]) => {
+        if (SENSITIVE_KEY_REGEX.test(key)) {
+          return [key, MASK];
+        }
+        return [key, redactSecrets(val)];
+      })
+    );
+  }
+
+  return value;
 };
 
 /**
- * Get or create a singleton logger instance.
- *
- * @param {string} loggerName The name of the logger instance.
- * @return {*}  {winston.Logger}
+ * Base format applied to all log entries.
+ * Adds request context and redacts secrets.
  */
-export const _getOrCreateLoggerSingleton = function (loggerName: string): winston.Logger {
-  const hasLogger = winston.loggers.has(loggerName);
+const baseFormat = winston.format.combine(
+  winston.format.metadata({
+    fillExcept: ['message', 'level', 'timestamp', 'logger', 'label']
+  }),
+  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+  winston.format.errors({ stack: true }),
+  winston.format((info) => ({
+    timestamp: info.timestamp,
+    level: info.level,
+    message: info.message,
+    logger: info.logger,
+    label: info.label,
+    requestId: getRequestId(),
+    user: getRequestUser(),
+    metadata: redactSecrets(info.metadata)
+  }))()
+);
 
-  if (hasLogger) {
-    // Return the existing logger instance
+/**
+ * Pretty, colorized console output for humans.
+ */
+const consoleFormat = winston.format.combine(
+  winston.format.colorize({ all: true }),
+  baseFormat,
+  winston.format.printf(({ timestamp, level, message, ...meta }) => {
+    const metaStr = Object.keys(meta).length > 0 ? `\n${JSON.stringify(meta, null, 2)}` : '';
+
+    return `${timestamp} [${level}]: ${message}${metaStr}`;
+  })
+);
+
+/**
+ * Structured, non-colorized format for file output.
+ * Intended for ingestion by log processors.
+ */
+const fileFormat = winston.format.combine(baseFormat, winston.format.json());
+
+/**
+ * Get or create a Winston logger singleton.
+ */
+const getOrCreateLoggerSingleton = (loggerName: string): winston.Logger => {
+  if (winston.loggers.has(loggerName)) {
     return winston.loggers.get(loggerName);
   }
 
-  const transportTypes = _getLoggerTransportTypes();
-
-  const transports = [];
+  const transports: winston.transport[] = [];
+  const transportTypes = getTransportTypes();
 
   if (transportTypes.includes('file')) {
-    // Output logs to file, except when running unit tests
     transports.push(
       new DailyRotateFile({
         dirname: process.env.LOG_FILE_DIR || 'data/logs',
@@ -171,13 +166,9 @@ export const _getOrCreateLoggerSingleton = function (loggerName: string): winsto
         maxSize: process.env.LOG_FILE_MAX_SIZE || '49m',
         maxFiles: process.env.LOG_FILE_MAX_FILES || '10',
         level: process.env.LOG_LEVEL_FILE || 'debug',
-        format: _getLogFormat(),
+        format: fileFormat,
         options: {
-          // https://nodejs.org/api/fs.html#file-system-flags
-          // Open file for reading and appending. The file is created if it does not exist.
           flags: 'a+',
-          // https://nodejs.org/api/fs.html#fs_fs_createwritestream_path_options
-          // Set the file mode to be readable and writable by all users.
           mode: 0o666
         }
       })
@@ -185,57 +176,37 @@ export const _getOrCreateLoggerSingleton = function (loggerName: string): winsto
   }
 
   if (transportTypes.includes('console')) {
-    // Output logs to console, except when running in production
     transports.push(
       new winston.transports.Console({
         level: process.env.LOG_LEVEL || 'debug',
-        format: _getLogFormat()
+        format: consoleFormat
       })
     );
   }
 
-  // Create new logger instance
-  return winston.loggers.add(loggerName, { transports: transports });
+  return winston.loggers.add(loggerName, { transports });
 };
 
 /**
- * Set the winston logger log level for the console transport
- *
- * @param {WinstonLogLevel} consoleLogLevel
+ * Update console log level at runtime.
  */
 export const setLogLevel = (consoleLogLevel: WinstonLogLevel): void => {
-  const transportTypes = _getLoggerTransportTypes();
-
-  if (!transportTypes.includes('console')) {
-    return;
-  }
-
-  // Update env var for future loggers
   process.env.LOG_LEVEL = consoleLogLevel;
 
-  // Update console transport log level, which is the last transport in all environments
   winston.loggers.loggers.forEach((logger) => {
-    logger.transports[transportTypes.length - 1].level = consoleLogLevel;
+    logger.transports
+      .filter((t) => t instanceof winston.transports.Console)
+      .forEach((t) => (t.level = consoleLogLevel));
   });
 };
 
 /**
- * Set the winston logger log level for the file transport.
- *
- * @param {WinstonLogLevel} fileLogLevel
+ * Update file log level at runtime.
  */
 export const setLogLevelFile = (fileLogLevel: WinstonLogLevel): void => {
-  const transportTypes = _getLoggerTransportTypes();
-
-  if (!transportTypes.includes('file')) {
-    return;
-  }
-
-  // Update env var for future loggers
   process.env.LOG_LEVEL_FILE = fileLogLevel;
 
-  // Update file transport log level, which is the first transport in all environments
   winston.loggers.loggers.forEach((logger) => {
-    logger.transports[0].level = fileLogLevel;
+    logger.transports.filter((t) => t instanceof DailyRotateFile).forEach((t) => (t.level = fileLogLevel));
   });
 };

@@ -37,7 +37,8 @@ const appTheme = createTheme({
     bcgovblue: {
       main: '#036',
       contrastText: '#fff'
-    }
+    },
+    divider: '#f0f0f0'
   },
   components: {
     MuiCssBaseline: {
@@ -88,6 +89,11 @@ const appTheme = createTheme({
         }
       }
     },
+    MuiIconButton: {
+      defaultProps: {
+        color: 'primary'
+      }
+    },
     MuiAlertTitle: {
       styleOverrides: {
         root: {
@@ -112,6 +118,10 @@ const appTheme = createTheme({
         },
         sizeLarge: {
           fontSize: '1rem'
+        },
+        sizeSmall: {
+          padding: '8px 12px',
+          fontSize: '0.75rem'
         },
         containedPrimary: {
           fontWeight: 700,
@@ -139,6 +149,16 @@ const appTheme = createTheme({
         }
       }
     },
+    MuiListItemButton: {
+      styleOverrides: {
+        root: {
+          padding: '4px 16px',
+          '& .MuiListItemText-root': {
+            margin: '4px'
+          }
+        }
+      }
+    },
     MuiLink: {
       styleOverrides: {
         root: {
@@ -152,10 +172,43 @@ const appTheme = createTheme({
         }
       }
     },
-    MuiDialogTitle: {
+    MuiTextField: {
+      defaultProps: {
+        size: 'medium'
+      }
+    },
+    MuiOutlinedInput: {
       styleOverrides: {
         root: {
-          fontWeight: '700'
+          borderRadius: 4,
+          backgroundColor: '#f7f8fa',
+          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+            borderColor: '#3B99FC'
+          },
+          padding: '4px 12px',
+          fontSize: '0.875rem'
+        },
+        sizeSmall: {
+          padding: '2px 12px',
+          fontSize: '0.875rem'
+        }
+      }
+    },
+    MuiAutocomplete: {
+      styleOverrides: {
+        root: {
+          '& .MuiOutlinedInput-root': {
+            borderRadius: 4,
+            backgroundColor: '#f7f8fa',
+            padding: '4px 12px',
+            fontSize: '0.875rem',
+            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+              borderColor: '#3B99FC'
+            }
+          },
+          '& .MuiAutocomplete-inputRoot': {
+            padding: 0
+          }
         }
       }
     },
@@ -163,16 +216,6 @@ const appTheme = createTheme({
       styleOverrides: {
         root: {
           padding: '20px 24px'
-        }
-      }
-    },
-    MuiOutlinedInput: {
-      styleOverrides: {
-        root: {
-          padding: '8px 12px !important',
-          '& .MuiInputBase-input': {
-            marginLeft: '12px'
-          }
         }
       }
     },
@@ -211,6 +254,8 @@ const appTheme = createTheme({
           fontSize: '0.875rem',
           backgroundColor: 'transparent',
           borderWidth: 0,
+          width: '100%',
+          overflowX: 'auto',
           '& .MuiDataGrid-columnHeaders': {
             fontSize: '0.875rem',
             fontWeight: 700,
@@ -245,7 +290,28 @@ const appTheme = createTheme({
           '& .MuiDataGrid-cell:focus-within, & .MuiDataGrid-cellCheckbox:focus-within, & .MuiDataGrid-columnHeader:focus-within':
             {
               outline: 'none'
-            }
+            },
+          '& .MuiDataGrid-virtualScroller': {
+            overflowX: 'auto'
+          }
+        }
+      }
+    },
+    MuiToggleButtonGroup: {
+      styleOverrides: {
+        root: {
+          border: 'none',
+          display: 'flex',
+          flexWrap: 'wrap',
+          borderRadius: 0,
+          gap: 1,
+          '& .MuiToggleButton-root': {
+            textTransform: 'none',
+            border: 'none',
+            fontWeight: 700,
+            fontSize: '0.875rem',
+            padding: '6px 12px'
+          }
         }
       }
     },

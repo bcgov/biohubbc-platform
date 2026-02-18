@@ -15,6 +15,7 @@
     "setup": "npm-run-all -l -s migrate-latest seed",
     "migrate-latest": "knex migrate:latest --knexfile ./src/knexfile.ts",
     "migrate-rollback": "knex migrate:rollback --knexfile ./src/knexfile.ts",
+    "migration-create": "./scripts/create-migration.sh",
     "seed": "knex seed:run --knexfile ./src/knexfile.ts",
     "lint": "eslint .",
     "lint-fix": "eslint . --fix",

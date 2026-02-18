@@ -6,7 +6,7 @@ import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
 import { SystemUser } from '../../repositories/user-repository';
 import { RegionService } from '../../services/region-service';
-import { SearchIndexService } from '../../services/search-index-service';
+import { SearchFeatureService } from '../../services/search-feature-service';
 import { SubmissionService } from '../../services/submission-service';
 import { ValidationService } from '../../services/validation-service';
 import * as keycloakUtils from '../../utils/keycloak-utils';
@@ -149,7 +149,7 @@ describe('intake', () => {
         .resolves();
 
       const indexFeaturesBySubmissionIdStub = sinon
-        .stub(SearchIndexService.prototype, 'indexFeaturesBySubmissionId')
+        .stub(SearchFeatureService.prototype, 'indexFeaturesBySubmissionId')
         .resolves();
 
       const findSubmissionFeaturesStub = sinon.stub(SubmissionService.prototype, 'findSubmissionFeatures').resolves([
