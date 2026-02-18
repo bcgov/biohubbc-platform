@@ -2,14 +2,15 @@ import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 import { GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
+import { PageHeader } from 'components/header/PageHeader';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { toApiPagination, useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ApiPaginationRequestOptions } from 'types/pagination';
 import { ActivePoliciesList } from './components/ActivePoliciesList';
 import { TeamPoliciesContainer } from './components/TeamPoliciesContainer';
 import { TeamsContainer } from './components/TeamsContainer';
-import { ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
  * Admin page for managing policies, teams, and team-policy assignments.
@@ -22,11 +23,9 @@ import { ApiPaginationRequestOptions } from 'types/pagination';
 export const ManagePoliciesPage = () => {
   const biohubApi = useApi();
 
-  // Selection state
   const [selectedPolicyId, setSelectedPolicyId] = useState<string | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
 
-  // Policies data grid
   const policies = useServerPaginatedDataGrid({
     fetcher: (search, pagination) => biohubApi.policies.getPolicies({ search }, pagination),
     extractData: (response) => response.policies,
@@ -34,7 +33,6 @@ export const ManagePoliciesPage = () => {
     defaultSort: { field: 'name', sort: 'asc' }
   });
 
-  // Teams data grid
   const teams = useServerPaginatedDataGrid({
     fetcher: (search, pagination) => biohubApi.teams.getTeams({ search }, pagination),
     extractData: (response) => response.teams,
@@ -42,7 +40,6 @@ export const ManagePoliciesPage = () => {
     defaultSort: { field: 'name', sort: 'asc' }
   });
 
-  // TeamPolicies - simpler pattern (no search, has client-side filtering)
   const [teamPoliciesPaginationModel, setTeamPoliciesPaginationModel] = useState<GridPaginationModel>({
     page: 0,
     pageSize: 10
@@ -55,7 +52,6 @@ export const ManagePoliciesPage = () => {
     biohubApi.teamPolicies.getTeamPolicies(pagination)
   );
 
-  // Load teamPolicies on mount
   useEffect(() => {
     teamPoliciesDataLoader.load(toApiPagination(teamPoliciesPaginationModel, teamPoliciesSortModel));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,7 +80,6 @@ export const ManagePoliciesPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamPoliciesPaginationModel, teamPoliciesSortModel]);
 
-  // Filter team-policies based on selection
   const filteredTeamPolicies = useMemo(() => {
     const teamPolicies = teamPoliciesDataLoader.data?.team_policies ?? [];
     let result = teamPolicies;
@@ -99,11 +94,9 @@ export const ManagePoliciesPage = () => {
     return result;
   }, [teamPoliciesDataLoader.data?.team_policies, selectedTeamId, selectedPolicyId]);
 
-  // Get selected objects for TeamPoliciesContainer
   const selectedTeam = teams.data.find((t) => t.team_id === selectedTeamId) ?? null;
   const selectedPolicy = policies.data.find((p) => p.policy_id === selectedPolicyId) ?? null;
 
-  // Selection handlers
   const handleSelectPolicy = useCallback((policyId: string | null) => {
     setSelectedPolicyId(policyId);
   }, []);
@@ -113,54 +106,57 @@ export const ManagePoliciesPage = () => {
   }, []);
 
   return (
-    <Box py={7}>
-      <ActivePoliciesList
-        policies={policies.data}
-        rowCount={policies.rowCount}
-        paginationModel={policies.paginationModel}
-        setPaginationModel={policies.handlePaginationChange}
-        sortModel={policies.sortModel}
-        setSortModel={policies.handleSortChange}
-        refresh={policies.refresh}
-        searchTerm={policies.searchTerm}
-        onSearch={policies.handleSearch}
-        selectedPolicyId={selectedPolicyId}
-        onSelectPolicy={handleSelectPolicy}
-      />
+    <>
+      <PageHeader label="Manage Policies" />
+      <Box py={4}>
+        <ActivePoliciesList
+          policies={policies.data}
+          rowCount={policies.rowCount}
+          paginationModel={policies.paginationModel}
+          setPaginationModel={policies.handlePaginationChange}
+          sortModel={policies.sortModel}
+          setSortModel={policies.handleSortChange}
+          refresh={policies.refresh}
+          searchTerm={policies.searchTerm}
+          onSearch={policies.handleSearch}
+          selectedPolicyId={selectedPolicyId}
+          onSelectPolicy={handleSelectPolicy}
+        />
 
-      <Container maxWidth="xl" sx={{ mt: 4 }}>
-        <Paper>
-          <TeamsContainer
-            teams={teams.data}
-            rowCount={teams.rowCount}
-            paginationModel={teams.paginationModel}
-            setPaginationModel={teams.handlePaginationChange}
-            sortModel={teams.sortModel}
-            setSortModel={teams.handleSortChange}
-            refresh={teams.refresh}
-            searchTerm={teams.searchTerm}
-            onSearch={teams.handleSearch}
-            selectedTeamId={selectedTeamId}
-            onSelectTeam={handleSelectTeam}
-          />
-        </Paper>
-      </Container>
+        <Container maxWidth="xl" sx={{ mt: 4 }}>
+          <Paper>
+            <TeamsContainer
+              teams={teams.data}
+              rowCount={teams.rowCount}
+              paginationModel={teams.paginationModel}
+              setPaginationModel={teams.handlePaginationChange}
+              sortModel={teams.sortModel}
+              setSortModel={teams.handleSortChange}
+              refresh={teams.refresh}
+              searchTerm={teams.searchTerm}
+              onSearch={teams.handleSearch}
+              selectedTeamId={selectedTeamId}
+              onSelectTeam={handleSelectTeam}
+            />
+          </Paper>
+        </Container>
 
-      <Container maxWidth="xl" sx={{ mt: 4 }}>
-        <Paper>
-          <TeamPoliciesContainer
-            teamPolicies={filteredTeamPolicies}
-            rowCount={teamPoliciesDataLoader.data?.pagination.total ?? 0}
-            paginationModel={teamPoliciesPaginationModel}
-            setPaginationModel={handleTeamPoliciesPaginationChange}
-            sortModel={teamPoliciesSortModel}
-            setSortModel={handleTeamPoliciesSortChange}
-            selectedTeam={selectedTeam}
-            selectedPolicy={selectedPolicy}
-            refresh={refreshTeamPolicies}
-          />
-        </Paper>
-      </Container>
-    </Box>
+        <Container maxWidth="xl" sx={{ mt: 4 }}>
+          <Paper>
+            <TeamPoliciesContainer
+              teamPolicies={filteredTeamPolicies}
+              rowCount={teamPoliciesDataLoader.data?.pagination.total ?? 0}
+              paginationModel={teamPoliciesPaginationModel}
+              setPaginationModel={handleTeamPoliciesPaginationChange}
+              sortModel={teamPoliciesSortModel}
+              setSortModel={handleTeamPoliciesSortChange}
+              selectedTeam={selectedTeam}
+              selectedPolicy={selectedPolicy}
+              refresh={refreshTeamPolicies}
+            />
+          </Paper>
+        </Container>
+      </Box>
+    </>
   );
 };

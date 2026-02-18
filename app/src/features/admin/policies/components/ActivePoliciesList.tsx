@@ -86,7 +86,6 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
     onSelectPolicy(newSelectedId);
   };
 
-  // Convert selectedPolicyId to DataGrid selection model format
   const rowSelectionModel: GridRowSelectionModel = {
     type: 'include',
     ids: selectedPolicyId ? new Set([selectedPolicyId]) : new Set()
@@ -384,9 +383,6 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
   return (
     <>
       <Container maxWidth="xl">
-        <Box mb={6}>
-          <Typography variant="h1">Manage Policies</Typography>
-        </Box>
         <Paper>
           <Toolbar disableGutters sx={{ px: 2 }}>
             <Typography variant="h4" component="h2" flexGrow={1}>

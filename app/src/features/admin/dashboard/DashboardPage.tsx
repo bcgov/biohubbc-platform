@@ -3,8 +3,7 @@ import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
-import Paper from '@mui/material/Paper';
-import Typography from '@mui/material/Typography';
+import { PageHeader } from 'components/header/PageHeader';
 import { TabGroup } from 'components/tabs/TabGroup';
 import ReviewedSubmissionsTable from 'features/admin/dashboard/components/ReviewedSubmissionsTable';
 import UnreviewedSubmissionsTable from 'features/admin/dashboard/components/UnreviewedSubmissionsTable';
@@ -17,28 +16,20 @@ const DashboardPage = () => {
 
   return (
     <>
-      <Paper square elevation={0}>
-        <Container
-          maxWidth="xl"
-          sx={{
-            py: 4,
-            pb: 0
-          }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h1" sx={{ ml: '-2px' }}>
-              Submissions
-            </Typography>
-            <Button component={NavLink} to="create" variant="contained" startIcon={<Icon path={mdiPlus} size={1} />}>
-              New Submission
-            </Button>
-          </Box>
-
+      <PageHeader
+        label="Submissions"
+        buttons={
+          <Button component={NavLink} to="create" variant="contained" startIcon={<Icon path={mdiPlus} size={1} />}>
+            New Submission
+          </Button>
+        }
+        tabs={
           <Box mx={2}>
             <TabGroup
               value={activeTab}
               onChange={setActiveTab}
               ariaLabel="submission dashboard tabs"
-              sx={{ mt: 1.5, mx: -2 }}
+              sx={{ mx: -2 }}
               tabs={[
                 {
                   value: 'pending',
@@ -61,8 +52,8 @@ const DashboardPage = () => {
               ]}
             />
           </Box>
-        </Container>
-      </Paper>
+        }
+      />
       <Container
         maxWidth="xl"
         sx={{

@@ -250,34 +250,14 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
   return (
     <>
       <Container maxWidth="xl">
-        <Box mb={6} display="flex" justifyContent="space-between" alignItems="center">
-          <Typography
-            variant="h1"
-            sx={{
-              mt: -2
-            }}>
-            Manage Users
-          </Typography>
-          <Button
-            size="medium"
-            color="primary"
-            variant="contained"
-            data-testid="invite-system-users-button"
-            aria-label={'Add Users'}
-            startIcon={<Icon path={mdiPlus} size={1} />}
-            onClick={() => setOpenAddUserDialog(true)}
-            sx={{
-              mt: -2,
-              fontWeight: 700
-            }}>
-            Add Users
-          </Button>
-        </Box>
         <Paper>
           <Toolbar
             sx={{
               pl: { sm: 2 },
-              pr: { xs: 1, sm: 1 }
+              pr: { xs: 1, sm: 1 },
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
             }}>
             <Typography variant="h4" component="h2">
               Active Users{' '}
@@ -285,6 +265,17 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
                 ({activeUsers?.length || 0})
               </Typography>
             </Typography>
+            <Button
+              size="medium"
+              color="primary"
+              variant="contained"
+              data-testid="invite-system-users-button"
+              aria-label={'Add Users'}
+              startIcon={<Icon path={mdiPlus} size={1} />}
+              onClick={() => setOpenAddUserDialog(true)}
+              sx={{ fontWeight: 700 }}>
+              Add Users
+            </Button>
           </Toolbar>
           <TableContainer>
             <Table sx={classes.table}>
