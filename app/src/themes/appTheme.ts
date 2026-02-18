@@ -496,21 +496,34 @@ const appTheme = createTheme({
     },
     MuiChip: {
       styleOverrides: {
-        root: {
-          fontWeight: 700
-        },
-        colorPrimary: {
-          color: '#003366',
-          backgroundColor: '#DCEBFB',
-          textTransform: 'uppercase',
-          fontSize: '12px',
-          '&.colorSuccess': {
-            color: '#2D4821',
-            backgroundColor: '#DFF0D8'
+        root: ({ theme }) => ({
+          borderRadius: 4,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          minWidth: 0,
+          maxWidth: '100%',
+          padding: '0 4px',
+          fontWeight: 700,
+          '& .MuiChip-label': {
+            fontWeight: 700,
+            fontSize: '0.75rem',
+            padding: '0 4px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          },
+          '& .MuiChip-deleteIcon': {
+            margin: '0 0 0 4px',
+            color: alpha(theme.palette.text.secondary, 0.75),
+            '&:hover': {
+              color: theme.palette.text.primary
+            }
           }
-        },
-        colorSecondary: {
-          backgroundColor: 'red'
+        }),
+        outlined: {
+          borderWidth: 1,
+          borderStyle: 'solid',
+          borderColor: 'currentColor'
         }
       }
     },

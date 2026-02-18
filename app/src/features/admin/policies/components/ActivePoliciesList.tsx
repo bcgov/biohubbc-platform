@@ -19,15 +19,15 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
-import { IServerPaginationProps } from 'types/pagination';
 import { useState } from 'react';
+import { IServerPaginationProps } from 'types/pagination';
+import { transformApiToPolicyJson, transformPolicyJsonToApi } from '../utils/policyTransform';
 import {
   AddPolicyForm,
   AddPolicyFormInitialValues,
   AddPolicyFormYupSchema,
   IAddPolicyFormValues
 } from './AddPolicyForm';
-import { transformApiToPolicyJson, transformPolicyJsonToApi } from '../utils/policyTransform';
 
 /**
  * Props for the ActivePoliciesList component.
