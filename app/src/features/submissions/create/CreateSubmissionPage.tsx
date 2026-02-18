@@ -1,5 +1,5 @@
 import { Box, Button, Container, Paper, Stack } from '@mui/material';
-import BaseHeader from 'components/layout/header/BaseHeader';
+import { PageHeader } from 'components/header/PageHeader';
 import { Formik, FormikProps } from 'formik';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
@@ -100,9 +100,9 @@ export const CreateSubmissionPage = () => {
 
   return (
     <>
-      <BaseHeader
-        title="New Submission"
-        buttonJSX={
+      <PageHeader
+        label="New Submission"
+        buttons={
           <Stack gap={1} flexDirection="row">
             <Button variant="outlined" disabled={isSubmitting} onClick={handleCancel}>
               Cancel
