@@ -26,7 +26,7 @@ describe('CustomAutocompleteFormik', () => {
   });
 
   it('updates primitive form value on selection', async () => {
-    const { getByLabelText, getByText, getByTestId } = render(
+    const { getByRole, getByText, getByTestId } = render(
       <Formik initialValues={{ status: '' }} onSubmit={async () => {}}>
         <>
           <CustomAutocompleteFormik id="status" name="status" label="Status" options={options} />
@@ -35,7 +35,7 @@ describe('CustomAutocompleteFormik', () => {
       </Formik>
     );
 
-    const input = getByLabelText('Status');
+    const input = getByRole('combobox');
 
     fireEvent.mouseDown(input);
     fireEvent.click(getByText('Closed'));
