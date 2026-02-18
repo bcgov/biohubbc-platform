@@ -2,6 +2,11 @@ import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
 import { IMalwareScanJobData, malwareScanFailedHandler, malwareScanJobHandler } from './jobs/malware-scan-job';
 import {
+  IProcessDownloadJobData,
+  processDownloadFailedHandler,
+  processDownloadJobHandler
+} from './jobs/process-download-job';
+import {
   IProcessSubmissionFeaturesJobData,
   processSubmissionFeaturesFailedHandler,
   processSubmissionFeaturesJobHandler
@@ -58,6 +63,23 @@ export const registerWorkers = async (): Promise<void> => {
 
   // Register dead letter queue handler for failed malware scan jobs
   await boss.work<IMalwareScanJobData>(JobQueues.MALWARE_SCAN_FAILED, malwareScanFailedHandler);
+
+  // Create dead letter queue first (must exist before main queue references it)
+  await boss.createQueue(JobQueues.PROCESS_DOWNLOAD_FAILED);
+
+  // Create main queue with dead letter queue and retry configuration
+  await boss.createQueue(JobQueues.PROCESS_DOWNLOAD, {
+    deadLetter: JobQueues.PROCESS_DOWNLOAD_FAILED,
+    retryLimit: 3,
+    retryDelay: 60,
+    retryBackoff: true
+  });
+
+  // Register process download job handler
+  await boss.work<IProcessDownloadJobData>(JobQueues.PROCESS_DOWNLOAD, processDownloadJobHandler);
+
+  // Register dead letter queue handler for failed download jobs
+  await boss.work<IProcessDownloadJobData>(JobQueues.PROCESS_DOWNLOAD_FAILED, processDownloadFailedHandler);
 
   defaultLog.info({
     label: 'registerWorkers',

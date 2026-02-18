@@ -166,7 +166,9 @@ export class ObjectStorageService {
         Body: stream,
         ContentType: mimetype,
         Metadata: metadata
-      }
+      },
+      partSize: 64 * 1024 * 1024,
+      queueSize: 2
     });
 
     await upload.done();
