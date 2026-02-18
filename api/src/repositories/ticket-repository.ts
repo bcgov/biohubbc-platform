@@ -12,12 +12,12 @@ export class TicketRepository extends BaseRepository {
   /**
    * Insert a new ticket record.
    *
-   * @param {CreateTicketRequest} ticket - Ticket payload to persist.
+   * @param {(CreateTicketRequest & { team_id: string })} ticket - Ticket payload to persist with resolved team ID.
    * @return {Promise<Ticket>} The created ticket record.
    * @throws {ApiExecuteSQLError} If the insert does not affect exactly one row.
    * @memberof TicketRepository
    */
-  async insertTicket(ticket: CreateTicketRequest): Promise<Ticket> {
+  async insertTicket(ticket: CreateTicketRequest & { team_id: string }): Promise<Ticket> {
     const knex = getKnex();
     const query = knex
       .table('ticket')

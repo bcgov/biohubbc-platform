@@ -420,6 +420,14 @@ export async function up(knex: Knex): Promise<void> {
       AFTER INSERT OR UPDATE OR DELETE ON ticket
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
 
+    CREATE TRIGGER audit_ticket_status_history
+      BEFORE INSERT OR UPDATE OR DELETE ON ticket_status_history
+      FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
+
+    CREATE TRIGGER journal_ticket_status_history
+      AFTER INSERT OR UPDATE OR DELETE ON ticket_status_history
+      FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
+
     CREATE TRIGGER audit_ticket_comment
       BEFORE INSERT OR UPDATE OR DELETE ON ticket_comment
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
@@ -474,6 +482,8 @@ export async function down(knex: Knex): Promise<void> {
     DROP TRIGGER IF EXISTS audit_data_request_decision ON data_request_decision;
     DROP TRIGGER IF EXISTS journal_ticket_decision ON ticket_decision;
     DROP TRIGGER IF EXISTS audit_ticket_decision ON ticket_decision;
+    DROP TRIGGER IF EXISTS journal_ticket_status_history ON ticket_status_history;
+    DROP TRIGGER IF EXISTS audit_ticket_status_history ON ticket_status_history;
     DROP TRIGGER IF EXISTS journal_ticket_reference ON ticket_reference;
     DROP TRIGGER IF EXISTS audit_ticket_reference ON ticket_reference;
     DROP TRIGGER IF EXISTS journal_ticket_comment ON ticket_comment;

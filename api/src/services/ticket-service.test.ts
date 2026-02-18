@@ -2,8 +2,9 @@ import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { IDBConnection } from '../database/db';
-import { getMockDBConnection } from '../__mocks__/db';
 import { TicketRepository } from '../repositories/ticket-repository';
+import { getMockDBConnection } from '../__mocks__/db';
+import { TeamService } from './access-policy/team-service';
 import { TicketService } from './ticket-service';
 
 chai.use(sinonChai);
@@ -32,15 +33,39 @@ describe('TicketService', () => {
   });
 
   describe('createTicket', () => {
-    it('creates ticket and inserts initial status history', async () => {
+    it('creates ticket and inserts initial status history when team_id is provided', async () => {
       const insertTicketStub = sinon.stub(TicketRepository.prototype, 'insertTicket').resolves(mockTicket as any);
       const insertHistoryStub = sinon.stub(TicketRepository.prototype, 'insertTicketStatusHistory').resolves({} as any);
+      const createTeamStub = sinon
+        .stub(TeamService.prototype, 'createTeam')
+        .resolves({ team_id: 'generated-team-id' } as any);
 
       const result = await service.createTicket({ title: 'A ticket', team_id: mockTicket.team_id });
 
-      expect(insertTicketStub).to.have.been.calledOnce;
+      expect(createTeamStub).to.not.have.been.called;
+      expect(insertTicketStub).to.have.been.calledWith({ title: 'A ticket', team_id: mockTicket.team_id });
       expect(insertHistoryStub).to.have.been.calledWith(mockTicket.ticket_id, 'OPEN');
       expect(result).to.eql(mockTicket);
+    });
+
+    it('creates team and uses generated team_id when team_id is not provided', async () => {
+      const generatedTeamId = '99999999-9999-9999-9999-999999999999';
+      const createdTicket = { ...mockTicket, team_id: generatedTeamId };
+      const createTeamStub = sinon
+        .stub(TeamService.prototype, 'createTeam')
+        .resolves({ team_id: generatedTeamId, name: 'Auto Team', description: null } as any);
+      const insertTicketStub = sinon.stub(TicketRepository.prototype, 'insertTicket').resolves(createdTicket as any);
+      const insertHistoryStub = sinon.stub(TicketRepository.prototype, 'insertTicketStatusHistory').resolves({} as any);
+
+      const result = await service.createTicket({ title: 'A ticket' });
+
+      expect(createTeamStub).to.have.been.calledOnce;
+      expect(insertTicketStub).to.have.been.calledWith({
+        title: 'A ticket',
+        team_id: generatedTeamId
+      });
+      expect(insertHistoryStub).to.have.been.calledWith(createdTicket.ticket_id, 'OPEN');
+      expect(result).to.eql(createdTicket);
     });
   });
 
@@ -56,6 +81,26 @@ describe('TicketService', () => {
       expect(countStub).to.have.been.calledWith(mockTicket.team_id, 'OPEN');
       expect(list).to.eql([mockTicket]);
       expect(count).to.equal(1);
+    });
+  });
+
+  describe('getTicket', () => {
+    it('returns ticket payload with inline history', async () => {
+      const history = [
+        {
+          ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
+          ticket_id: mockTicket.ticket_id,
+          status: 'OPEN' as const
+        }
+      ];
+      const getTicketStub = sinon.stub(TicketRepository.prototype, 'getTicketById').resolves(mockTicket as any);
+      const getHistoryStub = sinon.stub(TicketRepository.prototype, 'getTicketStatusHistory').resolves(history as any);
+
+      const result = await service.getTicket(mockTicket.ticket_id);
+
+      expect(getTicketStub).to.have.been.calledWith(mockTicket.ticket_id);
+      expect(getHistoryStub).to.have.been.calledWith(mockTicket.ticket_id);
+      expect(result).to.eql({ ...mockTicket, history });
     });
   });
 

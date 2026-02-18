@@ -1,13 +1,9 @@
+import { randomUUID } from 'crypto';
 import { IDBConnection } from '../database/db';
-import { TicketStatusHistory } from '../models/ticket-status-history';
-import {
-  CreateTicketRequest,
-  Ticket,
-  TicketStatus,
-  UpdateTicketRequest
-} from '../models/ticket';
+import { CreateTicketRequest, Ticket, TicketStatus, TicketWithHistory, UpdateTicketRequest } from '../models/ticket';
 import { TicketRepository } from '../repositories/ticket-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { TeamService } from './access-policy/team-service';
 import { DBService } from './db-service';
 
 export class TicketService extends DBService {
@@ -27,12 +23,15 @@ export class TicketService extends DBService {
   /**
    * Create a new ticket and write its initial status history entry.
    *
+   * If `team_id` is omitted, a team is auto-generated and associated with the ticket.
+   *
    * @param {CreateTicketRequest} ticket - Ticket payload to create.
    * @return {Promise<Ticket>} The newly created ticket.
    * @memberof TicketService
    */
   async createTicket(ticket: CreateTicketRequest): Promise<Ticket> {
-    const createdTicket = await this.ticketRepository.insertTicket(ticket);
+    const ticketTeamId = ticket.team_id ?? (await this.createTicketTeam()).team_id;
+    const createdTicket = await this.ticketRepository.insertTicket({ ...ticket, team_id: ticketTeamId });
 
     await this.ticketRepository.insertTicketStatusHistory(createdTicket.ticket_id, createdTicket.status);
 
@@ -40,14 +39,35 @@ export class TicketService extends DBService {
   }
 
   /**
+   * Create an internal team record for ticket ownership when a team is not provided.
+   *
+   * @return {*} {Promise<{ team_id: string }>}
+   * @memberof TicketService
+   */
+  private async createTicketTeam(): Promise<{ team_id: string }> {
+    const teamService = new TeamService(this.connection);
+    const createdTeam = await teamService.createTeam({
+      name: `Ticket Team ${randomUUID()}`,
+      description: 'Auto-generated team for ticket ownership.'
+    });
+
+    return { team_id: createdTeam.team_id };
+  }
+
+  /**
    * Get a ticket by its identifier.
    *
    * @param {string} ticketId - Ticket UUID.
-   * @return {Promise<Ticket>} The requested ticket.
+   * @return {Promise<TicketWithHistory>} The requested ticket including status history.
    * @memberof TicketService
    */
-  async getTicket(ticketId: string): Promise<Ticket> {
-    return this.ticketRepository.getTicketById(ticketId);
+  async getTicket(ticketId: string): Promise<TicketWithHistory> {
+    const [ticket, history] = await Promise.all([
+      this.ticketRepository.getTicketById(ticketId),
+      this.ticketRepository.getTicketStatusHistory(ticketId)
+    ]);
+
+    return { ...ticket, history };
   }
 
   /**
@@ -114,16 +134,5 @@ export class TicketService extends DBService {
     }
 
     return updatedTicket;
-  }
-
-  /**
-   * Get status history entries for a ticket ordered newest first.
-   *
-   * @param {string} ticketId - Ticket UUID.
-   * @return {Promise<TicketStatusHistory[]>} Status history rows.
-   * @memberof TicketService
-   */
-  async getTicketStatusHistory(ticketId: string): Promise<TicketStatusHistory[]> {
-    return this.ticketRepository.getTicketStatusHistory(ticketId);
   }
 }

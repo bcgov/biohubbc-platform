@@ -7,10 +7,16 @@ export interface ICustomTextField {
   other?: TextFieldProps;
 }
 
+/**
+ * Formik-connected wrapper around MUI TextField used across shared forms.
+ *
+ * @param {React.PropsWithChildren<ICustomTextField>} props
+ * @return {*}
+ */
 const CustomTextField: React.FC<React.PropsWithChildren<ICustomTextField>> = (props) => {
   const { touched, errors, values, handleChange } = useFormikContext<any>();
 
-  const { name, label, other } = props;
+  const { name, label, other, children } = props;
 
   return (
     <TextField
@@ -24,8 +30,9 @@ const CustomTextField: React.FC<React.PropsWithChildren<ICustomTextField>> = (pr
       fullWidth={true}
       error={get(touched, name) && Boolean(get(errors, name))}
       helperText={get(touched, name) && <>{get(errors, name) as string}</>}
-      {...other}
-    />
+      {...other}>
+      {children}
+    </TextField>
   );
 };
 

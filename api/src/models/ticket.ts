@@ -18,10 +18,22 @@ export const Ticket = z.object({
 
 export type Ticket = z.infer<typeof Ticket>;
 
+const TicketHistoryItem = z.object({
+  ticket_status_history_id: z.string().uuid(),
+  ticket_id: z.string().uuid(),
+  status: TicketStatus
+});
+
+export const TicketWithHistory = Ticket.extend({
+  history: z.array(TicketHistoryItem)
+});
+
+export type TicketWithHistory = z.infer<typeof TicketWithHistory>;
+
 export const CreateTicketRequest = z.object({
   title: z.string().max(100),
   description: z.string().max(2000).optional(),
-  team_id: z.string().uuid(),
+  team_id: z.string().uuid().optional(),
   priority: TicketPriority.optional()
 });
 
