@@ -1,7 +1,9 @@
 import { grey } from '@mui/material/colors';
-import { createTheme } from '@mui/material/styles';
+import { alpha, createTheme } from '@mui/material/styles';
 import type {} from '@mui/x-data-grid/themeAugmentation';
 import 'styles.scss';
+
+const BUTTON_BORDER_RADIUS = 4;
 
 const appTheme = createTheme({
   typography: {
@@ -106,35 +108,87 @@ const appTheme = createTheme({
         disableElevation: true
       },
       styleOverrides: {
-        root: {
-          padding: '8px 24px',
-          '&:focus': {
-            outline: '2px solid #3B99FC',
-            outlineOffset: '-1px'
+        root: ({ theme }) => ({
+          borderRadius: BUTTON_BORDER_RADIUS,
+          textTransform: 'none',
+          fontWeight: 700,
+          lineHeight: 1.2,
+          minWidth: 60,
+          '&.Mui-focusVisible': {
+            outline: `2px solid ${alpha(theme.palette.primary.main, 0.45)}`,
+            outlineOffset: '2px'
           }
-        },
-        startIcon: {
-          marginBottom: '1px'
-        },
-        sizeLarge: {
-          fontSize: '1rem'
-        },
-        sizeSmall: {
-          padding: '8px 12px',
-          fontSize: '0.75rem'
-        },
-        containedPrimary: {
-          fontWeight: 700,
-          letterSpacing: '0.02rem'
-        },
-        containedError: {
-          fontWeight: 700,
-          letterSpacing: '0.02rem'
-        },
-        outlinedPrimary: {
-          fontWeight: 700,
-          letterSpacing: '0.02rem'
-        }
+        }),
+        startIcon: ({ theme }) => ({
+          marginRight: theme.spacing(1),
+          marginLeft: theme.spacing(-0.25),
+          '& > *:nth-of-type(1)': {
+            fontSize: '1.1rem'
+          }
+        }),
+        endIcon: ({ theme }) => ({
+          marginLeft: theme.spacing(1),
+          marginRight: theme.spacing(-0.25),
+          '& > *:nth-of-type(1)': {
+            fontSize: '1.1rem'
+          }
+        }),
+        sizeSmall: ({ theme }) => ({
+          minHeight: 32,
+          padding: theme.spacing(0.5, 1.5),
+          fontSize: '0.8125rem',
+          '& .MuiButton-startIcon > *:nth-of-type(1), & .MuiButton-endIcon > *:nth-of-type(1)': {
+            fontSize: '1rem'
+          }
+        }),
+        sizeMedium: ({ theme }) => ({
+          minHeight: 40,
+          padding: theme.spacing(1, 2.5),
+          fontSize: '0.9375rem',
+          '& .MuiButton-startIcon > *:nth-of-type(1), & .MuiButton-endIcon > *:nth-of-type(1)': {
+            fontSize: '1.1rem'
+          }
+        }),
+        sizeLarge: ({ theme }) => ({
+          minHeight: 48,
+          padding: theme.spacing(1.25, 3.5),
+          fontSize: '1rem',
+          '& .MuiButton-startIcon > *:nth-of-type(1), & .MuiButton-endIcon > *:nth-of-type(1)': {
+            fontSize: '1.2rem'
+          }
+        }),
+        contained: ({ theme }) => ({
+          color: theme.palette.primary.contrastText,
+          backgroundColor: theme.palette.primary.main,
+          '&:hover': {
+            backgroundColor: theme.palette.primary.dark
+          },
+          '&.Mui-disabled': {
+            color: theme.palette.action.disabled,
+            backgroundColor: theme.palette.action.disabledBackground
+          }
+        }),
+        outlined: ({ theme }) => ({
+          borderWidth: 1,
+          borderColor: 'currentColor',
+          '&:hover': {
+            borderWidth: 1,
+            borderColor: 'currentColor',
+            backgroundColor: alpha(theme.palette.primary.main, theme.palette.action.hoverOpacity)
+          },
+          '&.Mui-disabled': {
+            color: theme.palette.action.disabled,
+            borderColor: theme.palette.action.disabledBackground
+          }
+        }),
+        text: ({ theme }) => ({
+          '&:hover': {
+            backgroundColor: alpha(theme.palette.primary.main, theme.palette.action.hoverOpacity)
+          },
+          '&.Mui-disabled': {
+            color: theme.palette.action.disabled
+          }
+        })
       }
     },
     MuiButtonBase: {

@@ -18,7 +18,7 @@ const NotFoundPage = () => {
           <Button
             onClick={() => navigate('/')}
             type="submit"
-            size="large"
+            size="medium"
             variant="contained"
             color="primary"
             data-testid="not-found-return-home-button">

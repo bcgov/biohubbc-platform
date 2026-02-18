@@ -259,7 +259,7 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
             Manage Users
           </Typography>
           <Button
-            size="large"
+            size="medium"
             color="primary"
             variant="contained"
             data-testid="invite-system-users-button"
