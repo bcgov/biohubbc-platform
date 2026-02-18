@@ -394,6 +394,179 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Insert a new submission feature record.
+   *
+   * @param {number} submissionId The ID of the submission.
+   * @param {(number | null)} parentSubmissionFeatureId The ID of the parent submission feature, or null.
+   * @param {(string | null)} featureSourceId The source ID of the feature, or null.
+   * @param {string} featureTypeName The name of the feature type.
+   * @param {ISubmissionFeature['properties']} featureProperties The properties of the submission feature.
+   * @return {*}  {Promise<{ submission_feature_id: number }>} Returns a promise that resolves to an object with the submission feature ID.
+   * @memberof SubmissionRepository
+   */
+  async insertSubmissionFeatureRecord(
+    submissionId: number,
+    parentSubmissionFeatureId: number | null,
+    featureSourceId: string | null,
+    featureTypeName: string,
+    featureProperties: ISubmissionFeature['properties']
+  ): Promise<{ submission_feature_id: number }> {
+    const sqlStatement = SQL`
+      INSERT INTO submission_feature (
+        submission_id,
+        parent_submission_feature_id,
+        source_id,
+        feature_type_id,
+        data,
+        record_effective_date
+      ) VALUES (
+        ${submissionId},
+        ${parentSubmissionFeatureId},
+        ${featureSourceId},
+        (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}),
+        ${featureProperties},
+        now()
+      )
+      RETURNING
+        submission_feature_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, z.object({ submission_feature_id: z.number() }));
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert submission feature record', [
+        'SubmissionRepository->insertSubmissionFeatureRecord',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Update the parent reference for a submission feature.
+   *
+   * @param {number} submissionFeatureId The ID of the feature to update.
+   * @param {number} parentSubmissionFeatureId The ID of the parent feature.
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionFeatureParent(submissionFeatureId: number, parentSubmissionFeatureId: number): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission_feature
+      SET parent_submission_feature_id = ${parentSubmissionFeatureId}
+      WHERE submission_feature_id = ${submissionFeatureId};
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Delete all submission features for a submission (soft delete).
+   * Used for idempotency - allows job retries to start fresh.
+   *
+   * @param {number} submissionId The submission ID.
+   * @return {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async deleteSubmissionFeatures(submissionId: number): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission_feature
+      SET record_end_date = NOW()
+      WHERE submission_id = ${submissionId}
+        AND record_end_date IS NULL;
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Delete all submission feature relationships for features belonging to a submission.
+   * Used for idempotency - allows job retries to start fresh.
+   *
+   * @param {number} submissionId The submission ID.
+   * @return {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async deleteSubmissionFeatureRelationships(submissionId: number): Promise<void> {
+    const sqlStatement = SQL`
+      DELETE FROM submission_feature_feature
+      WHERE source_feature_id IN (
+        SELECT submission_feature_id FROM submission_feature WHERE submission_id = ${submissionId}
+      )
+      OR target_feature_id IN (
+        SELECT submission_feature_id FROM submission_feature WHERE submission_id = ${submissionId}
+      );
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Insert submission feature relationships (source-target from content array).
+   * Uses ON CONFLICT DO NOTHING to avoid failures on duplicate pairs.
+   *
+   * @param {Array<{ source_feature_id: number; target_feature_id: number }>} pairs The pairs to insert.
+   * @return {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async insertSubmissionFeatureRelationships(
+    pairs: Array<{ source_feature_id: number; target_feature_id: number }>
+  ): Promise<void> {
+    if (pairs.length === 0) {
+      return;
+    }
+
+    const sourceIds = pairs.map((p) => p.source_feature_id);
+    const targetIds = pairs.map((p) => p.target_feature_id);
+
+    const sqlStatement = SQL`
+      INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
+      SELECT source_id, target_id FROM unnest(
+        ${sourceIds}::integer[],
+        ${targetIds}::integer[]
+      ) AS t(source_id, target_id)
+      ON CONFLICT (source_feature_id, target_feature_id) DO NOTHING;
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Get all related submission feature IDs for a given feature (sources and targets).
+   * sourceIds = features that reference this one; targetIds = features this one references.
+   *
+   * @param {number} submissionFeatureId The submission feature ID.
+   * @return {Promise<{ sourceIds: number[]; targetIds: number[] }>}
+   * @memberof SubmissionRepository
+   */
+  async getRelatedSubmissionFeatureIds(
+    submissionFeatureId: number
+  ): Promise<{ sourceIds: number[]; targetIds: number[] }> {
+    const parentSqlStatement = SQL`
+      SELECT source_feature_id
+      FROM submission_feature_feature
+      WHERE target_feature_id = ${submissionFeatureId};
+    `;
+
+    const childSqlStatement = SQL`
+      SELECT target_feature_id
+      FROM submission_feature_feature
+      WHERE source_feature_id = ${submissionFeatureId};
+    `;
+
+    const [parentResult, childResult] = await Promise.all([
+      this.connection.sql<{ source_feature_id: number }>(parentSqlStatement),
+      this.connection.sql<{ target_feature_id: number }>(childSqlStatement)
+    ]);
+
+    return {
+      sourceIds: parentResult.rows.map((r) => r.source_feature_id),
+      targetIds: childResult.rows.map((r) => r.target_feature_id)
+    };
+  }
+
+  /**
    * Get feature type id by name.
    *
    * @param {string} name

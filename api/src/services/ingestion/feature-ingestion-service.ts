@@ -1,9 +1,10 @@
-import { IDBConnection } from '../database/db';
-import { FeatureProperty, FeatureTypeWithProperties } from '../models/feature-type';
-import { IFlattenedBlock } from '../models/submission-feature';
-import { IngestionRepository } from '../repositories/ingestion/ingestion-repository';
-import { GeoJSONFeatureCollectionZodSchema } from '../zod-schema/geoJsonZodSchema';
-import { DBService } from './db-service';
+import { IDBConnection } from '../../database/db';
+import { FeatureProperty, FeatureTypeWithProperties } from '../../models/feature-type';
+import { IFlattenedBlock } from '../../models/submission-feature';
+import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
+import { SubmissionRepository } from '../../repositories/submission-repository';
+import { GeoJSONFeatureCollectionZodSchema } from '../../zod-schema/geoJsonZodSchema';
+import { DBService } from '../db-service';
 import { IValidationError, IValidationResult, ValidationErrorType } from './feature-ingestion-service.interface';
 
 /**
@@ -32,6 +33,127 @@ export class FeatureValidationService extends DBService {
     this.ingestionRepository = new IngestionRepository(connection);
     this.featureTypeCache = new Map<string, FeatureTypeWithProperties | null>();
   }
+
+  // ============================================================================
+  // INGESTION METHODS (validation + insertion)
+  // ============================================================================
+
+  /**
+   * Ingest flat submission features: validate and insert.
+   *
+   * Idempotent: soft-deletes existing features before inserting, safe for job retries.
+   *
+   * @param {number} submissionId - The submission to add features to
+   * @param {IFlattenedBlock[]} features - Flat array of features with UUID references
+   * @returns {Promise<IValidationResult>} Validation result with valid flag and any errors
+   * @memberof FeatureValidationService
+   */
+  async ingestFeatures(submissionId: number, features: IFlattenedBlock[]): Promise<IValidationResult> {
+    // 1. Validate all features
+    const validationResult = await this.validateFlatSubmissionFeatures(features);
+
+    if (!validationResult.valid) {
+      return validationResult;
+    }
+
+    // 2. Delete existing features and relationships (idempotency for job retries)
+    const submissionRepository = new SubmissionRepository(this.connection);
+    await submissionRepository.deleteSubmissionFeatures(submissionId);
+    await submissionRepository.deleteSubmissionFeatureRelationships(submissionId);
+
+    // 3. Insert features (two-pass for parent references, Pass 3 for content relationships)
+    await this.insertFlatFeatures(submissionId, features);
+
+    return { valid: true, errors: [] };
+  }
+
+  /**
+   * Insert flat features using three-pass approach.
+   * Pass 1: Insert all features with parent = NULL
+   * Pass 2: Update parent references using UUID → ID mapping
+   * Pass 3: Insert content relationships (parent-child from content array)
+   *
+   * @private
+   * @param {number} submissionId - The submission ID
+   * @param {IFlattenedBlock[]} features - Features to insert
+   * @memberof FeatureValidationService
+   */
+  private async insertFlatFeatures(submissionId: number, features: IFlattenedBlock[]): Promise<void> {
+    const submissionRepository = new SubmissionRepository(this.connection);
+    const uuidToDbId = new Map<string, number>();
+
+    // Pass 1: Insert all features without parent references
+    for (const feature of features) {
+      const result = await submissionRepository.insertSubmissionFeatureRecord(
+        submissionId,
+        null, // parent set in pass 2
+        feature.id,
+        feature.type,
+        feature.properties
+      );
+      uuidToDbId.set(feature.id, result.submission_feature_id);
+    }
+
+    // Pass 2: Update parent references
+    for (const feature of features) {
+      if (feature.parent) {
+        const parentDbId = uuidToDbId.get(feature.parent);
+        const featureDbId = uuidToDbId.get(feature.id);
+        if (parentDbId && featureDbId) {
+          await submissionRepository.updateSubmissionFeatureParent(featureDbId, parentDbId);
+        }
+      }
+    }
+
+    // Pass 3: Insert content relationships (many-to-many)
+    const relationshipPairs = this.buildContentRelationshipPairs(features, uuidToDbId);
+    if (relationshipPairs.length > 0) {
+      await submissionRepository.insertSubmissionFeatureRelationships(relationshipPairs);
+    }
+  }
+
+  /**
+   * Build source-target relationship pairs from features' content arrays.
+   *
+   * @private
+   * @param {IFlattenedBlock[]} features - Features with content references
+   * @param {Map<string, number>} uuidToDbId - UUID to submission_feature_id mapping
+   * @return {Array<{ source_feature_id: number; target_feature_id: number }>}
+   * @memberof FeatureValidationService
+   */
+  private buildContentRelationshipPairs(
+    features: IFlattenedBlock[],
+    uuidToDbId: Map<string, number>
+  ): Array<{ source_feature_id: number; target_feature_id: number }> {
+    const pairs: Array<{
+      source_feature_id: number;
+      target_feature_id: number;
+    }> = [];
+    for (const feature of features) {
+      if (!feature.content?.length) {
+        continue;
+      }
+      const sourceDbId = uuidToDbId.get(feature.id);
+      if (sourceDbId === undefined) {
+        continue;
+      }
+      for (const targetId of feature.content) {
+        const targetDbId = uuidToDbId.get(targetId);
+        if (targetDbId !== undefined) {
+          pairs.push({
+            source_feature_id: sourceDbId,
+            target_feature_id: targetDbId
+          });
+        }
+      }
+    }
+    return pairs;
+  }
+
+  // ============================================================================
+  // FLAT VALIDATION METHODS (for archive upload flow with IFlattenedBlock[])
+  // ============================================================================
+
 
   /**
    * Validate flat submission features (IFlattenedBlock[] format).

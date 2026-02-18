@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import * as db from '../../database/db';
-import { ValidationErrorType } from '../../services/feature-ingestion-service.interface';
+import { ValidationErrorType } from '../../services/ingestion/feature-ingestion-service.interface';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { getMockDBConnection } from '../../__mocks__/db';

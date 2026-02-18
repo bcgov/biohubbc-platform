@@ -302,6 +302,7 @@ describe('publisher', () => {
   describe('publishProcessDownloadJob', () => {
     const createMockDownload = (overrides: Partial<DownloadRecord> = {}): DownloadRecord => ({
       download_id: 'aaaa0000-0000-0000-0000-000000000001',
+      system_user_id: null,
       team_id: null,
       data_request_id: null,
       download_status: 'pending',
@@ -394,8 +395,7 @@ describe('publisher', () => {
 
       // Step 2: Call publisher
       await publishProcessDownloadJob(mockConnection, {
-        downloadId: 'aaaa0000-0000-0000-0000-000000000456',
-        teamId: null as string | null
+        downloadId: 'aaaa0000-0000-0000-0000-000000000456'
       });
 
       // Step 3: Verify singletonKey passed to pg-boss
@@ -417,8 +417,7 @@ describe('publisher', () => {
 
       // Step 2: Call publisher
       const result = await publishProcessDownloadJob(mockConnection, {
-        downloadId: 'aaaa0000-0000-0000-0000-000000000001',
-        teamId: null as string | null
+        downloadId: 'aaaa0000-0000-0000-0000-000000000001'
       });
 
       // Step 3: Verify duplicate status
@@ -439,8 +438,7 @@ describe('publisher', () => {
 
       // Step 2: Call publisher
       const result = await publishProcessDownloadJob(mockConnection, {
-        downloadId: 'aaaa0000-0000-0000-0000-000000000001',
-        teamId: null as string | null
+        downloadId: 'aaaa0000-0000-0000-0000-000000000001'
       });
 
       // Step 3: Verify error status

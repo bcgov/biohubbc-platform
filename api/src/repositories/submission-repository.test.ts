@@ -1502,4 +1502,170 @@ describe('SubmissionRepository', () => {
       }
     });
   });
+
+  describe('updateSubmissionFeatureParent', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should update the parent submission feature id successfully', async () => {
+      const mockQueryResponse: QueryResult<never> = {
+        rowCount: 1,
+        rows: [],
+        command: '',
+        oid: 0,
+        fields: []
+      };
+
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      await submissionRepository.updateSubmissionFeatureParent(10, 5);
+
+      expect(sqlStub).to.have.been.calledOnce;
+    });
+  });
+
+  describe('deleteSubmissionFeatures', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should soft delete all submission features for a submission', async () => {
+      const mockQueryResponse: QueryResult<never> = {
+        rowCount: 3,
+        rows: [],
+        command: '',
+        oid: 0,
+        fields: []
+      };
+
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      await submissionRepository.deleteSubmissionFeatures(1);
+
+      expect(sqlStub).to.have.been.calledOnce;
+    });
+
+    it('should complete successfully even when no features exist to delete', async () => {
+      const mockQueryResponse: QueryResult<never> = {
+        rowCount: 0,
+        rows: [],
+        command: '',
+        oid: 0,
+        fields: []
+      };
+
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      // Should not throw even when rowCount is 0
+      await submissionRepository.deleteSubmissionFeatures(999);
+
+      expect(sqlStub).to.have.been.calledOnce;
+    });
+  });
+
+  describe('deleteSubmissionFeatureRelationships', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should delete relationship rows for features belonging to the submission', async () => {
+      const mockQueryResponse: QueryResult<never> = {
+        rowCount: 5,
+        rows: [],
+        command: '',
+        oid: 0,
+        fields: []
+      };
+
+      const sqlStub = sinon.stub().resolves(mockQueryResponse);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      await submissionRepository.deleteSubmissionFeatureRelationships(1);
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const calledSql = sqlStub.args[0][0];
+      expect(calledSql.text).to.include('submission_feature_feature');
+      expect(calledSql.text).to.include('submission_id');
+    });
+  });
+
+  describe('insertSubmissionFeatureRelationships', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should insert relationship pairs', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 2, rows: [] });
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      await submissionRepository.insertSubmissionFeatureRelationships([
+        { source_feature_id: 1, target_feature_id: 2 },
+        { source_feature_id: 1, target_feature_id: 3 }
+      ]);
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const calledSql = sqlStub.args[0][0];
+      expect(calledSql.text).to.include('submission_feature_feature');
+      expect(calledSql.text).to.include('ON CONFLICT');
+    });
+
+    it('should not execute SQL when pairs array is empty', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      await submissionRepository.insertSubmissionFeatureRelationships([]);
+
+      expect(sqlStub).not.to.have.been.called;
+    });
+  });
+
+  describe('getRelatedSubmissionFeatureIds', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should return source and target IDs for a feature', async () => {
+      const mockParentResponse = {
+        rows: [{ source_feature_id: 10 }],
+        rowCount: 1
+      };
+      const mockChildResponse = {
+        rows: [{ target_feature_id: 2 }, { target_feature_id: 3 }],
+        rowCount: 2
+      };
+
+      const sqlStub = sinon
+        .stub()
+        .onFirstCall()
+        .resolves(mockParentResponse)
+        .onSecondCall()
+        .resolves(mockChildResponse);
+
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const result = await submissionRepository.getRelatedSubmissionFeatureIds(1);
+
+      expect(result.sourceIds).to.deep.equal([10]);
+      expect(result.targetIds).to.deep.equal([2, 3]);
+      expect(sqlStub).to.have.been.calledTwice;
+    });
+  });
 });

@@ -11,7 +11,7 @@ import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } 
 import { initPgBoss, stopPgBoss } from '../../queue/pg-boss-service';
 import { publishProcessSubmissionFeaturesJob } from '../../queue/publisher';
 
-import { ValidationErrorType } from '../../services/feature-ingestion-service.interface';
+import { ValidationErrorType } from '../../services/ingestion/feature-ingestion-service.interface';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
 
