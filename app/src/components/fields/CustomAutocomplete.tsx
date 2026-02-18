@@ -26,10 +26,7 @@ const CustomAutocomplete = <T extends string | number>(props: ICustomAutocomplet
   const { label, renderInput, ...rest } = props;
 
   return (
-    <Autocomplete
-      {...rest}
-      renderInput={renderInput ?? ((params) => <CustomTextField {...params} label={label} />)}
-    />
+    <Autocomplete {...rest} renderInput={renderInput ?? ((params) => <CustomTextField {...params} label={label} />)} />
   );
 };
 

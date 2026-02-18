@@ -30,4 +30,3 @@ const StyledDataGridOverlay: React.FC<IStyledDataGridOverlayProps> = (props) => 
 };
 
 export default StyledDataGridOverlay;
-

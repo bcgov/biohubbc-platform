@@ -91,10 +91,7 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
         props.onSave(values);
       }}>
       {(formikProps) => (
-        <Dialog
-          open={props.open}
-          aria-labelledby="edit-dialog-title"
-          aria-describedby="edit-dialog-description">
+        <Dialog open={props.open} aria-labelledby="edit-dialog-title" aria-describedby="edit-dialog-description">
           <DialogTitle id="edit-dialog-title">{props.dialogTitle}</DialogTitle>
           <DialogContent>{props.component.element}</DialogContent>
           <DialogActions>

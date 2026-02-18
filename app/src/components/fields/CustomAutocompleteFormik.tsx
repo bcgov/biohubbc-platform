@@ -41,9 +41,7 @@ const CustomAutocompleteFormik = <T extends string | number>(props: ICustomAutoc
         onChange?.(event, option);
         setFieldValue(name, option?.value);
       }}
-      renderInput={(params) => (
-        <CustomTextField {...params} error={showError} helperText={helperText} />
-      )}
+      renderInput={(params) => <CustomTextField {...params} error={showError} helperText={helperText} />}
     />
   );
 };

@@ -28,11 +28,7 @@ export const TabGroup = <T extends string>(props: ITabGroupProps<T>) => {
   const { value, tabs, onChange, ariaLabel, sx } = props;
 
   return (
-    <Tabs
-      value={value}
-      onChange={(_, nextValue: T) => onChange(nextValue)}
-      aria-label={ariaLabel}
-      sx={sx}>
+    <Tabs value={value} onChange={(_, nextValue: T) => onChange(nextValue)} aria-label={ariaLabel} sx={sx}>
       {tabs.map((tab) => (
         <Tab
           key={tab.value}

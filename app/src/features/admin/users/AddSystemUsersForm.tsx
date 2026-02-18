@@ -70,18 +70,10 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
                 return (
                   <Box display="flex" key={index} mx={-0.5} alignItems="flex-start">
                     <Box width="300px" py={1} px={0.5}>
-                      <CustomTextFieldFormik
-                        name={`systemUsers.[${index}].userIdentifier`}
-                        label="Username"
-                        required
-                      />
+                      <CustomTextFieldFormik name={`systemUsers.[${index}].userIdentifier`} label="Username" required />
                     </Box>
                     <Box width="300px" py={1} px={0.5}>
-                      <CustomTextFieldFormik
-                        name={`systemUsers.[${index}].userGuid`}
-                        label="User GUID"
-                        required
-                      />
+                      <CustomTextFieldFormik name={`systemUsers.[${index}].userGuid`} label="User GUID" required />
                     </Box>
                     <Box width="250px" py={1} px={0.5}>
                       <FormControl fullWidth required error={systemRoleMeta.touched && Boolean(systemRoleMeta.error)}>

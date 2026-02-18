@@ -3,8 +3,10 @@ import { useFormikContext } from 'formik';
 import get from 'lodash-es/get';
 import CustomTextField from './CustomTextField';
 
-export interface ICustomTextFieldFormikProps
-  extends Omit<TextFieldProps, 'name' | 'value' | 'onChange' | 'error' | 'helperText'> {
+export interface ICustomTextFieldFormikProps extends Omit<
+  TextFieldProps,
+  'name' | 'value' | 'onChange' | 'error' | 'helperText'
+> {
   name: string;
 }
 

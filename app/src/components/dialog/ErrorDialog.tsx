@@ -98,7 +98,9 @@ export const ErrorDialog: React.FC<React.PropsWithChildren<IErrorDialogProps>> =
       aria-describedby="alert-dialog-description">
       <DialogTitle id="alert-dialog-title">{props.dialogTitle}</DialogTitle>
       <DialogContent>
-        {props.dialogSubTitle && <DialogContentText id="alert-dialog-sub-title">{props.dialogSubTitle}</DialogContentText>}
+        {props.dialogSubTitle && (
+          <DialogContentText id="alert-dialog-sub-title">{props.dialogSubTitle}</DialogContentText>
+        )}
         <DialogContentText id="alert-dialog-description">{props.dialogText}</DialogContentText>
       </DialogContent>
       {props.dialogError && (

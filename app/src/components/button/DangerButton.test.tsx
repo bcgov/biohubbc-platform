@@ -27,9 +27,7 @@ describe('DangerButton', () => {
   });
 
   it('renders end icon', () => {
-    const { getByTestId } = render(
-      <DangerButton endIcon={<AddIcon data-testid="end-icon" />}>Delete</DangerButton>
-    );
+    const { getByTestId } = render(<DangerButton endIcon={<AddIcon data-testid="end-icon" />}>Delete</DangerButton>);
 
     expect(getByTestId('end-icon')).toBeVisible();
   });

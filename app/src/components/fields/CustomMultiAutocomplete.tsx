@@ -22,7 +22,9 @@ const CustomMultiAutocomplete: React.FC<ICustomMultiAutocompleteProps> = (props)
   return (
     <Autocomplete
       {...rest}
-      renderInput={renderInput ?? ((params) => <CustomTextField {...params} label={label} InputLabelProps={{ shrink: true }} />)}
+      renderInput={
+        renderInput ?? ((params) => <CustomTextField {...params} label={label} InputLabelProps={{ shrink: true }} />)
+      }
     />
   );
 };

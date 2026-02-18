@@ -6,11 +6,16 @@ import Chip from '@mui/material/Chip';
 import { useFormikContext } from 'formik';
 import { useEffect, useState } from 'react';
 import { sortAutocompleteOptions } from 'utils/autocomplete';
-import CustomMultiAutocomplete, { ICustomMultiAutocompleteProps, ICustomMultiAutocompleteOption } from './CustomMultiAutocomplete';
+import CustomMultiAutocomplete, {
+  ICustomMultiAutocompleteProps,
+  ICustomMultiAutocompleteOption
+} from './CustomMultiAutocomplete';
 import CustomTextField from './CustomTextField';
 
-export interface ICustomMultiAutocompleteFormikProps
-  extends Omit<ICustomMultiAutocompleteProps, 'value' | 'onChange' | 'inputValue' | 'onInputChange' | 'renderInput'> {
+export interface ICustomMultiAutocompleteFormikProps extends Omit<
+  ICustomMultiAutocompleteProps,
+  'value' | 'onChange' | 'inputValue' | 'onInputChange' | 'renderInput'
+> {
   name: string;
   label?: string;
   required?: boolean;
@@ -78,7 +83,9 @@ const CustomMultiAutocompleteFormik: React.FC<ICustomMultiAutocompleteFormikProp
           return undefined;
         }
 
-        return tagValue.map((option, index) => <Chip label={option.label} {...getTagProps({ index })} key={option.value} />);
+        return tagValue.map((option, index) => (
+          <Chip label={option.label} {...getTagProps({ index })} key={option.value} />
+        ));
       }}
       renderOption={(renderProps, option, { selected }) => (
         <li {...renderProps} key={option.value}>
