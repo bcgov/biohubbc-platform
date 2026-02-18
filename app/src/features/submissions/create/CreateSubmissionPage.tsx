@@ -42,6 +42,7 @@ export const CreateSubmissionPage = () => {
    * NOTE: The logic in creating the .tar file should be improved, where possible
    */
   const handleSubmit = async (values: ICreateSubmissionForm) => {
+    console.log('Submitting with values:', values);
     setIsSubmitting(true);
 
     const { file, ...submission } = values;
@@ -107,7 +108,7 @@ export const CreateSubmissionPage = () => {
             <Button variant="outlined" disabled={isSubmitting} onClick={handleCancel}>
               Cancel
             </Button>
-            <Button loading={isSubmitting} variant="contained" onClick={formikRef.current?.submitForm}>
+            <Button loading={isSubmitting} variant="contained" onClick={() => formikRef.current?.submitForm()}>
               Submit
             </Button>
           </Stack>

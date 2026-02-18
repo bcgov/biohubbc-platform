@@ -4,7 +4,7 @@ import { Alert, Box } from '@mui/material';
 import { AxiosProgressEvent, CancelTokenSource } from 'axios';
 import FileUpload from 'components/attachments/FileUpload';
 import { IUploadHandler } from 'components/attachments/FileUploadItem';
-import CustomTextField from 'components/fields/CustomTextField';
+import CustomTextFieldFormik from 'components/fields/CustomTextFieldFormik';
 import { AttachmentValidExtensions } from 'constants/attachments';
 import { useFormikContext } from 'formik';
 import { ICreateSubmissionForm } from './CreateSubmissionForm.interface';
@@ -33,30 +33,18 @@ export const CreateSubmissionForm = () => {
     return Promise.resolve();
   };
 
+  console.log(errors);
+
   return (
     <Box component="form" display="flex" flexDirection="column" gap={3}>
       {/* Name Field */}
-      <CustomTextField name="name" label="Name" />
+      <CustomTextFieldFormik name="name" label="Name" />
 
       {/* Description Field */}
-      <CustomTextField
-        name="description"
-        label="Description"
-        other={{
-          multiline: true,
-          rows: 4
-        }}
-      />
+      <CustomTextFieldFormik name="description" label="Description" multiline rows={4} />
 
       {/* Comment Field */}
-      <CustomTextField
-        name="comment"
-        label="Comment"
-        other={{
-          multiline: true,
-          rows: 4
-        }}
-      />
+      <CustomTextFieldFormik name="comment" label="Comment" multiline rows={4} />
 
       {errors?.file && (
         <Alert severity="error" variant="filled" icon={<Icon path={mdiAlertCircle} size={1} />}>

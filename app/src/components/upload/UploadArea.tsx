@@ -3,7 +3,7 @@ import Icon from '@mdi/react';
 import { Alert, Box, Typography } from '@mui/material';
 import FileUpload from 'components/attachments/FileUpload';
 import { IUploadHandler } from 'components/attachments/FileUploadItem';
-import CustomTextField from 'components/fields/CustomTextField';
+import CustomTextFieldFormik from 'components/fields/CustomTextFieldFormik';
 import { AttachmentValidExtensions } from 'constants/attachments';
 import { useFormikContext } from 'formik';
 import { Feature, Polygon } from 'geojson';
@@ -85,11 +85,7 @@ const UploadArea: React.FC<React.PropsWithChildren<any>> = () => {
         </Alert>
       )}
       <Box my={3}>
-        <CustomTextField
-          name="name"
-          label="Boundary Name"
-          other={{ multiline: false, rows: 1, error: !!formikProps.errors.name }}
-        />
+        <CustomTextFieldFormik name="name" label="Boundary Name" multiline={false} rows={1} />
       </Box>
       <FileUpload
         uploadHandler={AreaUploadHandler()}

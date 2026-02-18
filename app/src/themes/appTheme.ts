@@ -227,43 +227,168 @@ const appTheme = createTheme({
       }
     },
     MuiTextField: {
-      defaultProps: {
-        size: 'medium'
-      }
-    },
-    MuiOutlinedInput: {
       styleOverrides: {
-        root: {
-          borderRadius: 4,
-          backgroundColor: '#f7f8fa',
-          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-            borderColor: '#3B99FC'
+        root: ({ theme }) => ({
+          '& .MuiOutlinedInput-root': {
+            borderRadius: '4px',
+            padding: '8px 16px 8px 16px',
+            backgroundColor: theme.palette.background.paper,
+            color: theme.palette.text.primary,
+            '& .MuiInputAdornment-root': {
+              padding: 0
+            },
+            '& .MuiInputAdornment-positionStart': {
+              marginLeft: 0,
+              marginRight: '10px'
+            },
+            '& .MuiInputAdornment-positionEnd': {
+              marginLeft: '10px',
+              marginRight: 0
+            },
+            '&.MuiInputBase-sizeSmall': {
+              padding: '6px 12px'
+            },
+            '&.MuiInputBase-sizeSmall .MuiInputBase-input': {
+              padding: '6px 0'
+            },
+            '&.MuiInputBase-sizeSmall .MuiInputAdornment-positionStart': {
+              marginRight: '8px'
+            },
+            '&.MuiInputBase-sizeSmall .MuiInputAdornment-positionEnd': {
+              marginLeft: '8px'
+            },
+            '& fieldset': {
+              border: `1px solid ${theme.palette.divider}`
+            },
+            '&:hover fieldset': {
+              borderColor: theme.palette.text.secondary
+            },
+            '&.Mui-focused fieldset': {
+              borderColor: theme.palette.primary.main,
+              borderWidth: '2px'
+            },
+            '&.Mui-error input::placeholder': {
+              color: theme.palette.error.main,
+              opacity: 1
+            }
           },
-          padding: '4px 12px',
-          fontSize: '0.875rem'
-        },
-        sizeSmall: {
-          padding: '2px 12px',
-          fontSize: '0.875rem'
-        }
+          '& .MuiInputBase-input': {
+            padding: '8px 0',
+            color: theme.palette.text.primary
+          },
+          '& .MuiInputBase-input::placeholder': {
+            color: theme.palette.text.secondary,
+            opacity: 0.7
+          },
+          '& .MuiInputAdornment-positionStart': {
+            color: alpha(theme.palette.text.secondary, 0.78),
+            '& .MuiSvgIcon-root, & svg': {
+              color: 'inherit'
+            }
+          },
+          '& .MuiFormLabel-root': {
+            top: 1,
+            left: 1
+          },
+          '& .MuiOutlinedInput-root.Mui-error .MuiInputAdornment-positionStart': {
+            color: theme.palette.error.main
+          },
+          '& .MuiOutlinedInput-root.Mui-error .MuiInputAdornment-root': {
+            color: theme.palette.error.main
+          }
+        })
       }
     },
     MuiAutocomplete: {
       styleOverrides: {
-        root: {
-          '& .MuiOutlinedInput-root': {
-            borderRadius: 4,
-            backgroundColor: '#f7f8fa',
-            padding: '4px 12px',
-            fontSize: '0.875rem',
-            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-              borderColor: '#3B99FC'
+        root: ({ theme }) => {
+          const mode = theme.palette.mode;
+
+          return {
+            '&.MuiAutocomplete-hasPopupIcon .MuiOutlinedInput-root, &.MuiAutocomplete-hasClearIcon .MuiOutlinedInput-root':
+              {
+                paddingRight: '18px'
+              },
+            '& .MuiOutlinedInput-root': {
+              borderRadius: '4px',
+              padding: '8px 16px 8px 16px',
+              '& .MuiAutocomplete-endAdornment': {
+                paddingRight: '18px !important'
+              },
+              '& .MuiAutocomplete-popupIndicator, &.MuiAutocomplete-hasPopupIcon': {
+                display: 'none'
+              },
+              '& .MuiFormLabel-root': {
+                top: 1,
+                left: 1
+              }
+            },
+            '& .MuiInputBase-input': {
+              padding: '8px 0px !important'
+            },
+            '& .MuiAutocomplete-tag': {
+              backgroundColor: alpha(theme.palette.primary.main, mode === 'dark' ? 0.32 : 0.14),
+              color: theme.palette.primary.dark,
+              border: `1px solid ${alpha(theme.palette.primary.main, mode === 'dark' ? 0.6 : 0.3)}`,
+              marginRight: '8px',
+              '& .MuiChip-label': {
+                color: theme.palette.primary.dark,
+                fontWeight: 700
+              },
+              '& .MuiChip-deleteIcon': {
+                fontSize: '1rem',
+                color: alpha(theme.palette.primary.dark, 0.85),
+                '&:hover': {
+                  color: theme.palette.primary.dark
+                }
+              }
             }
-          },
-          '& .MuiAutocomplete-inputRoot': {
-            padding: 0
-          }
+          };
         }
+      }
+    },
+    MuiInputBase: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          color: theme.palette.text.primary
+        }),
+        input: ({ theme }) => ({
+          color: theme.palette.text.primary,
+          '&::placeholder': {
+            color: theme.palette.text.secondary,
+            opacity: 0.7
+          }
+        })
+      }
+    },
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          backgroundColor: theme.palette.background.paper,
+          '& .MuiOutlinedInput-notchedOutline': {
+            borderColor: theme.palette.divider
+          },
+          '&:hover .MuiOutlinedInput-notchedOutline': {
+            borderColor: theme.palette.text.secondary
+          },
+          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+            borderColor: theme.palette.primary.main,
+            borderWidth: '2px'
+          }
+        })
+      }
+    },
+    MuiInputLabel: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          color: theme.palette.text.secondary,
+          '&.Mui-focused': {
+            color: theme.palette.primary.main
+          },
+          '&.Mui-error': {
+            color: theme.palette.error.main
+          }
+        })
       }
     },
     MuiDialogActions: {
