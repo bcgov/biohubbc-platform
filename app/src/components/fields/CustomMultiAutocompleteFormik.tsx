@@ -7,8 +7,8 @@ import { useFormikContext } from 'formik';
 import { useEffect, useState } from 'react';
 import { sortAutocompleteOptions } from 'utils/autocomplete';
 import CustomMultiAutocomplete, {
-  ICustomMultiAutocompleteProps,
-  ICustomMultiAutocompleteOption
+  ICustomMultiAutocompleteOption,
+  ICustomMultiAutocompleteProps
 } from './CustomMultiAutocomplete';
 import CustomTextField from './CustomTextField';
 
@@ -62,7 +62,7 @@ const CustomMultiAutocompleteFormik: React.FC<ICustomMultiAutocompleteFormikProp
 
   useEffect(() => {
     if (handleSearchResults) {
-      void handleSearchResults(inputValue);
+      handleSearchResults(inputValue);
     }
   }, [handleSearchResults, inputValue]);
 
@@ -111,7 +111,7 @@ const CustomMultiAutocompleteFormik: React.FC<ICustomMultiAutocompleteFormikProp
         );
       }}
       onInputChange={(event: React.ChangeEvent<any>, newValue: string, reason: AutocompleteInputChangeReason) => {
-        if (event && event.type === 'blur') {
+        if (event?.type === 'blur') {
           setInputValue('');
         } else if (reason !== 'reset') {
           setInputValue(newValue);

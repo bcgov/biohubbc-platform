@@ -10,7 +10,7 @@ export const sortAutocompleteOptions = <T extends { value: string | number }>(
   selectedOptions: readonly T[],
   remainingOptions: readonly T[]
 ): T[] => {
-  const selectedValues = selectedOptions.map((item) => item.value);
+  const selectedValues = new Set(selectedOptions.map((item) => item.value));
 
-  return [...selectedOptions, ...remainingOptions.filter((item) => !selectedValues.includes(item.value))];
+  return [...selectedOptions, ...remainingOptions.filter((item) => !selectedValues.has(item.value))];
 };

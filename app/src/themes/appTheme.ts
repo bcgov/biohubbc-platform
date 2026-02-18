@@ -541,7 +541,7 @@ const appTheme = createTheme({
         root: ({ theme }) => ({
           fontWeight: 700,
           color: theme.palette.text.secondary,
-          opacity: 0.75,
+          opacity: 0.8,
           padding: theme.spacing(0, 2),
           '&.Mui-selected': {
             color: theme.palette.primary.main,
