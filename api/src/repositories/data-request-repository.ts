@@ -29,50 +29,31 @@ export class DataRequestRepository extends BaseRepository {
   async findDataRequests(filters?: DataRequestFilters): Promise<DataRequest[]> {
     const knex = getKnex();
 
+    const queryBuilder = knex('data_request as dr')
+      .select('dr.data_request_id', 'dr.team_id', 'dr.reason', 'dr.requested_by')
+      .whereNull('dr.record_end_date');
+
     if (filters?.status) {
-      const query = knex('data_request as dr')
-        .select('dr.requested_by', 'dr.team_id', 'dr.data_request_id', 'dr.reason')
-        .join('data_request_status as drs', function () {
-          this.on('dr.data_request_id', '=', 'drs.data_request_id').onNull('drs.record_end_date');
-        })
-        .where('drs.request_status', filters.status)
-        .whereNull('dr.record_end_date');
-
-      if (filters?.date_from) {
-        query.where('dr.create_date', '>=', filters.date_from);
-      }
-      if (filters?.date_to) {
-        query.where('dr.create_date', '<=', filters.date_to);
-      }
-      if (filters?.requested_by) {
-        query.where('dr.requested_by', filters.requested_by);
-      }
-      if (filters?.team_id) {
-        query.where('dr.team_id', filters.team_id);
-      }
-
-      const response = await this.connection.knex(query, DataRequest);
-      return response.rows;
+      queryBuilder
+        .join('data_request_status as drs', 'drs.data_request_id', 'dr.data_request_id')
+        .whereNull('drs.record_end_date')
+        .where('drs.request_status', filters.status);
     }
-
-    const query = knex('data_request')
-      .select('requested_by', 'team_id', 'data_request_id', 'reason')
-      .whereNull('record_end_date');
 
     if (filters?.date_from) {
-      query.where('create_date', '>=', filters.date_from);
+      queryBuilder.where('dr.create_date', '>=', filters.date_from);
     }
     if (filters?.date_to) {
-      query.where('create_date', '<=', filters.date_to);
+      queryBuilder.where('dr.create_date', '<=', filters.date_to);
     }
     if (filters?.requested_by) {
-      query.where('requested_by', filters.requested_by);
+      queryBuilder.where('dr.requested_by', filters.requested_by);
     }
     if (filters?.team_id) {
-      query.where('team_id', filters.team_id);
+      queryBuilder.where('dr.team_id', filters.team_id);
     }
 
-    const response = await this.connection.knex(query, DataRequest);
+    const response = await this.connection.knex(queryBuilder, DataRequest);
     return response.rows;
   }
 
