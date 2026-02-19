@@ -1,6 +1,6 @@
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { DataRequestStatus, DataRequestStatusEnum } from '../models/data-request';
+import { DataRequestStatus, DataRequestStatusEnum, UpdateDataRequestStatus } from '../models/data-request';
 import { BaseRepository } from './base-repository';
 
 /**
@@ -11,6 +11,24 @@ import { BaseRepository } from './base-repository';
  * @extends {BaseRepository}
  */
 export class DataRequestStatusRepository extends BaseRepository {
+  /**
+   * Find a specific data request status by its ID.
+   *
+   * @param {string} dataRequestStatusId
+   * @return {Promise<DataRequestStatus | null>}
+   * @memberof DataRequestStatusRepository
+   */
+  async findDataRequestStatusById(dataRequestStatusId: string): Promise<DataRequestStatus | null> {
+    const knex = getKnex();
+    const query = knex('data_request_status')
+      .select('data_request_id', 'data_request_status_id', 'comment_id', 'request_status')
+      .where('data_request_status_id', dataRequestStatusId)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query, DataRequestStatus);
+    return response.rows[0] ?? null;
+  }
+
   /**
    * Get all status records for a data request.
    *
