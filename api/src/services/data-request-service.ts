@@ -110,10 +110,7 @@ export class DataRequestService extends DBService {
    * @return {Promise<DataRequestWithStatus>}
    * @memberof DataRequestService
    */
-  async createDataRequest(
-    requestedBy: number,
-    payload: CreateDataRequest
-  ): Promise<DataRequestWithStatus> {
+  async createDataRequest(requestedBy: number, payload: CreateDataRequest): Promise<DataRequestWithStatus> {
     let resolvedTeamId = payload.team_id;
     if (resolvedTeamId === undefined) {
       const teamService = new TeamService(this.connection);
@@ -124,7 +121,9 @@ export class DataRequestService extends DBService {
       await teamMemberService.insertTeamMember({ system_user_id: requestedBy, team_id: resolvedTeamId });
     }
 
-    const dataRequest = await this.dataRequestRepository.createDataRequest(resolvedTeamId, requestedBy, payload);
+    const payloadWithTeamId = { ...payload, team_id: resolvedTeamId };
+
+    const dataRequest = await this.dataRequestRepository.createDataRequest(requestedBy, payloadWithTeamId);
 
     const dataRequestStatusRepository = new DataRequestStatusRepository(this.connection);
     const dataRequestStatus = await dataRequestStatusRepository.createDataRequestStatus(
