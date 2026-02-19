@@ -12,6 +12,7 @@ import {
 import { TeamMember } from '../models/team-member';
 import { TeamMemberRepository } from '../repositories/authorization/team-member-repository';
 import { DataRequestRepository } from '../repositories/data-request-repository';
+import { DataRequestStatusRepository } from '../repositories/data-request-status-repository';
 import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamService } from './access-policy/team-service';
 import { DBService } from './db-service';
@@ -125,7 +126,9 @@ export class DataRequestService extends DBService {
     }
 
     const dataRequest = await this.dataRequestRepository.createDataRequest(resolvedTeamId, requestedBy, payload);
-    const dataRequestStatus = await this.dataRequestRepository.createDataRequestStatus(
+
+    const dataRequestStatusRepository = new DataRequestStatusRepository(this.connection);
+    const dataRequestStatus = await dataRequestStatusRepository.createDataRequestStatus(
       dataRequest.data_request_id,
       DataRequestStatusEnum.enum.REQUESTED,
       null

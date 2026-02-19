@@ -1,0 +1,73 @@
+import { getKnex } from '../database/db';
+import { ApiExecuteSQLError } from '../errors/api-error';
+import { DataRequestStatus, DataRequestStatusEnum } from '../models/data-request';
+import { BaseRepository } from './base-repository';
+
+/**
+ * Data request status repository class.
+ *
+ * @export
+ * @class DataRequestStatusRepository
+ * @extends {BaseRepository}
+ */
+export class DataRequestStatusRepository extends BaseRepository {
+  /**
+   * Get all status records for a data request.
+   *
+   * @param {string} dataRequestId
+   * @return {Promise<DataRequestStatus[]>}
+   * @memberof DataRequestStatusRepository
+   */
+  async getDataRequestStatusByDataRequestId(dataRequestId: string): Promise<DataRequestStatus> {
+    const knex = getKnex();
+    const query = knex('data_request_status')
+      .select('data_request_id', 'data_request_status_id', 'comment_id', 'request_status')
+      .where('data_request_id', dataRequestId)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query, DataRequestStatus);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get data request status', [
+        'DataRequestStatusRepository->getDataRequestStatusByDataRequestId',
+        'rowCount !== 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Create a new status record for a data request, optionally with a comment.
+   *
+   * @param {string} dataRequestId
+   * @param {DataRequestStatus} requestStatus
+   * @param {string | null} commentId
+   * @return {Promise<DataRequestStatus>}
+   * @memberof DataRequestStatusRepository
+   */
+  async createDataRequestStatus(
+    dataRequestId: string,
+    requestStatus: DataRequestStatusEnum,
+    commentId: string | null
+  ): Promise<DataRequestStatus> {
+    const knex = getKnex();
+    const query = knex('data_request_status')
+      .insert({
+        data_request_id: dataRequestId,
+        request_status: requestStatus,
+        comment_id: commentId
+      })
+      .returning(['data_request_id', 'data_request_status_id', 'comment_id', 'request_status']);
+
+    const response = await this.connection.knex(query, DataRequestStatus);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to create data request status', [
+        'DataRequestRepository->createDataRequestStatus',
+        'rowCount !== 1'
+      ]);
+    }
+    return response.rows[0];
+  }
+}
