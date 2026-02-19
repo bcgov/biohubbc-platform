@@ -486,6 +486,23 @@ const randomIntFromInterval = (min: number, max: number) => {
   return Math.floor(Math.random() * (max - min + 1) + min);
 };
 
+export const insertSubmissionFeatureSecurity = async (
+  knex: Knex,
+  options: { submission_feature_id: number; security_rule_id: number }
+): Promise<number> => {
+  const res = await knex.raw(`
+    INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, create_user)
+    VALUES (
+      ${options.submission_feature_id},
+      ${options.security_rule_id},
+      (SELECT system_user_id from "system_user" where user_identifier = 'SIMS')
+    )
+    RETURNING submission_feature_security_id;
+  `);
+
+  return res.rows[0].submission_feature_security_id;
+};
+
 export const insertTelemetryDeployment = async (
   knex: Knex,
   options: { submission_id: number; parent_submission_feature_id: number }
@@ -584,6 +601,17 @@ export const insertTelemetryRecord = async (
       submission_feature_id
     })}`
   );
+
+  // randomly secure some telemetry points
+  if (Math.random() < 0.1) {
+    const ruleRes = await knex.raw(`SELECT security_rule_id FROM security_rule ORDER BY random() LIMIT 1`);
+    if (ruleRes.rows.length) {
+      await insertSubmissionFeatureSecurity(knex, {
+        submission_feature_id,
+        security_rule_id: ruleRes.rows[0].security_rule_id
+      });
+    }
+  }
 
   return submission_feature_id;
 };
