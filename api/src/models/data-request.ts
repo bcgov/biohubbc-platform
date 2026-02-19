@@ -37,7 +37,8 @@ export type DataRequestFilters = z.infer<typeof DataRequestFilters>;
 export const DataRequestWithFilters = DataRequest.extend(DataRequestFilters.shape);
 
 export const CreateDataRequest = z.object({
-  reason: z.string()
+  reason: z.string(),
+  team_id: z.string().optional()
 });
 export type CreateDataRequest = z.infer<typeof CreateDataRequest>;
 

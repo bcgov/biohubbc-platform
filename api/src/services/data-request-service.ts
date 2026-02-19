@@ -112,10 +112,9 @@ export class DataRequestService extends DBService {
    */
   async createDataRequest(
     requestedBy: number,
-    payload: CreateDataRequest,
-    teamId?: string
+    payload: CreateDataRequest
   ): Promise<DataRequestWithStatus> {
-    let resolvedTeamId = teamId;
+    let resolvedTeamId = payload.team_id;
     if (resolvedTeamId === undefined) {
       const teamService = new TeamService(this.connection);
       const team = await teamService.createTeam({ name: _generateDataRequestTeamName() });
