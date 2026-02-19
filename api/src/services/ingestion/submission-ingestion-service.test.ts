@@ -11,12 +11,12 @@ import * as biohubTarParser from '../../utils/biohub-tar-parser';
 import { IUploadedMediaFile } from '../../utils/biohub-tar-parser';
 import * as fileUtils from '../../utils/file-utils';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { FeatureValidationService } from './feature-ingestion-service';
-import { IValidationError, ValidationErrorType } from './feature-ingestion-service.interface';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { SubmissionUploadService } from '../upload/submission-upload-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
+import { FeatureValidationService } from './feature-validation-service';
+import { IValidationError, ValidationErrorType } from './feature-validation-service.interface';
 import { SubmissionIngestionService, validateMediaReferences } from './submission-ingestion-service';
 
 describe('SubmissionIngestionService', () => {

@@ -6,12 +6,12 @@ import { extractAndUploadMedia, extractBlocksFromArchive, IUploadedMediaFile } f
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { getLogger } from '../../utils/logger';
 import { DBService } from '../db-service';
-import { FeatureValidationService } from './feature-ingestion-service';
-import { IValidationError, IValidationResult, ValidationErrorType } from './feature-ingestion-service.interface';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { SubmissionUploadService } from '../upload/submission-upload-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
+import { FeatureValidationService } from './feature-validation-service';
+import { IValidationError, IValidationResult, ValidationErrorType } from './feature-validation-service.interface';
 
 const defaultLog = getLogger('services/ingestion/submission-ingestion-service');
 
