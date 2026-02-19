@@ -12,7 +12,7 @@ import { TeamMember } from '../models/team-member';
 import { TeamMemberRepository } from '../repositories/authorization/team-member-repository';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import { DataRequestStatusRepository } from '../repositories/data-request-status-repository';
-import { _generateDataRequestTeamName } from '../utils/data-request';
+import { _generateDataRequestTeamName, _transformFlatDataRequestToNested } from '../utils/data-request';
 import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamService } from './access-policy/team-service';
 import { DBService } from './db-service';
@@ -72,10 +72,10 @@ export class DataRequestService extends DBService {
    * Returns a specific data_request and user must be authorized
    *
    * @param {string} dataRequestId
-   * @return {Promise<DataRequest>}
+   * @return {Promise<DataRequestWithStatus>}
    * @memberof DataRequestService
    */
-  async getDataRequestById(dataRequestId: string): Promise<DataRequest> {
+  async getDataRequestById(dataRequestId: string): Promise<DataRequestWithStatus> {
     const dataRequest = await this.dataRequestRepository.getDataRequestById(dataRequestId);
 
     const authorized = await this._authorizeAccessForDataRequest(dataRequest.team_id);
@@ -84,7 +84,7 @@ export class DataRequestService extends DBService {
       throw new HTTP403('Access Denied');
     }
 
-    return dataRequest;
+    return _transformFlatDataRequestToNested(dataRequest);
   }
 
   /**
@@ -94,10 +94,10 @@ export class DataRequestService extends DBService {
    * @return {Promise<DataRequest[]>}
    * @memberof DataRequestService
    */
-  async findDataRequests(filters?: DataRequestFilters): Promise<DataRequest[]> {
+  async findDataRequests(filters?: DataRequestFilters): Promise<DataRequestWithStatus[]> {
     const dataRequests = await this.dataRequestRepository.findDataRequests(filters);
 
-    return dataRequests;
+    return dataRequests.map(_transformFlatDataRequestToNested);
   }
 
   /**
