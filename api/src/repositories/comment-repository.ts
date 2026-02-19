@@ -12,6 +12,24 @@ import { BaseRepository } from './base-repository';
  */
 export class CommentRepository extends BaseRepository {
   /**
+   * Find all comments associated with a data request status.
+   *
+   * @param {string} dataRequestStatusId
+   * @return {Promise<Comment[]>}
+   * @memberof CommentRepository
+   */
+  async findCommentsByDataRequestStatusId(dataRequestStatusId: string): Promise<Comment[]> {
+    const knex = getKnex();
+    const query = knex('comment as c')
+      .select('c.comment_id', 'c.comment')
+      .join('data_request_status as drs', 'c.comment_id', 'drs.comment_id')
+      .where('drs.data_request_status_id', dataRequestStatusId);
+
+    const response = await this.connection.knex(query, Comment);
+    return response.rows;
+  }
+
+  /**
    * Create a new comment.
    *
    * @param {string} comment
