@@ -36,5 +36,8 @@ export type UpdateDataRequest = z.infer<typeof UpdateDataRequest>;
 // data_request CRUD Responses
 // ──────────────────────────────────────────────────────────────────────────────
 
+export const FlatDataRequestWithStatus = DataRequest.extend(DataRequestStatus.shape);
+export type FlatDataRequestWithStatus = z.infer<typeof FlatDataRequestWithStatus>;
+
 export const DataRequestWithStatus = DataRequest.extend({ data_request_status: DataRequestStatus });
 export type DataRequestWithStatus = z.infer<typeof DataRequestWithStatus>;
