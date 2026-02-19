@@ -145,7 +145,7 @@ export function findDataRequests(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json(dataRequests);
+      return res.status(200).json(dataRequests);
     } catch (error) {
       defaultLog.error({ label: 'findDataRequests', message: 'error', error });
       await connection.rollback();
@@ -177,7 +177,7 @@ export function createDataRequest(): RequestHandler {
 
       await connection.commit();
 
-      res.status(201).json(dataRequest);
+      return res.status(201).json(dataRequest);
     } catch (error) {
       defaultLog.error({ label: 'createDataRequest', message: 'error', error });
       await connection.rollback();
