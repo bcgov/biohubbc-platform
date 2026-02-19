@@ -88,4 +88,35 @@ export class DataRequestStatusRepository extends BaseRepository {
     }
     return response.rows[0];
   }
+
+  /**
+   * Update the status of a data request status record.
+   *
+   * @param {string} dataRequestStatusId
+   * @param {UpdateDataRequestStatus} payload
+   * @return {Promise<DataRequestStatus>}
+   * @memberof DataRequestStatusRepository
+   */
+  async updateDataRequestStatus(
+    dataRequestStatusId: string,
+    payload: UpdateDataRequestStatus
+  ): Promise<DataRequestStatus> {
+    const knex = getKnex();
+    const query = knex('data_request_status')
+      .where('data_request_status_id', dataRequestStatusId)
+      .whereNull('record_end_date')
+      .update(payload)
+      .returning(['data_request_id', 'data_request_status_id', 'comment_id', 'request_status']);
+
+    const response = await this.connection.knex(query, DataRequestStatus);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update data request status', [
+        'DataRequestStatusRepository->updateDataRequestStatus',
+        'rowCount !== 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
 }
