@@ -170,6 +170,8 @@ export function getDataRequestById(): RequestHandler {
 
       const dataRequest = await dataRequestService.getDataRequestById(dataRequestId);
 
+      await connection.commit();
+
       return res.status(200).json(dataRequest);
     } catch (error) {
       defaultLog.error({ label: 'getDataRequestById', message: 'Error fetching data request', error });

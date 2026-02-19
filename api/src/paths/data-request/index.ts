@@ -143,6 +143,8 @@ export function findDataRequests(): RequestHandler {
       const dataRequestService = new DataRequestService(connection);
       const dataRequests = await dataRequestService.findDataRequests(filters);
 
+      await connection.commit();
+
       res.status(200).json(dataRequests);
     } catch (error) {
       defaultLog.error({ label: 'findDataRequests', message: 'error', error });
