@@ -15,10 +15,10 @@ export class DataRequestStatusRepository extends BaseRepository {
    * Find a specific data request status by its ID.
    *
    * @param {string} dataRequestStatusId
-   * @return {Promise<DataRequestStatus | null>}
+   * @return {Promise<DataRequestStatus>}
    * @memberof DataRequestStatusRepository
    */
-  async findDataRequestStatusById(dataRequestStatusId: string): Promise<DataRequestStatus | null> {
+  async getDataRequestStatusById(dataRequestStatusId: string): Promise<DataRequestStatus> {
     const knex = getKnex();
     const query = knex('data_request_status')
       .select('data_request_id', 'data_request_status_id', 'comment_id', 'request_status')
@@ -26,7 +26,15 @@ export class DataRequestStatusRepository extends BaseRepository {
       .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, DataRequestStatus);
-    return response.rows[0] ?? null;
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get data request status', [
+        'DataRequestStatusRepository->getDataRequestStatusById',
+        'rowCount !== 1'
+      ]);
+    }
+
+    return response.rows[0];
   }
 
   /**

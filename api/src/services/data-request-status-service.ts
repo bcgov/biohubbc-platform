@@ -1,5 +1,4 @@
 import { IDBConnection } from '../database/db';
-import { HTTP404 } from '../errors/http-error';
 import { DataRequestStatus, DataRequestStatusEnum } from '../models/data-request-status';
 import { DataRequestStatusRepository } from '../repositories/data-request-status-repository';
 import { DBService } from './db-service';
@@ -25,11 +24,11 @@ export class DataRequestStatusService extends DBService {
    * Find a specific data request status by its ID.
    *
    * @param {string} dataRequestStatusId
-   * @return {Promise<DataRequestStatus | null>}
+   * @return {Promise<DataRequestStatus>}
    * @memberof DataRequestStatusService
    */
-  async findDataRequestStatusById(dataRequestStatusId: string): Promise<DataRequestStatus | null> {
-    const dataRequestStatus = await this.dataRequestStatusRepository.findDataRequestStatusById(dataRequestStatusId);
+  async getDataRequestStatusById(dataRequestStatusId: string): Promise<DataRequestStatus> {
+    const dataRequestStatus = await this.dataRequestStatusRepository.getDataRequestStatusById(dataRequestStatusId);
     return dataRequestStatus;
   }
 
@@ -67,12 +66,6 @@ export class DataRequestStatusService extends DBService {
     dataRequestStatusId: string,
     requestStatus: DataRequestStatusEnum = DataRequestStatusEnum.enum.REQUESTED
   ): Promise<DataRequestStatus> {
-    const existingStatus = await this.findDataRequestStatusById(dataRequestStatusId);
-
-    if (!existingStatus) {
-      throw new HTTP404('Data request status not found');
-    }
-
     return this.dataRequestStatusRepository.updateDataRequestStatus(dataRequestStatusId, {
       request_status: requestStatus
     });
