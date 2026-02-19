@@ -1,6 +1,12 @@
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { CreateDataRequest, DataRequest, DataRequestFilters, UpdateDataRequest } from '../models/data-request';
+import {
+  CreateDataRequest,
+  DataRequest,
+  DataRequestFilters,
+  FlatDataRequestWithStatus,
+  UpdateDataRequest
+} from '../models/data-request';
 import { BaseRepository } from './base-repository';
 
 /**
@@ -15,23 +21,29 @@ export class DataRequestRepository extends BaseRepository {
    * Find all data requests, optionally filtered by date range, requested_by, team_id, or status.
    *
    * @param {DataRequestFilters} [filters] - Optional filters (date_from, date_to, requested_by, team_id, status).
-   * @return {Promise<DataRequest[]>}
+   * @return {Promise<FlatDataRequestWithStatus[]>}
    * @memberof DataRequestRepository
    */
-  async findDataRequests(filters?: DataRequestFilters): Promise<DataRequest[]> {
+  async findDataRequests(filters?: DataRequestFilters): Promise<FlatDataRequestWithStatus[]> {
     const knex = getKnex();
 
     const queryBuilder = knex('data_request as dr')
-      .select('dr.data_request_id', 'dr.team_id', 'dr.reason', 'dr.requested_by')
-      .whereNull('dr.record_end_date');
+      .select(
+        'dr.data_request_id',
+        'dr.team_id',
+        'dr.reason',
+        'dr.requested_by',
+        'drs.data_request_status_id',
+        'drs.comment_id',
+        'drs.request_status'
+      )
+      .join('data_request_status as drs', 'drs.data_request_id', 'dr.data_request_id')
+      .whereNull('dr.record_end_date')
+      .whereNull('drs.record_end_date');
 
     if (filters?.status) {
-      queryBuilder
-        .join('data_request_status as drs', 'drs.data_request_id', 'dr.data_request_id')
-        .whereNull('drs.record_end_date')
-        .where('drs.request_status', filters.status);
+      queryBuilder.where('drs.request_status', filters.status);
     }
-
     if (filters?.date_from) {
       queryBuilder.where('dr.create_date', '>=', filters.date_from);
     }
@@ -45,7 +57,7 @@ export class DataRequestRepository extends BaseRepository {
       queryBuilder.where('dr.team_id', filters.team_id);
     }
 
-    const response = await this.connection.knex(queryBuilder, DataRequest);
+    const response = await this.connection.knex(queryBuilder, FlatDataRequestWithStatus);
     return response.rows;
   }
 
@@ -53,17 +65,27 @@ export class DataRequestRepository extends BaseRepository {
    * Get a specific data request by its ID. Throws an error if the data request does not exist.
    *
    * @param {string} dataRequestId
-   * @return {Promise<DataRequest>}
+   * @return {Promise<FlatDataRequestWithStatus>}
    * @memberof DataRequestRepository
    */
-  async getDataRequestById(dataRequestId: string): Promise<DataRequest> {
+  async getDataRequestById(dataRequestId: string): Promise<FlatDataRequestWithStatus> {
     const knex = getKnex();
-    const query = knex('data_request')
-      .select('requested_by', 'team_id', 'data_request_id', 'reason')
+    const query = knex('data_request as dr')
+      .select(
+        'dr.data_request_id',
+        'dr.team_id',
+        'dr.reason',
+        'dr.requested_by',
+        'drs.data_request_status_id',
+        'drs.comment_id',
+        'drs.request_status'
+      )
+      .join('data_request_status as drs', 'drs.data_request_id', 'dr.data_request_id')
       .where('data_request_id', dataRequestId)
-      .whereNull('record_end_date');
+      .whereNull('dr.record_end_date')
+      .whereNull('drs.record_end_date');
 
-    const response = await this.connection.knex(query, DataRequest);
+    const response = await this.connection.knex(query, FlatDataRequestWithStatus);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get data request', [
@@ -79,17 +101,27 @@ export class DataRequestRepository extends BaseRepository {
    * Find a specific data request by its ID.
    *
    * @param {string} dataRequestId
-   * @return {Promise<DataRequest | null>}
+   * @return {Promise<FlatDataRequestWithStatus | null>}
    * @memberof DataRequestRepository
    */
-  async findDataRequestById(dataRequestId: string): Promise<DataRequest | null> {
+  async findDataRequestById(dataRequestId: string): Promise<FlatDataRequestWithStatus | null> {
     const knex = getKnex();
-    const query = knex('data_request')
-      .select('requested_by', 'team_id', 'data_request_id', 'reason')
+    const query = knex('data_request as dr')
+      .select(
+        'dr.data_request_id',
+        'dr.team_id',
+        'dr.reason',
+        'dr.requested_by',
+        'drs.data_request_status_id',
+        'drs.comment_id',
+        'drs.request_status'
+      )
+      .join('data_request_status as drs', 'drs.data_request_id', 'dr.data_request_id')
       .where('data_request_id', dataRequestId)
-      .whereNull('record_end_date');
+      .whereNull('dr.record_end_date')
+      .whereNull('drs.record_end_date');
 
-    const response = await this.connection.knex(query, DataRequest);
+    const response = await this.connection.knex(query, FlatDataRequestWithStatus);
     return response.rows[0] ?? null;
   }
 
