@@ -173,7 +173,7 @@ export function createDataRequest(): RequestHandler {
 
       const dataRequestService = new DataRequestService(connection);
 
-      const dataRequest = await dataRequestService.createDataRequest(systemUserId, { reason }, teamId);
+      const dataRequest = await dataRequestService.createDataRequest(systemUserId, { reason, team_id: teamId });
 
       await connection.commit();
 
