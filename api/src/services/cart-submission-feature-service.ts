@@ -71,6 +71,18 @@ export class CartSubmissionFeatureService extends DBService {
   }
 
   /**
+   * Get all submission feature IDs in a cart (unpaginated).
+   * Used by checkout to identify which features to link to the download record.
+   *
+   * @param {string} cartId - The ID of the cart
+   * @return {Promise<number[]>}
+   * @memberof CartSubmissionFeatureService
+   */
+  async getCartSubmissionFeatureIds(cartId: string): Promise<number[]> {
+    return this.cartSubmissionFeatureRepository.getCartSubmissionFeatureIds(cartId);
+  }
+
+  /**
    * Get submission features in a cart
    *
    * @param {string} cartId - The ID of the cart

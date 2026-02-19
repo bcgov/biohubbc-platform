@@ -101,6 +101,36 @@ export class CartRepository extends BaseRepository {
   }
 
   /**
+   * Atomically check out an active cart.
+   * Only active carts can be checked out. The WHERE clause filters on
+   * cart_status = 'active', preventing double-checkout (idempotent guard).
+   * Sets checkout_date and checkout_user to track when and who checked out,
+   * separate from the audit trigger's update_date/update_user.
+   *
+   * @param {string} cartId
+   * @param {number | null} checkoutUserId
+   * @return {Promise<void>}
+   * @memberof CartRepository
+   */
+  async checkoutCart(cartId: string, checkoutUserId: number | null): Promise<void> {
+    const knex = getKnex();
+    const query = knex('cart').where('cart_id', cartId).andWhere('cart_status', CartStatus.ACTIVE).update({
+      cart_status: CartStatus.CHECKED_OUT,
+      checkout_date: knex.fn.now(),
+      checkout_user: checkoutUserId
+    });
+
+    const response = await this.connection.knex(query);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to checkout cart', [
+        'CartRepository->checkoutCart',
+        'rowCount !== 1, expected rowCount === 1'
+      ]);
+    }
+  }
+
+  /**
    * Soft delete a cart
    * Requires system user ID to ensure the user owns the cart.
    *

@@ -1,9 +1,12 @@
 import { IDBConnection } from '../database/db';
+import { HTTP400 } from '../errors/http-error';
 import { Cart, CartWithFeatures, CartWithFeaturesResponse, UpdateCart } from '../models/cart';
+import { DownloadId } from '../models/download';
 import { CartRepository } from '../repositories/cart-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { CartSubmissionFeatureService } from './cart-submission-feature-service';
 import { DBService } from './db-service';
+import { DownloadService } from './download/download-service';
 
 /**
  * Service for managing carts and cart submission features.
@@ -11,6 +14,7 @@ import { DBService } from './db-service';
 export class CartService extends DBService {
   cartRepository: CartRepository;
   cartSubmissionFeatureService: CartSubmissionFeatureService;
+  downloadService: DownloadService;
 
   /**
    * Initializes the CartService with a database connection.
@@ -22,6 +26,7 @@ export class CartService extends DBService {
     super(connection);
     this.cartRepository = new CartRepository(connection);
     this.cartSubmissionFeatureService = new CartSubmissionFeatureService(connection);
+    this.downloadService = new DownloadService(connection);
   }
 
   /**
@@ -108,6 +113,40 @@ export class CartService extends DBService {
    */
   async updateCart(cartId: string, payload: UpdateCart): Promise<void> {
     await this.cartRepository.updateCart(cartId, payload);
+  }
+
+  /**
+   * Check out a cart: create a download record, link all cart features to it,
+   * and mark the cart as checked out.
+   *
+   * Checkout creates a download in `pending` status without triggering processing.
+   * Download processing is a separate concern handled by the pipeline.
+   * An empty cart checkout would create a useless download record, so the service
+   * validates this before creating any records.
+   *
+   * @param {string} cartId - The ID of the cart to check out
+   * @param {number | null} systemUserId - The authenticated user ID, or null for anonymous checkout
+   * @return {Promise<DownloadId>} The created download record ID
+   * @throws HTTP400 if the cart is empty (no features to download)
+   * @memberof CartService
+   */
+  async checkoutCart(cartId: string, systemUserId: number | null): Promise<DownloadId> {
+    const featureIds = await this.cartSubmissionFeatureService.getCartSubmissionFeatureIds(cartId);
+
+    if (featureIds.length === 0) {
+      throw new HTTP400('Cannot checkout an empty cart');
+    }
+
+    // Create download record (no team, no data request for cart checkouts)
+    const downloadId = await this.downloadService.createDownload(null, null, undefined, systemUserId);
+
+    // Link features to download
+    await this.downloadService.createDownloadFeatures(downloadId.download_id, featureIds);
+
+    // Mark cart as checked out
+    await this.cartRepository.checkoutCart(cartId, systemUserId);
+
+    return downloadId;
   }
 
   /**

@@ -188,6 +188,65 @@ describe('CartRepository', () => {
     });
   });
 
+  describe('checkoutCart', () => {
+    it('should resolve when rowCount is 1', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: []
+      } as unknown as QueryResult<any>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => mockQueryResponse
+      });
+
+      const repo = new CartRepository(mockDBConnection);
+
+      await repo.checkoutCart('cart-1', 42);
+
+      expect(true).to.be.true;
+    });
+
+    it('should throw when cart is not found or not active (rowCount 0)', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as QueryResult<any>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => mockQueryResponse
+      });
+
+      const repo = new CartRepository(mockDBConnection);
+
+      try {
+        await repo.checkoutCart('cart-1', 42);
+        throw new Error('Expected to throw');
+      } catch (err) {
+        expect((err as Error).message).to.equal('Failed to checkout cart');
+      }
+    });
+
+    it('should throw when rowCount is greater than 1', async () => {
+      const mockQueryResponse = {
+        rowCount: 2,
+        rows: []
+      } as unknown as QueryResult<any>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => mockQueryResponse
+      });
+
+      const repo = new CartRepository(mockDBConnection);
+
+      try {
+        await repo.checkoutCart('cart-1', null);
+        throw new Error('Expected to throw');
+      } catch (err) {
+        expect((err as Error).message).to.equal('Failed to checkout cart');
+      }
+    });
+  });
+
   describe('deleteCart', () => {
     it('should soft delete a cart successfully', async () => {
       const mockQueryResponse = {
