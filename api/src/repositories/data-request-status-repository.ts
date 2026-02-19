@@ -1,6 +1,6 @@
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { DataRequestStatus, DataRequestStatusEnum, UpdateDataRequestStatus } from '../models/data-request';
+import { DataRequestStatus, DataRequestStatusEnum, UpdateDataRequestStatus } from '../models/data-request-status';
 import { BaseRepository } from './base-repository';
 
 /**

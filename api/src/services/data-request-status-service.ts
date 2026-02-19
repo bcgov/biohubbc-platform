@@ -1,6 +1,6 @@
 import { IDBConnection } from '../database/db';
 import { HTTP404 } from '../errors/http-error';
-import { DataRequestStatus, DataRequestStatusEnum } from '../models/data-request';
+import { DataRequestStatus, DataRequestStatusEnum } from '../models/data-request-status';
 import { DataRequestStatusRepository } from '../repositories/data-request-status-repository';
 import { DBService } from './db-service';
 

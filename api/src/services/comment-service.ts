@@ -1,5 +1,5 @@
 import { IDBConnection } from '../database/db';
-import { Comment } from '../models/data-request';
+import { Comment } from '../models/comment';
 import { CommentRepository } from '../repositories/comment-repository';
 import { DataRequestStatusRepository } from '../repositories/data-request-status-repository';
 import { DBService } from './db-service';

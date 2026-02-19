@@ -4,10 +4,10 @@ import {
   CreateDataRequest,
   DataRequest,
   DataRequestFilters,
-  DataRequestStatusEnum,
   DataRequestWithStatus,
   UpdateDataRequest
 } from '../models/data-request';
+import { DataRequestStatusEnum } from '../models/data-request-status';
 import { TeamMember } from '../models/team-member';
 import { TeamMemberRepository } from '../repositories/authorization/team-member-repository';
 import { DataRequestRepository } from '../repositories/data-request-repository';

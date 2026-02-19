@@ -1,6 +1,6 @@
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { Comment } from '../models/data-request';
+import { Comment } from '../models/comment';
 import { BaseRepository } from './base-repository';
 
 /**

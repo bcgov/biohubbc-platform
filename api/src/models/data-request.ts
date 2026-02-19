@@ -1,35 +1,20 @@
 import { z } from 'zod';
-
-export const DataRequestStatusEnum = z.enum(['REQUESTED', 'APPROVED', 'DENIED']);
-export type DataRequestStatusEnum = z.infer<typeof DataRequestStatusEnum>;
+import { DataRequestStatus, DataRequestStatusEnum } from './data-request-status';
 
 export const DataRequest = z.object({
   data_request_id: z.string().uuid(),
   reason: z.string(),
   team_id: z.string().uuid(),
-  requested_by: z.number()
+  requested_by: z.number(),
+  data_request_status_id: z.string().uuid()
 });
 export type DataRequest = z.infer<typeof DataRequest>;
-
-export const Comment = z.object({
-  comment_id: z.string().uuid(),
-  comment: z.string()
-});
-export type Comment = z.infer<typeof Comment>;
-
-export const DataRequestStatus = z.object({
-  data_request_status_id: z.string().uuid(),
-  data_request_id: z.string().uuid(),
-  comment_id: z.string().uuid().nullable(),
-  request_status: DataRequestStatusEnum
-});
-export type DataRequestStatus = z.infer<typeof DataRequestStatus>;
 
 export const DataRequestFilters = z.object({
   date_from: z.string().optional(),
   date_to: z.string().optional(),
   requested_by: z.number().int().optional(),
-  team_id: z.string().optional(),
+  team_id: z.string().uuid().optional(),
   status: DataRequestStatusEnum.optional()
 });
 export type DataRequestFilters = z.infer<typeof DataRequestFilters>;
@@ -38,7 +23,7 @@ export const DataRequestWithFilters = DataRequest.extend(DataRequestFilters.shap
 
 export const CreateDataRequest = z.object({
   reason: z.string(),
-  team_id: z.string().optional()
+  team_id: z.string().uuid().optional()
 });
 export type CreateDataRequest = z.infer<typeof CreateDataRequest>;
 
