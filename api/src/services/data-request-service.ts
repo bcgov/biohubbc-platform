@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
 import { IDBConnection } from '../database/db';
 import { HTTP403, HTTP404 } from '../errors/http-error';
 import {
@@ -13,6 +12,7 @@ import { TeamMember } from '../models/team-member';
 import { TeamMemberRepository } from '../repositories/authorization/team-member-repository';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import { DataRequestStatusRepository } from '../repositories/data-request-status-repository';
+import { _generateDataRequestTeamName } from '../utils/data-request';
 import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamService } from './access-policy/team-service';
 import { DBService } from './db-service';
@@ -206,13 +206,4 @@ export class DataRequestService extends DBService {
 
     return dataRequestTeamMember !== null;
   }
-}
-
-/**
- * Generates a unique team name for auto-created data request teams.
- *
- * @returns {string} A unique team name.
- */
-function _generateDataRequestTeamName(): string {
-  return `Data request team - ${uuidv4()}`;
 }
