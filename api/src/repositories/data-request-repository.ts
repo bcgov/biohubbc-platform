@@ -96,18 +96,17 @@ export class DataRequestRepository extends BaseRepository {
   /**
    * Create a new data request.
    *
-   * @param {string} [teamId] - Optional. If omitted, caller must create a team first and pass its id.
    * @param {number} requestedBy
    * @param {CreateDataRequest} payload
    * @return {Promise<DataRequestWithStatus>}
    * @memberof DataRequestRepository
    */
-  async createDataRequest(teamId: string, requestedBy: number, payload: CreateDataRequest): Promise<DataRequest> {
+  async createDataRequest(requestedBy: number, payload: CreateDataRequest): Promise<DataRequest> {
     const knex = getKnex();
     const query = knex('data_request')
       .insert({
-        team_id: teamId,
         requested_by: requestedBy,
+        team_id: payload.team_id,
         reason: payload.reason
       })
       .returning(['requested_by', 'team_id', 'data_request_id', 'reason']);
