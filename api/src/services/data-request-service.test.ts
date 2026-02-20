@@ -2,19 +2,15 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import {
-  CreateDataRequest,
-  DataRequest,
-  DataRequestStatus,
-  DataRequestStatusEnum,
-  DataRequestWithStatus,
-  UpdateDataRequest
-} from '../models/data-request';
+import { CreateDataRequest, DataRequest, FlatDataRequestWithStatus, UpdateDataRequest } from '../models/data-request';
+import { DataRequestStatus, DataRequestStatusEnum } from '../models/data-request-status';
 import { TeamMember } from '../models/team-member';
+import { TeamMemberRepository } from '../repositories/authorization/team-member-repository';
 import { DataRequestRepository } from '../repositories/data-request-repository';
+import { DataRequestStatusRepository } from '../repositories/data-request-status-repository';
 import { getMockDBConnection } from '../__mocks__/db';
+import { TeamService } from './access-policy/team-service';
 import { DataRequestService } from './data-request-service';
-import { UserService } from './user-service';
 
 chai.use(sinonChai);
 
@@ -23,8 +19,19 @@ describe('DataRequestService', () => {
     sinon.restore();
   });
 
+  const mockFlatDataRequest: FlatDataRequestWithStatus = {
+    data_request_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    data_request_status_id: 'c3d4e5f6-a7b8-9012-cdef-123456789012',
+    reason: 'Research purposes',
+    team_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
+    requested_by: 1,
+    comment_id: null,
+    request_status: 'REQUESTED'
+  };
+
   const mockDataRequest: DataRequest = {
     data_request_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    data_request_status_id: 'c3d4e5f6-a7b8-9012-cdef-123456789012',
     reason: 'Research purposes',
     team_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
     requested_by: 1
@@ -37,11 +44,6 @@ describe('DataRequestService', () => {
     request_status: 'REQUESTED'
   };
 
-  const mockDataRequestWithStatus: DataRequestWithStatus = {
-    ...mockDataRequest,
-    data_request_status: mockDataRequestStatus
-  };
-
   const mockTeamMember: TeamMember = {
     team_member_id: 'd4e5f6a7-b8c9-0123-defa-234567890123',
     system_user_id: 1,
@@ -50,160 +52,86 @@ describe('DataRequestService', () => {
 
   describe('findDataRequestById', () => {
     it('should return a data request for a given dataRequestId', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DataRequestService(mockDBConnection);
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
 
-      const stub = sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(mockDataRequest);
+      const stub = sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(mockFlatDataRequest);
 
       const result = await service.findDataRequestById(mockDataRequest.data_request_id);
 
       expect(stub).to.have.been.calledOnceWith(mockDataRequest.data_request_id);
-      expect(result).to.deep.equal(mockDataRequest);
+      expect(result).to.deep.equal(mockFlatDataRequest);
     });
 
     it('should return null when data request is not found', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DataRequestService(mockDBConnection);
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
 
-      sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(null as unknown as DataRequest);
+      sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(null);
 
       const result = await service.findDataRequestById('non-existent-id');
 
       expect(result).to.be.null;
     });
+  });
+
+  describe('getDataRequestById', () => {
+    it('should return the transformed data request with nested status', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
+
+      const stub = sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').resolves(mockFlatDataRequest);
+
+      const result = await service.getDataRequestById(mockDataRequest.data_request_id);
+
+      expect(stub).to.have.been.calledOnceWith(mockDataRequest.data_request_id);
+      expect(result.data_request_id).to.equal(mockFlatDataRequest.data_request_id);
+      expect(result.data_request_status).to.deep.equal({
+        data_request_status_id: mockFlatDataRequest.data_request_status_id,
+        data_request_id: mockFlatDataRequest.data_request_id,
+        comment_id: mockFlatDataRequest.comment_id,
+        request_status: mockFlatDataRequest.request_status
+      });
+    });
 
     it('should propagate repository errors', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DataRequestService(mockDBConnection);
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
 
-      sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').rejects(new Error('DB error'));
+      sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').rejects(new Error('DB error'));
 
       try {
-        await service.findDataRequestById(mockDataRequest.data_request_id);
+        await service.getDataRequestById(mockDataRequest.data_request_id);
         throw new Error('Expected to throw');
-      } catch (err: any) {
-        expect(err.message).to.equal('DB error');
+      } catch (err) {
+        expect(err).to.be.instanceOf(Error);
+        expect((err as Error).message).to.equal('DB error');
       }
     });
   });
 
-  describe('getDataRequestById', () => {
-    describe('when the user is not authorized', () => {
-      it('should throw HTTP 403 when user is not a system admin and not a team member', async () => {
-        const mockDBConnection = getMockDBConnection({
-          systemUserId: () => 99
-        });
-        const service = new DataRequestService(mockDBConnection);
-
-        sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').resolves(mockDataRequest);
-        sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
-        sinon.stub(DataRequestService.prototype, 'findTeamMember').resolves(null);
-
-        try {
-          await service.getDataRequestById(mockDataRequest.data_request_id);
-          expect.fail('Expected HTTP403 to be thrown');
-        } catch (err: any) {
-          expect(err.status).to.equal(403);
-          expect(err.message).to.equal('Access Denied');
-        }
-      });
-
-      it('should propagate repository errors before authorization is checked', async () => {
-        const mockDBConnection = getMockDBConnection();
-        const service = new DataRequestService(mockDBConnection);
-
-        sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').rejects(new Error('DB error'));
-
-        try {
-          await service.getDataRequestById(mockDataRequest.data_request_id);
-          expect.fail('Expected error to be thrown');
-        } catch (err: any) {
-          expect(err.message).to.equal('DB error');
-        }
-      });
-    });
-
-    describe('when the user is authorized as a system administrator', () => {
-      it('should return the data request', async () => {
-        const mockDBConnection = getMockDBConnection({
-          systemUserId: () => 99
-        });
-        const service = new DataRequestService(mockDBConnection);
-
-        sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').resolves(mockDataRequest);
-        sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
-
-        const result = await service.getDataRequestById(mockDataRequest.data_request_id);
-
-        expect(result).to.deep.equal(mockDataRequest);
-      });
-
-      it('should not check team membership when user is a system admin', async () => {
-        const mockDBConnection = getMockDBConnection({
-          systemUserId: () => 99
-        });
-        const service = new DataRequestService(mockDBConnection);
-
-        sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').resolves(mockDataRequest);
-        sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
-        const findTeamMemberStub = sinon.stub(DataRequestService.prototype, 'findTeamMember');
-
-        await service.getDataRequestById(mockDataRequest.data_request_id);
-
-        expect(findTeamMemberStub).to.not.have.been.called;
-      });
-    });
-
-    describe('when the user is authorized as a team member but not a system administrator', () => {
-      it('should return the data request when user belongs to the team', async () => {
-        const mockDBConnection = getMockDBConnection({
-          systemUserId: () => mockTeamMember.system_user_id
-        });
-        const service = new DataRequestService(mockDBConnection);
-
-        sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').resolves(mockDataRequest);
-        sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
-        sinon.stub(DataRequestService.prototype, 'findTeamMember').resolves(mockTeamMember);
-
-        const result = await service.getDataRequestById(mockDataRequest.data_request_id);
-
-        expect(result).to.deep.equal(mockDataRequest);
-      });
-
-      it('should check team membership with the correct team_id and user_id', async () => {
-        const mockDBConnection = getMockDBConnection({
-          systemUserId: () => mockTeamMember.system_user_id
-        });
-        const service = new DataRequestService(mockDBConnection);
-
-        sinon.stub(DataRequestRepository.prototype, 'getDataRequestById').resolves(mockDataRequest);
-        sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
-        const findTeamMemberStub = sinon.stub(DataRequestService.prototype, 'findTeamMember').resolves(mockTeamMember);
-
-        await service.getDataRequestById(mockDataRequest.data_request_id);
-
-        expect(findTeamMemberStub).to.have.been.calledOnceWith(mockDataRequest.team_id, mockTeamMember.system_user_id);
-      });
-    });
-  });
-
   describe('findDataRequests', () => {
-    it('should return data requests when no filters provided', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DataRequestService(mockDBConnection);
+    it('should return transformed data requests when no filters provided', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
 
-      const mockRequests = [mockDataRequest];
-      const stub = sinon.stub(DataRequestRepository.prototype, 'findDataRequests').resolves(mockRequests);
+      const stub = sinon.stub(DataRequestRepository.prototype, 'findDataRequests').resolves([mockFlatDataRequest]);
 
       const result = await service.findDataRequests();
 
       expect(stub).to.have.been.calledOnceWith(undefined);
-      expect(result).to.deep.equal(mockRequests);
+      expect(result).to.have.length(1);
+      expect(result[0].data_request_status).to.deep.equal({
+        data_request_status_id: mockFlatDataRequest.data_request_status_id,
+        data_request_id: mockFlatDataRequest.data_request_id,
+        comment_id: mockFlatDataRequest.comment_id,
+        request_status: mockFlatDataRequest.request_status
+      });
     });
 
-    it('should return filtered data requests when filters provided', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DataRequestService(mockDBConnection);
+    it('should pass filters to repository', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
 
       const filters = {
         date_from: '2025-01-01',
@@ -211,260 +139,170 @@ describe('DataRequestService', () => {
         requested_by: 1,
         team_id: mockDataRequest.team_id
       };
-      const mockRequests = [mockDataRequest];
-      const stub = sinon.stub(DataRequestRepository.prototype, 'findDataRequests').resolves(mockRequests);
+      const stub = sinon.stub(DataRequestRepository.prototype, 'findDataRequests').resolves([mockFlatDataRequest]);
 
-      const result = await service.findDataRequests(filters);
-
-      expect(stub).to.have.been.calledOnceWith(filters);
-      expect(result).to.deep.equal(mockRequests);
-    });
-
-    it('should pass status in filters to repository', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DataRequestService(mockDBConnection);
-
-      const filters = { status: 'REQUESTED' as const };
-      const mockRequests = [mockDataRequest];
-      const stub = sinon.stub(DataRequestRepository.prototype, 'findDataRequests').resolves(mockRequests);
-
-      const result = await service.findDataRequests(filters);
+      await service.findDataRequests(filters);
 
       expect(stub).to.have.been.calledOnceWith(filters);
-      expect(result).to.deep.equal(mockRequests);
-    });
-
-    it('should propagate repository errors', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DataRequestService(mockDBConnection);
-
-      sinon.stub(DataRequestRepository.prototype, 'findDataRequests').rejects(new Error('DB error'));
-
-      try {
-        await service.findDataRequests();
-        throw new Error('Expected to throw');
-      } catch (err: any) {
-        expect(err.message).to.equal('DB error');
-      }
     });
   });
 
   describe('createDataRequest', () => {
-    it('should create a new data request and return it with status', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DataRequestService(mockDBConnection);
+    it('should create a data request with provided team_id and return it with status', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
 
-      const payload: CreateDataRequest = { reason: 'New research project' };
+      const payload: CreateDataRequest = { reason: 'New research project', team_id: mockDataRequest.team_id };
       const createStub = sinon.stub(DataRequestRepository.prototype, 'createDataRequest').resolves(mockDataRequest);
-      sinon.stub(DataRequestRepository.prototype, 'createDataRequestStatus').resolves(mockDataRequestStatus);
-
-      const result = await service.createDataRequest(mockDataRequest.requested_by, payload, mockDataRequest.team_id);
-
-      expect(createStub).to.have.been.calledOnceWith(mockDataRequest.team_id, mockDataRequest.requested_by, payload);
-      expect(result).to.deep.equal(mockDataRequestWithStatus);
-    });
-
-    it('should return a response containing the data_request_id', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DataRequestService(mockDBConnection);
-
-      const payload: CreateDataRequest = { reason: 'New research project' };
-      sinon.stub(DataRequestRepository.prototype, 'createDataRequest').resolves(mockDataRequest);
-      sinon.stub(DataRequestRepository.prototype, 'createDataRequestStatus').resolves(mockDataRequestStatus);
-
-      const result = await service.createDataRequest(mockDataRequest.requested_by, payload, mockDataRequest.team_id);
-
-      expect(result.data_request_id).to.equal(mockDataRequest.data_request_id);
-    });
-
-    it('should set the initial status to REQUESTED', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DataRequestService(mockDBConnection);
-
-      const payload: CreateDataRequest = { reason: 'New research project' };
-      sinon.stub(DataRequestRepository.prototype, 'createDataRequest').resolves(mockDataRequest);
       const statusStub = sinon
-        .stub(DataRequestRepository.prototype, 'createDataRequestStatus')
+        .stub(DataRequestStatusRepository.prototype, 'createDataRequestStatus')
         .resolves(mockDataRequestStatus);
 
-      await service.createDataRequest(mockDataRequest.requested_by, payload, mockDataRequest.team_id);
+      const result = await service.createDataRequest(mockDataRequest.requested_by, payload);
 
+      expect(createStub).to.have.been.calledOnceWith(mockDataRequest.requested_by, payload);
       expect(statusStub).to.have.been.calledOnceWith(
         mockDataRequest.data_request_id,
         DataRequestStatusEnum.enum.REQUESTED,
         null
       );
+      expect(result.data_request_id).to.equal(mockDataRequest.data_request_id);
+      expect(result.data_request_status).to.deep.equal(mockDataRequestStatus);
+    });
+
+    it('should create a new team when payload.team_id is undefined', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
+
+      const newTeamId = 'e5f6a7b8-c9d0-1234-efab-345678901234';
+      const teamStub = sinon
+        .stub(TeamService.prototype, 'createTeam')
+        .resolves({ team_id: newTeamId, name: 'test', description: null });
+      const memberStub = sinon.stub(TeamMemberRepository.prototype, 'insertTeamMember').resolves(mockTeamMember);
+      sinon.stub(DataRequestRepository.prototype, 'createDataRequest').resolves({
+        ...mockDataRequest,
+        team_id: newTeamId
+      });
+      sinon.stub(DataRequestStatusRepository.prototype, 'createDataRequestStatus').resolves(mockDataRequestStatus);
+
+      const payload: CreateDataRequest = { reason: 'New research project' };
+      await service.createDataRequest(mockDataRequest.requested_by, payload);
+
+      expect(teamStub).to.have.been.calledOnce;
+      expect(memberStub).to.have.been.calledOnceWith({
+        system_user_id: mockDataRequest.requested_by,
+        team_id: newTeamId
+      });
     });
 
     it('should propagate repository errors', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DataRequestService(mockDBConnection);
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
 
-      const payload: CreateDataRequest = { reason: 'Test' };
+      const payload: CreateDataRequest = { reason: 'Test', team_id: mockDataRequest.team_id };
       sinon.stub(DataRequestRepository.prototype, 'createDataRequest').rejects(new Error('DB error'));
 
       try {
-        await service.createDataRequest(1, payload, 'team-id');
+        await service.createDataRequest(1, payload);
         throw new Error('Expected to throw');
-      } catch (err: any) {
-        expect(err.message).to.equal('DB error');
+      } catch (err) {
+        expect(err).to.be.instanceOf(Error);
+        expect((err as Error).message).to.equal('DB error');
       }
     });
   });
 
   describe('updateDataRequest', () => {
-    describe('when the user is not authorized', () => {
-      it('should throw HTTP 403 when user is not a system admin and not a team member', async () => {
-        const mockDBConnection = getMockDBConnection({
-          systemUserId: () => 99
-        });
-        const service = new DataRequestService(mockDBConnection);
+    it('should update and return the data request', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
 
-        sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(mockDataRequest);
-        sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
-        sinon.stub(DataRequestService.prototype, 'findTeamMember').resolves(null);
+      sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(mockFlatDataRequest);
+      const payload: UpdateDataRequest = { reason: 'Updated reason' };
+      const updatedRequest: DataRequest = { ...mockDataRequest, reason: 'Updated reason' };
+      const stub = sinon.stub(DataRequestRepository.prototype, 'updateDataRequest').resolves(updatedRequest);
 
-        const payload: UpdateDataRequest = { reason: 'Updated reason' };
+      const result = await service.updateDataRequest(mockDataRequest.data_request_id, payload);
 
-        try {
-          await service.updateDataRequest(mockDataRequest.data_request_id, payload);
-          expect.fail('Expected HTTP403 to be thrown');
-        } catch (err: any) {
-          expect(err.status).to.equal(403);
-          expect(err.message).to.equal('Access Denied');
-        }
-      });
+      expect(stub).to.have.been.calledOnceWith(mockDataRequest.data_request_id, payload);
+      expect(result).to.deep.equal(updatedRequest);
     });
 
-    describe('when the user is authorized as a system administrator', () => {
-      it('should update and return the data request', async () => {
-        const mockDBConnection = getMockDBConnection({
-          systemUserId: () => 99
-        });
-        const service = new DataRequestService(mockDBConnection);
+    it('should throw HTTP 404 when data request is not found', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
 
-        sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(mockDataRequest);
-        sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
-        const payload: UpdateDataRequest = { reason: 'Updated reason' };
-        const updatedRequest: DataRequest = { ...mockDataRequest, reason: 'Updated reason' };
-        const stub = sinon.stub(DataRequestRepository.prototype, 'updateDataRequest').resolves(updatedRequest);
+      sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(null);
+      const payload: UpdateDataRequest = { reason: 'Updated reason' };
 
-        const result = await service.updateDataRequest(mockDataRequest.data_request_id, payload);
-
-        expect(stub).to.have.been.calledOnceWith(mockDataRequest.data_request_id, payload);
-        expect(result).to.deep.equal(updatedRequest);
-      });
-    });
-
-    describe('when the user is authorized as a team member but not a system administrator', () => {
-      it('should update and return the data request', async () => {
-        const mockDBConnection = getMockDBConnection({
-          systemUserId: () => mockTeamMember.system_user_id
-        });
-        const service = new DataRequestService(mockDBConnection);
-
-        sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(mockDataRequest);
-        sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
-        sinon.stub(DataRequestService.prototype, 'findTeamMember').resolves(mockTeamMember);
-        const payload: UpdateDataRequest = { reason: 'Updated reason' };
-        const updatedRequest: DataRequest = { ...mockDataRequest, reason: 'Updated reason' };
-        const stub = sinon.stub(DataRequestRepository.prototype, 'updateDataRequest').resolves(updatedRequest);
-
-        const result = await service.updateDataRequest(mockDataRequest.data_request_id, payload);
-
-        expect(stub).to.have.been.calledOnceWith(mockDataRequest.data_request_id, payload);
-        expect(result).to.deep.equal(updatedRequest);
-      });
+      try {
+        await service.updateDataRequest('non-existent-id', payload);
+        throw new Error('Expected to throw');
+      } catch (err: any) {
+        expect(err.status).to.equal(404);
+        expect(err.message).to.equal('Data request not found');
+      }
     });
 
     it('should propagate repository errors', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DataRequestService(mockDBConnection);
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
 
-      sinon.stub(DataRequestService.prototype, '_authorizeAccessForDataRequest').resolves(true);
-      sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(mockDataRequest);
-      const payload: UpdateDataRequest = { reason: 'Updated' };
+      sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(mockFlatDataRequest);
       sinon.stub(DataRequestRepository.prototype, 'updateDataRequest').rejects(new Error('DB error'));
+      const payload: UpdateDataRequest = { reason: 'Updated' };
 
       try {
         await service.updateDataRequest(mockDataRequest.data_request_id, payload);
         throw new Error('Expected to throw');
-      } catch (err: any) {
-        expect(err.message).to.equal('DB error');
+      } catch (err) {
+        expect(err).to.be.instanceOf(Error);
+        expect((err as Error).message).to.equal('DB error');
       }
     });
   });
 
   describe('deleteDataRequest', () => {
-    describe('when the user is not authorized', () => {
-      it('should throw HTTP 403 when user is not a system admin and not a team member', async () => {
-        const mockDBConnection = getMockDBConnection({
-          systemUserId: () => 99
-        });
-        const service = new DataRequestService(mockDBConnection);
+    it('should delete the data request successfully', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
 
-        sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(mockDataRequest);
-        sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
-        sinon.stub(DataRequestService.prototype, 'findTeamMember').resolves(null);
+      sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(mockFlatDataRequest);
+      const stub = sinon.stub(DataRequestRepository.prototype, 'deleteDataRequest').resolves();
 
-        try {
-          await service.deleteDataRequest(mockDataRequest.data_request_id);
-          expect.fail('Expected HTTP403 to be thrown');
-        } catch (err: any) {
-          expect(err.status).to.equal(403);
-          expect(err.message).to.equal('Access Denied');
-        }
-      });
+      await service.deleteDataRequest(mockDataRequest.data_request_id);
+
+      expect(stub).to.have.been.calledOnceWith(mockDataRequest.data_request_id);
     });
 
-    describe('when the user is authorized as a system administrator', () => {
-      it('should delete the data request successfully', async () => {
-        const mockDBConnection = getMockDBConnection({
-          systemUserId: () => 99
-        });
-        const service = new DataRequestService(mockDBConnection);
+    it('should throw HTTP 404 when data request is not found', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
 
-        sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(mockDataRequest);
-        sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
-        const stub = sinon.stub(DataRequestRepository.prototype, 'deleteDataRequest').resolves();
+      sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(null);
 
-        await service.deleteDataRequest(mockDataRequest.data_request_id);
-
-        expect(stub).to.have.been.calledOnceWith(mockDataRequest.data_request_id);
-      });
-    });
-
-    describe('when the user is authorized as a team member but not a system administrator', () => {
-      it('should delete the data request successfully', async () => {
-        const mockDBConnection = getMockDBConnection({
-          systemUserId: () => mockTeamMember.system_user_id
-        });
-        const service = new DataRequestService(mockDBConnection);
-
-        sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(mockDataRequest);
-        sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
-        sinon.stub(DataRequestService.prototype, 'findTeamMember').resolves(mockTeamMember);
-        const stub = sinon.stub(DataRequestRepository.prototype, 'deleteDataRequest').resolves();
-
-        await service.deleteDataRequest(mockDataRequest.data_request_id);
-
-        expect(stub).to.have.been.calledOnceWith(mockDataRequest.data_request_id);
-      });
+      try {
+        await service.deleteDataRequest('non-existent-id');
+        throw new Error('Expected to throw');
+      } catch (err: any) {
+        expect(err.status).to.equal(404);
+        expect(err.message).to.equal('Data request not found');
+      }
     });
 
     it('should propagate repository errors', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DataRequestService(mockDBConnection);
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
 
-      sinon.stub(DataRequestService.prototype, '_authorizeAccessForDataRequest').resolves(true);
-      sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(mockDataRequest);
+      sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(mockFlatDataRequest);
       sinon.stub(DataRequestRepository.prototype, 'deleteDataRequest').rejects(new Error('DB error'));
 
       try {
         await service.deleteDataRequest(mockDataRequest.data_request_id);
         throw new Error('Expected to throw');
-      } catch (err: any) {
-        expect(err.message).to.equal('DB error');
+      } catch (err) {
+        expect(err).to.be.instanceOf(Error);
+        expect((err as Error).message).to.equal('DB error');
       }
     });
   });
