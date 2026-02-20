@@ -102,13 +102,10 @@ export class DataRequestStatusRepository extends BaseRepository {
    *
    * @param {string} dataRequestStatusId
    * @param {UpdateDataRequestStatus} payload
-   * @return {Promise<DataRequestStatus>}
+   * @return {Promise<void>}
    * @memberof DataRequestStatusRepository
    */
-  async updateDataRequestStatus(
-    dataRequestStatusId: string,
-    payload: UpdateDataRequestStatus
-  ): Promise<DataRequestStatus> {
+  async updateDataRequestStatus(dataRequestStatusId: string, payload: UpdateDataRequestStatus): Promise<void> {
     const knex = getKnex();
     const query = knex('data_request_status')
       .where('data_request_status_id', dataRequestStatusId)
@@ -124,7 +121,5 @@ export class DataRequestStatusRepository extends BaseRepository {
         'rowCount !== 1'
       ]);
     }
-
-    return response.rows[0];
   }
 }

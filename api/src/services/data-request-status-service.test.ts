@@ -134,14 +134,11 @@ describe('DataRequestStatusService', () => {
   });
 
   describe('updateDataRequestStatus', () => {
-    it('should update data request status with provided requestStatus', async () => {
+    it('should update data request status with provided requestStatus and return void', async () => {
       const mockDB = getMockDBConnection();
       const service = new DataRequestStatusService(mockDB);
 
-      const approvedStatus = { ...mockDataRequestStatus, request_status: 'APPROVED' as const };
-      const stub = sinon
-        .stub(DataRequestStatusRepository.prototype, 'updateDataRequestStatus')
-        .resolves(approvedStatus);
+      const stub = sinon.stub(DataRequestStatusRepository.prototype, 'updateDataRequestStatus').resolves();
 
       const result = await service.updateDataRequestStatus(
         mockDataRequestStatus.data_request_status_id,
@@ -151,23 +148,21 @@ describe('DataRequestStatusService', () => {
       expect(stub).to.have.been.calledOnceWith(mockDataRequestStatus.data_request_status_id, {
         request_status: DataRequestStatusEnum.enum.APPROVED
       });
-      expect(result).to.deep.equal(approvedStatus);
+      expect(result).to.be.undefined;
     });
 
-    it('should update data request status with default REQUESTED when no status provided', async () => {
+    it('should update data request status with default REQUESTED when no status provided and return void', async () => {
       const mockDB = getMockDBConnection();
       const service = new DataRequestStatusService(mockDB);
 
-      const stub = sinon
-        .stub(DataRequestStatusRepository.prototype, 'updateDataRequestStatus')
-        .resolves(mockDataRequestStatus);
+      const stub = sinon.stub(DataRequestStatusRepository.prototype, 'updateDataRequestStatus').resolves();
 
       const result = await service.updateDataRequestStatus(mockDataRequestStatus.data_request_status_id);
 
       expect(stub).to.have.been.calledOnceWith(mockDataRequestStatus.data_request_status_id, {
         request_status: DataRequestStatusEnum.enum.REQUESTED
       });
-      expect(result).to.deep.equal(mockDataRequestStatus);
+      expect(result).to.be.undefined;
     });
 
     it('should propagate repository errors', async () => {

@@ -147,12 +147,10 @@ describe('DataRequestStatusRepository', () => {
   });
 
   describe('updateDataRequestStatus', () => {
-    it('should update and return the data request status', async () => {
-      const updatedStatus: DataRequestStatus = { ...mockDataRequestStatus, request_status: 'APPROVED' };
-
+    it('should update the data request status and return void', async () => {
       const mockQueryResponse = {
         rowCount: 1,
-        rows: [updatedStatus]
+        rows: []
       } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({
@@ -165,7 +163,7 @@ describe('DataRequestStatusRepository', () => {
 
       const result = await repo.updateDataRequestStatus(mockDataRequestStatus.data_request_status_id, payload);
 
-      expect(result).to.eql(updatedStatus);
+      expect(result).to.be.undefined;
     });
 
     it('should throw error when rowCount !== 1', async () => {

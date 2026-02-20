@@ -59,13 +59,13 @@ export class DataRequestStatusService extends DBService {
    *
    * @param {string} dataRequestStatusId
    * @param {DataRequestStatusEnum} [requestStatus=DataRequestStatusEnum.enum.REQUESTED]
-   * @return {Promise<DataRequestStatus>}
+   * @return {Promise<void>}
    * @memberof DataRequestStatusService
    */
   async updateDataRequestStatus(
     dataRequestStatusId: string,
     requestStatus: DataRequestStatusEnum = DataRequestStatusEnum.enum.REQUESTED
-  ): Promise<DataRequestStatus> {
+  ): Promise<void> {
     return this.dataRequestStatusRepository.updateDataRequestStatus(dataRequestStatusId, {
       request_status: requestStatus
     });
