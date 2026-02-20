@@ -1,18 +1,38 @@
 import { OpenAPIV3 } from 'openapi-types';
-
-// ──────────────────────────────────────────────────────────────────────────────
-// data_request
-// ──────────────────────────────────────────────────────────────────────────────
+import { DataRequestStatusResponseSchema } from './data-request-status';
 
 export const DataRequestResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['requested_by', 'team_id', 'data_request_id', 'reason'],
+  required: ['requested_by', 'team_id', 'data_request_id', 'reason', 'data_request_status_id', 'data_request_status'],
   additionalProperties: false,
   properties: {
-    data_request_id: { type: 'string', format: 'uuid' },
-    reason: { type: 'string' },
-    team_id: { type: 'string', format: 'uuid' },
-    requested_by: { type: 'integer' }
+    data_request_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'Unique identifier for the data request'
+    },
+    reason: {
+      type: 'string',
+      description: 'Reason for the data request'
+    },
+    team_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'ID of the team associated with this request'
+    },
+    requested_by: {
+      type: 'integer',
+      description: 'System user ID of the requester'
+    },
+    data_request_status_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'ID of the current status record'
+    },
+    data_request_status: {
+      ...DataRequestStatusResponseSchema,
+      description: 'Current status details of the data request'
+    }
   }
 };
 
@@ -48,50 +68,5 @@ export const UpdateDataRequestSchema: OpenAPIV3.SchemaObject = {
   }
 };
 
-// ──────────────────────────────────────────────────────────────────────────────
-// comment
-// ──────────────────────────────────────────────────────────────────────────────
-
-export const CommentResponseSchema: OpenAPIV3.SchemaObject = {
-  type: 'object',
-  required: ['comment', 'comment_id'],
-  additionalProperties: false,
-  properties: {
-    comment_id: { type: 'string', format: 'uuid' },
-    comment: { type: 'string' }
-  }
-};
-
-// ──────────────────────────────────────────────────────────────────────────────
-// data_request_status
-// ──────────────────────────────────────────────────────────────────────────────
-
-export const DataRequestStatusResponseSchema: OpenAPIV3.SchemaObject = {
-  type: 'object',
-  required: ['data_request_id', 'data_request_status_id', 'comment_id', 'request_status'],
-  additionalProperties: false,
-  properties: {
-    data_request_status_id: { type: 'string', format: 'uuid' },
-    data_request_id: { type: 'string', format: 'uuid' },
-    comment_id: { type: 'string', format: 'uuid', nullable: true },
-    request_status: { type: 'string', enum: ['REQUESTED', 'APPROVED', 'DENIED'] }
-  }
-};
-
-export const DataRequestStatusListResponseSchema: OpenAPIV3.SchemaObject = {
-  type: 'array',
-  items: DataRequestStatusResponseSchema
-};
-
-export const DataRequestWithStatusResponseSchema: OpenAPIV3.SchemaObject = {
-  type: 'object',
-  required: ['data_request_id', 'reason', 'team_id', 'requested_by', 'data_request_status'],
-  additionalProperties: false,
-  properties: {
-    data_request_id: { type: 'string', format: 'uuid' },
-    reason: { type: 'string' },
-    team_id: { type: 'string', format: 'uuid' },
-    requested_by: { type: 'integer' },
-    data_request_status: DataRequestStatusResponseSchema
-  }
-};
+// Alias for DataRequestResponseSchema for backward compatibility
+export const DataRequestWithStatusResponseSchema: OpenAPIV3.SchemaObject = DataRequestResponseSchema;
