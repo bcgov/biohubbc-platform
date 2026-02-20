@@ -1,5 +1,4 @@
 import { OpenAPIV3 } from 'openapi-types';
-import { CommentResponseSchema } from './comment';
 
 export const DataRequestStatusResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
@@ -26,11 +25,6 @@ export const DataRequestStatusResponseSchema: OpenAPIV3.SchemaObject = {
       type: 'string',
       enum: ['REQUESTED', 'APPROVED', 'DENIED'],
       description: 'Current status of the data request'
-    },
-    comment: {
-      ...CommentResponseSchema,
-      nullable: true,
-      description: 'The associated comment object (if any)'
     }
   }
 };
