@@ -8,11 +8,11 @@ import {
   UpdateDataRequest
 } from '../models/data-request';
 import { DataRequestStatusEnum } from '../models/data-request-status';
-import { TeamMemberRepository } from '../repositories/authorization/team-member-repository';
 import { DataRequestRepository } from '../repositories/data-request-repository';
-import { DataRequestStatusRepository } from '../repositories/data-request-status-repository';
 import { _generateDataRequestTeamName, _transformFlatDataRequestToNested } from '../utils/data-request';
+import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamService } from './access-policy/team-service';
+import { DataRequestStatusService } from './data-request-status-service';
 import { DBService } from './db-service';
 
 /**
@@ -87,19 +87,19 @@ export class DataRequestService extends DBService {
       const team = await teamService.createTeam({ name: _generateDataRequestTeamName() });
       resolvedTeamId = team.team_id;
 
-      const teamMemberService = new TeamMemberRepository(this.connection);
-      await teamMemberService.insertTeamMember({ system_user_id: requestedBy, team_id: resolvedTeamId });
+      const teamMemberService = new TeamMemberService(this.connection);
+      await teamMemberService.createTeamMember({ system_user_id: requestedBy, team_id: resolvedTeamId });
     }
 
     const payloadWithTeamId = { ...payload, team_id: resolvedTeamId };
 
     const dataRequest = await this.dataRequestRepository.createDataRequest(requestedBy, payloadWithTeamId);
 
-    const dataRequestStatusRepository = new DataRequestStatusRepository(this.connection);
-    const dataRequestStatus = await dataRequestStatusRepository.createDataRequestStatus(
+    const dataRequestStatusService = new DataRequestStatusService(this.connection);
+    const dataRequestStatus = await dataRequestStatusService.createDataRequestStatus(
       dataRequest.data_request_id,
       DataRequestStatusEnum.enum.REQUESTED,
-      null
+      undefined
     );
 
     const response = {
@@ -116,7 +116,7 @@ export class DataRequestService extends DBService {
    * @param {string} dataRequestId
    * @param {UpdateDataRequest} payload
    * @return {Promise<DataRequest>}
-   * @memberof DataRequestRepository
+   * @memberof DataRequestService
    */
   async updateDataRequest(dataRequestId: string, payload: UpdateDataRequest): Promise<DataRequest> {
     const dataRequest = await this.dataRequestRepository.findDataRequestById(dataRequestId);
@@ -133,7 +133,7 @@ export class DataRequestService extends DBService {
    *
    * @param {string} dataRequestId
    * @return {Promise<void>}
-   * @memberof DataRequestRepository
+   * @memberof DataRequestService
    */
   async deleteDataRequest(dataRequestId: string): Promise<void> {
     const dataRequest = await this.dataRequestRepository.findDataRequestById(dataRequestId);

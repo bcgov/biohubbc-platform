@@ -38,10 +38,10 @@ export class DataRequestStatusRepository extends BaseRepository {
   }
 
   /**
-   * Get all status records for a data request.
+   * Get the current status record for a data request.
    *
    * @param {string} dataRequestId
-   * @return {Promise<DataRequestStatus[]>}
+   * @return {Promise<DataRequestStatus>}
    * @memberof DataRequestStatusRepository
    */
   async getDataRequestStatusByDataRequestId(dataRequestId: string): Promise<DataRequestStatus> {

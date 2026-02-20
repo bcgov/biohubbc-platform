@@ -41,15 +41,6 @@ export const DataRequestListResponseSchema: OpenAPIV3.SchemaObject = {
   items: DataRequestResponseSchema
 };
 
-export const CreateDataRequestSchema: OpenAPIV3.SchemaObject = {
-  type: 'object',
-  required: ['reason'],
-  additionalProperties: false,
-  properties: {
-    reason: { type: 'string' }
-  }
-};
-
 export const CreateDataRequestRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   required: ['reason'],

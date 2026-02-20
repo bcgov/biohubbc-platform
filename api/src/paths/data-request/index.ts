@@ -22,9 +22,6 @@ export const GET: Operation = [
         {
           validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
           discriminator: 'SystemRole'
-        },
-        {
-          discriminator: 'SystemUser'
         }
       ]
     };

@@ -5,12 +5,12 @@ import sinonChai from 'sinon-chai';
 import { CreateDataRequest, DataRequest, FlatDataRequestWithStatus, UpdateDataRequest } from '../models/data-request';
 import { DataRequestStatus, DataRequestStatusEnum } from '../models/data-request-status';
 import { TeamMember } from '../models/team-member';
-import { TeamMemberRepository } from '../repositories/authorization/team-member-repository';
 import { DataRequestRepository } from '../repositories/data-request-repository';
-import { DataRequestStatusRepository } from '../repositories/data-request-status-repository';
 import { getMockDBConnection } from '../__mocks__/db';
+import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamService } from './access-policy/team-service';
 import { DataRequestService } from './data-request-service';
+import { DataRequestStatusService } from './data-request-status-service';
 
 chai.use(sinonChai);
 
@@ -31,7 +31,6 @@ describe('DataRequestService', () => {
 
   const mockDataRequest: DataRequest = {
     data_request_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-    data_request_status_id: 'c3d4e5f6-a7b8-9012-cdef-123456789012',
     reason: 'Research purposes',
     team_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
     requested_by: 1
@@ -155,7 +154,7 @@ describe('DataRequestService', () => {
       const payload: CreateDataRequest = { reason: 'New research project', team_id: mockDataRequest.team_id };
       const createStub = sinon.stub(DataRequestRepository.prototype, 'createDataRequest').resolves(mockDataRequest);
       const statusStub = sinon
-        .stub(DataRequestStatusRepository.prototype, 'createDataRequestStatus')
+        .stub(DataRequestStatusService.prototype, 'createDataRequestStatus')
         .resolves(mockDataRequestStatus);
 
       const result = await service.createDataRequest(mockDataRequest.requested_by, payload);
@@ -164,7 +163,7 @@ describe('DataRequestService', () => {
       expect(statusStub).to.have.been.calledOnceWith(
         mockDataRequest.data_request_id,
         DataRequestStatusEnum.enum.REQUESTED,
-        null
+        undefined
       );
       expect(result.data_request_id).to.equal(mockDataRequest.data_request_id);
       expect(result.data_request_status).to.deep.equal(mockDataRequestStatus);
@@ -178,12 +177,12 @@ describe('DataRequestService', () => {
       const teamStub = sinon
         .stub(TeamService.prototype, 'createTeam')
         .resolves({ team_id: newTeamId, name: 'test', description: null });
-      const memberStub = sinon.stub(TeamMemberRepository.prototype, 'insertTeamMember').resolves(mockTeamMember);
+      const memberStub = sinon.stub(TeamMemberService.prototype, 'createTeamMember').resolves(mockTeamMember);
       sinon.stub(DataRequestRepository.prototype, 'createDataRequest').resolves({
         ...mockDataRequest,
         team_id: newTeamId
       });
-      sinon.stub(DataRequestStatusRepository.prototype, 'createDataRequestStatus').resolves(mockDataRequestStatus);
+      sinon.stub(DataRequestStatusService.prototype, 'createDataRequestStatus').resolves(mockDataRequestStatus);
 
       const payload: CreateDataRequest = { reason: 'New research project' };
       await service.createDataRequest(mockDataRequest.requested_by, payload);

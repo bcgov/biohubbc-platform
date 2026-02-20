@@ -81,7 +81,7 @@ export class DataRequestRepository extends BaseRepository {
         'drs.request_status'
       )
       .join('data_request_status as drs', 'drs.data_request_id', 'dr.data_request_id')
-      .where('data_request_id', dataRequestId)
+      .where('dr.data_request_id', dataRequestId)
       .whereNull('dr.record_end_date')
       .whereNull('drs.record_end_date');
 
@@ -117,7 +117,7 @@ export class DataRequestRepository extends BaseRepository {
         'drs.request_status'
       )
       .join('data_request_status as drs', 'drs.data_request_id', 'dr.data_request_id')
-      .where('data_request_id', dataRequestId)
+      .where('dr.data_request_id', dataRequestId)
       .whereNull('dr.record_end_date')
       .whereNull('drs.record_end_date');
 
@@ -141,7 +141,7 @@ export class DataRequestRepository extends BaseRepository {
         team_id: payload.team_id,
         reason: payload.reason
       })
-      .returning(['requested_by', 'team_id', 'data_request_id', 'reason', 'data_request_status_id']);
+      .returning(['requested_by', 'team_id', 'data_request_id', 'reason']);
 
     const response = await this.connection.knex(query, DataRequest);
 
@@ -169,7 +169,7 @@ export class DataRequestRepository extends BaseRepository {
       .where('data_request_id', dataRequestId)
       .whereNull('record_end_date')
       .update(payload)
-      .returning(['data_request_id', 'reason', 'requested_by', 'team_id', 'data_request_status_id']);
+      .returning(['data_request_id', 'reason', 'requested_by', 'team_id']);
 
     const response = await this.connection.knex(query, DataRequest);
 

@@ -17,9 +17,6 @@ export const GET: Operation = [
         {
           validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
           discriminator: 'SystemRole'
-        },
-        {
-          discriminator: 'SystemUser'
         }
       ]
     };
@@ -33,9 +30,6 @@ export const PUT: Operation = [
         {
           validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
           discriminator: 'SystemRole'
-        },
-        {
-          discriminator: 'SystemUser'
         }
       ]
     };
@@ -49,9 +43,6 @@ export const DELETE: Operation = [
         {
           validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
           discriminator: 'SystemRole'
-        },
-        {
-          discriminator: 'SystemUser'
         }
       ]
     };

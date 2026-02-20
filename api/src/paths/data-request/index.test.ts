@@ -18,7 +18,6 @@ describe('data-request', () => {
 
   const mockDataRequestWithStatus: DataRequestWithStatus = {
     data_request_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-    data_request_status_id: 'c3d4e5f6-a7b8-9012-cdef-123456789012',
     reason: 'Research purposes',
     team_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
     requested_by: 1,

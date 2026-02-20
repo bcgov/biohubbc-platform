@@ -5,8 +5,7 @@ export const DataRequest = z.object({
   data_request_id: z.string().uuid(),
   reason: z.string(),
   team_id: z.string().uuid(),
-  requested_by: z.number(),
-  data_request_status_id: z.string().uuid()
+  requested_by: z.number()
 });
 export type DataRequest = z.infer<typeof DataRequest>;
 
@@ -18,8 +17,6 @@ export const DataRequestFilters = z.object({
   status: DataRequestStatusEnum.optional()
 });
 export type DataRequestFilters = z.infer<typeof DataRequestFilters>;
-
-export const DataRequestWithFilters = DataRequest.extend(DataRequestFilters.shape);
 
 export const CreateDataRequest = z.object({
   reason: z.string(),

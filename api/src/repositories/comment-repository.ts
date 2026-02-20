@@ -43,10 +43,7 @@ export class CommentRepository extends BaseRepository {
     const response = await this.connection.knex(query, Comment);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to create comment', [
-        'DataRequestRepository->createComment',
-        'rowCount !== 1'
-      ]);
+      throw new ApiExecuteSQLError('Failed to create comment', ['CommentRepository->createComment', 'rowCount !== 1']);
     }
     return response.rows[0];
   }
