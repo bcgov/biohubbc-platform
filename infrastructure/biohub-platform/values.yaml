@@ -20,9 +20,6 @@ database:
 database-setup:
   enabled: true
 
-clamav:
-  enabled: true
-
 api:
   enabled: true
 
@@ -69,18 +66,6 @@ database-setup:
     changeId: ""
     ts: ""
   # Add any database-setup-specific overrides here
-
-clamav:
-  enabled: true
-  environment:
-    licensePlate: "a0ec71"
-    name: ""
-    id: ""
-    changeId: ""
-    ts: ""
-  app:
-    name: clamav
-  # Add any clamav-specific overrides here
 
 api:
   enabled: true
