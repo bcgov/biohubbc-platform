@@ -1,4 +1,5 @@
 import chai, { expect } from 'chai';
+import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
@@ -15,6 +16,7 @@ describe('DataRequestRepository', () => {
 
   const mockDataRequest: DataRequest = {
     data_request_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    data_request_status_id: 'c3d4e5f6-a7b8-9012-cdef-123456789012',
     reason: 'Research purposes',
     team_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
     requested_by: 1
@@ -53,6 +55,43 @@ describe('DataRequestRepository', () => {
       const result = await repo.findDataRequests();
 
       expect(result).to.eql([]);
+    });
+
+    it('should return data requests when filtering by status', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [mockDataRequest]
+      } as unknown as QueryResult<any>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => mockQueryResponse
+      });
+
+      const repo = new DataRequestRepository(mockDBConnection);
+
+      const result = await repo.findDataRequests({ status: 'REQUESTED' });
+
+      expect(result).to.eql([mockDataRequest]);
+    });
+
+    it('should return data requests when filtering by multiple filters', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [mockDataRequest]
+      } as unknown as QueryResult<any>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => mockQueryResponse
+      });
+
+      const repo = new DataRequestRepository(mockDBConnection);
+
+      const result = await repo.findDataRequests({
+        team_id: mockDataRequest.team_id,
+        requested_by: mockDataRequest.requested_by
+      });
+
+      expect(result).to.eql([mockDataRequest]);
     });
   });
 
@@ -131,42 +170,6 @@ describe('DataRequestRepository', () => {
     });
   });
 
-  describe('findDataRequests with status filter', () => {
-    it('should return data requests when filtering by status', async () => {
-      const mockQueryResponse = {
-        rowCount: 1,
-        rows: [mockDataRequest]
-      } as unknown as QueryResult<any>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
-
-      const repo = new DataRequestRepository(mockDBConnection);
-
-      const result = await repo.findDataRequests({ status: 'REQUESTED' });
-
-      expect(result).to.eql([mockDataRequest]);
-    });
-
-    it('should return empty array when no data requests match status', async () => {
-      const mockQueryResponse = {
-        rowCount: 0,
-        rows: []
-      } as unknown as QueryResult<any>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
-
-      const repo = new DataRequestRepository(mockDBConnection);
-
-      const result = await repo.findDataRequests({ status: 'APPROVED' });
-
-      expect(result).to.eql([]);
-    });
-  });
-
   describe('createDataRequest', () => {
     it('should create and return a new data request', async () => {
       const mockQueryResponse = {
@@ -182,7 +185,7 @@ describe('DataRequestRepository', () => {
 
       const payload: CreateDataRequest = { reason: 'New research project' };
 
-      const result = await repo.createDataRequest(mockDataRequest.team_id, mockDataRequest.requested_by, payload);
+      const result = await repo.createDataRequest(mockDataRequest.requested_by, payload);
 
       expect(result).to.eql(mockDataRequest);
     });
@@ -202,7 +205,7 @@ describe('DataRequestRepository', () => {
       const payload: CreateDataRequest = { reason: 'Test' };
 
       try {
-        await repo.createDataRequest(mockDataRequest.team_id, mockDataRequest.requested_by, payload);
+        await repo.createDataRequest(mockDataRequest.requested_by, payload);
         throw new Error('Expected to throw');
       } catch (err) {
         expect((err as Error).message).to.equal('Failed to create data request');
@@ -268,9 +271,9 @@ describe('DataRequestRepository', () => {
 
       const repo = new DataRequestRepository(mockDBConnection);
 
-      await repo.deleteDataRequest(mockDataRequest.data_request_id);
+      const result = await repo.deleteDataRequest(mockDataRequest.data_request_id);
 
-      expect(true).to.be.true;
+      expect(result).to.be.undefined;
     });
 
     it('should throw error when rowCount !== 1', async () => {
