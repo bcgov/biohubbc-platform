@@ -1,5 +1,5 @@
 import { IDBConnection } from '../database/db';
-import { HTTP403, HTTP404 } from '../errors/http-error';
+import { HTTP404 } from '../errors/http-error';
 import {
   CreateDataRequest,
   DataRequest,
@@ -78,12 +78,6 @@ export class DataRequestService extends DBService {
   async getDataRequestById(dataRequestId: string): Promise<DataRequestWithStatus> {
     const dataRequest = await this.dataRequestRepository.getDataRequestById(dataRequestId);
 
-    const authorized = await this._authorizeAccessForDataRequest(dataRequest.team_id);
-
-    if (!authorized) {
-      throw new HTTP403('Access Denied');
-    }
-
     return _transformFlatDataRequestToNested(dataRequest);
   }
 
@@ -155,12 +149,6 @@ export class DataRequestService extends DBService {
       throw new HTTP404('Data request not found');
     }
 
-    const authorized = await this._authorizeAccessForDataRequest(dataRequest.team_id);
-
-    if (!authorized) {
-      throw new HTTP403('Access Denied');
-    }
-
     return this.dataRequestRepository.updateDataRequest(dataRequestId, payload);
   }
 
@@ -178,30 +166,6 @@ export class DataRequestService extends DBService {
       throw new HTTP404('Data request not found');
     }
 
-    const authorized = await this._authorizeAccessForDataRequest(dataRequest.team_id);
-
-    if (!authorized) {
-      throw new HTTP403('Access Denied');
-    }
-
     return this.dataRequestRepository.deleteDataRequest(dataRequestId);
-  }
-
-  /**
-   * Returns true if the current user may act on this data request (system admin or team member); otherwise false.
-   *
-   * @param teamId
-   */
-  async _authorizeAccessForDataRequest(teamId: string): Promise<boolean> {
-    const userService = new UserService(this.connection);
-    const isSystemAdmin = await userService.isSystemUserAdmin();
-    if (isSystemAdmin) {
-      return true;
-    }
-
-    const userId = this.connection.systemUserId();
-    const dataRequestTeamMember = await this.findTeamMember(teamId, userId);
-
-    return dataRequestTeamMember !== null;
   }
 }
