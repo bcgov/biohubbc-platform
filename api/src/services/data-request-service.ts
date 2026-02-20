@@ -2,9 +2,9 @@ import { IDBConnection } from '../database/db';
 import { HTTP404 } from '../errors/http-error';
 import {
   CreateDataRequest,
-  DataRequest,
   DataRequestFilters,
   DataRequestWithStatus,
+  FlatDataRequestWithStatus,
   UpdateDataRequest
 } from '../models/data-request';
 import { DataRequestStatusEnum } from '../models/data-request-status';
@@ -36,10 +36,10 @@ export class DataRequestService extends DBService {
    * Returns a specific data_request by its ID without an authorization check
    *
    * @param {string} dataRequestId
-   * @return {Promise<DataRequest | null>}
+   * @return {Promise<FlatDataRequestWithStatus | null>}
    * @memberof DataRequestService
    */
-  async findDataRequestById(dataRequestId: string): Promise<DataRequest | null> {
+  async findDataRequestById(dataRequestId: string): Promise<FlatDataRequestWithStatus | null> {
     const dataRequest = await this.dataRequestRepository.findDataRequestById(dataRequestId);
     return dataRequest;
   }
@@ -61,7 +61,7 @@ export class DataRequestService extends DBService {
    * Find all data requests, optionally filtered by date range, requested_by, team_id, or status.
    *
    * @param {DataRequestFilters} [filters]
-   * @return {Promise<DataRequest[]>}
+   * @return {Promise<DataRequestWithStatus[]>}
    * @memberof DataRequestService
    */
   async findDataRequests(filters?: DataRequestFilters): Promise<DataRequestWithStatus[]> {

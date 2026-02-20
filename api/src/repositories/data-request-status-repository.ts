@@ -67,7 +67,7 @@ export class DataRequestStatusRepository extends BaseRepository {
    * Create a new status record for a data request, optionally with a comment.
    *
    * @param {string} dataRequestId
-   * @param {DataRequestStatus} requestStatus
+   * @param {DataRequestStatusEnum} requestStatus
    * @param {string | null} commentId
    * @return {Promise<DataRequestStatus>}
    * @memberof DataRequestStatusRepository

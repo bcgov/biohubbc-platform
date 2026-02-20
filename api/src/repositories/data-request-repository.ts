@@ -130,7 +130,7 @@ export class DataRequestRepository extends BaseRepository {
    *
    * @param {number} requestedBy
    * @param {CreateDataRequest} payload
-   * @return {Promise<DataRequestWithStatus>}
+   * @return {Promise<DataRequest>}
    * @memberof DataRequestRepository
    */
   async createDataRequest(requestedBy: number, payload: CreateDataRequest): Promise<DataRequest> {
