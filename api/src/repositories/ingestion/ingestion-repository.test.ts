@@ -118,7 +118,7 @@ describe('IngestionRepository', () => {
     });
   });
 
-  describe('getFeatureTypeWithProperties', () => {
+  describe('findFeatureTypeWithProperties', () => {
     it('should return feature type with properties when valid', async () => {
       const mockRows: FeatureTypeWithPropertiesRow[] = [
         {
@@ -157,7 +157,7 @@ describe('IngestionRepository', () => {
       });
 
       const ingestionRepository = new IngestionRepository(mockDBConnection);
-      const response = await ingestionRepository.getFeatureTypeWithProperties('dataset');
+      const response = await ingestionRepository.findFeatureTypeWithProperties('dataset');
 
       const expectedResponse: FeatureTypeWithProperties = {
         featureType: {
@@ -202,7 +202,7 @@ describe('IngestionRepository', () => {
       });
 
       const ingestionRepository = new IngestionRepository(mockDBConnection);
-      const response = await ingestionRepository.getFeatureTypeWithProperties('nonexistent_type');
+      const response = await ingestionRepository.findFeatureTypeWithProperties('nonexistent_type');
 
       expect(response).to.be.null;
     });
@@ -234,7 +234,7 @@ describe('IngestionRepository', () => {
       });
 
       const ingestionRepository = new IngestionRepository(mockDBConnection);
-      const response = await ingestionRepository.getFeatureTypeWithProperties('empty_type');
+      const response = await ingestionRepository.findFeatureTypeWithProperties('empty_type');
 
       const expectedResponse: FeatureTypeWithProperties = {
         featureType: {

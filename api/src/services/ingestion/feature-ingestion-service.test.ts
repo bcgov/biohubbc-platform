@@ -74,7 +74,9 @@ describe('FeatureIngestionService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       const deleteStub = sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
       const deleteRelationshipsStub = sinon
@@ -111,7 +113,7 @@ describe('FeatureIngestionService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(null);
+      sinon.stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties').resolves(null);
 
       const features: IFlattenedBlock[] = [createValidFeature({ type: 'unknown_type' })];
 
@@ -125,7 +127,7 @@ describe('FeatureIngestionService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(null);
+      sinon.stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties').resolves(null);
 
       const deleteStub = sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures');
       const insertStub = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord');
@@ -143,7 +145,9 @@ describe('FeatureIngestionService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
 
@@ -166,7 +170,9 @@ describe('FeatureIngestionService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
 
@@ -196,7 +202,9 @@ describe('FeatureIngestionService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
 
@@ -226,7 +234,9 @@ describe('FeatureIngestionService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
 
@@ -279,7 +289,9 @@ describe('FeatureIngestionService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
 
@@ -307,7 +319,9 @@ describe('FeatureIngestionService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
 
@@ -339,7 +353,9 @@ describe('FeatureIngestionService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
 
@@ -419,7 +435,7 @@ describe('FeatureIngestionService', () => {
       };
 
       sinon
-        .stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties')
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithMultipleProps);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
@@ -460,7 +476,9 @@ describe('FeatureIngestionService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       const callOrder: string[] = [];
 
@@ -500,7 +518,9 @@ describe('FeatureIngestionService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatureRelationships').resolves();
@@ -530,7 +550,9 @@ describe('FeatureIngestionService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatureRelationships').resolves();
@@ -567,7 +589,9 @@ describe('FeatureIngestionService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
 

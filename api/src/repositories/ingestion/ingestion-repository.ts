@@ -118,7 +118,7 @@ export class IngestionRepository extends BaseRepository {
    * @return {Promise<FeatureTypeWithProperties | null>} The feature type with properties, or null if not found
    * @memberof IngestionRepository
    */
-  async getFeatureTypeWithProperties(name: string): Promise<FeatureTypeWithProperties | null> {
+  async findFeatureTypeWithProperties(name: string): Promise<FeatureTypeWithProperties | null> {
     const sqlStatement = SQL`
       SELECT
         ft.feature_type_id,

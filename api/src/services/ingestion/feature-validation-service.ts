@@ -84,7 +84,7 @@ export class FeatureValidationService extends DBService {
 
       // If type is valid, validate properties
       if (typeErrors.length === 0) {
-        const featureTypeWithProps = await this.getFeatureTypeWithPropertiesCached(feature.type);
+        const featureTypeWithProps = await this.findFeatureTypeWithPropertiesCached(feature.type);
         if (featureTypeWithProps) {
           const propertyErrors = this.validateFeaturePropertyFlat(feature, featureTypeWithProps.properties);
           errors.push(...propertyErrors);
@@ -174,7 +174,7 @@ export class FeatureValidationService extends DBService {
   async validateFeatureType(feature: IFlattenedBlock): Promise<IValidationError[]> {
     const errors: IValidationError[] = [];
 
-    const featureTypeWithProps = await this.getFeatureTypeWithPropertiesCached(feature.type);
+    const featureTypeWithProps = await this.findFeatureTypeWithPropertiesCached(feature.type);
 
     if (!featureTypeWithProps) {
       errors.push({
@@ -427,12 +427,12 @@ export class FeatureValidationService extends DBService {
    * @return {Promise<FeatureTypeWithProperties | null>} Feature type with properties, or null if not found
    * @memberof FeatureValidationService
    */
-  async getFeatureTypeWithPropertiesCached(typeName: string): Promise<FeatureTypeWithProperties | null> {
+  async findFeatureTypeWithPropertiesCached(typeName: string): Promise<FeatureTypeWithProperties | null> {
     if (this.featureTypeCache.has(typeName)) {
       return this.featureTypeCache.get(typeName) ?? null;
     }
 
-    const result = await this.ingestionRepository.getFeatureTypeWithProperties(typeName);
+    const result = await this.ingestionRepository.findFeatureTypeWithProperties(typeName);
     this.featureTypeCache.set(typeName, result);
     return result;
   }

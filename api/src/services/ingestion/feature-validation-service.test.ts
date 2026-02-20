@@ -74,7 +74,9 @@ describe('FeatureValidationService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       const features: IFlattenedBlock[] = [createValidFeature()];
 
@@ -88,7 +90,9 @@ describe('FeatureValidationService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       const parentId = '14ebb420-4cfa-4be1-99db-8122253e3106';
       const childId = '93541206-647a-4a00-81be-493e730ef86b';
@@ -108,7 +112,9 @@ describe('FeatureValidationService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       const duplicateId = '14ebb420-4cfa-4be1-99db-8122253e3106';
       const features: IFlattenedBlock[] = [
@@ -130,7 +136,7 @@ describe('FeatureValidationService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(null);
+      sinon.stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties').resolves(null);
 
       const features: IFlattenedBlock[] = [createValidFeature({ type: 'unknown_type' })];
 
@@ -146,7 +152,9 @@ describe('FeatureValidationService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       const nonexistentParent = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
       const features: IFlattenedBlock[] = [createValidFeature({ parent: nonexistentParent })];
@@ -165,7 +173,9 @@ describe('FeatureValidationService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       const nonexistentChild = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
       const features: IFlattenedBlock[] = [createValidFeature({ content: [nonexistentChild] })];
@@ -184,7 +194,9 @@ describe('FeatureValidationService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       const selfId = '14ebb420-4cfa-4be1-99db-8122253e3106';
       const features: IFlattenedBlock[] = [createValidFeature({ id: selfId, parent: selfId })];
@@ -202,7 +214,9 @@ describe('FeatureValidationService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(mockFeatureTypeWithProperties);
+      sinon
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .resolves(mockFeatureTypeWithProperties);
 
       const selfId = '14ebb420-4cfa-4be1-99db-8122253e3106';
       const features: IFlattenedBlock[] = [createValidFeature({ id: selfId, content: [selfId] })];
@@ -221,7 +235,7 @@ describe('FeatureValidationService', () => {
       const service = new FeatureValidationService(mockDBConnection);
 
       // First call returns null (invalid type), second returns valid
-      const getFeatureTypeStub = sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties');
+      const getFeatureTypeStub = sinon.stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties');
       getFeatureTypeStub.onFirstCall().resolves(null);
       getFeatureTypeStub.onSecondCall().resolves(mockFeatureTypeWithProperties);
 
@@ -247,7 +261,7 @@ describe('FeatureValidationService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties').resolves(null);
+      sinon.stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties').resolves(null);
 
       // Feature with invalid type - property validation should be skipped
       const features: IFlattenedBlock[] = [
@@ -643,7 +657,7 @@ describe('FeatureValidationService', () => {
     });
   });
 
-  describe('getFeatureTypeWithPropertiesCached', () => {
+  describe('findFeatureTypeWithPropertiesCached', () => {
     it('fetches from repository when cache is empty', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
@@ -663,10 +677,10 @@ describe('FeatureValidationService', () => {
       };
 
       const getFeatureTypeStub = sinon
-        .stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties')
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockResult);
 
-      const result = await service.getFeatureTypeWithPropertiesCached('dataset');
+      const result = await service.findFeatureTypeWithPropertiesCached('dataset');
 
       expect(getFeatureTypeStub).to.have.been.calledOnceWith('dataset');
       expect(result).to.eql(mockResult);
@@ -682,13 +696,13 @@ describe('FeatureValidationService', () => {
       };
 
       const getFeatureTypeStub = sinon
-        .stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties')
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockResult);
 
       // First call
-      const result1 = await service.getFeatureTypeWithPropertiesCached('dataset');
+      const result1 = await service.findFeatureTypeWithPropertiesCached('dataset');
       // Second call
-      const result2 = await service.getFeatureTypeWithPropertiesCached('dataset');
+      const result2 = await service.findFeatureTypeWithPropertiesCached('dataset');
 
       expect(getFeatureTypeStub).to.have.been.calledOnce;
       expect(result1).to.eql(mockResult);
@@ -700,13 +714,13 @@ describe('FeatureValidationService', () => {
       const service = new FeatureValidationService(mockDBConnection);
 
       const getFeatureTypeStub = sinon
-        .stub(IngestionRepository.prototype, 'getFeatureTypeWithProperties')
+        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(null);
 
       // First call
-      const result1 = await service.getFeatureTypeWithPropertiesCached('nonexistent');
+      const result1 = await service.findFeatureTypeWithPropertiesCached('nonexistent');
       // Second call
-      const result2 = await service.getFeatureTypeWithPropertiesCached('nonexistent');
+      const result2 = await service.findFeatureTypeWithPropertiesCached('nonexistent');
 
       expect(getFeatureTypeStub).to.have.been.calledOnce;
       expect(result1).to.be.null;
