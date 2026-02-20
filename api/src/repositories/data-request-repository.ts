@@ -160,10 +160,10 @@ export class DataRequestRepository extends BaseRepository {
    *
    * @param {string} dataRequestId
    * @param {UpdateDataRequest} payload
-   * @return {Promise<DataRequest>}
+   * @return {Promise<void>}
    * @memberof DataRequestRepository
    */
-  async updateDataRequest(dataRequestId: string, payload: UpdateDataRequest): Promise<DataRequest> {
+  async updateDataRequest(dataRequestId: string, payload: UpdateDataRequest): Promise<void> {
     const knex = getKnex();
     const query = knex('data_request')
       .where('data_request_id', dataRequestId)
@@ -179,8 +179,6 @@ export class DataRequestRepository extends BaseRepository {
         'rowCount !== 1'
       ]);
     }
-
-    return response.rows[0];
   }
 
   /**

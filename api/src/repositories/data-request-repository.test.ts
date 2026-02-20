@@ -213,12 +213,10 @@ describe('DataRequestRepository', () => {
   });
 
   describe('updateDataRequest', () => {
-    it('should update and return the data request', async () => {
-      const updatedRequest: DataRequest = { ...mockDataRequest, reason: 'Updated reason' };
-
+    it('should update the data request and return void', async () => {
       const mockQueryResponse = {
         rowCount: 1,
-        rows: [updatedRequest]
+        rows: []
       } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({
@@ -231,7 +229,7 @@ describe('DataRequestRepository', () => {
 
       const result = await repo.updateDataRequest(mockDataRequest.data_request_id, payload);
 
-      expect(result).to.eql(updatedRequest);
+      expect(result).to.be.undefined;
     });
 
     it('should throw error when rowCount !== 1', async () => {

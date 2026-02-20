@@ -115,17 +115,17 @@ export class DataRequestService extends DBService {
    *
    * @param {string} dataRequestId
    * @param {UpdateDataRequest} payload
-   * @return {Promise<DataRequest>}
+   * @return {Promise<void>}
    * @memberof DataRequestService
    */
-  async updateDataRequest(dataRequestId: string, payload: UpdateDataRequest): Promise<DataRequest> {
+  async updateDataRequest(dataRequestId: string, payload: UpdateDataRequest): Promise<void> {
     const dataRequest = await this.dataRequestRepository.findDataRequestById(dataRequestId);
 
     if (!dataRequest) {
       throw new HTTP404('Data request not found');
     }
 
-    return this.dataRequestRepository.updateDataRequest(dataRequestId, payload);
+    return await this.dataRequestRepository.updateDataRequest(dataRequestId, payload);
   }
 
   /**

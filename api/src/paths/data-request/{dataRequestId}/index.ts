@@ -113,12 +113,7 @@ PUT.apiDoc = {
   },
   responses: {
     200: {
-      description: 'Data request updated successfully',
-      content: {
-        'application/json': {
-          schema: DataRequestResponseSchema
-        }
-      }
+      description: 'Data request updated successfully'
     },
     404: {
       description: 'Data request not found'
@@ -202,11 +197,11 @@ export function updateDataRequest(): RequestHandler {
       const dataRequestService = new DataRequestService(connection);
 
       const dataRequestId = req.params.dataRequestId;
-      const dataRequest = await dataRequestService.updateDataRequest(dataRequestId, req.body);
+      await dataRequestService.updateDataRequest(dataRequestId, req.body);
 
       await connection.commit();
 
-      return res.status(200).json(dataRequest);
+      return res.sendStatus(200);
     } catch (error) {
       defaultLog.error({ label: 'updateDataRequest', message: 'Error updating data request', error });
       await connection.rollback();

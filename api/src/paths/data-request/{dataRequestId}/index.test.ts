@@ -133,7 +133,7 @@ describe('data-request/{dataRequestId}', () => {
       }
     });
 
-    it('returns 200 with updated data request', async () => {
+    it('returns 200 after updating data request', async () => {
       const mockDBConnection = getMockDBConnection({
         commit: sinon.stub(),
         rollback: sinon.stub(),
@@ -141,8 +141,7 @@ describe('data-request/{dataRequestId}', () => {
       });
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-      const updatedDataRequest: DataRequest = { ...mockDataRequest, reason: 'Updated reason' };
-      const stub = sinon.stub(DataRequestService.prototype, 'updateDataRequest').resolves(updatedDataRequest);
+      const stub = sinon.stub(DataRequestService.prototype, 'updateDataRequest').resolves();
 
       const requestHandler = updateDataRequest();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -154,8 +153,7 @@ describe('data-request/{dataRequestId}', () => {
       expect(stub).to.have.been.calledOnceWith(mockDataRequest.data_request_id, { reason: 'Updated reason' });
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
-      expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql(updatedDataRequest);
+      expect(mockRes.sendStatus).to.have.been.calledWith(200);
     });
 
     it('rolls back and rethrows if service throws', async () => {

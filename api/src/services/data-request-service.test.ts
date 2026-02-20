@@ -212,19 +212,19 @@ describe('DataRequestService', () => {
   });
 
   describe('updateDataRequest', () => {
-    it('should update and return the data request', async () => {
+    it('should update the data request and return void', async () => {
       const mockDB = getMockDBConnection();
       const service = new DataRequestService(mockDB);
 
       sinon.stub(DataRequestRepository.prototype, 'findDataRequestById').resolves(mockFlatDataRequest);
+      const updateStub = sinon.stub(DataRequestRepository.prototype, 'updateDataRequest').resolves();
+
       const payload: UpdateDataRequest = { reason: 'Updated reason' };
-      const updatedRequest: DataRequest = { ...mockDataRequest, reason: 'Updated reason' };
-      const stub = sinon.stub(DataRequestRepository.prototype, 'updateDataRequest').resolves(updatedRequest);
 
       const result = await service.updateDataRequest(mockDataRequest.data_request_id, payload);
 
-      expect(stub).to.have.been.calledOnceWith(mockDataRequest.data_request_id, payload);
-      expect(result).to.deep.equal(updatedRequest);
+      expect(updateStub).to.have.been.calledOnceWith(mockDataRequest.data_request_id, payload);
+      expect(result).to.be.undefined;
     });
 
     it('should throw HTTP 404 when data request is not found', async () => {
