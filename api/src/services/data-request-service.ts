@@ -8,15 +8,12 @@ import {
   UpdateDataRequest
 } from '../models/data-request';
 import { DataRequestStatusEnum } from '../models/data-request-status';
-import { TeamMember } from '../models/team-member';
 import { TeamMemberRepository } from '../repositories/authorization/team-member-repository';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import { DataRequestStatusRepository } from '../repositories/data-request-status-repository';
 import { _generateDataRequestTeamName, _transformFlatDataRequestToNested } from '../utils/data-request';
-import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamService } from './access-policy/team-service';
 import { DBService } from './db-service';
-import { UserService } from './user-service';
 
 /**
  * Service for managing data requests.
@@ -33,27 +30,6 @@ export class DataRequestService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.dataRequestRepository = new DataRequestRepository(connection);
-  }
-
-  /**
-   * Returns the team_member record if the given user is a member of the team associated with the data
-   * request; otherwise returns null.
-   *
-   * @param {string} teamId - The team id.
-   * @param {number} userId - The system user id to check for team membership.
-   * @return {Promise<TeamMember | null>}
-   */
-  async findTeamMember(teamId: string, userId: number): Promise<TeamMember | null> {
-    const teamMemberService = new TeamMemberService(this.connection);
-    const members = await teamMemberService.getTeamMembers(teamId);
-
-    const member = members.find((member) => member.system_user_id === userId);
-
-    if (!member) {
-      return null;
-    }
-
-    return member;
   }
 
   /**
