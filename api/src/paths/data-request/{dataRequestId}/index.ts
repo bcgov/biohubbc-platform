@@ -6,6 +6,7 @@ import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { DataRequestService } from '../../../services/data-request-service';
 import { getLogger } from '../../../utils/logger';
+import { SYSTEM_ROLE } from '../../../constants/roles';
 
 const defaultLog = getLogger('paths/data-request/{dataRequestId}');
 
@@ -13,6 +14,10 @@ export const GET: Operation = [
   authorizeRequestHandler(() => {
     return {
       and: [
+        {
+          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+          discriminator: 'SystemRole'
+        },
         {
           discriminator: 'SystemUser'
         }
@@ -26,6 +31,10 @@ export const PUT: Operation = [
     return {
       and: [
         {
+          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+          discriminator: 'SystemRole'
+        },
+        {
           discriminator: 'SystemUser'
         }
       ]
@@ -37,6 +46,10 @@ export const DELETE: Operation = [
   authorizeRequestHandler(() => {
     return {
       and: [
+        {
+          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+          discriminator: 'SystemRole'
+        },
         {
           discriminator: 'SystemUser'
         }
