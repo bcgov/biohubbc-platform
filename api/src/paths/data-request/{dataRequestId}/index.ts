@@ -1,12 +1,12 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
 import { DataRequestResponseSchema, UpdateDataRequestSchema } from '../../../openapi/schemas/data-request';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { DataRequestService } from '../../../services/data-request-service';
 import { getLogger } from '../../../utils/logger';
-import { SYSTEM_ROLE } from '../../../constants/roles';
 
 const defaultLog = getLogger('paths/data-request/{dataRequestId}');
 
