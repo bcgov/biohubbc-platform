@@ -518,6 +518,33 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
     }
   }, [state]);
 
+  /**
+   * Checks out the cart: creates a download from all cart features,
+   * then resets the cart for a fresh session.
+   *
+   * Checkout creates a download in `pending` status without triggering processing.
+   * Download processing is a separate concern handled by the pipeline.
+   * After checkout, the cart ID is cleared from session storage and state is reset,
+   * so the next addToCart call creates a fresh cart.
+   */
+  const checkout = useCallback(async (): Promise<void> => {
+    if (!state.cartId || operationInProgress.current) {
+      return;
+    }
+
+    operationInProgress.current = true;
+
+    try {
+      await cartApiRef.current.checkoutCart(state.cartId);
+
+      // Clear cart ID from session storage and reset state.
+      // setCartId(null) triggers the existing useEffect that dispatches RESET.
+      setCartId(null);
+    } finally {
+      operationInProgress.current = false;
+    }
+  }, [state.cartId, setCartId]);
+
   const value: ICartContext = useMemo(
     () => ({
       features: state.features,
@@ -526,9 +553,10 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
       error: state.error,
       addToCart,
       removeFromCart,
-      clearCart
+      clearCart,
+      checkout
     }),
-    [addToCart, clearCart, removeFromCart, state.features, state.pagination, state.isLoading, state.error]
+    [addToCart, checkout, clearCart, removeFromCart, state.features, state.pagination, state.isLoading, state.error]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

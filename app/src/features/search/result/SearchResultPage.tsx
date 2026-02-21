@@ -26,10 +26,8 @@ export enum SEARCH_RESULT_OPTION_VIEW {
 export const SearchResultPage = () => {
   const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination } = useSearchResults();
   const { codesDataLoader } = useCodesContext();
-  const { features, pagination: cartPagination } = useCartContext();
+  const { features, pagination: cartPagination, addToCart, checkout } = useCartContext();
   const dialogContext = useDialogContext();
-
-  const { addToCart } = useCartContext();
 
   const [view, setView] = useState<SEARCH_RESULT_OPTION_VIEW>(SEARCH_RESULT_OPTION_VIEW.LIST);
   const { recommended, handleRefresh: refreshRecommended } = useRecommendedFilters();
@@ -197,6 +195,14 @@ export const SearchResultPage = () => {
     }
   }, [rows, addToCart, dialogContext]);
 
+  const handleCheckout = useCallback(async () => {
+    try {
+      await checkout();
+    } catch (error) {
+      dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
+    }
+  }, [checkout, dialogContext]);
+
   return (
     <ResultPageContainer
       leftSidebar={
@@ -209,7 +215,9 @@ export const SearchResultPage = () => {
           onOmitListRecommended={omitRecommended}
         />
       }
-      rightSidebar={<DownloadSidebar features={features} itemCount={cartPagination?.total ?? 0} />}>
+      rightSidebar={
+        <DownloadSidebar features={features} itemCount={cartPagination?.total ?? 0} onDownload={handleCheckout} />
+      }>
       <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
         <PageHeader>
           <SearchResultHeader

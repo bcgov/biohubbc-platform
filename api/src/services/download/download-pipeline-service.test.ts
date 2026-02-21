@@ -465,22 +465,22 @@ describe('DownloadPipelineService', () => {
       );
 
       // Step 4: Call planFragments with bin packing
-      // Feature 10 = 300MB, Feature 20 = 300MB (total 600MB > 500MB threshold), Feature 30 = 200MB
-      const threeHundredMB = 300 * 1024 * 1024;
-      const twoHundredMB = 200 * 1024 * 1024;
+      // Feature 10 = 120MB, Feature 20 = 120MB (total 240MB > 200MB threshold), Feature 30 = 80MB
+      const oneHundredTwentyMB = 120 * 1024 * 1024;
+      const eightyMB = 80 * 1024 * 1024;
       // Override estimated_byte_size on features for bin packing test
-      features[0].estimated_byte_size = String(threeHundredMB);
-      features[1].estimated_byte_size = String(threeHundredMB);
-      features[2].estimated_byte_size = String(twoHundredMB);
+      features[0].estimated_byte_size = String(oneHundredTwentyMB);
+      features[1].estimated_byte_size = String(oneHundredTwentyMB);
+      features[2].estimated_byte_size = String(eightyMB);
       const sizeEstimate = {
-        totalEstimatedBytes: threeHundredMB * 2 + twoHundredMB,
+        totalEstimatedBytes: oneHundredTwentyMB * 2 + eightyMB,
         features
       };
       await service.planFragments('aaaa0000-0000-0000-0000-000000000001', sizeEstimate);
 
       // Step 5: Verify 2 fragments created — first has feature 10, then flush when 10+20 > threshold
-      // Fragment 0: feature 10 (300MB) — flush when adding 20 would exceed 500MB
-      // Fragment 1: features 20+30 (300+200=500MB)
+      // Fragment 0: feature 10 (120MB) — flush when adding 20 would exceed 200MB
+      // Fragment 1: features 20+30 (120+80=200MB)
       expect(createFragmentStub).to.have.been.calledTwice;
       expect(createFragmentStub.firstCall.args[1]).to.equal(0); // fragment_index 0
       expect(createFragmentStub.secondCall.args[1]).to.equal(1); // fragment_index 1

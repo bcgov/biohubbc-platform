@@ -40,6 +40,13 @@ export interface CartWithFeaturesResponse extends CartFeatureListResponse {
 }
 
 /**
+ * Response from the cart checkout endpoint (`POST /api/cart/{cartId}/checkout`).
+ */
+export interface CheckoutCartResponse {
+  download_id: string;
+}
+
+/**
  * Payload for updating a cart
  */
 export interface UpdateCartPayload {
