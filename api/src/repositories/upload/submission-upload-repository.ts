@@ -189,7 +189,7 @@ export class SubmissionUploadRepository extends BaseRepository {
    * @param {string} uploadId - The upload_id to look up.
    * @returns {Promise<SubmissionUpload | null>} - The submission_upload record, or null if not found.
    */
-  async findSubmissionUploadByUploadId(uploadId: string): Promise<SubmissionUpload | null> {
+  async getSubmissionUploadByUploadId(uploadId: string): Promise<SubmissionUpload> {
     const sqlStatement = SQL`
       SELECT
         submission_upload_id,
@@ -202,7 +202,15 @@ export class SubmissionUploadRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUpload);
-    return response.rows[0] ?? null;
+    
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get submission upload record', [
+        'SubmissionUploadRepository->getSubmissionUploadByUploadId',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
+    }
+    
+      return response.rows[0];
   }
 
   /**

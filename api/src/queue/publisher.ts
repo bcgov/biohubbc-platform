@@ -181,11 +181,13 @@ export const publishProcessSubmissionFeaturesJob = async (
  *
  * Queues ClamAV scanning for an uploaded artifact.
  *
+ * @param {IDBConnection} connection Database connection for submission validation tracking
  * @param {IMalwareScanJobData} data Job data containing artifactSecurityId
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
  */
 export const publishMalwareScanJob = async (
+  connection: IDBConnection,
   data: IMalwareScanJobData,
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
@@ -195,10 +197,18 @@ export const publishMalwareScanJob = async (
 
     await boss.createQueue(JobQueues.MALWARE_SCAN);
 
+    const db = {
+      executeSql: async (text: string, values: any[]) => {
+        const result = await connection.query(text, values);
+        return { rows: result.rows, rowCount: result.rowCount };
+      }
+    };
+
     // Use singletonKey to prevent duplicate concurrent jobs for the same artifact security record
     const jobId = await boss.send(JobQueues.MALWARE_SCAN, data, {
       ...mergedOptions,
-      singletonKey: `artifact-security-${data.artifactSecurityId}`
+      singletonKey: `artifact-security-${data.artifactSecurityId}`,
+      db
     });
 
     if (jobId) {

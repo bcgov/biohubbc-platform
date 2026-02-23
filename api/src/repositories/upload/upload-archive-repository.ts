@@ -85,7 +85,7 @@ export class UploadArchiveRepository extends BaseRepository {
    * @param {string} artifactId - The ID of the artifact.
    * @returns {Promise<UploadArchive | null>} - The upload archive or null if not found.
    */
-  async getUploadArchiveByArtifactId(artifactId: string): Promise<UploadArchive | null> {
+  async getUploadArchiveByArtifactId(artifactId: string): Promise<UploadArchive> {
     const sqlStatement = SQL`
       SELECT
         upload_archive_id,
@@ -99,7 +99,16 @@ export class UploadArchiveRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, UploadArchive);
-    return response.rows[0] ?? null;
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get upload archive record', [
+        'UploadArchiveRepository->getUploadArchiveByArtifactId',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
+    }
+
+    return response.rows[0];
+    
   }
 
   /**
