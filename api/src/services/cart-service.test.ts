@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { Cart, CartFeatureListResponse, CartStatus, CartSubmissionFeature, UpdateCart } from '../models/cart';
+import * as publisher from '../queue/publisher';
 import { CartRepository } from '../repositories/cart-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { getMockDBConnection } from '../__mocks__/db';
@@ -232,7 +233,7 @@ describe('CartService', () => {
   });
 
   describe('checkoutCart', () => {
-    it('should create a download, link features, and check out the cart', async () => {
+    it('should create a download, link features, check out the cart, and publish download job', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new CartService(mockDBConnection);
 
@@ -244,6 +245,9 @@ describe('CartService', () => {
         .resolves({ download_id: 'dl-uuid' });
       const createFeaturesStub = sinon.stub(DownloadService.prototype, 'createDownloadFeatures').resolves();
       const updateCartStub = sinon.stub(CartRepository.prototype, 'updateCart').resolves();
+      const publishStub = sinon
+        .stub(publisher, 'publishProcessDownloadJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
 
       const result = await service.checkoutCart('cart-1', 42);
 
@@ -256,6 +260,7 @@ describe('CartService', () => {
         checkout_date: sinon.match.string,
         checkout_user: 42
       });
+      expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, { downloadId: 'dl-uuid' });
     });
 
     it('should throw HTTP400 when cart is empty', async () => {
@@ -266,6 +271,7 @@ describe('CartService', () => {
       const createDownloadStub = sinon.stub(DownloadService.prototype, 'createDownload');
       const createFeaturesStub = sinon.stub(DownloadService.prototype, 'createDownloadFeatures');
       const updateCartStub = sinon.stub(CartRepository.prototype, 'updateCart');
+      const publishStub = sinon.stub(publisher, 'publishProcessDownloadJob');
 
       try {
         await service.checkoutCart('cart-1', 42);
@@ -278,6 +284,7 @@ describe('CartService', () => {
       expect(createDownloadStub).to.not.have.been.called;
       expect(createFeaturesStub).to.not.have.been.called;
       expect(updateCartStub).to.not.have.been.called;
+      expect(publishStub).to.not.have.been.called;
     });
 
     it('should forward systemUserId for authenticated users', async () => {
@@ -290,6 +297,7 @@ describe('CartService', () => {
         .resolves({ download_id: 'dl-uuid' });
       sinon.stub(DownloadService.prototype, 'createDownloadFeatures').resolves();
       const updateCartStub = sinon.stub(CartRepository.prototype, 'updateCart').resolves();
+      sinon.stub(publisher, 'publishProcessDownloadJob').resolves({ status: 'published', jobId: 'job-1' });
 
       await service.checkoutCart('cart-1', 7);
 
@@ -311,6 +319,7 @@ describe('CartService', () => {
         .resolves({ download_id: 'dl-uuid' });
       sinon.stub(DownloadService.prototype, 'createDownloadFeatures').resolves();
       const updateCartStub = sinon.stub(CartRepository.prototype, 'updateCart').resolves();
+      sinon.stub(publisher, 'publishProcessDownloadJob').resolves({ status: 'published', jobId: 'job-1' });
 
       await service.checkoutCart('cart-1', null);
 
@@ -330,6 +339,7 @@ describe('CartService', () => {
       sinon.stub(DownloadService.prototype, 'createDownload').rejects(new Error('DB error'));
       const createFeaturesStub = sinon.stub(DownloadService.prototype, 'createDownloadFeatures');
       const updateCartStub = sinon.stub(CartRepository.prototype, 'updateCart');
+      const publishStub = sinon.stub(publisher, 'publishProcessDownloadJob');
 
       try {
         await service.checkoutCart('cart-1', 42);
@@ -340,6 +350,7 @@ describe('CartService', () => {
 
       expect(createFeaturesStub).to.not.have.been.called;
       expect(updateCartStub).to.not.have.been.called;
+      expect(publishStub).to.not.have.been.called;
     });
   });
 

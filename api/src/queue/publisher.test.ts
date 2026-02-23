@@ -300,6 +300,33 @@ describe('publisher', () => {
       expect((result as { status: 'published'; jobId: string }).jobId).to.equal('download-job-id');
     });
 
+    it('passes db adapter for transactional job insert', async () => {
+      // Verifies: The db option wraps connection.query so the job row is inserted
+      // in the same transaction as the business data (atomic commit/rollback)
+
+      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 0 });
+      const mockConnection = getMockDBConnection({ query: queryStub });
+      const sendStub = sinon.stub().resolves('download-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
+
+      await publishProcessDownloadJob(mockConnection, {
+        downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+      });
+
+      // Verify db adapter is passed to boss.send
+      const options = sendStub.firstCall.args[2];
+      expect(options.db).to.exist;
+      expect(options.db.executeSql).to.be.a('function');
+
+      // Verify the adapter delegates to connection.query
+      await options.db.executeSql('SELECT 1', [42]);
+      expect(queryStub).to.have.been.calledOnceWith('SELECT 1', [42]);
+    });
+
     it('returns duplicate when download is not in pending status', async () => {
       // Verifies: Publisher returns duplicate status when download is already processing
 

@@ -2,6 +2,7 @@ import { IDBConnection } from '../database/db';
 import { HTTP400 } from '../errors/http-error';
 import { Cart, CartStatus, CartWithFeatures, CartWithFeaturesResponse, UpdateCart } from '../models/cart';
 import { DownloadId } from '../models/download';
+import { publishProcessDownloadJob } from '../queue/publisher';
 import { CartRepository } from '../repositories/cart-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { CartSubmissionFeatureService } from './cart-submission-feature-service';
@@ -119,8 +120,8 @@ export class CartService extends DBService {
    * Check out a cart: create a download record, link all cart features to it,
    * and mark the cart as checked out.
    *
-   * Checkout creates a download in `pending` status without triggering processing.
-   * Download processing is a separate concern handled by the pipeline.
+   * Checkout creates a download record, links features, marks the cart as checked out,
+   * then publishes a download job for async processing by the download pipeline.
    * An empty cart checkout would create a useless download record, so the service
    * validates this before creating any records.
    *
@@ -150,6 +151,9 @@ export class CartService extends DBService {
       checkout_date: new Date().toISOString(),
       checkout_user: systemUserId
     });
+
+    // Publish download job for async processing
+    await publishProcessDownloadJob(this.connection, { downloadId: downloadId.download_id });
 
     return downloadId;
   }
