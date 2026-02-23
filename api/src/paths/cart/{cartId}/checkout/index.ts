@@ -41,6 +41,22 @@ POST.apiDoc = {
       }
     }
   ],
+  requestBody: {
+    content: {
+      'application/json': {
+        schema: {
+          type: 'object',
+          properties: {
+            fragment_size_bytes: {
+              type: 'integer',
+              minimum: 1,
+              description: 'Target fragment size in bytes. Defaults to 10 MB if not provided.'
+            }
+          }
+        }
+      }
+    }
+  },
   responses: {
     201: {
       description: 'Cart checked out successfully',
@@ -82,8 +98,10 @@ export function checkoutCart(): RequestHandler {
       const systemUserId = isAuthenticated ? connection.systemUserId() : null;
       const cartId = req.params.cartId;
 
+      const fragmentSizeBytes = req.body?.fragment_size_bytes;
+
       const cartService = new CartService(connection);
-      const result = await cartService.checkoutCart(cartId, systemUserId);
+      const result = await cartService.checkoutCart(cartId, systemUserId, fragmentSizeBytes);
 
       await connection.commit();
 

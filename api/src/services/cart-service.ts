@@ -1,6 +1,6 @@
 import { IDBConnection } from '../database/db';
 import { HTTP400 } from '../errors/http-error';
-import { Cart, CartWithFeatures, CartWithFeaturesResponse, UpdateCart } from '../models/cart';
+import { Cart, CartStatus, CartWithFeatures, CartWithFeaturesResponse, UpdateCart } from '../models/cart';
 import { DownloadId } from '../models/download';
 import { CartRepository } from '../repositories/cart-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
@@ -126,11 +126,12 @@ export class CartService extends DBService {
    *
    * @param {string} cartId - The ID of the cart to check out
    * @param {number | null} systemUserId - The authenticated user ID, or null for anonymous checkout
+   * @param {number} [fragmentSizeBytes] - Target fragment size in bytes. Defaults to FRAGMENT_SIZE_THRESHOLD in the repository.
    * @return {Promise<DownloadId>} The created download record ID
    * @throws HTTP400 if the cart is empty (no features to download)
    * @memberof CartService
    */
-  async checkoutCart(cartId: string, systemUserId: number | null): Promise<DownloadId> {
+  async checkoutCart(cartId: string, systemUserId: number | null, fragmentSizeBytes?: number): Promise<DownloadId> {
     const featureIds = await this.cartSubmissionFeatureService.getCartSubmissionFeatureIds(cartId);
 
     if (featureIds.length === 0) {
@@ -138,13 +139,17 @@ export class CartService extends DBService {
     }
 
     // Create download record (no team, no data request for cart checkouts)
-    const downloadId = await this.downloadService.createDownload(null, null, undefined, systemUserId);
+    const downloadId = await this.downloadService.createDownload(null, null, fragmentSizeBytes, systemUserId);
 
     // Link features to download
     await this.downloadService.createDownloadFeatures(downloadId.download_id, featureIds);
 
     // Mark cart as checked out
-    await this.cartRepository.checkoutCart(cartId, systemUserId);
+    await this.cartRepository.updateCart(cartId, {
+      cart_status: CartStatus.CHECKED_OUT,
+      checkout_date: new Date().toISOString(),
+      checkout_user: systemUserId
+    });
 
     return downloadId;
   }

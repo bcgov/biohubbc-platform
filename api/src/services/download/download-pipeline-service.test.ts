@@ -4,9 +4,16 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { FRAGMENT_SIZE_THRESHOLD, SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
 import { ApiConflictError } from '../../errors/api-error';
-import { DownloadFeatureData, DownloadFeatureSummary, DownloadRecord } from '../../models/download';
-import { DownloadFragmentRecord } from '../../models/download-fragment';
+import {
+  DownloadFeatureData,
+  DownloadFeatureSummary,
+  DownloadId,
+  DownloadRecord,
+  DownloadSizeEstimate
+} from '../../models/download';
+import { DownloadFragmentId, DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { FeatureTypeWithFeaturePropertiesCode } from '../../repositories/code-repository';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -71,7 +78,7 @@ describe('DownloadPipelineService', () => {
 
       const createDownloadStub = sinon
         .stub(DownloadRepository.prototype, 'createDownload')
-        .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' });
+        .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
       sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
 
       await service.createDownloadRequest(null, [10, 20]);
@@ -89,7 +96,7 @@ describe('DownloadPipelineService', () => {
 
       const createDownloadStub = sinon
         .stub(DownloadRepository.prototype, 'createDownload')
-        .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' });
+        .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
       sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
 
       await service.createDownloadRequest(null, [10, 20]);
@@ -164,10 +171,8 @@ describe('DownloadPipelineService', () => {
 
       sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
       sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([]);
-      const estimateStub = sinon.stub(service, 'estimateDownloadSize').resolves({
-        totalEstimatedBytes: 1000,
-        features: []
-      });
+      const mockEstimate: DownloadSizeEstimate = { totalEstimatedBytes: 1000, features: [] };
+      const estimateStub = sinon.stub(service, 'estimateDownloadSize').resolves(mockEstimate);
       const planStub = sinon.stub(service, 'planFragments').resolves();
 
       await service.planDownloadIfNeeded('aaaa0000-0000-0000-0000-000000000042');
@@ -232,11 +237,13 @@ describe('DownloadPipelineService', () => {
       sinon
         .stub(DownloadFragmentRepository.prototype, 'getRootDatasetsByFragment')
         .resolves(
-          new Map([[1, { dataset_name: 'Test Dataset', dataset_uuid: '11111111-2222-3333-4444-555555555555' }]])
+          new Map<number, { dataset_uuid: string; dataset_name: string | null }>([
+            [1, { dataset_name: 'Test Dataset', dataset_uuid: '11111111-2222-3333-4444-555555555555' }]
+          ])
         );
 
       sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([
+      const mockCodes: FeatureTypeWithFeaturePropertiesCode[] = [
         {
           feature_type: { feature_type_id: 1, feature_type_name: 'file', feature_type_display_name: 'File' },
           feature_type_properties: [
@@ -249,7 +256,8 @@ describe('DownloadPipelineService', () => {
             }
           ]
         }
-      ]);
+      ];
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').rejects(new Error('NoSuchKey: File not found'));
       const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
 
@@ -289,12 +297,14 @@ describe('DownloadPipelineService', () => {
       sinon
         .stub(DownloadFragmentRepository.prototype, 'getRootDatasetsByFragment')
         .resolves(
-          new Map([[1, { dataset_name: 'Test Dataset', dataset_uuid: '11111111-2222-3333-4444-555555555555' }]])
+          new Map<number, { dataset_uuid: string; dataset_name: string | null }>([
+            [1, { dataset_name: 'Test Dataset', dataset_uuid: '11111111-2222-3333-4444-555555555555' }]
+          ])
         );
       sinon
         .stub(DownloadRepository.prototype, 'findDownloadById')
         .resolves(createMockDownloadRecord({ total_fragments: 3 }));
-      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([
+      const mockCodes: FeatureTypeWithFeaturePropertiesCode[] = [
         {
           feature_type: {
             feature_type_id: 2,
@@ -311,7 +321,8 @@ describe('DownloadPipelineService', () => {
             }
           ]
         }
-      ]);
+      ];
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
       const uploadStreamStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
 
       await service.processFragment(pendingFragment, 'aaaa0000-0000-0000-0000-000000000042');
@@ -446,8 +457,8 @@ describe('DownloadPipelineService', () => {
       ];
       // Step 3: Stub fragment repository methods
       const createFragmentStub = sinon.stub(DownloadFragmentRepository.prototype, 'createDownloadFragment');
-      createFragmentStub.onFirstCall().resolves({ download_fragment_id: 1 });
-      createFragmentStub.onSecondCall().resolves({ download_fragment_id: 2 });
+      createFragmentStub.onFirstCall().resolves({ download_fragment_id: 1 } satisfies DownloadFragmentId);
+      createFragmentStub.onSecondCall().resolves({ download_fragment_id: 2 } satisfies DownloadFragmentId);
       const createFragmentFeaturesStub = sinon
         .stub(DownloadFragmentRepository.prototype, 'createDownloadFragmentFeatures')
         .resolves();
@@ -472,7 +483,7 @@ describe('DownloadPipelineService', () => {
       features[0].estimated_byte_size = String(oneHundredTwentyMB);
       features[1].estimated_byte_size = String(oneHundredTwentyMB);
       features[2].estimated_byte_size = String(eightyMB);
-      const sizeEstimate = {
+      const sizeEstimate: DownloadSizeEstimate = {
         totalEstimatedBytes: oneHundredTwentyMB * 2 + eightyMB,
         features
       };
@@ -528,7 +539,7 @@ describe('DownloadPipelineService', () => {
 
       // Step 4: Stub fragment repository methods
       const createFragmentStub = sinon.stub(DownloadFragmentRepository.prototype, 'createDownloadFragment');
-      createFragmentStub.onFirstCall().resolves({ download_fragment_id: 1 });
+      createFragmentStub.onFirstCall().resolves({ download_fragment_id: 1 } satisfies DownloadFragmentId);
       const createFragmentFeaturesStub = sinon
         .stub(DownloadFragmentRepository.prototype, 'createDownloadFragmentFeatures')
         .resolves();
@@ -545,7 +556,7 @@ describe('DownloadPipelineService', () => {
       features[0].estimated_byte_size = String(threeHundredMB);
       features[1].estimated_byte_size = String(threeHundredMB);
       features[2].estimated_byte_size = String(twoHundredMB);
-      const sizeEstimate = {
+      const sizeEstimate: DownloadSizeEstimate = {
         totalEstimatedBytes: threeHundredMB * 2 + twoHundredMB,
         features
       };

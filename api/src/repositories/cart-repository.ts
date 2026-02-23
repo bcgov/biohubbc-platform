@@ -81,50 +81,20 @@ export class CartRepository extends BaseRepository {
    * Update a cart.
    *
    * @param {string} cartId
-   * @param {UpdateCart} payload
+   * @param {UpdateCart} cart
    * @return {Promise<void>}
    * @memberof CartRepository
    */
-  async updateCart(cartId: string, payload: UpdateCart): Promise<void> {
+  async updateCart(cartId: string, cart: UpdateCart): Promise<void> {
     const knex = getKnex();
 
-    const query = knex('cart').where('cart_id', cartId).update(payload);
+    const query = knex('cart').where('cart_id', cartId).update(cart);
 
     const response = await this.connection.knex(query, Cart);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update cart status', [
-        'CartRepository->updateCartStatus',
-        'rowCount !== 1, expected rowCount === 1'
-      ]);
-    }
-  }
-
-  /**
-   * Atomically check out an active cart.
-   * Only active carts can be checked out. The WHERE clause filters on
-   * cart_status = 'active', preventing double-checkout (idempotent guard).
-   * Sets checkout_date and checkout_user to track when and who checked out,
-   * separate from the audit trigger's update_date/update_user.
-   *
-   * @param {string} cartId
-   * @param {number | null} checkoutUserId
-   * @return {Promise<void>}
-   * @memberof CartRepository
-   */
-  async checkoutCart(cartId: string, checkoutUserId: number | null): Promise<void> {
-    const knex = getKnex();
-    const query = knex('cart').where('cart_id', cartId).andWhere('cart_status', CartStatus.ACTIVE).update({
-      cart_status: CartStatus.CHECKED_OUT,
-      checkout_date: knex.fn.now(),
-      checkout_user: checkoutUserId
-    });
-
-    const response = await this.connection.knex(query);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to checkout cart', [
-        'CartRepository->checkoutCart',
+      throw new ApiExecuteSQLError('Failed to update cart', [
+        'CartRepository->updateCart',
         'rowCount !== 1, expected rowCount === 1'
       ]);
     }
