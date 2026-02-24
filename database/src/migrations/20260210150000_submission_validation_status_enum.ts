@@ -46,12 +46,18 @@ export async function down(knex: Knex): Promise<void> {
 
     -- Revert to VARCHAR with CHECK constraint
     ALTER TABLE submission_validation
+      ALTER COLUMN status DROP DEFAULT;
+
+    ALTER TABLE submission_validation
       ALTER COLUMN status TYPE VARCHAR(20)
       USING status::text;
 
     ALTER TABLE submission_validation
+      ALTER COLUMN status SET DEFAULT 'pending';
+
+    ALTER TABLE submission_validation
       ADD CONSTRAINT submission_validation_status_check
-        CHECK (status IN ('pending', 'started', 'completed', 'failed'));
+        CHECK (status IN ('pending', 'started', 'completed', 'invalid', 'failed'));
 
     DROP TYPE IF EXISTS submission_validation_status;
   `);

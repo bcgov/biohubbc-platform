@@ -1,12 +1,7 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import {
-  FeatureProperty,
-  FeatureTypeSummary,
-  FeatureTypeWithProperties,
-  FeatureTypeWithPropertiesRow
-} from '../../models/feature-type';
+import { FeatureTypeWithProperties, FeatureTypeWithPropertiesRow } from '../../models/feature-type';
 import { BaseRepository } from '../base-repository';
 import { ISubmissionFeature } from '../submission-repository';
 
@@ -120,62 +115,76 @@ export class IngestionRepository extends BaseRepository {
    */
   async findFeatureTypeWithProperties(name: string): Promise<FeatureTypeWithProperties | null> {
     const sqlStatement = SQL`
+      WITH feature_type_cte AS (
+        SELECT
+          ft.feature_type_id,
+          ft.name,
+          ft.display_name
+        FROM feature_type ft
+        WHERE
+          ft.name = ${name}
+          AND ft.record_end_date IS NULL
+      ),
+      properties_cte AS (
+        SELECT
+          ftp.feature_type_id,
+          fp.name,
+          fp.display_name,
+          fp.description,
+          fpt.name AS type_name,
+          ftp.required_value,
+          fp.calculated_value
+        FROM feature_type_property ftp
+        JOIN feature_property fp
+          ON ftp.feature_property_id = fp.feature_property_id
+          AND fp.record_end_date IS NULL
+        JOIN feature_property_type fpt
+          ON fp.feature_property_type_id = fpt.feature_property_type_id
+          AND fpt.record_end_date IS NULL
+        WHERE
+          ftp.record_end_date IS NULL
+      )
       SELECT
         ft.feature_type_id,
         ft.name,
         ft.display_name,
-        fp.name as property_name,
-        fp.display_name as property_display_name,
-        fp.description as property_description,
-        fpt.name as property_type_name,
-        ftp.required_value,
-        fp.calculated_value
-      FROM
-        feature_type ft
-      LEFT JOIN
-        feature_type_property ftp ON ft.feature_type_id = ftp.feature_type_id
-        AND ftp.record_end_date IS NULL
-      LEFT JOIN
-        feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-        AND fp.record_end_date IS NULL
-      LEFT JOIN
-        feature_property_type fpt ON fp.feature_property_type_id = fpt.feature_property_type_id
-        AND fpt.record_end_date IS NULL
-      WHERE
-        ft.name = ${name}
-        AND ft.record_end_date IS NULL;
+        COALESCE(
+          JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'name', p.name,
+              'display_name', p.display_name,
+              'description', p.description,
+              'type_name', p.type_name,
+              'required_value', p.required_value,
+              'calculated_value', p.calculated_value
+            )
+          ) FILTER (WHERE p.name IS NOT NULL),
+          '[]'
+        ) AS properties
+      FROM feature_type_cte ft
+      LEFT JOIN properties_cte p
+        ON ft.feature_type_id = p.feature_type_id
+      GROUP BY
+        ft.feature_type_id,
+        ft.name,
+        ft.display_name;
     `;
 
     const response = await this.connection.sql(sqlStatement, FeatureTypeWithPropertiesRow);
 
-    // No rows means feature type doesn't exist or is soft-deleted
     if (response.rowCount === 0) {
       return null;
     }
 
-    // Extract feature type info from the first row
-    const firstRow = response.rows[0];
-    const featureType: FeatureTypeSummary = {
-      feature_type_id: firstRow.feature_type_id,
-      name: firstRow.name,
-      display_name: firstRow.display_name
-    };
-
-    // Extract properties from all rows (filter out null properties from LEFT JOIN)
-    const properties: FeatureProperty[] = response.rows
-      .filter((row) => row.property_name !== null)
-      .map((row) => ({
-        name: row.property_name as string,
-        display_name: row.property_display_name as string,
-        description: row.property_description as string,
-        type_name: row.property_type_name as string,
-        required_value: row.required_value as boolean,
-        calculated_value: row.calculated_value as boolean
-      }));
+    const row = response.rows[0];
 
     return {
-      featureType,
-      properties
+      featureType: {
+        feature_type_id: row.feature_type_id,
+        name: row.name,
+        display_name: row.display_name
+      },
+      properties: row.properties
     };
   }
 }

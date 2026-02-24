@@ -125,23 +125,24 @@ describe('IngestionRepository', () => {
           feature_type_id: 1,
           name: 'dataset',
           display_name: 'Dataset',
-          property_name: 'name',
-          property_display_name: 'Name',
-          property_description: 'The name of the dataset',
-          property_type_name: 'string',
-          required_value: true,
-          calculated_value: false
-        },
-        {
-          feature_type_id: 1,
-          name: 'dataset',
-          display_name: 'Dataset',
-          property_name: 'description',
-          property_display_name: 'Description',
-          property_description: 'The description of the dataset',
-          property_type_name: 'string',
-          required_value: false,
-          calculated_value: false
+          properties: [
+            {
+              name: 'name',
+              display_name: 'Name',
+              description: 'The name of the dataset',
+              type_name: 'string',
+              required_value: true,
+              calculated_value: false
+            },
+            {
+              name: 'description',
+              display_name: 'Description',
+              description: 'The description of the dataset',
+              type_name: 'string',
+              required_value: false,
+              calculated_value: false
+            }
+          ]
         }
       ];
       const mockQueryResponse: QueryResult<any> = {
@@ -213,12 +214,7 @@ describe('IngestionRepository', () => {
           feature_type_id: 99,
           name: 'empty_type',
           display_name: 'Empty Type',
-          property_name: null,
-          property_display_name: null,
-          property_description: null,
-          property_type_name: null,
-          required_value: null,
-          calculated_value: null
+          properties: []
         }
       ];
       const mockQueryResponse: QueryResult<any> = {
