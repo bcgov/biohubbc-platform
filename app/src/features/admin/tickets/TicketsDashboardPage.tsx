@@ -146,7 +146,7 @@ export const TicketsDashboardPage = () => {
               rowsPerPage={rowsPerPage}
               onPageChange={(_, newPage) => setPage(newPage)}
               onRowsPerPageChange={(event) => {
-                setRowsPerPage(parseInt(event.target.value, 10));
+                setRowsPerPage(Number.parseInt(event.target.value, 10));
                 setPage(0);
               }}
               rowsPerPageOptions={[10, 25, 50]}

@@ -90,16 +90,18 @@ describe('paths/tickets', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { page: '1', limit: '10' };
+    const noTeamFilter = undefined;
+    const noStatusFilter = undefined;
 
     await getTickets()(mockReq, mockRes, mockNext);
 
-    expect(listStub).to.have.been.calledWith(undefined, undefined, {
+    expect(listStub).to.have.been.calledWith(noTeamFilter, noStatusFilter, {
       page: 1,
       limit: 10,
       sort: undefined,
       order: undefined
     });
-    expect(countStub).to.have.been.calledWith(undefined, undefined);
+    expect(countStub).to.have.been.calledWith(noTeamFilter, noStatusFilter);
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql({
       tickets: [mockTicket],

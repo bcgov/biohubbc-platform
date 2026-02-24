@@ -159,7 +159,6 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                   }
                 }}>
                 <MenuItem
-                  tabIndex={1}
                   component={RouterLink}
                   to="/"
                   id="menu_home_sm"
@@ -168,7 +167,6 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                 </MenuItem>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
                   <MenuItem
-                    tabIndex={1}
                     component={RouterLink}
                     to="/admin/submissions"
                     id="menu_dashboard_sm"
@@ -179,7 +177,6 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                 </SystemRoleGuard>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
                   <MenuItem
-                    tabIndex={1}
                     component={RouterLink}
                     to="/admin/tickets"
                     id="menu_tickets_sm"

@@ -1,4 +1,5 @@
-import { randomInt, randomUUID } from 'crypto';
+import { randomInt } from 'crypto';
+import { v4 } from 'uuid';
 import { IDBConnection } from '../database/db';
 import { HTTP400 } from '../errors/http-error';
 import { CreateTicketRequest, Ticket, TicketStatus, TicketWithHistory, UpdateTicketRequest } from '../models/ticket';
@@ -89,7 +90,7 @@ export class TicketService extends DBService {
     const teamService = new TeamService(this.connection);
     const createdTeam = await teamService.createTeamWithMembers(
       {
-        name: `Ticket Team ${randomUUID()}`,
+        name: `Ticket Team ${v4()}`,
         description: 'Auto-generated team for ticket ownership.'
       },
       []

@@ -10,7 +10,14 @@ import { orange } from '@mui/material/colors';
 import { useTheme } from '@mui/material/styles';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { ITicket } from 'interfaces/useTicketsApi.interface';
-import { useMemo } from 'react';
+import { HTMLAttributes, PropsWithChildren, useMemo } from 'react';
+
+declare module '@mui/x-data-grid' {
+  interface NoRowsOverlayPropsOverrides {
+    emptyTitle: string;
+    emptyMessage: string;
+  }
+}
 
 interface ITicketsListProps {
   tickets: ITicket[];
@@ -19,6 +26,26 @@ interface ITicketsListProps {
   emptyMessage: string;
   onTicketClick: (ticketRef: string) => void;
 }
+
+interface ITicketsNoRowsOverlayProps extends HTMLAttributes<HTMLDivElement> {
+  emptyTitle: string;
+  emptyMessage: string;
+}
+
+const TicketsNoRowsOverlay = (props: PropsWithChildren<ITicketsNoRowsOverlayProps>) => {
+  const { emptyTitle, emptyMessage } = props;
+
+  return (
+    <Stack alignItems="center" justifyContent="center" p={3} minHeight={220}>
+      <Typography data-testid="tickets-empty-title" component="h2" sx={{ mb: 1, fontWeight: 700 }}>
+        {emptyTitle}
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        {emptyMessage}
+      </Typography>
+    </Stack>
+  );
+};
 
 /**
  * Type guard for ticket priority values coming from DataGrid cell params.
@@ -182,16 +209,13 @@ export const TicketsList = (props: ITicketsListProps) => {
         disableRowSelectionOnClick
         onRowClick={(params) => onTicketClick(params.row.ticket_short_id)}
         slots={{
-          noRowsOverlay: () => (
-            <Stack alignItems="center" justifyContent="center" p={3} minHeight={220}>
-              <Typography data-testid="tickets-empty-title" component="h2" sx={{ mb: 1, fontWeight: 700 }}>
-                {emptyTitle}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {emptyMessage}
-              </Typography>
-            </Stack>
-          )
+          noRowsOverlay: TicketsNoRowsOverlay
+        }}
+        slotProps={{
+          noRowsOverlay: {
+            emptyTitle,
+            emptyMessage
+          }
         }}
         sx={{
           border: 0,
