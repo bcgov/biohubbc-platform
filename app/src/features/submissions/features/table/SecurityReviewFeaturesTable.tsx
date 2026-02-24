@@ -3,7 +3,6 @@ import Icon from '@mdi/react';
 import { grey } from '@mui/material/colors';
 import IconButton from '@mui/material/IconButton';
 import {
-  DataGrid,
   GridColDef,
   GridPaginationModel,
   GridRowParams,
@@ -11,6 +10,7 @@ import {
   GridSortModel,
   MuiEvent
 } from '@mui/x-data-grid';
+import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import appTheme from 'themes/appTheme';
 import { FeatureRow } from './SecurityReviewFeaturesTable.interface';
 
@@ -63,7 +63,7 @@ export const SecurityReviewFeaturesTable = ({
   ];
 
   return (
-    <DataGrid
+    <CustomDataGrid
       rows={rows}
       columns={columns}
       checkboxSelection

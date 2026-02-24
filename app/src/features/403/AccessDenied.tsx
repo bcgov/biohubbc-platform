@@ -27,7 +27,7 @@ const AccessDenied = () => {
         <Box pt={4}>
           <Button
             onClick={() => navigate('/')}
-            size="large"
+            size="medium"
             variant="contained"
             color="primary"
             data-testid="access-denied-return-home-button">
