@@ -8,9 +8,10 @@ import IconButton from '@mui/material/IconButton';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
-import CustomTextField from 'components/fields/CustomTextField';
+import CustomTextFieldFormik from 'components/fields/CustomTextFieldFormik';
 import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { FieldArray, useFormikContext } from 'formik';
+import get from 'lodash-es/get';
 import yup from 'utils/YupSchema';
 
 export interface IAddSystemUsersFormArrayItem {
@@ -60,47 +61,29 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
         render={(arrayHelpers) => (
           <Box>
             <Box>
-              {values.systemUsers?.map((systemUser: IAddSystemUsersFormArrayItem, index: number) => {
-                const userIdentifierMeta = getFieldMeta(`systemUsers.[${index}].userIdentifier`);
-                const userGuidMeta = getFieldMeta(`systemUsers.[${index}].userGuid`);
-                const identitySourceMeta = getFieldMeta(`systemUsers.[${index}].identitySource`);
-                const systemRoleMeta = getFieldMeta(`systemUsers.[${index}].systemRole`);
+              {values.systemUsers?.map((_: IAddSystemUsersFormArrayItem, index: number) => {
+                const systemRoleName = `systemUsers.[${index}].systemRole`;
+                const identitySourceName = `systemUsers.[${index}].identitySource`;
+                const identitySourceMeta = getFieldMeta(identitySourceName);
+                const systemRoleMeta = getFieldMeta(systemRoleName);
 
                 return (
                   <Box display="flex" key={index} mx={-0.5} alignItems="flex-start">
                     <Box width="300px" py={1} px={0.5}>
-                      <CustomTextField
-                        name={`systemUsers.[${index}].userIdentifier`}
-                        label="Username"
-                        other={{
-                          required: true,
-                          value: systemUser.userIdentifier,
-                          error: userIdentifierMeta.touched && Boolean(userIdentifierMeta.error),
-                          helperText: userIdentifierMeta.touched && userIdentifierMeta.error
-                        }}
-                      />
+                      <CustomTextFieldFormik name={`systemUsers.[${index}].userIdentifier`} label="Username" required />
                     </Box>
                     <Box width="300px" py={1} px={0.5}>
-                      <CustomTextField
-                        name={`systemUsers.[${index}].userGuid`}
-                        label="User GUID"
-                        other={{
-                          required: true,
-                          value: systemUser.userGuid,
-                          error: userGuidMeta.touched && Boolean(userGuidMeta.error),
-                          helperText: userGuidMeta.touched && userGuidMeta.error
-                        }}
-                      />
+                      <CustomTextFieldFormik name={`systemUsers.[${index}].userGuid`} label="User GUID" required />
                     </Box>
                     <Box width="250px" py={1} px={0.5}>
                       <FormControl fullWidth required error={systemRoleMeta.touched && Boolean(systemRoleMeta.error)}>
-                        <InputLabel id="systemRole">System Role</InputLabel>
+                        <InputLabel id={`system-role-label-${index}`}>System Role</InputLabel>
                         <Select
-                          id={`systemUsers.[${index}].systemRole`}
-                          name={`systemUsers.[${index}].systemRole`}
-                          labelId="systemRole"
+                          id={systemRoleName}
+                          name={systemRoleName}
+                          labelId={`system-role-label-${index}`}
                           label="System Role"
-                          value={systemUser.systemRole}
+                          value={get(values, systemRoleName) ?? ''}
                           onChange={handleChange}
                           error={systemRoleMeta.touched && Boolean(systemRoleMeta.error)}
                           inputProps={{ 'aria-label': 'System Role' }}>
@@ -118,13 +101,13 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
                         fullWidth
                         required
                         error={identitySourceMeta.touched && Boolean(identitySourceMeta.error)}>
-                        <InputLabel id="loginMethod">Login Method</InputLabel>
+                        <InputLabel id={`login-method-label-${index}`}>Login Method</InputLabel>
                         <Select
-                          id={`systemUsers.[${index}].identitySource`}
-                          name={`systemUsers.[${index}].identitySource`}
-                          labelId="login_method"
+                          id={identitySourceName}
+                          name={identitySourceName}
+                          labelId={`login-method-label-${index}`}
                           label="Login Method"
-                          value={systemUser.identitySource}
+                          value={get(values, identitySourceName) ?? ''}
                           onChange={handleChange}
                           error={identitySourceMeta.touched && Boolean(identitySourceMeta.error)}
                           inputProps={{ 'aria-label': 'Login Method' }}>

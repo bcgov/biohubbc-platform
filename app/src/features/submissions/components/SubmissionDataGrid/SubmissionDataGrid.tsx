@@ -1,6 +1,7 @@
 import { Box, Divider, Paper, Toolbar } from '@mui/material';
 import Typography from '@mui/material/Typography';
-import { DataGrid, GridRowSelectionModel } from '@mui/x-data-grid';
+import { GridRowSelectionModel } from '@mui/x-data-grid';
+import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
 import { pluralize } from 'utils/Utils';
 import useSubmissionDataGridColumns from './useSubmissionDataGridColumns';
@@ -35,7 +36,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
       </Toolbar>
       <Box px={3}>
         <Divider flexItem></Divider>
-        <DataGrid
+        <CustomDataGrid
           checkboxSelection
           data-testid="submission-reviews-data-grid"
           getRowId={(row) => row.submission_feature_id}

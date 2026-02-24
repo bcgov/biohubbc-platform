@@ -5,7 +5,8 @@ import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import { DataGrid, GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
+import { GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
+import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
@@ -277,7 +278,7 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
 
       <Divider flexItem />
 
-      <DataGrid
+      <CustomDataGrid
         data-testid="team-policies-table"
         rows={teamPolicies}
         columns={columns}

@@ -154,14 +154,7 @@ export const TeamMemberSelect = ({ selectedUserIds, onChange, initialUsers = [] 
       onChange={handleChange}
       // Disable client-side filtering - server handles it
       filterOptions={(x) => x}
-      renderInput={(params) => (
-        <TextField
-          {...params}
-          label="Team Members"
-          placeholder="Search users..."
-          helperText="Type to search for users"
-        />
-      )}
+      renderInput={(params) => <TextField {...params} label="Team Members" placeholder="Search users..." />}
       slotProps={{
         chip: {
           size: 'small'
