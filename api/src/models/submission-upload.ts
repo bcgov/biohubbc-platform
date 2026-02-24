@@ -7,8 +7,7 @@ import { UploadArtifactRoleEnum } from './upload-artifact';
 export const SubmissionUpload = z.object({
   submission_upload_id: z.string().uuid(),
   submission_id: z.number(),
-  upload_id: z.string().uuid(),
-  ticket_id: z.string().uuid().nullable().optional()
+  upload_id: z.string().uuid()
 });
 export type SubmissionUpload = z.infer<typeof SubmissionUpload>;
 
@@ -17,8 +16,7 @@ export type SubmissionUpload = z.infer<typeof SubmissionUpload>;
  */
 export const CreateSubmissionUpload = z.object({
   submission_id: z.number(),
-  upload_id: z.string().uuid(),
-  ticket_id: z.string().uuid().nullable().optional()
+  upload_id: z.string().uuid()
 });
 export type CreateSubmissionUpload = z.infer<typeof CreateSubmissionUpload>;
 
@@ -27,8 +25,7 @@ export type CreateSubmissionUpload = z.infer<typeof CreateSubmissionUpload>;
  */
 export const UpdateSubmissionUpload = z.object({
   submission_id: z.number().optional(),
-  upload_id: z.string().uuid().optional(),
-  ticket_id: z.string().uuid().nullable().optional()
+  upload_id: z.string().uuid().optional()
 });
 export type UpdateSubmissionUpload = z.infer<typeof UpdateSubmissionUpload>;
 

@@ -244,35 +244,6 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN ticket_decision.revision_count IS 'Revision count used for concurrency control.';
 
     --------------------------------------------------------------------------------
-    -- DATA REQUEST TICKET LINK
-    --------------------------------------------------------------------------------
-
-    ALTER TABLE data_request
-      ADD COLUMN ticket_id uuid;
-
-    ALTER TABLE data_request
-      ADD CONSTRAINT data_request_ticket_fk
-        FOREIGN KEY (ticket_id)
-        REFERENCES ticket(ticket_id);
-
-    ALTER TABLE data_request
-      ADD COLUMN IF NOT EXISTS policy_id uuid;
-
-    ALTER TABLE data_request
-      ADD CONSTRAINT data_request_policy_fk
-        FOREIGN KEY (policy_id)
-        REFERENCES policy(policy_id);
-
-    CREATE INDEX data_request_ticket_idx ON data_request(ticket_id);
-    CREATE INDEX data_request_policy_idx ON data_request(policy_id);
-    CREATE INDEX data_request_ticket_active_idx
-      ON data_request(ticket_id, create_date DESC)
-      WHERE record_end_date IS NULL;
-
-    COMMENT ON COLUMN data_request.ticket_id IS 'Foreign key to the governing ticket. This data request appears as a card in the ticket timeline with approve/deny buttons.';
-    COMMENT ON COLUMN data_request.policy_id IS 'Optional foreign key to the governing policy for this data request.';
-
-    --------------------------------------------------------------------------------
     -- DATA REQUEST DECISION HISTORY
     --------------------------------------------------------------------------------
 
@@ -313,24 +284,6 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN data_request_decision.update_date IS 'The datetime the record was last updated.';
     COMMENT ON COLUMN data_request_decision.update_user IS 'The id of the user who last updated the record.';
     COMMENT ON COLUMN data_request_decision.revision_count IS 'Revision count used for concurrency control.';
-
-    --------------------------------------------------------------------------------
-    -- SUBMISSION UPLOAD TICKET LINK
-    --------------------------------------------------------------------------------
-
-    ALTER TABLE submission_upload
-      ADD COLUMN ticket_id uuid;
-
-    ALTER TABLE submission_upload
-      ADD CONSTRAINT submission_upload_ticket_fk
-        FOREIGN KEY (ticket_id)
-        REFERENCES ticket(ticket_id);
-
-    CREATE INDEX submission_upload_ticket_idx ON submission_upload(ticket_id);
-    CREATE INDEX submission_upload_ticket_active_idx
-      ON submission_upload(ticket_id, create_date DESC);
-
-    COMMENT ON COLUMN submission_upload.ticket_id IS 'Foreign key to the governing ticket. This submission upload appears as a card in the ticket timeline with approve/deny buttons.';
 
     --------------------------------------------------------------------------------
     -- SUBMISSION UPLOAD DECISION HISTORY
@@ -504,9 +457,6 @@ export async function down(knex: Knex): Promise<void> {
     DROP INDEX IF EXISTS ticket_decision_one_active_idx;
     DROP INDEX IF EXISTS ticket_decision_active_latest_idx;
     DROP INDEX IF EXISTS ticket_decision_decision_idx;
-    DROP INDEX IF EXISTS submission_upload_ticket_active_idx;
-    DROP INDEX IF EXISTS data_request_ticket_active_idx;
-    DROP INDEX IF EXISTS data_request_policy_idx;
     DROP INDEX IF EXISTS ticket_status_history_ticket_date_idx;
     DROP INDEX IF EXISTS ticket_open_team_idx;
     DROP INDEX IF EXISTS ticket_active_team_status_idx;
@@ -515,24 +465,12 @@ export async function down(knex: Knex): Promise<void> {
     ALTER TABLE submission_upload_decision DROP CONSTRAINT IF EXISTS submission_upload_decision_comment_fk;
     ALTER TABLE data_request_decision DROP CONSTRAINT IF EXISTS data_request_decision_comment_fk;
     ALTER TABLE ticket_decision DROP CONSTRAINT IF EXISTS ticket_decision_comment_fk;
-    ALTER TABLE data_request DROP CONSTRAINT IF EXISTS data_request_policy_fk;
 
     -- Drop decision tables
     DROP TABLE IF EXISTS submission_upload_decision;
     DROP TABLE IF EXISTS data_request_decision;
     DROP TABLE IF EXISTS ticket_decision;
     DROP TABLE IF EXISTS ticket_status_history;
-
-    -- Drop submission_upload columns and indexes
-    DROP INDEX IF EXISTS submission_upload_ticket_idx;
-    ALTER TABLE submission_upload DROP CONSTRAINT IF EXISTS submission_upload_ticket_fk;
-    ALTER TABLE submission_upload DROP COLUMN IF EXISTS ticket_id;
-
-    -- Drop data_request columns and indexes
-    DROP INDEX IF EXISTS data_request_ticket_idx;
-    ALTER TABLE data_request DROP CONSTRAINT IF EXISTS data_request_ticket_fk;
-    ALTER TABLE data_request DROP COLUMN IF EXISTS policy_id;
-    ALTER TABLE data_request DROP COLUMN IF EXISTS ticket_id;
 
     -- Drop ticket tables
     ALTER TABLE ticket DROP COLUMN IF EXISTS status;

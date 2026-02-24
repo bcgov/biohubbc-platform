@@ -23,8 +23,7 @@ export class SubmissionUploadRepository extends BaseRepository {
       SELECT
         submission_upload_id,
         submission_id,
-        upload_id,
-        ticket_id
+        upload_id
       FROM
         submission_upload
       WHERE
@@ -59,7 +58,7 @@ export class SubmissionUploadRepository extends BaseRepository {
     const knex = getKnex();
 
     let query = knex
-      .select('submission_upload_id', 'submission_id', 'upload_id', 'ticket_id')
+      .select('submission_upload_id', 'submission_id', 'upload_id')
       .from('submission_upload')
       .join('upload_artifact ua', 'ua.upload_id', 'submission_upload.upload_id')
       .where('submission_id', submissionId);
@@ -87,12 +86,10 @@ export class SubmissionUploadRepository extends BaseRepository {
     const sqlStatement = SQL`
       INSERT INTO submission_upload (
         submission_id,
-        upload_id,
-        ticket_id
+        upload_id
       ) VALUES (
         ${submissionUpload.submission_id},
-        ${submissionUpload.upload_id},
-        ${submissionUpload.ticket_id ?? null}
+        ${submissionUpload.upload_id}
       )
       RETURNING submission_upload_id;
     `;
@@ -164,11 +161,7 @@ export class SubmissionUploadRepository extends BaseRepository {
       UPDATE submission_upload
       SET
         submission_id = COALESCE(${submissionUpload.submission_id}, submission_id),
-        upload_id = COALESCE(${submissionUpload.upload_id}, upload_id),
-        ticket_id = CASE
-          WHEN ${submissionUpload.ticket_id !== undefined} THEN ${submissionUpload.ticket_id ?? null}
-          ELSE ticket_id
-        END
+        upload_id = COALESCE(${submissionUpload.upload_id}, upload_id)
       WHERE
         submission_upload_id = ${submissionUploadId}
       RETURNING submission_upload_id;

@@ -64,20 +64,14 @@ export async function seed(knex: Knex): Promise<void> {
   await ensureTicketDecision(knex, openTicket.ticket_id, 'PENDING', openComment.comment_id, createUser);
   await ensureTicketDecision(knex, closedTicket.ticket_id, 'APPROVED', closedComment.comment_id, createUser);
 
-  // Seed one data_request linked to ticket
-  const dataRequest = await ensureDataRequest(knex, openTicket.ticket_id, teamId, createUser);
+  // Seed one data_request and add a decision row
+  const dataRequest = await ensureDataRequest(knex, teamId, createUser);
   await ensureDataRequestDecision(knex, dataRequest.data_request_id, 'PENDING', openComment.comment_id, createUser);
 
-  // Link one submission upload (if any exist) to ticket and add a decision row
-  const submissionUpload = await knex('submission_upload').select('submission_upload_id', 'ticket_id').first();
+  // Seed one submission upload decision row (if any submission uploads exist)
+  const submissionUpload = await knex('submission_upload').select('submission_upload_id').first();
 
   if (submissionUpload) {
-    if (!submissionUpload.ticket_id) {
-      await knex('submission_upload')
-        .where({ submission_upload_id: submissionUpload.submission_upload_id })
-        .update({ ticket_id: openTicket.ticket_id });
-    }
-
     await ensureSubmissionUploadDecision(
       knex,
       submissionUpload.submission_upload_id,
@@ -291,19 +285,14 @@ const ensureTicketDecision = async (
  */
 const ensureDataRequest = async (
   knex: Knex,
-  ticketId: string,
   teamId: string,
   createUser: number
 ): Promise<{ data_request_id: string }> => {
-  const reason = `Seed data request for ticket ${ticketId}`;
+  const reason = 'Seed data request for ticket domain testing';
 
   const existing = await knex('data_request').where({ reason }).whereNull('record_end_date').first();
 
   if (existing) {
-    if (!existing.ticket_id) {
-      await knex('data_request').where({ data_request_id: existing.data_request_id }).update({ ticket_id: ticketId });
-    }
-
     return { data_request_id: existing.data_request_id };
   }
 
@@ -312,7 +301,6 @@ const ensureDataRequest = async (
       reason,
       team_id: teamId,
       requested_by: createUser,
-      ticket_id: ticketId,
       create_user: createUser
     })
     .returning(['data_request_id']);
