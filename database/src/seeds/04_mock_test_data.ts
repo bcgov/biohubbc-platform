@@ -223,7 +223,10 @@ export const insertObservationRecord = async (
           1, // number of features in feature collection
           [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
         )['features'][0]['geometry'],
-        count: faker.number.int({ min: 0, max: 100 })
+        count: faker.number.int({ min: 0, max: 100 }),
+        // species observation-specific properties
+        timestamp: faker.date.between({ from: '2020-01-01T00:00:00.000Z', to: new Date().toISOString() }).toISOString(),
+        sign: faker.helpers.arrayElement(['tracks', 'scat', 'sighting', 'other'])
       }
     })}`
   );
@@ -246,6 +249,36 @@ export const insertObservationRecord = async (
   //   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
 
   await knex.raw(`${insertSpatialPoint({ submission_feature_id })}`);
+
+  // attach a measurement child record (sex & life stage) to the observation
+  await insertMeasurementRecord(knex, {
+    submission_id: options.submission_id,
+    parent_submission_feature_id: submission_feature_id
+  });
+
+  return submission_feature_id;
+};
+
+export const insertMeasurementRecord = async (
+  knex: Knex,
+  options: { submission_id: number; parent_submission_feature_id: number }
+): Promise<number> => {
+  const response = await knex.raw(
+    `${insertSubmissionFeature({
+      submission_id: options.submission_id,
+      parent_submission_feature_id: options.parent_submission_feature_id,
+      feature_type: 'measurement',
+      data: {
+        sex: faker.helpers.arrayElement(['male', 'female', 'unknown']),
+        life_stage: faker.helpers.arrayElement(['adult', 'juvenile', 'unknown'])
+      }
+    })}`
+  );
+  const submission_feature_id = response.rows[0].submission_feature_id;
+  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
+  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
+  await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
+  await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
 
   return submission_feature_id;
 };
@@ -335,7 +368,8 @@ export const insertSubmissionFeature = (options: {
     | 'artifact'
     | 'telemetry'
     | 'telemetry_deployment'
-    | 'telemetry_device';
+    | 'telemetry_device'
+    | 'measurement';
   data: { [key: string]: any };
 }) => `
     INSERT INTO submission_feature

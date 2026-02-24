@@ -109,6 +109,54 @@ WHERE ft.name = 'telemetry'
     COMMENT ON COLUMN bcgw.telemetry_public.device_key IS 'The vendor and device serial';
     COMMENT ON COLUMN bcgw.telemetry_public.animal_id IS 'The identifier of the animal wearing the telemetry device';
   `);
+
+  await knex.raw(`
+CREATE MATERIALIZED VIEW bcgw.observations_public AS
+WITH measurements AS (
+    SELECT
+        m.parent_submission_feature_id   AS observation_id,
+        (m.data->>'sex')::text           AS sex,
+        (m.data->>'life_stage')::text    AS life_stage,
+        (m.data->>'measurement_type')::text   AS measurement_type,
+        (m.data->>'measurement_value')::text  AS measurement_value
+    FROM biohub.submission_feature m
+    JOIN biohub.feature_type ft_m
+      ON m.feature_type_id = ft_m.feature_type_id
+    WHERE ft_m.name = 'measurement'
+      AND m.record_end_date IS NULL
+)
+SELECT
+    sf.submission_feature_id AS Feature_ID,
+    (sf.data->>'timestamp')::timestamptz AS DATETIME,
+    (EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz))::int AS YEAR,
+    public.ST_Y(public.ST_GeomFromGeoJSON(sf.data->>'geometry')) AS Latitude,
+    public.ST_X(public.ST_GeomFromGeoJSON(sf.data->>'geometry')) AS Longitude,
+    (sf.data->>'sign')::text AS sign,
+    (sf.data->>'count')::int AS count,
+    meas.sex,
+    meas.life_stage
+FROM biohub.submission_feature sf
+JOIN biohub.feature_type ft
+  ON sf.feature_type_id = ft.feature_type_id
+LEFT JOIN measurements meas
+  ON meas.observation_id = sf.submission_feature_id
+WHERE ft.name = 'species_observation'
+  AND sf.record_end_date IS NULL
+  AND sf.submission_feature_id NOT IN (
+        SELECT submission_feature_id
+        FROM biohub.submission_feature_security
+      );
+  `);
+
+  await knex.raw(`
+    COMMENT ON COLUMN bcgw.observations_public.Feature_ID IS 'System generated surrogate primary key identifier';
+    COMMENT ON COLUMN bcgw.observations_public.Latitude IS 'The latitude of the observation location';
+    COMMENT ON COLUMN bcgw.observations_public.Longitude IS 'The longitude of the observation location';
+    COMMENT ON COLUMN bcgw.observations_public.DATETIME IS 'The timestamp of the observation';
+    COMMENT ON COLUMN bcgw.observations_public.YEAR IS 'The year of the observation';
+    COMMENT ON COLUMN bcgw.observations_public.sign IS 'Type of sign associated with the observation';
+    COMMENT ON COLUMN bcgw.observations_public.count IS 'Count value for the observation';
+  `);
 }
 
 /**
@@ -124,5 +172,8 @@ export async function down(knex: Knex): Promise<void> {
   `);
   await knex.raw(`
     DROP MATERIALIZED VIEW IF EXISTS bcgw.telemetry_public;
+  `);
+  await knex.raw(`
+    DROP MATERIALIZED VIEW IF EXISTS bcgw.observations_public;
   `);
 }
