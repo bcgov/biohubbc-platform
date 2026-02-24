@@ -5,6 +5,7 @@ import { DownloadId } from '../models/download';
 import { publishProcessDownloadJob } from '../queue/publisher';
 import { CartRepository } from '../repositories/cart-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { TeamService } from './access-policy/team-service';
 import { CartSubmissionFeatureService } from './cart-submission-feature-service';
 import { DBService } from './db-service';
 import { DownloadService } from './download/download-service';
@@ -16,6 +17,7 @@ export class CartService extends DBService {
   cartRepository: CartRepository;
   cartSubmissionFeatureService: CartSubmissionFeatureService;
   downloadService: DownloadService;
+  teamService: TeamService;
 
   /**
    * Initializes the CartService with a database connection.
@@ -28,6 +30,7 @@ export class CartService extends DBService {
     this.cartRepository = new CartRepository(connection);
     this.cartSubmissionFeatureService = new CartSubmissionFeatureService(connection);
     this.downloadService = new DownloadService(connection);
+    this.teamService = new TeamService(connection);
   }
 
   /**
@@ -139,8 +142,23 @@ export class CartService extends DBService {
       throw new HTTP400('Cannot checkout an empty cart');
     }
 
-    // Create download record (no team, no data request for cart checkouts)
-    const downloadId = await this.downloadService.createDownload(null, null, fragmentSizeBytes, systemUserId);
+    // Create team if user is authenticated
+    let teamId: string | null = null;
+
+    if (systemUserId) {
+      const team = await this.teamService.createTeamWithMembers(
+        {
+          name: `Team for cart ${cartId}`,
+          description: 'Team automatically created for cart checkout'
+        },
+        [systemUserId]
+      );
+
+      teamId = team.team_id ?? null;
+    }
+
+    // Create download record (no data request for cart checkouts)
+    const downloadId = await this.downloadService.createDownload(teamId, null, fragmentSizeBytes, systemUserId);
 
     // Link features to download
     await this.downloadService.createDownloadFeatures(downloadId.download_id, featureIds);
