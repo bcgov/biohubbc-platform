@@ -1,12 +1,11 @@
 import { SYSTEM_ROLE } from '../../constants/roles';
-import { getKnex, IDBConnection } from '../../database/db';
+import { IDBConnection } from '../../database/db';
 import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
 import { getServiceClientSystemUser, getUserGuid } from '../../utils/keycloak-utils';
-import { PolicyService } from '../access-policy/policy-service';
 import { CartService } from '../cart-service';
 import { DBService } from '../db-service';
-import { SubmissionService } from '../submission-service';
 import { UserService } from '../user-service';
+import { TeamAuthorizationService } from './team-authorization-service';
 
 export enum AuthorizeOperator {
   AND = 'and',
@@ -251,97 +250,8 @@ export class AuthorizationService extends DBService {
       return false;
     }
 
-    return this.authorizeByTeamEntity(user.system_user_id, authorizeRule);
-  }
-
-  /**
-   * Resolve and authorize access to a single team-scoped entity.
-   *
-   * @param {number} systemUserId
-   * @param {TeamAuthorizationEntity} entity
-   * @returns {Promise<boolean>}
-   */
-  private async authorizeByTeamEntity(systemUserId: number, entity: TeamAuthorizationEntity): Promise<boolean> {
-    const knex = getKnex();
-
-    switch (entity.entity) {
-      case 'team': {
-        const query = knex('team_member as tm')
-          .select('tm.team_member_id')
-          .where('tm.team_id', entity.teamId)
-          .where('tm.system_user_id', systemUserId)
-          .whereNull('tm.record_end_date')
-          .limit(1);
-
-        const response = await this.connection.knex(query);
-        return !!response.rowCount && response.rowCount > 0;
-      }
-
-      case 'policy': {
-        const query = knex('team_policy as tp')
-          .select('tp.team_policy_id')
-          .innerJoin('team_member as tm', 'tm.team_id', 'tp.team_id')
-          .where('tp.policy_id', entity.policyId)
-          .where('tm.system_user_id', systemUserId)
-          .whereNull('tp.record_end_date')
-          .whereNull('tm.record_end_date')
-          .limit(1);
-
-        const response = await this.connection.knex(query);
-        return !!response.rowCount && response.rowCount > 0;
-      }
-
-      case 'ticket': {
-        const query = knex('ticket as t')
-          .select('t.ticket_id')
-          .innerJoin('team_member as tm', 'tm.team_id', 't.team_id')
-          .where('t.ticket_id', entity.ticketId)
-          .where('tm.system_user_id', systemUserId)
-          .whereNull('t.record_end_date')
-          .whereNull('tm.record_end_date')
-          .limit(1);
-
-        const response = await this.connection.knex(query);
-        return !!response.rowCount && response.rowCount > 0;
-      }
-
-      case 'data_request': {
-        const query = knex('data_request as dr')
-          .select('dr.data_request_id')
-          .innerJoin('team_member as tm', 'tm.team_id', 'dr.team_id')
-          .where('dr.data_request_id', entity.dataRequestId)
-          .where('tm.system_user_id', systemUserId)
-          .whereNull('dr.record_end_date')
-          .whereNull('tm.record_end_date')
-          .limit(1);
-
-        const response = await this.connection.knex(query);
-        return !!response.rowCount && response.rowCount > 0;
-      }
-
-      case 'submission_feature': {
-        const submissionService = new SubmissionService(this.connection);
-        const feature = await submissionService.getSubmissionFeatureById(entity.submissionFeatureId);
-
-        if (!feature.secured) {
-          return true;
-        }
-
-        if (entity.submissionId !== undefined && feature.submission_id !== entity.submissionId) {
-          return false;
-        }
-
-        const policyService = new PolicyService(this.connection);
-        const policiesThatGrantAccess = await policyService.getPoliciesThatAuthorizeFeatureAccessByUrn(
-          feature.urn,
-          systemUserId
-        );
-
-        return policiesThatGrantAccess.length > 0;
-      }
-    }
-
-    return false;
+    const teamAuthorizationService = new TeamAuthorizationService(this.connection);
+    return teamAuthorizationService.isUserAuthorizedForTeamEntity(user.system_user_id, authorizeRule);
   }
 
   /**
