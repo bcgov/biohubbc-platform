@@ -20,8 +20,10 @@ export class TeamAuthorizationRepository extends BaseRepository {
    */
   async findTeamMembership(systemUserId: number, teamId: string): Promise<TeamMemberRecord | null> {
     const knex = getKnex();
-    const query = knex('team_member as tm')
+    const query = knex
+      .queryBuilder()
       .select('tm.team_member_id')
+      .from('team_member as tm')
       .where('tm.team_id', teamId)
       .where('tm.system_user_id', systemUserId)
       .whereNull('tm.record_end_date')
@@ -41,8 +43,10 @@ export class TeamAuthorizationRepository extends BaseRepository {
    */
   async findTeamMembershipByPolicy(systemUserId: number, policyId: string): Promise<TeamPolicyRecord | null> {
     const knex = getKnex();
-    const query = knex('team_policy as tp')
+    const query = knex
+      .queryBuilder()
       .select('tp.team_policy_id')
+      .from('team_policy as tp')
       .join('team_member as tm', 'tm.team_id', 'tp.team_id')
       .where('tp.policy_id', policyId)
       .where('tm.system_user_id', systemUserId)
@@ -67,8 +71,10 @@ export class TeamAuthorizationRepository extends BaseRepository {
     dataRequestId: string
   ): Promise<DataRequestRecord | null> {
     const knex = getKnex();
-    const query = knex('data_request as dr')
+    const query = knex
+      .queryBuilder()
       .select('dr.data_request_id')
+      .from('data_request as dr')
       .join('team_member as tm', 'tm.team_id', 'dr.team_id')
       .where('dr.data_request_id', dataRequestId)
       .where('tm.system_user_id', systemUserId)
