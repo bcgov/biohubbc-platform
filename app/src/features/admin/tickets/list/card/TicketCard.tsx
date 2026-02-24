@@ -1,15 +1,14 @@
-import { mdiChevronDoubleUp, mdiChevronTripleUp, mdiChevronUp, mdiChevronUpBox } from '@mdi/js';
 import Icon from '@mdi/react';
 import Card from '@mui/material/Card';
 import CardActionArea from '@mui/material/CardActionArea';
 import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
-import Tooltip from '@mui/material/Tooltip';
 import Stack from '@mui/material/Stack';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { orange } from '@mui/material/colors';
 import { useTheme } from '@mui/material/styles';
 import { ITicket } from 'interfaces/useTicketsApi.interface';
+import { getPriorityIcon } from '../../utils/priority';
 
 interface ITicketCardProps {
   ticket: ITicket;
@@ -25,23 +24,7 @@ interface ITicketCardProps {
 export const TicketCard = (props: ITicketCardProps) => {
   const { ticket, onClick } = props;
   const theme = useTheme();
-
-  const getPriorityIcon = () => {
-    switch (ticket.priority) {
-      case 'LOW':
-        return { path: mdiChevronUp, color: theme.palette.success.main };
-      case 'MEDIUM':
-        return { path: mdiChevronDoubleUp, color: theme.palette.primary.main };
-      case 'HIGH':
-        return { path: mdiChevronTripleUp, color: orange[700] };
-      case 'CRITICAL':
-        return { path: mdiChevronUpBox, color: theme.palette.error.main };
-      default:
-        return { path: mdiChevronDoubleUp, color: theme.palette.primary.main };
-    }
-  };
-
-  const priorityIcon = getPriorityIcon();
+  const priorityIcon = getPriorityIcon(ticket.priority, theme);
 
   return (
     <Card elevation={0}>

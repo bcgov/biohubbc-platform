@@ -36,12 +36,9 @@ export const TicketsDashboardPage = () => {
   const [error, setError] = useState<string | undefined>();
   const [createError, setCreateError] = useState<string | undefined>();
 
-  const ticketsLoader = useDataLoader((params: {
-    page: number;
-    limit: number;
-    sort: 'create_date';
-    order: 'desc';
-  }) => api.tickets.getTickets(params));
+  const ticketsLoader = useDataLoader((params: { page: number; limit: number; sort: 'create_date'; order: 'desc' }) =>
+    api.tickets.getTickets(params)
+  );
 
   useEffect(() => {
     ticketsLoader.refresh({
@@ -110,8 +107,13 @@ export const TicketsDashboardPage = () => {
               setPage(0);
             }}
             aria-label="administrative tabs"
-            sx={{ mt: 1.5, mx: -2 }}>
-            <Tab value="tickets" label="Tickets" id="administrative-tickets-tab" aria-controls="administrative-tickets-tabpanel" />
+            sx={{ mt: 1.5 }}>
+            <Tab
+              value="tickets"
+              label="Tickets"
+              id="administrative-tickets-tab"
+              aria-controls="administrative-tickets-tabpanel"
+            />
           </Tabs>
         </Container>
       </Paper>

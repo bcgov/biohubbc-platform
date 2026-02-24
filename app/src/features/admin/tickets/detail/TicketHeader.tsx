@@ -1,10 +1,9 @@
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Chip from '@mui/material/Chip';
-import Container from '@mui/material/Container';
 import Link from '@mui/material/Link';
-import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { PageHeader } from 'components/header/PageHeader';
 import { ITicketWithHistory } from 'interfaces/useTicketsApi.interface';
 import { Link as RouterLink } from 'react-router-dom';
 
@@ -22,29 +21,29 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
   const { ticket } = props;
 
   return (
-    <Paper square elevation={0}>
-      <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Breadcrumbs aria-label="ticket breadcrumb" sx={{ mb: 1.5 }}>
+    <PageHeader
+      maxWidth="xl"
+      breadcrumbs={
+        <Breadcrumbs aria-label="ticket breadcrumb">
           <Link component={RouterLink} to="/admin/tickets" underline="hover" color="inherit">
             Tickets
           </Link>
           <Typography color="text.primary">{ticket ? `Ticket #${ticket.ticket_slug}` : 'Ticket'}</Typography>
         </Breadcrumbs>
-
+      }
+      label={
         <Stack direction="row" spacing={2} alignItems="center">
           <Typography variant="h1">{ticket ? `Ticket #${ticket.ticket_slug}` : 'Ticket'}</Typography>
           {ticket?.status && (
             <Chip
               label={ticket.status === 'OPEN' ? 'Open' : 'Closed'}
-              color="primary"
-              sx={{ height: 40, px: 1.25, borderRadius: 5, '& .MuiChip-label': { fontSize: '1.5rem', fontWeight: 700 } }}
+              size="medium"
+              color={ticket.status === 'OPEN' ? 'primary' : 'default'}
             />
           )}
         </Stack>
-        <Typography color="text.secondary" sx={{ mt: 1 }}>
-          {ticket?.description || 'No description has been added to this ticket.'}
-        </Typography>
-      </Container>
-    </Paper>
+      }
+      subheader={ticket?.description || 'No description has been added to this ticket.'}
+    />
   );
 };

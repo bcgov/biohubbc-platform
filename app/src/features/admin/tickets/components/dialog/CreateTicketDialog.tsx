@@ -1,10 +1,7 @@
-import MenuItem from '@mui/material/MenuItem';
-import Stack from '@mui/material/Stack';
 import EditDialog from 'components/dialog/EditDialog';
-import CustomTextField from 'components/fields/CustomTextField';
-import { useFormikContext } from 'formik';
 import { ICreateTicketRequest, TicketPriority } from 'interfaces/useTicketsApi.interface';
 import yup from 'utils/YupSchema';
+import { ITicketFormValues, TICKET_PRIORITIES, TicketForm } from './form/TicketForm';
 
 interface ICreateTicketDialogProps {
   open: boolean;
@@ -14,15 +11,7 @@ interface ICreateTicketDialogProps {
   onCreate: (payload: ICreateTicketRequest) => Promise<void>;
 }
 
-interface ICreateTicketFormValues {
-  title: string;
-  description: string;
-  priority: TicketPriority;
-}
-
-const PRIORITIES: TicketPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
-
-const CreateTicketFormInitialValues: ICreateTicketFormValues = {
+const CreateTicketFormInitialValues: ITicketFormValues = {
   title: '',
   description: '',
   priority: 'MEDIUM'
@@ -31,35 +20,8 @@ const CreateTicketFormInitialValues: ICreateTicketFormValues = {
 const CreateTicketFormYupSchema = yup.object().shape({
   title: yup.string().required('Title is required').max(100, 'Title must be 100 characters or less'),
   description: yup.string().max(2000, 'Description must be 2000 characters or less'),
-  priority: yup.mixed<TicketPriority>().oneOf(PRIORITIES).required('Priority is required')
+  priority: yup.mixed<TicketPriority>().oneOf(TICKET_PRIORITIES).required('Priority is required')
 });
-
-/**
- * Form body rendered inside the shared EditDialog for ticket creation.
- *
- * @return {*}
- */
-const CreateTicketForm = () => {
-  const { values } = useFormikContext<ICreateTicketFormValues>();
-
-  return (
-    <Stack gap={2} sx={{ pt: 1 }}>
-      <CustomTextField label="Title" name="title" other={{ required: true, inputProps: { maxLength: 100 } }} />
-      <CustomTextField
-        label="Description"
-        name="description"
-        other={{ multiline: true, minRows: 3, inputProps: { maxLength: 2000 } }}
-      />
-      <CustomTextField label="Priority" name="priority" other={{ select: true, value: values.priority }}>
-        {PRIORITIES.map((value) => (
-          <MenuItem key={value} value={value}>
-            {value}
-          </MenuItem>
-        ))}
-      </CustomTextField>
-    </Stack>
-  );
-};
 
 /**
  * Dialog wrapper for creating tickets using the shared EditDialog pattern.
@@ -70,7 +32,7 @@ const CreateTicketForm = () => {
 export const CreateTicketDialog = (props: ICreateTicketDialogProps) => {
   const { open, onClose, onCreate, isSaving, error } = props;
 
-  const handleSave = async (values: ICreateTicketFormValues) => {
+  const handleSave = async (values: ITicketFormValues) => {
     await onCreate({
       title: values.title.trim(),
       description: values.description.trim() || null,
@@ -79,13 +41,13 @@ export const CreateTicketDialog = (props: ICreateTicketDialogProps) => {
   };
 
   return (
-    <EditDialog<ICreateTicketFormValues>
+    <EditDialog<ITicketFormValues>
       isLoading={isSaving}
       dialogTitle="Create Ticket"
-      dialogSaveButtonLabel="Create Ticket"
+      dialogSaveButtonLabel="Create"
       open={open}
       component={{
-        element: <CreateTicketForm />,
+        element: <TicketForm />,
         initialValues: CreateTicketFormInitialValues,
         validationSchema: CreateTicketFormYupSchema
       }}

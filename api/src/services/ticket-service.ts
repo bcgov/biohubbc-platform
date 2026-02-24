@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { v4 } from 'uuid';
 import { IDBConnection } from '../database/db';
-import { CreateTicketRequest, TeamFilters, Ticket, TicketStatus, TicketWithHistory, UpdateTicketRequest } from '../models/ticket';
+import { CreateTicketRequest, TeamFilters, Ticket, TicketWithHistory, UpdateTicketRequest } from '../models/ticket';
 import { TicketRepository } from '../repositories/ticket-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
@@ -123,7 +123,11 @@ export class TicketService extends DBService {
    * @return {Promise<Ticket[]>} Matching tickets.
    * @memberof TicketService
    */
-  async getTicketsByTeamId(teamId: string, filters?: TeamFilters, pagination?: ApiPaginationOptions): Promise<Ticket[]> {
+  async getTicketsByTeamId(
+    teamId: string,
+    filters?: TeamFilters,
+    pagination?: ApiPaginationOptions
+  ): Promise<Ticket[]> {
     return this.ticketRepository.getTicketsByTeamId(teamId, filters, pagination);
   }
 
