@@ -133,6 +133,23 @@ export class MockRes {
  *
  * @return {*}
  */
+/**
+ * Helper to create a properly typed QueryResult for mock responses.
+ *
+ * @param {T[]} rows The result rows
+ * @param {number} [rowCount] Optional row count override (defaults to rows.length)
+ * @return {*}  {QueryResult<any>}
+ */
+export function mockQueryResult<T>(rows: T[], rowCount?: number): QueryResult<any> {
+  return {
+    rowCount: rowCount ?? rows.length,
+    rows,
+    command: '',
+    oid: 0,
+    fields: []
+  };
+}
+
 export const getRequestHandlerMocks = () => {
   const mockReq = new MockReq() as ExtendedMockReq;
 

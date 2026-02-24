@@ -1,7 +1,8 @@
 import { mdiClose, mdiMagnify } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Autocomplete, IconButton, InputAdornment, TextField } from '@mui/material';
+import { Autocomplete, IconButton, InputAdornment } from '@mui/material';
 import { AutocompleteProps as MuiAutocompleteProps } from '@mui/material/Autocomplete';
+import CustomTextField from 'components/fields/CustomTextField';
 import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
 import { useState } from 'react';
 
@@ -53,7 +54,7 @@ export const SearchAutocomplete = ({
         }
       }}
       renderInput={(params) => (
-        <TextField
+        <CustomTextField
           {...params}
           placeholder={placeholder}
           InputProps={{

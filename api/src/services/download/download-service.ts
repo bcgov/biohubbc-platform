@@ -1,0 +1,70 @@
+import { IDBConnection } from '../../database/db';
+import { DownloadFeatureSummary, DownloadRecord } from '../../models/download';
+import { DownloadRepository } from '../../repositories/download/download-repository';
+import { DBService } from '../db-service';
+
+/**
+ * CRUD service for download records.
+ *
+ * Thin pass-through to DownloadRepository. Business logic and orchestration
+ * live in DownloadPipelineService.
+ *
+ * @export
+ * @class DownloadService
+ * @extends {DBService}
+ */
+export class DownloadService extends DBService {
+  downloadRepository: DownloadRepository;
+
+  constructor(connection: IDBConnection) {
+    super(connection);
+    this.downloadRepository = new DownloadRepository(connection);
+  }
+
+  /**
+   * Get a download record by ID.
+   *
+   * @param {string} downloadId - The download ID.
+   * @return {Promise<DownloadRecord | null>}
+   * @memberof DownloadService
+   */
+  async findDownloadById(downloadId: string): Promise<DownloadRecord | null> {
+    return this.downloadRepository.findDownloadById(downloadId);
+  }
+
+  /**
+   * Get all download records accessible to a user.
+   *
+   * @param {number} systemUserId - The user ID.
+   * @return {Promise<DownloadRecord[]>}
+   * @memberof DownloadService
+   */
+  async getDownloadsByTeamMembership(systemUserId: number): Promise<DownloadRecord[]> {
+    return this.downloadRepository.getDownloadsByTeamMembership(systemUserId);
+  }
+
+  /**
+   * Get lightweight summaries for all authorized features in a download.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {string | null} teamId - The team that owns the download. Null for anonymous downloads.
+   * @return {Promise<DownloadFeatureSummary[]>}
+   * @memberof DownloadService
+   */
+  async getDownloadFeatureSummaries(downloadId: string, teamId: string | null): Promise<DownloadFeatureSummary[]> {
+    return this.downloadRepository.getDownloadFeatureSummaries(downloadId, teamId);
+  }
+
+  /**
+   * Mark a download as downloaded after the client has retrieved all fragments.
+   *
+   * Sets `downloaded_at` timestamp and status to `downloaded` (AC #3).
+   *
+   * @param {string} downloadId - The download ID.
+   * @return {Promise<void>}
+   * @memberof DownloadService
+   */
+  async markDownloadAsDownloaded(downloadId: string): Promise<void> {
+    await this.downloadRepository.markDownloadAsDownloaded(downloadId);
+  }
+}

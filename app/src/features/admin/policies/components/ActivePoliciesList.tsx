@@ -11,7 +11,8 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
+import { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
+import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import EditDialog from 'components/dialog/EditDialog';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
@@ -19,15 +20,15 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
-import { IServerPaginationProps } from 'types/pagination';
 import { useState } from 'react';
+import { IServerPaginationProps } from 'types/pagination';
+import { transformApiToPolicyJson, transformPolicyJsonToApi } from '../utils/policyTransform';
 import {
   AddPolicyForm,
   AddPolicyFormInitialValues,
   AddPolicyFormYupSchema,
   IAddPolicyFormValues
 } from './AddPolicyForm';
-import { transformApiToPolicyJson, transformPolicyJsonToApi } from '../utils/policyTransform';
 
 /**
  * Props for the ActivePoliciesList component.
@@ -85,7 +86,6 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
     onSelectPolicy(newSelectedId);
   };
 
-  // Convert selectedPolicyId to DataGrid selection model format
   const rowSelectionModel: GridRowSelectionModel = {
     type: 'include',
     ids: selectedPolicyId ? new Set([selectedPolicyId]) : new Set()
@@ -383,9 +383,6 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
   return (
     <>
       <Container maxWidth="xl">
-        <Box mb={6}>
-          <Typography variant="h1">Manage Policies</Typography>
-        </Box>
         <Paper>
           <Toolbar disableGutters sx={{ px: 2 }}>
             <Typography variant="h4" component="h2" flexGrow={1}>
@@ -424,7 +421,7 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
 
           <Divider flexItem />
 
-          <DataGrid
+          <CustomDataGrid
             data-testid="active-policies-table"
             rows={policies}
             columns={columns}
@@ -445,19 +442,6 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
             disableColumnSelector
             disableColumnMenu
             localeText={{ noRowsLabel: 'No Policies' }}
-            sx={{
-              border: 'none',
-              '& .MuiDataGrid-columnHeaderTitle': {
-                fontWeight: 700,
-                textTransform: 'uppercase'
-              },
-              '& .MuiDataGrid-row.Mui-selected': {
-                backgroundColor: 'action.selected'
-              },
-              '& .MuiDataGrid-row.Mui-selected:hover': {
-                backgroundColor: 'action.selected'
-              }
-            }}
           />
         </Paper>
       </Container>
