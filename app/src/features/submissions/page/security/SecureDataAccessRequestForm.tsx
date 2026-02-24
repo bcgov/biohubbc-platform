@@ -2,8 +2,9 @@ import { DialogContentText, FormControl, FormControlLabel, FormHelperText, Radio
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
-import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
-import CustomTextField from 'components/fields/CustomTextField';
+import { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
+import CustomDataGrid from 'components/data-grid/CustomDataGrid';
+import CustomTextFieldFormik from 'components/fields/CustomTextFieldFormik';
 import { useFormikContext } from 'formik';
 import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import { ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
@@ -148,7 +149,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
         </Typography>
         <Box py={2}>
           <Box mb={1}>
-            <DataGrid
+            <CustomDataGrid
               sx={classes.dataGrid}
               getRowId={(row) => row.artifact_id}
               autoHeight
@@ -181,31 +182,13 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
         <Box py={2}>
           <Grid container spacing={3}>
             <Grid size={{ xs: 12 }}>
-              <CustomTextField
-                name="fullName"
-                label="Full Name"
-                other={{
-                  required: true
-                }}
-              />
+              <CustomTextFieldFormik name="fullName" label="Full Name" required />
             </Grid>
             <Grid size={{ xs: 6 }}>
-              <CustomTextField
-                name="emailAddress"
-                label="Email Address"
-                other={{
-                  required: true
-                }}
-              />
+              <CustomTextFieldFormik name="emailAddress" label="Email Address" required />
             </Grid>
             <Grid size={{ xs: 6 }}>
-              <CustomTextField
-                name="phoneNumber"
-                label="Phone Number"
-                other={{
-                  required: true
-                }}
-              />
+              <CustomTextFieldFormik name="phoneNumber" label="Phone Number" required />
             </Grid>
           </Grid>
         </Box>
@@ -217,11 +200,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
         </Typography>
         <DialogContentText variant="body1">Please be specific in describing your request.</DialogContentText>
         <Box py={2}>
-          <CustomTextField
-            name="reasonDescription"
-            label="Description"
-            other={{ multiline: true, required: true, rows: 4 }}
-          />
+          <CustomTextFieldFormik name="reasonDescription" label="Description" multiline required rows={4} />
         </Box>
       </Box>
 
@@ -263,49 +242,19 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
           <Box py={2}>
             <Grid container spacing={3}>
               <Grid size={{ xs: 12 }}>
-                <CustomTextField
-                  name="companyInformation.companyName"
-                  label="Company Name"
-                  other={{
-                    required: true
-                  }}
-                />
+                <CustomTextFieldFormik name="companyInformation.companyName" label="Company Name" required />
               </Grid>
               <Grid size={{ xs: 12 }}>
-                <CustomTextField
-                  name="companyInformation.jobTitle"
-                  label="Job/Position Title"
-                  other={{
-                    required: true
-                  }}
-                />
+                <CustomTextFieldFormik name="companyInformation.jobTitle" label="Job/Position Title" required />
               </Grid>
               <Grid size={{ xs: 12 }}>
-                <CustomTextField
-                  name="companyInformation.streetAddress"
-                  label="Street Address"
-                  other={{
-                    required: true
-                  }}
-                />
+                <CustomTextFieldFormik name="companyInformation.streetAddress" label="Street Address" required />
               </Grid>
               <Grid size={{ xs: 6 }}>
-                <CustomTextField
-                  name="companyInformation.city"
-                  label="City / Town"
-                  other={{
-                    required: true
-                  }}
-                />
+                <CustomTextFieldFormik name="companyInformation.city" label="City / Town" required />
               </Grid>
               <Grid size={{ xs: 6 }}>
-                <CustomTextField
-                  name="companyInformation.postalCode"
-                  label="Postal Code"
-                  other={{
-                    required: true
-                  }}
-                />
+                <CustomTextFieldFormik name="companyInformation.postalCode" label="Postal Code" required />
               </Grid>
             </Grid>
           </Box>
@@ -318,22 +267,10 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
             <Box py={2}>
               <Grid container spacing={3}>
                 <Grid size={{ xs: 6 }}>
-                  <CustomTextField
-                    name="professionalOrganization.organizationName"
-                    label="Organization Name"
-                    other={{
-                      required: false
-                    }}
-                  />
+                  <CustomTextFieldFormik name="professionalOrganization.organizationName" label="Organization Name" />
                 </Grid>
                 <Grid size={{ xs: 6 }}>
-                  <CustomTextField
-                    name="professionalOrganization.memberNumber"
-                    label="Member Number"
-                    other={{
-                      required: false
-                    }}
-                  />
+                  <CustomTextFieldFormik name="professionalOrganization.memberNumber" label="Member Number" />
                 </Grid>
               </Grid>
             </Box>

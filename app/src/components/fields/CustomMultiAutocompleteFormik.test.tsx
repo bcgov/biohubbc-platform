@@ -1,32 +1,30 @@
 import { Formik } from 'formik';
 import { render } from 'test-helpers/test-utils';
-import MultiAutocompleteField, {
-  IMultiAutocompleteFieldOption,
-  sortAutocompleteOptions
-} from './MultiAutocompleteField';
+import { sortAutocompleteOptions } from 'utils/autocomplete';
+import CustomMultiAutocompleteFormik from './CustomMultiAutocompleteFormik';
+import { ICustomMultiAutocompleteOption } from './CustomMultiAutocomplete';
 
-describe('MultiAutocompleteField', () => {
+describe('CustomMultiAutocompleteFormik', () => {
   it('renders correctly', () => {
     const { getByText } = render(
-      <Formik initialValues={[]} onSubmit={async () => {}}>
-        {() => (
-          <MultiAutocompleteField
-            id="id"
-            label="label"
-            options={[{ value: 'val', label: 'label' }]}
-            required={true}
-            filterLimit={1}
-          />
-        )}
+      <Formik initialValues={{ categories: [] }} onSubmit={async () => {}}>
+        <CustomMultiAutocompleteFormik
+          id="categories"
+          name="categories"
+          label="Categories"
+          options={[{ value: 'val', label: 'label' }]}
+          required={true}
+          filterLimit={1}
+        />
       </Formik>
     );
 
-    expect(getByText('label')).toBeVisible();
+    expect(getByText('Categories')).toBeVisible();
   });
 
-  describe('handleSortSelectedOption', () => {
+  describe('sortAutocompleteOptions', () => {
     it('retains selected options if no remaining options are given', () => {
-      const selected: IMultiAutocompleteFieldOption[] = [
+      const selected: ICustomMultiAutocompleteOption[] = [
         { value: 'value1', label: 'Value_1' },
         { value: 'value2', label: 'Value_2' },
         { value: 'value3', label: 'Value_3' }
@@ -37,13 +35,13 @@ describe('MultiAutocompleteField', () => {
     });
 
     it('combines selected and given options in sorted order', () => {
-      const selected: IMultiAutocompleteFieldOption[] = [
+      const selected: ICustomMultiAutocompleteOption[] = [
         { value: 'value1', label: 'Value_1' },
         { value: 'value2', label: 'Value_2' },
         { value: 'value3', label: 'Value_3' }
       ];
 
-      const optionsLeft: IMultiAutocompleteFieldOption[] = [
+      const optionsLeft: ICustomMultiAutocompleteOption[] = [
         { value: 'value4', label: 'Value_4' },
         { value: 'value5', label: 'Value_5' }
       ];
@@ -54,13 +52,13 @@ describe('MultiAutocompleteField', () => {
     });
 
     it('removes duplicate options from selected and given options', () => {
-      const selected: IMultiAutocompleteFieldOption[] = [
+      const selected: ICustomMultiAutocompleteOption[] = [
         { value: 'value1', label: 'Value_1' },
         { value: 'value2', label: 'Value_2' },
         { value: 'value3', label: 'Value_3' }
       ];
 
-      const optionsLeft: IMultiAutocompleteFieldOption[] = [
+      const optionsLeft: ICustomMultiAutocompleteOption[] = [
         { value: 'value2', label: 'Value_2' },
         { value: 'value3', label: 'Value_3' },
         { value: 'value4', label: 'Value_4' }
@@ -71,7 +69,7 @@ describe('MultiAutocompleteField', () => {
     });
 
     it('returns all given options if none are selected', () => {
-      const optionsLeft: IMultiAutocompleteFieldOption[] = [
+      const optionsLeft: ICustomMultiAutocompleteOption[] = [
         { value: 'value2', label: 'Value_2' },
         { value: 'value3', label: 'Value_3' },
         { value: 'value4', label: 'Value_4' }

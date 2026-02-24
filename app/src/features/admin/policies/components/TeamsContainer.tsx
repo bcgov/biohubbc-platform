@@ -8,7 +8,8 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
+import { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
+import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import EditDialog from 'components/dialog/EditDialog';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
@@ -394,7 +395,7 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
 
         <Divider flexItem />
 
-        <DataGrid
+        <CustomDataGrid
           data-testid="teams-table"
           rows={teams}
           columns={columns}
@@ -415,19 +416,6 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
           disableColumnSelector
           disableColumnMenu
           localeText={{ noRowsLabel: 'No Teams' }}
-          sx={{
-            border: 'none',
-            '& .MuiDataGrid-columnHeaderTitle': {
-              fontWeight: 700,
-              textTransform: 'uppercase'
-            },
-            '& .MuiDataGrid-row.Mui-selected': {
-              backgroundColor: 'action.selected'
-            },
-            '& .MuiDataGrid-row.Mui-selected:hover': {
-              backgroundColor: 'action.selected'
-            }
-          }}
         />
       </Box>
 
