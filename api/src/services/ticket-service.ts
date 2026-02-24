@@ -1,4 +1,3 @@
-import { randomInt } from 'crypto';
 import { v4 } from 'uuid';
 import { IDBConnection } from '../database/db';
 import { HTTP400 } from '../errors/http-error';
@@ -75,7 +74,7 @@ export class TicketService extends DBService {
     const utcYearStart = Date.UTC(now.getUTCFullYear(), 0, 0);
     const utcToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
     const dayOfYear = Math.floor((utcToday - utcYearStart) / (1000 * 60 * 60 * 24));
-    const randomSequence = randomInt(0, 100000);
+    const randomSequence = Math.floor(Math.random() * 100000);
 
     return `${dayOfYear.toString().padStart(3, '0')}${randomSequence.toString().padStart(5, '0')}`;
   }
@@ -192,7 +191,7 @@ export class TicketService extends DBService {
    */
   private async resolveTicketByRef(ticketRef: string): Promise<Ticket> {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const shortIdRegex = /^[0-9]{8}$/;
+    const shortIdRegex = /^\d{8}$/;
 
     if (uuidRegex.test(ticketRef)) {
       return this.ticketRepository.getTicketById(ticketRef);

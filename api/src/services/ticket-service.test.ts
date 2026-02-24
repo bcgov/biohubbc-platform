@@ -48,7 +48,7 @@ describe('TicketService', () => {
         sinon.match({
           title: 'A ticket',
           team_id: mockTicket.team_id,
-          ticket_short_id: sinon.match(/^[0-9]{8}$/)
+          ticket_short_id: sinon.match(/^\d{8}$/)
         })
       );
       expect(insertHistoryStub).to.have.been.calledWith(mockTicket.ticket_id, 'OPEN');
@@ -77,7 +77,7 @@ describe('TicketService', () => {
         sinon.match({
           title: 'A ticket',
           team_id: generatedTeamId,
-          ticket_short_id: sinon.match(/^[0-9]{8}$/)
+          ticket_short_id: sinon.match(/^\d{8}$/)
         })
       );
       expect(insertHistoryStub).to.have.been.calledWith(createdTicket.ticket_id, 'OPEN');
