@@ -42,23 +42,23 @@ export interface AuthorizeBySystemUser {
 export type TeamAuthorizationEntity =
   | {
       entity: 'team';
-      id: string;
+      teamId: string;
     }
   | {
       entity: 'policy';
-      id: string;
+      policyId: string;
     }
   | {
       entity: 'ticket';
-      id: string;
+      ticketId: string;
     }
   | {
       entity: 'data_request';
-      id: string;
+      dataRequestId: string;
     }
   | {
       entity: 'submission_feature';
-      id: number;
+      submissionFeatureId: number;
       submissionId?: number;
     };
 
@@ -268,7 +268,7 @@ export class AuthorizationService extends DBService {
       case 'team': {
         const query = knex('team_member as tm')
           .select('tm.team_member_id')
-          .where('tm.team_id', entity.id)
+          .where('tm.team_id', entity.teamId)
           .where('tm.system_user_id', systemUserId)
           .whereNull('tm.record_end_date')
           .limit(1);
@@ -281,7 +281,7 @@ export class AuthorizationService extends DBService {
         const query = knex('team_policy as tp')
           .select('tp.team_policy_id')
           .innerJoin('team_member as tm', 'tm.team_id', 'tp.team_id')
-          .where('tp.policy_id', entity.id)
+          .where('tp.policy_id', entity.policyId)
           .where('tm.system_user_id', systemUserId)
           .whereNull('tp.record_end_date')
           .whereNull('tm.record_end_date')
@@ -295,7 +295,7 @@ export class AuthorizationService extends DBService {
         const query = knex('ticket as t')
           .select('t.ticket_id')
           .innerJoin('team_member as tm', 'tm.team_id', 't.team_id')
-          .where('t.ticket_id', entity.id)
+          .where('t.ticket_id', entity.ticketId)
           .where('tm.system_user_id', systemUserId)
           .whereNull('t.record_end_date')
           .whereNull('tm.record_end_date')
@@ -309,7 +309,7 @@ export class AuthorizationService extends DBService {
         const query = knex('data_request as dr')
           .select('dr.data_request_id')
           .innerJoin('team_member as tm', 'tm.team_id', 'dr.team_id')
-          .where('dr.data_request_id', entity.id)
+          .where('dr.data_request_id', entity.dataRequestId)
           .where('tm.system_user_id', systemUserId)
           .whereNull('dr.record_end_date')
           .whereNull('tm.record_end_date')
@@ -321,7 +321,7 @@ export class AuthorizationService extends DBService {
 
       case 'submission_feature': {
         const submissionService = new SubmissionService(this.connection);
-        const feature = await submissionService.getSubmissionFeatureById(entity.id);
+        const feature = await submissionService.getSubmissionFeatureById(entity.submissionFeatureId);
 
         if (!feature.secured) {
           return true;

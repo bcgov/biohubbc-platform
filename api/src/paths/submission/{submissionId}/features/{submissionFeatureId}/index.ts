@@ -16,7 +16,7 @@ export const GET: Operation = [
         {
           discriminator: 'Team',
           entity: 'submission_feature',
-          id: Number(req.params.submissionFeatureId),
+          submissionFeatureId: Number(req.params.submissionFeatureId),
           submissionId: Number(req.params.submissionId)
         }
       ]

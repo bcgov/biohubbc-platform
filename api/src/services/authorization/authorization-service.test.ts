@@ -505,13 +505,14 @@ describe('authorizeByTeam', function () {
   it('returns true immediately if feature is not secured', async function () {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(SubmissionService.prototype, 'getSubmissionFeatureById').resolves({ ...fakeFeature, secured: false });
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
     const result = await authorizationService.authorizeByTeam({
       discriminator: 'Team',
       entity: 'submission_feature',
-      id: 1,
+      submissionFeatureId: 1,
       submissionId: 1
     });
 
@@ -521,13 +522,14 @@ describe('authorizeByTeam', function () {
   it('returns false if submission ID does not match', async function () {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(SubmissionService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
     const result = await authorizationService.authorizeByTeam({
       discriminator: 'Team',
       entity: 'submission_feature',
-      id: 1,
+      submissionFeatureId: 1,
       submissionId: 999
     });
 
@@ -544,7 +546,7 @@ describe('authorizeByTeam', function () {
     const result = await authorizationService.authorizeByTeam({
       discriminator: 'Team',
       entity: 'submission_feature',
-      id: 1,
+      submissionFeatureId: 1,
       submissionId: 1
     });
 
@@ -562,7 +564,7 @@ describe('authorizeByTeam', function () {
     const result = await authorizationService.authorizeByTeam({
       discriminator: 'Team',
       entity: 'submission_feature',
-      id: 1,
+      submissionFeatureId: 1,
       submissionId: 1
     });
 
@@ -580,7 +582,7 @@ describe('authorizeByTeam', function () {
     const result = await authorizationService.authorizeByTeam({
       discriminator: 'Team',
       entity: 'submission_feature',
-      id: 1,
+      submissionFeatureId: 1,
       submissionId: 1
     });
 
