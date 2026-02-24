@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { v4 } from 'uuid';
 import { IDBConnection } from '../database/db';
 import { HTTP400 } from '../errors/http-error';
@@ -74,7 +75,7 @@ export class TicketService extends DBService {
     const utcYearStart = Date.UTC(now.getUTCFullYear(), 0, 0);
     const utcToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
     const dayOfYear = Math.floor((utcToday - utcYearStart) / (1000 * 60 * 60 * 24));
-    const randomSequence = Math.floor(Math.random() * 100000);
+    const randomSequence = randomInt(0, 100000);
 
     return `${dayOfYear.toString().padStart(3, '0')}${randomSequence.toString().padStart(5, '0')}`;
   }
