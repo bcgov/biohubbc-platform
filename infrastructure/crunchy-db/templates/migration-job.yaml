@@ -1,0 +1,163 @@
+{{- if .Values.migration.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: biohub-platform-db-migration
+  labels:
+    app: biohub-platform-db-migration
+    role: migration
+  annotations:
+    # Ensures this job is not re-created on subsequent helm upgrades unless explicitly enabled
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  # Allow up to 30 minutes for the migration
+  activeDeadlineSeconds: 1800
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app: biohub-platform-db-migration
+        role: migration
+    spec:
+      restartPolicy: Never
+      initContainers:
+        # Wait for the old database to be reachable
+        - name: wait-for-old-db
+          image: postgres:17-alpine
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Waiting for old database to be ready at {{ .Values.migration.oldDb.host }}..."
+              until pg_isready -h {{ .Values.migration.oldDb.host }} -p 5432 -U $OLD_DB_ADMIN; do
+                echo "Old database not ready, waiting..."
+                sleep 5
+              done
+              echo "Old database is ready."
+          env:
+            - name: OLD_DB_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.migration.oldDb.secretName }}
+                  key: {{ .Values.migration.oldDb.adminKey }}
+        # Wait for the new Crunchy DB to be ready (host from postgres secret = primary)
+        - name: wait-for-new-db
+          image: postgres:17-alpine
+          command: ['sh', '-c']
+          args:
+            - |
+              echo "Waiting for Crunchy DB at $NEW_DB_HOST:5432..."
+              until pg_isready -h "$NEW_DB_HOST" -p 5432 -U $NEW_DB_ADMIN; do
+                echo "Crunchy DB not ready, waiting..."
+                sleep 5
+              done
+              echo "Crunchy DB is ready."
+          env:
+            - name: NEW_DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-pguser-postgres
+                  key: host
+            - name: NEW_DB_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-pguser-postgres
+                  key: user
+      containers:
+        - name: migrate
+          image: postgres:17-alpine
+          command: ['sh', '-c']
+          args:
+            - |
+              set -e
+
+              echo "=== Starting database migration ==="
+              echo "Source: $OLD_DB_HOST / $OLD_DB_NAME"
+              echo "Target: $NEW_DB_HOST / $NEW_DB_NAME"
+
+              echo "--- Running pg_dump from old database and restoring into Crunchy ---"
+              PGPASSWORD=$OLD_DB_ADMIN_PASS pg_dump \
+                -h $OLD_DB_HOST \
+                -p 5432 \
+                -U $OLD_DB_ADMIN \
+                -d $OLD_DB_NAME \
+                --no-owner \
+                --no-acl \
+                --format=custom \
+                -f /tmp/migration.dump
+
+              echo "--- Dump complete, size: $(du -sh /tmp/migration.dump | cut -f1) ---"
+
+              echo "--- Pre-restore: drop extensions and pgboss schema with CASCADE so pg_restore --clean does not fail ---"
+              export PGSSLMODE=require
+              PGPASSWORD=$NEW_DB_ADMIN_PASS psql -h "$NEW_DB_HOST" -p 5432 -U $NEW_DB_ADMIN -d $NEW_DB_NAME -v ON_ERROR_STOP=0 -c "
+                DROP EXTENSION IF EXISTS postgis_tiger_geocoder CASCADE;
+                DROP EXTENSION IF EXISTS postgis_topology CASCADE;
+                DROP EXTENSION IF EXISTS postgis_raster CASCADE;
+                DROP EXTENSION IF EXISTS postgis_sfcgal CASCADE;
+                DROP EXTENSION IF EXISTS postgis CASCADE;
+                DROP EXTENSION IF EXISTS fuzzystrmatch CASCADE;
+                DROP EXTENSION IF EXISTS pgrouting CASCADE;
+                DROP SCHEMA IF EXISTS pgboss CASCADE;
+              "
+
+              echo "--- Restoring into Crunchy database (postgres superuser required for extensions/schema) ---"
+              PGPASSWORD=$NEW_DB_ADMIN_PASS pg_restore \
+                -h "$NEW_DB_HOST" \
+                -p 5432 \
+                -U $NEW_DB_ADMIN \
+                -d $NEW_DB_NAME \
+                --no-owner \
+                --no-acl \
+                --clean \
+                --if-exists \
+                /tmp/migration.dump
+
+              echo "=== Migration complete ==="
+          env:
+            - name: OLD_DB_HOST
+              value: {{ .Values.migration.oldDb.host }}
+            - name: OLD_DB_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.migration.oldDb.secretName }}
+                  key: {{ .Values.migration.oldDb.adminKey }}
+            - name: OLD_DB_ADMIN_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.migration.oldDb.secretName }}
+                  key: {{ .Values.migration.oldDb.passwordKey }}
+            - name: OLD_DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.migration.oldDb.secretName }}
+                  key: {{ .Values.migration.oldDb.dbNameKey }}
+            - name: NEW_DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-pguser-postgres
+                  key: host
+            - name: NEW_DB_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-pguser-postgres
+                  key: user
+            - name: NEW_DB_ADMIN_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-pguser-postgres
+                  key: password
+            - name: NEW_DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-pguser-{{ .Release.Name }}
+                  key: dbname
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+{{- end }}
