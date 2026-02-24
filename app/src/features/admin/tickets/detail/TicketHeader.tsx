@@ -28,11 +28,11 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
           <Link component={RouterLink} to="/admin/tickets" underline="hover" color="inherit">
             Tickets
           </Link>
-          <Typography color="text.primary">{ticket ? `Ticket #${ticket.ticket_short_id}` : 'Ticket'}</Typography>
+          <Typography color="text.primary">{ticket ? `Ticket #${ticket.ticket_slug}` : 'Ticket'}</Typography>
         </Breadcrumbs>
 
         <Stack direction="row" spacing={2} alignItems="center">
-          <Typography variant="h1">{ticket ? `Ticket #${ticket.ticket_short_id}` : 'Ticket'}</Typography>
+          <Typography variant="h1">{ticket ? `Ticket #${ticket.ticket_slug}` : 'Ticket'}</Typography>
           {ticket?.status && (
             <Chip
               label={ticket.status === 'OPEN' ? 'Open' : 'Closed'}

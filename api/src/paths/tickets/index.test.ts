@@ -11,8 +11,7 @@ chai.use(sinonChai);
 describe('paths/tickets', () => {
   const mockTicket = {
     ticket_id: '11111111-1111-1111-1111-111111111111',
-    ticket_number: 1,
-    ticket_short_id: '04900001',
+    ticket_slug: '04900001',
     title: 'A ticket',
     description: 'desc',
     team_id: '22222222-2222-2222-2222-222222222222',
@@ -57,13 +56,13 @@ describe('paths/tickets', () => {
 
     await getTickets()(mockReq, mockRes, mockNext);
 
-    expect(listStub).to.have.been.calledWith(mockTicket.team_id, 'OPEN', {
+    expect(listStub).to.have.been.calledWith(mockTicket.team_id, { status: 'OPEN' }, {
       page: 2,
       limit: 10,
       sort: undefined,
       order: undefined
     });
-    expect(countStub).to.have.been.calledWith(mockTicket.team_id, 'OPEN');
+    expect(countStub).to.have.been.calledWith(mockTicket.team_id, { status: 'OPEN' });
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql({
       tickets: [mockTicket],
@@ -90,18 +89,18 @@ describe('paths/tickets', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { page: '1', limit: '10' };
-    const noTeamFilter = undefined;
-    const noStatusFilter = undefined;
+    const noTeamFilter = '';
+    const noFilters = { status: undefined };
 
     await getTickets()(mockReq, mockRes, mockNext);
 
-    expect(listStub).to.have.been.calledWith(noTeamFilter, noStatusFilter, {
+    expect(listStub).to.have.been.calledWith(noTeamFilter, noFilters, {
       page: 1,
       limit: 10,
       sort: undefined,
       order: undefined
     });
-    expect(countStub).to.have.been.calledWith(noTeamFilter, noStatusFilter);
+    expect(countStub).to.have.been.calledWith(noTeamFilter, noFilters);
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql({
       tickets: [mockTicket],

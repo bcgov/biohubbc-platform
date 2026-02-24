@@ -13,7 +13,7 @@ import { ITicket } from 'interfaces/useTicketsApi.interface';
 
 interface ITicketCardProps {
   ticket: ITicket;
-  onClick: (ticketRef: string) => void;
+  onClick: (ticketId: string) => void;
 }
 
 /**
@@ -45,7 +45,7 @@ export const TicketCard = (props: ITicketCardProps) => {
 
   return (
     <Card elevation={0}>
-      <CardActionArea onClick={() => onClick(ticket.ticket_short_id)} data-testid={`ticket-card-${ticket.ticket_id}`}>
+      <CardActionArea onClick={() => onClick(ticket.ticket_id)} data-testid={`ticket-card-${ticket.ticket_id}`}>
         <CardContent>
           <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2}>
             <Stack gap={0.5}>
@@ -56,7 +56,7 @@ export const TicketCard = (props: ITicketCardProps) => {
                 {ticket.description || 'No description provided.'}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Ticket #{ticket.ticket_short_id} • Team: {ticket.team_id}
+                Ticket #{ticket.ticket_slug} • Team: {ticket.team_id}
               </Typography>
             </Stack>
             <Stack direction="row" gap={1} alignItems="center">

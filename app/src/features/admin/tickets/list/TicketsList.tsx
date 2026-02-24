@@ -24,7 +24,7 @@ interface ITicketsListProps {
   isLoading: boolean;
   emptyTitle: string;
   emptyMessage: string;
-  onTicketClick: (ticketRef: string) => void;
+  onTicketClick: (ticketId: string) => void;
 }
 
 interface ITicketsNoRowsOverlayProps extends HTMLAttributes<HTMLDivElement> {
@@ -101,7 +101,7 @@ export const TicketsList = (props: ITicketsListProps) => {
   const columns = useMemo<GridColDef<ITicket>[]>(
     () => [
       {
-        field: 'ticket_short_id',
+        field: 'ticket_slug',
         headerName: 'Ticket ID',
         minWidth: 130,
         flex: 0.8,
@@ -174,14 +174,6 @@ export const TicketsList = (props: ITicketsListProps) => {
           </Typography>
         )
       },
-      {
-        field: 'ticket_number',
-        headerName: 'Ticket #',
-        minWidth: 120,
-        flex: 0.8,
-        sortable: false,
-        renderCell: (params) => <Typography variant="body2">{params.value}</Typography>
-      }
     ],
     [priorityConfig]
   );
@@ -207,7 +199,7 @@ export const TicketsList = (props: ITicketsListProps) => {
         disableColumnSelector
         disableDensitySelector
         disableRowSelectionOnClick
-        onRowClick={(params) => onTicketClick(params.row.ticket_short_id)}
+        onRowClick={(params) => onTicketClick(params.row.ticket_id)}
         slots={{
           noRowsOverlay: TicketsNoRowsOverlay
         }}

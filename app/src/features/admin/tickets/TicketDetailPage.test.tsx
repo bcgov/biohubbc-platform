@@ -11,8 +11,7 @@ const mockUseApi = useApi as Mock;
 
 const ticket = {
   ticket_id: '11111111-1111-1111-1111-111111111111',
-  ticket_number: 42,
-  ticket_short_id: '04900042',
+  ticket_slug: '04900042',
   title: 'Test Ticket',
   description: 'Test description',
   team_id: '22222222-2222-2222-2222-222222222222',
@@ -68,7 +67,7 @@ describe('TicketDetailPage', () => {
 
   const renderPage = () =>
     render(
-      <MemoryRouter initialEntries={[`/admin/tickets/${ticket.ticket_short_id}`]}>
+      <MemoryRouter initialEntries={[`/admin/tickets/${ticket.ticket_id}`]}>
         <Routes>
           <Route path="/admin/tickets/:ticketId" element={<TicketDetailPage />} />
         </Routes>
@@ -79,7 +78,7 @@ describe('TicketDetailPage', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(mockGetTicket).toHaveBeenCalledWith(ticket.ticket_short_id);
+      expect(mockGetTicket).toHaveBeenCalledWith(ticket.ticket_id);
       expect(mockGetTeam).toHaveBeenCalledWith(ticket.team_id);
     });
   });
@@ -108,7 +107,7 @@ describe('TicketDetailPage', () => {
     fireEvent.click(getByTestId('close-ticket-button'));
 
     await waitFor(() => {
-      expect(mockUpdateTicketStatus).toHaveBeenCalledWith(ticket.ticket_short_id, 'CLOSED');
+      expect(mockUpdateTicketStatus).toHaveBeenCalledWith(ticket.ticket_id, 'CLOSED');
     });
   });
 });

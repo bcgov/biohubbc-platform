@@ -49,10 +49,9 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE TABLE ticket (
       ticket_id uuid DEFAULT gen_random_uuid() NOT NULL,
-      ticket_number integer GENERATED ALWAYS AS IDENTITY,
-      ticket_short_id varchar(8) NOT NULL,
+      ticket_slug varchar(8) NOT NULL,
       title varchar(100) NOT NULL,
-      description varchar(2000),
+      description varchar(2000) NULL,
       team_id uuid NOT NULL,
       priority ticket_priority NOT NULL DEFAULT 'MEDIUM',
       status ticket_status NOT NULL DEFAULT 'OPEN',
@@ -64,14 +63,12 @@ export async function up(knex: Knex): Promise<void> {
       revision_count integer DEFAULT 0 NOT NULL,
       CONSTRAINT ticket_pk PRIMARY KEY (ticket_id),
       CONSTRAINT ticket_team_fk FOREIGN KEY (team_id) REFERENCES team(team_id),
-      CONSTRAINT ticket_number_unique UNIQUE (ticket_number),
-      CONSTRAINT ticket_short_id_unique UNIQUE (ticket_short_id),
-      CONSTRAINT ticket_short_id_format_chk CHECK (ticket_short_id ~ '^[0-9]{8}$')
+      CONSTRAINT ticket_slug_unique UNIQUE (ticket_slug),
+      CONSTRAINT ticket_slug_format_chk CHECK (ticket_slug ~ '^[0-9]{8}$')
     );
 
     CREATE INDEX ticket_team_idx ON ticket(team_id);
     CREATE INDEX ticket_priority_idx ON ticket(priority);
-    CREATE INDEX ticket_number_idx ON ticket(ticket_number);
     CREATE INDEX ticket_active_team_status_idx
       ON ticket(team_id, status, create_date DESC)
       WHERE record_end_date IS NULL;
@@ -79,10 +76,9 @@ export async function up(knex: Knex): Promise<void> {
       ON ticket(team_id, create_date DESC)
       WHERE record_end_date IS NULL AND status = 'OPEN';
 
-    COMMENT ON TABLE ticket IS 'Coordination ticket for admin actions requiring review. Each ticket has a unique number and URL. Access controlled by team membership - team members and system admins can view.';
+    COMMENT ON TABLE ticket IS 'Coordination ticket for admin actions requiring review. Each ticket has a unique slug and URL. Access controlled by team membership - team members and system admins can view.';
     COMMENT ON COLUMN ticket.ticket_id IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN ticket.ticket_number IS 'Human-readable sequential ticket number for URLs (e.g., /tickets/123).';
-    COMMENT ON COLUMN ticket.ticket_short_id IS '8-digit short identifier in DDDNNNNN format where DDD is UTC day-of-year and NNNNN is per-day sequence.';
+    COMMENT ON COLUMN ticket.ticket_slug IS '8-digit slug in DDDNNNNN format where DDD is UTC day-of-year and NNNNN is per-day sequence.';
     COMMENT ON COLUMN ticket.title IS 'Brief title describing the ticket purpose.';
     COMMENT ON COLUMN ticket.description IS 'Detailed description of what this ticket is for.';
     COMMENT ON COLUMN ticket.team_id IS 'Foreign key to the team. Determines access control - team members and system admins can view this ticket.';
@@ -474,7 +470,7 @@ export async function down(knex: Knex): Promise<void> {
 
     -- Drop ticket tables
     ALTER TABLE ticket DROP COLUMN IF EXISTS status;
-    ALTER TABLE ticket DROP COLUMN IF EXISTS ticket_short_id;
+    ALTER TABLE ticket DROP COLUMN IF EXISTS ticket_slug;
     DROP TABLE IF EXISTS ticket_reference;
     DROP TABLE IF EXISTS ticket_comment;
     DROP TABLE IF EXISTS ticket;

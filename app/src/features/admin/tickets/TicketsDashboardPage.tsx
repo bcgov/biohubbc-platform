@@ -11,7 +11,7 @@ import Typography from '@mui/material/Typography';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { IGetTicketsResponse, ITicket } from 'interfaces/useTicketsApi.interface';
+import { ICreateTicketRequest, IGetTicketsResponse, ITicket } from 'interfaces/useTicketsApi.interface';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CreateTicketDialog } from './components/dialog/CreateTicketDialog';
@@ -57,11 +57,7 @@ export const TicketsDashboardPage = () => {
   const tickets: ITicket[] = response?.tickets ?? [];
   const totalTickets = response?.pagination.total ?? 0;
 
-  const handleCreateTicket = async (payload: {
-    title: string;
-    description?: string;
-    priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  }) => {
+  const handleCreateTicket = async (payload: ICreateTicketRequest) => {
     try {
       setIsSaving(true);
       setError(undefined);
@@ -77,7 +73,7 @@ export const TicketsDashboardPage = () => {
         order: 'desc'
       });
 
-      navigate(`/admin/tickets/${createdTicket.ticket_short_id}`);
+      navigate(`/admin/tickets/${createdTicket.ticket_id}`);
     } catch (caughtError) {
       const apiError = caughtError as APIError;
       setCreateError(apiError.message || 'Failed to create ticket.');
@@ -131,7 +127,7 @@ export const TicketsDashboardPage = () => {
           <TicketsList
             tickets={tickets}
             isLoading={ticketsLoader.isLoading}
-            onTicketClick={(ticketRef) => navigate(`/admin/tickets/${ticketRef}`)}
+            onTicketClick={(ticketId) => navigate(`/admin/tickets/${ticketId}`)}
             emptyTitle="No tickets"
             emptyMessage="There are no tickets matching your filters."
           />

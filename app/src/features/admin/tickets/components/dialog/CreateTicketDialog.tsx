@@ -73,7 +73,7 @@ export const CreateTicketDialog = (props: ICreateTicketDialogProps) => {
   const handleSave = async (values: ICreateTicketFormValues) => {
     await onCreate({
       title: values.title.trim(),
-      description: values.description.trim() || undefined,
+      description: values.description.trim() || null,
       priority: values.priority
     });
   };

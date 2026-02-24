@@ -6,10 +6,13 @@ export type TicketPriority = z.infer<typeof TicketPriority>;
 export const TicketStatus = z.enum(['OPEN', 'CLOSED']);
 export type TicketStatus = z.infer<typeof TicketStatus>;
 
+export interface TeamFilters {
+  status?: TicketStatus;
+}
+
 export const Ticket = z.object({
   ticket_id: z.string().uuid(),
-  ticket_number: z.number(),
-  ticket_short_id: z.string().regex(/^\d{8}$/),
+  ticket_slug: z.string().regex(/^\d{8}$/),
   title: z.string(),
   description: z.string().nullable(),
   team_id: z.string().uuid(),
@@ -33,7 +36,7 @@ export type TicketWithHistory = z.infer<typeof TicketWithHistory>;
 
 export const CreateTicketRequest = z.object({
   title: z.string().max(100),
-  description: z.string().max(2000).optional(),
+  description: z.string().max(2000).nullable().optional(),
   team_id: z.string().uuid().optional(),
   priority: TicketPriority.optional()
 });
@@ -42,7 +45,7 @@ export type CreateTicketRequest = z.infer<typeof CreateTicketRequest>;
 
 export const UpdateTicketRequest = z.object({
   title: z.string().max(100).optional(),
-  description: z.string().max(2000).optional(),
+  description: z.string().max(2000).nullable().optional(),
   priority: TicketPriority.optional(),
   status: TicketStatus.optional()
 });

@@ -17,8 +17,7 @@ describe('TicketRepository', () => {
 
   const mockTicket: Ticket = {
     ticket_id: '11111111-1111-1111-1111-111111111111',
-    ticket_number: 1,
-    ticket_short_id: '04900001',
+    ticket_slug: '04900001',
     title: 'A ticket',
     description: 'desc',
     team_id: '22222222-2222-2222-2222-222222222222',
@@ -36,7 +35,7 @@ describe('TicketRepository', () => {
         await repo.insertTicket({
           title: 'A',
           team_id: mockTicket.team_id,
-          ticket_short_id: mockTicket.ticket_short_id
+          ticket_slug: mockTicket.ticket_slug
         });
         expect.fail();
       } catch (error) {
@@ -53,7 +52,7 @@ describe('TicketRepository', () => {
       const result = await repo.insertTicket({
         title: 'A',
         team_id: mockTicket.team_id,
-        ticket_short_id: mockTicket.ticket_short_id
+        ticket_slug: mockTicket.ticket_slug
       });
       expect(result).to.eql(mockTicket);
     });
@@ -84,38 +83,13 @@ describe('TicketRepository', () => {
     });
   });
 
-  describe('getTicketByShortId', () => {
-    it('throws when not found', async () => {
-      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
-      const repo = new TicketRepository(mockDBConnection);
-
-      try {
-        await repo.getTicketByShortId(mockTicket.ticket_short_id);
-        expect.fail();
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiExecuteSQLError);
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get ticket record');
-      }
-    });
-
-    it('returns ticket when found', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [mockTicket] } as any as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
-      const repo = new TicketRepository(mockDBConnection);
-
-      const result = await repo.getTicketByShortId(mockTicket.ticket_short_id);
-      expect(result).to.eql(mockTicket);
-    });
-  });
-
   describe('getTicketsByTeamId', () => {
     it('returns matching tickets', async () => {
       const mockQueryResponse = { rowCount: 1, rows: [mockTicket] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
       const repo = new TicketRepository(mockDBConnection);
 
-      const result = await repo.getTicketsByTeamId(mockTicket.team_id, 'OPEN', { page: 1, limit: 10 });
+      const result = await repo.getTicketsByTeamId(mockTicket.team_id, { status: 'OPEN' }, { page: 1, limit: 10 });
       expect(result).to.eql([mockTicket]);
     });
   });
@@ -126,7 +100,7 @@ describe('TicketRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
       const repo = new TicketRepository(mockDBConnection);
 
-      const result = await repo.getTicketsByTeamIdCount(mockTicket.team_id, 'OPEN');
+      const result = await repo.getTicketsByTeamIdCount(mockTicket.team_id, { status: 'OPEN' });
       expect(result).to.equal(7);
     });
   });

@@ -122,7 +122,7 @@ const ensureTicket = async (
 
   const [created] = await knex('ticket')
     .insert({
-      ticket_short_id: await generateUniqueTicketShortId(knex),
+      ticket_slug: await generateUniqueTicketSlug(knex),
       title: input.title,
       description: input.description,
       team_id: input.teamId,
@@ -136,9 +136,9 @@ const ensureTicket = async (
 };
 
 /**
- * Generate an unused DDDNNNNN ticket short ID.
+ * Generate an unused DDDNNNNN ticket slug.
  */
-const generateUniqueTicketShortId = async (knex: Knex): Promise<string> => {
+const generateUniqueTicketSlug = async (knex: Knex): Promise<string> => {
   const now = new Date();
   const utcYearStart = Date.UTC(now.getUTCFullYear(), 0, 0);
   const utcToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
@@ -151,14 +151,14 @@ const generateUniqueTicketShortId = async (knex: Knex): Promise<string> => {
       .padStart(5, '0');
     const candidate = `${dayPrefix}${randomDigits}`;
 
-    const existing = await knex('ticket').where({ ticket_short_id: candidate }).first();
+    const existing = await knex('ticket').where({ ticket_slug: candidate }).first();
 
     if (!existing) {
       return candidate;
     }
   }
 
-  throw new Error('Unable to generate a unique ticket_short_id for seed data');
+  throw new Error('Unable to generate a unique ticket_slug for seed data');
 };
 
 /**

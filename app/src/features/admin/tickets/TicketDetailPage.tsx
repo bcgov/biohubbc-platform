@@ -22,7 +22,7 @@ import { TicketTimeline } from './detail/TicketTimeline';
  */
 export const TicketDetailPage = () => {
   const api = useApi();
-  const { ticketId: ticketRef } = useParams<{ ticketId: string }>();
+  const { ticketId } = useParams<{ ticketId: string }>();
 
   const ticketLoader = useDataLoader((ticketId: string) => api.tickets.getTicket(ticketId));
   const teamLoader = useDataLoader((teamId: string) => api.teams.getTeam(teamId));
@@ -32,12 +32,12 @@ export const TicketDetailPage = () => {
   const [error, setError] = useState<string | undefined>();
 
   useEffect(() => {
-    if (!ticketRef) {
+    if (!ticketId) {
       return;
     }
 
-    ticketLoader.load(ticketRef);
-  }, [ticketRef, ticketLoader]);
+    ticketLoader.load(ticketId);
+  }, [ticketId, ticketLoader]);
 
   const ticket: ITicketWithHistory | undefined = ticketLoader.data;
   const ticketTeam: ITeamWithMembers | undefined = teamLoader.data;
@@ -51,15 +51,15 @@ export const TicketDetailPage = () => {
   }, [ticket?.team_id, teamLoader]);
 
   const refreshTicketData = async () => {
-    if (!ticketRef) {
+    if (!ticketId) {
       return;
     }
 
-    await ticketLoader.refresh(ticketRef);
+    await ticketLoader.refresh(ticketId);
   };
 
   const handleUpdateStatus = async (status: TicketStatus) => {
-    if (!ticket || !ticketRef) {
+    if (!ticket || !ticketId) {
       return;
     }
 
@@ -67,7 +67,7 @@ export const TicketDetailPage = () => {
       setIsSaving(true);
       setError(undefined);
 
-      await api.tickets.updateTicketStatus(ticketRef, status);
+      await api.tickets.updateTicketStatus(ticketId, status);
 
       await refreshTicketData();
     } catch (caughtError) {
@@ -78,7 +78,7 @@ export const TicketDetailPage = () => {
     }
   };
 
-  if (!ticketRef) {
+  if (!ticketId) {
     return null;
   }
 

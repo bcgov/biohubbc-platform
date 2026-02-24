@@ -127,13 +127,14 @@ export function getTickets(): RequestHandler {
       await connection.open();
 
       const ticketService = new TicketService(connection);
-      const teamId = req.query.team_id as string | undefined;
+      const teamId = (req.query.team_id as string | undefined) ?? '';
       const status = req.query.status as 'OPEN' | 'CLOSED' | undefined;
       const pagination = makePaginationOptionsFromRequest(req);
+      const filters = { status };
 
       const [tickets, count] = await Promise.all([
-        ticketService.getTicketsByTeamId(teamId, status, ensureCompletePaginationOptions(pagination)),
-        ticketService.getTicketsByTeamIdCount(teamId, status)
+        ticketService.getTicketsByTeamId(teamId, filters, ensureCompletePaginationOptions(pagination)),
+        ticketService.getTicketsByTeamIdCount(teamId, filters)
       ]);
 
       await connection.commit();

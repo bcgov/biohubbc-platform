@@ -6,11 +6,10 @@ const TicketStatusEnum = ['OPEN', 'CLOSED'];
 
 export const TicketSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['ticket_id', 'ticket_number', 'ticket_short_id', 'title', 'team_id', 'priority', 'status'],
+  required: ['ticket_id', 'ticket_slug', 'title', 'team_id', 'priority', 'status'],
   properties: {
     ticket_id: { type: 'string', format: 'uuid' },
-    ticket_number: { type: 'integer' },
-    ticket_short_id: { type: 'string', minLength: 8, maxLength: 8, pattern: '^[0-9]{8}$' },
+    ticket_slug: { type: 'string', minLength: 8, maxLength: 8, pattern: '^\\d{8}$' },
     title: { type: 'string', maxLength: 100 },
     description: { type: 'string', maxLength: 2000, nullable: true },
     team_id: { type: 'string', format: 'uuid' },
@@ -21,11 +20,10 @@ export const TicketSchema: OpenAPIV3.SchemaObject = {
 
 export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['ticket_id', 'ticket_number', 'ticket_short_id', 'title', 'team_id', 'priority', 'status', 'history'],
+  required: ['ticket_id', 'ticket_slug', 'title', 'team_id', 'priority', 'status', 'history'],
   properties: {
     ticket_id: { type: 'string', format: 'uuid' },
-    ticket_number: { type: 'integer' },
-    ticket_short_id: { type: 'string', minLength: 8, maxLength: 8, pattern: '^[0-9]{8}$' },
+    ticket_slug: { type: 'string', minLength: 8, maxLength: 8, pattern: '^\\d{8}$' },
     title: { type: 'string', maxLength: 100 },
     description: { type: 'string', maxLength: 2000, nullable: true },
     team_id: { type: 'string', format: 'uuid' },
@@ -52,7 +50,7 @@ export const CreateTicketRequestSchema: OpenAPIV3.SchemaObject = {
   required: ['title'],
   properties: {
     title: { type: 'string', maxLength: 100 },
-    description: { type: 'string', maxLength: 2000 },
+    description: { type: 'string', maxLength: 2000, nullable: true },
     team_id: { type: 'string', format: 'uuid' },
     priority: { type: 'string', enum: TicketPriorityEnum }
   }
@@ -63,7 +61,7 @@ export const UpdateTicketRequestSchema: OpenAPIV3.SchemaObject = {
   additionalProperties: false,
   properties: {
     title: { type: 'string', maxLength: 100 },
-    description: { type: 'string', maxLength: 2000 },
+    description: { type: 'string', maxLength: 2000, nullable: true },
     priority: { type: 'string', enum: TicketPriorityEnum },
     status: { type: 'string', enum: TicketStatusEnum }
   }

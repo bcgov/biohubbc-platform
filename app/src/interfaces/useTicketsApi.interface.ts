@@ -5,8 +5,7 @@ export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 export interface ITicket {
   ticket_id: string;
-  ticket_number: number;
-  ticket_short_id: string;
+  ticket_slug: string;
   title: string;
   description: string | null;
   team_id: string;
@@ -26,13 +25,13 @@ export interface ITicketWithHistory extends ITicket {
 
 export interface ICreateTicketRequest {
   title: string;
-  description?: string;
+  description?: string | null;
   priority?: TicketPriority;
 }
 
 export interface IUpdateTicketRequest {
   title?: string;
-  description?: string;
+  description?: string | null;
   priority?: TicketPriority;
   status?: TicketStatus;
 }

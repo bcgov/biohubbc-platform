@@ -1,15 +1,14 @@
 import { SQL } from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { CreateTicketRequest, Ticket, TicketStatus, UpdateTicketRequest } from '../models/ticket';
+import { CreateTicketRequest, TeamFilters, Ticket, TicketStatus, UpdateTicketRequest } from '../models/ticket';
 import { TicketStatusHistory } from '../models/ticket-status-history';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 
 const TICKET_COLUMNS = [
   'ticket_id',
-  'ticket_number',
-  'ticket_short_id',
+  'ticket_slug',
   'title',
   'description',
   'team_id',
@@ -21,12 +20,12 @@ export class TicketRepository extends BaseRepository {
   /**
    * Insert a new ticket record.
    *
-   * @param {(CreateTicketRequest & { team_id: string; ticket_short_id: string })} ticket - Ticket payload to persist with resolved team ID and generated short ID.
+   * @param {(CreateTicketRequest & { team_id: string; ticket_slug: string })} ticket - Ticket payload to persist with resolved team ID and generated slug.
    * @return {Promise<Ticket>} The created ticket record.
    * @throws {ApiExecuteSQLError} If the insert does not affect exactly one row.
    * @memberof TicketRepository
    */
-  async insertTicket(ticket: CreateTicketRequest & { team_id: string; ticket_short_id: string }): Promise<Ticket> {
+  async insertTicket(ticket: CreateTicketRequest & { team_id: string; ticket_slug: string }): Promise<Ticket> {
     const knex = getKnex();
     const query = knex
       .table('ticket')
@@ -34,7 +33,7 @@ export class TicketRepository extends BaseRepository {
         title: ticket.title,
         description: ticket.description ?? null,
         team_id: ticket.team_id,
-        ticket_short_id: ticket.ticket_short_id,
+        ticket_slug: ticket.ticket_slug,
         priority: ticket.priority ?? 'MEDIUM'
       })
       .returning(TICKET_COLUMNS);
@@ -76,75 +75,15 @@ export class TicketRepository extends BaseRepository {
   }
 
   /**
-   * Get a single active ticket by ticket number.
-   *
-   * @param {number} ticketNumber - Human-readable ticket number.
-   * @return {Promise<Ticket>} Matching ticket record.
-   * @throws {ApiExecuteSQLError} If exactly one active ticket is not found.
-   * @memberof TicketRepository
-   */
-  async getTicketByNumber(ticketNumber: number): Promise<Ticket> {
-    const knex = getKnex();
-    const query = knex
-      .table('ticket')
-      .select(TICKET_COLUMNS)
-      .where('ticket_number', ticketNumber)
-      .whereNull('record_end_date');
-
-    const response = await this.connection.knex(query, Ticket);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get ticket record', [
-        'TicketRepository->getTicketByNumber',
-        `rowCount was ${response.rowCount}, expected 1`
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
-   * Get a single active ticket by short reference identifier.
-   *
-   * @param {string} ticketShortId - 8-digit ticket short ID.
-   * @return {Promise<Ticket>} Matching ticket record.
-   * @throws {ApiExecuteSQLError} If exactly one active ticket is not found.
-   * @memberof TicketRepository
-   */
-  async getTicketByShortId(ticketShortId: string): Promise<Ticket> {
-    const knex = getKnex();
-    const query = knex
-      .table('ticket')
-      .select(TICKET_COLUMNS)
-      .where('ticket_short_id', ticketShortId)
-      .whereNull('record_end_date');
-
-    const response = await this.connection.knex(query, Ticket);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get ticket record', [
-        'TicketRepository->getTicketByShortId',
-        `rowCount was ${response.rowCount}, expected 1`
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
    * List active tickets for a team with an optional status filter.
    *
-   * @param {string} [teamId] - Optional team UUID filter.
-   * @param {TicketStatus} [status] - Optional status filter.
+   * @param {string} teamId - Team UUID filter. Pass an empty string to query all teams.
+   * @param {TeamFilters} [filters] - Optional list filters.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
    * @return {Promise<Ticket[]>} Matching tickets.
    * @memberof TicketRepository
    */
-  async getTicketsByTeamId(
-    teamId?: string,
-    status?: TicketStatus,
-    pagination?: ApiPaginationOptions
-  ): Promise<Ticket[]> {
+  async getTicketsByTeamId(teamId: string, filters?: TeamFilters, pagination?: ApiPaginationOptions): Promise<Ticket[]> {
     const knex = getKnex();
     let query = knex.table('ticket').select(TICKET_COLUMNS).whereNull('record_end_date');
 
@@ -152,8 +91,8 @@ export class TicketRepository extends BaseRepository {
       query = query.andWhere('team_id', teamId);
     }
 
-    if (status) {
-      query = query.andWhere('status', status);
+    if (filters?.status) {
+      query = query.andWhere('status', filters.status);
     }
 
     if (!pagination?.sort || !pagination?.order) {
@@ -170,12 +109,12 @@ export class TicketRepository extends BaseRepository {
   /**
    * Count active tickets for a team with an optional status filter.
    *
-   * @param {string} [teamId] - Optional team UUID filter.
-   * @param {TicketStatus} [status] - Optional status filter.
+   * @param {string} teamId - Team UUID filter. Pass an empty string to query all teams.
+   * @param {TeamFilters} [filters] - Optional list filters.
    * @return {Promise<number>} Total number of matching tickets.
    * @memberof TicketRepository
    */
-  async getTicketsByTeamIdCount(teamId?: string, status?: TicketStatus): Promise<number> {
+  async getTicketsByTeamIdCount(teamId: string, filters?: TeamFilters): Promise<number> {
     const knex = getKnex();
     let query = knex.table('ticket').whereNull('record_end_date').select(knex.raw('count(*)::integer as count'));
 
@@ -183,8 +122,8 @@ export class TicketRepository extends BaseRepository {
       query = query.andWhere('team_id', teamId);
     }
 
-    if (status) {
-      query = query.andWhere('status', status);
+    if (filters?.status) {
+      query = query.andWhere('status', filters.status);
     }
 
     const response = await this.connection.knex(query);
@@ -207,7 +146,7 @@ export class TicketRepository extends BaseRepository {
       .table('ticket')
       .update({
         title: ticket.title,
-        description: ticket.description,
+        description: ticket.description !== undefined ? ticket.description : undefined,
         priority: ticket.priority,
         status: ticket.status
       })

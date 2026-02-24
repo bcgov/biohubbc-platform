@@ -27,9 +27,10 @@ POST.apiDoc = {
       name: 'ticketId',
       required: true,
       schema: {
-        type: 'string'
+        type: 'string',
+        format: 'uuid'
       },
-      description: 'Ticket UUID or 8-digit short ID.'
+      description: 'Ticket UUID.'
     }
   ],
   requestBody: {
