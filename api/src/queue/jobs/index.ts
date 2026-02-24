@@ -30,7 +30,16 @@ export const JobQueues = {
    * Dead letter queue for failed download jobs.
    * Jobs are moved here after all retries are exhausted.
    */
-  PROCESS_DOWNLOAD_FAILED: 'process-download-failed'
+  PROCESS_DOWNLOAD_FAILED: 'process-download-failed',
+  /**
+   * Index submission features job queue for async search indexing after validation.
+   */
+  INDEX_SUBMISSION_FEATURES: 'index-submission-features',
+  /**
+   * Dead letter queue for failed index-submission-features jobs.
+   * Jobs are moved here after all retries are exhausted.
+   */
+  INDEX_SUBMISSION_FEATURES_FAILED: 'index-submission-features-failed'
 } as const;
 
 export type JobQueueName = (typeof JobQueues)[keyof typeof JobQueues];

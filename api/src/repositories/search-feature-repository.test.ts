@@ -18,6 +18,36 @@ describe('SearchFeatureRepository', () => {
     Sinon.restore();
   });
 
+  describe('deleteSearchRecordsBySubmissionId', () => {
+    it('should delete from all 4 search tables for the given submission', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+
+      const mockDBConnection = getMockDBConnection({
+        knex: knexSpy
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.deleteSearchRecordsBySubmissionId(777);
+
+      expect(knexSpy.callCount).to.equal(4);
+    });
+
+    it('should succeed when no existing records to delete', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+
+      const mockDBConnection = getMockDBConnection({
+        knex: knexSpy
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.deleteSearchRecordsBySubmissionId(999);
+
+      expect(knexSpy.callCount).to.equal(4);
+    });
+  });
+
   describe('insertSearchableDatetimeRecords', () => {
     it('should succeed on insert with matching row count', async () => {
       const mockRows: DatetimeSearchableRecord[] = [
