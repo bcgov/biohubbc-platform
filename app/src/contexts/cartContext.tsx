@@ -2,7 +2,7 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useSessionStorage } from 'hooks/useSessionStorage';
-import { CartSubmissionFeature } from 'interfaces/useCartApi.interface';
+import { CartSubmissionFeature, CheckoutCartResponse } from 'interfaces/useCartApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import React, { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { ApiPaginationResponseParams } from 'types/pagination';
@@ -527,19 +527,21 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
    * After checkout, the cart ID is cleared from session storage and state is reset,
    * so the next addToCart call creates a fresh cart.
    */
-  const checkout = useCallback(async (): Promise<void> => {
+  const checkout = useCallback(async (): Promise<CheckoutCartResponse | null> => {
     if (!state.cartId || operationInProgress.current) {
-      return;
+      return null;
     }
 
     operationInProgress.current = true;
 
     try {
-      await cartApiRef.current.checkoutCart(state.cartId);
+      const download = await cartApiRef.current.checkoutCart(state.cartId);
 
       // Clear cart ID from session storage and reset state.
       // setCartId(null) triggers the existing useEffect that dispatches RESET.
       setCartId(null);
+
+      return download;
     } finally {
       operationInProgress.current = false;
     }

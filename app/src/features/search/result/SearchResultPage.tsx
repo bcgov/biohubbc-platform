@@ -4,6 +4,7 @@ import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
 import { APIError } from 'hooks/api/useAxios';
 import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { normalizeQueryParam } from 'utils/query-param';
 import { SearchResultOptions } from './content/option/SearchResultOptions';
 import { SearchResultToolbar } from './content/toolbar/SearchResultToolbar';
@@ -24,6 +25,7 @@ export enum SEARCH_RESULT_OPTION_VIEW {
 }
 
 export const SearchResultPage = () => {
+  const navigate = useNavigate();
   const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination } = useSearchResults();
   const { codesDataLoader } = useCodesContext();
   const { features, pagination: cartPagination, addToCart, checkout } = useCartContext();
@@ -197,11 +199,16 @@ export const SearchResultPage = () => {
 
   const handleCheckout = useCallback(async () => {
     try {
-      await checkout();
+      const download = await checkout();
+
+      if (download?.download_id) {
+        // Navigate to the download
+        navigate(`/download/${download.download_id}`);
+      }
     } catch (error) {
       dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
     }
-  }, [checkout, dialogContext]);
+  }, [checkout, dialogContext, navigate]);
 
   return (
     <ResultPageContainer

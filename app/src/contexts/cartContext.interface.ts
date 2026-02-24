@@ -1,4 +1,4 @@
-import { CartFeatureListResponse, CartSubmissionFeature } from 'interfaces/useCartApi.interface';
+import { CartFeatureListResponse, CartSubmissionFeature, CheckoutCartResponse } from 'interfaces/useCartApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { ApiPaginationResponseParams } from 'types/pagination';
 
@@ -99,7 +99,7 @@ export interface ICartContext {
    * on the next addToCart call. Errors propagate to the caller without
    * resetting the cart, so the user can retry.
    */
-  checkout: () => Promise<void>;
+  checkout: () => Promise<CheckoutCartResponse | null>;
 
   /**
    * Pagination metadata returned by the cart API.
