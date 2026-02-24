@@ -6,14 +6,10 @@ import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import * as db from '../../database/db';
 import { Cart, CartStatus } from '../../models/cart';
-import { Policy } from '../../models/policy';
-import { SubmissionFeature } from '../../repositories/submission-repository';
 import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
 import * as keycloakUtils from '../../utils/keycloak-utils';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { PolicyService } from '../access-policy/policy-service';
 import { CartService } from '../cart-service';
-import { SubmissionService } from '../submission-service';
 import { UserService } from '../user-service';
 import {
   AuthorizationScheme,
@@ -21,6 +17,7 @@ import {
   AuthorizeBySystemRoles,
   AuthorizeRule
 } from './authorization-service';
+import { TeamAuthorizationService } from './team-authorization-service';
 
 chai.use(sinonChai);
 
@@ -468,20 +465,6 @@ describe('authorizeByTeam', function () {
     sinon.restore();
   });
 
-  const fakeFeature: SubmissionFeature = {
-    submission_feature_id: 1,
-    uuid: 'uuid-1',
-    urn: 'urn:1:Feature:1',
-    submission_id: 1,
-    feature_type_id: 10,
-    source_id: null,
-    data: {},
-    feature_type_name: 'Feature',
-    secured: true
-  };
-
-  const mockPolicies: Policy[] = [{ policy_id: 'policy', description: 'policy description', name: 'Policy Name' }];
-
   const systemUser: SystemUser = {
     system_user_id: 1,
     user_identity_source_id: 2,
@@ -502,88 +485,48 @@ describe('authorizeByTeam', function () {
     notes: null
   };
 
-  it('returns true immediately if feature is not secured', async function () {
-    const mockDBConnection = getMockDBConnection();
-    sinon.stub(SubmissionService.prototype, 'getSubmissionFeatureById').resolves({ ...fakeFeature, secured: false });
-    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
-
-    const authorizationService = new AuthorizationService(mockDBConnection);
-
-    const result = await authorizationService.authorizeByTeam({
-      discriminator: 'Team',
-      entity: 'submission_feature',
-      submissionFeatureId: 1,
-      submissionId: 1
-    });
-
-    expect(result).to.be.true;
-  });
-
-  it('returns false if submission ID does not match', async function () {
-    const mockDBConnection = getMockDBConnection();
-    sinon.stub(SubmissionService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
-    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
-
-    const authorizationService = new AuthorizationService(mockDBConnection);
-
-    const result = await authorizationService.authorizeByTeam({
-      discriminator: 'Team',
-      entity: 'submission_feature',
-      submissionFeatureId: 1,
-      submissionId: 999
-    });
-
-    expect(result).to.be.false;
-  });
-
   it('returns false if no system user is found', async function () {
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(SubmissionService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
     sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(null);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
     const result = await authorizationService.authorizeByTeam({
       discriminator: 'Team',
-      entity: 'submission_feature',
-      submissionFeatureId: 1,
-      submissionId: 1
+      entity: 'team',
+      teamId: 'team-1'
     });
 
     expect(result).to.be.false;
   });
 
-  it('returns true if policies grant access', async function () {
+  it('returns true when TeamAuthorizationService grants access', async function () {
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(SubmissionService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
     sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
-    sinon.stub(PolicyService.prototype, 'getPoliciesThatAuthorizeFeatureAccessByUrn').resolves(mockPolicies);
+    sinon.stub(TeamAuthorizationService.prototype, 'isUserAuthorizedForTeamEntity').resolves(true);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
     const result = await authorizationService.authorizeByTeam({
       discriminator: 'Team',
-      entity: 'submission_feature',
-      submissionFeatureId: 1,
-      submissionId: 1
+      entity: 'team',
+      teamId: 'team-1'
     });
 
     expect(result).to.be.true;
   });
 
-  it('returns false if no policies grant access', async function () {
+  it('returns false when TeamAuthorizationService denies access', async function () {
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(SubmissionService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
     sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
-    sinon.stub(PolicyService.prototype, 'getPoliciesThatAuthorizeFeatureAccessByUrn').resolves([]);
+    sinon.stub(TeamAuthorizationService.prototype, 'isUserAuthorizedForTeamEntity').resolves(false);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
     const result = await authorizationService.authorizeByTeam({
       discriminator: 'Team',
-      entity: 'submission_feature',
-      submissionFeatureId: 1,
-      submissionId: 1
+      entity: 'data_request',
+      dataRequestId: 'dr-1'
     });
 
     expect(result).to.be.false;
