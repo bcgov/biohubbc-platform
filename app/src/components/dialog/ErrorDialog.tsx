@@ -1,4 +1,3 @@
-import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Collapse from '@mui/material/Collapse';
 import Dialog from '@mui/material/Dialog';
@@ -6,18 +5,7 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import Divider from '@mui/material/Divider';
 import { useState } from 'react';
-
-const useStyles = () => {
-  return {
-    dialogSubTitle: {
-      fontSize: '14px',
-      color: '#787f81',
-      fontWeight: 'bold'
-    }
-  };
-};
 
 export interface IErrorDialogProps {
   /**
@@ -85,7 +73,6 @@ export interface IErrorDialogProps {
  */
 export const ErrorDialog: React.FC<React.PropsWithChildren<IErrorDialogProps>> = (props) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const classes = useStyles();
 
   const ErrorDetailsList = (errorProps: { errors: (string | object)[] }) => {
     const items = errorProps.errors.map((error, index) => {
@@ -104,44 +91,38 @@ export const ErrorDialog: React.FC<React.PropsWithChildren<IErrorDialogProps>> =
   }
 
   return (
-    <Box>
-      <Dialog
-        fullWidth
-        open={props.open}
-        onClose={props.onClose}
-        aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description">
-        <DialogTitle id="alert-dialog-title">{props.dialogTitle}</DialogTitle>
-        <DialogContent>
-          {props.dialogSubTitle && (
-            <DialogContentText mb={'1em'} sx={classes.dialogSubTitle} id="alert-dialog-sub-title">
-              {props.dialogSubTitle}
-            </DialogContentText>
-          )}
-          <DialogContentText id="alert-dialog-description">{props.dialogText}</DialogContentText>
-        </DialogContent>
-        {props.dialogError && (
-          <DialogContent>
-            <DialogContentText id="alert-dialog-description">{props.dialogError}</DialogContentText>
-            {!!props?.dialogErrorDetails?.length && (
-              <>
-                <Button color="primary" onClick={() => setIsExpanded(!isExpanded)}>
-                  {(isExpanded && 'Hide detailed error message') || 'Show detailed error message'}
-                </Button>
-                <Collapse in={isExpanded}>
-                  <ErrorDetailsList errors={props.dialogErrorDetails} />
-                </Collapse>
-              </>
-            )}
-          </DialogContent>
+    <Dialog
+      open={props.open}
+      onClose={props.onClose}
+      aria-labelledby="alert-dialog-title"
+      aria-describedby="alert-dialog-description">
+      <DialogTitle id="alert-dialog-title">{props.dialogTitle}</DialogTitle>
+      <DialogContent>
+        {props.dialogSubTitle && (
+          <DialogContentText id="alert-dialog-sub-title">{props.dialogSubTitle}</DialogContentText>
         )}
-        <Divider />
-        <DialogActions>
-          <Button onClick={props.onOk} color="primary" variant="contained" autoFocus>
-            Ok
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+        <DialogContentText id="alert-dialog-description">{props.dialogText}</DialogContentText>
+      </DialogContent>
+      {props.dialogError && (
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">{props.dialogError}</DialogContentText>
+          {!!props?.dialogErrorDetails?.length && (
+            <>
+              <Button color="primary" onClick={() => setIsExpanded(!isExpanded)}>
+                {(isExpanded && 'Hide detailed error message') || 'Show detailed error message'}
+              </Button>
+              <Collapse in={isExpanded}>
+                <ErrorDetailsList errors={props.dialogErrorDetails} />
+              </Collapse>
+            </>
+          )}
+        </DialogContent>
+      )}
+      <DialogActions>
+        <Button onClick={props.onOk} color="primary" variant="contained" autoFocus>
+          Ok
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };
