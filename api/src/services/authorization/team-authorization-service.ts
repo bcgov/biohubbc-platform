@@ -1,6 +1,5 @@
 import { IDBConnection } from '../../database/db';
 import { TeamAuthorizationRepository } from '../../repositories/authorization/team-authorization-repository';
-import { PolicyService } from '../access-policy/policy-service';
 import { DBService } from '../db-service';
 import { SubmissionService } from '../submission-service';
 import { TeamAuthorizationEntity } from './authorization-service';
@@ -56,17 +55,19 @@ export class TeamAuthorizationService extends DBService {
           return true;
         }
 
-        if (entity.submissionId !== undefined && feature.submission_id !== entity.submissionId) {
+        if (
+          entity.submissionId !== undefined &&
+          entity.submissionId !== null &&
+          feature.submission_id !== entity.submissionId
+        ) {
           return false;
         }
 
-        const policyService = new PolicyService(this.connection);
-        const policiesThatGrantAccess = await policyService.getPoliciesThatAuthorizeFeatureAccessByUrn(
-          feature.urn,
-          systemUserId
+        const record = await this.teamAuthorizationRepository.findTeamPolicyBySubmissionFeature(
+          systemUserId,
+          entity.submissionFeatureId
         );
-
-        return policiesThatGrantAccess.length > 0;
+        return record !== null;
       }
     }
 
