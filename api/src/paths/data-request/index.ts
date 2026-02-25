@@ -40,7 +40,8 @@ export const POST: Operation = [
 ];
 
 GET.apiDoc = {
-  description: 'Find all data request records, optionally filtered by date range, requested_by, team_id, or status',
+  description:
+    'Find all data request records, optionally filtered by date range, requested_by, team_id, team_ids, or status',
   tags: ['data-request'],
   security: [
     {
@@ -70,7 +71,17 @@ GET.apiDoc = {
       in: 'query',
       name: 'team_id',
       required: false,
-      schema: { type: 'string', format: 'uuid', description: 'Filter by team ID' }
+      schema: { type: 'string', format: 'uuid', description: 'Filter by a single team ID' }
+    },
+    {
+      in: 'query',
+      name: 'team_ids',
+      required: false,
+      schema: {
+        type: 'array',
+        items: { type: 'string', format: 'uuid' },
+        description: 'Filter by team IDs (comma-separated or repeated)'
+      }
     },
     {
       in: 'query',
@@ -186,12 +197,15 @@ export function createDataRequest(): RequestHandler {
   };
 }
 
+/** Query params for list endpoint (team_ids may be string or string[] from request). */
+type DataRequestListQuery = Omit<DataRequestFilters, 'team_ids'> & { team_ids?: string | string[] };
+
 /**
  * Parses query params from the request into a filters object for data request list.
  * Returns empty object when no filter params are present.
  */
-function parseQueryParams(req: Request<unknown, unknown, unknown, DataRequestFilters>): DataRequestFilters {
-  const { date_from, date_to, requested_by, team_id, status } = req.query;
+function parseQueryParams(req: Request<unknown, unknown, unknown, DataRequestListQuery>): DataRequestFilters {
+  const { date_from, date_to, requested_by, team_id, team_ids, status } = req.query;
   const filters: DataRequestFilters = {
     ...(date_from && { date_from: String(date_from) }),
     ...(date_to && { date_to: String(date_to) }),
@@ -199,5 +213,15 @@ function parseQueryParams(req: Request<unknown, unknown, unknown, DataRequestFil
     ...(team_id && { team_id: String(team_id) }),
     ...(status && { status: String(status) as DataRequestFilters['status'] })
   };
+  if (team_ids !== undefined) {
+    const ids = Array.isArray(team_ids)
+      ? team_ids.map(String)
+      : String(team_ids)
+          .split(',')
+          .map((s) => s.trim());
+    if (ids.length > 0) {
+      filters.team_ids = ids;
+    }
+  }
   return filters;
 }
