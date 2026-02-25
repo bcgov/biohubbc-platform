@@ -103,8 +103,8 @@ export const publishProcessSubmissionFeaturesJob = async (
     );
 
     if (existingValidation) {
-      // Only allow retry if status is 'failed'
-      if (existingValidation.status !== 'failed') {
+      // Only allow retry if status is 'failed' or 'invalid'
+      if (existingValidation.status !== 'failed' && existingValidation.status !== 'invalid') {
         defaultLog.warn({
           label: 'publishProcessSubmissionFeaturesJob',
           message: 'Blocked: validation record already exists',
@@ -276,10 +276,20 @@ export const publishProcessDownloadJob = async (
 
     await boss.createQueue(JobQueues.PROCESS_DOWNLOAD);
 
+    // Insert the job in the same transaction as the business data via the `db` option.
+    // This prevents ghost jobs (job exists but data rolled back) and lost jobs (data committed but job never sent).
+    const db = {
+      executeSql: async (text: string, values: any[]) => {
+        const result = await connection.query(text, values);
+        return { rows: result.rows, rowCount: result.rowCount };
+      }
+    };
+
     // Use singletonKey to prevent duplicate concurrent jobs for the same download
     const jobId = await boss.send(JobQueues.PROCESS_DOWNLOAD, data, {
       ...mergedOptions,
-      singletonKey: `download-${data.downloadId}`
+      singletonKey: `download-${data.downloadId}`,
+      db
     });
 
     if (jobId) {

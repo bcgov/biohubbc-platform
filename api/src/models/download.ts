@@ -40,3 +40,16 @@ export const DownloadFeatureSummary = z.object({
   estimated_byte_size: z.string()
 });
 export type DownloadFeatureSummary = z.infer<typeof DownloadFeatureSummary>;
+
+/**
+ * Result of estimating a download's total size before processing.
+ * Used by planFragments to decide how to split features across zip files.
+ *
+ * Per-feature and total sizes are computed inline in the SQL query.
+ */
+export interface DownloadSizeEstimate {
+  /** Total estimated bytes across all features. */
+  totalEstimatedBytes: number;
+  /** The features included in this download with per-feature estimated_byte_size. */
+  features: DownloadFeatureSummary[];
+}

@@ -1,5 +1,9 @@
 import { AxiosInstance } from 'axios';
-import { CartFeatureListResponse, CartWithFeaturesResponse } from 'interfaces/useCartApi.interface';
+import {
+  CartFeatureListResponse,
+  CartWithFeaturesResponse,
+  CheckoutCartResponse
+} from 'interfaces/useCartApi.interface';
 import qs from 'qs';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 
@@ -115,12 +119,25 @@ export const useCartApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Check out a cart, creating a download from all cart features.
+   *
+   * @param {string} cartId - The cart to check out.
+   * @return {Promise<CheckoutCartResponse>} The created download ID.
+   */
+  const checkoutCart = async (cartId: string): Promise<CheckoutCartResponse> => {
+    const { data } = await axios.post<CheckoutCartResponse>(`/api/cart/${cartId}/checkout`);
+
+    return data;
+  };
+
   return {
     createCart,
     assignCartToCurrentUser,
     getCartById,
     addCartFeatures,
     removeCartFeatureById,
-    clearCart
+    clearCart,
+    checkoutCart
   };
 };

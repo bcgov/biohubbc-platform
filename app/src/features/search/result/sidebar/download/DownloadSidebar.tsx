@@ -49,8 +49,8 @@ export const DownloadSidebar = ({ features, itemCount, onDownload }: DownloadSid
           borderTop: '1px solid',
           borderColor: 'divider'
         }}>
-        <Button variant="contained" fullWidth onClick={onDownload}>
-          Download
+        <Button variant="contained" fullWidth onClick={onDownload} disabled={!features.length}>
+          Checkout
         </Button>
       </Box>
     </Stack>

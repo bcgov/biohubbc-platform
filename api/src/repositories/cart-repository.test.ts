@@ -183,7 +183,7 @@ describe('CartRepository', () => {
         await repo.updateCart('cart-1', payload);
         throw new Error('Expected to throw');
       } catch (err) {
-        expect((err as Error).message).to.equal('Failed to update cart status');
+        expect((err as Error).message).to.equal('Failed to update cart');
       }
     });
   });

@@ -156,6 +156,49 @@ describe('publisher', () => {
       expect((result as { status: 'blocked'; existingStatus: string }).existingStatus).to.equal('pending');
     });
 
+    it('allows retry when validation record exists with invalid status', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('new-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      const mockInvalidValidationRecord: SubmissionValidationRecord = {
+        submission_validation_id: 1,
+        job_id: 'invalid-job-id',
+        status: 'invalid'
+      };
+      sinon
+        .stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId')
+        .resolves(mockInvalidValidationRecord);
+      sinon
+        .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
+        .resolves({ submission_validation_id: 2 });
+
+      const result = await publishProcessSubmissionFeaturesJob(mockConnection, { submissionId: 123 });
+
+      expect(result.status).to.equal('published');
+      expect((result as { status: 'published'; jobId: string }).jobId).to.equal('new-job-id');
+    });
+
+    it('returns blocked status when validation record exists with completed status', async () => {
+      const mockConnection = getMockDBConnection();
+
+      const mockCompletedRecord: SubmissionValidationRecord = {
+        submission_validation_id: 1,
+        job_id: 'completed-job-id',
+        status: 'completed'
+      };
+      sinon
+        .stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId')
+        .resolves(mockCompletedRecord);
+
+      const result = await publishProcessSubmissionFeaturesJob(mockConnection, { submissionId: 123 });
+
+      expect(result.status).to.equal('blocked');
+      expect((result as { status: 'blocked'; existingStatus: string }).existingStatus).to.equal('completed');
+    });
+
     it('allows retry when validation record exists with failed status', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('new-job-id');
@@ -298,6 +341,33 @@ describe('publisher', () => {
       expect(sendStub.firstCall.args[1]).to.deep.equal(data);
       expect(result.status).to.equal('published');
       expect((result as { status: 'published'; jobId: string }).jobId).to.equal('download-job-id');
+    });
+
+    it('passes db adapter for transactional job insert', async () => {
+      // Verifies: The db option wraps connection.query so the job row is inserted
+      // in the same transaction as the business data (atomic commit/rollback)
+
+      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 0 });
+      const mockConnection = getMockDBConnection({ query: queryStub });
+      const sendStub = sinon.stub().resolves('download-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
+
+      await publishProcessDownloadJob(mockConnection, {
+        downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+      });
+
+      // Verify db adapter is passed to boss.send
+      const options = sendStub.firstCall.args[2];
+      expect(options.db).to.exist;
+      expect(options.db.executeSql).to.be.a('function');
+
+      // Verify the adapter delegates to connection.query
+      await options.db.executeSql('SELECT 1', [42]);
+      expect(queryStub).to.have.been.calledOnceWith('SELECT 1', [42]);
     });
 
     it('returns duplicate when download is not in pending status', async () => {

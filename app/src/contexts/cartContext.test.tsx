@@ -15,7 +15,8 @@ const { mockCartApi, mockUseApi, mockSetStoredCartId, getStoredCartId, setStored
     addCartFeatures: vi.fn(),
     removeCartFeatureById: vi.fn(),
     clearCart: vi.fn(),
-    assignCartToCurrentUser: vi.fn()
+    assignCartToCurrentUser: vi.fn(),
+    checkoutCart: vi.fn()
   };
 
   const useApi = vi.fn(() => ({ cart: cartApi }));
@@ -104,6 +105,7 @@ describe('CartContextProvider', () => {
     mockCartApi.removeCartFeatureById.mockResolvedValue(buildCartResponse('default-cart', []));
     mockCartApi.clearCart.mockResolvedValue(buildCartResponse('default-cart', []));
     mockCartApi.assignCartToCurrentUser.mockResolvedValue(undefined);
+    mockCartApi.checkoutCart.mockResolvedValue({ download_id: 'dl-001' });
   });
 
   it('initializes with an empty cart when no stored cart id exists', async () => {
@@ -479,5 +481,108 @@ describe('CartContextProvider', () => {
       expect(mockCartApi.assignCartToCurrentUser).not.toHaveBeenCalled();
       expect(mockCartApi.getCartById).toHaveBeenCalledWith('cart-anon');
     });
+  });
+
+  it('checkout calls API with cartId and clears cart state', async () => {
+    const existingFeature = createMockFeature('saved-1', 1, 101, 201, 'Feature A');
+    setStoredCartId('cart-1');
+    mockCartApi.getCartById.mockResolvedValueOnce(buildCartResponse('cart-1', [existingFeature]));
+
+    const { getContext } = await renderProvider(getMockAuthState({ base: SystemUserAuthState }));
+
+    await waitFor(() => {
+      expect(getContext().features).toEqual([existingFeature]);
+    });
+
+    await act(async () => {
+      await getContext().checkout();
+    });
+
+    expect(mockCartApi.checkoutCart).toHaveBeenCalledTimes(1);
+    expect(mockCartApi.checkoutCart).toHaveBeenCalledWith('cart-1');
+    expect(mockSetStoredCartId).toHaveBeenCalledWith(null);
+
+    await waitFor(() => {
+      expect(getContext().features).toEqual([]);
+      expect(getContext().pagination.total).toBe(0);
+    });
+  });
+
+  it('checkout is a no-op when no cartId exists', async () => {
+    const { getContext } = await renderProvider(getMockAuthState({ base: UnauthenticatedUserAuthState }));
+
+    await act(async () => {
+      await getContext().checkout();
+    });
+
+    expect(mockCartApi.checkoutCart).not.toHaveBeenCalled();
+  });
+
+  it('checkout propagates errors without resetting cart state', async () => {
+    const existingFeature = createMockFeature('saved-1', 1, 101, 201, 'Feature A');
+    const checkoutError = new Error('checkout failed');
+
+    setStoredCartId('cart-1');
+    mockCartApi.getCartById.mockResolvedValueOnce(buildCartResponse('cart-1', [existingFeature]));
+    mockCartApi.checkoutCart.mockRejectedValueOnce(checkoutError);
+
+    const { getContext } = await renderProvider(getMockAuthState({ base: SystemUserAuthState }));
+
+    await waitFor(() => {
+      expect(getContext().features).toEqual([existingFeature]);
+    });
+
+    await expect(
+      act(async () => {
+        await getContext().checkout();
+      })
+    ).rejects.toThrow('checkout failed');
+
+    await waitFor(() => {
+      expect(getContext().features).toEqual([existingFeature]);
+      expect(getContext().pagination.total).toBe(1);
+    });
+
+    expect(mockSetStoredCartId).not.toHaveBeenCalledWith(null);
+  });
+
+  it('checkout prevents concurrent calls via operationInProgress guard', async () => {
+    const existingFeature = createMockFeature('saved-1', 1, 101, 201, 'Feature A');
+    setStoredCartId('cart-1');
+    mockCartApi.getCartById.mockResolvedValueOnce(buildCartResponse('cart-1', [existingFeature]));
+
+    // Make checkoutCart hang so we can test concurrency
+    let resolveCheckout: () => void;
+    mockCartApi.checkoutCart.mockImplementation(
+      () =>
+        new Promise<{ download_id: string }>((resolve) => {
+          resolveCheckout = () => resolve({ download_id: 'dl-001' });
+        })
+    );
+
+    const { getContext } = await renderProvider(getMockAuthState({ base: SystemUserAuthState }));
+
+    await waitFor(() => {
+      expect(getContext().features).toEqual([existingFeature]);
+    });
+
+    // Fire two checkouts concurrently
+    let firstDone = false;
+    const first = act(async () => {
+      await getContext().checkout();
+      firstDone = true;
+    });
+
+    // Second call should be a no-op (operationInProgress is true)
+    await act(async () => {
+      await getContext().checkout();
+    });
+
+    expect(mockCartApi.checkoutCart).toHaveBeenCalledTimes(1);
+
+    // Resolve the first call
+    resolveCheckout!();
+    await first;
+    expect(firstDone).toBe(true);
   });
 });

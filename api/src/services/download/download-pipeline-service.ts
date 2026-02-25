@@ -4,7 +4,7 @@ import { FRAGMENT_SIZE_THRESHOLD, SIGNED_URL_EXPIRY_FRAGMENT } from '../../const
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
 import { HTTP403, HTTP404, HTTP409, HTTP500 } from '../../errors/http-error';
-import { DownloadFeatureSummary, DownloadId, DownloadRecord } from '../../models/download';
+import { DownloadId, DownloadRecord, DownloadSizeEstimate } from '../../models/download';
 import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
@@ -22,19 +22,6 @@ import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 
 const defaultLog = getLogger('services/download-pipeline-service');
-
-/**
- * Result of estimating a download's total size before processing.
- * Used by planFragments to decide how to split features across zip files.
- *
- * Per-feature and total sizes are computed inline in the SQL query.
- */
-interface DownloadSizeEstimate {
-  /** Total estimated bytes across all features. */
-  totalEstimatedBytes: number;
-  /** The features included in this download with per-feature estimated_byte_size. */
-  features: DownloadFeatureSummary[];
-}
 
 /**
  * Lightweight reference to a file-type feature's binary attachment.
