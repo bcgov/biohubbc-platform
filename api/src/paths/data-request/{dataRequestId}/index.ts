@@ -11,12 +11,17 @@ import { getLogger } from '../../../utils/logger';
 const defaultLog = getLogger('paths/data-request/{dataRequestId}');
 
 export const GET: Operation = [
-  authorizeRequestHandler(() => {
+  authorizeRequestHandler((req) => {
     return {
-      and: [
+      or: [
         {
           validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
           discriminator: 'SystemRole'
+        },
+        {
+          discriminator: 'Team',
+          entity: 'data_request',
+          dataRequestId: req.params.dataRequestId!
         }
       ]
     };
@@ -24,12 +29,17 @@ export const GET: Operation = [
   getDataRequestById()
 ];
 export const PUT: Operation = [
-  authorizeRequestHandler(() => {
+  authorizeRequestHandler((req) => {
     return {
-      and: [
+      or: [
         {
           validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
           discriminator: 'SystemRole'
+        },
+        {
+          discriminator: 'Team',
+          entity: 'data_request',
+          dataRequestId: req.params.dataRequestId!
         }
       ]
     };
@@ -37,12 +47,17 @@ export const PUT: Operation = [
   updateDataRequest()
 ];
 export const DELETE: Operation = [
-  authorizeRequestHandler(() => {
+  authorizeRequestHandler((req) => {
     return {
-      and: [
+      or: [
         {
           validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
           discriminator: 'SystemRole'
+        },
+        {
+          discriminator: 'Team',
+          entity: 'data_request',
+          dataRequestId: req.params.dataRequestId!
         }
       ]
     };
