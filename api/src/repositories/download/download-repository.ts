@@ -22,7 +22,7 @@ export class DownloadRepository extends BaseRepository {
    *
    * @param {string | null} teamId - The team that owns this download. Null for anonymous downloads.
    * @param {string | null} dataRequestId - The data request that originated this download. Null for non-request downloads.
-   * @param {number} [fragmentSizeBytes] - Target fragment size in bytes. Defaults to FRAGMENT_SIZE_THRESHOLD (500 MB).
+   * @param {number} [fragmentSizeBytes] - Target fragment size in bytes. Defaults to FRAGMENT_SIZE_THRESHOLD (200 MB).
    * @param {number | null} [systemUserId] - The user who created this download. Null for anonymous downloads.
    * @return {Promise<DownloadId>} The created record ID.
    * @memberof DownloadRepository

@@ -1,4 +1,4 @@
-import { CartFeatureListResponse, CartSubmissionFeature } from 'interfaces/useCartApi.interface';
+import { CartFeatureListResponse, CartSubmissionFeature, CheckoutCartResponse } from 'interfaces/useCartApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { ApiPaginationResponseParams } from 'types/pagination';
 
@@ -90,6 +90,16 @@ export interface ICartContext {
    * - If the API request fails, the previous cart state is restored
    */
   clearCart: () => Promise<void>;
+
+  /**
+   * Checks out the cart: creates a download from all cart features,
+   * then resets the cart for a fresh session.
+   *
+   * After checkout, the cart is cleared and a new cart will be created
+   * on the next addToCart call. Errors propagate to the caller without
+   * resetting the cart, so the user can retry.
+   */
+  checkout: () => Promise<CheckoutCartResponse | null>;
 
   /**
    * Pagination metadata returned by the cart API.

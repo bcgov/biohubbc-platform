@@ -81,20 +81,20 @@ export class CartRepository extends BaseRepository {
    * Update a cart.
    *
    * @param {string} cartId
-   * @param {UpdateCart} payload
+   * @param {UpdateCart} cart
    * @return {Promise<void>}
    * @memberof CartRepository
    */
-  async updateCart(cartId: string, payload: UpdateCart): Promise<void> {
+  async updateCart(cartId: string, cart: UpdateCart): Promise<void> {
     const knex = getKnex();
 
-    const query = knex('cart').where('cart_id', cartId).update(payload);
+    const query = knex('cart').where('cart_id', cartId).update(cart);
 
     const response = await this.connection.knex(query, Cart);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update cart status', [
-        'CartRepository->updateCartStatus',
+      throw new ApiExecuteSQLError('Failed to update cart', [
+        'CartRepository->updateCart',
         'rowCount !== 1, expected rowCount === 1'
       ]);
     }

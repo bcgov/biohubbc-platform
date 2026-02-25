@@ -128,11 +128,15 @@ describe('DownloadPipelineService (integration)', function () {
     });
 
     it('should fail and not create a download when linking an invalid feature ID', async () => {
-      // Step 1: Use a savepoint so we can continue querying after the expected FK error
+      // Step 1: Snapshot count before the attempt
+      const before = await connection.sql(SQL`SELECT COUNT(*)::int as count FROM download;`);
+      const countBefore = before.rows[0].count;
+
+      // Step 2: Use a savepoint so we can continue querying after the expected FK error
       // (PostgreSQL aborts the entire transaction on error without savepoints)
       await connection.query('SAVEPOINT before_fk_test');
 
-      // Step 2: Attempt to link a non-existent submission_feature_id
+      // Step 3: Attempt to link a non-existent submission_feature_id
       try {
         await service.createDownloadRequest(null, [999999]);
         expect.fail('Should have thrown a foreign key violation');
@@ -141,13 +145,13 @@ describe('DownloadPipelineService (integration)', function () {
         expect(error).to.exist;
       }
 
-      // Step 3: Restore to savepoint so the transaction is usable again
+      // Step 4: Restore to savepoint so the transaction is usable again
       await connection.query('ROLLBACK TO SAVEPOINT before_fk_test');
 
-      // Step 4: Verify no orphan download record was created
+      // Step 5: Verify no orphan download record was created (count unchanged)
       const after = await connection.sql(SQL`SELECT COUNT(*)::int as count FROM download;`);
       const countAfter = after.rows[0].count;
-      expect(countAfter).to.equal(0);
+      expect(countAfter).to.equal(countBefore);
     });
   });
 
