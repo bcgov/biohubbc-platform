@@ -1,6 +1,5 @@
 import { Request, RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../constants/roles';
 import { getDBConnection } from '../../database/db';
 import { DataRequestFilters } from '../../models/data-request';
 import {
@@ -20,8 +19,7 @@ export const GET: Operation = [
     return {
       and: [
         {
-          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
-          discriminator: 'SystemRole'
+          discriminator: 'SystemUser'
         }
       ]
     };
