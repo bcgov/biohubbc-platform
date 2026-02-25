@@ -102,54 +102,84 @@ describe('PolicyRepository', () => {
     });
   });
 
-  describe('getPoliciesWithPagination', () => {
-    it('returns paginated policies with total count', async () => {
+  describe('getPolicies', () => {
+    it('returns paginated policies', async () => {
       const mockPolicies: Policy[] = [
         { policy_id: '11111111-1111-1111-1111-111111111111', name: 'Policy1', description: 'Test1' },
         { policy_id: '22222222-2222-2222-2222-222222222222', name: 'Policy2', description: 'Test2' }
       ];
 
-      const knexStub = sinon.stub();
-      knexStub.onFirstCall().resolves({ rows: [{ count: '5' }] });
-      knexStub.onSecondCall().resolves({ rows: mockPolicies });
+      const mockResponse = {
+        rowCount: 2,
+        rows: mockPolicies
+      } as unknown as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
 
       const repository = new PolicyRepository(mockDBConnection);
-      const result = await repository.getPoliciesWithPagination(undefined, { page: 1, limit: 2 });
+      const result = await repository.getPolicies(undefined, { page: 1, limit: 2 });
 
-      expect(result.policies).to.eql(mockPolicies);
-      expect(result.total).to.equal(5);
+      expect(result).to.eql(mockPolicies);
     });
 
     it('filters by search term', async () => {
       const mockPolicies = [{ policy_id: '1', name: 'Telemetry Policy', description: 'Test' }];
 
-      const knexStub = sinon.stub();
-      knexStub.onFirstCall().resolves({ rows: [{ count: '1' }] });
-      knexStub.onSecondCall().resolves({ rows: mockPolicies });
+      const mockResponse = {
+        rowCount: 1,
+        rows: mockPolicies
+      } as unknown as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
 
       const repository = new PolicyRepository(mockDBConnection);
-      const result = await repository.getPoliciesWithPagination('Telemetry', { page: 1, limit: 50 });
+      const result = await repository.getPolicies({ search: 'Telemetry' }, { page: 1, limit: 50 });
 
-      expect(result.policies).to.eql(mockPolicies);
-      expect(result.total).to.equal(1);
+      expect(result).to.eql(mockPolicies);
     });
 
     it('returns empty array when no policies exist', async () => {
-      const knexStub = sinon.stub();
-      knexStub.onFirstCall().resolves({ rows: [{ count: '0' }] });
-      knexStub.onSecondCall().resolves({ rows: [] });
+      const mockResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
 
       const repository = new PolicyRepository(mockDBConnection);
-      const result = await repository.getPoliciesWithPagination(undefined, { page: 1, limit: 50 });
+      const result = await repository.getPolicies(undefined, { page: 1, limit: 50 });
 
-      expect(result.policies).to.eql([]);
-      expect(result.total).to.equal(0);
+      expect(result).to.eql([]);
+    });
+  });
+
+  describe('getPoliciesCount', () => {
+    it('returns count for matching policies', async () => {
+      const mockResponse = {
+        rowCount: 1,
+        rows: [{ count: 2 }]
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+      const repository = new PolicyRepository(mockDBConnection);
+      const result = await repository.getPoliciesCount();
+
+      expect(result).to.equal(2);
+    });
+
+    it('returns zero when no rows are returned', async () => {
+      const mockResponse = {
+        rowCount: 1,
+        rows: [{ count: 0 }]
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+      const repository = new PolicyRepository(mockDBConnection);
+      const result = await repository.getPoliciesCount({ search: 'none' });
+
+      expect(result).to.equal(0);
     });
   });
 

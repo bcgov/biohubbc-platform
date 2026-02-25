@@ -80,6 +80,25 @@ export const CreateTeamPolicyRequestSchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
+ * Schema for create team-policies batch request body.
+ */
+export const CreateTeamPoliciesRequestSchema: OpenAPIV3.SchemaObject = {
+  title: 'CreateTeamPoliciesRequest',
+  type: 'object',
+  required: ['policies'],
+  properties: {
+    policies: {
+      type: 'array',
+      items: {
+        type: 'string',
+        format: 'uuid'
+      },
+      description: 'List of policy IDs to associate with a team'
+    }
+  }
+};
+
+/**
  * Schema for created team-policy response (basic, without names).
  */
 export const TeamPolicySchema: OpenAPIV3.SchemaObject = {
@@ -101,6 +120,22 @@ export const TeamPolicySchema: OpenAPIV3.SchemaObject = {
       type: 'string',
       format: 'uuid',
       description: 'ID of the policy'
+    }
+  }
+};
+
+/**
+ * Schema for create team-policies batch response.
+ */
+export const TeamPoliciesBatchSchema: OpenAPIV3.SchemaObject = {
+  title: 'TeamPoliciesBatch',
+  type: 'object',
+  required: ['team_policies'],
+  properties: {
+    team_policies: {
+      type: 'array',
+      items: TeamPolicySchema,
+      description: 'Processed team-policy associations for this request'
     }
   }
 };

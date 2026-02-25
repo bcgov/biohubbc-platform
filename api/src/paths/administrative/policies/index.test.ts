@@ -39,7 +39,7 @@ describe('paths/administrative/policies/index', () => {
       }
     });
 
-    it('should call service.getPoliciesWithStatements and return policies with pagination', async () => {
+    it('should call service methods and return policies with pagination', async () => {
       const dbConnectionObj = getMockDBConnection({
         commit: sinon.stub(),
         rollback: sinon.stub(),
@@ -48,21 +48,23 @@ describe('paths/administrative/policies/index', () => {
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
+      const mockPolicies = [
+        {
+          policy_id: '1',
+          name: 'Test Policy',
+          description: 'Test description',
+          statements: []
+        }
+      ];
       const mockPoliciesResponse = {
-        policies: [
-          {
-            policy_id: '1',
-            name: 'Test Policy',
-            description: 'Test description',
-            statements: []
-          }
-        ],
-        pagination: { total: 1, per_page: 10, current_page: 1, last_page: 1 }
+        policies: mockPolicies,
+        pagination: { total: 1, per_page: 10, current_page: 1, last_page: 1, sort: undefined, order: undefined }
       };
 
       const getPoliciesWithStatementsStub = sinon
         .stub(PolicyService.prototype, 'getPoliciesWithStatements')
-        .resolves(mockPoliciesResponse);
+        .resolves(mockPolicies);
+      const getPoliciesCountStub = sinon.stub(PolicyService.prototype, 'getPoliciesCount').resolves(1);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -75,17 +77,21 @@ describe('paths/administrative/policies/index', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(getPoliciesWithStatementsStub).to.have.been.calledOnceWith(undefined, {
-        page: 1,
-        limit: 10,
-        sort: undefined,
-        order: undefined
-      });
+      expect(getPoliciesWithStatementsStub).to.have.been.calledOnceWith(
+        { search: undefined },
+        {
+          page: 1,
+          limit: 10,
+          sort: undefined,
+          order: undefined
+        }
+      );
+      expect(getPoliciesCountStub).to.have.been.calledOnceWith({ search: undefined });
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql(mockPoliciesResponse);
     });
 
-    it('should call service.getPoliciesWithStatements with search parameter', async () => {
+    it('should call service methods with search parameter', async () => {
       const dbConnectionObj = getMockDBConnection({
         commit: sinon.stub(),
         rollback: sinon.stub(),
@@ -94,14 +100,10 @@ describe('paths/administrative/policies/index', () => {
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const mockPoliciesResponse = {
-        policies: [],
-        pagination: { total: 0, per_page: 25, current_page: 2, last_page: 1 }
-      };
-
       const getPoliciesWithStatementsStub = sinon
         .stub(PolicyService.prototype, 'getPoliciesWithStatements')
-        .resolves(mockPoliciesResponse);
+        .resolves([]);
+      const getPoliciesCountStub = sinon.stub(PolicyService.prototype, 'getPoliciesCount').resolves(0);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -115,14 +117,21 @@ describe('paths/administrative/policies/index', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(getPoliciesWithStatementsStub).to.have.been.calledOnceWith('test', {
-        page: 2,
-        limit: 25,
-        sort: undefined,
-        order: undefined
-      });
+      expect(getPoliciesWithStatementsStub).to.have.been.calledOnceWith(
+        { search: 'test' },
+        {
+          page: 2,
+          limit: 25,
+          sort: undefined,
+          order: undefined
+        }
+      );
+      expect(getPoliciesCountStub).to.have.been.calledOnceWith({ search: 'test' });
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql(mockPoliciesResponse);
+      expect(mockRes.jsonValue).to.eql({
+        policies: [],
+        pagination: { total: 0, per_page: 25, current_page: 2, last_page: 1, sort: undefined, order: undefined }
+      });
     });
 
     it('should call service.getPoliciesWithStatements with sort ascending', async () => {
@@ -144,7 +153,8 @@ describe('paths/administrative/policies/index', () => {
 
       const getPoliciesWithStatementsStub = sinon
         .stub(PolicyService.prototype, 'getPoliciesWithStatements')
-        .resolves(mockPoliciesResponse);
+        .resolves(mockPoliciesResponse.policies);
+      const getPoliciesCountStub = sinon.stub(PolicyService.prototype, 'getPoliciesCount').resolves(2);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -159,12 +169,16 @@ describe('paths/administrative/policies/index', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(getPoliciesWithStatementsStub).to.have.been.calledOnceWith(undefined, {
-        page: 1,
-        limit: 10,
-        sort: 'name',
-        order: 'asc'
-      });
+      expect(getPoliciesWithStatementsStub).to.have.been.calledOnceWith(
+        { search: undefined },
+        {
+          page: 1,
+          limit: 10,
+          sort: 'name',
+          order: 'asc'
+        }
+      );
+      expect(getPoliciesCountStub).to.have.been.calledOnceWith({ search: undefined });
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql(mockPoliciesResponse);
     });
@@ -188,7 +202,8 @@ describe('paths/administrative/policies/index', () => {
 
       const getPoliciesWithStatementsStub = sinon
         .stub(PolicyService.prototype, 'getPoliciesWithStatements')
-        .resolves(mockPoliciesResponse);
+        .resolves(mockPoliciesResponse.policies);
+      const getPoliciesCountStub = sinon.stub(PolicyService.prototype, 'getPoliciesCount').resolves(2);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -203,12 +218,16 @@ describe('paths/administrative/policies/index', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(getPoliciesWithStatementsStub).to.have.been.calledOnceWith(undefined, {
-        page: 1,
-        limit: 10,
-        sort: 'name',
-        order: 'desc'
-      });
+      expect(getPoliciesWithStatementsStub).to.have.been.calledOnceWith(
+        { search: undefined },
+        {
+          page: 1,
+          limit: 10,
+          sort: 'name',
+          order: 'desc'
+        }
+      );
+      expect(getPoliciesCountStub).to.have.been.calledOnceWith({ search: undefined });
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql(mockPoliciesResponse);
     });

@@ -1,202 +1,109 @@
 import { IDBConnection } from '../../database/db';
 import { CreateTeam, Team, UpdateTeam } from '../../models/team';
-import { TeamMemberRepository, TeamMemberWithUser } from '../../repositories/authorization/team-member-repository';
 import { TeamRepository } from '../../repositories/authorization/team-repository';
-import { makePaginationResponse } from '../../utils/pagination';
-import { ApiPaginationOptions, ApiPaginationResults } from '../../zod-schema/pagination';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
+import { TeamMemberService } from './team-member-service';
+import { TeamFilters } from './team-service.interface';
 
 /**
- * A team with its members.
+ * Service for managing teams.
+ *
+ * Note: Team members are managed by `TeamMemberService` and are not returned by this service.
  */
-export interface TeamWithMembers extends Team {
-  members: TeamMemberWithUser[];
-}
-
 export class TeamService extends DBService {
   teamRepository: TeamRepository;
-  teamMemberRepository: TeamMemberRepository;
+  teamMemberService: TeamMemberService;
 
+  /**
+   * Creates a TeamService instance.
+   *
+   * @param {IDBConnection} connection - The active database connection.
+   */
   constructor(connection: IDBConnection) {
     super(connection);
     this.teamRepository = new TeamRepository(connection);
-    this.teamMemberRepository = new TeamMemberRepository(connection);
+    this.teamMemberService = new TeamMemberService(connection);
   }
 
   /**
-   * Create a new team record.
+   * Create a team record.
    *
-   * @param {CreateTeam} teamData - Data required to create a new team.
-   * @return {Promise<Team>} - The created team record.
-   * @memberof TeamService
+   * @param {CreateTeam} teamData - Team fields required to create the team.
+   * @return {Promise<Team>} The created team (includes `member_count`).
    */
-  createTeam(teamData: CreateTeam): Promise<Team> {
-    return this.teamRepository.insertTeam(teamData);
+  async createTeam(teamData: CreateTeam): Promise<Team> {
+    const team = await this.teamRepository.insertTeam({
+      name: teamData.name,
+      description: teamData.description
+    });
+
+    const systemUserIds = teamData.system_user_ids ?? [];
+
+    if (systemUserIds.length > 0) {
+      await Promise.all(
+        systemUserIds.map((systemUserId) =>
+          this.teamMemberService.createTeamMember({
+            team_id: team.team_id,
+            system_user_id: systemUserId
+          })
+        )
+      );
+    }
+
+    return this.teamRepository.getTeam(team.team_id);
   }
 
   /**
-   * Retrieve a team record
+   * Get a single team by ID.
    *
-   * @param {string} teamId - The ID of the team to fetch.
-   * @return {Promise<Team>} - The team record.
-   * @memberof TeamService
+   * @param {string} teamId - Team identifier.
+   * @return {Promise<Team>} Team record including `member_count`.
    */
   getTeam(teamId: string): Promise<Team> {
     return this.teamRepository.getTeam(teamId);
   }
 
   /**
-   * Retrieve multiple team records
+   * Get teams with optional search and optional pagination.
    *
-   * @return {Promise<Team[]>} - The team records.
-   * @memberof TeamService
+   * @param {TeamFilters} [filters] - Optional filter set.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
+   * @return {Promise<Team[]>} Team list response.
    */
-  getTeams(): Promise<Team[]> {
-    return this.teamRepository.getTeams();
+  getTeams(filters?: TeamFilters, pagination?: ApiPaginationOptions): Promise<Team[]> {
+    return this.teamRepository.getTeams(filters, pagination);
   }
 
   /**
-   * Update an existing team record.
+   * Get total count of teams matching optional filters.
    *
-   * @param {string} teamId - The ID of the team to update.
-   * @param {UpdateTeam} teamData - Partial data to update the team record.
-   * @return {Promise<Team>} - The updated team record.
-   * @memberof TeamService
+   * @param {TeamFilters} [filters] - Optional filter set.
+   * @return {Promise<number>} Count of matching teams.
    */
-  updateTeam(teamId: string, teamData: UpdateTeam): Promise<Team> {
-    return this.teamRepository.updateTeam(teamId, teamData);
+  getTeamsCount(filters?: TeamFilters): Promise<number> {
+    return this.teamRepository.getTeamsCount(filters);
   }
 
   /**
-   * Delete a team record.
+   * Update a team record by ID.
    *
-   * @param {string} teamId - The id of the team to delete
+   * @param {string} teamId - Team identifier.
+   * @param {UpdateTeam} teamData - Partial team fields to update.
+   * @return {Promise<Team>} Updated team including current `member_count`.
+   */
+  async updateTeam(teamId: string, teamData: UpdateTeam): Promise<Team> {
+    await this.teamRepository.updateTeam(teamId, teamData);
+    return this.teamRepository.getTeam(teamId);
+  }
+
+  /**
+   * Soft-delete a team by ID.
+   *
+   * @param {string} teamId - Team identifier.
    * @return {Promise<void>}
-   * @memberof TeamService
    */
   async deleteTeam(teamId: string): Promise<void> {
     await this.teamRepository.deleteTeam(teamId);
-  }
-
-  /**
-   * Get all teams with their members, with pagination and search.
-   *
-   * @param {string} [search] - Optional search term to filter by team name.
-   * @param {ApiPaginationOptions} pagination - Pagination options.
-   * @return {Promise<{ teams: TeamWithMembers[]; pagination: ApiPaginationResults }>}
-   * @memberof TeamService
-   */
-  async getTeamsWithMembers(
-    search: string | undefined,
-    pagination: ApiPaginationOptions
-  ): Promise<{
-    teams: TeamWithMembers[];
-    pagination: ApiPaginationResults;
-  }> {
-    const { teams, total } = await this.teamRepository.getTeamsWithPagination(search, pagination);
-
-    const teamsWithMembers = await Promise.all(
-      teams.map(async (team) => ({
-        ...team,
-        members: await this.getTeamMembersWithUsers(team.team_id)
-      }))
-    );
-
-    return {
-      teams: teamsWithMembers,
-      pagination: makePaginationResponse(total, pagination)
-    };
-  }
-
-  /**
-   * Get a single team with its members.
-   *
-   * @param {string} teamId - The ID of the team to fetch.
-   * @return {Promise<TeamWithMembers>}
-   * @memberof TeamService
-   */
-  async getTeamWithMembers(teamId: string): Promise<TeamWithMembers> {
-    const [team, members] = await Promise.all([
-      this.teamRepository.getTeam(teamId),
-      this.getTeamMembersWithUsers(teamId)
-    ]);
-    return { ...team, members };
-  }
-
-  /**
-   * Get team members with user details.
-   *
-   * @param {string} teamId - The ID of the team.
-   * @return {Promise<TeamMemberWithUser[]>}
-   * @memberof TeamService
-   */
-  async getTeamMembersWithUsers(teamId: string): Promise<TeamMemberWithUser[]> {
-    return this.teamMemberRepository.getTeamMembersWithUsers(teamId);
-  }
-
-  /**
-   * Create a team with members.
-   *
-   * @param {CreateTeam} teamData - Data required to create a new team.
-   * @param {number[]} memberUserIds - System user IDs to add as members.
-   * @return {Promise<TeamWithMembers>}
-   * @memberof TeamService
-   */
-  async createTeamWithMembers(teamData: CreateTeam, memberUserIds: number[]): Promise<TeamWithMembers> {
-    const team = await this.createTeam(teamData);
-
-    // Add members
-    await Promise.all(
-      memberUserIds.map((userId) =>
-        this.teamMemberRepository.insertTeamMember({
-          team_id: team.team_id,
-          system_user_id: userId
-        })
-      )
-    );
-
-    const members = await this.getTeamMembersWithUsers(team.team_id);
-    return { ...team, members };
-  }
-
-  /**
-   * Update a team and sync its members.
-   * Strategy: Compare new member list with existing, add new, remove old.
-   *
-   * @param {string} teamId - The ID of the team to update.
-   * @param {UpdateTeam} teamData - Partial data to update the team record.
-   * @param {number[]} memberUserIds - New complete member list (user IDs).
-   * @return {Promise<TeamWithMembers>}
-   * @memberof TeamService
-   */
-  async updateTeamWithMembers(teamId: string, teamData: UpdateTeam, memberUserIds: number[]): Promise<TeamWithMembers> {
-    const team = await this.updateTeam(teamId, teamData);
-
-    // Get current members
-    const currentMembers = await this.teamMemberRepository.getTeamMembersByTeamId(teamId);
-    const currentUserIds = new Set(currentMembers.map((m) => m.system_user_id));
-    const newUserIds = new Set(memberUserIds);
-
-    // Find members to add (in new list but not current)
-    const toAdd = memberUserIds.filter((id) => !currentUserIds.has(id));
-
-    // Find members to remove (in current but not new list)
-    const toRemove = currentMembers.filter((m) => !newUserIds.has(m.system_user_id));
-
-    // Add new members
-    await Promise.all(
-      toAdd.map((userId) =>
-        this.teamMemberRepository.insertTeamMember({
-          team_id: teamId,
-          system_user_id: userId
-        })
-      )
-    );
-
-    // Soft-delete removed members
-    await Promise.all(toRemove.map((member) => this.teamMemberRepository.deleteTeamMember(member.team_member_id)));
-
-    const members = await this.getTeamMembersWithUsers(teamId);
-    return { ...team, members };
   }
 }

@@ -12,7 +12,11 @@ import {
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { PolicyService } from '../../../services/access-policy/policy-service';
 import { getLogger } from '../../../utils/logger';
-import { ApiPaginationOptions } from '../../../zod-schema/pagination';
+import {
+  ensureCompletePaginationOptions,
+  makePaginationOptionsFromRequest,
+  makePaginationResponse
+} from '../../../utils/pagination';
 
 const defaultLog = getLogger('paths/administrative/policies');
 
@@ -71,22 +75,21 @@ export function getPolicies(): RequestHandler {
     const connection = getDBConnection(req['keycloak_token']);
 
     const search = req.query.search as string | undefined;
-    const pagination: ApiPaginationOptions = {
-      page: Number(req.query.page) || 1,
-      limit: Math.min(Number(req.query.limit) || 10, 100),
-      sort: req.query.sort as string | undefined,
-      order: req.query.order as 'asc' | 'desc' | undefined
-    };
 
     try {
       await connection.open();
 
       const policyService = new PolicyService(connection);
-      const response = await policyService.getPoliciesWithStatements(search, pagination);
+      const filters = { search };
+      const pagination = makePaginationOptionsFromRequest(req);
+      const [policies, count] = await Promise.all([
+        policyService.getPoliciesWithStatements(filters, ensureCompletePaginationOptions(pagination)),
+        policyService.getPoliciesCount(filters)
+      ]);
 
       await connection.commit();
 
-      return res.status(200).json(response);
+      return res.status(200).json({ policies, pagination: makePaginationResponse(count, pagination) });
     } catch (error) {
       defaultLog.error({ label: 'getPolicies', message: 'error', error });
       await connection.rollback();

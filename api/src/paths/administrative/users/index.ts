@@ -3,7 +3,7 @@ import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
-import { AvailableUsersListResponseSchema } from '../../../openapi/schemas/team';
+import { AvailableUsersListResponseSchema } from '../../../openapi/schemas/team-member';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { UserService } from '../../../services/user-service';
 import { getLogger } from '../../../utils/logger';
@@ -12,7 +12,12 @@ const defaultLog = getLogger('paths/administrative/users');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR], discriminator: 'SystemRole' }]
+    and: [
+      {
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR],
+        discriminator: 'SystemRole'
+      }
+    ]
   })),
   getAvailableUsers()
 ];
@@ -32,7 +37,11 @@ GET.apiDoc = {
   responses: {
     200: {
       description: 'List of available users',
-      content: { 'application/json': { schema: AvailableUsersListResponseSchema } }
+      content: {
+        'application/json': {
+          schema: AvailableUsersListResponseSchema
+        }
+      }
     },
     ...defaultErrorResponses
   }

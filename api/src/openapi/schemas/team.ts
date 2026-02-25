@@ -8,30 +8,6 @@ import { OpenAPIV3 } from 'openapi-types';
 import { paginationResponseSchema } from './pagination';
 
 /**
- * Schema for a team member with user details.
- */
-export const TeamMemberWithUserSchema: OpenAPIV3.SchemaObject = {
-  title: 'TeamMemberWithUser',
-  type: 'object',
-  required: ['team_member_id', 'system_user_id', 'user_identifier'],
-  properties: {
-    team_member_id: {
-      type: 'string',
-      format: 'uuid',
-      description: 'Unique identifier for the team membership'
-    },
-    system_user_id: {
-      type: 'integer',
-      description: 'The system user ID of the team member'
-    },
-    user_identifier: {
-      type: 'string',
-      description: 'Username or identifier from identity provider'
-    }
-  }
-};
-
-/**
  * Schema for a team (without members).
  */
 export const TeamSchema: OpenAPIV3.SchemaObject = {
@@ -59,12 +35,12 @@ export const TeamSchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
- * Schema for a team with its members.
+ * Schema for a team with member count.
  */
-export const TeamWithMembersSchema: OpenAPIV3.SchemaObject = {
-  title: 'TeamWithMembers',
+export const TeamWithMemberCountSchema: OpenAPIV3.SchemaObject = {
+  title: 'TeamWithMemberCount',
   type: 'object',
-  required: ['team_id', 'name', 'members'],
+  required: ['team_id', 'name', 'member_count'],
   properties: {
     team_id: {
       type: 'string',
@@ -82,10 +58,9 @@ export const TeamWithMembersSchema: OpenAPIV3.SchemaObject = {
       nullable: true,
       description: 'Description of the team'
     },
-    members: {
-      type: 'array',
-      items: TeamMemberWithUserSchema,
-      description: 'List of team members with user details'
+    member_count: {
+      type: 'integer',
+      description: 'Number of active members in the team'
     }
   }
 };
@@ -100,8 +75,8 @@ export const TeamsListResponseSchema: OpenAPIV3.SchemaObject = {
   properties: {
     teams: {
       type: 'array',
-      items: TeamWithMembersSchema,
-      description: 'List of teams with members'
+      items: TeamWithMemberCountSchema,
+      description: 'List of teams with member counts'
     },
     pagination: paginationResponseSchema
   }
@@ -125,7 +100,7 @@ export const CreateTeamRequestSchema: OpenAPIV3.SchemaObject = {
       maxLength: 1000,
       description: 'Description of the team'
     },
-    member_user_ids: {
+    system_user_ids: {
       type: 'array',
       items: { type: 'integer' },
       description: 'System user IDs to add as team members'
@@ -150,45 +125,10 @@ export const UpdateTeamRequestSchema: OpenAPIV3.SchemaObject = {
       maxLength: 1000,
       description: 'Description of the team'
     },
-    member_user_ids: {
+    system_user_ids: {
       type: 'array',
       items: { type: 'integer' },
       description: 'Complete list of system user IDs (replaces existing members)'
-    }
-  }
-};
-
-/**
- * Schema for an available user (for team membership selection).
- */
-export const AvailableUserSchema: OpenAPIV3.SchemaObject = {
-  title: 'AvailableUser',
-  type: 'object',
-  required: ['system_user_id', 'user_identifier'],
-  properties: {
-    system_user_id: {
-      type: 'integer',
-      description: 'Unique identifier for the system user'
-    },
-    user_identifier: {
-      type: 'string',
-      description: 'Username or identifier from identity provider'
-    }
-  }
-};
-
-/**
- * Schema for available users list response.
- */
-export const AvailableUsersListResponseSchema: OpenAPIV3.SchemaObject = {
-  title: 'AvailableUsersListResponse',
-  type: 'object',
-  required: ['users'],
-  properties: {
-    users: {
-      type: 'array',
-      items: AvailableUserSchema,
-      description: 'List of available users for team membership'
     }
   }
 };

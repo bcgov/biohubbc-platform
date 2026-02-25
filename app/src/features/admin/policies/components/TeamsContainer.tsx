@@ -16,7 +16,7 @@ import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
+import { ITeam } from 'interfaces/useTeamsApi.interface';
 import { IServerPaginationProps } from 'types/pagination';
 import { useState } from 'react';
 import { AddTeamForm, AddTeamFormInitialValues, AddTeamFormYupSchema, IAddTeamFormValues } from './AddTeamForm';
@@ -26,7 +26,7 @@ import { AddTeamForm, AddTeamFormInitialValues, AddTeamFormYupSchema, IAddTeamFo
  */
 export interface ITeamsContainerProps extends IServerPaginationProps {
   /** Array of teams to display in the table */
-  teams: ITeamWithMembers[];
+  teams: ITeam[];
   /** Callback to refresh the teams list after create/update/delete */
   refresh: () => void;
   /** Current search term for filtering teams */
@@ -73,7 +73,7 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
   // Dialog state
   const [openAddTeamDialog, setOpenAddTeamDialog] = useState(false);
   const [openEditTeamDialog, setOpenEditTeamDialog] = useState(false);
-  const [editingTeam, setEditingTeam] = useState<ITeamWithMembers | null>(null);
+  const [editingTeam, setEditingTeam] = useState<ITeam | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   /**
@@ -106,9 +106,9 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
   /**
    * Open confirmation dialog to delete a team.
    *
-   * @param {ITeamWithMembers} team - The team to delete
+   * @param {ITeam} team - The team to delete
    */
-  const handleDeleteTeamClick = (team: ITeamWithMembers) => {
+  const handleDeleteTeamClick = (team: ITeam) => {
     dialogContext.setYesNoDialog({
       dialogTitle: 'Delete team?',
       dialogContent: (
@@ -137,10 +137,10 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
   /**
    * Delete a team via API.
    *
-   * @param {ITeamWithMembers} team - The team to delete
+   * @param {ITeam} team - The team to delete
    * @returns {Promise<void>}
    */
-  const deleteTeam = async (team: ITeamWithMembers) => {
+  const deleteTeam = async (team: ITeam) => {
     if (!team?.team_id) {
       return;
     }
@@ -184,9 +184,9 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
   /**
    * Open the edit dialog for a team.
    *
-   * @param {ITeamWithMembers} team - The team to edit
+   * @param {ITeam} team - The team to edit
    */
-  const handleEditTeamClick = (team: ITeamWithMembers) => {
+  const handleEditTeamClick = (team: ITeam) => {
     setEditingTeam(team);
     setOpenEditTeamDialog(true);
   };
@@ -204,7 +204,7 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
       await biohubApi.teams.createTeam({
         name: values.name,
         description: values.description || undefined,
-        member_user_ids: values.member_user_ids
+        system_user_ids: values.system_user_ids
       });
 
       setOpenAddTeamDialog(false);
@@ -255,7 +255,7 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
       await biohubApi.teams.updateTeam(editingTeam.team_id, {
         name: values.name,
         description: values.description || undefined,
-        member_user_ids: values.member_user_ids
+        system_user_ids: values.system_user_ids
       });
 
       setOpenEditTeamDialog(false);
@@ -302,12 +302,12 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
     return {
       name: editingTeam.name,
       description: editingTeam.description || '',
-      member_user_ids: editingTeam.members.map((m) => m.system_user_id)
+      system_user_ids: []
     };
   };
 
   // DataGrid columns
-  const columns: GridColDef<ITeamWithMembers>[] = [
+  const columns: GridColDef<ITeam>[] = [
     {
       field: 'name',
       headerName: 'Name',
@@ -322,11 +322,10 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
       valueGetter: (value) => value || '-'
     },
     {
-      field: 'members',
+      field: 'member_count',
       headerName: 'Members',
       width: 100,
-      sortable: false,
-      valueGetter: (_value, row) => row.members?.length ?? 0
+      valueGetter: (_value, row) => row.member_count
     },
     {
       field: 'actions',
