@@ -1,11 +1,9 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
-import { Policy } from '../../models/policy';
 import { TeamAuthorizationRepository } from '../../repositories/authorization/team-authorization-repository';
 import { SubmissionFeature } from '../../repositories/submission-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { PolicyService } from '../access-policy/policy-service';
 import { SubmissionService } from '../submission-service';
 import { TeamAuthorizationService } from './team-authorization-service';
 
@@ -104,8 +102,6 @@ describe('TeamAuthorizationService', () => {
         secured: true
       };
 
-      const mockPolicies: Policy[] = [{ policy_id: 'policy', description: 'desc', name: 'Policy' }];
-
       it('returns true immediately if the feature is not secured', async () => {
         const mockConnection = getMockDBConnection();
         sinon
@@ -136,10 +132,12 @@ describe('TeamAuthorizationService', () => {
         expect(result).to.be.false;
       });
 
-      it('returns true if policies grant access', async () => {
+      it('returns true when the user has team policy access to the submission feature', async () => {
         const mockConnection = getMockDBConnection();
         sinon.stub(SubmissionService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
-        sinon.stub(PolicyService.prototype, 'getPoliciesThatAuthorizeFeatureAccessByUrn').resolves(mockPolicies);
+        sinon
+          .stub(TeamAuthorizationRepository.prototype, 'findTeamPolicyBySubmissionFeature')
+          .resolves({ team_policy_id: 'tp-1' });
 
         const service = new TeamAuthorizationService(mockConnection);
         const result = await service.isUserAuthorizedForTeamEntity(1, {
@@ -151,10 +149,10 @@ describe('TeamAuthorizationService', () => {
         expect(result).to.be.true;
       });
 
-      it('returns false if no policies grant access', async () => {
+      it('returns false when the user does not have team policy access to the submission feature', async () => {
         const mockConnection = getMockDBConnection();
         sinon.stub(SubmissionService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
-        sinon.stub(PolicyService.prototype, 'getPoliciesThatAuthorizeFeatureAccessByUrn').resolves([]);
+        sinon.stub(TeamAuthorizationRepository.prototype, 'findTeamPolicyBySubmissionFeature').resolves(null);
 
         const service = new TeamAuthorizationService(mockConnection);
         const result = await service.isUserAuthorizedForTeamEntity(1, {
