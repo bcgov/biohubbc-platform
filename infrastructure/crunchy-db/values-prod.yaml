@@ -28,11 +28,11 @@ crunchy-postgres:
 
 # To perform the one-time data migration from the old database, set:
 #   migration.enabled: true
-#   migration.oldDb.host: "biohub-platform-db-prod"
-#   migration.oldDb.secretName: "biohub-platform-db-prod"
+#   migration.oldDb.host: "biohub-platform-db-postgresql-prod"
+#   migration.oldDb.secretName: "biohub-platform-db-postgresql-prod"
 # Then re-deploy with migration.enabled: false once complete.
 migration:
   enabled: false
   oldDb:
-    host: "biohub-platform-db-prod"
-    secretName: "biohub-platform-db-prod"
+    host: "biohub-platform-db-postgresql-prod"
+    secretName: "biohub-platform-db-postgresql-prod"

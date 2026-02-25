@@ -74,11 +74,12 @@ biohub-platform-db-setup:
       adminUserKey: "user"
       adminPasswordKey: "password"
       # Legacy deploy secret (has database-user-api=biohub_api and database-user-api-password)
-      appSecretName: "biohub-platform-db-dev-deploy"
+      appSecretName: "biohub-platform-db-postgresql-dev-deploy"
       appUserKey: "database-user-api"
       appPasswordKey: "database-user-api-password"
-      dbNameSecretName: "biohub-platform-db-dev-deploy"
-      dbNameKey: "database-name"
+      # Crunchy DB name comes from PGO app user secret (dbname = biohub-platform-db-dev)
+      dbNameSecretName: "biohub-platform-db-dev-pguser-biohub-platform-db-dev"
+      dbNameKey: "dbname"
 
 # Values passed to biohub-platform-api subchart
 biohub-platform-api:
@@ -106,11 +107,12 @@ biohub-platform-api:
       host: "biohub-platform-db-dev-pgbouncer"
       port: 5432
       # Legacy deploy secret (has database-user-api=biohub_api and database-user-api-password)
-      appSecretName: "biohub-platform-db-dev-deploy"
+      appSecretName: "biohub-platform-db-postgresql-dev-deploy"
       appUserKey: "database-user-api"
       appPasswordKey: "database-user-api-password"
-      dbNameSecretName: "biohub-platform-db-dev-deploy"
-      dbNameKey: "database-name"
+      # Crunchy DB name comes from PGO app user secret (dbname = biohub-platform-db-dev)
+      dbNameSecretName: "biohub-platform-db-dev-pguser-biohub-platform-db-dev"
+      dbNameKey: "dbname"
       adminSecretName: "biohub-platform-db-dev-pguser-postgres"
       adminUserKey: "user"
       adminPasswordKey: "password"
@@ -163,11 +165,12 @@ biohub-platform-queue:
       host: "biohub-platform-db-dev-pgbouncer"
       port: 5432
       # Legacy deploy secret (has database-user-api=biohub_api and database-user-api-password)
-      appSecretName: "biohub-platform-db-dev-deploy"
+      appSecretName: "biohub-platform-db-postgresql-dev-deploy"
       appUserKey: "database-user-api"
       appPasswordKey: "database-user-api-password"
-      dbNameSecretName: "biohub-platform-db-dev-deploy"
-      dbNameKey: "database-name"
+      # Crunchy DB name comes from PGO app user secret (dbname = biohub-platform-db-dev)
+      dbNameSecretName: "biohub-platform-db-dev-pguser-biohub-platform-db-dev"
+      dbNameKey: "dbname"
       adminSecretName: "biohub-platform-db-dev-pguser-postgres"
       adminUserKey: "user"
       adminPasswordKey: "password"

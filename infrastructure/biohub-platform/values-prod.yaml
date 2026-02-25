@@ -74,11 +74,12 @@ biohub-platform-db-setup:
       adminUserKey: "user"
       adminPasswordKey: "password"
       # Legacy deploy secret (has database-user-api=biohub_api and database-user-api-password)
-      appSecretName: "biohub-platform-db-prod"
+      appSecretName: "biohub-platform-db-postgresql-prod"
       appUserKey: "database-user-api"
       appPasswordKey: "database-user-api-password"
-      dbNameSecretName: "biohub-platform-db-prod"
-      dbNameKey: "database-name"
+      # Crunchy DB name from PGO app user secret (dbname = biohub-platform-db-prod)
+      dbNameSecretName: "biohub-platform-db-prod-pguser-biohub-platform-db-prod"
+      dbNameKey: "dbname"
 
 # Values passed to biohub-platform-api subchart
 biohub-platform-api:
@@ -105,11 +106,12 @@ biohub-platform-api:
       useCrunchy: true
       host: "biohub-platform-db-prod-pgbouncer"
       port: 5432
-      appSecretName: "biohub-platform-db-prod"
+      appSecretName: "biohub-platform-db-postgresql-prod"
       appUserKey: "database-user-api"
       appPasswordKey: "database-user-api-password"
-      dbNameSecretName: "biohub-platform-db-prod"
-      dbNameKey: "database-name"
+      # Crunchy DB name from PGO app user secret (dbname = biohub-platform-db-prod)
+      dbNameSecretName: "biohub-platform-db-prod-pguser-biohub-platform-db-prod"
+      dbNameKey: "dbname"
       adminSecretName: "biohub-platform-db-prod-pguser-postgres"
       adminUserKey: "user"
       adminPasswordKey: "password"
@@ -161,11 +163,12 @@ biohub-platform-queue:
       useCrunchy: true
       host: "biohub-platform-db-prod-pgbouncer"
       port: 5432
-      appSecretName: "biohub-platform-db-prod"
+      appSecretName: "biohub-platform-db-postgresql-prod"
       appUserKey: "database-user-api"
       appPasswordKey: "database-user-api-password"
-      dbNameSecretName: "biohub-platform-db-prod"
-      dbNameKey: "database-name"
+      # Crunchy DB name from PGO app user secret (dbname = biohub-platform-db-prod)
+      dbNameSecretName: "biohub-platform-db-prod-pguser-biohub-platform-db-prod"
+      dbNameKey: "dbname"
       adminSecretName: "biohub-platform-db-prod-pguser-postgres"
       adminUserKey: "user"
       adminPasswordKey: "password"

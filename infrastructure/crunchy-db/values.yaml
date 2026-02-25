@@ -115,3 +115,7 @@ migration:
     dbNameKey: "database-name"
     # Keys for biohub_api password (legacy secret has database-user-api-password); set in post-restore so API can use same secret.
     apiPasswordKey: "database-user-api-password"
+  # New (Crunchy) DB admin secret: cluster name comes from crunchy-postgres.fullnameOverride; override keys if your PGO uses different names.
+  newDb:
+    adminUserKey: "user"
+    adminPasswordKey: "password"
