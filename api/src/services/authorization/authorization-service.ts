@@ -48,10 +48,6 @@ export type TeamAuthorizationEntity =
       policyId: string;
     }
   | {
-      entity: 'ticket';
-      ticketId: string;
-    }
-  | {
       entity: 'data_request';
       dataRequestId: string;
     }
