@@ -4,7 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { Ticket } from '../models/ticket';
+import { Ticket, TicketSlug } from '../models/ticket';
 import { getMockDBConnection } from '../__mocks__/db';
 import { TicketRepository } from './ticket-repository';
 
@@ -56,6 +56,36 @@ describe('TicketRepository', () => {
         ticket_slug: mockTicket.ticket_slug
       });
       expect(result).to.eql(mockTicket);
+    });
+  });
+
+  describe('getNextTicketSlug', () => {
+    it('throws when slug generation fails', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new TicketRepository(mockDBConnection);
+
+      try {
+        await repo.getNextTicketSlug();
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiExecuteSQLError);
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to generate ticket slug');
+      }
+    });
+
+    it('returns the next slug value', async () => {
+      const sqlStub = sinon.stub().resolves({
+        rowCount: 1,
+        rows: [{ ticket_slug: '04900042' }]
+      } as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repo = new TicketRepository(mockDBConnection);
+
+      const result = await repo.getNextTicketSlug();
+
+      expect(sqlStub).to.have.been.calledWithMatch(sinon.match.any, TicketSlug);
+      expect(result).to.equal('04900042');
     });
   });
 
@@ -151,6 +181,7 @@ describe('TicketRepository', () => {
       const mockRow = {
         ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
         ticket_id: mockTicket.ticket_id,
+        create_date: '2026-02-25T00:00:00.000Z',
         status: 'open' as const
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
@@ -168,6 +199,7 @@ describe('TicketRepository', () => {
         {
           ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
           ticket_id: mockTicket.ticket_id,
+          create_date: '2026-02-25T00:00:00.000Z',
           status: 'open' as const
         }
       ];

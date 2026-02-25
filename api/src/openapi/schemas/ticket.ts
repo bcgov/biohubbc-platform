@@ -35,10 +35,11 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
       type: 'array',
       items: {
         type: 'object',
-        required: ['ticket_status_history_id', 'ticket_id', 'status'],
+        required: ['ticket_status_history_id', 'ticket_id', 'create_date', 'status'],
         properties: {
           ticket_status_history_id: { type: 'string', format: 'uuid' },
           ticket_id: { type: 'string', format: 'uuid' },
+          create_date: { type: 'string', format: 'date-time' },
           status: { type: 'string', enum: TicketStatusEnum }
         }
       }
@@ -80,10 +81,11 @@ export const UpdateTicketStatusRequestSchema: OpenAPIV3.SchemaObject = {
 
 export const TicketStatusHistorySchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['ticket_status_history_id', 'ticket_id', 'status'],
+  required: ['ticket_status_history_id', 'ticket_id', 'create_date', 'status'],
   properties: {
     ticket_status_history_id: { type: 'string', format: 'uuid' },
     ticket_id: { type: 'string', format: 'uuid' },
+    create_date: { type: 'string', format: 'date-time' },
     status: { type: 'string', enum: TicketStatusEnum }
   }
 };

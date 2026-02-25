@@ -22,10 +22,13 @@ export const Ticket = z.object({
 });
 
 export type Ticket = z.infer<typeof Ticket>;
+export const TicketSlug = Ticket.pick({ ticket_slug: true });
+export type TicketSlug = z.infer<typeof TicketSlug>;
 
 const TicketHistoryItem = z.object({
   ticket_status_history_id: z.string().uuid(),
   ticket_id: z.string().uuid(),
+  create_date: z.string(),
   status: TicketStatus
 });
 

@@ -1,7 +1,14 @@
 import { SQL } from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { CreateTicketRequest, TeamFilters, Ticket, TicketStatus, UpdateTicketRequest } from '../models/ticket';
+import {
+  CreateTicketRequest,
+  TeamFilters,
+  Ticket,
+  TicketSlug,
+  TicketStatus,
+  UpdateTicketRequest
+} from '../models/ticket';
 import { TicketStatusHistory } from '../models/ticket-status-history';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
@@ -18,6 +25,52 @@ const TICKET_COLUMNS = [
 ] as const;
 
 export class TicketRepository extends BaseRepository {
+  /**
+   * Generate the next unique ticket slug for the current UTC day in DDDNNNNN format.
+   *
+   * Uses a transaction-scoped advisory lock plus existing ticket rows to guarantee uniqueness without retries.
+   *
+   * @return {Promise<string>} Next ticket slug.
+   * @throws {ApiExecuteSQLError} If slug generation fails.
+   * @memberof TicketRepository
+   */
+  async getNextTicketSlug(): Promise<string> {
+    const sqlStatement = SQL`
+      WITH advisory_lock AS (
+        SELECT pg_advisory_xact_lock(hashtext('ticket_slug_generation'))
+      ),
+      day_context AS (
+        SELECT TO_CHAR((now() AT TIME ZONE 'UTC')::date, 'DDD') AS day_of_year
+      ),
+      latest AS (
+        SELECT
+          COALESCE(MAX(RIGHT(ticket_slug, 5)::integer), -1) AS last_value
+        FROM ticket, day_context, advisory_lock
+        WHERE ticket_slug LIKE day_context.day_of_year || '%'
+      ),
+      next_value AS (
+        SELECT
+          day_context.day_of_year,
+          latest.last_value + 1 AS next_sequence
+        FROM day_context, latest
+      )
+      SELECT
+        day_of_year || LPAD(next_sequence::text, 5, '0') AS ticket_slug
+      FROM next_value;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, TicketSlug);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to generate ticket slug', [
+        'TicketRepository->getNextTicketSlug',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
+    }
+
+    return response.rows[0].ticket_slug;
+  }
+
   /**
    * Insert a new ticket record.
    *
@@ -192,6 +245,7 @@ export class TicketRepository extends BaseRepository {
       RETURNING
         ticket_status_history_id,
         ticket_id,
+        create_date,
         status;
     `;
 
@@ -219,6 +273,7 @@ export class TicketRepository extends BaseRepository {
       SELECT
         ticket_status_history_id,
         ticket_id,
+        create_date,
         status
       FROM ticket_status_history
       WHERE ticket_id = ${ticketId}

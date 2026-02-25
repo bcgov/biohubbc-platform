@@ -31,6 +31,7 @@ describe('useTicketsApi', () => {
       {
         ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
         ticket_id: '11111111-1111-1111-1111-111111111111',
+        create_date: '2026-02-25T00:00:00.000Z',
         status: 'open'
       }
     ];
@@ -41,6 +42,7 @@ describe('useTicketsApi', () => {
       title: 'Test ticket',
       description: null,
       team_id: '22222222-2222-2222-2222-222222222222',
+      create_date: '2026-02-25T00:00:00.000Z',
       priority: 'medium',
       status: 'open',
       history
@@ -65,6 +67,7 @@ describe('useTicketsApi', () => {
       title: 'New ticket',
       description: 'desc',
       team_id: '22222222-2222-2222-2222-222222222222',
+      create_date: '2026-02-25T00:00:00.000Z',
       priority: 'medium',
       status: 'open'
     };
@@ -85,6 +88,7 @@ describe('useTicketsApi', () => {
       title: 'Updated title',
       description: null,
       team_id: '22222222-2222-2222-2222-222222222222',
+      create_date: '2026-02-25T00:00:00.000Z',
       priority: 'medium',
       status: 'open'
     };
@@ -104,6 +108,7 @@ describe('useTicketsApi', () => {
       title: 'Status changed',
       description: null,
       team_id: '22222222-2222-2222-2222-222222222222',
+      create_date: '2026-02-25T00:00:00.000Z',
       priority: 'medium',
       status: 'closed'
     };

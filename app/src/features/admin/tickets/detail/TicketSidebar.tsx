@@ -1,6 +1,5 @@
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
-import Paper from '@mui/material/Paper';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -21,14 +20,20 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
   const { isLoading, team } = props;
 
   return (
-    <Paper variant="outlined">
-      <Box sx={{ px: 2.5, py: 2 }}>
+    <Box
+      sx={{
+        bgcolor: 'transparent',
+        borderTop: 1,
+        borderBottom: 1,
+        borderColor: 'divider'
+      }}>
+      <Box sx={{ py: 2.5 }}>
         <Typography component="h3" sx={{ fontWeight: 700 }}>
           Team
         </Typography>
       </Box>
       <Divider />
-      <Box sx={{ px: 2.5, py: 2 }}>
+      <Box sx={{ py: 2.5 }}>
         {isLoading ? (
           <Stack spacing={1}>
             <Skeleton variant="text" width="75%" />
@@ -37,18 +42,18 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
         ) : (
           <Stack spacing={0.75}>
             {(team?.members ?? []).map((member) => (
-              <Typography key={member.team_member_id} variant="body2" color="text.secondary">
+              <Typography key={member.team_member_id} variant="body2">
                 {member.user_identifier}
               </Typography>
             ))}
             {!team?.members?.length && (
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2">
                 No team members
               </Typography>
             )}
           </Stack>
         )}
       </Box>
-    </Paper>
+    </Box>
   );
 };

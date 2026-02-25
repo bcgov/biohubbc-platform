@@ -17,6 +17,7 @@ export interface ITicket {
 export interface ITicketStatusHistory {
   ticket_status_history_id: string;
   ticket_id: string;
+  create_date: string;
   status: TicketStatus;
 }
 

@@ -6,9 +6,9 @@ import Typography from '@mui/material/Typography';
 import { GridColDef } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
-import dayjs from 'dayjs';
 import { ITicket } from 'interfaces/useTicketsApi.interface';
 import { useMemo } from 'react';
+import { getRelativeTimeLabel } from 'utils/date';
 import { TicketsNoRowsOverlay } from './TicketsNoRowsOverlay';
 
 interface ITicketsListProps {
@@ -27,22 +27,6 @@ interface ITicketsListProps {
  */
 export const TicketsList = (props: ITicketsListProps) => {
   const { tickets, isLoading, emptyTitle, emptyMessage, onTicketClick } = props;
-
-  const getDaysAgoLabel = (createDate?: string): string | null => {
-    if (!createDate) {
-      return null;
-    }
-
-    const createdAt = dayjs(createDate);
-
-    if (!createdAt.isValid()) {
-      return null;
-    }
-
-    const daysAgo = Math.max(dayjs().diff(createdAt, 'day'), 0);
-
-    return `${daysAgo} days ago`;
-  };
 
   const columns: GridColDef<ITicket>[] = useMemo(
     () => [
@@ -97,7 +81,7 @@ export const TicketsList = (props: ITicketsListProps) => {
         sortable: false,
         renderCell: (params) => (
           <Typography variant="body2" noWrap title={params.value || ''}>
-            {getDaysAgoLabel(typeof params.value === 'string' ? params.value : undefined)}
+            {getRelativeTimeLabel(typeof params.value === 'string' ? params.value : undefined)}
           </Typography>
         )
       }

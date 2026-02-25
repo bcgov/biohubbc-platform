@@ -1,4 +1,3 @@
-import { randomInt } from 'node:crypto';
 import { v4 } from 'uuid';
 import { IDBConnection } from '../database/db';
 import { CreateTicketRequest, TeamFilters, Ticket, TicketWithHistory, UpdateTicketRequest } from '../models/ticket';
@@ -31,52 +30,22 @@ export class TicketService extends DBService {
    * @memberof TicketService
    */
   async createTicket(ticket: CreateTicketRequest): Promise<Ticket> {
-    const ticketTeamId = ticket.team_id ?? (await this.createTicketTeam()).team_id;
-    const maxSlugAttempts = 20;
-    let createdTicket: Ticket | null = null;
-
-    for (let attempt = 0; attempt < maxSlugAttempts; attempt++) {
-      const ticketSlug = this.generateTicketSlug();
-
-      try {
-        createdTicket = await this.ticketRepository.insertTicket({
-          ...ticket,
-          team_id: ticketTeamId,
-          ticket_slug: ticketSlug
-        });
-        break;
-      } catch (error: any) {
-        if (error?.code === '23505' && error?.constraint === 'ticket_slug_unique') {
-          continue;
-        }
-
-        throw error;
-      }
+    let teamId = ticket.team_id;
+    if (!teamId) {
+      const team = await this.createTicketTeam();
+      teamId = team.team_id;
     }
 
-    if (!createdTicket) {
-      throw new Error('Failed to generate a unique ticket slug');
-    }
+    const ticketSlug = await this.ticketRepository.getNextTicketSlug();
+    const createdTicket = await this.ticketRepository.insertTicket({
+      ...ticket,
+      team_id: teamId,
+      ticket_slug: ticketSlug
+    });
 
     await this.ticketRepository.insertTicketStatusHistory(createdTicket.ticket_id, createdTicket.status);
 
     return createdTicket;
-  }
-
-  /**
-   * Generate an 8-digit ticket slug in DDDNNNNN format using UTC day-of-year plus random digits.
-   *
-   * @return {string} The generated ticket slug.
-   * @memberof TicketService
-   */
-  private generateTicketSlug(): string {
-    const now = new Date();
-    const utcYearStart = Date.UTC(now.getUTCFullYear(), 0, 0);
-    const utcToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-    const dayOfYear = Math.floor((utcToday - utcYearStart) / (1000 * 60 * 60 * 24));
-    const randomSequence = randomInt(0, 100000);
-
-    return `${dayOfYear.toString().padStart(3, '0')}${randomSequence.toString().padStart(5, '0')}`;
   }
 
   /**

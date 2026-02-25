@@ -1,8 +1,11 @@
-import Box from '@mui/material/Box';
+import { mdiExportVariant, mdiTagOutline } from '@mdi/js';
+import Icon from '@mdi/react';
+import { CustomTimeline, ICustomTimelineItem } from 'components/timeline';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { ITicketStatusHistory } from 'interfaces/useTicketsApi.interface';
+import { getRelativeTimeLabel } from 'utils/date';
 
 interface ITicketStatusTimelineProps {
   history: ITicketStatusHistory[];
@@ -39,30 +42,12 @@ export const TicketStatusTimeline = (props: ITicketStatusTimelineProps) => {
     return index === total - 1 ? 'Ticket was opened' : 'Ticket was reopened';
   };
 
-  return (
-    <Stack spacing={2.5} data-testid="ticket-status-history-timeline">
-      {history.map((item, index) => (
-        <Box key={item.ticket_status_history_id} sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
-          <Box sx={{ position: 'relative', width: 32, minHeight: 38, display: 'flex', justifyContent: 'center' }}>
-            {index < history.length - 1 && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: 28,
-                  bottom: -18,
-                  width: 2,
-                  bgcolor: 'divider'
-                }}
-              />
-            )}
-            <Box sx={{ width: 32, height: 32, borderRadius: 1.25, bgcolor: 'grey.300', mt: 0.25 }} />
-          </Box>
+  const timelineItems: ICustomTimelineItem[] = history.map((item, index) => ({
+    id: item.ticket_status_history_id,
+    content: <Typography>{getStatusMessage(item.status, index, history.length)}</Typography>,
+    icon: <Icon path={item.status === 'closed' ? mdiTagOutline : mdiExportVariant} size={0.85} />,
+    rightContent: getRelativeTimeLabel(item.create_date, { maxRelativeDays: 30, absoluteFormat: 'MMM D, YYYY' })
+  }));
 
-          <Typography sx={{ pt: 0.75 }}>
-            {getStatusMessage(item.status, index, history.length)}
-          </Typography>
-        </Box>
-      ))}
-    </Stack>
-  );
+  return <CustomTimeline items={timelineItems} dataTestId="ticket-status-history-timeline" />;
 };

@@ -19,6 +19,7 @@ describe('TicketService', () => {
     title: 'A ticket',
     description: 'desc',
     team_id: '22222222-2222-2222-2222-222222222222',
+    create_date: '2026-02-25T00:00:00.000Z',
     priority: 'medium' as const,
     status: 'open' as const
   };
@@ -34,6 +35,7 @@ describe('TicketService', () => {
 
   describe('createTicket', () => {
     it('creates ticket and inserts initial status history when team_id is provided', async () => {
+      const getNextTicketSlugStub = sinon.stub(TicketRepository.prototype, 'getNextTicketSlug').resolves('04900001');
       const insertTicketStub = sinon.stub(TicketRepository.prototype, 'insertTicket').resolves(mockTicket as any);
       const insertHistoryStub = sinon.stub(TicketRepository.prototype, 'insertTicketStatusHistory').resolves({} as any);
       const createTeamWithMembersStub = sinon
@@ -43,6 +45,7 @@ describe('TicketService', () => {
       const result = await service.createTicket({ title: 'A ticket', team_id: mockTicket.team_id });
 
       expect(createTeamWithMembersStub).to.not.have.been.called;
+      expect(getNextTicketSlugStub).to.have.been.calledOnce;
       expect(insertTicketStub).to.have.been.calledWith(
         sinon.match({
           title: 'A ticket',
@@ -57,6 +60,7 @@ describe('TicketService', () => {
     it('creates team and uses generated team_id when team_id is not provided', async () => {
       const generatedTeamId = '99999999-9999-9999-9999-999999999999';
       const createdTicket = { ...mockTicket, team_id: generatedTeamId };
+      const getNextTicketSlugStub = sinon.stub(TicketRepository.prototype, 'getNextTicketSlug').resolves('04900001');
       const createTeamWithMembersStub = sinon
         .stub(TeamService.prototype, 'createTeamWithMembers')
         .resolves({ team_id: generatedTeamId, name: 'Auto Team', description: null, members: [] } as any);
@@ -72,6 +76,7 @@ describe('TicketService', () => {
         }),
         []
       );
+      expect(getNextTicketSlugStub).to.have.been.calledOnce;
       expect(insertTicketStub).to.have.been.calledWith(
         sinon.match({
           title: 'A ticket',
@@ -83,23 +88,19 @@ describe('TicketService', () => {
       expect(result).to.eql(createdTicket);
     });
 
-    it('retries when generated slug collides on unique constraint', async () => {
-      const duplicateError: any = new Error('duplicate key value violates unique constraint');
-      duplicateError.code = '23505';
-      duplicateError.constraint = 'ticket_slug_unique';
-      const insertTicketStub = sinon
-        .stub(TicketRepository.prototype, 'insertTicket')
-        .onFirstCall()
-        .rejects(duplicateError)
-        .onSecondCall()
-        .resolves(mockTicket as any);
+    it('throws when insert fails', async () => {
+      sinon.stub(TicketRepository.prototype, 'getNextTicketSlug').resolves('04900001');
+      const insertError = new Error('insert failed');
+      sinon.stub(TicketRepository.prototype, 'insertTicket').rejects(insertError);
       const insertHistoryStub = sinon.stub(TicketRepository.prototype, 'insertTicketStatusHistory').resolves({} as any);
 
-      const result = await service.createTicket({ title: 'A ticket', team_id: mockTicket.team_id });
-
-      expect(insertTicketStub).to.have.callCount(2);
-      expect(insertHistoryStub).to.have.been.calledWith(mockTicket.ticket_id, 'open');
-      expect(result).to.eql(mockTicket);
+      try {
+        await service.createTicket({ title: 'A ticket', team_id: mockTicket.team_id });
+        expect.fail();
+      } catch (error) {
+        expect(error).to.equal(insertError);
+        expect(insertHistoryStub).to.not.have.been.called;
+      }
     });
   });
 
@@ -125,6 +126,7 @@ describe('TicketService', () => {
         {
           ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
           ticket_id: mockTicket.ticket_id,
+          create_date: '2026-02-25T00:00:00.000Z',
           status: 'open' as const
         }
       ];

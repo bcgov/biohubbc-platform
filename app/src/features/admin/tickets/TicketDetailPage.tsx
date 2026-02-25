@@ -5,10 +5,11 @@ import Stack from '@mui/material/Stack';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { ITicketWithHistory, TicketStatus } from 'interfaces/useTicketsApi.interface';
+import { ITicketWithHistory, IUpdateTicketRequest, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { EditTicketDialog } from './components/dialog/EditTicketDialog';
 import { TicketComment } from './detail/TicketComment';
 import { TicketFooter } from './detail/TicketFooter';
 import { TicketHeader } from './detail/TicketHeader';
@@ -28,8 +29,11 @@ export const TicketDetailPage = () => {
   const teamLoader = useDataLoader((teamId: string) => api.teams.getTeam(teamId));
 
   const [comment, setComment] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSavingStatus, setIsSavingStatus] = useState(false);
+  const [isSavingTicket, setIsSavingTicket] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const [editTicketError, setEditTicketError] = useState<string | undefined>();
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!ticketId) {
@@ -64,7 +68,7 @@ export const TicketDetailPage = () => {
     }
 
     try {
-      setIsSaving(true);
+      setIsSavingStatus(true);
       setError(undefined);
 
       await api.tickets.updateTicketStatus(ticketId, status);
@@ -74,7 +78,27 @@ export const TicketDetailPage = () => {
       const apiError = caughtError as APIError;
       setError(apiError.message || 'Failed to update status.');
     } finally {
-      setIsSaving(false);
+      setIsSavingStatus(false);
+    }
+  };
+
+  const handleEditTicket = async (payload: IUpdateTicketRequest) => {
+    if (!ticketId) {
+      return;
+    }
+
+    try {
+      setIsSavingTicket(true);
+      setEditTicketError(undefined);
+
+      await api.tickets.updateTicket(ticketId, payload);
+      await refreshTicketData();
+      setIsEditDialogOpen(false);
+    } catch (caughtError) {
+      const apiError = caughtError as APIError;
+      setEditTicketError(apiError.message || 'Failed to update ticket.');
+    } finally {
+      setIsSavingTicket(false);
     }
   };
 
@@ -84,9 +108,9 @@ export const TicketDetailPage = () => {
 
   return (
     <>
-      <TicketHeader ticket={ticket} />
+      <TicketHeader ticket={ticket} onEdit={() => setIsEditDialogOpen(true)} />
 
-      <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
         <Box
           sx={{
             display: 'grid',
@@ -101,7 +125,7 @@ export const TicketDetailPage = () => {
             <TicketComment comment={comment} setComment={setComment} />
             <TicketFooter
               comment={comment}
-              isSaving={isSaving}
+              isSaving={isSavingStatus}
               status={ticket?.status}
               onUpdateStatus={handleUpdateStatus}
             />
@@ -110,6 +134,20 @@ export const TicketDetailPage = () => {
           <TicketSidebar isLoading={teamLoader.isLoading} team={ticketTeam} />
         </Box>
       </Container>
+
+      {isEditDialogOpen && ticket ? (
+        <EditTicketDialog
+          open={isEditDialogOpen}
+          ticket={ticket}
+          isSaving={isSavingTicket}
+          error={editTicketError}
+          onClose={() => {
+            setEditTicketError(undefined);
+            setIsEditDialogOpen(false);
+          }}
+          onSave={handleEditTicket}
+        />
+      ) : null}
     </>
   );
 };

@@ -15,6 +15,7 @@ describe('paths/tickets/{ticketId}', () => {
     title: 'A ticket',
     description: 'desc',
     team_id: '22222222-2222-2222-2222-222222222222',
+    create_date: '2026-02-25T00:00:00.000Z',
     priority: 'medium' as const,
     status: 'open' as const
   };
@@ -24,6 +25,7 @@ describe('paths/tickets/{ticketId}', () => {
       {
         ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
         ticket_id: mockTicket.ticket_id,
+        create_date: '2026-02-25T00:00:00.000Z',
         status: 'open' as const
       }
     ]

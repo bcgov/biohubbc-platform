@@ -1,5 +1,8 @@
 import { fireEvent, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
+import { CodesContext, ICodesContext } from 'contexts/codesContext';
+import { DataLoader } from 'hooks/useDataLoader';
+import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -15,6 +18,7 @@ const ticket = {
   title: 'Test Ticket',
   description: 'Test description',
   team_id: '22222222-2222-2222-2222-222222222222',
+  create_date: '2026-02-24T00:00:00.000Z',
   priority: 'medium' as const,
   status: 'open' as const
 };
@@ -23,11 +27,13 @@ const history = [
   {
     ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
     ticket_id: ticket.ticket_id,
+    create_date: '2026-02-24T00:00:00.000Z',
     status: 'open' as const
   },
   {
     ticket_status_history_id: '44444444-4444-4444-4444-444444444444',
     ticket_id: ticket.ticket_id,
+    create_date: '2026-02-25T00:00:00.000Z',
     status: 'closed' as const
   }
 ];
@@ -40,7 +46,30 @@ const ticketWithHistory = {
 describe('TicketDetailPage', () => {
   const mockGetTicket = vi.fn();
   const mockGetTeam = vi.fn();
+  const mockUpdateTicket = vi.fn();
   const mockUpdateTicketStatus = vi.fn();
+
+  const mockCodesData: IGetAllCodeSetsResponse = {
+    feature_type_with_properties: [],
+    ticket_priorities: ['low', 'medium', 'high', 'critical']
+  };
+
+  const mockCodesDataLoader: DataLoader<[], IGetAllCodeSetsResponse, unknown> = {
+    data: mockCodesData,
+    error: undefined,
+    isLoading: false,
+    isReady: true,
+    load: vi.fn().mockResolvedValue(mockCodesData),
+    refresh: vi.fn().mockResolvedValue(mockCodesData),
+    clear: vi.fn(),
+    setData: vi.fn()
+  };
+
+  const mockCodesContext: ICodesContext = {
+    codesDataLoader: {
+      ...mockCodesDataLoader
+    }
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -52,11 +81,13 @@ describe('TicketDetailPage', () => {
       description: null,
       members: [{ team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' }]
     });
+    mockUpdateTicket.mockResolvedValue(ticket);
     mockUpdateTicketStatus.mockResolvedValue({ ...ticket, status: 'closed' });
 
     mockUseApi.mockImplementation(() => ({
       tickets: {
         getTicket: mockGetTicket,
+        updateTicket: mockUpdateTicket,
         updateTicketStatus: mockUpdateTicketStatus
       },
       teams: {
@@ -67,11 +98,13 @@ describe('TicketDetailPage', () => {
 
   const renderPage = () =>
     render(
-      <MemoryRouter initialEntries={[`/admin/tickets/${ticket.ticket_id}`]}>
-        <Routes>
-          <Route path="/admin/tickets/:ticketId" element={<TicketDetailPage />} />
-        </Routes>
-      </MemoryRouter>
+      <CodesContext.Provider value={mockCodesContext}>
+        <MemoryRouter initialEntries={[`/admin/tickets/${ticket.ticket_id}`]}>
+          <Routes>
+            <Route path="/admin/tickets/:ticketId" element={<TicketDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </CodesContext.Provider>
     );
 
   it('loads ticket with inline status history on mount', async () => {
@@ -108,6 +141,31 @@ describe('TicketDetailPage', () => {
 
     await waitFor(() => {
       expect(mockUpdateTicketStatus).toHaveBeenCalledWith(ticket.ticket_id, 'closed');
+    });
+  });
+
+  it('opens edit dialog with current ticket values and submits update', async () => {
+    const { getByTestId, getByLabelText } = renderPage();
+
+    await waitFor(() => {
+      expect(getByTestId('edit-ticket-button')).toBeVisible();
+    });
+
+    fireEvent.click(getByTestId('edit-ticket-button'));
+
+    await waitFor(() => {
+      expect(getByLabelText(/Subject/i)).toHaveValue('Test Ticket');
+    });
+
+    fireEvent.change(getByLabelText(/Subject/i), { target: { value: 'Updated Subject' } });
+    fireEvent.click(getByTestId('edit-dialog-save-button'));
+
+    await waitFor(() => {
+      expect(mockUpdateTicket).toHaveBeenCalledWith(ticket.ticket_id, {
+        title: 'Updated Subject',
+        description: 'Test description',
+        priority: 'medium'
+      });
     });
   });
 });
