@@ -108,7 +108,6 @@ export class UploadArchiveRepository extends BaseRepository {
     }
 
     return response.rows[0];
-    
   }
 
   /**

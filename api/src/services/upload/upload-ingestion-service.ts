@@ -154,7 +154,9 @@ export class UploadIngestionService extends DBService {
 
     // 7. Publish malware scan jobs for each artifact_security record
     await Promise.all(
-      securityRecords.map((record) => publishMalwareScanJob(this.connection, { artifactSecurityId: record.artifact_security_id }))
+      securityRecords.map((record) =>
+        publishMalwareScanJob(this.connection, { artifactSecurityId: record.artifact_security_id })
+      )
     );
   }
 

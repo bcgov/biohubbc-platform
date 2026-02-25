@@ -202,15 +202,15 @@ export class SubmissionUploadRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUpload);
-    
+
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get submission upload record', [
         'SubmissionUploadRepository->getSubmissionUploadByUploadId',
         `rowCount was ${response.rowCount}, expected 1`
       ]);
     }
-    
-      return response.rows[0];
+
+    return response.rows[0];
   }
 
   /**

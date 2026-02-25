@@ -296,7 +296,9 @@ describe('publisher', () => {
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
-      const result = await publishMalwareScanJob(getMockDBConnection(), { artifactSecurityId: 'artifact-security-999' });
+      const result = await publishMalwareScanJob(getMockDBConnection(), {
+        artifactSecurityId: 'artifact-security-999'
+      });
 
       expect(result.status).to.equal('duplicate');
       expect((result as { status: 'duplicate'; message: string }).message).to.equal(
@@ -307,7 +309,9 @@ describe('publisher', () => {
     it('returns error status when pg-boss throws', async () => {
       sinon.stub(pgBossService, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
-      const result = await publishMalwareScanJob(getMockDBConnection(), { artifactSecurityId: 'artifact-security-000' });
+      const result = await publishMalwareScanJob(getMockDBConnection(), {
+        artifactSecurityId: 'artifact-security-000'
+      });
 
       expect(result.status).to.equal('error');
       expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
