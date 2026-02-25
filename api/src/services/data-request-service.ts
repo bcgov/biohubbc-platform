@@ -1,3 +1,4 @@
+import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
 import { HTTP404 } from '../errors/http-error';
 import {
@@ -14,6 +15,7 @@ import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamService } from './access-policy/team-service';
 import { DataRequestStatusService } from './data-request-status-service';
 import { DBService } from './db-service';
+import { UserService } from './user-service';
 
 /**
  * Service for managing data requests.
@@ -58,14 +60,33 @@ export class DataRequestService extends DBService {
   }
 
   /**
-   * Find all data requests, optionally filtered by date range, requested_by, team_id, or status.
+   * Find all data requests, optionally filtered by date range, requested_by, team_ids, or status.
    *
    * @param {DataRequestFilters} [filters]
    * @return {Promise<DataRequestWithStatus[]>}
    * @memberof DataRequestService
    */
   async findDataRequests(filters?: DataRequestFilters): Promise<DataRequestWithStatus[]> {
-    const dataRequests = await this.dataRequestRepository.findDataRequests(filters);
+    const systemUserId = this.connection.systemUserId();
+    const userService = new UserService(this.connection);
+    const user = await userService.getUserById(systemUserId);
+
+    const isSystemAdmin = user.role_names.includes(SYSTEM_ROLE.SYSTEM_ADMIN);
+
+    if (isSystemAdmin) {
+      const dataRequests = await this.dataRequestRepository.findDataRequests(filters);
+      return dataRequests.map(_transformFlatDataRequestToNested);
+    }
+
+    const teamService = new TeamService(this.connection);
+    const teamIds = await teamService.getTeamIdsBySystemUserId(systemUserId);
+
+    if (teamIds.length === 0) {
+      return [];
+    }
+
+    const scopedFilters = { ...filters, team_ids: teamIds };
+    const dataRequests = await this.dataRequestRepository.findDataRequests(scopedFilters);
 
     return dataRequests.map(_transformFlatDataRequestToNested);
   }
