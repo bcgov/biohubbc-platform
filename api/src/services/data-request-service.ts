@@ -76,7 +76,6 @@ export class DataRequestService extends DBService {
    *
    * @param {number} requestedBy - system user id
    * @param {CreateDataRequest} payload
-   * @param {string} [teamId]
    * @return {Promise<DataRequestWithStatus>}
    * @memberof DataRequestService
    */
