@@ -29,7 +29,7 @@ spec:
               echo "Database is ready!"
           env:
             - name: DB_HOST
-              value: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.host }}{{ else }}{{ include "dbHost" . }}{{ end }}
+              value: {{ if and .Values.app.database.useCrunchy .Values.app.database.migrationHost }}{{ .Values.app.database.migrationHost }}{{ else if .Values.app.database.useCrunchy }}{{ .Values.app.database.host }}{{ else }}{{ include "dbHost" . }}{{ end }}
             - name: DB_ADMIN
               valueFrom:
                 secretKeyRef:
@@ -49,7 +49,7 @@ spec:
         - name: postgresql
           env:
             - name: DB_HOST
-              value: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.host }}{{ else }}{{ include "dbHost" . }}{{ end }}
+              value: {{ if and .Values.app.database.useCrunchy .Values.app.database.migrationHost }}{{ .Values.app.database.migrationHost }}{{ else if .Values.app.database.useCrunchy }}{{ .Values.app.database.host }}{{ else }}{{ include "dbHost" . }}{{ end }}
             - name: DB_ADMIN
               valueFrom:
                 secretKeyRef:
@@ -60,6 +60,12 @@ spec:
                 secretKeyRef:
                   name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.adminSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
                   key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.adminPasswordKey }}{{ else }}database-admin-password{{ end }}
+            {{- if .Values.app.database.useCrunchy }}
+            - name: PGSSLMODE
+              value: "require"
+            - name: NODE_TLS_REJECT_UNAUTHORIZED
+              value: "0"
+            {{- end }}
             - name: DB_USER_API
               valueFrom:
                 secretKeyRef:

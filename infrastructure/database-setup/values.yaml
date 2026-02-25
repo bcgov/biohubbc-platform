@@ -22,6 +22,9 @@ app:
     # When false (default), connection details are derived from the legacy dbHost secret (PR environments).
     useCrunchy: false
     host: "" # e.g. "biohub-platform-db-dev-pgbouncer" (only used when useCrunchy: true; use -dev/-test/-prod for env)
+    # When useCrunchy: true, set migrationHost to the primary service so migrations run as postgres (pgBouncer rejects postgres auth).
+    # e.g. "biohub-platform-db-dev-primary" for dev; same namespace, so short name works.
+    migrationHost: ""
     adminSecretName: "" # e.g. "biohub-platform-db-dev-pguser-postgres" (only used when useCrunchy: true)
     adminUserKey: "user" # Secret key for the admin DB username
     adminPasswordKey: "password" # Secret key for the admin DB password

@@ -105,7 +105,6 @@ crunchy-postgres:
         memory: 64Mi
 
 # Migration job values (disabled by default, enabled one-time per environment to copy data).
-# See MIGRATION.md for full instructions.
 migration:
   enabled: false
   oldDb:
@@ -114,3 +113,5 @@ migration:
     adminKey: "database-admin"
     passwordKey: "database-admin-password"
     dbNameKey: "database-name"
+    # Keys for biohub_api password (legacy secret has database-user-api-password); set in post-restore so API can use same secret.
+    apiPasswordKey: "database-user-api-password"

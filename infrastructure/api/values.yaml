@@ -32,13 +32,13 @@ app:
     # Set useCrunchy: true for DEV/TEST/PROD environments that use the Crunchy Postgres cluster.
     # When false (default), connection details are derived from the legacy dbHost secret (PR environments).
     useCrunchy: false
-    host: "" # e.g. "biohub-platform-db-dev-pgbouncer" (only used when useCrunchy: true; use -dev/-test/-prod for env)
-    appSecretName: "" # e.g. "biohub-platform-db-dev-pguser-biohub-platform-db-dev" (only used when useCrunchy: true)
+    host: "" # e.g. "<crunchy-release-name>-pgbouncer" (biohub-platform-db-dev-pgbouncer for DEV) (only used when useCrunchy: true)
+    appSecretName: "" # e.g. "<crunchy-release-name>-pguser-biohub-platform-db" (only used when useCrunchy: true)
     appUserKey: "user" # Secret key for the API DB username
     appPasswordKey: "password" # Secret key for the API DB password
-    dbNameSecretName: "" # e.g. "biohub-platform-db-dev-pguser-biohub-platform-db-dev" (only used when useCrunchy: true)
+    dbNameSecretName: "" # e.g. "<crunchy-release-name>-pguser-biohub-platform-db" (only used when useCrunchy: true)
     dbNameKey: "dbname" # Secret key for the DB name
-    adminSecretName: "" # e.g. "biohub-platform-db-dev-pguser-postgres" (only used when useCrunchy: true)
+    adminSecretName: "" # e.g. "<crunchy-release-name>-pguser-postgres" (only used when useCrunchy: true)
     adminUserKey: "user" # Secret key for the admin DB username
     adminPasswordKey: "password" # Secret key for the admin DB password
 

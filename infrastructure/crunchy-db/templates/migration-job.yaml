@@ -114,6 +114,16 @@ spec:
                 --if-exists \
                 /tmp/migration.dump
 
+              echo "--- Set biohub_api password to match legacy secret (pg_dump does not restore role passwords) ---"
+              if [ -n "$OLD_DB_API_PASS" ]; then
+                ESCAPED=$(echo "$OLD_DB_API_PASS" | sed "s/'/''/g")
+                export PGSSLMODE=require
+                PGPASSWORD=$NEW_DB_ADMIN_PASS psql -h "$NEW_DB_HOST" -p 5432 -U $NEW_DB_ADMIN -d $NEW_DB_NAME -v ON_ERROR_STOP=1 -c "ALTER USER biohub_api PASSWORD '${ESCAPED}';"
+                echo "biohub_api password updated."
+              else
+                echo "OLD_DB_API_PASS not set, skipping biohub_api password update."
+              fi
+
               echo "=== Migration complete ==="
           env:
             - name: OLD_DB_HOST
@@ -153,6 +163,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-pguser-{{ .Release.Name }}
                   key: dbname
+            - name: OLD_DB_API_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.migration.oldDb.secretName }}
+                  key: {{ .Values.migration.oldDb.apiPasswordKey }}
           resources:
             requests:
               cpu: 100m
