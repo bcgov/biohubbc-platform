@@ -14,6 +14,7 @@ export const DataRequestFilters = z.object({
   date_to: z.string().optional(),
   requested_by: z.number().int().optional(),
   team_id: z.string().uuid().optional(),
+  team_ids: z.array(z.string().uuid()).optional(),
   status: DataRequestStatusEnum.optional()
 });
 export type DataRequestFilters = z.infer<typeof DataRequestFilters>;

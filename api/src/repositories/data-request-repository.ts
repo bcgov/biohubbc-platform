@@ -18,9 +18,9 @@ import { BaseRepository } from './base-repository';
  */
 export class DataRequestRepository extends BaseRepository {
   /**
-   * Find all data requests, optionally filtered by date range, requested_by, team_id, or status.
+   * Find all data requests, optionally filtered by date range, requested_by, team_ids, or status.
    *
-   * @param {DataRequestFilters} [filters] - Optional filters (date_from, date_to, requested_by, team_id, status).
+   * @param {DataRequestFilters} [filters] - Optional filters (date_from, date_to, requested_by, team_ids, status).
    * @return {Promise<FlatDataRequestWithStatus[]>}
    * @memberof DataRequestRepository
    */
@@ -55,6 +55,9 @@ export class DataRequestRepository extends BaseRepository {
     }
     if (filters?.team_id) {
       queryBuilder.where('dr.team_id', filters.team_id);
+    }
+    if (filters?.team_ids && filters.team_ids.length > 0) {
+      queryBuilder.whereIn('dr.team_id', filters.team_ids);
     }
 
     const response = await this.connection.knex(queryBuilder, FlatDataRequestWithStatus);
