@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../errors/api-error';
+import { IngestionRepository } from '../repositories/ingestion/ingestion-repository';
 import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
   ISubmissionFeature,
@@ -102,7 +103,7 @@ describe('SubmissionService', () => {
       const parentSubmissionFeatureId = 2;
 
       const insertSubmissionFeatureRecordStub = sinon
-        .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord')
+        .stub(IngestionRepository.prototype, 'insertSubmissionFeatureRecord')
         .resolves({ submission_feature_id: parentSubmissionFeatureId });
 
       const submissionFeatures: ISubmissionFeature[] = [

@@ -103,8 +103,8 @@ export const publishProcessSubmissionFeaturesJob = async (
     );
 
     if (existingValidation) {
-      // Only allow retry if status is 'failed'
-      if (existingValidation.status !== 'failed') {
+      // Only allow retry if status is 'failed' or 'invalid'
+      if (existingValidation.status !== 'failed' && existingValidation.status !== 'invalid') {
         defaultLog.warn({
           label: 'publishProcessSubmissionFeaturesJob',
           message: 'Blocked: validation record already exists',
