@@ -60,7 +60,7 @@ export const TicketsDashboardPage = () => {
       setError(undefined);
       setCreateError(undefined);
 
-      const createdTicket = await api.tickets.createTicket(payload);
+      await api.tickets.createTicket(payload);
 
       setIsCreateOpen(false);
       await ticketsLoader.refresh({
@@ -70,7 +70,6 @@ export const TicketsDashboardPage = () => {
         order: 'desc'
       });
 
-      navigate(`/admin/tickets/${createdTicket.ticket_id}`);
     } catch (caughtError) {
       const apiError = caughtError as APIError;
       setCreateError(apiError.message || 'Failed to create ticket.');

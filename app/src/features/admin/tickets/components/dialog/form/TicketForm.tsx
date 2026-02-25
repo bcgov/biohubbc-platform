@@ -26,7 +26,7 @@ export const TicketForm = (props: ITicketFormProps) => {
 
   return (
     <Stack gap={2} sx={{ pt: 1 }}>
-      <CustomTextFieldFormik label="Title" name="title" required inputProps={{ maxLength: 100 }} />
+      <CustomTextFieldFormik label="Subject" name="title" required inputProps={{ maxLength: 100 }} />
       <CustomTextFieldFormik
         label="Description"
         name="description"

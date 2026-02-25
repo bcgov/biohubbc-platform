@@ -9,6 +9,7 @@ export interface ITicket {
   title: string;
   description: string | null;
   team_id: string;
+  create_date: string;
   priority: TicketPriority;
   status: TicketStatus;
 }

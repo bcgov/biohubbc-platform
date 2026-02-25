@@ -16,6 +16,7 @@ export const Ticket = z.object({
   title: z.string(),
   description: z.string().nullable(),
   team_id: z.string().uuid(),
+  create_date: z.string(),
   priority: TicketPriority,
   status: TicketStatus
 });

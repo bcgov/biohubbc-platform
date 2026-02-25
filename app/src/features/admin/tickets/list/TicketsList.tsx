@@ -1,17 +1,15 @@
-import Icon from '@mdi/react';
 import Chip from '@mui/material/Chip';
 import Paper from '@mui/material/Paper';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { useTheme } from '@mui/material/styles';
 import { GridColDef } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { ITicket, TicketPriority } from 'interfaces/useTicketsApi.interface';
+import dayjs from 'dayjs';
+import { ITicket } from 'interfaces/useTicketsApi.interface';
 import { useMemo } from 'react';
 import { TicketsNoRowsOverlay } from './TicketsNoRowsOverlay';
-import { getPriorityDisplay } from '../utils/priority';
 
 interface ITicketsListProps {
   tickets: ITicket[];
@@ -29,16 +27,22 @@ interface ITicketsListProps {
  */
 export const TicketsList = (props: ITicketsListProps) => {
   const { tickets, isLoading, emptyTitle, emptyMessage, onTicketClick } = props;
-  const theme = useTheme();
 
-  /**
-   * Type guard for ticket priority values coming from DataGrid cell params.
-   *
-   * @param {unknown} value
-   * @return {value is TicketPriority}
-   */
-  const isTicketPriority = (value: unknown): value is TicketPriority =>
-    value === 'low' || value === 'medium' || value === 'high' || value === 'critical';
+  const getDaysAgoLabel = (createDate?: string): string | null => {
+    if (!createDate) {
+      return null;
+    }
+
+    const createdAt = dayjs(createDate);
+
+    if (!createdAt.isValid()) {
+      return null;
+    }
+
+    const daysAgo = Math.max(dayjs().diff(createdAt, 'day'), 0);
+
+    return `${daysAgo} days ago`;
+  };
 
   const columns: GridColDef<ITicket>[] = useMemo(
     () => [
@@ -65,33 +69,10 @@ export const TicketsList = (props: ITicketsListProps) => {
       {
         field: 'priority',
         headerName: 'Priority',
-        minWidth: 150,
+        minWidth: 30,
         flex: 0.9,
         sortable: false,
-        renderCell: (params) => {
-          if (!isTicketPriority(params.value)) {
-            return null;
-          }
-
-          const priority = getPriorityDisplay(params.value, theme);
-
-          return (
-            <Chip
-              icon={<Icon path={priority.path} size={0.7} color={priority.color} />}
-              label={priority.label}
-              size="small"
-              variant="outlined"
-              sx={{
-                fontWeight: 700,
-                color: priority.color,
-                borderColor: priority.color,
-                '& .MuiChip-icon': {
-                  ml: 0.5
-                }
-              }}>
-            </Chip>
-          );
-        }
+        renderCell: (params) => <Typography variant="body2">{params.value}</Typography>
       },
       {
         field: 'status',
@@ -101,28 +82,27 @@ export const TicketsList = (props: ITicketsListProps) => {
         sortable: false,
         renderCell: (params) => (
           <Chip
-            label={params.value === 'open' ? 'Open' : 'Closed'}
+            label={params.value}
             size="small"
-            variant="outlined"
-            color={params.value === 'open' ? 'primary' : 'default'}
-            sx={{ fontWeight: 700 }}
+            color={params.value === 'open' ? 'success' : 'default'}
+            sx={{ fontWeight: 700, textTransform: 'capitalize' }}
           />
         )
       },
       {
-        field: 'team_id',
-        headerName: 'Team',
+        field: 'create_date',
+        headerName: 'Created',
         minWidth: 140,
         flex: 1,
         sortable: false,
         renderCell: (params) => (
           <Typography variant="body2" noWrap title={params.value || ''}>
-            {params.value}
+            {getDaysAgoLabel(typeof params.value === 'string' ? params.value : undefined)}
           </Typography>
         )
-      },
+      }
     ],
-    [theme]
+    []
   );
 
   return (
@@ -147,6 +127,7 @@ export const TicketsList = (props: ITicketsListProps) => {
           onRowClick={(params) => onTicketClick(params.row.ticket_id)}
           noRowsOverlay={<TicketsNoRowsOverlay emptyTitle={emptyTitle} emptyMessage={emptyMessage} />}
           sx={{
+            '--DataGrid-overlayHeight': '220px',
             '& .MuiDataGrid-columnHeaderTitle': {
               fontWeight: 700
             }

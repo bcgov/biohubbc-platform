@@ -52,7 +52,7 @@ describe('CreateTicketDialog', () => {
 
     const { getByLabelText, getByTestId } = renderDialog(onCreate);
 
-    fireEvent.change(getByLabelText(/Title/i), { target: { value: 'Test Ticket' } });
+    fireEvent.change(getByLabelText(/Subject/i), { target: { value: 'Test Ticket' } });
     fireEvent.change(getByLabelText(/Description/i), { target: { value: 'Details' } });
 
     fireEvent.click(getByTestId('edit-dialog-save-button'));

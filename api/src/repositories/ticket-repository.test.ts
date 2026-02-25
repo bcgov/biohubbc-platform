@@ -21,6 +21,7 @@ describe('TicketRepository', () => {
     title: 'A ticket',
     description: 'desc',
     team_id: '22222222-2222-2222-2222-222222222222',
+    create_date: '2026-02-25T00:00:00.000Z',
     priority: 'medium',
     status: 'open'
   };

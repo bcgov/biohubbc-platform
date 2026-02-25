@@ -37,13 +37,12 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
           {ticket?.status && (
             <Chip
               label={ticket.status === 'open' ? 'Open' : 'Closed'}
-              size="medium"
-              color={ticket.status === 'open' ? 'primary' : 'default'}
+              color={ticket.status === 'open' ? 'success' : 'default'}
             />
           )}
         </Stack>
       }
-      subheader={ticket?.description || 'No description has been added to this ticket.'}
+      subheader={ticket?.description}
     />
   );
 };

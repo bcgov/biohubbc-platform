@@ -6,7 +6,16 @@ import { TicketStatusHistory } from '../models/ticket-status-history';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 
-const TICKET_COLUMNS = ['ticket_id', 'ticket_slug', 'title', 'description', 'team_id', 'priority', 'status'] as const;
+const TICKET_COLUMNS = [
+  'ticket_id',
+  'ticket_slug',
+  'title',
+  'description',
+  'team_id',
+  'create_date',
+  'priority',
+  'status'
+] as const;
 
 export class TicketRepository extends BaseRepository {
   /**

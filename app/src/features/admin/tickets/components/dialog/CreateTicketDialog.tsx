@@ -41,7 +41,7 @@ export const CreateTicketDialog = (props: ICreateTicketDialogProps) => {
     const validPriorities = ticketPriorityOptions.map((option) => option.value);
 
     return yup.object().shape({
-      title: yup.string().required('Title is required').max(100, 'Title must be 100 characters or less'),
+      title: yup.string().required('Subject is required').max(100, 'Subject must be 100 characters or less'),
       description: yup.string().max(2000, 'Description must be 2000 characters or less'),
       priority: yup
         .mixed<TicketPriority>()

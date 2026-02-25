@@ -13,7 +13,7 @@ export const TicketsNoRowsOverlay = (props: TicketsNoRowsOverlayProps) => {
   const { emptyTitle, emptyMessage } = props;
 
   return (
-    <Stack alignItems="center" justifyContent="center" p={3} minHeight={220}>
+    <Stack alignItems="center" justifyContent="center" p={3} height="100%">
       <Typography data-testid="tickets-empty-title" component="h2" sx={{ mb: 1, fontWeight: 700 }}>
         {emptyTitle ?? 'No tickets found'}
       </Typography>
