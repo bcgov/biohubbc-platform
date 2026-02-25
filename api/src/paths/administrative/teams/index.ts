@@ -2,13 +2,10 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
+import { CreateTeam } from '../../../models/team';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../../openapi/schemas/pagination';
-import {
-  CreateTeamRequestSchema,
-  TeamsListResponseSchema,
-  TeamWithMemberCountSchema
-} from '../../../openapi/schemas/team';
+import { CreateTeamRequestSchema, TeamSchema, TeamsListResponseSchema } from '../../../openapi/schemas/team';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { TeamService } from '../../../services/access-policy/team-service';
 import { getLogger } from '../../../utils/logger';
@@ -24,7 +21,7 @@ export const GET: Operation = [
   authorizeRequestHandler(() => ({
     and: [
       {
-        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR],
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
         discriminator: 'SystemRole'
       }
     ]
@@ -98,7 +95,7 @@ export const POST: Operation = [
   authorizeRequestHandler(() => ({
     and: [
       {
-        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR],
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
         discriminator: 'SystemRole'
       }
     ]
@@ -123,7 +120,7 @@ POST.apiDoc = {
       description: 'Team created',
       content: {
         'application/json': {
-          schema: TeamWithMemberCountSchema
+          schema: TeamSchema
         }
       }
     },
@@ -139,7 +136,7 @@ POST.apiDoc = {
 export function createTeam(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
-    const { name, description, system_user_ids } = req.body;
+    const { name, description, system_user_ids } = req.body as CreateTeam;
 
     try {
       await connection.open();

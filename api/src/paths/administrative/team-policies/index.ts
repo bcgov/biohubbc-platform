@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
+import { CreateTeamPolicy } from '../../../models/team-policy';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../../openapi/schemas/pagination';
 import {
@@ -154,7 +155,7 @@ export function createTeamPolicy(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
 
-    const { team_id, policy_id } = req.body;
+    const { team_id, policy_id } = req.body as CreateTeamPolicy;
 
     try {
       await connection.open();

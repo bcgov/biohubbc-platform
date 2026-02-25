@@ -1,21 +1,14 @@
-import { z } from 'zod';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { CreateTeamMember, TeamMember, UpdateTeamMember } from '../../models/team-member';
+import {
+  CreateTeamMember,
+  TeamMember,
+  TeamMemberByUserFilter,
+  TeamMemberWithUser,
+  UpdateTeamMember
+} from '../../models/team-member';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
-
-/**
- * A team member with user details.
- */
-export const TeamMemberWithUser = z.object({
-  team_member_id: z.string().uuid(),
-  system_user_id: z.number(),
-  user_identifier: z.string(),
-  email: z.string().nullable()
-});
-
-export type TeamMemberWithUser = z.infer<typeof TeamMemberWithUser>;
 
 /**
  * A repository class for accessing team member data.
@@ -195,18 +188,39 @@ export class TeamMemberRepository extends BaseRepository {
    * @return {Promise<TeamMemberWithUser | null>}
    * @memberof TeamMemberRepository
    */
-  async getTeamMemberWithUser(teamId: string, systemUserId: number): Promise<TeamMemberWithUser | null> {
+  async getTeamMemberWithUser(teamMemberData: TeamMemberByUserFilter): Promise<TeamMemberWithUser | null> {
     const knex = getKnex();
     const query = knex
       .table('team_member as tm')
       .select(['tm.team_member_id', 'tm.system_user_id', 'su.user_identifier', 'su.email'])
       .innerJoin('system_user as su', 'tm.system_user_id', 'su.system_user_id')
-      .where('tm.team_id', teamId)
-      .where('tm.system_user_id', systemUserId)
+      .where('tm.team_id', teamMemberData.team_id)
+      .where('tm.system_user_id', teamMemberData.system_user_id)
       .whereNull('tm.record_end_date')
       .first();
 
     const response = await this.connection.knex(query, TeamMemberWithUser);
+    return response.rows[0] ?? null;
+  }
+
+  /**
+   * Get a single active team member for a team and system user.
+   *
+   * @param {TeamMemberByUserFilter} teamMemberData - Team and system user identifiers.
+   * @return {Promise<TeamMember | null>}
+   * @memberof TeamMemberRepository
+   */
+  async getTeamMemberByTeamAndUser(teamMemberData: TeamMemberByUserFilter): Promise<TeamMember | null> {
+    const knex = getKnex();
+    const query = knex
+      .table('team_member')
+      .select(['team_member_id', 'system_user_id', 'team_id'])
+      .where('team_id', teamMemberData.team_id)
+      .where('system_user_id', teamMemberData.system_user_id)
+      .whereNull('record_end_date')
+      .first();
+
+    const response = await this.connection.knex(query, TeamMember);
     return response.rows[0] ?? null;
   }
 

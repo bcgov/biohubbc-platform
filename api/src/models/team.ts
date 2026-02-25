@@ -20,3 +20,9 @@ export interface UpdateTeam {
   description?: string;
   record_end_date?: string;
 }
+
+export interface UpdateTeamRequest {
+  name?: string;
+  description?: string;
+  system_user_ids?: number[];
+}

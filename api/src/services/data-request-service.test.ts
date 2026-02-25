@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { CreateDataRequest, DataRequest, FlatDataRequestWithStatus, UpdateDataRequest } from '../models/data-request';
 import { DataRequestStatus, DataRequestStatusEnum } from '../models/data-request-status';
-import { TeamMemberWithUser } from '../repositories/authorization/team-member-repository';
+import { TeamMemberWithUser } from '../models/team-member';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { TeamMemberService } from './access-policy/team-member-service';

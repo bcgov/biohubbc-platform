@@ -2,8 +2,9 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
+import { CreateTeamPoliciesRequest } from '../../../../../models/team-policy';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
-import { CreateTeamPoliciesRequestSchema, TeamPoliciesBatchSchema } from '../../../../../openapi/schemas/team-policy';
+import { CreateTeamPoliciesRequestSchema, TeamPoliciesSchema } from '../../../../../openapi/schemas/team-policy';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
 import { TeamPolicyService } from '../../../../../services/access-policy/team-policy-service';
 import { getLogger } from '../../../../../utils/logger';
@@ -49,7 +50,7 @@ POST.apiDoc = {
       description: 'Processed team-policy associations for this request.',
       content: {
         'application/json': {
-          schema: TeamPoliciesBatchSchema
+          schema: TeamPoliciesSchema
         }
       }
     },
@@ -66,13 +67,13 @@ export function createTeamPolicies(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
     const teamId = req.params.teamId;
-    const { policies } = req.body;
+    const { policies } = req.body as CreateTeamPoliciesRequest;
 
     try {
       await connection.open();
 
       const teamPolicyService = new TeamPolicyService(connection);
-      const teamPolicies = await teamPolicyService.createTeamPolicies(teamId, policies || []);
+      const teamPolicies = await teamPolicyService.createTeamPolicies(teamId, policies);
 
       await connection.commit();
 

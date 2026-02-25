@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../../../database/db';
-import { TeamMemberWithUser } from '../../../../../repositories/authorization/team-member-repository';
+import { TeamMemberWithUser } from '../../../../../models/team-member';
 import { TeamMemberService } from '../../../../../services/access-policy/team-member-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import { createTeamMember, deleteTeamMember, getTeamMembers } from './index';
@@ -101,7 +101,7 @@ describe('getTeamMembers', () => {
   it('should delete team member by system_user_id on DELETE', async () => {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-    const deleteStub = sinon.stub(TeamMemberService.prototype, 'deleteTeamMember').resolves();
+    const deleteStub = sinon.stub(TeamMemberService.prototype, 'deleteTeamMemberByUser').resolves();
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { teamId: 'team-1' };
@@ -110,7 +110,7 @@ describe('getTeamMembers', () => {
     const requestHandler = deleteTeamMember();
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(deleteStub).to.have.been.calledOnceWith('team-1', 42);
+    expect(deleteStub).to.have.been.calledOnceWith({ team_id: 'team-1', system_user_id: 42 });
     expect(mockRes.statusValue).to.equal(204);
   });
 });

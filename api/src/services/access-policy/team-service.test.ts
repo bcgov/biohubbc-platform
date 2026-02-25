@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { Team } from '../../models/team';
-import { TeamMemberWithUser } from '../../repositories/authorization/team-member-repository';
+import { TeamMemberWithUser } from '../../models/team-member';
 import { TeamRepository } from '../../repositories/authorization/team-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { TeamMemberService } from './team-member-service';

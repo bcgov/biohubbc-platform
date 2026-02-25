@@ -1,6 +1,12 @@
 import { IDBConnection } from '../../database/db';
-import { CreateTeamMember, TeamMember, UpdateTeamMember } from '../../models/team-member';
-import { TeamMemberRepository, TeamMemberWithUser } from '../../repositories/authorization/team-member-repository';
+import {
+  CreateTeamMember,
+  TeamMember,
+  TeamMemberByUserFilter,
+  TeamMemberWithUser,
+  UpdateTeamMember
+} from '../../models/team-member';
+import { TeamMemberRepository } from '../../repositories/authorization/team-member-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
 
@@ -20,10 +26,7 @@ export class TeamMemberService extends DBService {
    * @memberof TeamMemberService
    */
   async createTeamMember(teamMemberData: CreateTeamMember): Promise<TeamMemberWithUser> {
-    const existing = await this.teamMemberRepository.getTeamMemberWithUser(
-      teamMemberData.team_id,
-      teamMemberData.system_user_id
-    );
+    const existing = await this.teamMemberRepository.getTeamMemberWithUser(teamMemberData);
 
     if (existing) {
       return existing;
@@ -31,10 +34,7 @@ export class TeamMemberService extends DBService {
 
     await this.teamMemberRepository.insertTeamMember(teamMemberData);
 
-    const created = await this.teamMemberRepository.getTeamMemberWithUser(
-      teamMemberData.team_id,
-      teamMemberData.system_user_id
-    );
+    const created = await this.teamMemberRepository.getTeamMemberWithUser(teamMemberData);
 
     if (!created) {
       throw new Error('Failed to create team member');
@@ -80,19 +80,23 @@ export class TeamMemberService extends DBService {
   /**
    * Delete a team member record.
    *
-   * @param {string} id - Team member ID (or team ID when systemUserId is provided).
-   * @param {number} [systemUserId] - Optional system user ID for delete-by-team-and-user.
+   * @param {string} teamMemberId - Team member ID.
    * @return {Promise<void>}
    * @memberof TeamMemberService
    */
-  async deleteTeamMember(id: string, systemUserId?: number): Promise<void> {
-    if (systemUserId === undefined) {
-      await this.teamMemberRepository.deleteTeamMember(id);
-      return;
-    }
+  async deleteTeamMember(teamMemberId: string): Promise<void> {
+    await this.teamMemberRepository.deleteTeamMember(teamMemberId);
+  }
 
-    const teamMembers = await this.teamMemberRepository.getTeamMembersByTeamId(id);
-    const existing = teamMembers.find((member) => member.system_user_id === systemUserId);
+  /**
+   * Delete a team member association by team and system user IDs.
+   *
+   * @param {TeamMemberByUserFilter} teamMemberData - Team and user identifiers.
+   * @return {Promise<void>}
+   * @memberof TeamMemberService
+   */
+  async deleteTeamMemberByUser(teamMemberData: TeamMemberByUserFilter): Promise<void> {
+    const existing = await this.teamMemberRepository.getTeamMemberByTeamAndUser(teamMemberData);
 
     if (!existing) {
       return;

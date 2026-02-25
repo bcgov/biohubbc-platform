@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
+import { TeamMemberByUserRequest } from '../../../../../models/team-member';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../../../../openapi/schemas/pagination';
 import {
@@ -24,7 +25,7 @@ export const GET: Operation = [
   authorizeRequestHandler(() => ({
     and: [
       {
-        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR],
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
         discriminator: 'SystemRole'
       }
     ]
@@ -95,7 +96,7 @@ export const POST: Operation = [
   authorizeRequestHandler(() => ({
     and: [
       {
-        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR],
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
         discriminator: 'SystemRole'
       }
     ]
@@ -141,7 +142,7 @@ export const DELETE: Operation = [
   authorizeRequestHandler(() => ({
     and: [
       {
-        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR],
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
         discriminator: 'SystemRole'
       }
     ]
@@ -185,7 +186,7 @@ export function createTeamMember(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
     const teamId = req.params.teamId;
-    const { system_user_id } = req.body;
+    const { system_user_id } = req.body as TeamMemberByUserRequest;
 
     try {
       await connection.open();
@@ -213,12 +214,12 @@ export function deleteTeamMember(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
     const teamId = req.params.teamId;
-    const { system_user_id } = req.body;
+    const { system_user_id } = req.body as TeamMemberByUserRequest;
 
     try {
       await connection.open();
       const teamMemberService = new TeamMemberService(connection);
-      await teamMemberService.deleteTeamMember(teamId, system_user_id);
+      await teamMemberService.deleteTeamMemberByUser({ team_id: teamId, system_user_id });
 
       await connection.commit();
       return res.status(204).send();

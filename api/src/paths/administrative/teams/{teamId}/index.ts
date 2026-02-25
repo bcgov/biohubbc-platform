@@ -2,8 +2,9 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
+import { UpdateTeamRequest } from '../../../../models/team';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { TeamWithMemberCountSchema, UpdateTeamRequestSchema } from '../../../../openapi/schemas/team';
+import { TeamSchema, UpdateTeamRequestSchema } from '../../../../openapi/schemas/team';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { TeamMemberService } from '../../../../services/access-policy/team-member-service';
 import { TeamService } from '../../../../services/access-policy/team-service';
@@ -15,7 +16,7 @@ export const GET: Operation = [
   authorizeRequestHandler(() => ({
     and: [
       {
-        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR],
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
         discriminator: 'SystemRole'
       }
     ]
@@ -41,7 +42,7 @@ GET.apiDoc = {
       description: 'Team',
       content: {
         'application/json': {
-          schema: TeamWithMemberCountSchema
+          schema: TeamSchema
         }
       }
     },
@@ -79,7 +80,7 @@ export const PUT: Operation = [
   authorizeRequestHandler(() => ({
     and: [
       {
-        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR],
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
         discriminator: 'SystemRole'
       }
     ]
@@ -113,7 +114,7 @@ PUT.apiDoc = {
       description: 'Team updated',
       content: {
         'application/json': {
-          schema: TeamWithMemberCountSchema
+          schema: TeamSchema
         }
       }
     },
@@ -130,7 +131,7 @@ export function updateTeam(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
     const teamId = req.params.teamId;
-    const { name, description, system_user_ids } = req.body;
+    const { name, description, system_user_ids } = req.body as UpdateTeamRequest;
 
     try {
       await connection.open();
@@ -139,23 +140,25 @@ export function updateTeam(): RequestHandler {
 
       await teamService.updateTeam(teamId, { name, description });
 
-      const currentMembers = await teamMemberService.getTeamMembers(teamId);
-      const currentUserIds = new Set(currentMembers.map((member) => member.system_user_id));
-      const newUserIds = new Set(system_user_ids || []);
+      if (system_user_ids) {
+        const currentMembers = await teamMemberService.getTeamMembers(teamId);
+        const currentUserIds = new Set(currentMembers.map((member) => member.system_user_id));
+        const newUserIds = new Set(system_user_ids);
 
-      const toAdd = (system_user_ids || []).filter((userId: number) => !currentUserIds.has(userId));
-      const toRemove = currentMembers.filter((member) => !newUserIds.has(member.system_user_id));
+        const toAdd = system_user_ids.filter((userId) => !currentUserIds.has(userId));
+        const toRemove = currentMembers.filter((member) => !newUserIds.has(member.system_user_id));
 
-      await Promise.all(
-        toAdd.map((userId: number) =>
-          teamMemberService.createTeamMember({
-            team_id: teamId,
-            system_user_id: userId
-          })
-        )
-      );
+        await Promise.all(
+          toAdd.map((userId) =>
+            teamMemberService.createTeamMember({
+              team_id: teamId,
+              system_user_id: userId
+            })
+          )
+        );
 
-      await Promise.all(toRemove.map((member) => teamMemberService.deleteTeamMember(member.team_member_id)));
+        await Promise.all(toRemove.map((member) => teamMemberService.deleteTeamMember(member.team_member_id)));
+      }
 
       const result = await teamService.getTeam(teamId);
       await connection.commit();
@@ -174,7 +177,7 @@ export const DELETE: Operation = [
   authorizeRequestHandler(() => ({
     and: [
       {
-        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR],
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
         discriminator: 'SystemRole'
       }
     ]

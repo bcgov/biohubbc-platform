@@ -8,37 +8,10 @@ import { OpenAPIV3 } from 'openapi-types';
 import { paginationResponseSchema } from './pagination';
 
 /**
- * Schema for a team (without members).
+ * Schema for a team.
  */
 export const TeamSchema: OpenAPIV3.SchemaObject = {
   title: 'Team',
-  type: 'object',
-  required: ['team_id', 'name'],
-  properties: {
-    team_id: {
-      type: 'string',
-      format: 'uuid',
-      description: 'Unique identifier for the team'
-    },
-    name: {
-      type: 'string',
-      maxLength: 250,
-      description: 'Name of the team'
-    },
-    description: {
-      type: 'string',
-      maxLength: 1000,
-      nullable: true,
-      description: 'Description of the team'
-    }
-  }
-};
-
-/**
- * Schema for a team with member count.
- */
-export const TeamWithMemberCountSchema: OpenAPIV3.SchemaObject = {
-  title: 'TeamWithMemberCount',
   type: 'object',
   required: ['team_id', 'name', 'member_count'],
   properties: {
@@ -75,7 +48,7 @@ export const TeamsListResponseSchema: OpenAPIV3.SchemaObject = {
   properties: {
     teams: {
       type: 'array',
-      items: TeamWithMemberCountSchema,
+      items: TeamSchema,
       description: 'List of teams with member counts'
     },
     pagination: paginationResponseSchema

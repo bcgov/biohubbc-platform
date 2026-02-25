@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../../database/db';
 import { Team } from '../../../../models/team';
-import { TeamMemberWithUser } from '../../../../repositories/authorization/team-member-repository';
+import { TeamMemberWithUser } from '../../../../models/team-member';
 import { TeamMemberService } from '../../../../services/access-policy/team-member-service';
 import { TeamService } from '../../../../services/access-policy/team-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';

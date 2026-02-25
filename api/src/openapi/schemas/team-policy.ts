@@ -127,7 +127,7 @@ export const TeamPolicySchema: OpenAPIV3.SchemaObject = {
 /**
  * Schema for create team-policies batch response.
  */
-export const TeamPoliciesBatchSchema: OpenAPIV3.SchemaObject = {
+export const TeamPoliciesSchema: OpenAPIV3.SchemaObject = {
   title: 'TeamPoliciesBatch',
   type: 'object',
   required: ['team_policies'],

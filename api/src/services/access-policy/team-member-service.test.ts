@@ -2,8 +2,14 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { CreateTeamMember, TeamMember, UpdateTeamMember } from '../../models/team-member';
-import { TeamMemberRepository, TeamMemberWithUser } from '../../repositories/authorization/team-member-repository';
+import {
+  CreateTeamMember,
+  TeamMember,
+  TeamMemberByUserFilter,
+  TeamMemberWithUser,
+  UpdateTeamMember
+} from '../../models/team-member';
+import { TeamMemberRepository } from '../../repositories/authorization/team-member-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { TeamMemberService } from './team-member-service';
 
@@ -52,7 +58,10 @@ describe('TeamMemberService', () => {
       const result = await service.createTeamMember(input);
 
       expect(insertStub).to.have.been.calledWith(input);
-      expect(getWithUserStub).to.have.been.calledWith('22222222-2222-2222-2222-222222222222', 1);
+      expect(getWithUserStub).to.have.been.calledWith({
+        team_id: '22222222-2222-2222-2222-222222222222',
+        system_user_id: 1
+      });
       expect(result).to.eql(mockTeamMemberWithUser);
     });
 
@@ -151,25 +160,31 @@ describe('TeamMemberService', () => {
     });
 
     it('should find and delete by teamId and systemUserId', async () => {
-      sinon.stub(TeamMemberRepository.prototype, 'getTeamMembersByTeamId').resolves([
-        {
-          team_member_id: '11111111-1111-1111-1111-111111111111',
-          system_user_id: 2,
-          team_id: '22222222-2222-2222-2222-222222222222'
-        } as TeamMember
-      ]);
+      const teamMemberFilter: TeamMemberByUserFilter = {
+        team_id: '22222222-2222-2222-2222-222222222222',
+        system_user_id: 2
+      };
+      sinon.stub(TeamMemberRepository.prototype, 'getTeamMemberByTeamAndUser').resolves({
+        team_member_id: '11111111-1111-1111-1111-111111111111',
+        system_user_id: 2,
+        team_id: '22222222-2222-2222-2222-222222222222'
+      });
       const deleteStub = sinon.stub(TeamMemberRepository.prototype, 'deleteTeamMember').resolves();
 
-      await service.deleteTeamMember('22222222-2222-2222-2222-222222222222', 2);
+      await service.deleteTeamMemberByUser(teamMemberFilter);
 
       expect(deleteStub).to.have.been.calledWith('11111111-1111-1111-1111-111111111111');
     });
 
     it('should no-op when deleting by teamId and systemUserId if no member exists', async () => {
-      sinon.stub(TeamMemberRepository.prototype, 'getTeamMembersByTeamId').resolves([]);
+      const teamMemberFilter: TeamMemberByUserFilter = {
+        team_id: '22222222-2222-2222-2222-222222222222',
+        system_user_id: 2
+      };
+      sinon.stub(TeamMemberRepository.prototype, 'getTeamMemberByTeamAndUser').resolves(null);
       const deleteStub = sinon.stub(TeamMemberRepository.prototype, 'deleteTeamMember').resolves();
 
-      await service.deleteTeamMember('22222222-2222-2222-2222-222222222222', 2);
+      await service.deleteTeamMemberByUser(teamMemberFilter);
 
       expect(deleteStub).to.not.have.been.called;
     });
