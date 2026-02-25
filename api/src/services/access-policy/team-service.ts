@@ -139,7 +139,7 @@ export class TeamService extends DBService {
    *
    * @param {number} systemUserId - The ID of the system user.
    * @return {Promise<string[]>} - List of team IDs the user belongs to.
-   * @memberof TeamMemberService
+   * @memberof TeamService
    */
   async getTeamIdsBySystemUserId(systemUserId: number): Promise<string[]> {
     const teams = await this.teamRepository.getTeamsBySystemUserId(systemUserId);
