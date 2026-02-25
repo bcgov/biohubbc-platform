@@ -21,8 +21,8 @@ describe('TicketRepository', () => {
     title: 'A ticket',
     description: 'desc',
     team_id: '22222222-2222-2222-2222-222222222222',
-    priority: 'MEDIUM',
-    status: 'OPEN'
+    priority: 'medium',
+    status: 'open'
   };
 
   describe('insertTicket', () => {
@@ -89,7 +89,7 @@ describe('TicketRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
       const repo = new TicketRepository(mockDBConnection);
 
-      const result = await repo.getTicketsByTeamId(mockTicket.team_id, { status: 'OPEN' }, { page: 1, limit: 10 });
+      const result = await repo.getTicketsByTeamId(mockTicket.team_id, { status: 'open' }, { page: 1, limit: 10 });
       expect(result).to.eql([mockTicket]);
     });
   });
@@ -100,7 +100,7 @@ describe('TicketRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
       const repo = new TicketRepository(mockDBConnection);
 
-      const result = await repo.getTicketsByTeamIdCount(mockTicket.team_id, { status: 'OPEN' });
+      const result = await repo.getTicketsByTeamIdCount(mockTicket.team_id, { status: 'open' });
       expect(result).to.equal(7);
     });
   });
@@ -121,12 +121,12 @@ describe('TicketRepository', () => {
     });
 
     it('returns updated ticket', async () => {
-      const updated: Ticket = { ...mockTicket, title: 'new title', status: 'CLOSED' };
+      const updated: Ticket = { ...mockTicket, title: 'new title', status: 'closed' };
       const mockQueryResponse = { rowCount: 1, rows: [updated] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
       const repo = new TicketRepository(mockDBConnection);
 
-      const result = await repo.updateTicket(mockTicket.ticket_id, { title: 'new title', status: 'CLOSED' });
+      const result = await repo.updateTicket(mockTicket.ticket_id, { title: 'new title', status: 'closed' });
       expect(result).to.eql(updated);
     });
   });
@@ -138,7 +138,7 @@ describe('TicketRepository', () => {
       const repo = new TicketRepository(mockDBConnection);
 
       try {
-        await repo.insertTicketStatusHistory(mockTicket.ticket_id, 'OPEN');
+        await repo.insertTicketStatusHistory(mockTicket.ticket_id, 'open');
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(ApiExecuteSQLError);
@@ -150,13 +150,13 @@ describe('TicketRepository', () => {
       const mockRow = {
         ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
         ticket_id: mockTicket.ticket_id,
-        status: 'OPEN' as const
+        status: 'open' as const
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new TicketRepository(mockDBConnection);
 
-      const result = await repo.insertTicketStatusHistory(mockTicket.ticket_id, 'OPEN');
+      const result = await repo.insertTicketStatusHistory(mockTicket.ticket_id, 'open');
       expect(result).to.eql(mockRow);
     });
   });
@@ -167,7 +167,7 @@ describe('TicketRepository', () => {
         {
           ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
           ticket_id: mockTicket.ticket_id,
-          status: 'OPEN' as const
+          status: 'open' as const
         }
       ];
       const mockQueryResponse = { rowCount: 1, rows } as any as Promise<QueryResult<any>>;

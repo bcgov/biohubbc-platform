@@ -9,37 +9,37 @@ export async function up(knex: Knex): Promise<void> {
     --------------------------------------------------------------------------------
 
     CREATE TYPE ticket_priority AS ENUM (
-      'LOW',
-      'MEDIUM',
-      'HIGH',
-      'CRITICAL'
+      'low',
+      'medium',
+      'high',
+      'critical'
     );
 
     COMMENT ON TYPE ticket_priority IS 'Priority levels for tickets.';
 
     CREATE TYPE ticket_relationship_type AS ENUM (
-      'BLOCKS',
-      'BLOCKED_BY',
-      'DUPLICATES',
-      'DUPLICATE_OF',
-      'RELATES_TO',
-      'RESOLVES',
-      'RESOLVED_BY'
+      'blocks',
+      'blocked_by',
+      'duplicates',
+      'duplicate_of',
+      'relates_to',
+      'resolves',
+      'resolved_by'
     );
 
-    COMMENT ON TYPE ticket_relationship_type IS 'Type of relationship between tickets: BLOCKS (source blocks target), BLOCKED_BY (source is blocked by target), DUPLICATES (source duplicates target), DUPLICATE_OF (source is duplicate of target), RELATES_TO (general reference), RESOLVES (source resolves target), RESOLVED_BY (source is resolved by target).';
+    COMMENT ON TYPE ticket_relationship_type IS 'Type of relationship between tickets: blocks (source blocks target), blocked_by (source is blocked by target), duplicates (source duplicates target), duplicate_of (source is duplicate of target), relates_to (general reference), resolves (source resolves target), resolved_by (source is resolved by target).';
 
     CREATE TYPE ticket_status AS ENUM (
-      'OPEN',
-      'CLOSED'
+      'open',
+      'closed'
     );
 
-    COMMENT ON TYPE ticket_status IS 'Lifecycle status for tickets (OPEN or CLOSED).';
+    COMMENT ON TYPE ticket_status IS 'Lifecycle status for tickets (open or closed).';
 
     CREATE TYPE decision_type AS ENUM (
-      'APPROVED',
-      'DENIED',
-      'PENDING'
+      'approved',
+      'denied',
+      'pending'
     );
 
     COMMENT ON TYPE decision_type IS 'Decision status for admin-reviewed entities.';
@@ -53,8 +53,8 @@ export async function up(knex: Knex): Promise<void> {
       title varchar(100) NOT NULL,
       description varchar(2000) NULL,
       team_id uuid NOT NULL,
-      priority ticket_priority NOT NULL DEFAULT 'MEDIUM',
-      status ticket_status NOT NULL DEFAULT 'OPEN',
+      priority ticket_priority NOT NULL DEFAULT 'medium',
+      status ticket_status NOT NULL DEFAULT 'open',
       record_end_date timestamptz(6),
       create_date timestamptz(6) DEFAULT now() NOT NULL,
       create_user integer NOT NULL,
@@ -74,7 +74,7 @@ export async function up(knex: Knex): Promise<void> {
       WHERE record_end_date IS NULL;
     CREATE INDEX ticket_open_team_idx
       ON ticket(team_id, create_date DESC)
-      WHERE record_end_date IS NULL AND status = 'OPEN';
+      WHERE record_end_date IS NULL AND status = 'open';
 
     COMMENT ON TABLE ticket IS 'Coordination ticket for admin actions requiring review. Each ticket has a unique slug and URL. Access controlled by team membership - team members and system admins can view.';
     COMMENT ON COLUMN ticket.ticket_id IS 'System generated surrogate primary key identifier.';
@@ -82,7 +82,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN ticket.title IS 'Brief title describing the ticket purpose.';
     COMMENT ON COLUMN ticket.description IS 'Detailed description of what this ticket is for.';
     COMMENT ON COLUMN ticket.team_id IS 'Foreign key to the team. Determines access control - team members and system admins can view this ticket.';
-    COMMENT ON COLUMN ticket.priority IS 'Priority level: LOW, MEDIUM, HIGH, CRITICAL.';
+    COMMENT ON COLUMN ticket.priority IS 'Priority level: low, medium, high, critical.';
     COMMENT ON COLUMN ticket.status IS 'Authoritative lifecycle state of the ticket.';
     COMMENT ON COLUMN ticket.record_end_date IS 'Timestamp for soft delete; null when record is active.';
     COMMENT ON COLUMN ticket.create_date IS 'The datetime the record was created.';
@@ -189,7 +189,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN ticket_reference.ticket_reference_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN ticket_reference.source_ticket_id IS 'The source ticket in the relationship.';
     COMMENT ON COLUMN ticket_reference.target_ticket_id IS 'The target ticket in the relationship.';
-    COMMENT ON COLUMN ticket_reference.relationship IS 'The type of relationship from source to target (e.g., source BLOCKS target, source DUPLICATES target).';
+    COMMENT ON COLUMN ticket_reference.relationship IS 'The type of relationship from source to target (e.g., source blocks target, source duplicates target).';
     COMMENT ON COLUMN ticket_reference.record_end_date IS 'Timestamp for soft delete; null when record is active.';
     COMMENT ON COLUMN ticket_reference.create_date IS 'The datetime the record was created.';
     COMMENT ON COLUMN ticket_reference.create_user IS 'The id of the user who created the record.';
@@ -230,7 +230,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON TABLE ticket_decision IS 'Links tickets to admin decisions. Provides history of all decisions made on a ticket. Most commonly used for final ticket resolution decisions.';
     COMMENT ON COLUMN ticket_decision.ticket_decision_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN ticket_decision.ticket_id IS 'Foreign key to the ticket.';
-    COMMENT ON COLUMN ticket_decision.decision IS 'Decision made for this ticket: APPROVED, DENIED, or PENDING.';
+    COMMENT ON COLUMN ticket_decision.decision IS 'Decision made for this ticket: approved, denied, or pending.';
     COMMENT ON COLUMN ticket_decision.comment_id IS 'Optional comment explaining the decision.';
     COMMENT ON COLUMN ticket_decision.record_end_date IS 'Timestamp for soft delete; null when record is active.';
     COMMENT ON COLUMN ticket_decision.create_date IS 'The datetime the record was created.';
@@ -272,7 +272,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON TABLE data_request_decision IS 'Links data requests to admin decisions. Provides history of all decisions made on a data request. Status is derived from the most recent decision.';
     COMMENT ON COLUMN data_request_decision.data_request_decision_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN data_request_decision.data_request_id IS 'Foreign key to the data request.';
-    COMMENT ON COLUMN data_request_decision.decision IS 'Decision made for this data request: APPROVED, DENIED, or PENDING.';
+    COMMENT ON COLUMN data_request_decision.decision IS 'Decision made for this data request: approved, denied, or pending.';
     COMMENT ON COLUMN data_request_decision.comment_id IS 'Optional comment explaining the decision.';
     COMMENT ON COLUMN data_request_decision.record_end_date IS 'Timestamp for soft delete; null when record is active.';
     COMMENT ON COLUMN data_request_decision.create_date IS 'The datetime the record was created.';
@@ -314,7 +314,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON TABLE submission_upload_decision IS 'Links submission uploads to admin decisions. Provides history of all decisions made on a submission upload. Status is derived from the most recent decision.';
     COMMENT ON COLUMN submission_upload_decision.submission_upload_decision_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN submission_upload_decision.submission_upload_id IS 'Foreign key to the submission upload.';
-    COMMENT ON COLUMN submission_upload_decision.decision IS 'Decision made for this submission upload: APPROVED, DENIED, or PENDING.';
+    COMMENT ON COLUMN submission_upload_decision.decision IS 'Decision made for this submission upload: approved, denied, or pending.';
     COMMENT ON COLUMN submission_upload_decision.comment_id IS 'Optional comment explaining the decision.';
     COMMENT ON COLUMN submission_upload_decision.record_end_date IS 'Timestamp for soft delete; null when record is active.';
     COMMENT ON COLUMN submission_upload_decision.create_date IS 'The datetime the record was created.';
@@ -351,7 +351,7 @@ export async function up(knex: Knex): Promise<void> {
     -- COMMENT ON TABLE download_decision IS 'Links downloads to admin decisions. Provides history of all decisions made on a download. Status is derived from the most recent decision.';
     -- COMMENT ON COLUMN download_decision.download_decision_id IS 'System generated surrogate primary key identifier.';
     -- COMMENT ON COLUMN download_decision.download_id IS 'Foreign key to the download.';
-    -- COMMENT ON COLUMN download_decision.decision IS 'Decision made for this download: APPROVED, DENIED, or PENDING.';
+    -- COMMENT ON COLUMN download_decision.decision IS 'Decision made for this download: approved, denied, or pending.';
     -- COMMENT ON COLUMN download_decision.comment_id IS 'Optional comment explaining the decision.';
     -- COMMENT ON COLUMN download_decision.record_end_date IS 'Timestamp for soft delete; null when record is active.';
     -- COMMENT ON COLUMN download_decision.create_date IS 'The datetime the record was created.';

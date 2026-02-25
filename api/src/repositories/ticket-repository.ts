@@ -6,15 +6,7 @@ import { TicketStatusHistory } from '../models/ticket-status-history';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 
-const TICKET_COLUMNS = [
-  'ticket_id',
-  'ticket_slug',
-  'title',
-  'description',
-  'team_id',
-  'priority',
-  'status'
-] as const;
+const TICKET_COLUMNS = ['ticket_id', 'ticket_slug', 'title', 'description', 'team_id', 'priority', 'status'] as const;
 
 export class TicketRepository extends BaseRepository {
   /**
@@ -34,7 +26,7 @@ export class TicketRepository extends BaseRepository {
         description: ticket.description ?? null,
         team_id: ticket.team_id,
         ticket_slug: ticket.ticket_slug,
-        priority: ticket.priority ?? 'MEDIUM'
+        priority: ticket.priority ?? 'medium'
       })
       .returning(TICKET_COLUMNS);
 
@@ -83,7 +75,11 @@ export class TicketRepository extends BaseRepository {
    * @return {Promise<Ticket[]>} Matching tickets.
    * @memberof TicketRepository
    */
-  async getTicketsByTeamId(teamId: string, filters?: TeamFilters, pagination?: ApiPaginationOptions): Promise<Ticket[]> {
+  async getTicketsByTeamId(
+    teamId: string,
+    filters?: TeamFilters,
+    pagination?: ApiPaginationOptions
+  ): Promise<Ticket[]> {
     const knex = getKnex();
     let query = knex.table('ticket').select(TICKET_COLUMNS).whereNull('record_end_date');
 

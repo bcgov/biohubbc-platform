@@ -1,7 +1,7 @@
 import { ApiPaginationRequestOptions, ApiPaginationResponseParams } from 'types/pagination';
 
-export type TicketStatus = 'OPEN' | 'CLOSED';
-export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type TicketStatus = 'open' | 'closed';
+export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
 
 export interface ITicket {
   ticket_id: string;

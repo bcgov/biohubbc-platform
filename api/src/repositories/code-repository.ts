@@ -1,6 +1,7 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import { TicketPriority } from '../models/ticket';
 import { BaseRepository } from './base-repository';
 
 const FeatureTypeCode = z.object({
@@ -28,8 +29,15 @@ const FeatureTypeWithFeaturePropertiesCode = z.object({
 
 export type FeatureTypeWithFeaturePropertiesCode = z.infer<typeof FeatureTypeWithFeaturePropertiesCode>;
 
+const TicketPriorityCode = z.object({
+  ticket_priority: TicketPriority
+});
+
+export type TicketPriorityCode = z.infer<typeof TicketPriorityCode>;
+
 export const IAllCodeSets = z.object({
-  feature_type_with_properties: z.array(FeatureTypeWithFeaturePropertiesCode)
+  feature_type_with_properties: z.array(FeatureTypeWithFeaturePropertiesCode),
+  ticket_priorities: z.array(TicketPriority)
 });
 
 export type IAllCodeSets = z.infer<typeof IAllCodeSets>;
@@ -97,6 +105,34 @@ export class CodeRepository extends BaseRepository {
     const response = await this.connection.sql(sql, FeatureTypeCode.merge(FeaturePropertyCode));
 
     return response.rows;
+  }
+
+  /**
+   * Get all ticket priority values.
+   *
+   * @return {*}  {Promise<TicketPriority[]>}
+   * @memberof CodeRepository
+   */
+  async getTicketPriorities(): Promise<TicketPriority[]> {
+    const sql = SQL`
+      SELECT
+        e.enumlabel as ticket_priority
+      FROM
+        pg_type t
+      INNER JOIN
+        pg_enum e ON e.enumtypid = t.oid
+      INNER JOIN
+        pg_namespace n ON n.oid = t.typnamespace
+      WHERE
+        t.typname = 'ticket_priority'
+        AND n.nspname = current_schema()
+      ORDER BY
+        e.enumsortorder;
+    `;
+
+    const response = await this.connection.sql(sql, TicketPriorityCode);
+
+    return response.rows.map((row) => row.ticket_priority);
   }
 
   /**

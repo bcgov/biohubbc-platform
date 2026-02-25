@@ -19,8 +19,8 @@ describe('TicketService', () => {
     title: 'A ticket',
     description: 'desc',
     team_id: '22222222-2222-2222-2222-222222222222',
-    priority: 'MEDIUM' as const,
-    status: 'OPEN' as const
+    priority: 'medium' as const,
+    status: 'open' as const
   };
 
   beforeEach(() => {
@@ -50,7 +50,7 @@ describe('TicketService', () => {
           ticket_slug: sinon.match(/^\d{8}$/)
         })
       );
-      expect(insertHistoryStub).to.have.been.calledWith(mockTicket.ticket_id, 'OPEN');
+      expect(insertHistoryStub).to.have.been.calledWith(mockTicket.ticket_id, 'open');
       expect(result).to.eql(mockTicket);
     });
 
@@ -79,7 +79,7 @@ describe('TicketService', () => {
           ticket_slug: sinon.match(/^\d{8}$/)
         })
       );
-      expect(insertHistoryStub).to.have.been.calledWith(createdTicket.ticket_id, 'OPEN');
+      expect(insertHistoryStub).to.have.been.calledWith(createdTicket.ticket_id, 'open');
       expect(result).to.eql(createdTicket);
     });
 
@@ -98,7 +98,7 @@ describe('TicketService', () => {
       const result = await service.createTicket({ title: 'A ticket', team_id: mockTicket.team_id });
 
       expect(insertTicketStub).to.have.callCount(2);
-      expect(insertHistoryStub).to.have.been.calledWith(mockTicket.ticket_id, 'OPEN');
+      expect(insertHistoryStub).to.have.been.calledWith(mockTicket.ticket_id, 'open');
       expect(result).to.eql(mockTicket);
     });
   });
@@ -108,7 +108,7 @@ describe('TicketService', () => {
       const listStub = sinon.stub(TicketRepository.prototype, 'getTicketsByTeamId').resolves([mockTicket as any]);
       const countStub = sinon.stub(TicketRepository.prototype, 'getTicketsByTeamIdCount').resolves(1);
 
-      const filters = { status: 'OPEN' as const };
+      const filters = { status: 'open' as const };
       const list = await service.getTicketsByTeamId(mockTicket.team_id, filters, { page: 1, limit: 10 });
       const count = await service.getTicketsByTeamIdCount(mockTicket.team_id, filters);
 
@@ -125,7 +125,7 @@ describe('TicketService', () => {
         {
           ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
           ticket_id: mockTicket.ticket_id,
-          status: 'OPEN' as const
+          status: 'open' as const
         }
       ];
       const getTicketStub = sinon.stub(TicketRepository.prototype, 'getTicketById').resolves(mockTicket as any);
@@ -137,7 +137,6 @@ describe('TicketService', () => {
       expect(getHistoryStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(result).to.eql({ ...mockTicket, history });
     });
-
   });
 
   describe('updateTicket', () => {
@@ -146,7 +145,7 @@ describe('TicketService', () => {
       const updateStub = sinon.stub(TicketRepository.prototype, 'updateTicket').resolves(mockTicket as any);
       const historyStub = sinon.stub(TicketRepository.prototype, 'insertTicketStatusHistory').resolves({} as any);
 
-      const result = await service.updateTicket(mockTicket.ticket_id, { status: 'OPEN' });
+      const result = await service.updateTicket(mockTicket.ticket_id, { status: 'open' });
 
       expect(getStub).to.have.been.calledOnce;
       expect(updateStub).to.not.have.been.called;
@@ -155,15 +154,15 @@ describe('TicketService', () => {
     });
 
     it('updates and inserts status history when status changes', async () => {
-      const updated = { ...mockTicket, status: 'CLOSED' as const };
+      const updated = { ...mockTicket, status: 'closed' as const };
       sinon.stub(TicketRepository.prototype, 'getTicketById').resolves(mockTicket as any);
       const updateStub = sinon.stub(TicketRepository.prototype, 'updateTicket').resolves(updated as any);
       const historyStub = sinon.stub(TicketRepository.prototype, 'insertTicketStatusHistory').resolves({} as any);
 
-      const result = await service.updateTicket(mockTicket.ticket_id, { status: 'CLOSED' });
+      const result = await service.updateTicket(mockTicket.ticket_id, { status: 'closed' });
 
-      expect(updateStub).to.have.been.calledWith(mockTicket.ticket_id, { status: 'CLOSED' });
-      expect(historyStub).to.have.been.calledWith(mockTicket.ticket_id, 'CLOSED');
+      expect(updateStub).to.have.been.calledWith(mockTicket.ticket_id, { status: 'closed' });
+      expect(historyStub).to.have.been.calledWith(mockTicket.ticket_id, 'closed');
       expect(result).to.eql(updated);
     });
 

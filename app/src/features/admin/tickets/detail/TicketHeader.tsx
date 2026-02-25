@@ -36,9 +36,9 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
           <Typography variant="h1">{ticket ? `Ticket #${ticket.ticket_slug}` : 'Ticket'}</Typography>
           {ticket?.status && (
             <Chip
-              label={ticket.status === 'OPEN' ? 'Open' : 'Closed'}
+              label={ticket.status === 'open' ? 'Open' : 'Closed'}
               size="medium"
-              color={ticket.status === 'OPEN' ? 'primary' : 'default'}
+              color={ticket.status === 'open' ? 'primary' : 'default'}
             />
           )}
         </Stack>

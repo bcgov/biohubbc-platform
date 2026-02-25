@@ -27,19 +27,19 @@ describe('paths/tickets/{ticketId}/status', () => {
       title: 'A ticket',
       description: 'desc',
       team_id: '22222222-2222-2222-2222-222222222222',
-      priority: 'MEDIUM' as const,
-      status: 'CLOSED' as const
+      priority: 'medium' as const,
+      status: 'closed' as const
     };
 
     const updateStub = sinon.stub(TicketService.prototype, 'updateTicket').resolves(updatedTicket as any);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { ticketId: updatedTicket.ticket_id };
-    mockReq.body = { status: 'CLOSED' };
+    mockReq.body = { status: 'closed' };
 
     await updateTicketStatus()(mockReq, mockRes, mockNext);
 
-    expect(updateStub).to.have.been.calledWith(updatedTicket.ticket_id, { status: 'CLOSED' });
+    expect(updateStub).to.have.been.calledWith(updatedTicket.ticket_id, { status: 'closed' });
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql(updatedTicket);
   });

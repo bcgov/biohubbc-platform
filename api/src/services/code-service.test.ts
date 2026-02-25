@@ -39,13 +39,20 @@ describe('codeService', () => {
       const getFeatureTypePropertiesStub = sinon
         .stub(CodeService.prototype, 'getFeatureTypePropertyCodes')
         .resolves(mockFeatureTypePropertyCodes);
+      const getTicketPrioritiesStub = sinon
+        .stub(CodeService.prototype, 'getTicketPriorities')
+        .resolves(['low', 'medium', 'high', 'critical']);
 
       const codeService = new CodeService(dbConnectionObj);
 
       const result = await codeService.getAllCodeSets();
 
       expect(getFeatureTypePropertiesStub).to.have.been.calledOnce;
-      expect(result).to.eql({ feature_type_with_properties: mockFeatureTypePropertyCodes });
+      expect(getTicketPrioritiesStub).to.have.been.calledOnce;
+      expect(result).to.eql({
+        feature_type_with_properties: mockFeatureTypePropertyCodes,
+        ticket_priorities: ['low', 'medium', 'high', 'critical']
+      });
     });
   });
 
@@ -167,6 +174,26 @@ describe('codeService', () => {
 
       expect(getFeatureTypePropertiesStub).to.have.been.calledOnce;
       expect(result).to.eql(expectedResult);
+    });
+  });
+
+  describe('getTicketPriorities', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('returns ticket priorities from repository', async () => {
+      const dbConnectionObj = getMockDBConnection();
+      const getTicketPrioritiesStub = sinon
+        .stub(CodeRepository.prototype, 'getTicketPriorities')
+        .resolves(['low', 'medium', 'high', 'critical']);
+
+      const codeService = new CodeService(dbConnectionObj);
+
+      const result = await codeService.getTicketPriorities();
+
+      expect(getTicketPrioritiesStub).to.have.been.calledOnce;
+      expect(result).to.eql(['low', 'medium', 'high', 'critical']);
     });
   });
 });

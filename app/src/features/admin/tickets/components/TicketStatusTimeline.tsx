@@ -31,8 +31,8 @@ export const TicketStatusTimeline = (props: ITicketStatusTimelineProps) => {
     return null;
   }
 
-  const getStatusMessage = (status: 'OPEN' | 'CLOSED', index: number, total: number) => {
-    if (status === 'CLOSED') {
+  const getStatusMessage = (status: 'open' | 'closed', index: number, total: number) => {
+    if (status === 'closed') {
       return 'Ticket was closed';
     }
 

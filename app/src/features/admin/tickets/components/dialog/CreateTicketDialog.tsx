@@ -1,7 +1,9 @@
 import EditDialog from 'components/dialog/EditDialog';
+import { useCodesContext } from 'hooks/useContext';
 import { ICreateTicketRequest, TicketPriority } from 'interfaces/useTicketsApi.interface';
+import { useMemo } from 'react';
 import yup from 'utils/YupSchema';
-import { ITicketFormValues, TICKET_PRIORITIES, TicketForm } from './form/TicketForm';
+import { IAutocompleteOption, ITicketFormValues, TicketForm } from './form/TicketForm';
 
 interface ICreateTicketDialogProps {
   open: boolean;
@@ -14,14 +16,8 @@ interface ICreateTicketDialogProps {
 const CreateTicketFormInitialValues: ITicketFormValues = {
   title: '',
   description: '',
-  priority: 'MEDIUM'
+  priority: 'medium'
 };
-
-const CreateTicketFormYupSchema = yup.object().shape({
-  title: yup.string().required('Title is required').max(100, 'Title must be 100 characters or less'),
-  description: yup.string().max(2000, 'Description must be 2000 characters or less'),
-  priority: yup.mixed<TicketPriority>().oneOf(TICKET_PRIORITIES).required('Priority is required')
-});
 
 /**
  * Dialog wrapper for creating tickets using the shared EditDialog pattern.
@@ -31,6 +27,30 @@ const CreateTicketFormYupSchema = yup.object().shape({
  */
 export const CreateTicketDialog = (props: ICreateTicketDialogProps) => {
   const { open, onClose, onCreate, isSaving, error } = props;
+  const { codesDataLoader } = useCodesContext();
+  const ticketPriorityOptions = useMemo<IAutocompleteOption[]>(
+    () =>
+      (codesDataLoader.data?.ticket_priorities ?? []).map((value) => ({
+        value,
+        label: value
+      })),
+    [codesDataLoader.data?.ticket_priorities]
+  );
+
+  const createTicketFormYupSchema = useMemo(() => {
+    const validPriorities = ticketPriorityOptions.map((option) => option.value);
+
+    return yup.object().shape({
+      title: yup.string().required('Title is required').max(100, 'Title must be 100 characters or less'),
+      description: yup.string().max(2000, 'Description must be 2000 characters or less'),
+      priority: yup
+        .mixed<TicketPriority>()
+        .required('Priority is required')
+        .test('is-valid-priority', 'Priority is required', (value) => {
+          return Boolean(value) && (validPriorities.length === 0 || validPriorities.includes(value));
+        })
+    });
+  }, [ticketPriorityOptions]);
 
   const handleSave = async (values: ITicketFormValues) => {
     await onCreate({
@@ -47,9 +67,9 @@ export const CreateTicketDialog = (props: ICreateTicketDialogProps) => {
       dialogSaveButtonLabel="Create"
       open={open}
       component={{
-        element: <TicketForm />,
+        element: <TicketForm priorities={ticketPriorityOptions} />,
         initialValues: CreateTicketFormInitialValues,
-        validationSchema: CreateTicketFormYupSchema
+        validationSchema: createTicketFormYupSchema
       }}
       dialogError={error}
       onCancel={onClose}

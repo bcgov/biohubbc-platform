@@ -15,28 +15,28 @@ type PriorityDisplay = PriorityIcon & {
 
 export const getPriorityDisplay = (priority: TicketPriority, theme: Theme): PriorityDisplay => {
   switch (priority) {
-    case 'LOW':
+    case 'low':
       return {
         path: mdiChevronUp,
         color: theme.palette.success.main,
         bgColor: theme.palette.success.light,
         label: 'Low'
       };
-    case 'MEDIUM':
+    case 'medium':
       return {
         path: mdiChevronDoubleUp,
         color: theme.palette.primary.main,
         bgColor: theme.palette.primary.light,
         label: 'Medium'
       };
-    case 'HIGH':
+    case 'high':
       return {
         path: mdiChevronTripleUp,
         color: orange[700],
         bgColor: '#fff3e0',
         label: 'High'
       };
-    case 'CRITICAL':
+    case 'critical':
       return {
         path: mdiChevronUpBox,
         color: theme.palette.error.main,

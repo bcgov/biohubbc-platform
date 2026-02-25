@@ -12,15 +12,16 @@ export interface ITicketFormValues {
   priority: TicketPriority;
 }
 
-export const TICKET_PRIORITIES: TicketPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
-const TICKET_PRIORITY_OPTIONS: ICustomAutocompleteOption<TicketPriority>[] = TICKET_PRIORITIES.map((value) => ({
-  value,
-  label: value
-}));
+export type IAutocompleteOption = ICustomAutocompleteOption<TicketPriority>;
 
-export const TicketForm = () => {
+interface ITicketFormProps {
+  priorities: IAutocompleteOption[];
+}
+
+export const TicketForm = (props: ITicketFormProps) => {
+  const { priorities } = props;
   const { touched, errors, values, submitCount, setFieldValue } = useFormikContext<ITicketFormValues>();
-  const selectedPriority = TICKET_PRIORITY_OPTIONS.find((option) => option.value === values.priority) ?? null;
+  const selectedPriority = priorities.find((option) => option.value === values.priority) ?? null;
   const showPriorityError = Boolean(get(errors, 'priority')) && (Boolean(get(touched, 'priority')) || submitCount > 0);
 
   return (
@@ -37,7 +38,7 @@ export const TicketForm = () => {
         id="priority"
         data-testid="priority"
         label="Priority"
-        options={TICKET_PRIORITY_OPTIONS}
+        options={priorities}
         value={selectedPriority}
         isOptionEqualToValue={(option, value) => option.value === value.value}
         onChange={(_, option) => {

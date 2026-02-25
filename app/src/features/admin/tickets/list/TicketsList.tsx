@@ -38,7 +38,7 @@ export const TicketsList = (props: ITicketsListProps) => {
    * @return {value is TicketPriority}
    */
   const isTicketPriority = (value: unknown): value is TicketPriority =>
-    value === 'LOW' || value === 'MEDIUM' || value === 'HIGH' || value === 'CRITICAL';
+    value === 'low' || value === 'medium' || value === 'high' || value === 'critical';
 
   const columns: GridColDef<ITicket>[] = useMemo(
     () => [
@@ -101,10 +101,10 @@ export const TicketsList = (props: ITicketsListProps) => {
         sortable: false,
         renderCell: (params) => (
           <Chip
-            label={params.value}
+            label={params.value === 'open' ? 'Open' : 'Closed'}
             size="small"
             variant="outlined"
-            color={params.value === 'OPEN' ? 'primary' : 'default'}
+            color={params.value === 'open' ? 'primary' : 'default'}
             sx={{ fontWeight: 700 }}
           />
         )

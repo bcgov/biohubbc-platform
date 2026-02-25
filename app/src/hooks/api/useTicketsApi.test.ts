@@ -21,7 +21,7 @@ describe('useTicketsApi', () => {
 
     mock.onGet('/api/tickets').reply(200, response);
 
-    const result = await useTicketsApi(axios).getTickets({ status: 'OPEN', page: 1, limit: 10 });
+    const result = await useTicketsApi(axios).getTickets({ status: 'open', page: 1, limit: 10 });
 
     expect(result).toEqual(response);
   });
@@ -31,7 +31,7 @@ describe('useTicketsApi', () => {
       {
         ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
         ticket_id: '11111111-1111-1111-1111-111111111111',
-        status: 'OPEN'
+        status: 'open'
       }
     ];
 
@@ -41,8 +41,8 @@ describe('useTicketsApi', () => {
       title: 'Test ticket',
       description: null,
       team_id: '22222222-2222-2222-2222-222222222222',
-      priority: 'MEDIUM',
-      status: 'OPEN',
+      priority: 'medium',
+      status: 'open',
       history
     };
 
@@ -65,8 +65,8 @@ describe('useTicketsApi', () => {
       title: 'New ticket',
       description: 'desc',
       team_id: '22222222-2222-2222-2222-222222222222',
-      priority: 'MEDIUM',
-      status: 'OPEN'
+      priority: 'medium',
+      status: 'open'
     };
 
     mock.onPost('/api/tickets', payload).reply(200, ticket);
@@ -85,8 +85,8 @@ describe('useTicketsApi', () => {
       title: 'Updated title',
       description: null,
       team_id: '22222222-2222-2222-2222-222222222222',
-      priority: 'MEDIUM',
-      status: 'OPEN'
+      priority: 'medium',
+      status: 'open'
     };
 
     mock.onPatch(`/api/tickets/${ticketId}`, payload).reply(200, ticket);
@@ -104,13 +104,13 @@ describe('useTicketsApi', () => {
       title: 'Status changed',
       description: null,
       team_id: '22222222-2222-2222-2222-222222222222',
-      priority: 'MEDIUM',
-      status: 'CLOSED'
+      priority: 'medium',
+      status: 'closed'
     };
 
-    mock.onPost(`/api/tickets/${ticketId}/status`, { status: 'CLOSED' }).reply(200, ticket);
+    mock.onPost(`/api/tickets/${ticketId}/status`, { status: 'closed' }).reply(200, ticket);
 
-    const result = await useTicketsApi(axios).updateTicketStatus(ticketId, 'CLOSED');
+    const result = await useTicketsApi(axios).updateTicketStatus(ticketId, 'closed');
 
     expect(result).toEqual(ticket);
   });

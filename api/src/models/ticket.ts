@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-export const TicketPriority = z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
+export const TicketPriority = z.enum(['low', 'medium', 'high', 'critical']);
 export type TicketPriority = z.infer<typeof TicketPriority>;
 
-export const TicketStatus = z.enum(['OPEN', 'CLOSED']);
+export const TicketStatus = z.enum(['open', 'closed']);
 export type TicketStatus = z.infer<typeof TicketStatus>;
 
 export interface TeamFilters {

@@ -1,8 +1,8 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { paginationResponseSchema } from './pagination';
 
-const TicketPriorityEnum = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
-const TicketStatusEnum = ['OPEN', 'CLOSED'];
+const TicketPriorityEnum = ['low', 'medium', 'high', 'critical'];
+const TicketStatusEnum = ['open', 'closed'];
 
 export const TicketSchema: OpenAPIV3.SchemaObject = {
   type: 'object',

@@ -15,20 +15,20 @@ const ticket = {
   title: 'Test Ticket',
   description: 'Test description',
   team_id: '22222222-2222-2222-2222-222222222222',
-  priority: 'MEDIUM' as const,
-  status: 'OPEN' as const
+  priority: 'medium' as const,
+  status: 'open' as const
 };
 
 const history = [
   {
     ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
     ticket_id: ticket.ticket_id,
-    status: 'OPEN' as const
+    status: 'open' as const
   },
   {
     ticket_status_history_id: '44444444-4444-4444-4444-444444444444',
     ticket_id: ticket.ticket_id,
-    status: 'CLOSED' as const
+    status: 'closed' as const
   }
 ];
 
@@ -52,7 +52,7 @@ describe('TicketDetailPage', () => {
       description: null,
       members: [{ team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' }]
     });
-    mockUpdateTicketStatus.mockResolvedValue({ ...ticket, status: 'CLOSED' });
+    mockUpdateTicketStatus.mockResolvedValue({ ...ticket, status: 'closed' });
 
     mockUseApi.mockImplementation(() => ({
       tickets: {
@@ -107,7 +107,7 @@ describe('TicketDetailPage', () => {
     fireEvent.click(getByTestId('close-ticket-button'));
 
     await waitFor(() => {
-      expect(mockUpdateTicketStatus).toHaveBeenCalledWith(ticket.ticket_id, 'CLOSED');
+      expect(mockUpdateTicketStatus).toHaveBeenCalledWith(ticket.ticket_id, 'closed');
     });
   });
 });

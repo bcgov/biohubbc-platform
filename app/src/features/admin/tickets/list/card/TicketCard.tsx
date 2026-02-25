@@ -47,9 +47,9 @@ export const TicketCard = (props: ITicketCardProps) => {
                 <Icon path={priorityIcon.path} size={1} color={priorityIcon.color} />
               </Tooltip>
               <Chip
-                label={ticket.status}
+                label={ticket.status === 'open' ? 'Open' : 'Closed'}
                 size="small"
-                color={ticket.status === 'OPEN' ? 'primary' : 'default'}
+                color={ticket.status === 'open' ? 'primary' : 'default'}
                 sx={{ fontWeight: 700 }}
               />
             </Stack>

@@ -20,12 +20,12 @@ export const TicketFooter = (props: ITicketFooterProps) => {
 
   return (
     <Stack direction="row" justifyContent="flex-end" spacing={2} alignItems="center">
-      {status === 'OPEN' ? (
-        <Button variant="contained" onClick={() => onUpdateStatus('CLOSED')} disabled={isSaving} data-testid="close-ticket-button">
+      {status === 'open' ? (
+        <Button variant="contained" onClick={() => onUpdateStatus('closed')} disabled={isSaving} data-testid="close-ticket-button">
           Close Ticket
         </Button>
       ) : (
-        <Button variant="contained" onClick={() => onUpdateStatus('OPEN')} disabled={isSaving} data-testid="open-ticket-button">
+        <Button variant="contained" onClick={() => onUpdateStatus('open')} disabled={isSaving} data-testid="open-ticket-button">
           Reopen Ticket
         </Button>
       )}

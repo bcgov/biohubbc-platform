@@ -34,8 +34,8 @@ export async function seed(knex: Knex): Promise<void> {
   const openTicket = await ensureTicket(knex, {
     title: 'Seed Ticket - Open Review',
     description: 'Open ticket used for admin ticket list and timeline testing.',
-    priority: 'MEDIUM',
-    status: 'OPEN',
+    priority: 'medium',
+    status: 'open',
     teamId,
     createUser
   });
@@ -43,15 +43,15 @@ export async function seed(knex: Knex): Promise<void> {
   const closedTicket = await ensureTicket(knex, {
     title: 'Seed Ticket - Closed Review',
     description: 'Closed ticket used for admin ticket list and status history testing.',
-    priority: 'HIGH',
-    status: 'CLOSED',
+    priority: 'high',
+    status: 'closed',
     teamId,
     createUser
   });
 
-  await ensureTicketStatusHistory(knex, openTicket.ticket_id, 'OPEN', createUser);
-  await ensureTicketStatusHistory(knex, closedTicket.ticket_id, 'OPEN', createUser);
-  await ensureTicketStatusHistory(knex, closedTicket.ticket_id, 'CLOSED', createUser);
+  await ensureTicketStatusHistory(knex, openTicket.ticket_id, 'open', createUser);
+  await ensureTicketStatusHistory(knex, closedTicket.ticket_id, 'open', createUser);
+  await ensureTicketStatusHistory(knex, closedTicket.ticket_id, 'closed', createUser);
 
   const openComment = await ensureComment(knex, 'Seed comment for open ticket.', createUser);
   const closedComment = await ensureComment(knex, 'Seed comment for closed ticket.', createUser);
@@ -59,14 +59,14 @@ export async function seed(knex: Knex): Promise<void> {
   await ensureTicketComment(knex, openTicket.ticket_id, openComment.comment_id, createUser);
   await ensureTicketComment(knex, closedTicket.ticket_id, closedComment.comment_id, createUser);
 
-  await ensureTicketReference(knex, openTicket.ticket_id, closedTicket.ticket_id, 'RELATES_TO', createUser);
+  await ensureTicketReference(knex, openTicket.ticket_id, closedTicket.ticket_id, 'relates_to', createUser);
 
-  await ensureTicketDecision(knex, openTicket.ticket_id, 'PENDING', openComment.comment_id, createUser);
-  await ensureTicketDecision(knex, closedTicket.ticket_id, 'APPROVED', closedComment.comment_id, createUser);
+  await ensureTicketDecision(knex, openTicket.ticket_id, 'pending', openComment.comment_id, createUser);
+  await ensureTicketDecision(knex, closedTicket.ticket_id, 'approved', closedComment.comment_id, createUser);
 
   // Seed one data_request and add a decision row
   const dataRequest = await ensureDataRequest(knex, teamId, createUser);
-  await ensureDataRequestDecision(knex, dataRequest.data_request_id, 'PENDING', openComment.comment_id, createUser);
+  await ensureDataRequestDecision(knex, dataRequest.data_request_id, 'pending', openComment.comment_id, createUser);
 
   // Seed one submission upload decision row (if any submission uploads exist)
   const submissionUpload = await knex('submission_upload').select('submission_upload_id').first();
@@ -75,24 +75,24 @@ export async function seed(knex: Knex): Promise<void> {
     await ensureSubmissionUploadDecision(
       knex,
       submissionUpload.submission_upload_id,
-      'PENDING',
+      'pending',
       openComment.comment_id,
       createUser
     );
   }
 }
 
-type TicketStatus = 'OPEN' | 'CLOSED';
-type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-type DecisionType = 'APPROVED' | 'DENIED' | 'PENDING';
+type TicketStatus = 'open' | 'closed';
+type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
+type DecisionType = 'approved' | 'denied' | 'pending';
 type TicketRelationshipType =
-  | 'BLOCKS'
-  | 'BLOCKED_BY'
-  | 'DUPLICATES'
-  | 'DUPLICATE_OF'
-  | 'RELATES_TO'
-  | 'RESOLVES'
-  | 'RESOLVED_BY';
+  | 'blocks'
+  | 'blocked_by'
+  | 'duplicates'
+  | 'duplicate_of'
+  | 'relates_to'
+  | 'resolves'
+  | 'resolved_by';
 
 interface ITicketSeedInput {
   title: string;

@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { TicketPriority } from '../models/ticket';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CodeRepository, FeaturePropertyCode, FeatureTypeCode } from './code-repository';
 
@@ -128,6 +129,36 @@ describe('CodeRepository', () => {
       const result = await codeRepository.getFeaturePropertyByName(featurePropertyName);
 
       expect(result).to.be.eql(mockRow);
+    });
+  });
+
+  describe('getTicketPriorities', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should return ticket priority values if succeeds', async () => {
+      const mockRows: { ticket_priority: TicketPriority }[] = [
+        { ticket_priority: 'low' },
+        { ticket_priority: 'medium' },
+        { ticket_priority: 'high' },
+        { ticket_priority: 'critical' }
+      ];
+
+      const mockQueryResponse = {
+        rowCount: 4,
+        rows: mockRows
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const codeRepository = new CodeRepository(mockDBConnection);
+
+      const result = await codeRepository.getTicketPriorities();
+
+      expect(result).to.eql(['low', 'medium', 'high', 'critical']);
     });
   });
 });

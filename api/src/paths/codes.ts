@@ -19,7 +19,7 @@ GET.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['feature_type_with_properties'],
+            required: ['feature_type_with_properties', 'ticket_priorities'],
             properties: {
               feature_type_with_properties: {
                 type: 'array',
@@ -92,6 +92,13 @@ GET.apiDoc = {
                     }
                   },
                   additionalProperties: false
+                }
+              },
+              ticket_priorities: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                  enum: ['low', 'medium', 'high', 'critical']
                 }
               }
             },
