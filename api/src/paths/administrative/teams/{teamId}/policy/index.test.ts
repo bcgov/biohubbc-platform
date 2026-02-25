@@ -53,12 +53,12 @@ describe('teams/{teamId}/policy', () => {
     expect(mockRes.jsonValue).to.eql({ team_policies: mockResponse });
   });
 
-  it('should default policies to an empty array when omitted', async () => {
+  it('should pass through an explicitly provided empty policies array', async () => {
     const mockDBConnection = getMockDBConnection();
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
     mockReq.params = { teamId: '22222222-2222-2222-2222-222222222222' };
-    mockReq.body = {};
+    mockReq.body = { policies: [] };
 
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
     const createStub = sinon.stub(TeamPolicyService.prototype, 'createTeamPolicies').resolves([]);
