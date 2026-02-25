@@ -89,19 +89,21 @@ export class ArtifactRepository extends BaseRepository {
         ${artifact.checksum_sha256 ?? null},
         ${artifact.uploaded_at ?? null}
       )
-      RETURNING artifact_id;
+      ON CONFLICT (bucket, object_key) DO NOTHING;
     `;
 
     const response = await this.connection.sql(sqlStatement);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert artifact record', [
-        'ArtifactRepository->insertArtifact',
-        `rowCount was ${response.rowCount}, expected 1`
-      ]);
+    if (response.rowCount === 1) {
+      return response.rows[0];
     }
 
-    return response.rows[0];
+    // Conflict: return existing artifact_id
+    const existing = await this.connection.sql(SQL`
+      SELECT artifact_id FROM artifact WHERE bucket = ${artifact.bucket} AND object_key = ${artifact.object_key};
+    `);
+
+    return existing.rows[0];
   }
 
   /**

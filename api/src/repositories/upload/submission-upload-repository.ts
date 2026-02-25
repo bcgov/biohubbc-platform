@@ -58,10 +58,14 @@ export class SubmissionUploadRepository extends BaseRepository {
     const knex = getKnex();
 
     let query = knex
-      .select('submission_upload_id', 'submission_id', 'upload_id')
+      .select(
+        'submission_upload.submission_upload_id',
+        'submission_upload.submission_id',
+        'submission_upload.upload_id'
+      )
       .from('submission_upload')
-      .join('upload_artifact ua', 'ua.upload_id', 'submission_upload.upload_id')
-      .where('submission_id', submissionId);
+      .join('upload_artifact as ua', 'ua.upload_id', 'submission_upload.upload_id')
+      .where('submission_upload.submission_id', submissionId);
 
     if (filters?.role) {
       query = query.andWhere('role', filters.role);
@@ -177,6 +181,28 @@ export class SubmissionUploadRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Get a submission_upload record by upload_id (reverse lookup).
+   *
+   * @param {string} uploadId - The upload_id to look up.
+   * @returns {Promise<SubmissionUpload | null>} - The submission_upload record, or null if not found.
+   */
+  async findSubmissionUploadByUploadId(uploadId: string): Promise<SubmissionUpload | null> {
+    const sqlStatement = SQL`
+      SELECT
+        submission_upload_id,
+        submission_id,
+        upload_id
+      FROM
+        submission_upload
+      WHERE
+        upload_id = ${uploadId};
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionUpload);
+    return response.rows[0] ?? null;
   }
 
   /**

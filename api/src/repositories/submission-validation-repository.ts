@@ -86,9 +86,10 @@ export class SubmissionValidationRepository extends BaseRepository {
   }
 
   /**
-   * Update submission validation status by submission ID.
+   * Update the most recent submission validation status by submission ID.
    *
    * Used by Dead Letter Queue handler where the original job ID is not available.
+   * Scoped to the latest record so manual retries don't corrupt historical records.
    *
    * @param {number} submissionId - The submission ID.
    * @param {SubmissionValidationStatus} status - The new status.
@@ -107,7 +108,13 @@ export class SubmissionValidationRepository extends BaseRepository {
         status = ${status},
         metadata = ${JSON.stringify(metadata ?? null)}::jsonb,
         ended_at = CASE WHEN ${status} IN ('completed', 'invalid', 'failed') THEN now() ELSE ended_at END
-      WHERE submission_id = ${submissionId};
+      WHERE submission_validation_id = (
+        SELECT submission_validation_id
+        FROM submission_validation
+        WHERE submission_id = ${submissionId}
+        ORDER BY create_date DESC
+        LIMIT 1
+      );
     `;
 
     await this.connection.sql(sql);

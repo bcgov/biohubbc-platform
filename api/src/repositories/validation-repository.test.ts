@@ -4,7 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../errors/api-error';
-import { FeatureProperty, FeatureTypeWithProperties, FeatureTypeWithPropertiesRow } from '../models/feature-type';
+import { FeatureProperty } from '../models/feature-type';
 import { getMockDBConnection } from '../__mocks__/db';
 import { IInsertStyleSchema, IStyleModel, ValidationRepository } from './validation-repository';
 
@@ -54,7 +54,14 @@ describe('ValidationRepository', () => {
     it('should succeed with valid data', async () => {
       // Type mock data with Zod-inferred type - TypeScript will catch field name errors
       const mockData: FeatureProperty[] = [
-        { name: 'dataset', display_name: 'Dataset', description: 'asd', type_name: 'string', required_value: true }
+        {
+          name: 'dataset',
+          display_name: 'Dataset',
+          description: 'asd',
+          type_name: 'string',
+          required_value: true,
+          calculated_value: false
+        }
       ];
       const mockQueryResponse = mockQueryResult(mockData);
 
@@ -67,121 +74,6 @@ describe('ValidationRepository', () => {
 
       // Reuse typed mock data in assertion
       expect(response).to.eql(mockData);
-    });
-  });
-
-  describe('getFeatureTypeWithProperties', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should return feature type with properties when valid', async () => {
-      // Type mock data with Zod-inferred type - TypeScript will catch field name errors
-      const mockRows: FeatureTypeWithPropertiesRow[] = [
-        {
-          feature_type_id: 1,
-          name: 'dataset',
-          display_name: 'Dataset',
-          property_name: 'name',
-          property_display_name: 'Name',
-          property_description: 'The name of the dataset',
-          property_type_name: 'string',
-          required_value: true
-        },
-        {
-          feature_type_id: 1,
-          name: 'dataset',
-          display_name: 'Dataset',
-          property_name: 'description',
-          property_display_name: 'Description',
-          property_description: 'The description of the dataset',
-          property_type_name: 'string',
-          required_value: false
-        }
-      ];
-      const mockQueryResponse = mockQueryResult(mockRows);
-
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => mockQueryResponse
-      });
-
-      const validationRepository = new ValidationRepository(mockDBConnection);
-      const response = await validationRepository.getFeatureTypeWithProperties('dataset');
-
-      // Type expected response with Zod-inferred type
-      const expectedResponse: FeatureTypeWithProperties = {
-        featureType: {
-          feature_type_id: 1,
-          name: 'dataset',
-          display_name: 'Dataset'
-        },
-        properties: [
-          {
-            name: 'name',
-            display_name: 'Name',
-            description: 'The name of the dataset',
-            type_name: 'string',
-            required_value: true
-          },
-          {
-            name: 'description',
-            display_name: 'Description',
-            description: 'The description of the dataset',
-            type_name: 'string',
-            required_value: false
-          }
-        ]
-      };
-
-      expect(response).to.eql(expectedResponse);
-    });
-
-    it('should return null when feature type does not exist', async () => {
-      const mockQueryResponse = mockQueryResult<FeatureTypeWithPropertiesRow>([], 0);
-
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => mockQueryResponse
-      });
-
-      const validationRepository = new ValidationRepository(mockDBConnection);
-      const response = await validationRepository.getFeatureTypeWithProperties('nonexistent_type');
-
-      expect(response).to.be.null;
-    });
-
-    it('should return empty properties array when type has no properties', async () => {
-      // Type mock data with Zod-inferred type
-      const mockRows: FeatureTypeWithPropertiesRow[] = [
-        {
-          feature_type_id: 99,
-          name: 'empty_type',
-          display_name: 'Empty Type',
-          property_name: null,
-          property_display_name: null,
-          property_description: null,
-          property_type_name: null,
-          required_value: null
-        }
-      ];
-      const mockQueryResponse = mockQueryResult(mockRows);
-
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => mockQueryResponse
-      });
-
-      const validationRepository = new ValidationRepository(mockDBConnection);
-      const response = await validationRepository.getFeatureTypeWithProperties('empty_type');
-
-      const expectedResponse: FeatureTypeWithProperties = {
-        featureType: {
-          feature_type_id: 99,
-          name: 'empty_type',
-          display_name: 'Empty Type'
-        },
-        properties: []
-      };
-
-      expect(response).to.eql(expectedResponse);
     });
   });
 

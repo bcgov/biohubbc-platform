@@ -12,8 +12,6 @@ export enum ValidationErrorType {
   INVALID_FEATURE_TYPE = 'Invalid Feature Type',
 
   // Property errors
-  /** Property is not allowed for this feature type */
-  INVALID_PROPERTY = 'Invalid Property',
   /** A required property for this feature type is missing */
   MISSING_REQUIRED_PROPERTY = 'Missing Required Property',
   /** Property value has wrong type (e.g., string instead of number) */
@@ -25,7 +23,11 @@ export enum ValidationErrorType {
   /** Parent or content UUID does not resolve to a feature in the submission */
   UNRESOLVED_REFERENCE = 'Unresolved Reference',
   /** Feature references itself in parent or content */
-  SELF_REFERENCE = 'Self Reference'
+  SELF_REFERENCE = 'Self Reference',
+
+  // Media errors
+  /** A file/report block references a media file not found in the archive */
+  MISSING_MEDIA_FILE = 'Missing Media File'
 }
 
 /**
