@@ -78,4 +78,27 @@ describe('TeamAuthorizationRepository', () => {
       expect(result).to.be.null;
     });
   });
+
+  describe('findTeamPolicyBySubmissionFeature', () => {
+    it('returns a record when the user has team policy access to the submission feature', async () => {
+      const mockRow = { team_policy_id: 'tp-1' };
+      const mockResponse = { rowCount: 1, rows: [mockRow] } as unknown as QueryResult<any>;
+      const mockConnection = getMockDBConnection({ sql: async () => mockResponse });
+
+      const repository = new TeamAuthorizationRepository(mockConnection);
+      const result = await repository.findTeamPolicyBySubmissionFeature(1, 100);
+
+      expect(result).to.eql(mockRow);
+    });
+
+    it('returns null when the user does not have team policy access to the submission feature', async () => {
+      const mockResponse = { rowCount: 0, rows: [] } as unknown as QueryResult<any>;
+      const mockConnection = getMockDBConnection({ sql: async () => mockResponse });
+
+      const repository = new TeamAuthorizationRepository(mockConnection);
+      const result = await repository.findTeamPolicyBySubmissionFeature(1, 100);
+
+      expect(result).to.be.null;
+    });
+  });
 });
