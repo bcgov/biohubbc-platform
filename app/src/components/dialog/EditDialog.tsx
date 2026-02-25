@@ -97,7 +97,6 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
           <DialogActions>
             <Button
               loading={props.isLoading}
-              disabled={!formikProps.isValid}
               onClick={formikProps.submitForm}
               color="primary"
               variant="contained"

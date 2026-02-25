@@ -64,13 +64,14 @@ describe('TicketsDashboardPage', () => {
   });
 
   it('changes page and requests paginated data', async () => {
-    const { getByLabelText } = render(
+    const { findByLabelText } = render(
       <MemoryRouter>
         <TicketsDashboardPage />
       </MemoryRouter>
     );
 
-    fireEvent.click(getByLabelText('Go to next page'));
+    const nextPageButton = await findByLabelText('Go to next page');
+    fireEvent.click(nextPageButton);
 
     await waitFor(() => {
       expect(mockGetTickets).toHaveBeenLastCalledWith({

@@ -3,14 +3,14 @@ import { render } from 'test-helpers/test-utils';
 import { CreateTicketDialog } from './CreateTicketDialog';
 
 describe('CreateTicketDialog', () => {
-  it('disables save until required fields are provided', async () => {
+  it('does not submit when required fields are missing', async () => {
     const onCreate = vi.fn();
 
     const { getByTestId } = render(
       <CreateTicketDialog open={true} isSaving={false} onClose={vi.fn()} onCreate={onCreate} />
     );
 
-    expect(getByTestId('edit-dialog-save-button')).toBeDisabled();
+    fireEvent.click(getByTestId('edit-dialog-save-button'));
     expect(onCreate).not.toHaveBeenCalled();
   });
 

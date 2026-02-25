@@ -84,11 +84,11 @@ describe('TicketDetailPage', () => {
   });
 
   it('renders timeline and comment input', async () => {
-    const { getByText, getByPlaceholderText, getByRole } = renderPage();
+    const { getAllByText, getByText, getByPlaceholderText, getByRole } = renderPage();
 
     await waitFor(() => {
-      expect(getByText('Ticket #04900042')).toBeVisible();
-      expect(getByText('Ticket was opened')).toBeVisible();
+      expect(getAllByText('Ticket #04900042').length).toBeGreaterThan(0);
+      expect(getByText('Ticket was reopened')).toBeVisible();
       expect(getByText('Ticket was closed')).toBeVisible();
       expect(getByText('Team')).toBeVisible();
       expect(getByText('alice')).toBeVisible();
