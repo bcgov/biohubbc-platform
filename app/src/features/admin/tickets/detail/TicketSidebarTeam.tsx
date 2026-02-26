@@ -2,12 +2,13 @@ import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
+import { useApi } from 'hooks/useApi';
+import useDataLoader from 'hooks/useDataLoader';
+import { useEffect } from 'react';
 import { TicketSidebarSection } from './TicketSidebarSection';
 
 interface ITicketSidebarTeamProps {
-  isLoading: boolean;
-  team?: ITeamWithMembers;
+  teamId?: string;
   onAddTeam?: () => void;
 }
 
@@ -18,12 +19,24 @@ interface ITicketSidebarTeamProps {
  * @return {*}
  */
 export const TicketSidebarTeam = (props: ITicketSidebarTeamProps) => {
-  const { isLoading, team, onAddTeam } = props;
+  const { teamId, onAddTeam } = props;
+  const api = useApi();
+  const teamLoader = useDataLoader((currentTeamId: string) => api.teams.getTeam(currentTeamId));
+
+  useEffect(() => {
+    if (!teamId) {
+      return;
+    }
+
+    teamLoader.load(teamId);
+  }, [teamId, teamLoader]);
+
+  const team = teamId ? teamLoader.data : undefined;
 
   return (
     <TicketSidebarSection label="Members" onAdd={onAddTeam}>
       <LoadingGuard
-        isLoading={isLoading}
+        isLoading={teamLoader.isLoading}
         isLoadingFallback={
           <Stack spacing={1}>
             <Skeleton variant="text" width="75%" />
@@ -42,4 +55,3 @@ export const TicketSidebarTeam = (props: ITicketSidebarTeamProps) => {
     </TicketSidebarSection>
   );
 };
-

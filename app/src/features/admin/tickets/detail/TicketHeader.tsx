@@ -6,13 +6,14 @@ import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { PageHeader } from 'components/header/PageHeader';
-import { useDialogContext } from 'hooks/useContext';
+import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketWithHistory } from 'interfaces/useTicketsApi.interface';
 import { Link as RouterLink } from 'react-router-dom';
+import { EditTicketDialog } from '../components/dialog/EditTicketDialog';
+import { useTicketEditDialog } from '../hooks/useTicketEditDialog';
 
 interface ITicketHeaderProps {
   ticket?: ITicketWithHistory;
-  onEdit?: () => void;
 }
 
 /**
@@ -22,9 +23,18 @@ interface ITicketHeaderProps {
  * @return {*}
  */
 export const TicketHeader = (props: ITicketHeaderProps) => {
-  const { ticket, onEdit } = props;
+  const { ticket } = props;
   const dialogContext = useDialogContext();
+  const { ticketId, ticketDataLoader } = useTicketContext();
   const descriptionPreviewMaxLength = 300;
+  const handleRefresh = async () => {
+    await ticketDataLoader.refresh(ticketId);
+  };
+  const { isSavingTicket, editTicketError, isEditDialogOpen, openEditDialog, closeEditDialog, handleEditTicket } =
+    useTicketEditDialog({
+      ticketId,
+      onRefreshTicket: handleRefresh
+    });
 
   const handleReadMoreClick = () => {
     if (!ticket?.description) {
@@ -66,7 +76,7 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
       }
       label={<Typography variant="h1">{ticket?.title ?? 'Ticket'}</Typography>}
       buttons={
-        <Button variant="outlined" onClick={onEdit} disabled={!ticket} data-testid="edit-ticket-button">
+        <Button variant="outlined" onClick={openEditDialog} disabled={!ticket} data-testid="edit-ticket-button">
           Edit
         </Button>
       }
@@ -122,6 +132,17 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
           </Stack>
         ) : null
       }
-    />
+    >
+      {isEditDialogOpen && ticket ? (
+        <EditTicketDialog
+          open={isEditDialogOpen}
+          ticket={ticket}
+          isSaving={isSavingTicket}
+          error={editTicketError}
+          onClose={closeEditDialog}
+          onSave={handleEditTicket}
+        />
+      ) : null}
+    </PageHeader>
   );
 };

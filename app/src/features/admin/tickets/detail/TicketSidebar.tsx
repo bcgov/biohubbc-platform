@@ -1,13 +1,12 @@
 import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
-import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
+import { useState } from 'react';
+import { TicketTeamDialog } from '../components/dialog/TicketTeamDialog';
 import { TicketSidebarSection } from './TicketSidebarSection';
 import { TicketSidebarTeam } from './TicketSidebarTeam';
 
 interface ITicketSidebarProps {
-  isLoading: boolean;
-  team?: ITeamWithMembers;
-  onAddTeam?: () => void;
+  teamId?: string;
 }
 
 /**
@@ -17,15 +16,19 @@ interface ITicketSidebarProps {
  * @return {*}
  */
 export const TicketSidebar = (props: ITicketSidebarProps) => {
-  const { isLoading, team, onAddTeam } = props;
+  const { teamId } = props;
+  const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
 
   return (
-    <Stack spacing={2}>
-      <TicketSidebarTeam isLoading={isLoading} team={team} onAddTeam={onAddTeam} />
-      <Divider />
-      <TicketSidebarSection label="Data Requests" />
-      <Divider />
-      <TicketSidebarSection label="Uploads" />
-    </Stack>
+    <>
+      <Stack spacing={2}>
+        <TicketSidebarTeam teamId={teamId} onAddTeam={() => setIsTeamDialogOpen(true)} />
+        <Divider />
+        <TicketSidebarSection label="Data Requests" />
+        <Divider />
+        <TicketSidebarSection label="Uploads" />
+      </Stack>
+      <TicketTeamDialog open={isTeamDialogOpen} onClose={() => setIsTeamDialogOpen(false)} />
+    </>
   );
 };

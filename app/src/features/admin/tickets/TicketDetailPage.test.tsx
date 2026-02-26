@@ -1,6 +1,7 @@
 import { fireEvent, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { CodesContext, ICodesContext } from 'contexts/codesContext';
+import { TicketContextProvider } from 'contexts/ticketContext';
 import { DataLoader } from 'hooks/useDataLoader';
 import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -114,7 +115,14 @@ describe('TicketDetailPage', () => {
       <CodesContext.Provider value={mockCodesContext}>
         <MemoryRouter initialEntries={[`/admin/tickets/${ticket.ticket_id}`]}>
           <Routes>
-            <Route path="/admin/tickets/:ticketId" element={<TicketDetailPage />} />
+            <Route
+              path="/admin/tickets/:ticketId"
+              element={
+                <TicketContextProvider>
+                  <TicketDetailPage />
+                </TicketContextProvider>
+              }
+            />
           </Routes>
         </MemoryRouter>
       </CodesContext.Provider>

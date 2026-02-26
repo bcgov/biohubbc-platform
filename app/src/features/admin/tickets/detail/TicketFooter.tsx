@@ -1,12 +1,12 @@
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
+import { useTicketContext } from 'hooks/useContext';
+import { useTicketStatus } from '../hooks/useTicketStatus';
 import { TicketStatus } from 'interfaces/useTicketsApi.interface';
 
 interface ITicketFooterProps {
-  isSavingStatus: boolean;
   isSavingComment: boolean;
   status?: TicketStatus;
-  onUpdateStatus: (status: TicketStatus) => Promise<void>;
 }
 
 /**
@@ -16,7 +16,15 @@ interface ITicketFooterProps {
  * @return {*}
  */
 export const TicketFooter = (props: ITicketFooterProps) => {
-  const { isSavingStatus, isSavingComment, status, onUpdateStatus } = props;
+  const { isSavingComment, status } = props;
+  const { ticketId, ticketDataLoader } = useTicketContext();
+  const handleRefresh = async () => {
+    await ticketDataLoader.refresh(ticketId);
+  };
+  const { isSavingStatus, handleUpdateStatus } = useTicketStatus({
+    ticketId,
+    onRefreshTicket: handleRefresh
+  });
 
   return (
     <Stack direction="row" justifyContent="flex-end" spacing={2} alignItems="center">
@@ -25,7 +33,7 @@ export const TicketFooter = (props: ITicketFooterProps) => {
           color="error"
           variant="outlined"
           size="small"
-          onClick={() => onUpdateStatus('closed')}
+          onClick={() => handleUpdateStatus('closed')}
           disabled={isSavingStatus || isSavingComment}
           data-testid="close-ticket-button">
           Close Ticket
@@ -35,7 +43,7 @@ export const TicketFooter = (props: ITicketFooterProps) => {
           color={status === 'closed' ? 'primary' : 'error'}
           variant="outlined"
           size="small"
-          onClick={() => onUpdateStatus('open')}
+          onClick={() => handleUpdateStatus('open')}
           disabled={isSavingStatus || isSavingComment}
           data-testid="open-ticket-button">
           Reopen Ticket

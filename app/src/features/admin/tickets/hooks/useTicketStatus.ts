@@ -1,4 +1,5 @@
 import { APIError } from 'hooks/api/useAxios';
+import { useDialogContext } from 'hooks/useContext';
 import { useApi } from 'hooks/useApi';
 import { TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
@@ -6,7 +7,6 @@ import { useState } from 'react';
 interface IUseTicketStatusProps {
   ticketId?: string;
   onRefreshTicket: () => Promise<void>;
-  onError: (message: string | undefined) => void;
 }
 
 /**
@@ -16,9 +16,21 @@ interface IUseTicketStatusProps {
  * @return {*}
  */
 export const useTicketStatus = (props: IUseTicketStatusProps) => {
-  const { ticketId, onRefreshTicket, onError } = props;
+  const { ticketId, onRefreshTicket } = props;
   const api = useApi();
+  const dialogContext = useDialogContext();
   const [isSavingStatus, setIsSavingStatus] = useState(false);
+
+  const handleError = (message: string | undefined) => {
+    if (!message) {
+      return;
+    }
+
+    dialogContext.setSnackbar({
+      open: true,
+      snackbarMessage: message
+    });
+  };
 
   const handleUpdateStatus = async (status: TicketStatus) => {
     if (!ticketId) {
@@ -27,13 +39,12 @@ export const useTicketStatus = (props: IUseTicketStatusProps) => {
 
     try {
       setIsSavingStatus(true);
-      onError(undefined);
 
       await api.tickets.updateTicketStatus(ticketId, status);
       await onRefreshTicket();
     } catch (caughtError) {
       const apiError = caughtError as APIError;
-      onError(apiError.message || 'Failed to update status.');
+      handleError(apiError.message || 'Failed to update status.');
     } finally {
       setIsSavingStatus(false);
     }
@@ -41,7 +52,7 @@ export const useTicketStatus = (props: IUseTicketStatusProps) => {
 
   return {
     isSavingStatus,
+    handleError,
     handleUpdateStatus
   };
 };
-

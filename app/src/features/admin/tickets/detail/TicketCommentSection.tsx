@@ -1,13 +1,10 @@
+import { useTicketContext } from 'hooks/useContext';
 import { Dispatch, SetStateAction } from 'react';
 import { useTicketComment } from '../hooks/useTicketComment';
 import { TicketComment } from './TicketComment';
 
 interface ITicketCommentSectionProps {
-  ticketId?: string;
   isTicketOpen: boolean;
-  isSavingStatus: boolean;
-  onRefreshTicket: () => Promise<void>;
-  onError: (message: string | undefined) => void;
   onSavingChange: Dispatch<SetStateAction<boolean>>;
 }
 
@@ -18,11 +15,14 @@ interface ITicketCommentSectionProps {
  * @return {*}
  */
 export const TicketCommentSection = (props: ITicketCommentSectionProps) => {
-  const { ticketId, isTicketOpen, isSavingStatus, onRefreshTicket, onError, onSavingChange } = props;
+  const { isTicketOpen, onSavingChange } = props;
+  const { ticketId, ticketDataLoader } = useTicketContext();
+  const handleRefresh = async () => {
+    await ticketDataLoader.refresh(ticketId);
+  };
   const { comment, setComment, isSavingComment, handleAddComment } = useTicketComment({
     ticketId,
-    onRefreshTicket,
-    onError,
+    onRefreshTicket: handleRefresh,
     onSavingChange
   });
 
@@ -34,7 +34,7 @@ export const TicketCommentSection = (props: ITicketCommentSectionProps) => {
     <TicketComment
       comment={comment}
       setComment={setComment}
-      isSaving={isSavingComment || isSavingStatus}
+      isSaving={isSavingComment}
       onAddComment={handleAddComment}
     />
   );
