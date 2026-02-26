@@ -21,7 +21,7 @@ export const GET: Operation = [
         {
           discriminator: 'Team',
           entity: 'data_request',
-          dataRequestId: req.params.dataRequestId!
+          dataRequestId: req.params.dataRequestId
         }
       ]
     };
@@ -39,7 +39,7 @@ export const PUT: Operation = [
         {
           discriminator: 'Team',
           entity: 'data_request',
-          dataRequestId: req.params.dataRequestId!
+          dataRequestId: req.params.dataRequestId
         }
       ]
     };
@@ -57,7 +57,7 @@ export const DELETE: Operation = [
         {
           discriminator: 'Team',
           entity: 'data_request',
-          dataRequestId: req.params.dataRequestId!
+          dataRequestId: req.params.dataRequestId
         }
       ]
     };
