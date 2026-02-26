@@ -213,4 +213,69 @@ describe('TicketRepository', () => {
       expect(result).to.eql(rows);
     });
   });
+
+  describe('insertTicketComment', () => {
+    it('throws when insert fails', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new TicketRepository(mockDBConnection);
+
+      try {
+        await repo.insertTicketComment(mockTicket.ticket_id, { comment: 'New comment' });
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiExecuteSQLError);
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to insert ticket comment');
+      }
+    });
+
+    it('returns inserted comment history row', async () => {
+      const mockRow = {
+        ticket_status_history_id: null,
+        ticket_comment_id: '33333333-3333-3333-3333-333333333333',
+        ticket_id: mockTicket.ticket_id,
+        user_identifier: 'Sarah',
+        create_date: '2026-02-25T00:00:00.000Z',
+        status: null,
+        comment: 'New comment'
+      };
+      const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new TicketRepository(mockDBConnection);
+
+      const result = await repo.insertTicketComment(mockTicket.ticket_id, { comment: 'New comment' });
+      expect(result).to.eql(mockRow);
+    });
+  });
+
+  describe('getTicketHistory', () => {
+    it('returns combined status and comment rows ordered by query', async () => {
+      const rows = [
+        {
+          ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
+          ticket_comment_id: null,
+          ticket_id: mockTicket.ticket_id,
+          user_identifier: 'Sarah',
+          create_date: '2026-02-25T00:00:00.000Z',
+          status: 'open' as const,
+          comment: null
+        },
+        {
+          ticket_status_history_id: null,
+          ticket_comment_id: '44444444-4444-4444-4444-444444444444',
+          ticket_id: mockTicket.ticket_id,
+          user_identifier: 'Sarah',
+          create_date: '2026-02-25T00:01:00.000Z',
+          status: null,
+          comment: 'New comment'
+        }
+      ];
+      const mockQueryResponse = { rowCount: 2, rows } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new TicketRepository(mockDBConnection);
+
+      const result = await repo.getTicketHistory(mockTicket.ticket_id);
+      expect(result).to.eql(rows);
+    });
+  });
 });

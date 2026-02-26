@@ -125,20 +125,46 @@ describe('TicketService', () => {
       const history = [
         {
           ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
+          ticket_comment_id: null,
           ticket_id: mockTicket.ticket_id,
           user_identifier: 'Sarah',
           create_date: '2026-02-25T00:00:00.000Z',
-          status: 'open' as const
+          status: 'open' as const,
+          comment: null
         }
       ];
       const getTicketStub = sinon.stub(TicketRepository.prototype, 'getTicketById').resolves(mockTicket as any);
-      const getHistoryStub = sinon.stub(TicketRepository.prototype, 'getTicketStatusHistory').resolves(history as any);
+      const getHistoryStub = sinon.stub(TicketRepository.prototype, 'getTicketHistory').resolves(history as any);
 
       const result = await service.getTicket(mockTicket.ticket_id);
 
       expect(getTicketStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getHistoryStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(result).to.eql({ ...mockTicket, history });
+    });
+  });
+
+  describe('createTicketComment', () => {
+    it('creates a comment history item for the ticket', async () => {
+      const createdHistoryItem = {
+        ticket_status_history_id: null,
+        ticket_comment_id: '33333333-3333-3333-3333-333333333333',
+        ticket_id: mockTicket.ticket_id,
+        user_identifier: 'Sarah',
+        create_date: '2026-02-25T00:00:00.000Z',
+        status: null,
+        comment: 'New comment'
+      };
+      const getTicketStub = sinon.stub(TicketRepository.prototype, 'getTicketById').resolves(mockTicket as any);
+      const insertCommentStub = sinon
+        .stub(TicketRepository.prototype, 'insertTicketComment')
+        .resolves(createdHistoryItem as any);
+
+      const result = await service.createTicketComment(mockTicket.ticket_id, { comment: 'New comment' });
+
+      expect(getTicketStub).to.have.been.calledWith(mockTicket.ticket_id);
+      expect(insertCommentStub).to.have.been.calledWith(mockTicket.ticket_id, { comment: 'New comment' });
+      expect(result).to.eql(createdHistoryItem);
     });
   });
 

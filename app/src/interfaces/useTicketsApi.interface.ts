@@ -15,11 +15,13 @@ export interface ITicket {
 }
 
 export interface ITicketStatusHistory {
-  ticket_status_history_id: string;
+  ticket_status_history_id?: string | null;
+  ticket_comment_id?: string | null;
   ticket_id: string;
   user_identifier: string;
   create_date: string;
-  status: TicketStatus;
+  status?: TicketStatus | null;
+  comment?: string | null;
 }
 
 export interface ITicketWithHistory extends ITicket {
@@ -37,6 +39,10 @@ export interface IUpdateTicketRequest {
   description?: string | null;
   priority?: TicketPriority;
   status?: TicketStatus;
+}
+
+export interface ICreateTicketCommentRequest {
+  comment: string;
 }
 
 export interface IGetTicketsResponse {

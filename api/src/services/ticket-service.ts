@@ -1,6 +1,14 @@
 import { v4 } from 'uuid';
 import { IDBConnection } from '../database/db';
-import { CreateTicketRequest, TeamFilters, Ticket, TicketWithHistory, UpdateTicketRequest } from '../models/ticket';
+import {
+  CreateTicketCommentRequest,
+  CreateTicketRequest,
+  TeamFilters,
+  Ticket,
+  TicketHistoryItem,
+  TicketWithHistory,
+  UpdateTicketRequest
+} from '../models/ticket';
 import { TicketRepository } from '../repositories/ticket-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
@@ -77,10 +85,24 @@ export class TicketService extends DBService {
   async getTicket(ticketId: string): Promise<TicketWithHistory> {
     const [ticket, history] = await Promise.all([
       this.ticketRepository.getTicketById(ticketId),
-      this.ticketRepository.getTicketStatusHistory(ticketId)
+      this.ticketRepository.getTicketHistory(ticketId)
     ]);
 
     return { ...ticket, history };
+  }
+
+  /**
+   * Add a comment to a ticket timeline.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @param {CreateTicketCommentRequest} payload - Comment payload.
+   * @return {Promise<TicketHistoryItem>} Created timeline history item.
+   * @memberof TicketService
+   */
+  async createTicketComment(ticketId: string, payload: CreateTicketCommentRequest): Promise<TicketHistoryItem> {
+    await this.ticketRepository.getTicketById(ticketId);
+
+    return this.ticketRepository.insertTicketComment(ticketId, payload);
   }
 
   /**

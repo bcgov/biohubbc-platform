@@ -25,13 +25,16 @@ export type Ticket = z.infer<typeof Ticket>;
 export const TicketSlug = Ticket.pick({ ticket_slug: true });
 export type TicketSlug = z.infer<typeof TicketSlug>;
 
-const TicketHistoryItem = z.object({
-  ticket_status_history_id: z.string().uuid(),
+export const TicketHistoryItem = z.object({
+  ticket_status_history_id: z.string().uuid().nullable().optional(),
+  ticket_comment_id: z.string().uuid().nullable().optional(),
   ticket_id: z.string().uuid(),
   user_identifier: z.string(),
   create_date: z.string(),
-  status: TicketStatus
+  status: TicketStatus.nullable().optional(),
+  comment: z.string().nullable().optional()
 });
+export type TicketHistoryItem = z.infer<typeof TicketHistoryItem>;
 
 export const TicketWithHistory = Ticket.extend({
   history: z.array(TicketHistoryItem)
@@ -62,3 +65,9 @@ export const UpdateTicketStatusRequest = z.object({
 });
 
 export type UpdateTicketStatusRequest = z.infer<typeof UpdateTicketStatusRequest>;
+
+export const CreateTicketCommentRequest = z.object({
+  comment: z.string().trim().min(1).max(3000)
+});
+
+export type CreateTicketCommentRequest = z.infer<typeof CreateTicketCommentRequest>;

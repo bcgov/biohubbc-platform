@@ -2,9 +2,11 @@ import { SQL } from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
+  CreateTicketCommentRequest,
   CreateTicketRequest,
   TeamFilters,
   Ticket,
+  TicketHistoryItem,
   TicketSlug,
   TicketStatus,
   UpdateTicketRequest
@@ -297,6 +299,116 @@ export class TicketRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, TicketStatusHistory);
+
+    return response.rows;
+  }
+
+  /**
+   * Insert a ticket comment and link it to the ticket.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @param {CreateTicketCommentRequest} payload - Comment payload.
+   * @return {Promise<TicketHistoryItem>} Created comment history row.
+   * @throws {ApiExecuteSQLError} If the insert does not affect exactly one row.
+   * @memberof TicketRepository
+   */
+  async insertTicketComment(ticketId: string, payload: CreateTicketCommentRequest): Promise<TicketHistoryItem> {
+    const sqlStatement = SQL`
+      WITH inserted_comment AS (
+        INSERT INTO comment (
+          comment
+        ) VALUES (
+          ${payload.comment}
+        )
+        RETURNING comment_id
+      )
+      INSERT INTO ticket_comment (
+        ticket_id,
+        comment_id
+      )
+      SELECT
+        ${ticketId},
+        ic.comment_id
+      FROM inserted_comment ic
+      RETURNING
+        NULL::uuid AS ticket_status_history_id,
+        ticket_comment_id,
+        ticket_id,
+        (
+          SELECT COALESCE(
+            to_jsonb(su)->>'user_identifier',
+            to_jsonb(su)->>'user_guid',
+            'Unknown user'
+          )
+          FROM "system_user" su
+          WHERE su.system_user_id = create_user
+        ) AS user_identifier,
+        create_date,
+        NULL::text AS status,
+        ${payload.comment}::text AS comment;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, TicketHistoryItem);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert ticket comment', [
+        'TicketRepository->insertTicketComment',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get all ticket timeline history entries (status + comments) ordered oldest first.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @return {Promise<TicketHistoryItem[]>} Timeline history rows.
+   * @memberof TicketRepository
+   */
+  async getTicketHistory(ticketId: string): Promise<TicketHistoryItem[]> {
+    const sqlStatement = SQL`
+      SELECT
+        tsh.ticket_status_history_id,
+        NULL::uuid AS ticket_comment_id,
+        tsh.ticket_id,
+        COALESCE(
+          to_jsonb(su)->>'user_identifier',
+          to_jsonb(su)->>'user_guid',
+          'Unknown user'
+        ) AS user_identifier,
+        tsh.create_date,
+        tsh.status::text AS status,
+        NULL::text AS comment
+      FROM ticket_status_history tsh
+      JOIN "system_user" su
+        ON su.system_user_id = tsh.create_user
+      WHERE tsh.ticket_id = ${ticketId}
+      UNION ALL
+      SELECT
+        NULL::uuid AS ticket_status_history_id,
+        tc.ticket_comment_id,
+        tc.ticket_id,
+        COALESCE(
+          to_jsonb(su)->>'user_identifier',
+          to_jsonb(su)->>'user_guid',
+          'Unknown user'
+        ) AS user_identifier,
+        tc.create_date,
+        NULL::text AS status,
+        c.comment
+      FROM ticket_comment tc
+      JOIN comment c
+        ON c.comment_id = tc.comment_id
+      JOIN "system_user" su
+        ON su.system_user_id = tc.create_user
+      WHERE tc.ticket_id = ${ticketId}
+        AND tc.record_end_date IS NULL
+      ORDER BY create_date ASC;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, TicketHistoryItem);
 
     return response.rows;
   }

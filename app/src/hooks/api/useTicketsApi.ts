@@ -1,9 +1,11 @@
 import { AxiosInstance } from 'axios';
 import {
+  ICreateTicketCommentRequest,
   ICreateTicketRequest,
   IGetTicketsParams,
   IGetTicketsResponse,
   ITicket,
+  ITicketStatusHistory,
   ITicketWithHistory,
   IUpdateTicketRequest,
   TicketStatus
@@ -82,11 +84,28 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Add a comment to a ticket timeline.
+   *
+   * @param {string} ticketId
+   * @param {ICreateTicketCommentRequest} payload
+   * @return {*} {Promise<ITicketStatusHistory>}
+   */
+  const createTicketComment = async (
+    ticketId: string,
+    payload: ICreateTicketCommentRequest
+  ): Promise<ITicketStatusHistory> => {
+    const { data } = await axios.post(`/api/tickets/${ticketId}/comment`, payload);
+
+    return data;
+  };
+
   return {
     getTickets,
     getTicket,
     createTicket,
     updateTicket,
-    updateTicketStatus
+    updateTicketStatus,
+    createTicketComment
   };
 };

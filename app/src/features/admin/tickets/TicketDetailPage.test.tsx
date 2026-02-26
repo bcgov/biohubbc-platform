@@ -50,6 +50,7 @@ describe('TicketDetailPage', () => {
   const mockGetTeam = vi.fn();
   const mockUpdateTicket = vi.fn();
   const mockUpdateTicketStatus = vi.fn();
+  const mockCreateTicketComment = vi.fn();
 
   const mockCodesData: IGetAllCodeSetsResponse = {
     feature_type_with_properties: [],
@@ -85,12 +86,22 @@ describe('TicketDetailPage', () => {
     });
     mockUpdateTicket.mockResolvedValue(ticket);
     mockUpdateTicketStatus.mockResolvedValue({ ...ticket, status: 'closed' });
+    mockCreateTicketComment.mockResolvedValue({
+      ticket_status_history_id: null,
+      ticket_comment_id: '55555555-5555-5555-5555-555555555555',
+      ticket_id: ticket.ticket_id,
+      user_identifier: 'Sarah',
+      create_date: '2026-02-25T00:00:00.000Z',
+      status: null,
+      comment: 'New comment'
+    });
 
     mockUseApi.mockImplementation(() => ({
       tickets: {
         getTicket: mockGetTicket,
         updateTicket: mockUpdateTicket,
-        updateTicketStatus: mockUpdateTicketStatus
+        updateTicketStatus: mockUpdateTicketStatus,
+        createTicketComment: mockCreateTicketComment
       },
       teams: {
         getTeam: mockGetTeam
@@ -143,6 +154,21 @@ describe('TicketDetailPage', () => {
 
     await waitFor(() => {
       expect(mockUpdateTicketStatus).toHaveBeenCalledWith(ticket.ticket_id, 'closed');
+    });
+  });
+
+  it('adds a comment and refreshes timeline', async () => {
+    const { getByPlaceholderText, getByRole } = renderPage();
+
+    await waitFor(() => {
+      expect(getByPlaceholderText('Type your comment...')).toBeVisible();
+    });
+
+    fireEvent.change(getByPlaceholderText('Type your comment...'), { target: { value: 'New comment' } });
+    fireEvent.click(getByRole('button', { name: 'Comment' }));
+
+    await waitFor(() => {
+      expect(mockCreateTicketComment).toHaveBeenCalledWith(ticket.ticket_id, { comment: 'New comment' });
     });
   });
 

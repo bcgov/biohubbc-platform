@@ -35,13 +35,15 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
       type: 'array',
       items: {
         type: 'object',
-        required: ['ticket_status_history_id', 'ticket_id', 'user_identifier', 'create_date', 'status'],
+        required: ['ticket_id', 'user_identifier', 'create_date'],
         properties: {
-          ticket_status_history_id: { type: 'string', format: 'uuid' },
+          ticket_status_history_id: { type: 'string', format: 'uuid', nullable: true },
+          ticket_comment_id: { type: 'string', format: 'uuid', nullable: true },
           ticket_id: { type: 'string', format: 'uuid' },
           user_identifier: { type: 'string' },
           create_date: { type: 'string', format: 'date-time' },
-          status: { type: 'string', enum: TicketStatusEnum }
+          status: { type: 'string', enum: TicketStatusEnum, nullable: true },
+          comment: { type: 'string', nullable: true }
         }
       }
     }
@@ -80,15 +82,26 @@ export const UpdateTicketStatusRequestSchema: OpenAPIV3.SchemaObject = {
   }
 };
 
+export const CreateTicketCommentRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['comment'],
+  properties: {
+    comment: { type: 'string', minLength: 1, maxLength: 3000 }
+  }
+};
+
 export const TicketStatusHistorySchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['ticket_status_history_id', 'ticket_id', 'user_identifier', 'create_date', 'status'],
+  required: ['ticket_id', 'user_identifier', 'create_date'],
   properties: {
-    ticket_status_history_id: { type: 'string', format: 'uuid' },
+    ticket_status_history_id: { type: 'string', format: 'uuid', nullable: true },
+    ticket_comment_id: { type: 'string', format: 'uuid', nullable: true },
     ticket_id: { type: 'string', format: 'uuid' },
     user_identifier: { type: 'string' },
     create_date: { type: 'string', format: 'date-time' },
-    status: { type: 'string', enum: TicketStatusEnum }
+    status: { type: 'string', enum: TicketStatusEnum, nullable: true },
+    comment: { type: 'string', nullable: true }
   }
 };
 

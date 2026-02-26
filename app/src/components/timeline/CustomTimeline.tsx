@@ -5,7 +5,6 @@ import TimelineDot from '@mui/lab/TimelineDot';
 import TimelineItem from '@mui/lab/TimelineItem';
 import TimelineSeparator from '@mui/lab/TimelineSeparator';
 import Box from '@mui/material/Box';
-import { SxProps, Theme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 import { ReactNode } from 'react';
 
@@ -14,13 +13,11 @@ export interface ICustomTimelineItem {
   content: ReactNode;
   icon?: ReactNode;
   rightContent?: ReactNode;
+  stretchToRightEdge?: boolean;
 }
 
 interface ICustomTimelineProps {
   items: ICustomTimelineItem[];
-  dotSx?: SxProps<Theme>;
-  contentSx?: SxProps<Theme>;
-  sx?: SxProps<Theme>;
   dataTestId?: string;
 }
 
@@ -31,7 +28,7 @@ interface ICustomTimelineProps {
  * @return {*}
  */
 export const CustomTimeline = (props: ICustomTimelineProps) => {
-  const { items, dotSx, contentSx, sx, dataTestId } = props;
+  const { items, dataTestId } = props;
 
   if (!items.length) {
     return null;
@@ -46,14 +43,19 @@ export const CustomTimeline = (props: ICustomTimelineProps) => {
         '& .MuiTimelineItem-root:before': {
           flex: 0,
           p: 0
-        },
-        ...sx
+        }
       }}>
       {items.map((item, index) => {
-        const isLast = index === items.length - 1;
+        const isLastItem = index === items.length - 1;
 
         return (
-          <TimelineItem key={item.id}>
+          <TimelineItem
+            key={item.id}
+            sx={{
+              '&:not(:last-of-type)': {
+                pb: 2
+              }
+            }}>
             <TimelineSeparator>
               <TimelineDot
                 sx={{
@@ -65,14 +67,18 @@ export const CustomTimeline = (props: ICustomTimelineProps) => {
                   height: 32,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  ...dotSx
+                  justifyContent: 'center'
                 }}>
                 {item.icon}
               </TimelineDot>
-              {!isLast ? <TimelineConnector sx={{ bgcolor: 'divider', width: 2 }} /> : null}
+              {!isLastItem ? <TimelineConnector sx={{ bgcolor: 'divider', width: 2, mb: -2 }} /> : null}
             </TimelineSeparator>
-            <TimelineContent sx={{ py: 1.25, px: 2.5, ...contentSx }}>
+            <TimelineContent
+              sx={{
+                py: 0.5,
+                pl: 2.5,
+                pr: 0
+              }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                 <Box sx={{ minWidth: 0, flex: 1 }}>{item.content}</Box>
                 {item.rightContent ? (

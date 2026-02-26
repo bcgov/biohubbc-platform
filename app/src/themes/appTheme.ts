@@ -226,6 +226,23 @@ const appTheme = createTheme({
         }
       }
     },
+    MuiBreadcrumbs: {
+      styleOverrides: {
+        root: {
+          fontSize: '0.8125rem',
+          lineHeight: 1.35
+        },
+        li: {
+          fontSize: 'inherit',
+          lineHeight: 'inherit'
+        },
+        separator: {
+          fontSize: '0.75rem',
+          marginLeft: 6,
+          marginRight: 6
+        }
+      }
+    },
     MuiTextField: {
       styleOverrides: {
         root: ({ theme }) => ({

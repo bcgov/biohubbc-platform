@@ -121,4 +121,24 @@ describe('useTicketsApi', () => {
     expect(result).toEqual(ticket);
   });
 
+  it('createTicketComment posts payload and returns history item', async () => {
+    const ticketId = '11111111-1111-1111-1111-111111111111';
+    const payload = { comment: 'New comment' };
+    const historyItem = {
+      ticket_status_history_id: null,
+      ticket_comment_id: '33333333-3333-3333-3333-333333333333',
+      ticket_id: ticketId,
+      user_identifier: 'Sarah',
+      create_date: '2026-02-25T00:00:00.000Z',
+      status: null,
+      comment: 'New comment'
+    };
+
+    mock.onPost(`/api/tickets/${ticketId}/comment`, payload).reply(200, historyItem);
+
+    const result = await useTicketsApi(axios).createTicketComment(ticketId, payload);
+
+    expect(result).toEqual(historyItem);
+  });
+
 });

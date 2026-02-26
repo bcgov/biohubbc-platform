@@ -32,6 +32,7 @@ export const TicketDetailPage = () => {
 
   const [comment, setComment] = useState('');
   const [isSavingStatus, setIsSavingStatus] = useState(false);
+  const [isSavingComment, setIsSavingComment] = useState(false);
   const [isSavingTicket, setIsSavingTicket] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [editTicketError, setEditTicketError] = useState<string | undefined>();
@@ -105,6 +106,26 @@ export const TicketDetailPage = () => {
     }
   };
 
+  const handleAddComment = async () => {
+    if (!ticketId || !comment.trim()) {
+      return;
+    }
+
+    try {
+      setIsSavingComment(true);
+      setError(undefined);
+
+      await api.tickets.createTicketComment(ticketId, { comment: comment.trim() });
+      setComment('');
+      await refreshTicketData();
+    } catch (caughtError) {
+      const apiError = caughtError as APIError;
+      setError(apiError.message || 'Failed to add comment.');
+    } finally {
+      setIsSavingComment(false);
+    }
+  };
+
   if (!ticketId) {
     return null;
   }
@@ -118,24 +139,30 @@ export const TicketDetailPage = () => {
           <Stack
             sx={{
               display: 'flex',
-              flexDirection: { xs: 'column', lg: 'row' },
+              flexDirection: 'row',
+              flexWrap: 'wrap',
               gap: 7,
-              alignItems: 'start'
+              alignItems: 'flex-start'
             }}>
-            <Stack spacing={4} sx={{ flex: 1, minWidth: 0 }}>
+            <Stack spacing={4} sx={{ flex: '1 1 0', minWidth: { xs: '100%', md: 560 } }}>
               {error && <Alert severity="error">{error}</Alert>}
 
               <TicketTimeline history={ticket?.history ?? []} isLoading={ticketLoader.isLoading} />
-              <TicketComment comment={comment} setComment={setComment} />
-              <TicketFooter
+              <TicketComment
                 comment={comment}
-                isSaving={isSavingStatus}
+                setComment={setComment}
+                isSaving={isSavingComment || isSavingStatus}
+                onAddComment={handleAddComment}
+              />
+              <TicketFooter
+                isSavingStatus={isSavingStatus}
+                isSavingComment={isSavingComment}
                 status={ticket?.status}
                 onUpdateStatus={handleUpdateStatus}
               />
             </Stack>
 
-            <Box sx={{ width: { xs: '100%', lg: 280 }, flexShrink: 0 }}>
+            <Box sx={{ width: { xs: '100%', sm: 280 }, flex: { xs: '1 1 100%', sm: '0 0 280px' } }}>
               <TicketSidebar
                 isLoading={teamLoader.isLoading}
                 team={ticketTeam}
