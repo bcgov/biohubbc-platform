@@ -3,7 +3,7 @@ import { initialize } from 'express-openapi';
 import multer from 'multer';
 import { OpenAPIV3 } from 'openapi-types';
 import swaggerUIExperss from 'swagger-ui-express';
-import { defaultPoolConfig, initDBPool } from './database/db';
+import { getDefaultPoolConfig, initDBPool } from './database/db';
 import { initDBConstants } from './database/db-constants';
 import { ensureHTTPError, HTTP400, HTTP500 } from './errors/http-error';
 import { rootAPIDoc } from './openapi/root-api-doc';
@@ -154,7 +154,7 @@ app.use('/api-docs', swaggerUIExperss.serve, swaggerUIExperss.setup(openAPIFrame
 
 // Start api
 async function main() {
-  initDBPool(defaultPoolConfig);
+  initDBPool(getDefaultPoolConfig());
   await initDBConstants();
   await initPgBoss();
 

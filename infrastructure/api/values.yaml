@@ -26,21 +26,19 @@ app:
 
   # Database
   database:
-    secretName: biohub-platform-db
-    serviceName: "" # Database service name associated with deployment
+    secretName: biohub-platform-db # Unused: legacy path uses hardcoded dbHost helper (biohub-platform-db + app.suffix) for secret name
+    serviceName: "" # Unused: reserved for future use
     port: 5432 # Database port
-    # Set useCrunchy: true for DEV/TEST/PROD environments that use the Crunchy Postgres cluster.
-    # When false (default), connection details are derived from the legacy dbHost secret (PR environments).
-    useCrunchy: false
-    host: "" # e.g. "<crunchy-release-name>-pgbouncer" (biohub-platform-db-dev-pgbouncer for DEV) (only used when useCrunchy: true)
-    appSecretName: "" # e.g. "<crunchy-release-name>-pguser-biohub-platform-db" (only used when useCrunchy: true)
-    appUserKey: "user" # Secret key for the API DB username
-    appPasswordKey: "password" # Secret key for the API DB password
-    dbNameSecretName: "" # e.g. "<crunchy-release-name>-pguser-biohub-platform-db" (only used when useCrunchy: true)
-    dbNameKey: "dbname" # Secret key for the DB name
-    adminSecretName: "" # e.g. "<crunchy-release-name>-pguser-postgres" (only used when useCrunchy: true)
-    adminUserKey: "user" # Secret key for the admin DB username
-    adminPasswordKey: "password" # Secret key for the admin DB password
+    # useCrunchy: true = Crunchy Postgres (DEV/TEST/PROD). Set to false for PR environments (legacy dbHost secret).
+    useCrunchy: true
+    host: "" # e.g. "<release>-primary" (biohub-platform-db-dev-primary for DEV); use primary not pgbouncer (biohub_api not in PgBouncer config)
+    appSecretName: "" # e.g. "<release>-pguser-biohub-api" (biohub-platform-db-dev-pguser-biohub-api for DEV)
+    dbNameSecretName: "" # e.g. "<release>-pguser-<cluster-name>" (biohub-platform-db-dev-pguser-biohub-platform-db-dev for DEV)
+    adminSecretName: "" # e.g. "<release>-pguser-postgres" (biohub-platform-db-dev-pguser-postgres for DEV)
+    # Secret keys default in templates: user/password/dbname (override in parent values if needed)
+    # PGO root CA for TLS verification (same secret name in all envs)
+    caSecretName: "pgo-root-cacert"
+    caSecretKey: "root.crt"
 
   # Keycloak
   keycloak:

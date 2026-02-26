@@ -43,17 +43,17 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
-                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appUserKey }}{{ else }}database-user-api{{ end }}
+                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appUserKey | default "user" }}{{ else }}database-user-api{{ end }}
             - name: DB_USER_API_PASS
               valueFrom:
                 secretKeyRef:
                   name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
-                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appPasswordKey }}{{ else }}database-user-api-password{{ end }}
+                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appPasswordKey | default "password" }}{{ else }}database-user-api-password{{ end }}
             - name: PGPASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
-                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appPasswordKey }}{{ else }}database-user-api-password{{ end }}
+                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appPasswordKey | default "password" }}{{ else }}database-user-api-password{{ end }}
         - name: wait-for-database-setup
           image: postgres:15-alpine
           command: ['sh', '-c']
@@ -72,22 +72,22 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
-                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appUserKey }}{{ else }}database-admin{{ end }}
+                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appUserKey | default "user" }}{{ else }}database-admin{{ end }}
             - name: DB_CHECK_PASS
               valueFrom:
                 secretKeyRef:
                   name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
-                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appPasswordKey }}{{ else }}database-admin-password{{ end }}
+                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appPasswordKey | default "password" }}{{ else }}database-admin-password{{ end }}
             - name: DB_DATABASE
               valueFrom:
                 secretKeyRef:
                   name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.dbNameSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
-                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.dbNameKey }}{{ else }}database-name{{ end }}
+                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.dbNameKey | default "dbname" }}{{ else }}database-name{{ end }}
             - name: DB_USER_API
               valueFrom:
                 secretKeyRef:
                   name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
-                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appUserKey }}{{ else }}database-user-api{{ end }}
+                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appUserKey | default "user" }}{{ else }}database-user-api{{ end }}
       containers:
         - name: api
           env:
@@ -124,19 +124,23 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
-                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appUserKey }}{{ else }}database-user-api{{ end }}
+                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appUserKey | default "user" }}{{ else }}database-user-api{{ end }}
             - name: DB_USER_API_PASS
               valueFrom:
                 secretKeyRef:
                   name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
-                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appPasswordKey }}{{ else }}database-user-api-password{{ end }}
+                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.appPasswordKey | default "password" }}{{ else }}database-user-api-password{{ end }}
             - name: DB_DATABASE
               valueFrom:
                 secretKeyRef:
                   name: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.dbNameSecretName }}{{ else }}{{ include "dbHost" . }}{{ end }}
-                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.dbNameKey }}{{ else }}database-name{{ end }}
+                  key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.dbNameKey | default "dbname" }}{{ else }}database-name{{ end }}
             - name: DB_PORT
               value: {{ .Values.app.database.port | quote }}
+            {{- if .Values.app.database.useCrunchy }}
+            - name: PG_SSL_CA_PATH
+              value: "/etc/pg-ssl/{{ .Values.app.database.caSecretKey }}"
+            {{- end }}
             # Keycloak
             - name: KEYCLOAK_HOST
               value: {{ .Values.app.keycloak.host }}
@@ -290,6 +294,11 @@ spec:
           volumeMounts:
             - name: {{ include "app.fullname" . }}
               mountPath: /opt/app-root/src/data
+            {{- if .Values.app.database.useCrunchy }}
+            - name: pg-root-ca
+              mountPath: /etc/pg-ssl
+              readOnly: true
+            {{- end }}
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -299,3 +308,11 @@ spec:
         - name: {{ include "app.fullname" . }}
           persistentVolumeClaim:
             claimName: {{ default (include "app.fullname" .) .Values.persistence.existingClaim }}
+        {{- if .Values.app.database.useCrunchy }}
+        - name: pg-root-ca
+          secret:
+            secretName: {{ .Values.app.database.caSecretName }}
+            items:
+              - key: {{ .Values.app.database.caSecretKey }}
+                path: {{ .Values.app.database.caSecretKey }}
+        {{- end }}

@@ -66,20 +66,14 @@ biohub-platform-db-setup:
   # App configuration
   app:
     nodeEnv: production # This is set to production as test is not a valid name in the Knexfile
+
+    # Database
     database:
-      useCrunchy: true
-      host: "biohub-platform-db-test-pgbouncer"
-      migrationHost: "biohub-platform-db-test-primary"
-      adminSecretName: "biohub-platform-db-test-pguser-postgres"
-      adminUserKey: "user"
-      adminPasswordKey: "password"
-      # Legacy deploy secret (has database-user-api=biohub_api and database-user-api-password)
-      appSecretName: "biohub-platform-db-postgresql-test"
-      appUserKey: "database-user-api"
-      appPasswordKey: "database-user-api-password"
-      # Crunchy DB name from PGO app user secret (dbname = biohub-platform-db-test)
+      host: "biohub-platform-db-test-primary"
+      port: 5432
+      appSecretName: "biohub-platform-db-test-pguser-biohub-api"
       dbNameSecretName: "biohub-platform-db-test-pguser-biohub-platform-db-test"
-      dbNameKey: "dbname"
+      adminSecretName: "biohub-platform-db-test-pguser-postgres"
 
 # Values passed to biohub-platform-api subchart
 biohub-platform-api:
@@ -102,19 +96,13 @@ biohub-platform-api:
       cssApi:
         environment: test
 
+    # Database
     database:
-      useCrunchy: true
-      host: "biohub-platform-db-test-pgbouncer"
+      host: "biohub-platform-db-test-primary"
       port: 5432
-      appSecretName: "biohub-platform-db-postgresql-test"
-      appUserKey: "database-user-api"
-      appPasswordKey: "database-user-api-password"
-      # Crunchy DB name from PGO app user secret (dbname = biohub-platform-db-test)
+      appSecretName: "biohub-platform-db-test-pguser-biohub-api"
       dbNameSecretName: "biohub-platform-db-test-pguser-biohub-platform-db-test"
-      dbNameKey: "dbname"
       adminSecretName: "biohub-platform-db-test-pguser-postgres"
-      adminUserKey: "user"
-      adminPasswordKey: "password"
 
     # Object Store (S3)
     objectStore:
@@ -159,19 +147,13 @@ biohub-platform-queue:
     nodeOptions: --max_old_space_size=512
     # objectStore.keyPrefix will be dynamically set: "biohub"
 
+    # Database
     database:
-      useCrunchy: true
-      host: "biohub-platform-db-test-pgbouncer"
+      host: "biohub-platform-db-test-primary"
       port: 5432
-      appSecretName: "biohub-platform-db-postgresql-test"
-      appUserKey: "database-user-api"
-      appPasswordKey: "database-user-api-password"
-      # Crunchy DB name from PGO app user secret (dbname = biohub-platform-db-test)
+      appSecretName: "biohub-platform-db-test-pguser-biohub-api"
       dbNameSecretName: "biohub-platform-db-test-pguser-biohub-platform-db-test"
-      dbNameKey: "dbname"
       adminSecretName: "biohub-platform-db-test-pguser-postgres"
-      adminUserKey: "user"
-      adminPasswordKey: "password"
 
     # Clamav
     clamav:

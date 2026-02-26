@@ -66,20 +66,13 @@ biohub-platform-db-setup:
   # App configuration
   app:
     nodeEnv: development
+
+    # Database
     database:
-      useCrunchy: true
-      host: "biohub-platform-db-dev-pgbouncer"
-      migrationHost: "biohub-platform-db-dev-primary"
+      host: "biohub-platform-db-dev-primary"
       adminSecretName: "biohub-platform-db-dev-pguser-postgres"
-      adminUserKey: "user"
-      adminPasswordKey: "password"
-      # Legacy deploy secret (has database-user-api=biohub_api and database-user-api-password)
-      appSecretName: "biohub-platform-db-postgresql-dev-deploy"
-      appUserKey: "database-user-api"
-      appPasswordKey: "database-user-api-password"
-      # Crunchy DB name comes from PGO app user secret (dbname = biohub-platform-db-dev)
+      appSecretName: "biohub-platform-db-dev-pguser-biohub-api"
       dbNameSecretName: "biohub-platform-db-dev-pguser-biohub-platform-db-dev"
-      dbNameKey: "dbname"
 
 # Values passed to biohub-platform-api subchart
 biohub-platform-api:
@@ -102,20 +95,13 @@ biohub-platform-api:
       cssApi:
         environment: dev
 
+    # Database
     database:
-      useCrunchy: true
-      host: "biohub-platform-db-dev-pgbouncer"
+      host: "biohub-platform-db-dev-primary"
       port: 5432
-      # Legacy deploy secret (has database-user-api=biohub_api and database-user-api-password)
-      appSecretName: "biohub-platform-db-postgresql-dev-deploy"
-      appUserKey: "database-user-api"
-      appPasswordKey: "database-user-api-password"
-      # Crunchy DB name comes from PGO app user secret (dbname = biohub-platform-db-dev)
+      appSecretName: "biohub-platform-db-dev-pguser-biohub-api"
       dbNameSecretName: "biohub-platform-db-dev-pguser-biohub-platform-db-dev"
-      dbNameKey: "dbname"
       adminSecretName: "biohub-platform-db-dev-pguser-postgres"
-      adminUserKey: "user"
-      adminPasswordKey: "password"
 
     # Object Store (S3)
     objectStore:
@@ -160,20 +146,13 @@ biohub-platform-queue:
     nodeOptions: --max_old_space_size=512
     # objectStore.keyPrefix will be dynamically set: "biohub"
 
+    # Database
     database:
-      useCrunchy: true
-      host: "biohub-platform-db-dev-pgbouncer"
+      host: "biohub-platform-db-dev-primary"
       port: 5432
-      # Legacy deploy secret (has database-user-api=biohub_api and database-user-api-password)
-      appSecretName: "biohub-platform-db-postgresql-dev-deploy"
-      appUserKey: "database-user-api"
-      appPasswordKey: "database-user-api-password"
-      # Crunchy DB name comes from PGO app user secret (dbname = biohub-platform-db-dev)
+      appSecretName: "biohub-platform-db-dev-pguser-biohub-api"
       dbNameSecretName: "biohub-platform-db-dev-pguser-biohub-platform-db-dev"
-      dbNameKey: "dbname"
       adminSecretName: "biohub-platform-db-dev-pguser-postgres"
-      adminUserKey: "user"
-      adminPasswordKey: "password"
 
     # Clamav
     clamav:

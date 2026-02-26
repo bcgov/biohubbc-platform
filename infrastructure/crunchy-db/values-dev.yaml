@@ -28,13 +28,11 @@ crunchy-postgres:
 
 # To perform the one-time data migration from the old database, set:
 #   migration.enabled: true
-#   migration.oldDb.host: <Service name of legacy Postgres in this namespace>
+#   migration.oldDb.host: "biohub-platform-db-dev-deploy"
 #   migration.oldDb.secretName: "biohub-platform-db-postgresql-dev-deploy"
-# Host must be the Kubernetes Service name (e.g. biohub-platform-db-dev-deploy if different from secret).
 # Then re-deploy with migration.enabled: false once complete.
 migration:
   enabled: false
   oldDb:
-    # Host = Service name for legacy Postgres (often same as secret; use 'oc get svc -n <namespace>' to confirm)
     host: "biohub-platform-db-dev-deploy"
     secretName: "biohub-platform-db-postgresql-dev-deploy"

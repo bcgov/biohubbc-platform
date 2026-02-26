@@ -113,9 +113,11 @@ migration:
     adminKey: "database-admin"
     passwordKey: "database-admin-password"
     dbNameKey: "database-name"
-    # Keys for biohub_api password (legacy secret has database-user-api-password); set in post-restore so API can use same secret.
-    apiPasswordKey: "database-user-api-password"
-  # New (Crunchy) DB admin secret: cluster name comes from crunchy-postgres.fullnameOverride; override keys if your PGO uses different names.
+  # New (Crunchy) DB: admin secret and app user secret (create manually before migration; name must be RFC 1123, e.g. <fullnameOverride>-pguser-biohub-api).
   newDb:
     adminUserKey: "user"
     adminPasswordKey: "password"
+    # App user secret: create manually before migration. Leave empty to use <fullnameOverride>-pguser-biohub-api (hyphen, not underscore).
+    appUserSecretName: ""
+    appUserKey: "user"
+    appPasswordKey: "password"

@@ -101,6 +101,8 @@ biohub-platform-db-setup:
   # App configuration
   app:
     nodeEnv: development
+    database:
+      useCrunchy: false # PRs use legacy dbHost secret
 
 # Values passed to biohub-platform-api subchart
 biohub-platform-api:
@@ -116,6 +118,8 @@ biohub-platform-api:
     nodeEnv: development
     nodeOptions: --max_old_space_size=2250 # 75% of memoryLimit (bytes)
     # appHost will be dynamically set: "biohub-platform-app-1234-a0ec71-dev.apps.silver.devops.gov.bc.ca"
+    database:
+      useCrunchy: false # PRs use legacy dbHost secret
     
     # Keycloak
     keycloak:
@@ -163,6 +167,8 @@ biohub-platform-queue:
     nodeEnv: development
     nodeOptions: --max_old_space_size=512
     # objectStore.keyPrefix will be dynamically set: "local/1234/biohub"
+    database:
+      useCrunchy: false # PRs use legacy dbHost secret
 
     # Clamav
     clamav:

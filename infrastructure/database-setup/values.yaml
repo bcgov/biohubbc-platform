@@ -18,21 +18,17 @@ app:
   dbSchema: biohub # Database schema
 
   database:
-    # Set useCrunchy: true for DEV/TEST/PROD environments that use the Crunchy Postgres cluster.
-    # When false (default), connection details are derived from the legacy dbHost secret (PR environments).
-    useCrunchy: false
-    host: "" # e.g. "biohub-platform-db-dev-pgbouncer" (only used when useCrunchy: true; use -dev/-test/-prod for env)
-    # When useCrunchy: true, set migrationHost to the primary service so migrations run as postgres (pgBouncer rejects postgres auth).
-    # e.g. "biohub-platform-db-dev-primary" for dev; same namespace, so short name works.
-    migrationHost: ""
-    adminSecretName: "" # e.g. "biohub-platform-db-dev-pguser-postgres" (only used when useCrunchy: true)
-    adminUserKey: "user" # Secret key for the admin DB username
-    adminPasswordKey: "password" # Secret key for the admin DB password
-    appSecretName: "" # e.g. "biohub-platform-db-dev-pguser-biohub-platform-db-dev" (only used when useCrunchy: true)
-    appUserKey: "user" # Secret key for the app DB username
-    appPasswordKey: "password" # Secret key for the app DB password
-    dbNameSecretName: "" # e.g. "biohub-platform-db-dev-pguser-biohub-platform-db-dev" (only used when useCrunchy: true)
-    dbNameKey: "dbname" # Secret key for the DB name
+    # useCrunchy: true = Crunchy Postgres (DEV/TEST/PROD). Set to false for PR environments (legacy dbHost secret).
+    useCrunchy: true
+    host: "" # e.g. "biohub-platform-db-dev-primary" (use -primary not pgbouncer; also used for migrations unless migrationHost set)
+    migrationHost: "" # optional; defaults to host when empty (set only if migration target differs from app host)
+    adminSecretName: "" # e.g. "biohub-platform-db-dev-pguser-postgres"
+    appSecretName: "" # e.g. "biohub-platform-db-dev-pguser-biohub-api"
+    dbNameSecretName: "" # e.g. "biohub-platform-db-dev-pguser-biohub-platform-db-dev"
+    # Secret keys default in templates: user/password/dbname (override in parent values if needed)
+    # PGO root CA for TLS verification (same secret name in all envs)
+    caSecretName: "pgo-root-cacert"
+    caSecretKey: "root.crt"
 
 # Openshift Resources
 resources:

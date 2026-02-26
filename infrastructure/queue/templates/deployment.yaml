@@ -119,6 +119,10 @@ spec:
                   key: {{ if .Values.app.database.useCrunchy }}{{ .Values.app.database.dbNameKey }}{{ else }}database-name{{ end }}
             - name: DB_PORT
               value: {{ .Values.app.database.port | quote }}
+            {{- if .Values.app.database.useCrunchy }}
+            - name: PG_SSL_CA_PATH
+              value: "/etc/pg-ssl/{{ .Values.app.database.caSecretKey }}"
+            {{- end }}
             # Object Store (S3) - needed for job processing
             - name: OBJECT_STORE_URL
               valueFrom:
@@ -213,9 +217,24 @@ spec:
             failureThreshold: 3
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
+          volumeMounts:
+            {{- if .Values.app.database.useCrunchy }}
+            - name: pg-root-ca
+              mountPath: /etc/pg-ssl
+              readOnly: true
+            {{- end }}
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
       securityContext: {}
       # Allow time for pg-boss to gracefully complete jobs
       terminationGracePeriodSeconds: 120
+      volumes:
+        {{- if .Values.app.database.useCrunchy }}
+        - name: pg-root-ca
+          secret:
+            secretName: {{ .Values.app.database.caSecretName }}
+            items:
+              - key: {{ .Values.app.database.caSecretKey }}
+                path: {{ .Values.app.database.caSecretKey }}
+        {{- end }}
