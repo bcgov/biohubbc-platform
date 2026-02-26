@@ -4,7 +4,8 @@ import {
   insertDatasetRecord,
   insertSampleSiteRecord,
   insertSubmissionRecord,
-  insertTelemetryRecord
+  insertTelemetryRecord,
+  insertUploadRecord
 } from './04_mock_test_data';
 
 const ENABLE_MOCK_FEATURE_SEEDING = process.env.ENABLE_MOCK_FEATURE_SEEDING === 'true';
@@ -52,28 +53,22 @@ const createSubmissionWithUploads = async (
   reviewed: boolean,
   withArchive: boolean
 ): Promise<SeedContext> => {
-  // --- 1. Create submission & features ---
+  // --- 1. Create upload session ---
+  const upload_id = await insertUploadRecord(knex);
+
+  // --- 2. Create submission & features ---
   const submission_id = await insertSubmissionRecord(knex, reviewed, reviewed);
-  const parent_feature_id = await insertDatasetRecord(knex, { submission_id });
+  const parent_feature_id = await insertDatasetRecord(knex, { submission_id, upload_id });
   await insertSampleSiteRecord(knex, {
     submission_id,
+    upload_id,
     parent_submission_feature_id: parent_feature_id
   });
   await insertTelemetryRecord(knex, {
     submission_id,
+    upload_id, 
     parent_submission_feature_id: parent_feature_id
   });
-
-  // --- 2. Create upload session ---
-  const { upload_id } = (
-    await knex('upload')
-      .insert({
-        upload_status: 'completed',
-        create_user: 1,
-        record_end_date: new Date()
-      })
-      .returning('upload_id')
-  )[0];
 
   // --- 3. Create artifacts and security scans ---
   const artifacts: { artifact_id: string; role: string }[] = [];
