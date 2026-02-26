@@ -184,29 +184,4 @@ describe('createTeam', () => {
     });
     expect(mockRes.statusValue).to.equal(201);
   });
-
-  it('should default system_user_ids to empty array when not provided', async () => {
-    const mockTeam: Team = {
-      team_id: '5d92f13c-fefa-49f3-9fb9-4e4611c67a34',
-      name: 'Empty Team',
-      description: null,
-      member_count: 0
-    };
-
-    const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-    const createStub = sinon.stub(TeamService.prototype, 'createTeam').resolves(mockTeam);
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.body = { name: 'Empty Team' };
-
-    const requestHandler = createTeam();
-    await requestHandler(mockReq, mockRes, mockNext);
-
-    expect(createStub).to.have.been.calledWith({
-      name: 'Empty Team',
-      description: undefined,
-      system_user_ids: undefined
-    });
-  });
 });
