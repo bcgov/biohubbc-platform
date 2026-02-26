@@ -172,6 +172,17 @@ describe('TicketDetailPage', () => {
     });
   });
 
+  it('hides comment input when ticket is closed', async () => {
+    mockGetTicket.mockResolvedValueOnce({ ...ticketWithHistory, status: 'closed' as const });
+
+    const { queryByPlaceholderText } = renderPage();
+
+    await waitFor(() => {
+      expect(mockGetTicket).toHaveBeenCalledWith(ticket.ticket_id);
+      expect(queryByPlaceholderText('Type your comment...')).not.toBeInTheDocument();
+    });
+  });
+
   it('opens edit dialog with current ticket values and submits update', async () => {
     const { getByTestId, getByLabelText } = renderPage();
 

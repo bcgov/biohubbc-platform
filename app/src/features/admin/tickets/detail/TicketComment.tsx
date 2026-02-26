@@ -26,11 +26,11 @@ export const TicketComment = (props: ITicketCommentProps) => {
     <Paper variant="outlined">
       <Box sx={{ px: 2, py: 1 }}>
         <Typography variant="body2" sx={{ fontWeight: 700 }}>
-          Comment
+          New Comment
         </Typography>
       </Box>
       <Divider />
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ p: 2 }}>
         <TextField
           fullWidth
           multiline

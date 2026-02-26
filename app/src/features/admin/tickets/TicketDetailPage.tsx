@@ -148,12 +148,14 @@ export const TicketDetailPage = () => {
               {error && <Alert severity="error">{error}</Alert>}
 
               <TicketTimeline history={ticket?.history ?? []} isLoading={ticketLoader.isLoading} />
-              <TicketComment
-                comment={comment}
-                setComment={setComment}
-                isSaving={isSavingComment || isSavingStatus}
-                onAddComment={handleAddComment}
-              />
+              {ticket?.status === 'open' ? (
+                <TicketComment
+                  comment={comment}
+                  setComment={setComment}
+                  isSaving={isSavingComment || isSavingStatus}
+                  onAddComment={handleAddComment}
+                />
+              ) : null}
               <TicketFooter
                 isSavingStatus={isSavingStatus}
                 isSavingComment={isSavingComment}

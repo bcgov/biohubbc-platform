@@ -23,7 +23,7 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
 
   return (
     <Stack spacing={2}>
-      <TicketSidebarSection label="Team" onAdd={onAddTeam}>
+      <TicketSidebarSection label="Members" onAdd={onAddTeam}>
         <LoadingGuard
           isLoading={isLoading}
           isLoadingFallback={
@@ -38,7 +38,7 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
                 {member.user_identifier}
               </Typography>
             ))}
-            {!team?.members?.length && <Typography variant="body2">No team members</Typography>}
+            {!team?.members?.length && <Typography variant="body2">No members</Typography>}
           </Stack>
         </LoadingGuard>
       </TicketSidebarSection>

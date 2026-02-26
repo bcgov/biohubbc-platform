@@ -32,7 +32,7 @@ export const TicketFooter = (props: ITicketFooterProps) => {
         </Button>
       ) : (
         <Button
-          color="error"
+          color={status === 'closed' ? 'primary' : 'error'}
           variant="outlined"
           size="small"
           onClick={() => onUpdateStatus('open')}
