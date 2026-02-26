@@ -245,6 +245,15 @@ export class TicketRepository extends BaseRepository {
       RETURNING
         ticket_status_history_id,
         ticket_id,
+        (
+          SELECT COALESCE(
+            to_jsonb(su)->>'user_identifier',
+            to_jsonb(su)->>'user_guid',
+            'Unknown user'
+          )
+          FROM "system_user" su
+          WHERE su.system_user_id = create_user
+        ) AS user_identifier,
         create_date,
         status;
     `;
@@ -271,13 +280,20 @@ export class TicketRepository extends BaseRepository {
   async getTicketStatusHistory(ticketId: string): Promise<TicketStatusHistory[]> {
     const sqlStatement = SQL`
       SELECT
-        ticket_status_history_id,
-        ticket_id,
-        create_date,
-        status
-      FROM ticket_status_history
-      WHERE ticket_id = ${ticketId}
-      ORDER BY create_date ASC;
+        tsh.ticket_status_history_id,
+        tsh.ticket_id,
+        COALESCE(
+          to_jsonb(su)->>'user_identifier',
+          to_jsonb(su)->>'user_guid',
+          'Unknown user'
+        ) AS user_identifier,
+        tsh.create_date,
+        tsh.status
+      FROM ticket_status_history tsh
+      JOIN "system_user" su
+        ON su.system_user_id = tsh.create_user
+      WHERE tsh.ticket_id = ${ticketId}
+      ORDER BY tsh.create_date ASC;
     `;
 
     const response = await this.connection.sql(sqlStatement, TicketStatusHistory);

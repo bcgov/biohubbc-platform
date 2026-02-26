@@ -25,6 +25,7 @@ describe('paths/tickets/{ticketId}', () => {
       {
         ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
         ticket_id: mockTicket.ticket_id,
+        user_identifier: 'Sarah',
         create_date: '2026-02-25T00:00:00.000Z',
         status: 'open' as const
       }

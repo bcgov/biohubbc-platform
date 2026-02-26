@@ -119,7 +119,7 @@ export const TicketDetailPage = () => {
             sx={{
               display: 'flex',
               flexDirection: { xs: 'column', lg: 'row' },
-              gap: 10,
+              gap: 7,
               alignItems: 'start'
             }}>
             <Stack spacing={4} sx={{ flex: 1, minWidth: 0 }}>

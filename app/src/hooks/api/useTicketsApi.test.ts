@@ -31,6 +31,7 @@ describe('useTicketsApi', () => {
       {
         ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
         ticket_id: '11111111-1111-1111-1111-111111111111',
+        user_identifier: 'Sarah',
         create_date: '2026-02-25T00:00:00.000Z',
         status: 'open'
       }

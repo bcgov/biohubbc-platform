@@ -27,12 +27,14 @@ const history = [
   {
     ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
     ticket_id: ticket.ticket_id,
+    user_identifier: 'Sarah',
     create_date: '2026-02-24T00:00:00.000Z',
     status: 'open' as const
   },
   {
     ticket_status_history_id: '44444444-4444-4444-4444-444444444444',
     ticket_id: ticket.ticket_id,
+    user_identifier: 'Bob',
     create_date: '2026-02-25T00:00:00.000Z',
     status: 'closed' as const
   }
@@ -121,8 +123,8 @@ describe('TicketDetailPage', () => {
 
     await waitFor(() => {
       expect(getAllByText('Ticket #04900042').length).toBeGreaterThan(0);
-      expect(getByText('Ticket was reopened')).toBeVisible();
-      expect(getByText('Ticket was closed')).toBeVisible();
+      expect(getByText('Sarah opened the ticket')).toBeVisible();
+      expect(getByText('Bob closed the ticket')).toBeVisible();
       expect(getByText('Team')).toBeVisible();
       expect(getByText('alice')).toBeVisible();
       expect(getByPlaceholderText('Type your comment...')).toBeVisible();
