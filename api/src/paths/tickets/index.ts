@@ -18,13 +18,23 @@ const defaultLog = getLogger('paths/tickets');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]
+    and: [
+      {
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        discriminator: 'SystemRole'
+      }
+    ]
   })),
   createTicket()
 ];
 export const GET: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]
+    and: [
+      {
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        discriminator: 'SystemRole'
+      }
+    ]
   })),
   getTickets()
 ];
@@ -32,7 +42,11 @@ export const GET: Operation = [
 POST.apiDoc = {
   description: 'Create a ticket',
   tags: ['tickets'],
-  security: [{ Bearer: [] }],
+  security: [
+    {
+      Bearer: []
+    }
+  ],
   requestBody: {
     content: {
       'application/json': {
@@ -56,7 +70,11 @@ POST.apiDoc = {
 GET.apiDoc = {
   description: 'List tickets by team ID, optionally filtered by status',
   tags: ['tickets'],
-  security: [{ Bearer: [] }],
+  security: [
+    {
+      Bearer: []
+    }
+  ],
   parameters: [
     {
       in: 'query',

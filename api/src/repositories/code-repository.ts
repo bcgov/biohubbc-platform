@@ -36,8 +36,7 @@ const TicketPriorityCode = z.object({
 export type TicketPriorityCode = z.infer<typeof TicketPriorityCode>;
 
 export const IAllCodeSets = z.object({
-  feature_type_with_properties: z.array(FeatureTypeWithFeaturePropertiesCode),
-  ticket_priorities: z.array(TicketPriority)
+  feature_type_with_properties: z.array(FeatureTypeWithFeaturePropertiesCode)
 });
 
 export type IAllCodeSets = z.infer<typeof IAllCodeSets>;

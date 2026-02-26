@@ -4,8 +4,7 @@ import {
   FeaturePropertyCode,
   FeatureTypeCode,
   FeatureTypeWithFeaturePropertiesCode,
-  IAllCodeSets,
-  TicketPriorityCode
+  IAllCodeSets
 } from '../repositories/code-repository';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
@@ -30,14 +29,10 @@ export class CodeService extends DBService {
   async getAllCodeSets(): Promise<IAllCodeSets> {
     defaultLog.debug({ message: 'getAllCodeSets' });
 
-    const [feature_type_with_properties, ticket_priorities] = await Promise.all([
-      this.getFeatureTypePropertyCodes(),
-      this.getTicketPriorities()
-    ]);
+    const feature_type_with_properties = await this.getFeatureTypePropertyCodes();
 
     return {
-      feature_type_with_properties,
-      ticket_priorities
+      feature_type_with_properties
     };
   }
 
@@ -106,17 +101,5 @@ export class CodeService extends DBService {
     defaultLog.debug({ message: 'getFeaturePropertyByName' });
 
     return this.codeRepository.getFeaturePropertyByName(featurePropertyName);
-  }
-
-  /**
-   * Get all ticket priorities.
-   *
-   * @return {*}  {Promise<TicketPriorityCode['ticket_priority'][]>}
-   * @memberof CodeService
-   */
-  async getTicketPriorities(): Promise<TicketPriorityCode['ticket_priority'][]> {
-    defaultLog.debug({ message: 'getTicketPriorities' });
-
-    return this.codeRepository.getTicketPriorities();
   }
 }

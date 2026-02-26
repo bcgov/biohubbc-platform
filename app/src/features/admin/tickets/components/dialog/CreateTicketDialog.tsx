@@ -1,6 +1,5 @@
 import EditDialog from 'components/dialog/EditDialog';
-import { useCodesContext } from 'hooks/useContext';
-import { ICreateTicketRequest, TicketPriority } from 'interfaces/useTicketsApi.interface';
+import { ICreateTicketRequest, TicketPriority, TICKET_PRIORITIES } from 'interfaces/useTicketsApi.interface';
 import { useMemo } from 'react';
 import yup from 'utils/YupSchema';
 import { IAutocompleteOption, ITicketFormValues, TicketForm } from './form/TicketForm';
@@ -27,14 +26,13 @@ const CreateTicketFormInitialValues: ITicketFormValues = {
  */
 export const CreateTicketDialog = (props: ICreateTicketDialogProps) => {
   const { open, onClose, onCreate, isSaving, error } = props;
-  const { codesDataLoader } = useCodesContext();
   const ticketPriorityOptions = useMemo<IAutocompleteOption[]>(
     () =>
-      (codesDataLoader.data?.ticket_priorities ?? []).map((value) => ({
+      TICKET_PRIORITIES.map((value) => ({
         value,
         label: value
       })),
-    [codesDataLoader.data?.ticket_priorities]
+    []
   );
 
   const createTicketFormYupSchema = useMemo(() => {

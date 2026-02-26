@@ -147,7 +147,12 @@ export const TicketDetailPage = () => {
             <Stack spacing={4} sx={{ flex: '1 1 0', minWidth: { xs: '100%', md: 560 } }}>
               {error && <Alert severity="error">{error}</Alert>}
 
-              <TicketTimeline history={ticket?.history ?? []} isLoading={ticketLoader.isLoading} />
+              <TicketTimeline
+                history={[...(ticket?.status_log ?? []), ...(ticket?.comment_log ?? [])].sort(
+                  (a, b) => new Date(a.create_date).getTime() - new Date(b.create_date).getTime()
+                )}
+                isLoading={ticketLoader.isLoading}
+              />
               {ticket?.status === 'open' ? (
                 <TicketComment
                   comment={comment}

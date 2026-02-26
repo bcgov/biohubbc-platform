@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
-import { ReactNode } from 'react';
+import { PropsWithChildren, ReactNode } from 'react';
 
 interface ITicketTimelineEventProps {
   icon?: ReactNode;
@@ -9,16 +9,15 @@ interface ITicketTimelineEventProps {
   subtitle?: ReactNode;
   dateLabel?: ReactNode;
   actions?: ReactNode;
-  children?: ReactNode;
 }
 
 /**
  * Reusable timeline event card wrapper for ticket timeline entries.
  *
- * @param {ITicketTimelineEventProps} props
+ * @param {PropsWithChildren<ITicketTimelineEventProps>} props
  * @return {*}
  */
-export const TicketTimelineEvent = (props: ITicketTimelineEventProps) => {
+export const TicketTimelineEvent = (props: PropsWithChildren<ITicketTimelineEventProps>) => {
   const { icon, title, subtitle, dateLabel, actions, children } = props;
 
   return (

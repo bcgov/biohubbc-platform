@@ -2,7 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
-import { CreateTicketCommentRequest } from '../../../../models/ticket';
+import { type CreateTicketCommentRequest } from '../../../../models/ticket';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { CreateTicketCommentRequestSchema, TicketStatusHistorySchema } from '../../../../openapi/schemas/ticket';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
@@ -13,7 +13,12 @@ const defaultLog = getLogger('paths/tickets/{ticketId}/comment');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]
+    and: [
+      {
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        discriminator: 'SystemRole'
+      }
+    ]
   })),
   createTicketComment()
 ];
@@ -21,7 +26,11 @@ export const POST: Operation = [
 POST.apiDoc = {
   description: 'Add a comment to a ticket timeline',
   tags: ['tickets'],
-  security: [{ Bearer: [] }],
+  security: [
+    {
+      Bearer: []
+    }
+  ],
   parameters: [
     {
       in: 'path',
@@ -62,7 +71,7 @@ export function createTicketComment(): RequestHandler {
       await connection.open();
 
       const ticketService = new TicketService(connection);
-      const commentPayload = CreateTicketCommentRequest.parse(req.body);
+      const commentPayload = req.body as CreateTicketCommentRequest;
       const historyItem = await ticketService.createTicketComment(req.params.ticketId, commentPayload);
 
       await connection.commit();

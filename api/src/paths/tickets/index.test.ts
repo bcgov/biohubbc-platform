@@ -34,7 +34,7 @@ describe('paths/tickets', () => {
     sinon.stub(TicketService.prototype, 'createTicket').resolves(mockTicket as any);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.body = { title: 'A ticket' };
+    mockReq.body = { title: 'A ticket', description: null, priority: 'medium' };
 
     await createTicket()(mockReq, mockRes, mockNext);
 

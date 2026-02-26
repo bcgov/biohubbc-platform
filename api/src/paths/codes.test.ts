@@ -47,7 +47,7 @@ describe('codes', () => {
 
       const getAllCodeSetsStub = sinon
         .stub(CodeService.prototype, 'getAllCodeSets')
-        .resolves({ feature_type_with_properties: [], ticket_priorities: [] });
+        .resolves({ feature_type_with_properties: [] });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -57,7 +57,7 @@ describe('codes', () => {
 
       expect(getAllCodeSetsStub).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.eql(200);
-      expect(mockRes.jsonValue).to.eql({ feature_type_with_properties: [], ticket_priorities: [] });
+      expect(mockRes.jsonValue).to.eql({ feature_type_with_properties: [] });
     });
   });
 });

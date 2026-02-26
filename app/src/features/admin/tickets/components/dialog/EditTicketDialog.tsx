@@ -1,6 +1,5 @@
 import EditDialog from 'components/dialog/EditDialog';
-import { useCodesContext } from 'hooks/useContext';
-import { ITicketWithHistory, IUpdateTicketRequest, TicketPriority } from 'interfaces/useTicketsApi.interface';
+import { ITicketWithHistory, IUpdateTicketRequest, TicketPriority, TICKET_PRIORITIES } from 'interfaces/useTicketsApi.interface';
 import { useMemo } from 'react';
 import yup from 'utils/YupSchema';
 import { IAutocompleteOption, ITicketFormValues, TicketForm } from './form/TicketForm';
@@ -22,15 +21,14 @@ interface IEditTicketDialogProps {
  */
 export const EditTicketDialog = (props: IEditTicketDialogProps) => {
   const { open, ticket, isSaving, error, onClose, onSave } = props;
-  const { codesDataLoader } = useCodesContext();
 
   const ticketPriorityOptions = useMemo<IAutocompleteOption[]>(
     () =>
-      (codesDataLoader.data?.ticket_priorities ?? []).map((value) => ({
+      TICKET_PRIORITIES.map((value) => ({
         value,
         label: value
       })),
-    [codesDataLoader.data?.ticket_priorities]
+    []
   );
 
   const editTicketFormYupSchema = useMemo(() => {

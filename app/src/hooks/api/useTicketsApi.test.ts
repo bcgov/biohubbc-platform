@@ -27,7 +27,7 @@ describe('useTicketsApi', () => {
   });
 
   it('getTicket returns a single ticket', async () => {
-    const history = [
+    const status_log = [
       {
         ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
         ticket_id: '11111111-1111-1111-1111-111111111111',
@@ -36,6 +36,7 @@ describe('useTicketsApi', () => {
         status: 'open'
       }
     ];
+    const comment_log = [];
 
     const ticket = {
       ticket_id: '11111111-1111-1111-1111-111111111111',
@@ -46,7 +47,8 @@ describe('useTicketsApi', () => {
       create_date: '2026-02-25T00:00:00.000Z',
       priority: 'medium',
       status: 'open',
-      history
+      status_log,
+      comment_log
     };
 
     mock.onGet(`/api/tickets/${ticket.ticket_id}`).reply(200, ticket);
@@ -59,7 +61,8 @@ describe('useTicketsApi', () => {
   it('createTicket posts payload and returns ticket', async () => {
     const payload = {
       title: 'New ticket',
-      description: 'desc'
+      description: 'desc',
+      priority: 'medium' as const
     };
 
     const ticket = {

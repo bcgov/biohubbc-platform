@@ -34,30 +34,7 @@ describe('TicketService', () => {
   });
 
   describe('createTicket', () => {
-    it('creates ticket and inserts initial status history when team_id is provided', async () => {
-      const getNextTicketSlugStub = sinon.stub(TicketRepository.prototype, 'getNextTicketSlug').resolves('04900001');
-      const insertTicketStub = sinon.stub(TicketRepository.prototype, 'insertTicket').resolves(mockTicket as any);
-      const insertHistoryStub = sinon.stub(TicketRepository.prototype, 'insertTicketStatusHistory').resolves({} as any);
-      const createTeamWithMembersStub = sinon
-        .stub(TeamService.prototype, 'createTeamWithMembers')
-        .resolves({ team_id: 'generated-team-id', members: [] } as any);
-
-      const result = await service.createTicket({ title: 'A ticket', team_id: mockTicket.team_id });
-
-      expect(createTeamWithMembersStub).to.not.have.been.called;
-      expect(getNextTicketSlugStub).to.have.been.calledOnce;
-      expect(insertTicketStub).to.have.been.calledWith(
-        sinon.match({
-          title: 'A ticket',
-          team_id: mockTicket.team_id,
-          ticket_slug: sinon.match(/^\d{8}$/)
-        })
-      );
-      expect(insertHistoryStub).to.have.been.calledWith(mockTicket.ticket_id, 'open');
-      expect(result).to.eql(mockTicket);
-    });
-
-    it('creates team and uses generated team_id when team_id is not provided', async () => {
+    it('creates team, ticket and initial status history', async () => {
       const generatedTeamId = '99999999-9999-9999-9999-999999999999';
       const createdTicket = { ...mockTicket, team_id: generatedTeamId };
       const getNextTicketSlugStub = sinon.stub(TicketRepository.prototype, 'getNextTicketSlug').resolves('04900001');
@@ -67,7 +44,7 @@ describe('TicketService', () => {
       const insertTicketStub = sinon.stub(TicketRepository.prototype, 'insertTicket').resolves(createdTicket as any);
       const insertHistoryStub = sinon.stub(TicketRepository.prototype, 'insertTicketStatusHistory').resolves({} as any);
 
-      const result = await service.createTicket({ title: 'A ticket' });
+      const result = await service.createTicket({ title: 'A ticket', description: null, priority: 'medium' });
 
       expect(createTeamWithMembersStub).to.have.been.calledWith(
         sinon.match({
@@ -80,6 +57,8 @@ describe('TicketService', () => {
       expect(insertTicketStub).to.have.been.calledWith(
         sinon.match({
           title: 'A ticket',
+          description: null,
+          priority: 'medium',
           team_id: generatedTeamId,
           ticket_slug: sinon.match(/^\d{8}$/)
         })
@@ -90,12 +69,15 @@ describe('TicketService', () => {
 
     it('throws when insert fails', async () => {
       sinon.stub(TicketRepository.prototype, 'getNextTicketSlug').resolves('04900001');
+      sinon
+        .stub(TeamService.prototype, 'createTeamWithMembers')
+        .resolves({ team_id: mockTicket.team_id, members: [] } as any);
       const insertError = new Error('insert failed');
       sinon.stub(TicketRepository.prototype, 'insertTicket').rejects(insertError);
       const insertHistoryStub = sinon.stub(TicketRepository.prototype, 'insertTicketStatusHistory').resolves({} as any);
 
       try {
-        await service.createTicket({ title: 'A ticket', team_id: mockTicket.team_id });
+        await service.createTicket({ title: 'A ticket', description: 'desc', priority: 'medium' });
         expect.fail();
       } catch (error) {
         expect(error).to.equal(insertError);
@@ -121,26 +103,37 @@ describe('TicketService', () => {
   });
 
   describe('getTicket', () => {
-    it('returns ticket payload with inline history when resolved by UUID', async () => {
-      const history = [
+    it('returns ticket payload with separate status and comment logs when resolved by UUID', async () => {
+      const statusLog = [
         {
           ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
-          ticket_comment_id: null,
           ticket_id: mockTicket.ticket_id,
           user_identifier: 'Sarah',
           create_date: '2026-02-25T00:00:00.000Z',
-          status: 'open' as const,
-          comment: null
+          status: 'open' as const
+        }
+      ];
+      const commentLog = [
+        {
+          ticket_comment_id: '44444444-4444-4444-4444-444444444444',
+          ticket_id: mockTicket.ticket_id,
+          user_identifier: 'Bob',
+          create_date: '2026-02-25T01:00:00.000Z',
+          comment: 'New comment'
         }
       ];
       const getTicketStub = sinon.stub(TicketRepository.prototype, 'getTicketById').resolves(mockTicket as any);
-      const getHistoryStub = sinon.stub(TicketRepository.prototype, 'getTicketHistory').resolves(history as any);
+      const getStatusLogStub = sinon
+        .stub(TicketRepository.prototype, 'getTicketStatusHistory')
+        .resolves(statusLog as any);
+      const getCommentLogStub = sinon.stub(TicketRepository.prototype, 'getTicketCommentLog').resolves(commentLog as any);
 
       const result = await service.getTicket(mockTicket.ticket_id);
 
       expect(getTicketStub).to.have.been.calledWith(mockTicket.ticket_id);
-      expect(getHistoryStub).to.have.been.calledWith(mockTicket.ticket_id);
-      expect(result).to.eql({ ...mockTicket, history });
+      expect(getStatusLogStub).to.have.been.calledWith(mockTicket.ticket_id);
+      expect(getCommentLogStub).to.have.been.calledWith(mockTicket.ticket_id);
+      expect(result).to.eql({ ...mockTicket, status_log: statusLog, comment_log: commentLog });
     });
   });
 

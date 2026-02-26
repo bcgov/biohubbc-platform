@@ -42,7 +42,8 @@ const history = [
 
 const ticketWithHistory = {
   ...ticket,
-  history
+  status_log: history,
+  comment_log: []
 };
 
 describe('TicketDetailPage', () => {
@@ -53,8 +54,7 @@ describe('TicketDetailPage', () => {
   const mockCreateTicketComment = vi.fn();
 
   const mockCodesData: IGetAllCodeSetsResponse = {
-    feature_type_with_properties: [],
-    ticket_priorities: ['low', 'medium', 'high', 'critical']
+    feature_type_with_properties: []
   };
 
   const mockCodesDataLoader: DataLoader<[], IGetAllCodeSetsResponse, unknown> = {

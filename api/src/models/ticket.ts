@@ -6,7 +6,7 @@ export type TicketPriority = z.infer<typeof TicketPriority>;
 export const TicketStatus = z.enum(['open', 'closed']);
 export type TicketStatus = z.infer<typeof TicketStatus>;
 
-export interface TeamFilters {
+export interface TicketFilters {
   status?: TicketStatus;
 }
 
@@ -22,6 +22,7 @@ export const Ticket = z.object({
 });
 
 export type Ticket = z.infer<typeof Ticket>;
+
 export const TicketSlug = Ticket.pick({ ticket_slug: true });
 export type TicketSlug = z.infer<typeof TicketSlug>;
 
@@ -36,20 +37,42 @@ export const TicketHistoryItem = z.object({
 });
 export type TicketHistoryItem = z.infer<typeof TicketHistoryItem>;
 
+export const TicketStatusLogItem = z.object({
+  ticket_status_history_id: z.string().uuid(),
+  ticket_id: z.string().uuid(),
+  user_identifier: z.string(),
+  create_date: z.string(),
+  status: TicketStatus
+});
+export type TicketStatusLogItem = z.infer<typeof TicketStatusLogItem>;
+
+export const TicketCommentLogItem = z.object({
+  ticket_comment_id: z.string().uuid(),
+  ticket_id: z.string().uuid(),
+  user_identifier: z.string(),
+  create_date: z.string(),
+  comment: z.string()
+});
+export type TicketCommentLogItem = z.infer<typeof TicketCommentLogItem>;
+
 export const TicketWithHistory = Ticket.extend({
-  history: z.array(TicketHistoryItem)
+  status_log: z.array(TicketStatusLogItem),
+  comment_log: z.array(TicketCommentLogItem)
 });
 
 export type TicketWithHistory = z.infer<typeof TicketWithHistory>;
 
 export const CreateTicketRequest = z.object({
   title: z.string().max(100),
-  description: z.string().max(2000).nullable().optional(),
-  team_id: z.string().uuid().optional(),
-  priority: TicketPriority.optional()
+  description: z.string().max(2000).nullable(),
+  priority: TicketPriority
 });
 
 export type CreateTicketRequest = z.infer<typeof CreateTicketRequest>;
+export type CreateTicketPayload = CreateTicketRequest & {
+  team_id: string;
+  ticket_slug: string;
+};
 
 export const UpdateTicketRequest = z.object({
   title: z.string().max(100).optional(),

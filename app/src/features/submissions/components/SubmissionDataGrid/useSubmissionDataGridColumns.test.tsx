@@ -21,8 +21,7 @@ const MockCodesContextProvider = ({ children }: PropsWithChildren) => {
   const mockContextValue = {
     codesDataLoader: {
       data: {
-        feature_type_with_properties: mockFeatureTypes,
-        ticket_priorities: ['low', 'medium', 'high', 'critical']
+        feature_type_with_properties: mockFeatureTypes
       }
     }
   } as ICodesContext;

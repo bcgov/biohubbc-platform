@@ -21,7 +21,7 @@ describe('paths/tickets/{ticketId}', () => {
   };
   const mockTicketWithHistory = {
     ...mockTicket,
-    history: [
+    status_log: [
       {
         ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
         ticket_id: mockTicket.ticket_id,
@@ -29,7 +29,8 @@ describe('paths/tickets/{ticketId}', () => {
         create_date: '2026-02-25T00:00:00.000Z',
         status: 'open' as const
       }
-    ]
+    ],
+    comment_log: []
   };
 
   afterEach(() => {

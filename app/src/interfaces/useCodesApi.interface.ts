@@ -1,5 +1,3 @@
-import { TicketPriority } from './useTicketsApi.interface';
-
 export type FeatureTypeCode = {
   feature_type_id: number;
   feature_type_name: string;
@@ -27,5 +25,4 @@ export type FeaturePropertyCode = {
  */
 export interface IGetAllCodeSetsResponse {
   feature_type_with_properties: FeatureTypeWithFeaturePropertiesCode[];
-  ticket_priorities: TicketPriority[];
 }

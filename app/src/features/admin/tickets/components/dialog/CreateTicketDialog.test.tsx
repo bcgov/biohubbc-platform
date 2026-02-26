@@ -1,41 +1,12 @@
 import { fireEvent, waitFor } from '@testing-library/react';
-import { CodesContext, ICodesContext } from 'contexts/codesContext';
-import { DataLoader } from 'hooks/useDataLoader';
-import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
 import { render } from 'test-helpers/test-utils';
 import { CreateTicketDialog } from './CreateTicketDialog';
 
 describe('CreateTicketDialog', () => {
   const renderDialog = (onCreate = vi.fn()) => {
-    const mockCodesData: IGetAllCodeSetsResponse = {
-      feature_type_with_properties: [],
-      ticket_priorities: ['low', 'medium', 'high', 'critical']
-    };
-
-    const mockCodesDataLoader: DataLoader<[], IGetAllCodeSetsResponse, unknown> = {
-      data: mockCodesData,
-      error: undefined,
-      isLoading: false,
-      isReady: true,
-      load: vi.fn().mockResolvedValue(mockCodesData),
-      refresh: vi.fn().mockResolvedValue(mockCodesData),
-      clear: vi.fn(),
-      setData: vi.fn()
-    };
-
-    const mockCodesContext: ICodesContext = {
-      codesDataLoader: {
-        ...mockCodesDataLoader
-      }
-    };
-
     return {
       onCreate,
-      ...render(
-        <CodesContext.Provider value={mockCodesContext}>
-          <CreateTicketDialog open={true} isSaving={false} onClose={vi.fn()} onCreate={onCreate} />
-        </CodesContext.Provider>
-      )
+      ...render(<CreateTicketDialog open={true} isSaving={false} onClose={vi.fn()} onCreate={onCreate} />)
     };
   };
 

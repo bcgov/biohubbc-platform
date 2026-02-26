@@ -21,7 +21,17 @@ export const TicketSchema: OpenAPIV3.SchemaObject = {
 
 export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['ticket_id', 'ticket_slug', 'title', 'team_id', 'create_date', 'priority', 'status', 'history'],
+  required: [
+    'ticket_id',
+    'ticket_slug',
+    'title',
+    'team_id',
+    'create_date',
+    'priority',
+    'status',
+    'status_log',
+    'comment_log'
+  ],
   properties: {
     ticket_id: { type: 'string', format: 'uuid' },
     ticket_slug: { type: 'string', minLength: 8, maxLength: 8, pattern: '^\\d{8}$' },
@@ -31,19 +41,31 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
     create_date: { type: 'string', format: 'date-time' },
     priority: { type: 'string', enum: TicketPriorityEnum },
     status: { type: 'string', enum: TicketStatusEnum },
-    history: {
+    status_log: {
       type: 'array',
       items: {
         type: 'object',
-        required: ['ticket_id', 'user_identifier', 'create_date'],
+        required: ['ticket_status_history_id', 'ticket_id', 'user_identifier', 'create_date', 'status'],
         properties: {
-          ticket_status_history_id: { type: 'string', format: 'uuid', nullable: true },
-          ticket_comment_id: { type: 'string', format: 'uuid', nullable: true },
+          ticket_status_history_id: { type: 'string', format: 'uuid' },
           ticket_id: { type: 'string', format: 'uuid' },
           user_identifier: { type: 'string' },
           create_date: { type: 'string', format: 'date-time' },
-          status: { type: 'string', enum: TicketStatusEnum, nullable: true },
-          comment: { type: 'string', nullable: true }
+          status: { type: 'string', enum: TicketStatusEnum }
+        }
+      }
+    },
+    comment_log: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['ticket_comment_id', 'ticket_id', 'user_identifier', 'create_date', 'comment'],
+        properties: {
+          ticket_comment_id: { type: 'string', format: 'uuid' },
+          ticket_id: { type: 'string', format: 'uuid' },
+          user_identifier: { type: 'string' },
+          create_date: { type: 'string', format: 'date-time' },
+          comment: { type: 'string' }
         }
       }
     }
@@ -53,11 +75,10 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
 export const CreateTicketRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['title'],
+  required: ['title', 'description', 'priority'],
   properties: {
     title: { type: 'string', maxLength: 100 },
     description: { type: 'string', maxLength: 2000, nullable: true },
-    team_id: { type: 'string', format: 'uuid' },
     priority: { type: 'string', enum: TicketPriorityEnum }
   }
 };

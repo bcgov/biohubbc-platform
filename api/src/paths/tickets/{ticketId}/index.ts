@@ -12,13 +12,23 @@ const defaultLog = getLogger('paths/tickets/{ticketId}');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]
+    and: [
+      {
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        discriminator: 'SystemRole'
+      }
+    ]
   })),
   getTicket()
 ];
 export const PATCH: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]
+    and: [
+      {
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        discriminator: 'SystemRole'
+      }
+    ]
   })),
   patchTicket()
 ];
@@ -26,7 +36,11 @@ export const PATCH: Operation = [
 GET.apiDoc = {
   description: 'Get ticket details by ticket ID',
   tags: ['tickets'],
-  security: [{ Bearer: [] }],
+  security: [
+    {
+      Bearer: []
+    }
+  ],
   parameters: [
     {
       in: 'path',
@@ -55,7 +69,11 @@ GET.apiDoc = {
 PATCH.apiDoc = {
   description: 'Update ticket fields excluding status',
   tags: ['tickets'],
-  security: [{ Bearer: [] }],
+  security: [
+    {
+      Bearer: []
+    }
+  ],
   parameters: [
     {
       in: 'path',

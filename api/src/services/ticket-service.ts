@@ -3,8 +3,8 @@ import { IDBConnection } from '../database/db';
 import {
   CreateTicketCommentRequest,
   CreateTicketRequest,
-  TeamFilters,
   Ticket,
+  TicketFilters,
   TicketHistoryItem,
   TicketWithHistory,
   UpdateTicketRequest
@@ -31,24 +31,17 @@ export class TicketService extends DBService {
   /**
    * Create a new ticket and write its initial status history entry.
    *
-   * If `team_id` is omitted, a team is auto-generated and associated with the ticket.
-   *
    * @param {CreateTicketRequest} ticket - Ticket payload to create.
    * @return {Promise<Ticket>} The newly created ticket.
    * @memberof TicketService
    */
   async createTicket(ticket: CreateTicketRequest): Promise<Ticket> {
-    let teamId = ticket.team_id;
-    if (!teamId) {
-      const team = await this.createTicketTeam();
-      teamId = team.team_id;
-    }
+    const [team, slug] = await Promise.all([this.createTicketTeam(), this.ticketRepository.getNextTicketSlug()]);
 
-    const ticketSlug = await this.ticketRepository.getNextTicketSlug();
     const createdTicket = await this.ticketRepository.insertTicket({
       ...ticket,
-      team_id: teamId,
-      ticket_slug: ticketSlug
+      team_id: team.team_id,
+      ticket_slug: slug
     });
 
     await this.ticketRepository.insertTicketStatusHistory(createdTicket.ticket_id, createdTicket.status);
@@ -57,7 +50,7 @@ export class TicketService extends DBService {
   }
 
   /**
-   * Create an internal team record for ticket ownership when a team is not provided.
+   * Create an internal team record for ticket ownership.
    *
    * @return {*} {Promise<{ team_id: string }>}
    * @memberof TicketService
@@ -76,19 +69,20 @@ export class TicketService extends DBService {
   }
 
   /**
-   * Get a ticket by its UUID.
+   * Get a ticket by its UUID with separate status and comment logs.
    *
    * @param {string} ticketId - Ticket UUID.
-   * @return {Promise<TicketWithHistory>} The requested ticket including status history.
+   * @return {Promise<TicketWithHistory>} The requested ticket including status and comment logs.
    * @memberof TicketService
    */
   async getTicket(ticketId: string): Promise<TicketWithHistory> {
-    const [ticket, history] = await Promise.all([
+    const [ticket, status_log, comment_log] = await Promise.all([
       this.ticketRepository.getTicketById(ticketId),
-      this.ticketRepository.getTicketHistory(ticketId)
+      this.ticketRepository.getTicketStatusHistory(ticketId),
+      this.ticketRepository.getTicketCommentLog(ticketId)
     ]);
 
-    return { ...ticket, history };
+    return { ...ticket, status_log, comment_log };
   }
 
   /**
@@ -109,14 +103,14 @@ export class TicketService extends DBService {
    * List tickets for a team with an optional status filter.
    *
    * @param {string} teamId - Team UUID filter. Pass an empty string to query all teams.
-   * @param {TeamFilters} [filters] - Optional ticket list filters.
+   * @param {TicketFilters} [filters] - Optional ticket list filters.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
    * @return {Promise<Ticket[]>} Matching tickets.
    * @memberof TicketService
    */
   async getTicketsByTeamId(
     teamId: string,
-    filters?: TeamFilters,
+    filters?: TicketFilters,
     pagination?: ApiPaginationOptions
   ): Promise<Ticket[]> {
     return this.ticketRepository.getTicketsByTeamId(teamId, filters, pagination);
@@ -126,11 +120,11 @@ export class TicketService extends DBService {
    * Count tickets for a team with an optional status filter.
    *
    * @param {string} teamId - Team UUID filter. Pass an empty string to query all teams.
-   * @param {TeamFilters} [filters] - Optional ticket list filters.
+   * @param {TicketFilters} [filters] - Optional ticket list filters.
    * @return {Promise<number>} Total count of matching tickets.
    * @memberof TicketService
    */
-  async getTicketsByTeamIdCount(teamId: string, filters?: TeamFilters): Promise<number> {
+  async getTicketsByTeamIdCount(teamId: string, filters?: TicketFilters): Promise<number> {
     return this.ticketRepository.getTicketsByTeamIdCount(teamId, filters);
   }
 

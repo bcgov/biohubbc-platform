@@ -2,9 +2,10 @@ import { SQL } from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
+  CreateTicketPayload,
+  TicketCommentLogItem,
   CreateTicketCommentRequest,
-  CreateTicketRequest,
-  TeamFilters,
+  TicketFilters,
   Ticket,
   TicketHistoryItem,
   TicketSlug,
@@ -76,12 +77,12 @@ export class TicketRepository extends BaseRepository {
   /**
    * Insert a new ticket record.
    *
-   * @param {(CreateTicketRequest & { team_id: string; ticket_slug: string })} ticket - Ticket payload to persist with resolved team ID and generated slug.
+   * @param {CreateTicketPayload} ticket - Ticket payload to persist with resolved team ID and generated slug.
    * @return {Promise<Ticket>} The created ticket record.
    * @throws {ApiExecuteSQLError} If the insert does not affect exactly one row.
    * @memberof TicketRepository
    */
-  async insertTicket(ticket: CreateTicketRequest & { team_id: string; ticket_slug: string }): Promise<Ticket> {
+  async insertTicket(ticket: CreateTicketPayload): Promise<Ticket> {
     const knex = getKnex();
     const query = knex
       .table('ticket')
@@ -90,7 +91,7 @@ export class TicketRepository extends BaseRepository {
         description: ticket.description ?? null,
         team_id: ticket.team_id,
         ticket_slug: ticket.ticket_slug,
-        priority: ticket.priority ?? 'medium'
+        priority: ticket.priority
       })
       .returning(TICKET_COLUMNS);
 
@@ -134,14 +135,14 @@ export class TicketRepository extends BaseRepository {
    * List active tickets for a team with an optional status filter.
    *
    * @param {string} teamId - Team UUID filter. Pass an empty string to query all teams.
-   * @param {TeamFilters} [filters] - Optional list filters.
+   * @param {TicketFilters} [filters] - Optional list filters.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
    * @return {Promise<Ticket[]>} Matching tickets.
    * @memberof TicketRepository
    */
   async getTicketsByTeamId(
     teamId: string,
-    filters?: TeamFilters,
+    filters?: TicketFilters,
     pagination?: ApiPaginationOptions
   ): Promise<Ticket[]> {
     const knex = getKnex();
@@ -170,11 +171,11 @@ export class TicketRepository extends BaseRepository {
    * Count active tickets for a team with an optional status filter.
    *
    * @param {string} teamId - Team UUID filter. Pass an empty string to query all teams.
-   * @param {TeamFilters} [filters] - Optional list filters.
+   * @param {TicketFilters} [filters] - Optional list filters.
    * @return {Promise<number>} Total number of matching tickets.
    * @memberof TicketRepository
    */
-  async getTicketsByTeamIdCount(teamId: string, filters?: TeamFilters): Promise<number> {
+  async getTicketsByTeamIdCount(teamId: string, filters?: TicketFilters): Promise<number> {
     const knex = getKnex();
     let query = knex.table('ticket').whereNull('record_end_date').select(knex.raw('count(*)::integer as count'));
 
@@ -299,6 +300,40 @@ export class TicketRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, TicketStatusHistory);
+
+    return response.rows;
+  }
+
+  /**
+   * Get ticket comment history entries ordered oldest first.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @return {Promise<TicketCommentLogItem[]>} Comment history rows.
+   * @memberof TicketRepository
+   */
+  async getTicketCommentLog(ticketId: string): Promise<TicketCommentLogItem[]> {
+    const sqlStatement = SQL`
+      SELECT
+        tc.ticket_comment_id,
+        tc.ticket_id,
+        COALESCE(
+          to_jsonb(su)->>'user_identifier',
+          to_jsonb(su)->>'user_guid',
+          'Unknown user'
+        ) AS user_identifier,
+        tc.create_date,
+        c.comment
+      FROM ticket_comment tc
+      JOIN comment c
+        ON c.comment_id = tc.comment_id
+      JOIN "system_user" su
+        ON su.system_user_id = tc.create_user
+      WHERE tc.ticket_id = ${ticketId}
+        AND tc.record_end_date IS NULL
+      ORDER BY tc.create_date ASC;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, TicketCommentLogItem);
 
     return response.rows;
   }
