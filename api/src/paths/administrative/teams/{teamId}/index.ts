@@ -6,7 +6,6 @@ import { UpdateTeamRequest } from '../../../../models/team';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { TeamSchema, UpdateTeamRequestSchema } from '../../../../openapi/schemas/team';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { TeamMemberService } from '../../../../services/access-policy/team-member-service';
 import { TeamService } from '../../../../services/access-policy/team-service';
 import { getLogger } from '../../../../utils/logger';
 
@@ -131,38 +130,16 @@ export function updateTeam(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
     const teamId = req.params.teamId;
-    const { name, description, system_user_ids } = req.body as UpdateTeamRequest;
+    const payload = req.body as UpdateTeamRequest;
 
     try {
       await connection.open();
       const teamService = new TeamService(connection);
-      const teamMemberService = new TeamMemberService(connection);
 
-      await teamService.updateTeam(teamId, { name, description });
+      const team = await teamService.updateTeam(teamId, payload);
 
-      if (system_user_ids) {
-        const currentMembers = await teamMemberService.getTeamMembers(teamId);
-        const currentUserIds = new Set(currentMembers.map((member) => member.system_user_id));
-        const newUserIds = new Set(system_user_ids);
-
-        const toAdd = system_user_ids.filter((userId) => !currentUserIds.has(userId));
-        const toRemove = currentMembers.filter((member) => !newUserIds.has(member.system_user_id));
-
-        await Promise.all(
-          toAdd.map((userId) =>
-            teamMemberService.createTeamMember({
-              team_id: teamId,
-              system_user_id: userId
-            })
-          )
-        );
-
-        await Promise.all(toRemove.map((member) => teamMemberService.deleteTeamMember(member.team_member_id)));
-      }
-
-      const result = await teamService.getTeam(teamId);
       await connection.commit();
-      return res.status(200).json(result);
+      return res.status(200).json(team);
     } catch (error) {
       defaultLog.error({ label: 'updateTeam', message: 'error', error });
       await connection.rollback();

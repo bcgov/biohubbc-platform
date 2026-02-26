@@ -151,6 +151,33 @@ export class TeamMemberRepository extends BaseRepository {
   }
 
   /**
+   * Soft delete all team members for a team
+   *
+   * @param {string} teamId
+   * @return {Promise<void>}
+   * @memberof TeamMemberRepository
+   */
+  async deleteAllTeamMembers(teamId: string): Promise<void> {
+    const knex = getKnex();
+    const query = knex
+      .table('team_member')
+      .update({
+        record_end_date: knex.fn.now()
+      })
+      .where('team_id', teamId)
+      .returning(['team_id']);
+
+    const response = await this.connection.knex(query);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to delete all team members', [
+        'TeamMemberRepository->deleteAllTeamMembers',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+  }
+
+  /**
    * Get team members with user details for a given team.
    *
    * @param {string} teamId - The ID of the team.

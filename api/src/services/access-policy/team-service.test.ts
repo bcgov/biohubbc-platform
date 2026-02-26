@@ -2,6 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { IDBConnection } from '../../database/db';
 import { Team } from '../../models/team';
 import { TeamMemberWithUser } from '../../models/team-member';
 import { TeamRepository } from '../../repositories/authorization/team-repository';
@@ -12,7 +13,7 @@ import { TeamService } from './team-service';
 chai.use(sinonChai);
 
 describe('TeamService', () => {
-  let mockDBConnection: any;
+  let mockDBConnection: IDBConnection;
   let service: TeamService;
 
   beforeEach(() => {
@@ -144,7 +145,7 @@ describe('TeamService', () => {
     expect(result).to.equal(3);
   });
 
-  it('updateTeam calls repository.updateTeam and then getTeam', async () => {
+  it('updateTeam calls repository.updateTeam, creates team members, and then getTeam', async () => {
     const mockTeam: Team = {
       team_id: '11111111-1111-1111-1111-111111111111',
       name: 'Engineering',
@@ -152,18 +153,34 @@ describe('TeamService', () => {
       member_count: 2
     };
 
+    const systemUserIds = [101, 102];
+
     const updateStub = sinon.stub(TeamRepository.prototype, 'updateTeam').resolves();
     const getStub = sinon.stub(TeamRepository.prototype, 'getTeam').resolves(mockTeam);
+    const createMemberStub = sinon.stub(TeamMemberService.prototype, 'createTeamMember').resolves();
 
     const result = await service.updateTeam('11111111-1111-1111-1111-111111111111', {
       name: 'Engineering',
-      description: 'Team description'
+      description: 'Team description',
+      system_user_ids: systemUserIds
     });
 
     expect(updateStub).to.have.been.calledWith('11111111-1111-1111-1111-111111111111', {
       name: 'Engineering',
-      description: 'Team description'
+      description: 'Team description',
+      system_user_ids: systemUserIds
     });
+
+    expect(createMemberStub).to.have.been.calledTwice;
+    expect(createMemberStub.getCall(0)).to.have.been.calledWith({
+      team_id: '11111111-1111-1111-1111-111111111111',
+      system_user_id: 101
+    });
+    expect(createMemberStub.getCall(1)).to.have.been.calledWith({
+      team_id: '11111111-1111-1111-1111-111111111111',
+      system_user_id: 102
+    });
+
     expect(getStub).to.have.been.calledWith('11111111-1111-1111-1111-111111111111');
     expect(result).to.eql(mockTeam);
   });

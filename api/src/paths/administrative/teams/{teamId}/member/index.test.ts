@@ -6,7 +6,7 @@ import * as db from '../../../../../database/db';
 import { TeamMemberWithUser } from '../../../../../models/team-member';
 import { TeamMemberService } from '../../../../../services/access-policy/team-member-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
-import { createTeamMember, deleteTeamMember, getTeamMembers } from './index';
+import { createTeamMember, deleteAllTeamMembers, getTeamMembers } from './index';
 
 chai.use(sinonChai);
 
@@ -89,7 +89,7 @@ describe('getTeamMembers', () => {
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(createStub).to.have.been.calledOnceWith({ team_id: 'team-1', system_user_id: 42 });
-    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.statusValue).to.equal(201);
     expect(mockRes.jsonValue).to.eql({
       team_member_id: 'tm-1',
       system_user_id: 42,
@@ -98,19 +98,20 @@ describe('getTeamMembers', () => {
     });
   });
 
-  it('should delete team member by system_user_id on DELETE', async () => {
+  it('should delete all team members for a team', async () => {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-    const deleteStub = sinon.stub(TeamMemberService.prototype, 'deleteTeamMemberByUser').resolves();
+
+    // Stub the new service method
+    const deleteAllStub = sinon.stub(TeamMemberService.prototype, 'deleteAllTeamMembers').resolves();
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { teamId: 'team-1' };
-    mockReq.body = { system_user_id: 42 };
 
-    const requestHandler = deleteTeamMember();
+    const requestHandler = deleteAllTeamMembers();
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(deleteStub).to.have.been.calledOnceWith({ team_id: 'team-1', system_user_id: 42 });
+    expect(deleteAllStub).to.have.been.calledOnceWith('team-1');
     expect(mockRes.statusValue).to.equal(204);
   });
 });

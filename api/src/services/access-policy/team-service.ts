@@ -94,6 +94,20 @@ export class TeamService extends DBService {
    */
   async updateTeam(teamId: string, teamData: UpdateTeam): Promise<Team> {
     await this.teamRepository.updateTeam(teamId, teamData);
+
+    const systemUserIds = teamData.system_user_ids ?? [];
+
+    if (systemUserIds.length > 0) {
+      await Promise.all(
+        systemUserIds.map((systemUserId) =>
+          this.teamMemberService.createTeamMember({
+            team_id: teamId,
+            system_user_id: systemUserId
+          })
+        )
+      );
+    }
+
     return this.teamRepository.getTeam(teamId);
   }
 

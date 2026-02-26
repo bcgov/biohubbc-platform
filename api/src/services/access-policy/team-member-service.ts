@@ -106,6 +106,17 @@ export class TeamMemberService extends DBService {
   }
 
   /**
+   * Delete all members for a team
+   *
+   * @param {string} teamId
+   * @return {Promise<void>}
+   * @memberof TeamMemberService
+   */
+  async deleteAllTeamMembers(teamId: string): Promise<void> {
+    await this.teamMemberRepository.deleteAllTeamMembers(teamId);
+  }
+
+  /**
    * Retrieve team members with user details for a given team.
    *
    * @param {string} teamId - The ID of the team to fetch members for.

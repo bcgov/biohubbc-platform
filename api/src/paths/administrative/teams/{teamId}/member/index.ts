@@ -126,7 +126,7 @@ POST.apiDoc = {
     }
   },
   responses: {
-    200: {
+    201: {
       description: 'Team member association',
       content: {
         'application/json': {
@@ -147,7 +147,7 @@ export const DELETE: Operation = [
       }
     ]
   })),
-  deleteTeamMember()
+  deleteAllTeamMembers()
 ];
 
 DELETE.apiDoc = {
@@ -194,7 +194,7 @@ export function createTeamMember(): RequestHandler {
       const created = await teamMemberService.createTeamMember({ team_id: teamId, system_user_id });
 
       await connection.commit();
-      return res.status(200).json(created);
+      return res.status(201).json(created);
     } catch (error) {
       defaultLog.error({ label: 'createTeamMember', message: 'error', error });
       await connection.rollback();
@@ -210,16 +210,15 @@ export function createTeamMember(): RequestHandler {
  *
  * @returns {RequestHandler}
  */
-export function deleteTeamMember(): RequestHandler {
+export function deleteAllTeamMembers(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
     const teamId = req.params.teamId;
-    const { system_user_id } = req.body as TeamMemberByUserRequest;
 
     try {
       await connection.open();
       const teamMemberService = new TeamMemberService(connection);
-      await teamMemberService.deleteTeamMemberByUser({ team_id: teamId, system_user_id });
+      await teamMemberService.deleteAllTeamMembers(teamId);
 
       await connection.commit();
       return res.status(204).send();
