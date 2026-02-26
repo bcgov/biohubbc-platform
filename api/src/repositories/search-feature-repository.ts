@@ -32,6 +32,34 @@ const defaultLog = getLogger('repositories/search-feature-repository');
  */
 export class SearchFeatureRepository extends BaseRepository {
   /**
+   * Deletes all existing search records (string, number, datetime, spatial) for features
+   * belonging to the given submission. Used before re-indexing to ensure idempotency —
+   * job retries and manual re-indexing would otherwise accumulate duplicate records
+   * because the search tables have no unique constraint on (submission_feature_id, feature_property_id).
+   *
+   * @param {number} submissionId - The submission whose search records should be cleared
+   * @return {Promise<void>}
+   */
+  async deleteSearchRecordsBySubmissionId(submissionId: number): Promise<void> {
+    defaultLog.debug({ label: 'deleteSearchRecordsBySubmissionId', message: 'start', submissionId });
+
+    const knex = getKnex();
+    const featureIdSubquery = knex
+      .select('submission_feature_id')
+      .from('submission_feature')
+      .where('submission_id', submissionId);
+
+    const tables = ['search_string', 'search_number', 'search_datetime', 'search_spatial'];
+
+    await Promise.all(
+      tables.map((table) => {
+        const qb = knex.queryBuilder().delete().from(table).whereIn('submission_feature_id', featureIdSubquery);
+        return this.connection.knex(qb);
+      })
+    );
+  }
+
+  /**
    * Inserts searchable datetime records into the search_datetime table.
    * @param datetimeRecords - Array of datetime records to insert
    * @returns Promise resolving to array of inserted records with generated IDs

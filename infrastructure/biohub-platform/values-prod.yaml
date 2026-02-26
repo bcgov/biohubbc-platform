@@ -9,8 +9,9 @@ environment:
 app:
   enabled: true
 
+# Disabled: PROD uses the separate Crunchy Postgres Helm release (infrastructure/crunchy-db).
 database:
-  enabled: true
+  enabled: false
 
 database-setup:
   enabled: true
@@ -53,33 +54,6 @@ biohub-platform-app:
   route:
     host: biohub-platform.apps.silver.devops.gov.bc.ca
 
-# Values passed to biohub-platform-db subchart
-biohub-platform-db:
-  environment:
-    licensePlate: "a0ec71"
-    name: prod
-    id: deploy
-    # changeId will be dynamically set: "1234"
-    ts: ""
-
-  # App configuration
-  app:
-    nodeEnv: production
-
-  # Openshift Resources
-  replicas: 1
-  resources:
-    requests:
-      cpu: 50m
-      memory: 100Mi
-    limits:
-      cpu: 1500m
-      memory: 6Gi
-
-  # Volume for persistent data
-  persistence:
-    existingClaim: "biohub-platform-db-postgresql-prod"
-
 # Values passed to biohub-platform-db-setup subchart
 biohub-platform-db-setup:
   environment:
@@ -92,6 +66,13 @@ biohub-platform-db-setup:
   # App configuration
   app:
     nodeEnv: production
+
+    # Database
+    database:
+      host: "biohub-platform-db-prod-primary"
+      adminSecretName: "biohub-platform-db-prod-pguser-postgres"
+      appSecretName: "biohub-platform-db-prod-pguser-biohub-api"
+      dbNameSecretName: "biohub-platform-db-prod-pguser-biohub-platform-db-prod"
 
 # Values passed to biohub-platform-api subchart
 biohub-platform-api:
@@ -114,10 +95,17 @@ biohub-platform-api:
       cssApi:
         environment: prod
 
+    # Database
+    database:
+      host: "biohub-platform-db-prod-primary"
+      adminSecretName: "biohub-platform-db-prod-pguser-postgres"
+      appSecretName: "biohub-platform-db-prod-pguser-biohub-api"
+      dbNameSecretName: "biohub-platform-db-prod-pguser-biohub-platform-db-prod"
+
     # Object Store (S3)
     objectStore:
       keyPrefix: biohub
-    
+
     # Logging
     logging:
       level: silent
@@ -156,6 +144,13 @@ biohub-platform-queue:
     nodeEnv: production
     nodeOptions: --max_old_space_size=1024
     # objectStore.keyPrefix will be dynamically set: "biohub"
+
+    # Database
+    database:
+      host: "biohub-platform-db-prod-primary"
+      adminSecretName: "biohub-platform-db-prod-pguser-postgres"
+      appSecretName: "biohub-platform-db-prod-pguser-biohub-api"
+      dbNameSecretName: "biohub-platform-db-prod-pguser-biohub-platform-db-prod"
 
     # Clamav
     clamav:

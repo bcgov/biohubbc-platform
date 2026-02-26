@@ -89,6 +89,17 @@ describe('Process Submission Features Worker', function () {
     try {
       // Clean up in reverse FK order
       for (const submissionId of createdSubmissionIds) {
+        // search_ tables FK to submission_feature — delete first
+        const featureIds = await db('biohub.submission_feature')
+          .where('submission_id', submissionId)
+          .select('submission_feature_id');
+        const ids = featureIds.map((r: { submission_feature_id: number }) => r.submission_feature_id);
+        if (ids.length) {
+          await db('biohub.search_string').whereIn('submission_feature_id', ids).del();
+          await db('biohub.search_number').whereIn('submission_feature_id', ids).del();
+          await db('biohub.search_datetime').whereIn('submission_feature_id', ids).del();
+          await db('biohub.search_spatial').whereIn('submission_feature_id', ids).del();
+        }
         await db('biohub.submission_feature').where('submission_id', submissionId).del();
         await db('biohub.submission_validation').where('submission_id', submissionId).del();
         await db('biohub.submission_upload').where('submission_id', submissionId).del();

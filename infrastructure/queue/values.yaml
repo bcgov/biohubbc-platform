@@ -19,9 +19,19 @@ app:
 
   # Database
   database:
-    secretName: biohub-platform-db
-    serviceName: "" # Database service name associated with deployment
+    secretName: biohub-platform-db # Unused: legacy path uses hardcoded dbHost helper (biohub-platform-db + app.suffix) for secret name
+    serviceName: "" # Unused: reserved for future use
     port: 5432 # Database port
+    # useCrunchy: true = Crunchy Postgres (DEV/TEST/PROD). Set to false for PR environments (legacy dbHost secret).
+    useCrunchy: true
+    host: "" # e.g. "<release>-primary" (biohub-platform-db-dev-primary for DEV); use primary not pgbouncer (biohub_api not in PgBouncer config)
+    appSecretName: "" # e.g. "<release>-pguser-biohub-api" (biohub-platform-db-dev-pguser-biohub-api for DEV)
+    dbNameSecretName: "" # e.g. "<release>-pguser-<cluster-name>" (biohub-platform-db-dev-pguser-biohub-platform-db-dev for DEV)
+    adminSecretName: "" # e.g. "<release>-pguser-postgres" (biohub-platform-db-dev-pguser-postgres for DEV)
+    # Secret keys default in templates: user/password/dbname (override in parent values if needed)
+    # PGO root CA for TLS verification (same secret name in all envs)
+    caSecretName: "pgo-root-cacert"
+    caSecretKey: "root.crt"
 
   # Object Store (S3)
   objectStore:
