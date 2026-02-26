@@ -73,7 +73,7 @@ describe('DataRequestRepository', () => {
       expect(result).to.eql([mockDataRequest]);
     });
 
-    it('should return data requests when filtering by multiple filters', async () => {
+    it('should return data requests when filtering by team_id', async () => {
       const mockQueryResponse = {
         rowCount: 1,
         rows: [mockDataRequest]
@@ -86,47 +86,11 @@ describe('DataRequestRepository', () => {
       const repo = new DataRequestRepository(mockDBConnection);
 
       const result = await repo.findDataRequests({
-        team_ids: [mockDataRequest.team_id],
+        team_id: mockDataRequest.team_id,
         requested_by: mockDataRequest.requested_by
       });
 
       expect(result).to.eql([mockDataRequest]);
-    });
-
-    it('should return data requests when filtering by team_ids array', async () => {
-      const mockQueryResponse = {
-        rowCount: 2,
-        rows: [mockDataRequest, { ...mockDataRequest, data_request_id: 'other-id' }]
-      } as unknown as QueryResult<any>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
-
-      const repo = new DataRequestRepository(mockDBConnection);
-
-      const result = await repo.findDataRequests({
-        team_ids: [mockDataRequest.team_id, 'other-team-id']
-      });
-
-      expect(result).to.have.length(2);
-    });
-
-    it('should return empty array when filtering by empty team_ids array', async () => {
-      const mockQueryResponse = {
-        rowCount: 0,
-        rows: []
-      } as unknown as QueryResult<any>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
-      });
-
-      const repo = new DataRequestRepository(mockDBConnection);
-
-      const result = await repo.findDataRequests({ team_ids: [] });
-
-      expect(result).to.eql([]);
     });
   });
 

@@ -60,7 +60,8 @@ export class DataRequestService extends DBService {
   }
 
   /**
-   * Find all data requests, optionally filtered by date range, requested_by, team_ids, or status.
+   * Find all data requests, optionally filtered by date range, requested_by, team_id, or status.
+   * For non-SYSTEM_ADMIN users, results are scoped to data requests in teams the user is a member of.
    *
    * @param {DataRequestFilters} [filters]
    * @return {Promise<DataRequestWithStatus[]>}
@@ -78,16 +79,7 @@ export class DataRequestService extends DBService {
       return dataRequests.map(_transformFlatDataRequestToNested);
     }
 
-    const teamService = new TeamService(this.connection);
-    const teamIds = await teamService.getTeamIdsBySystemUserId(systemUserId);
-
-    if (teamIds.length === 0) {
-      return [];
-    }
-
-    const scopedFilters = { ...filters, team_ids: teamIds };
-    const dataRequests = await this.dataRequestRepository.findDataRequests(scopedFilters);
-
+    const dataRequests = await this.dataRequestRepository.findDataRequests(filters, systemUserId);
     return dataRequests.map(_transformFlatDataRequestToNested);
   }
 
