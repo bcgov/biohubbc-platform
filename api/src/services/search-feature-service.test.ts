@@ -23,6 +23,8 @@ describe('SearchFeatureService', () => {
 
       const searchFeatureService = new SearchFeatureService(mockDBConnection);
 
+      sinon.stub(SearchFeatureRepository.prototype, 'deleteSearchRecordsBySubmissionId').resolves();
+
       const getSubmissionFeaturesStub = sinon
         .stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBySubmissionId')
         .resolves([
@@ -289,6 +291,8 @@ describe('SearchFeatureService', () => {
 
       const searchFeatureService = new SearchFeatureService(mockDBConnection);
 
+      sinon.stub(SearchFeatureRepository.prototype, 'deleteSearchRecordsBySubmissionId').resolves();
+
       sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBySubmissionId').resolves([
         {
           submission_feature_id: 11111,
@@ -325,6 +329,8 @@ describe('SearchFeatureService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const searchFeatureService = new SearchFeatureService(mockDBConnection);
+
+      sinon.stub(SearchFeatureRepository.prototype, 'deleteSearchRecordsBySubmissionId').resolves();
 
       sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBySubmissionId').resolves([
         {
@@ -390,6 +396,75 @@ describe('SearchFeatureService', () => {
           value: 'Dataset1'
         }
       ]);
+    });
+
+    it('should call delete before insert for idempotency', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+
+      const deleteStub = sinon.stub(SearchFeatureRepository.prototype, 'deleteSearchRecordsBySubmissionId').resolves();
+
+      sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBySubmissionId').resolves([
+        {
+          submission_feature_id: 11111,
+          submission_id: 777,
+          feature_type_id: 1,
+          urn: 'urn:777:dataset:11111',
+          data: { name: 'Dataset1' },
+          source_id: '123',
+          uuid: '123-456-789',
+          parent_submission_feature_id: null,
+          record_effective_date: '2024-01-01',
+          record_end_date: null,
+          create_date: '2024-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          feature_type_name: 'dataset',
+          feature_type_display_name: 'Dataset',
+          submission_feature_security_ids: []
+        }
+      ]);
+
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([
+        {
+          feature_type: { feature_type_id: 1, feature_type_name: 'dataset', feature_type_display_name: 'Dataset' },
+          feature_type_properties: [
+            {
+              feature_property_id: 1,
+              feature_property_name: 'name',
+              feature_property_display_name: 'Name',
+              feature_property_type_id: 1,
+              feature_property_type_name: 'string'
+            }
+          ]
+        }
+      ]);
+
+      const insertStub = sinon.stub(SearchFeatureRepository.prototype, 'insertSearchableStringRecords');
+
+      await searchFeatureService.indexFeaturesBySubmissionId(777);
+
+      expect(deleteStub).to.have.been.calledOnceWith(777);
+      expect(deleteStub).to.have.been.calledBefore(insertStub);
+    });
+
+    it('should call delete even when no features exist for the submission', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+
+      const deleteStub = sinon.stub(SearchFeatureRepository.prototype, 'deleteSearchRecordsBySubmissionId').resolves();
+
+      sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBySubmissionId').resolves([]);
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([]);
+
+      const insertStub = sinon.stub(SearchFeatureRepository.prototype, 'insertSearchableStringRecords');
+
+      await searchFeatureService.indexFeaturesBySubmissionId(777);
+
+      expect(deleteStub).to.have.been.calledOnceWith(777);
+      expect(insertStub).not.to.have.been.called;
     });
   });
 
