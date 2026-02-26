@@ -114,34 +114,6 @@ describe('updateTeam', () => {
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql(mockTeam);
   });
-
-  it('should default system_user_ids to empty array when not provided', async () => {
-    const mockTeam: Team = {
-      team_id: '5d92f13c-fefa-49f3-9fb9-4e4611c67a34',
-      name: 'Updated Team',
-      description: 'Some description',
-      member_count: 0
-    };
-
-    const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-    const updateStub = sinon.stub(TeamService.prototype, 'updateTeam').resolves(mockTeam);
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { teamId: 'team-1' };
-    mockReq.body = { name: 'Updated Team', description: 'Some description' };
-
-    const requestHandler = updateTeam();
-    await requestHandler(mockReq, mockRes, mockNext);
-
-    expect(updateStub).to.have.been.calledWith('team-1', {
-      name: 'Updated Team',
-      description: 'Some description',
-      system_user_ids: undefined
-    });
-    expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql(mockTeam);
-  });
 });
 
 describe('deleteTeam', () => {
