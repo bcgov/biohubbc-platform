@@ -25,15 +25,12 @@ interface ITicketHeaderProps {
 export const TicketHeader = (props: ITicketHeaderProps) => {
   const { ticket } = props;
   const dialogContext = useDialogContext();
-  const { ticketId, ticketDataLoader } = useTicketContext();
+  const { updateTicket } = useTicketContext();
   const descriptionPreviewMaxLength = 300;
-  const handleRefresh = async () => {
-    await ticketDataLoader.refresh(ticketId);
-  };
   const { isSavingTicket, editTicketError, isEditDialogOpen, openEditDialog, closeEditDialog, handleEditTicket } =
     useTicketEditDialog({
-      ticketId,
-      onRefreshTicket: handleRefresh
+      ticket,
+      onUpdateTicket: updateTicket
     });
 
   const handleReadMoreClick = () => {

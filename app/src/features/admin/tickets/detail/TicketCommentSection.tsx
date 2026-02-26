@@ -16,13 +16,10 @@ interface ITicketCommentSectionProps {
  */
 export const TicketCommentSection = (props: ITicketCommentSectionProps) => {
   const { isTicketOpen, onSavingChange } = props;
-  const { ticketId, ticketDataLoader } = useTicketContext();
-  const handleRefresh = async () => {
-    await ticketDataLoader.refresh(ticketId);
-  };
+  const { handleComment } = useTicketContext();
+
   const { comment, setComment, isSavingComment, handleAddComment } = useTicketComment({
-    ticketId,
-    onRefreshTicket: handleRefresh,
+    onSubmitComment: handleComment,
     onSavingChange
   });
 

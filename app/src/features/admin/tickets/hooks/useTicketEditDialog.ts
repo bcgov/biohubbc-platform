@@ -1,11 +1,10 @@
 import { APIError } from 'hooks/api/useAxios';
-import { useApi } from 'hooks/useApi';
-import { IUpdateTicketRequest } from 'interfaces/useTicketsApi.interface';
+import { ITicketWithHistory, IUpdateTicketRequest } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
 
 interface IUseTicketEditDialogProps {
-  ticketId?: string;
-  onRefreshTicket: () => Promise<void>;
+  ticket?: ITicketWithHistory;
+  onUpdateTicket: (nextTicket: ITicketWithHistory) => Promise<void>;
 }
 
 /**
@@ -15,8 +14,7 @@ interface IUseTicketEditDialogProps {
  * @return {*}
  */
 export const useTicketEditDialog = (props: IUseTicketEditDialogProps) => {
-  const { ticketId, onRefreshTicket } = props;
-  const api = useApi();
+  const { ticket, onUpdateTicket } = props;
 
   const [isSavingTicket, setIsSavingTicket] = useState(false);
   const [editTicketError, setEditTicketError] = useState<string | undefined>();
@@ -30,7 +28,7 @@ export const useTicketEditDialog = (props: IUseTicketEditDialogProps) => {
   };
 
   const handleEditTicket = async (payload: IUpdateTicketRequest) => {
-    if (!ticketId) {
+    if (!ticket) {
       return;
     }
 
@@ -38,8 +36,15 @@ export const useTicketEditDialog = (props: IUseTicketEditDialogProps) => {
       setIsSavingTicket(true);
       setEditTicketError(undefined);
 
-      await api.tickets.updateTicket(ticketId, payload);
-      await onRefreshTicket();
+      const nextTicket: ITicketWithHistory = {
+        ...ticket,
+        title: payload.title ?? ticket.title,
+        description: payload.description === undefined ? ticket.description : payload.description,
+        priority: payload.priority ?? ticket.priority,
+        status: payload.status ?? ticket.status
+      };
+
+      await onUpdateTicket(nextTicket);
       setIsEditDialogOpen(false);
     } catch (caughtError) {
       const apiError = caughtError as APIError;
@@ -58,4 +63,3 @@ export const useTicketEditDialog = (props: IUseTicketEditDialogProps) => {
     handleEditTicket
   };
 };
-

@@ -1,11 +1,9 @@
 import { APIError } from 'hooks/api/useAxios';
 import { useDialogContext } from 'hooks/useContext';
-import { useApi } from 'hooks/useApi';
 import { Dispatch, SetStateAction, useState } from 'react';
 
 interface IUseTicketCommentProps {
-  ticketId?: string;
-  onRefreshTicket: () => Promise<void>;
+  onSubmitComment: (comment: string) => Promise<void>;
   onSavingChange: Dispatch<SetStateAction<boolean>>;
 }
 
@@ -16,25 +14,23 @@ interface IUseTicketCommentProps {
  * @return {*}
  */
 export const useTicketComment = (props: IUseTicketCommentProps) => {
-  const { ticketId, onRefreshTicket, onSavingChange } = props;
-  const api = useApi();
+  const { onSubmitComment, onSavingChange } = props;
   const dialogContext = useDialogContext();
 
   const [comment, setComment] = useState('');
   const [isSavingComment, setIsSavingComment] = useState(false);
 
   const handleAddComment = async () => {
-    if (!ticketId || !comment.trim()) {
+    if (!comment.trim()) {
       return;
     }
 
     try {
       setIsSavingComment(true);
       onSavingChange(true);
-
-      await api.tickets.createTicketComment(ticketId, { comment: comment.trim() });
+      const trimmedComment = comment.trim();
+      await onSubmitComment(trimmedComment);
       setComment('');
-      await onRefreshTicket();
     } catch (caughtError) {
       const apiError = caughtError as APIError;
       dialogContext.setSnackbar({
