@@ -3,7 +3,7 @@ import { useApi } from 'hooks/useApi';
 import { MemoryRouter } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
-import { TicketsDashboardPage } from './TicketsDashboardPage';
+import { TicketsPage } from './TicketsPage';
 
 vi.mock('../../../hooks/useApi');
 
@@ -19,7 +19,7 @@ const apiMock = {
   }
 };
 
-describe('TicketsDashboardPage', () => {
+describe('TicketsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseApi.mockImplementation(() => apiMock);
@@ -33,7 +33,7 @@ describe('TicketsDashboardPage', () => {
   it('fetches all tickets by default with create_date desc', async () => {
     render(
       <MemoryRouter>
-        <TicketsDashboardPage />
+        <TicketsPage />
       </MemoryRouter>
     );
 
@@ -50,7 +50,7 @@ describe('TicketsDashboardPage', () => {
   it('renders only Tickets in the administrative tabs', async () => {
     const { getByRole, queryByRole } = render(
       <MemoryRouter>
-        <TicketsDashboardPage />
+        <TicketsPage />
       </MemoryRouter>
     );
 
@@ -66,7 +66,7 @@ describe('TicketsDashboardPage', () => {
   it('changes page and requests paginated data', async () => {
     const { findByLabelText } = render(
       <MemoryRouter>
-        <TicketsDashboardPage />
+        <TicketsPage />
       </MemoryRouter>
     );
 
@@ -86,7 +86,7 @@ describe('TicketsDashboardPage', () => {
   it('renders empty state message', async () => {
     const { getByTestId } = render(
       <MemoryRouter>
-        <TicketsDashboardPage />
+        <TicketsPage />
       </MemoryRouter>
     );
 

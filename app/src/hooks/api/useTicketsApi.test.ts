@@ -1,5 +1,6 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
+import { ITicketCommentLog, ITicketStatusLog } from 'interfaces/useTicketsApi.interface';
 import { useTicketsApi } from './useTicketsApi';
 
 describe('useTicketsApi', () => {
@@ -27,7 +28,7 @@ describe('useTicketsApi', () => {
   });
 
   it('getTicket returns a single ticket', async () => {
-    const status_log = [
+    const status_log: ITicketStatusLog[] = [
       {
         ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
         ticket_id: '11111111-1111-1111-1111-111111111111',
@@ -36,7 +37,7 @@ describe('useTicketsApi', () => {
         status: 'open'
       }
     ];
-    const comment_log = [];
+    const comment_log: ITicketCommentLog[] = [];
 
     const ticket = {
       ticket_id: '11111111-1111-1111-1111-111111111111',

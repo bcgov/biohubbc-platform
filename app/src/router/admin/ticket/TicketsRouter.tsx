@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
 import { TicketDetailPage } from 'features/admin/tickets/TicketDetailPage';
-import { TicketsDashboardPage } from 'features/admin/tickets/TicketsDashboardPage';
+import { TicketsPage } from 'features/admin/tickets/TicketsPage';
 
 /**
  * Router for all `/tickets/` pages.
@@ -16,7 +16,7 @@ export const TicketsRouter = () => {
         element={
           <>
             <PageTitle title="Administrative" description="Browse and manage administrative tickets" />
-            <TicketsDashboardPage />
+            <TicketsPage />
           </>
         }
       />

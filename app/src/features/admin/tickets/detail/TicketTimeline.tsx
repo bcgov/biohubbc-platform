@@ -3,7 +3,6 @@ import Box from '@mui/material/Box';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import dayjs from 'dayjs';
 import { TICKET_TIMELINE_ICONS } from 'constants/icon';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { CustomTimeline, ICustomTimelineItem } from 'components/timeline';
@@ -44,7 +43,7 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
           <TicketCommentTimelineEvent
             author={item.user_identifier || 'Unknown user'}
             comment={item.comment ?? ''}
-            dateLabel={dayjs(item.create_date).format('MMMM D, YYYY')}
+            dateLabel={getRelativeTimeLabel(item.create_date, { maxRelativeDays: 30, absoluteFormat: 'MMM D, YYYY' }) ?? ''}
           />
         )
       };
