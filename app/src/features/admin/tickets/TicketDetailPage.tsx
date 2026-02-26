@@ -1,15 +1,17 @@
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
+import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { ITicketWithHistory, IUpdateTicketRequest, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
+import { ITicketWithHistory, IUpdateTicketRequest, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { EditTicketDialog } from './components/dialog/EditTicketDialog';
+import { TicketTeamDialog } from './components/dialog/TicketTeamDialog';
 import { TicketComment } from './detail/TicketComment';
 import { TicketFooter } from './detail/TicketFooter';
 import { TicketHeader } from './detail/TicketHeader';
@@ -34,6 +36,7 @@ export const TicketDetailPage = () => {
   const [error, setError] = useState<string | undefined>();
   const [editTicketError, setEditTicketError] = useState<string | undefined>();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!ticketId) {
@@ -111,28 +114,36 @@ export const TicketDetailPage = () => {
       <TicketHeader ticket={ticket} onEdit={() => setIsEditDialogOpen(true)} />
 
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 280px' },
-            gap: 3,
-            alignItems: 'start'
-          }}>
-          <Stack spacing={4}>
-            {error && <Alert severity="error">{error}</Alert>}
+        <Paper elevation={1} sx={{ p: { xs: 2, md: 3 } }}>
+          <Stack
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', lg: 'row' },
+              gap: 10,
+              alignItems: 'start'
+            }}>
+            <Stack spacing={4} sx={{ flex: 1, minWidth: 0 }}>
+              {error && <Alert severity="error">{error}</Alert>}
 
-            <TicketTimeline history={ticket?.history ?? []} isLoading={ticketLoader.isLoading} />
-            <TicketComment comment={comment} setComment={setComment} />
-            <TicketFooter
-              comment={comment}
-              isSaving={isSavingStatus}
-              status={ticket?.status}
-              onUpdateStatus={handleUpdateStatus}
-            />
+              <TicketTimeline history={ticket?.history ?? []} isLoading={ticketLoader.isLoading} />
+              <TicketComment comment={comment} setComment={setComment} />
+              <TicketFooter
+                comment={comment}
+                isSaving={isSavingStatus}
+                status={ticket?.status}
+                onUpdateStatus={handleUpdateStatus}
+              />
+            </Stack>
+
+            <Box sx={{ width: { xs: '100%', lg: 280 }, flexShrink: 0 }}>
+              <TicketSidebar
+                isLoading={teamLoader.isLoading}
+                team={ticketTeam}
+                onAddTeam={() => setIsTeamDialogOpen(true)}
+              />
+            </Box>
           </Stack>
-
-          <TicketSidebar isLoading={teamLoader.isLoading} team={ticketTeam} />
-        </Box>
+        </Paper>
       </Container>
 
       {isEditDialogOpen && ticket ? (
@@ -148,6 +159,8 @@ export const TicketDetailPage = () => {
           onSave={handleEditTicket}
         />
       ) : null}
+
+      <TicketTeamDialog open={isTeamDialogOpen} onClose={() => setIsTeamDialogOpen(false)} />
     </>
   );
 };

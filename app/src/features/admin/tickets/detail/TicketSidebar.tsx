@@ -1,13 +1,15 @@
-import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
+import { TicketSidebarSection } from './TicketSidebarSection';
 
 interface ITicketSidebarProps {
   isLoading: boolean;
   team?: ITeamWithMembers;
+  onAddTeam?: () => void;
 }
 
 /**
@@ -17,43 +19,33 @@ interface ITicketSidebarProps {
  * @return {*}
  */
 export const TicketSidebar = (props: ITicketSidebarProps) => {
-  const { isLoading, team } = props;
+  const { isLoading, team, onAddTeam } = props;
 
   return (
-    <Box
-      sx={{
-        bgcolor: 'transparent',
-        borderTop: 1,
-        borderBottom: 1,
-        borderColor: 'divider'
-      }}>
-      <Box sx={{ py: 2.5 }}>
-        <Typography component="h3" sx={{ fontWeight: 700 }}>
-          Team
-        </Typography>
-      </Box>
-      <Divider />
-      <Box sx={{ py: 2.5 }}>
-        {isLoading ? (
-          <Stack spacing={1}>
-            <Skeleton variant="text" width="75%" />
-            <Skeleton variant="text" width="60%" />
-          </Stack>
-        ) : (
+    <Stack spacing={2}>
+      <TicketSidebarSection label="Team" onAdd={onAddTeam}>
+        <LoadingGuard
+          isLoading={isLoading}
+          isLoadingFallback={
+            <Stack spacing={1}>
+              <Skeleton variant="text" width="75%" />
+              <Skeleton variant="text" width="60%" />
+            </Stack>
+          }>
           <Stack spacing={0.75}>
             {(team?.members ?? []).map((member) => (
               <Typography key={member.team_member_id} variant="body2">
                 {member.user_identifier}
               </Typography>
             ))}
-            {!team?.members?.length && (
-              <Typography variant="body2">
-                No team members
-              </Typography>
-            )}
+            {!team?.members?.length && <Typography variant="body2">No team members</Typography>}
           </Stack>
-        )}
-      </Box>
-    </Box>
+        </LoadingGuard>
+      </TicketSidebarSection>
+      <Divider />
+      <TicketSidebarSection label="Data Requests" />
+      <Divider />
+      <TicketSidebarSection label="Uploads" />
+    </Stack>
   );
 };

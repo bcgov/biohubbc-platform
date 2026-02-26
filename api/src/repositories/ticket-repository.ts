@@ -262,7 +262,7 @@ export class TicketRepository extends BaseRepository {
   }
 
   /**
-   * Get ticket status history entries ordered newest first.
+   * Get ticket status history entries ordered oldest first.
    *
    * @param {string} ticketId - Ticket UUID.
    * @return {Promise<TicketStatusHistory[]>} Status history rows.
@@ -277,7 +277,7 @@ export class TicketRepository extends BaseRepository {
         status
       FROM ticket_status_history
       WHERE ticket_id = ${ticketId}
-      ORDER BY create_date DESC;
+      ORDER BY create_date ASC;
     `;
 
     const response = await this.connection.sql(sqlStatement, TicketStatusHistory);
