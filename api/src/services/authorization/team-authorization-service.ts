@@ -34,11 +34,6 @@ export class TeamAuthorizationService extends DBService {
         return record !== null;
       }
 
-      case 'policy': {
-        const record = await this.teamAuthorizationRepository.findTeamMembershipByPolicy(systemUserId, entity.policyId);
-        return record !== null;
-      }
-
       case 'data_request': {
         const record = await this.teamAuthorizationRepository.findTeamMembershipByDataRequest(
           systemUserId,
@@ -69,8 +64,9 @@ export class TeamAuthorizationService extends DBService {
         );
         return record !== null;
       }
-    }
 
-    return false;
+      default:
+        return false;
+    }
   }
 }

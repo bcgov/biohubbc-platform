@@ -44,17 +44,13 @@ export type TeamAuthorizationEntity =
       teamId: string;
     }
   | {
-      entity: 'policy';
-      policyId: string;
-    }
-  | {
       entity: 'data_request';
       dataRequestId: string;
     }
   | {
       entity: 'submission_feature';
       submissionFeatureId: number;
-      submissionId?: number;
+      submissionId: number;
     };
 
 export type AuthorizeByTeam = TeamAuthorizationEntity & {

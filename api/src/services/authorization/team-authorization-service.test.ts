@@ -35,30 +35,6 @@ describe('TeamAuthorizationService', () => {
       });
     });
 
-    describe('entity: policy', () => {
-      it('returns true when the user has team access to the policy', async () => {
-        const mockConnection = getMockDBConnection();
-        sinon
-          .stub(TeamAuthorizationRepository.prototype, 'findTeamMembershipByPolicy')
-          .resolves({ team_policy_id: 'tp-1' });
-
-        const service = new TeamAuthorizationService(mockConnection);
-        const result = await service.isUserAuthorizedForTeamEntity(1, { entity: 'policy', policyId: 'policy-1' });
-
-        expect(result).to.be.true;
-      });
-
-      it('returns false when the user does not have team access to the policy', async () => {
-        const mockConnection = getMockDBConnection();
-        sinon.stub(TeamAuthorizationRepository.prototype, 'findTeamMembershipByPolicy').resolves(null);
-
-        const service = new TeamAuthorizationService(mockConnection);
-        const result = await service.isUserAuthorizedForTeamEntity(1, { entity: 'policy', policyId: 'policy-1' });
-
-        expect(result).to.be.false;
-      });
-    });
-
     describe('entity: data_request', () => {
       it('returns true when the user has team access to the data request', async () => {
         const mockConnection = getMockDBConnection();
