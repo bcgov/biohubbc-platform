@@ -1,19 +1,23 @@
-import { Box, Divider, Paper, Stack } from '@mui/material';
+import { Box, Divider, Paper } from '@mui/material';
 import { PageHeader } from 'components/header/PageHeader';
 import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
-import { useCodesContext } from 'hooks/useContext';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { APIError } from 'hooks/api/useAxios';
+import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { normalizeQueryParam } from 'utils/query-param';
 import { SearchResultOptions } from './content/option/SearchResultOptions';
 import { SearchResultToolbar } from './content/toolbar/SearchResultToolbar';
 import { SearchResultHeader } from './header/SearchResultHeader';
 import { useSearchResults } from './hooks/useSearchResults';
+import { ResultPageContainer } from './layout/ResultPageContainer';
+import { DownloadSidebar } from './sidebar/download/DownloadSidebar';
+import { SearchSidebar } from './sidebar/search/SearchSidebar';
 import {
   OmitListedRecommendedState,
   RecommendedFiltersInput,
   useRecommendedFilters
-} from './sidebar/hooks/useRecommendedFilters';
-import { SearchSidebar } from './sidebar/SearchSidebar';
+} from './sidebar/search/hooks/useRecommendedFilters';
 
 export enum SEARCH_RESULT_OPTION_VIEW {
   LIST = 'list',
@@ -21,77 +25,70 @@ export enum SEARCH_RESULT_OPTION_VIEW {
 }
 
 export const SearchResultPage = () => {
+  const navigate = useNavigate();
   const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination } = useSearchResults();
   const { codesDataLoader } = useCodesContext();
-
-  const hasBeenCalled = useRef(false);
+  const { features, pagination: cartPagination, addToCart, checkout } = useCartContext();
+  const dialogContext = useDialogContext();
 
   const [view, setView] = useState<SEARCH_RESULT_OPTION_VIEW>(SEARCH_RESULT_OPTION_VIEW.LIST);
   const { recommended, handleRefresh: refreshRecommended } = useRecommendedFilters();
 
-  // Track omitListed recommended items (per session only)
-  const [omitListedRecommended, setOmitListedRecommended] = useState<OmitListedRecommendedState>({
-    species: new Set(),
-    feature_types: new Set(),
-    properties: new Set()
-  });
+  /**
+   * --------------------
+   * Derived data
+   * --------------------
+   */
+  const featureTypes = useMemo(() => {
+    const types = codesDataLoader.data?.feature_type_with_properties ?? [];
 
-  const tabs = useMemo(
-    () =>
-      codesDataLoader.data?.feature_type_with_properties.map((type) => ({
-        value: type.feature_type.feature_type_name,
-        label: type.feature_type.feature_type_name
-      })) ?? [],
-    [codesDataLoader.data]
-  );
-
-  const featureTypeOptions = useMemo(
-    () =>
-      tabs.map((tab) => ({
-        label: tab.label ?? tab.value,
-        value: tab.value
+    return {
+      tabs: types.map((t) => ({
+        value: t.feature_type.feature_type_name,
+        label: t.feature_type.feature_type_name
       })),
-    [tabs]
-  );
+      options: types.map((t) => ({
+        label: t.feature_type.feature_type_name,
+        value: t.feature_type.feature_type_name
+      })),
+      allNames: types.map((t) => t.feature_type.feature_type_display_name)
+    };
+  }, [codesDataLoader.data]);
 
-  // Extract primitive values for dependency tracking
-  const searchQuery = useMemo(() => searchParams.get(URL_PARAMS.SEARCH_QUERY) || undefined, [searchParams]);
-  const featureType = useMemo(() => searchParams.get(URL_PARAMS.FEATURE_TYPE) || undefined, [searchParams]);
+  const searchQuery = searchParams.get(URL_PARAMS.SEARCH_QUERY) || undefined;
+  const featureType = searchParams.get(URL_PARAMS.FEATURE_TYPE) || undefined;
   const allFeatureTypes = useMemo(
     () =>
       codesDataLoader.data?.feature_type_with_properties.map((ft) => ft.feature_type.feature_type_display_name) ?? [],
     [codesDataLoader.data]
   );
 
-  // Build omitList from selected filters + manually omitListed items
-  const computedOmitListedRecommended = useMemo(() => {
-    const omitList: OmitListedRecommendedState = {
+  /**
+   * --------------------
+   * Recommended filters
+   * --------------------
+   */
+  const [omitListedRecommended, setOmitListedRecommended] = useState<OmitListedRecommendedState>({
+    species: new Set(),
+    feature_types: new Set(),
+    properties: new Set()
+  });
+
+  const computedOmitList = useMemo<OmitListedRecommendedState>(() => {
+    const omit: OmitListedRecommendedState = {
       species: new Set(omitListedRecommended.species),
       feature_types: new Set(omitListedRecommended.feature_types),
       properties: new Set(omitListedRecommended.properties)
     };
 
-    // Add currently selected filters to the omitList
-    if (searchParams.has(URL_PARAMS.SPECIES)) {
-      const speciesValues = searchParams.getAll(URL_PARAMS.SPECIES);
-      speciesValues.forEach((val) => omitList.species.add(normalizeQueryParam(val)));
-    }
+    searchParams.getAll(URL_PARAMS.SPECIES).forEach((v) => omit.species.add(normalizeQueryParam(v)));
+    searchParams.getAll(URL_PARAMS.FEATURE_TYPE).forEach((v) => omit.feature_types.add(normalizeQueryParam(v)));
 
-    if (searchParams.has(URL_PARAMS.FEATURE_TYPE)) {
-      const featureTypeValues = searchParams.getAll(URL_PARAMS.FEATURE_TYPE);
-      featureTypeValues.forEach((val) => omitList.feature_types.add(normalizeQueryParam(val)));
-    }
-
-    // Note: Properties are filtered by feature type, so we don't omitList them globally
-    // They're handled per feature type in the sidebar
-
-    return omitList;
+    return omit;
   }, [omitListedRecommended, searchParams]);
 
-  // Refresh recommended filters when search query or filters change
   useEffect(() => {
-    // Skip if feature types haven't loaded yet
-    if (allFeatureTypes.length === 0) {
+    if (!featureTypes.allNames.length) {
       return;
     }
 
@@ -109,18 +106,37 @@ export const SearchResultPage = () => {
         pagination: { page: 1, limit: 2 }
       }
     };
+
     refreshRecommended(recommendedFiltersInput);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, featureType, allFeatureTypes]);
 
   /**
-   * REMOVE RECOMMENDED: omitList it, deselect if selected, and trigger search
+   * --------------------
+   * Query param helpers
+   * --------------------
    */
-  const handleOmitListRecommended = useCallback(
-    (type: keyof OmitListedRecommendedState, id: string | number) => {
-      const normalizedId = normalizeQueryParam(id);
+  const handleFilterChange = useCallback(
+    ({ param, value, replace }: { param: UrlParamKey; value: string; replace?: boolean }) => {
+      const normalizedValue = normalizeQueryParam(value);
+      const currentValues = searchParams.getAll(param).map((val) => normalizeQueryParam(val));
 
-      // Map type to URL param
+      // Check if the value is already selected
+      if (currentValues.includes(normalizedValue)) {
+        // If it's selected, remove it from the URL (deselect it)
+        removeSearchParam(param, normalizedValue);
+      } else {
+        // If it's not selected, add it to the URL (select it)
+        setSearchParams({ [param]: normalizedValue }, replace);
+      }
+    },
+    [setSearchParams, removeSearchParam, searchParams]
+  );
+
+  const omitRecommended = useCallback(
+    (type: keyof OmitListedRecommendedState, id: string | number) => {
+      const normalized = normalizeQueryParam(id);
+
       const paramMap: Record<keyof OmitListedRecommendedState, UrlParamKey> = {
         species: URL_PARAMS.SPECIES,
         feature_types: URL_PARAMS.FEATURE_TYPE,
@@ -128,158 +144,116 @@ export const SearchResultPage = () => {
       };
 
       const param = paramMap[type];
-
-      // Deselect if currently selected
-      if (param && searchParams.has(param, normalizedId)) {
-        removeSearchParam(param, normalizedId);
+      if (searchParams.has(param, normalized)) {
+        removeSearchParam(param, normalized);
       }
 
-      // OmitList it (store normalized value)
       setOmitListedRecommended((prev) => ({
         ...prev,
-        [type]: new Set([...prev[type], normalizedId])
+        [type]: new Set(prev[type]).add(normalized)
       }));
     },
     [searchParams, removeSearchParam]
   );
 
   /**
-   * UPDATE FILTERS: select/deselect options from query params
+   * --------------------
+   * Sorting
+   * --------------------
    */
-  const handleFilterChange = useCallback(
-    ({ param, value, replace }: { param: UrlParamKey; value: string; replace?: boolean }) => {
-      const normalizedValue = normalizeQueryParam(value);
-      hasBeenCalled.current = true;
-
-      if (replace === undefined) {
-        // DESELECT: remove from query params
-        removeSearchParam(param, normalizedValue);
-      } else {
-        // SELECT: add to query params (or replace if replace=true)
-        setSearchParams({ [param]: normalizedValue }, replace);
-      }
-    },
-    [setSearchParams, removeSearchParam]
-  );
-
-  // Sort handling
-  const sortOptionsBase = useMemo(
-    () => [
-      { label: 'Date', value: 'create_date' },
-      { label: 'Name', value: 'feature_type_name' },
-      { label: 'Relevance', value: 'relevancy_score' }
-    ],
-    []
-  );
-
   const activeSort = pagination?.sort ?? 'relevancy_score';
   const sortOrder = pagination?.order ?? 'desc';
 
-  /**
-   * Handle sort option changes
-   */
+  const sortOptions = useMemo(
+    () => [
+      { label: 'Date', value: 'create_date', direction: activeSort === 'create_date' ? sortOrder : 'desc' },
+      { label: 'Name', value: 'feature_type_name', direction: activeSort === 'feature_type_name' ? sortOrder : 'desc' },
+      { label: 'Relevance', value: 'relevancy_score', direction: activeSort === 'relevancy_score' ? sortOrder : 'desc' }
+    ],
+    [activeSort, sortOrder]
+  );
+
   const handleSortChange = useCallback(
     (sort: string) => {
       if (sort === activeSort) {
         setSearchParams({ [URL_PARAMS.ORDER]: sortOrder === 'asc' ? 'desc' : 'asc' }, true);
       } else {
-        setSearchParams(
-          {
-            [URL_PARAMS.SORT]: sort,
-            [URL_PARAMS.ORDER]: 'desc'
-          },
-          true
-        );
+        setSearchParams({ [URL_PARAMS.SORT]: sort, [URL_PARAMS.ORDER]: 'desc' }, true);
       }
     },
     [activeSort, sortOrder, setSearchParams]
   );
 
-  const sortOptions = useMemo(
-    () =>
-      sortOptionsBase.map((opt) => ({
-        ...opt,
-        direction: opt.value === activeSort ? sortOrder : 'desc'
-      })),
-    [activeSort, sortOrder, sortOptionsBase]
-  );
+  /**
+   * --------------------
+   * Add to cart logic
+   * --------------------
+   */
+  const handleAddAllToCart = useCallback(async () => {
+    try {
+      await addToCart(rows);
+    } catch (error) {
+      dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
+    }
+  }, [rows, addToCart, dialogContext]);
+
+  const handleCheckout = useCallback(async () => {
+    try {
+      const download = await checkout();
+
+      if (download?.download_id) {
+        // Navigate to the download
+        navigate(`/download/${download.download_id}`);
+      }
+    } catch (error) {
+      dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
+    }
+  }, [checkout, dialogContext, navigate]);
 
   return (
-    <Stack direction="row" flex="1 1 100%" height="100%" overflow="hidden">
-      {/* Sidebar */}
-      <Paper
-        sx={{
-          width: 300,
-          flexShrink: 0,
-          position: 'sticky',
-          top: 0,
-          height: '100%',
-          p: 2,
-          display: 'flex',
-          flexDirection: 'column',
-          borderRight: '1px solid',
-          borderColor: 'divider',
-          boxShadow: '4px 0 6px -2px rgba(0,0,0,0.025)'
-        }}>
+    <ResultPageContainer
+      leftSidebar={
         <SearchSidebar
           recommended={recommended}
-          featureTypeOptions={featureTypeOptions}
+          featureTypeOptions={featureTypes.options}
           queryParams={searchParams}
-          omitListedRecommended={computedOmitListedRecommended}
+          omitListedRecommended={computedOmitList}
           onFilterChange={handleFilterChange}
-          onOmitListRecommended={handleOmitListRecommended}
+          onOmitListRecommended={omitRecommended}
         />
-      </Paper>
+      }
+      rightSidebar={
+        <DownloadSidebar features={features} itemCount={cartPagination?.total ?? 0} onDownload={handleCheckout} />
+      }>
+      <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+        <PageHeader>
+          <SearchResultHeader
+            searchTerm={searchQuery ?? ''}
+            onSubmit={(value) => handleFilterChange({ param: URL_PARAMS.SEARCH_QUERY, value, replace: true })}
+            onClear={() => removeSearchParam(URL_PARAMS.SEARCH_QUERY)}
+            isSubmitting={isLoading}
+          />
+        </PageHeader>
 
-      {/* Main content */}
-      <Box flex="1 1 auto" display="flex" flexDirection="column" overflow="hidden">
-        {/* Sticky headers */}
-        <Box flexShrink={0}>
-          <PageHeader>
-            <SearchResultHeader
-              searchTerm={searchParams.get(URL_PARAMS.SEARCH_QUERY) ?? ''}
-              onSubmit={(searchTerm) =>
-                handleFilterChange({
-                  param: URL_PARAMS.SEARCH_QUERY,
-                  value: searchTerm,
-                  replace: true
-                })
-              }
-              onClear={() => removeSearchParam(URL_PARAMS.SEARCH_QUERY)}
-              isSubmitting={isLoading}
+        <Paper sx={{ borderRadius: 0, flex: 1, display: 'flex', flexDirection: 'column', m: 1, minHeight: 0 }}>
+          <Box sx={{ px: 2, py: 1 }}>
+            <SearchResultToolbar
+              view={view}
+              onViewChange={setView}
+              sortOptions={sortOptions}
+              activeSort={activeSort}
+              onSortChange={handleSortChange}
+              handleAddAllToCart={handleAddAllToCart}
             />
-          </PageHeader>
-        </Box>
+          </Box>
 
-        {/* Scrollable content */}
-        <Box flex="1 1 auto" overflow="auto" p={1}>
-          <Paper
-            sx={{
-              boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column'
-            }}>
-            {/* Toolbar */}
-            <Box px={2} py={1} flexShrink={0}>
-              <SearchResultToolbar
-                view={view}
-                onViewChange={setView}
-                sortOptions={sortOptions}
-                activeSort={activeSort}
-                onSortChange={handleSortChange}
-              />
-            </Box>
+          <Divider />
 
-            <Divider />
-
-            {/* Scrollable results */}
-            <Box flex="1 1 auto" overflow="auto">
-              <SearchResultOptions rows={rows} isLoading={isLoading && !hasBeenCalled} view={view} />
-            </Box>
-          </Paper>
-        </Box>
+          <Box sx={{ flex: 1, overflow: 'auto' }}>
+            <SearchResultOptions rows={rows} isLoading={isLoading} view={view} />
+          </Box>
+        </Paper>
       </Box>
-    </Stack>
+    </ResultPageContainer>
   );
 };

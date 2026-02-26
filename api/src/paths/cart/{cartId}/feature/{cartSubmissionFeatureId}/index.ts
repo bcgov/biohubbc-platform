@@ -1,10 +1,13 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../../../database/db';
+import { CartFeaturesResponseSchema } from '../../../../../openapi/schemas/cart';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema } from '../../../../../openapi/schemas/pagination';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
 import { CartSubmissionFeatureService } from '../../../../../services/cart-submission-feature-service';
 import { getLogger } from '../../../../../utils/logger';
+import { makePaginationOptionsFromRequest } from '../../../../../utils/pagination';
 
 const defaultLog = getLogger('paths/cart/{cartId}/feature/{cartSubmissionFeatureId}');
 
@@ -43,11 +46,17 @@ DELETE.apiDoc = {
       required: true,
       schema: { type: 'string', format: 'uuid' },
       description: 'ID of the submission feature to remove from the cart'
-    }
+    },
+    ...paginationRequestQueryParamSchema
   ],
   responses: {
     200: {
-      description: 'Cart feature deleted successfully'
+      description: 'Cart feature deleted successfully',
+      content: {
+        'application/json': {
+          schema: CartFeaturesResponseSchema
+        }
+      }
     },
     ...defaultErrorResponses
   }
@@ -68,14 +77,16 @@ export function deleteCartSubmissionFeature(): RequestHandler {
 
       const cartId = req.params.cartId;
       const cartSubmissionFeatureId = req.params.cartSubmissionFeatureId;
+      const pagination = makePaginationOptionsFromRequest(req);
 
       const cartSubmissionFeatureService = new CartSubmissionFeatureService(connection);
 
       await cartSubmissionFeatureService.removeSubmissionFeaturesFromCart(cartId, [cartSubmissionFeatureId]);
+      const response = await cartSubmissionFeatureService.getPaginatedCartFeaturesResponse(cartId, pagination);
 
       await connection.commit();
 
-      res.sendStatus(200);
+      return res.status(200).json(response);
     } catch (error) {
       defaultLog.error({ label: 'deleteCartSubmissionFeature', message: 'Error deleting cart feature', error });
       await connection.rollback();

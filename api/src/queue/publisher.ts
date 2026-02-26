@@ -1,8 +1,11 @@
 import { IDBConnection } from '../database/db';
+import { DownloadStatusEnum } from '../models/download-status';
+import { DownloadService } from '../services/download/download-service';
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
 import { IMalwareScanJobData } from './jobs/malware-scan-job';
+import { IProcessDownloadJobData } from './jobs/process-download-job';
 import { IProcessSubmissionFeaturesJobData } from './jobs/process-submission-features-job';
 import { getPgBoss } from './pg-boss-service';
 
@@ -61,6 +64,18 @@ const MALWARE_SCAN_OPTIONS: IPublishOptions = {
 };
 
 /**
+ * Options for process download jobs.
+ * Generous timeout — large downloads stream millions of rows via cursor and may take significant time.
+ * Includes S3 upload which may have transient failures.
+ */
+const PROCESS_DOWNLOAD_OPTIONS: IPublishOptions = {
+  retryLimit: 3,
+  retryDelay: 60,
+  retryBackoff: true,
+  expireInSeconds: 60 * 60 * 4 // 4 hours
+};
+
+/**
  * Publish a process submission features job to the queue.
  *
  * Queues slow operations (indexing, regions) for submission feature processing.
@@ -88,8 +103,8 @@ export const publishProcessSubmissionFeaturesJob = async (
     );
 
     if (existingValidation) {
-      // Only allow retry if status is 'failed'
-      if (existingValidation.status !== 'failed') {
+      // Only allow retry if status is 'failed' or 'invalid'
+      if (existingValidation.status !== 'failed' && existingValidation.status !== 'invalid') {
         defaultLog.warn({
           label: 'publishProcessSubmissionFeaturesJob',
           message: 'Blocked: validation record already exists',
@@ -211,6 +226,97 @@ export const publishMalwareScanJob = async (
       label: 'publishMalwareScanJob',
       message: 'Failed to publish job',
       artifactSecurityId: data.artifactSecurityId,
+      error
+    });
+
+    return { status: 'error', message: errorMessage };
+  }
+};
+
+/**
+ * Publish a process download job to the queue.
+ *
+ * Queues async packaging of selected features into a downloadable zip file.
+ * Updates the download record with the job_id for tracking.
+ *
+ * @param {IDBConnection} connection Database connection for download record updates
+ * @param {IProcessDownloadJobData} data Job data containing downloadId
+ * @param {IPublishOptions} [options={}] Job options
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
+ */
+export const publishProcessDownloadJob = async (
+  connection: IDBConnection,
+  data: IProcessDownloadJobData,
+  options: IPublishOptions = {}
+): Promise<PublishJobResult> => {
+  try {
+    const downloadService = new DownloadService(connection);
+
+    // Check if download exists
+    const download = await downloadService.findDownloadById(data.downloadId);
+
+    if (!download) {
+      return { status: 'error', message: 'Download not found' };
+    }
+
+    // Check if download is already being processed or completed
+    if (download.download_status !== DownloadStatusEnum.PENDING) {
+      defaultLog.warn({
+        label: 'publishProcessDownloadJob',
+        message: 'Download is not in pending status',
+        downloadId: data.downloadId,
+        currentStatus: download.download_status
+      });
+
+      return { status: 'duplicate', message: 'Job already exists for this download' };
+    }
+
+    const boss = getPgBoss();
+    const mergedOptions = { ...PROCESS_DOWNLOAD_OPTIONS, ...options };
+
+    await boss.createQueue(JobQueues.PROCESS_DOWNLOAD);
+
+    // Insert the job in the same transaction as the business data via the `db` option.
+    // This prevents ghost jobs (job exists but data rolled back) and lost jobs (data committed but job never sent).
+    const db = {
+      executeSql: async (text: string, values: any[]) => {
+        const result = await connection.query(text, values);
+        return { rows: result.rows, rowCount: result.rowCount };
+      }
+    };
+
+    // Use singletonKey to prevent duplicate concurrent jobs for the same download
+    const jobId = await boss.send(JobQueues.PROCESS_DOWNLOAD, data, {
+      ...mergedOptions,
+      singletonKey: `download-${data.downloadId}`,
+      db
+    });
+
+    if (jobId) {
+      defaultLog.info({
+        label: 'publishProcessDownloadJob',
+        message: 'Process download job published',
+        jobId,
+        downloadId: data.downloadId
+      });
+
+      return { status: 'published', jobId };
+    }
+
+    defaultLog.warn({
+      label: 'publishProcessDownloadJob',
+      message: 'Job not published (duplicate or throttled)',
+      downloadId: data.downloadId
+    });
+
+    return { status: 'duplicate', message: 'Job already exists for this download' };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    defaultLog.error({
+      label: 'publishProcessDownloadJob',
+      message: 'Failed to publish job',
+      downloadId: data.downloadId,
       error
     });
 

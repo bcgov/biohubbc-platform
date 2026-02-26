@@ -15,9 +15,6 @@ database:
 database-setup:
   enabled: true
 
-clamav:
-  enabled: false  # PR previews share the DEV environment's ClamAV instance
-
 api:
   enabled: true
 
@@ -104,12 +101,8 @@ biohub-platform-db-setup:
   # App configuration
   app:
     nodeEnv: development
-
-# Values passed to biohub-platform-clamav subchart
-# NOTE: ClamAV is DISABLED for PR previews to save resources.
-# PR previews share the DEV environment's ClamAV instance
-biohub-platform-clamav:
-  enabled: false
+    database:
+      useCrunchy: false # PRs use legacy dbHost secret
 
 # Values passed to biohub-platform-api subchart
 biohub-platform-api:
@@ -125,13 +118,9 @@ biohub-platform-api:
     nodeEnv: development
     nodeOptions: --max_old_space_size=2250 # 75% of memoryLimit (bytes)
     # appHost will be dynamically set: "biohub-platform-app-1234-a0ec71-dev.apps.silver.devops.gov.bc.ca"
-
-    # ClamAV - PR previews share the DEV environment's ClamAV instance
-    clamav:
-      enabled: true
-      host: clamav  # Use the shared DEV ClamAV service
-      port: 3310
-
+    database:
+      useCrunchy: false # PRs use legacy dbHost secret
+    
     # Keycloak
     keycloak:
       host: "https://dev.loginproxy.gov.bc.ca/auth"
@@ -178,6 +167,8 @@ biohub-platform-queue:
     nodeEnv: development
     nodeOptions: --max_old_space_size=512
     # objectStore.keyPrefix will be dynamically set: "local/1234/biohub"
+    database:
+      useCrunchy: false # PRs use legacy dbHost secret
 
     # Clamav
     clamav:

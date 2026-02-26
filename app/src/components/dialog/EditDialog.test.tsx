@@ -1,6 +1,6 @@
 import { fireEvent, waitFor } from '@testing-library/react';
 import EditDialog from 'components/dialog/EditDialog';
-import CustomTextField from 'components/fields/CustomTextField';
+import CustomTextFieldFormik from 'components/fields/CustomTextFieldFormik';
 import { useFormikContext } from 'formik';
 import { render } from 'test-helpers/test-utils';
 import yup from 'utils/YupSchema';
@@ -20,7 +20,7 @@ const SampleFormikForm = () => {
 
   return (
     <form onSubmit={handleSubmit}>
-      <CustomTextField name="testField" label="Test Field" other={{ multiline: true, required: true, rows: 4 }} />
+      <CustomTextFieldFormik name="testField" label="Test Field" multiline required rows={4} />
     </form>
   );
 };

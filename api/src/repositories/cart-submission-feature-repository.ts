@@ -37,10 +37,15 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
       w_valid_features AS (
         SELECT wf.submission_feature_id
         FROM w_features wf
-        LEFT JOIN submission_feature_security sfs 
-          ON sfs.submission_feature_id = wf.submission_feature_id
-        WHERE sfs.record_end_date IS NULL 
-           OR sfs.record_end_date > now()
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM submission_feature_security sfs
+          WHERE sfs.submission_feature_id = wf.submission_feature_id
+            AND (
+              sfs.record_end_date IS NULL
+              OR sfs.record_end_date > now()
+            )
+        )
       )
       INSERT INTO cart_submission_feature (cart_id, submission_feature_id)
       SELECT wc.cart_id, wvf.submission_feature_id
@@ -92,6 +97,28 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
   }
 
   /**
+   * Get all submission feature IDs in a cart (unpaginated).
+   * Used by checkout to copy cart contents to download_feature
+   * without fetching full feature metadata.
+   *
+   * @param {string} cartId - The ID of the cart
+   * @return {Promise<number[]>} - Array of submission feature IDs
+   * @memberof CartSubmissionFeatureRepository
+   */
+  async getCartSubmissionFeatureIds(cartId: string): Promise<number[]> {
+    const knex = getKnex();
+    const query = knex('cart_submission_feature as csf')
+      .join('cart as c', 'c.cart_id', 'csf.cart_id')
+      .where('csf.cart_id', cartId)
+      .andWhere('c.cart_status', CartStatus.ACTIVE)
+      .select('csf.submission_feature_id');
+
+    const response = await this.connection.knex(query);
+
+    return response.rows.map((row: { submission_feature_id: number }) => row.submission_feature_id);
+  }
+
+  /**
    * Get all submission features in an active cart with pagination.
    * Excludes secured features where the submission_feature_id is present in submission_feature_security.
    *
@@ -117,7 +144,7 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
         'sf.submission_id',
         'sf.feature_type_id',
         'ft.name as feature_type_name',
-        knex.raw('CASE WHEN sf_sec.submission_feature_id IS NOT NULL THEN TRUE ELSE FALSE END AS secured')
+        knex.raw('FALSE AS secured')
       )
       .from('submission_feature as sf')
       .leftJoin('secured_features as sf_sec', 'sf_sec.submission_feature_id', 'sf.submission_feature_id')

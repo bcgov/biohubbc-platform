@@ -1,4 +1,18 @@
 import { OpenAPIV3 } from 'openapi-types';
+import { paginationResponseSchema } from './pagination';
+
+export const CartFeatureIdsRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['features'],
+  additionalProperties: false,
+  properties: {
+    features: {
+      type: 'array',
+      items: { type: 'integer' },
+      description: 'List of submission feature IDs to add to the cart'
+    }
+  }
+};
 
 export const GetCartSubmissionFeaturesSchema: OpenAPIV3.SchemaObject = {
   type: 'array',
@@ -24,11 +38,11 @@ export const GetCartSubmissionFeaturesSchema: OpenAPIV3.SchemaObject = {
         description: 'Unique ID of the submission feature'
       },
       submission_id: {
-        type: 'number',
+        type: 'integer',
         description: 'ID of the submission this feature belongs to'
       },
       feature_type_id: {
-        type: 'number',
+        type: 'integer',
         description: 'ID of the feature type'
       },
       feature_type_name: {
@@ -43,12 +57,37 @@ export const GetCartSubmissionFeaturesSchema: OpenAPIV3.SchemaObject = {
   }
 };
 
-export const GetCartWithFeaturesSchema: OpenAPIV3.SchemaObject = {
+export const GetCartSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['cart_id', 'system_user_id', 'features'],
+  required: ['cart_id', 'system_user_id', 'cart_status'],
+  additionalProperties: false,
   properties: {
-    cart_id: { type: 'string' },
-    system_user_id: { type: 'number', nullable: true },
-    features: GetCartSubmissionFeaturesSchema
+    cart_id: { type: 'string', format: 'uuid' },
+    system_user_id: { type: 'integer', nullable: true },
+    cart_status: {
+      type: 'string',
+      enum: ['active', 'checked_out', 'expired', 'abandoned']
+    }
+  }
+};
+
+export const CartFeaturesResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['features', 'pagination'],
+  additionalProperties: false,
+  properties: {
+    features: GetCartSubmissionFeaturesSchema,
+    pagination: paginationResponseSchema
+  }
+};
+
+export const CartWithFeaturesResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['cart', 'features', 'pagination'],
+  additionalProperties: false,
+  properties: {
+    cart: GetCartSchema,
+    features: GetCartSubmissionFeaturesSchema,
+    pagination: paginationResponseSchema
   }
 };

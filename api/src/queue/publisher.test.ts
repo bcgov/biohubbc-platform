@@ -1,12 +1,14 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
+import { DownloadRecord } from '../models/download';
 import { SubmissionValidationRecord } from '../models/submission-validation';
+import { DownloadService } from '../services/download/download-service';
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getMockDBConnection } from '../__mocks__/db';
 import { JobQueues } from './jobs';
 import * as pgBossService from './pg-boss-service';
-import { publishMalwareScanJob, publishProcessSubmissionFeaturesJob } from './publisher';
+import { publishMalwareScanJob, publishProcessDownloadJob, publishProcessSubmissionFeaturesJob } from './publisher';
 
 describe('publisher', () => {
   afterEach(() => {
@@ -154,6 +156,49 @@ describe('publisher', () => {
       expect((result as { status: 'blocked'; existingStatus: string }).existingStatus).to.equal('pending');
     });
 
+    it('allows retry when validation record exists with invalid status', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('new-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      const mockInvalidValidationRecord: SubmissionValidationRecord = {
+        submission_validation_id: 1,
+        job_id: 'invalid-job-id',
+        status: 'invalid'
+      };
+      sinon
+        .stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId')
+        .resolves(mockInvalidValidationRecord);
+      sinon
+        .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
+        .resolves({ submission_validation_id: 2 });
+
+      const result = await publishProcessSubmissionFeaturesJob(mockConnection, { submissionId: 123 });
+
+      expect(result.status).to.equal('published');
+      expect((result as { status: 'published'; jobId: string }).jobId).to.equal('new-job-id');
+    });
+
+    it('returns blocked status when validation record exists with completed status', async () => {
+      const mockConnection = getMockDBConnection();
+
+      const mockCompletedRecord: SubmissionValidationRecord = {
+        submission_validation_id: 1,
+        job_id: 'completed-job-id',
+        status: 'completed'
+      };
+      sinon
+        .stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId')
+        .resolves(mockCompletedRecord);
+
+      const result = await publishProcessSubmissionFeaturesJob(mockConnection, { submissionId: 123 });
+
+      expect(result.status).to.equal('blocked');
+      expect((result as { status: 'blocked'; existingStatus: string }).existingStatus).to.equal('completed');
+    });
+
     it('allows retry when validation record exists with failed status', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('new-job-id');
@@ -200,7 +245,7 @@ describe('publisher', () => {
       expect((result as { status: 'published'; jobId: string }).jobId).to.equal('scan-job-id');
     });
 
-    it('uses malware scan options with 30 minute timeout', async () => {
+    it('uses malware scan options with 60 minute timeout', async () => {
       const sendStub = sinon.stub().resolves('scan-job-id');
       const createQueueStub = sinon.stub().resolves();
       const mockBoss = { send: sendStub, createQueue: createQueueStub };
@@ -249,6 +294,181 @@ describe('publisher', () => {
 
       const result = await publishMalwareScanJob({ artifactSecurityId: 'artifact-security-000' });
 
+      expect(result.status).to.equal('error');
+      expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
+    });
+  });
+
+  describe('publishProcessDownloadJob', () => {
+    const createMockDownload = (overrides: Partial<DownloadRecord> = {}): DownloadRecord => ({
+      download_id: 'aaaa0000-0000-0000-0000-000000000001',
+      system_user_id: null,
+      team_id: null,
+      data_request_id: null,
+      download_status: 'pending',
+      metadata: null,
+      started_at: null,
+      completed_at: null,
+      downloaded_at: null,
+      total_fragments: 1,
+      completed_fragments: 0,
+      estimated_total_size_bytes: null,
+      fragment_size_bytes: '524288000',
+      ...overrides
+    });
+
+    it('publishes job to pg-boss with correct queue and data', async () => {
+      // Verifies: Job is published to pg-boss with correct queue name and data payload
+
+      // Step 1: Setup mock pg-boss
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('download-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
+
+      // Step 2: Call publisher
+      const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
+      const result = await publishProcessDownloadJob(mockConnection, data);
+
+      // Step 3: Verify job was sent to correct queue with correct data
+      expect(createQueueStub.calledOnce).to.be.true;
+      expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD);
+      expect(sendStub.calledOnce).to.be.true;
+      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD);
+      expect(sendStub.firstCall.args[1]).to.deep.equal(data);
+      expect(result.status).to.equal('published');
+      expect((result as { status: 'published'; jobId: string }).jobId).to.equal('download-job-id');
+    });
+
+    it('passes db adapter for transactional job insert', async () => {
+      // Verifies: The db option wraps connection.query so the job row is inserted
+      // in the same transaction as the business data (atomic commit/rollback)
+
+      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 0 });
+      const mockConnection = getMockDBConnection({ query: queryStub });
+      const sendStub = sinon.stub().resolves('download-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
+
+      await publishProcessDownloadJob(mockConnection, {
+        downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+      });
+
+      // Verify db adapter is passed to boss.send
+      const options = sendStub.firstCall.args[2];
+      expect(options.db).to.exist;
+      expect(options.db.executeSql).to.be.a('function');
+
+      // Verify the adapter delegates to connection.query
+      await options.db.executeSql('SELECT 1', [42]);
+      expect(queryStub).to.have.been.calledOnceWith('SELECT 1', [42]);
+    });
+
+    it('returns duplicate when download is not in pending status', async () => {
+      // Verifies: Publisher returns duplicate status when download is already processing
+
+      // Step 1: Setup mock with download that is already processing
+      const mockConnection = getMockDBConnection();
+      sinon
+        .stub(DownloadService.prototype, 'findDownloadById')
+        .resolves(createMockDownload({ download_status: 'processing' }));
+
+      // Step 2: Call publisher
+      const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
+      const result = await publishProcessDownloadJob(mockConnection, data);
+
+      // Step 3: Verify duplicate status returned
+      expect(result.status).to.equal('duplicate');
+      expect((result as { status: 'duplicate'; message: string }).message).to.equal(
+        'Job already exists for this download'
+      );
+    });
+
+    it('returns error when download not found', async () => {
+      // Verifies: Publisher returns error status when download doesn't exist
+
+      // Step 1: Setup mock to return null (not found)
+      const mockConnection = getMockDBConnection();
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(null);
+
+      // Step 2: Call publisher
+      const data = { downloadId: 'aaaa0000-0000-0000-0000-000000000999' };
+      const result = await publishProcessDownloadJob(mockConnection, data);
+
+      // Step 3: Verify error status returned
+      expect(result.status).to.equal('error');
+      expect((result as { status: 'error'; message: string }).message).to.equal('Download not found');
+    });
+
+    it('uses singletonKey based on downloadId to prevent duplicates', async () => {
+      // Verifies: singletonKey is constructed from downloadId to prevent duplicate concurrent jobs
+
+      // Step 1: Setup mock pg-boss
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('download-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      sinon
+        .stub(DownloadService.prototype, 'findDownloadById')
+        .resolves(createMockDownload({ download_id: 'aaaa0000-0000-0000-0000-000000000456' }));
+
+      // Step 2: Call publisher
+      await publishProcessDownloadJob(mockConnection, {
+        downloadId: 'aaaa0000-0000-0000-0000-000000000456'
+      });
+
+      // Step 3: Verify singletonKey passed to pg-boss
+      const options = sendStub.firstCall.args[2];
+      expect(options.singletonKey).to.equal('download-aaaa0000-0000-0000-0000-000000000456');
+    });
+
+    it('returns duplicate status when send returns null (singleton conflict)', async () => {
+      // Verifies: When pg-boss rejects due to singleton conflict, returns duplicate status
+
+      // Step 1: Setup mock pg-boss to return null (singleton conflict)
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves(null);
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
+
+      // Step 2: Call publisher
+      const result = await publishProcessDownloadJob(mockConnection, {
+        downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+      });
+
+      // Step 3: Verify duplicate status
+      expect(result.status).to.equal('duplicate');
+      expect((result as { status: 'duplicate'; message: string }).message).to.equal(
+        'Job already exists for this download'
+      );
+    });
+
+    it('returns error status when pg-boss throws', async () => {
+      // Verifies: Exceptions from pg-boss are caught and returned as error status
+
+      // Step 1: Setup mock that throws
+      const mockConnection = getMockDBConnection();
+
+      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(createMockDownload());
+      sinon.stub(pgBossService, 'getPgBoss').throws(new Error('pg-boss not initialized'));
+
+      // Step 2: Call publisher
+      const result = await publishProcessDownloadJob(mockConnection, {
+        downloadId: 'aaaa0000-0000-0000-0000-000000000001'
+      });
+
+      // Step 3: Verify error status
       expect(result.status).to.equal('error');
       expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
     });

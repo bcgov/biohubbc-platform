@@ -1,4 +1,5 @@
 import z from 'zod';
+import { ApiPaginationResults } from '../zod-schema/pagination';
 
 export enum CartStatus {
   ACTIVE = 'active',
@@ -29,8 +30,27 @@ export type Cart = z.infer<typeof Cart>;
 export const CartWithFeatures = Cart.extend({ features: z.array(CartSubmissionFeature) });
 export type CartWithFeatures = z.infer<typeof CartWithFeatures>;
 
-export interface UpdateCart {
-  system_user_id?: number | null;
-  cart_status?: CartStatus;
-  record_end_date?: string | null;
-}
+export const UpdateCart = z.object({
+  system_user_id: z.number().nullable().optional(),
+  cart_status: z.nativeEnum(CartStatus).optional(),
+  record_end_date: z.string().nullable().optional(),
+  checkout_date: z.string().nullable().optional(),
+  checkout_user: z.number().nullable().optional()
+});
+
+export type UpdateCart = z.infer<typeof UpdateCart>;
+
+export const CartFeatureListResponse = z.object({
+  features: z.array(CartSubmissionFeature),
+  pagination: ApiPaginationResults
+});
+
+export type CartFeatureListResponse = z.infer<typeof CartFeatureListResponse>;
+
+export const CartWithFeaturesResponse = z.object({
+  cart: Cart,
+  features: z.array(CartSubmissionFeature),
+  pagination: ApiPaginationResults
+});
+
+export type CartWithFeaturesResponse = z.infer<typeof CartWithFeaturesResponse>;
