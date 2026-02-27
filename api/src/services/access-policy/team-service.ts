@@ -135,18 +135,6 @@ export class TeamService extends DBService {
   }
 
   /**
-   * Retrieve all active team IDs for a given system user.
-   *
-   * @param {number} systemUserId - The ID of the system user.
-   * @return {Promise<string[]>} - List of team IDs the user belongs to.
-   * @memberof TeamService
-   */
-  async getTeamIdsBySystemUserId(systemUserId: number): Promise<string[]> {
-    const teams = await this.teamRepository.getTeamsBySystemUserId(systemUserId);
-    return teams.map((row) => row.team_id);
-  }
-
-  /**
    * Create a team with members.
    *
    * @param {CreateTeam} teamData - Data required to create a new team.
