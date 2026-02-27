@@ -227,6 +227,7 @@ describe('DownloadPipelineService (integration)', function () {
         description: 'Parent dataset for testing'
       });
       const childFeatureId = await createTestFeature(
+        connection,
         submissionId,
         'species_observation',
         { taxon_id: 180703, count: 5 },
