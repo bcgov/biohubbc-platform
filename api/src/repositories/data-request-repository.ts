@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
@@ -26,7 +27,6 @@ export class DataRequestRepository extends BaseRepository {
    */
   async findDataRequests(filters?: DataRequestFilters): Promise<FlatDataRequestWithStatus[]> {
     const knex = getKnex();
-
     const queryBuilder = knex('data_request as dr')
       .select(
         'dr.data_request_id',
@@ -41,22 +41,7 @@ export class DataRequestRepository extends BaseRepository {
       .whereNull('dr.record_end_date')
       .whereNull('drs.record_end_date');
 
-    if (filters?.status) {
-      queryBuilder.where('drs.request_status', filters.status);
-    }
-    if (filters?.date_from) {
-      queryBuilder.where('dr.create_date', '>=', filters.date_from);
-    }
-    if (filters?.date_to) {
-      queryBuilder.where('dr.create_date', '<=', filters.date_to);
-    }
-    if (filters?.requested_by) {
-      queryBuilder.where('dr.requested_by', filters.requested_by);
-    }
-    if (filters?.team_id) {
-      queryBuilder.where('dr.team_id', filters.team_id);
-    }
-
+    this.applyFilters(queryBuilder, filters);
     const response = await this.connection.knex(queryBuilder, FlatDataRequestWithStatus);
     return response.rows;
   }
@@ -74,7 +59,6 @@ export class DataRequestRepository extends BaseRepository {
     filters?: DataRequestFilters
   ): Promise<FlatDataRequestWithStatus[]> {
     const knex = getKnex();
-
     const queryBuilder = knex('data_request as dr')
       .select(
         'dr.data_request_id',
@@ -92,24 +76,40 @@ export class DataRequestRepository extends BaseRepository {
       .whereNull('drs.record_end_date')
       .whereNull('tm.record_end_date');
 
-    if (filters?.status) {
-      queryBuilder.where('drs.request_status', filters.status);
-    }
-    if (filters?.date_from) {
-      queryBuilder.where('dr.create_date', '>=', filters.date_from);
-    }
-    if (filters?.date_to) {
-      queryBuilder.where('dr.create_date', '<=', filters.date_to);
-    }
-    if (filters?.requested_by) {
-      queryBuilder.where('dr.requested_by', filters.requested_by);
-    }
-    if (filters?.team_id) {
-      queryBuilder.where('dr.team_id', filters.team_id);
-    }
-
+    this.applyFilters(queryBuilder, filters);
     const response = await this.connection.knex(queryBuilder, FlatDataRequestWithStatus);
     return response.rows;
+  }
+
+  /**
+   * Apply data request list filters to the provided query.
+   *
+   * @param {Knex.QueryBuilder} query - Base query to filter.
+   * @param {DataRequestFilters} [filters] - Optional filter set.
+   * @return {Knex.QueryBuilder} Filtered query.
+   */
+  private applyFilters(query: Knex.QueryBuilder, filters?: DataRequestFilters): Knex.QueryBuilder {
+    if (!filters) {
+      return query;
+    }
+
+    if (filters.status) {
+      query.where('drs.request_status', filters.status);
+    }
+    if (filters.date_from) {
+      query.where('dr.create_date', '>=', filters.date_from);
+    }
+    if (filters.date_to) {
+      query.where('dr.create_date', '<=', filters.date_to);
+    }
+    if (filters.requested_by) {
+      query.where('dr.requested_by', filters.requested_by);
+    }
+    if (filters.team_id) {
+      query.where('dr.team_id', filters.team_id);
+    }
+
+    return query;
   }
 
   /**
