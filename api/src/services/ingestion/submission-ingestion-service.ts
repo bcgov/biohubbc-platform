@@ -157,7 +157,6 @@ export class SubmissionIngestionService extends DBService {
    * @memberof SubmissionIngestionService
    */
   private async getTarballObjectKey(uploadId: string): Promise<string> {
-
     const uploadArchives = await this.uploadArchiveService.getUploadArchivesByUploadId(uploadId);
     if (uploadArchives.length === 0) {
       throw new Error(`No archives found for upload ${uploadId}`);

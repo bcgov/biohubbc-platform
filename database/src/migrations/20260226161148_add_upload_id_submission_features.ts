@@ -5,7 +5,7 @@ import { Knex } from 'knex';
  * back to the upload session that produced it.
  */
 export async function up(knex: Knex): Promise<void> {
-    await knex.raw(`
+  await knex.raw(`
     SET SEARCH_PATH = biohub, public;
 
     ALTER TABLE "submission_feature" ADD COLUMN upload_id uuid NOT NULL;
@@ -21,9 +21,8 @@ export async function up(knex: Knex): Promise<void> {
   `);
 }
 
-
 export async function down(knex: Knex): Promise<void> {
-    await knex.raw(`
+  await knex.raw(`
     SET SEARCH_PATH = biohub, public;
 
     ALTER TABLE "submission_feature" 
@@ -33,4 +32,3 @@ export async function down(knex: Knex): Promise<void> {
       DROP COLUMN IF EXISTS upload_id;
   `);
 }
-

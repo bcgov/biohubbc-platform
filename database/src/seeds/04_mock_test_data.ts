@@ -80,12 +80,20 @@ const insertRecord = async (knex: Knex) => {
 
     // Animals
     const animalPromises = Array.from({ length: 2 }).map(() =>
-      insertAnimalRecord(knex, { submission_id, upload_id, parent_submission_feature_id: parent_submission_feature_id2 })
+      insertAnimalRecord(knex, {
+        submission_id,
+        upload_id,
+        parent_submission_feature_id: parent_submission_feature_id2
+      })
     );
 
     // Observations
     const observationPromises = Array.from({ length: 20 }).map(() =>
-      insertObservationRecord(knex, { submission_id, upload_id, parent_submission_feature_id: parent_submission_feature_id2 })
+      insertObservationRecord(knex, {
+        submission_id,
+        upload_id,
+        parent_submission_feature_id: parent_submission_feature_id2
+      })
     );
 
     // Wait for all animals and observations for this sample site
@@ -94,7 +102,11 @@ const insertRecord = async (knex: Knex) => {
 
   // Telemetry
   const telemetryPromises = Array.from({ length: 100 }).map(() =>
-    insertTelemetryRecord(knex, { submission_id, upload_id, parent_submission_feature_id: parent_submission_feature_id1 })
+    insertTelemetryRecord(knex, {
+      submission_id,
+      upload_id,
+      parent_submission_feature_id: parent_submission_feature_id1
+    })
   );
 
   // Wait for all sample sites and telemetry to complete concurrently
@@ -112,7 +124,10 @@ export const insertSubmissionRecord = async (
   return submission_id;
 };
 
-export const insertDatasetRecord = async (knex: Knex, options: { submission_id: number, upload_id: string }): Promise<number> => {
+export const insertDatasetRecord = async (
+  knex: Knex,
+  options: { submission_id: number; upload_id: string }
+): Promise<number> => {
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
@@ -155,23 +170,21 @@ export const insertDatasetRecord = async (knex: Knex, options: { submission_id: 
   return submission_feature_id;
 };
 
-export const insertUploadRecord = async (
-  knex: Knex
-): Promise<string> => {
+export const insertUploadRecord = async (knex: Knex): Promise<string> => {
   const [{ upload_id }] = await knex('upload')
-      .insert({
-        upload_status: 'completed',
-        create_user: 1,
-        record_end_date: new Date()
-      })
-      .returning('upload_id')
+    .insert({
+      upload_status: 'completed',
+      create_user: 1,
+      record_end_date: new Date()
+    })
+    .returning('upload_id');
 
-  return upload_id
+  return upload_id;
 };
 
 export const insertSampleSiteRecord = async (
   knex: Knex,
-  options: { submission_id: number; upload_id: string, parent_submission_feature_id: number }
+  options: { submission_id: number; upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
   const response = await knex.raw(
     `${insertSubmissionFeature({
@@ -201,7 +214,7 @@ export const insertSampleSiteRecord = async (
 
 export const insertObservationRecord = async (
   knex: Knex,
-  options: { submission_id: number; upload_id: string, parent_submission_feature_id: number }
+  options: { submission_id: number; upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
   const response = await knex.raw(
     `${insertSubmissionFeature({
@@ -244,7 +257,7 @@ export const insertObservationRecord = async (
 
 const insertAnimalRecord = async (
   knex: Knex,
-  options: { submission_id: number; upload_id: string, parent_submission_feature_id: number }
+  options: { submission_id: number; upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
   const response = await knex.raw(
     `${insertSubmissionFeature({
@@ -476,7 +489,7 @@ const randomIntFromInterval = (min: number, max: number) => {
 
 export const insertTelemetryRecord = async (
   knex: Knex,
-  options: { submission_id: number; upload_id: string, parent_submission_feature_id: number }
+  options: { submission_id: number; upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
   const telemetryData = {
     device_id: faker.string.alphanumeric({ length: 8 }),

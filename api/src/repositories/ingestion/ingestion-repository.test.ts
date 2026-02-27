@@ -50,7 +50,15 @@ describe('IngestionRepository', () => {
         properties: {}
       };
 
-      const response = await ingestionRepository.insertSubmissionFeatureRecord(1, 'some-upload-uuid', 2, '321', 'type', feature, 0);
+      const response = await ingestionRepository.insertSubmissionFeatureRecord(
+        1,
+        'some-upload-uuid',
+        2,
+        '321',
+        'type',
+        feature,
+        0
+      );
 
       expect(response).to.eql(mockResponse);
     });

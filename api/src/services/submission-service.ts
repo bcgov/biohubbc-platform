@@ -92,7 +92,11 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<void>}
    * @memberof SubmissionService
    */
-  async insertSubmissionFeatureRecords(submissionId: number, uploadId: string, submissionFeatures: ISubmissionFeature[]): Promise<void> {
+  async insertSubmissionFeatureRecords(
+    submissionId: number,
+    uploadId: string,
+    submissionFeatures: ISubmissionFeature[]
+  ): Promise<void> {
     try {
       // Generate paths to all non-null nodes which contain a 'child_features' property
       const submissionFeatureJsonPaths: string[] = JSONPath({

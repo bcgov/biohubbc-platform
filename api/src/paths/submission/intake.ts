@@ -2,17 +2,17 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getServiceAccountDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
+import { UploadStatusEnum } from '../../models/upload';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { ISubmissionFeature } from '../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { RegionService } from '../../services/region-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
 import { SubmissionService } from '../../services/submission-service';
+import { UploadService } from '../../services/upload/upload-service';
 import { ValidationService } from '../../services/validation-service';
 import { getServiceClientSystemUser } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
-import { UploadService } from '../../services/upload/upload-service';
-import { UploadStatusEnum } from '../../models/upload';
 
 const defaultLog = getLogger('paths/submission/intake');
 
@@ -181,7 +181,9 @@ export function submissionIntake(): RequestHandler {
       });
 
       // insert each submission feature record
-      await submissionService.insertSubmissionFeatureRecords(submissionRecord.submission_id, upload_id, [submissionFeature]);
+      await submissionService.insertSubmissionFeatureRecords(submissionRecord.submission_id, upload_id, [
+        submissionFeature
+      ]);
 
       // Index the submission feature record properties
       await searchFeatureService.indexFeaturesBySubmissionId(submissionRecord.submission_id);

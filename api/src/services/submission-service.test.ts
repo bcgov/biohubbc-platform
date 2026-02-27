@@ -198,14 +198,25 @@ describe('SubmissionService', () => {
 
       const submissionService = new SubmissionService(mockDBConnection);
 
-      const response = await submissionService.insertSubmissionFeatureRecords(submissionId, 'some-uuid', submissionFeatures);
+      const response = await submissionService.insertSubmissionFeatureRecords(
+        submissionId,
+        'some-uuid',
+        submissionFeatures
+      );
 
       expect(response).to.be.undefined;
 
       expect(insertSubmissionFeatureRecordStub.callCount).to.equal(9);
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, 'some-uuid', null, '1-1', 'dataset', {
-        name: 'Dataset1'
-      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        submissionId,
+        'some-uuid',
+        null,
+        '1-1',
+        'dataset',
+        {
+          name: 'Dataset1'
+        }
+      );
       expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
         submissionId,
         'some-uuid',

@@ -35,7 +35,11 @@ export class FeatureIngestionService extends DBService {
    * @returns {Promise<IValidationResult>} Validation result with valid flag and any errors
    * @memberof FeatureIngestionService
    */
-  async ingestFeatures(submissionId: number, uploadId: string, features: IFlattenedBlock[]): Promise<IValidationResult> {
+  async ingestFeatures(
+    submissionId: number,
+    uploadId: string,
+    features: IFlattenedBlock[]
+  ): Promise<IValidationResult> {
     // 1. Validate all features
     const validationResult = await this.featureValidationService.validateFlatSubmissionFeatures(features);
 
