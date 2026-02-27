@@ -106,7 +106,13 @@ describe('data-request', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(stub).to.have.been.calledOnceWith(mockNonAdminUser.system_user_id, {});
+      expect(stub).to.have.been.calledOnceWith(mockNonAdminUser.system_user_id, {
+        date_from: undefined,
+        date_to: undefined,
+        requested_by: undefined,
+        team_id: undefined,
+        status: undefined
+      });
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.equal(200);
@@ -159,7 +165,9 @@ describe('data-request', () => {
       });
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockAdminUser);
-      sinon.stub(DataRequestService.prototype, 'findDataRequests').rejects(new Error('Service error'));
+      sinon
+        .stub(DataRequestService.prototype, 'findDataRequestsBySystemUserId')
+        .rejects(new Error('Service error'));
 
       const requestHandler = findDataRequests();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();

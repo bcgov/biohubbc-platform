@@ -189,16 +189,16 @@ export function createDataRequest(): RequestHandler {
 
 /**
  * Parses query params from the request into a filters object for data request list.
- * Returns empty object when no filter params are present.
+ * Query params are strings or undefined per the OpenAPI spec.
  */
 function parseQueryParams(req: Request<unknown, unknown, unknown, DataRequestFilters>): DataRequestFilters {
-  const { date_from, date_to, requested_by, team_id, status } = req.query;
+  const q = req.query;
   const filters: DataRequestFilters = {
-    ...(date_from && { date_from: String(date_from) }),
-    ...(date_to && { date_to: String(date_to) }),
-    ...(requested_by !== undefined && { requested_by: Number(requested_by) }),
-    ...(team_id && { team_id: String(team_id) }),
-    ...(status && { status: String(status) as DataRequestFilters['status'] })
+    date_from: q.date_from ?? undefined,
+    date_to: q.date_to ?? undefined,
+    requested_by: q.requested_by ? Number(q.requested_by) : undefined,
+    team_id: q.team_id ?? undefined,
+    status: q.status ?? undefined
   };
   return filters;
 }
