@@ -165,9 +165,7 @@ describe('data-request', () => {
       });
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockAdminUser);
-      sinon
-        .stub(DataRequestService.prototype, 'findDataRequestsBySystemUserId')
-        .rejects(new Error('Service error'));
+      sinon.stub(DataRequestService.prototype, 'findDataRequestsBySystemUserId').rejects(new Error('Service error'));
 
       const requestHandler = findDataRequests();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
