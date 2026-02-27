@@ -1,5 +1,4 @@
 import { IDBConnection } from '../../database/db';
-import { HTTP401 } from '../../errors/http-error';
 import { TeamAuthorizationRepository } from '../../repositories/authorization/team-authorization-repository';
 import { DBService } from '../db-service';
 import { SubmissionService } from '../submission-service';
