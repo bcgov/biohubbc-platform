@@ -1,19 +1,15 @@
 import { z } from 'zod';
 
-export const TeamMemberRecord = z.object({
-  team_member_id: z.string().uuid()
-});
-
-export type TeamMemberRecord = z.infer<typeof TeamMemberRecord>;
-
 export const TeamPolicyRecord = z.object({
-  team_policy_id: z.string().uuid()
+  team_policy_id: z.string().uuid(),
+  record_end_date: z.string().nullable()
 });
 
 export type TeamPolicyRecord = z.infer<typeof TeamPolicyRecord>;
 
 export const DataRequestRecord = z.object({
-  data_request_id: z.string().uuid()
+  data_request_id: z.string().uuid(),
+  record_end_date: z.string().nullable()
 });
 
 export type DataRequestRecord = z.infer<typeof DataRequestRecord>;

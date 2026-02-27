@@ -1,4 +1,5 @@
 import { IDBConnection } from '../../database/db';
+import { HTTP401 } from '../../errors/http-error';
 import { TeamAuthorizationRepository } from '../../repositories/authorization/team-authorization-repository';
 import { DBService } from '../db-service';
 import { SubmissionService } from '../submission-service';
@@ -28,19 +29,15 @@ export class TeamAuthorizationService extends DBService {
    * @memberof TeamAuthorizationService
    */
   async isUserAuthorizedForTeamEntity(systemUserId: number, entity: TeamAuthorizationEntity): Promise<boolean> {
-    switch (entity.entity) {
-      case 'team': {
-        const record = await this.teamAuthorizationRepository.findTeamMembership(systemUserId, entity.teamId);
-        return record !== null;
-      }
+    let record: { record_end_date: string | null } | null;
 
-      case 'data_request': {
-        const record = await this.teamAuthorizationRepository.findTeamMembershipByDataRequest(
+    switch (entity.entity) {
+      case 'data_request':
+        record = await this.teamAuthorizationRepository.findTeamMembershipByDataRequest(
           systemUserId,
           entity.dataRequestId
         );
-        return record !== null;
-      }
+        break;
 
       case 'submission_feature': {
         const submissionService = new SubmissionService(this.connection);
@@ -58,15 +55,25 @@ export class TeamAuthorizationService extends DBService {
           return false;
         }
 
-        const record = await this.teamAuthorizationRepository.findTeamPolicyBySubmissionFeature(
+        record = await this.teamAuthorizationRepository.findTeamPolicyBySubmissionFeature(
           systemUserId,
           entity.submissionFeatureId
         );
-        return record !== null;
+        break;
       }
 
       default:
         return false;
     }
+
+    if (!record) {
+      return false;
+    }
+
+    if (record.record_end_date !== null && new Date(record.record_end_date) <= new Date()) {
+      throw new HTTP401('Access Denied');
+    }
+
+    return true;
   }
 }

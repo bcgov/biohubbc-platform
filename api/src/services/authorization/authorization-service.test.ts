@@ -493,8 +493,8 @@ describe('authorizeByTeam', function () {
 
     const result = await authorizationService.authorizeByTeam({
       discriminator: 'Team',
-      entity: 'team',
-      teamId: 'team-1'
+      entity: 'data_request',
+      dataRequestId: 'dr-1'
     });
 
     expect(result).to.be.false;
@@ -509,8 +509,8 @@ describe('authorizeByTeam', function () {
 
     const result = await authorizationService.authorizeByTeam({
       discriminator: 'Team',
-      entity: 'team',
-      teamId: 'team-1'
+      entity: 'data_request',
+      dataRequestId: 'dr-1'
     });
 
     expect(result).to.be.true;

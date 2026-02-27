@@ -10,32 +10,9 @@ describe('TeamAuthorizationRepository', () => {
     sinon.restore();
   });
 
-  describe('findTeamMembership', () => {
-    it('returns a record when the user is an active member of the team', async () => {
-      const mockRow = { team_member_id: 'tm-1' };
-      const mockResponse = { rowCount: 1, rows: [mockRow] } as unknown as Promise<QueryResult<any>>;
-      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
-
-      const repository = new TeamAuthorizationRepository(mockConnection);
-      const result = await repository.findTeamMembership(1, 'team-1');
-
-      expect(result).to.eql(mockRow);
-    });
-
-    it('returns null when the user is not a member of the team', async () => {
-      const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
-      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
-
-      const repository = new TeamAuthorizationRepository(mockConnection);
-      const result = await repository.findTeamMembership(1, 'team-1');
-
-      expect(result).to.be.null;
-    });
-  });
-
   describe('findTeamMembershipByDataRequest', () => {
     it('returns a record when the user has team access to the data request', async () => {
-      const mockRow = { data_request_id: 'dr-1' };
+      const mockRow = { data_request_id: 'dr-1', record_end_date: null };
       const mockResponse = { rowCount: 1, rows: [mockRow] } as unknown as Promise<QueryResult<any>>;
       const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
 
@@ -58,7 +35,7 @@ describe('TeamAuthorizationRepository', () => {
 
   describe('findTeamPolicyBySubmissionFeature', () => {
     it('returns a record when the user has team policy access to the submission feature', async () => {
-      const mockRow = { team_policy_id: 'tp-1' };
+      const mockRow = { team_policy_id: 'tp-1', record_end_date: null };
       const mockResponse = { rowCount: 1, rows: [mockRow] } as unknown as QueryResult<any>;
       const mockConnection = getMockDBConnection({ sql: async () => mockResponse });
 

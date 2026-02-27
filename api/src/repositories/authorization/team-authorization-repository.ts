@@ -1,7 +1,7 @@
 import SQL from 'sql-template-strings';
 import { getKnex } from '../../database/db';
 import { PolicyEffect } from '../../models/policy-statement';
-import { DataRequestRecord, TeamMemberRecord, TeamPolicyRecord } from '../../models/team-authorization';
+import { DataRequestRecord, TeamPolicyRecord } from '../../models/team-authorization';
 import { BaseRepository } from '../base-repository';
 
 /**
@@ -13,30 +13,7 @@ import { BaseRepository } from '../base-repository';
  */
 export class TeamAuthorizationRepository extends BaseRepository {
   /**
-   * Find an active team membership for a user in a team.
-   *
-   * @param {number} systemUserId
-   * @param {string} teamId
-   * @return {Promise<TeamMemberRecord | null>}
-   * @memberof TeamAuthorizationRepository
-   */
-  async findTeamMembership(systemUserId: number, teamId: string): Promise<TeamMemberRecord | null> {
-    const knex = getKnex();
-    const query = knex
-      .queryBuilder()
-      .select('tm.team_member_id')
-      .from('team_member as tm')
-      .where('tm.team_id', teamId)
-      .where('tm.system_user_id', systemUserId)
-      .whereNull('tm.record_end_date')
-      .limit(1);
-
-    const response = await this.connection.knex(query, TeamMemberRecord);
-    return response.rows[0] ?? null;
-  }
-
-  /**
-   * Find an active team membership for a user through a data request.
+   * Find a team membership for a user through a data request.
    *
    * @param {number} systemUserId
    * @param {string} dataRequestId
@@ -50,13 +27,12 @@ export class TeamAuthorizationRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex
       .queryBuilder()
-      .select('dr.data_request_id')
+      .select('dr.data_request_id', 'tm.record_end_date')
       .from('data_request as dr')
       .join('team_member as tm', 'tm.team_id', 'dr.team_id')
       .where('dr.data_request_id', dataRequestId)
       .where('tm.system_user_id', systemUserId)
       .whereNull('dr.record_end_date')
-      .whereNull('tm.record_end_date')
       .limit(1);
 
     const response = await this.connection.knex(query, DataRequestRecord);
@@ -86,7 +62,7 @@ export class TeamAuthorizationRepository extends BaseRepository {
         INNER JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
         WHERE sf.submission_feature_id = ${submissionFeatureId}
       )
-      SELECT tp.team_policy_id
+      SELECT tp.team_policy_id, tm.record_end_date
       FROM policy_statement ps
       INNER JOIN feature_urn_parts f
         ON (ps.urn_submission_id = f.submission_id_part OR ps.urn_submission_id = '*')
@@ -100,7 +76,6 @@ export class TeamAuthorizationRepository extends BaseRepository {
         AND tp.record_end_date IS NULL
       INNER JOIN team_member tm
         ON tm.team_id = tp.team_id
-        AND tm.record_end_date IS NULL
       WHERE ps.effect = ${PolicyEffect.ALLOW}
         AND ps.record_end_date IS NULL
         AND tm.system_user_id = ${systemUserId}

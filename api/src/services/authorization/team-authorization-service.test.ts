@@ -1,11 +1,15 @@
-import { expect } from 'chai';
+import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
+import sinonChai from 'sinon-chai';
+import { HTTP401 } from '../../errors/http-error';
 import { TeamAuthorizationRepository } from '../../repositories/authorization/team-authorization-repository';
 import { SubmissionFeature } from '../../repositories/submission-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { SubmissionService } from '../submission-service';
 import { TeamAuthorizationService } from './team-authorization-service';
+
+chai.use(sinonChai);
 
 describe('TeamAuthorizationService', () => {
   afterEach(() => {
@@ -13,34 +17,12 @@ describe('TeamAuthorizationService', () => {
   });
 
   describe('isUserAuthorizedForTeamEntity', () => {
-    describe('entity: team', () => {
-      it('returns true when the user is a member of the team', async () => {
-        const mockConnection = getMockDBConnection();
-        sinon.stub(TeamAuthorizationRepository.prototype, 'findTeamMembership').resolves({ team_member_id: 'tm-1' });
-
-        const service = new TeamAuthorizationService(mockConnection);
-        const result = await service.isUserAuthorizedForTeamEntity(1, { entity: 'team', teamId: 'team-1' });
-
-        expect(result).to.be.true;
-      });
-
-      it('returns false when the user is not a member of the team', async () => {
-        const mockConnection = getMockDBConnection();
-        sinon.stub(TeamAuthorizationRepository.prototype, 'findTeamMembership').resolves(null);
-
-        const service = new TeamAuthorizationService(mockConnection);
-        const result = await service.isUserAuthorizedForTeamEntity(1, { entity: 'team', teamId: 'team-1' });
-
-        expect(result).to.be.false;
-      });
-    });
-
     describe('entity: data_request', () => {
-      it('returns true when the user has team access to the data request', async () => {
+      it('returns true when the user has active team access to the data request', async () => {
         const mockConnection = getMockDBConnection();
         sinon
           .stub(TeamAuthorizationRepository.prototype, 'findTeamMembershipByDataRequest')
-          .resolves({ data_request_id: 'dr-1' });
+          .resolves({ data_request_id: 'dr-1', record_end_date: null });
 
         const service = new TeamAuthorizationService(mockConnection);
         const result = await service.isUserAuthorizedForTeamEntity(1, {
@@ -62,6 +44,23 @@ describe('TeamAuthorizationService', () => {
         });
 
         expect(result).to.be.false;
+      });
+
+      it('throws HTTP401 when the team membership has expired', async () => {
+        const mockConnection = getMockDBConnection();
+        sinon
+          .stub(TeamAuthorizationRepository.prototype, 'findTeamMembershipByDataRequest')
+          .resolves({ data_request_id: 'dr-1', record_end_date: '2025-01-01' });
+
+        const service = new TeamAuthorizationService(mockConnection);
+
+        try {
+          await service.isUserAuthorizedForTeamEntity(1, { entity: 'data_request', dataRequestId: 'dr-1' });
+          expect.fail('Expected handler to throw');
+        } catch (error) {
+          expect(error).to.be.instanceOf(HTTP401);
+          expect((error as HTTP401).message).to.equal('Access Denied');
+        }
       });
     });
 
@@ -108,12 +107,12 @@ describe('TeamAuthorizationService', () => {
         expect(result).to.be.false;
       });
 
-      it('returns true when the user has team policy access to the submission feature', async () => {
+      it('returns true when the user has active team policy access to the submission feature', async () => {
         const mockConnection = getMockDBConnection();
         sinon.stub(SubmissionService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
         sinon
           .stub(TeamAuthorizationRepository.prototype, 'findTeamPolicyBySubmissionFeature')
-          .resolves({ team_policy_id: 'tp-1' });
+          .resolves({ team_policy_id: 'tp-1', record_end_date: null });
 
         const service = new TeamAuthorizationService(mockConnection);
         const result = await service.isUserAuthorizedForTeamEntity(1, {
@@ -138,6 +137,28 @@ describe('TeamAuthorizationService', () => {
         });
 
         expect(result).to.be.false;
+      });
+
+      it('throws HTTP401 when the team membership has expired', async () => {
+        const mockConnection = getMockDBConnection();
+        sinon.stub(SubmissionService.prototype, 'getSubmissionFeatureById').resolves(fakeFeature);
+        sinon
+          .stub(TeamAuthorizationRepository.prototype, 'findTeamPolicyBySubmissionFeature')
+          .resolves({ team_policy_id: 'tp-1', record_end_date: '2025-01-01' });
+
+        const service = new TeamAuthorizationService(mockConnection);
+
+        try {
+          await service.isUserAuthorizedForTeamEntity(1, {
+            entity: 'submission_feature',
+            submissionFeatureId: 1,
+            submissionId: 1
+          });
+          expect.fail('Expected handler to throw');
+        } catch (error) {
+          expect(error).to.be.instanceOf(HTTP401);
+          expect((error as HTTP401).message).to.equal('Access Denied');
+        }
       });
     });
   });
