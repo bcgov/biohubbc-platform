@@ -2,18 +2,15 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { SYSTEM_ROLE } from '../constants/roles';
 import { CreateDataRequest, DataRequest, FlatDataRequestWithStatus, UpdateDataRequest } from '../models/data-request';
 import { DataRequestStatus, DataRequestStatusEnum } from '../models/data-request-status';
 import { TeamMember } from '../models/team-member';
-import { SystemUserExtended } from '../models/user';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamService } from './access-policy/team-service';
 import { DataRequestService } from './data-request-service';
 import { DataRequestStatusService } from './data-request-status-service';
-import { UserService } from './user-service';
 
 chai.use(sinonChai);
 
@@ -113,43 +110,10 @@ describe('DataRequestService', () => {
   });
 
   describe('findDataRequests', () => {
-    const mockAdminUser: SystemUserExtended = {
-      system_user_id: 1,
-      user_identifier: 'admin@example.com',
-      user_guid: 'admin-guid',
-      user_identity_source_id: 1,
-      identity_source: 'IDIR',
-      record_effective_date: '2025-01-01',
-      record_end_date: null,
-      create_date: '2025-01-01',
-      create_user: 1,
-      update_date: null,
-      update_user: null,
-      revision_count: 0,
-      display_name: 'Admin User',
-      email: 'admin@example.com',
-      given_name: 'Admin',
-      family_name: 'User',
-      agency: null,
-      notes: null,
-      role_ids: [1],
-      role_names: [SYSTEM_ROLE.SYSTEM_ADMIN]
-    };
-
-    const mockNonAdminUser: SystemUserExtended = {
-      ...mockAdminUser,
-      system_user_id: 2,
-      user_identifier: 'member@example.com',
-      user_guid: 'member-guid',
-      role_ids: [2],
-      role_names: [SYSTEM_ROLE.MEMBER]
-    };
-
-    it('should return transformed data requests for SYSTEM_ADMIN when no filters provided', async () => {
+    it('should return transformed data requests when no filters provided', async () => {
       const mockDB = getMockDBConnection();
       const service = new DataRequestService(mockDB);
 
-      sinon.stub(UserService.prototype, 'getUserById').resolves(mockAdminUser);
       const stub = sinon.stub(DataRequestRepository.prototype, 'findDataRequests').resolves([mockFlatDataRequest]);
 
       const result = await service.findDataRequests();
@@ -164,7 +128,7 @@ describe('DataRequestService', () => {
       });
     });
 
-    it('should pass filters to repository for SYSTEM_ADMIN', async () => {
+    it('should pass filters to repository', async () => {
       const mockDB = getMockDBConnection();
       const service = new DataRequestService(mockDB);
 
@@ -174,58 +138,60 @@ describe('DataRequestService', () => {
         requested_by: 1,
         team_id: mockDataRequest.team_id
       };
-      sinon.stub(UserService.prototype, 'getUserById').resolves(mockAdminUser);
       const stub = sinon.stub(DataRequestRepository.prototype, 'findDataRequests').resolves([mockFlatDataRequest]);
 
       await service.findDataRequests(filters);
 
       expect(stub).to.have.been.calledOnceWith(filters);
     });
+  });
 
-    it('should scope to user team membership for non-SYSTEM_ADMIN users', async () => {
-      const mockDB = getMockDBConnection({
-        systemUserId: () => mockNonAdminUser.system_user_id
-      });
+  describe('findDataRequestsBySystemUserId', () => {
+    it('should call findDataRequestsByTeamMembership with systemUserId and return transformed results', async () => {
+      const mockDB = getMockDBConnection();
       const service = new DataRequestService(mockDB);
 
-      sinon.stub(UserService.prototype, 'getUserById').resolves(mockNonAdminUser);
-      const repoStub = sinon.stub(DataRequestRepository.prototype, 'findDataRequests').resolves([mockFlatDataRequest]);
+      const systemUserId = mockDataRequest.requested_by;
+      const stub = sinon
+        .stub(DataRequestRepository.prototype, 'findDataRequestsByTeamMembership')
+        .resolves([mockFlatDataRequest]);
 
-      const result = await service.findDataRequests();
+      const result = await service.findDataRequestsBySystemUserId(systemUserId);
 
-      expect(repoStub).to.have.been.calledOnceWith(undefined, mockNonAdminUser.system_user_id);
+      expect(stub).to.have.been.calledOnceWith(systemUserId, undefined);
       expect(result).to.have.length(1);
+      expect(result[0].data_request_status).to.deep.equal({
+        data_request_status_id: mockFlatDataRequest.data_request_status_id,
+        data_request_id: mockFlatDataRequest.data_request_id,
+        comment_id: mockFlatDataRequest.comment_id,
+        request_status: mockFlatDataRequest.request_status
+      });
     });
 
-    it('should return empty array for non-SYSTEM_ADMIN users with no team memberships', async () => {
-      const mockDB = getMockDBConnection({
-        systemUserId: () => mockNonAdminUser.system_user_id
-      });
+    it('should pass filters to findDataRequestsByTeamMembership', async () => {
+      const mockDB = getMockDBConnection();
       const service = new DataRequestService(mockDB);
 
-      sinon.stub(UserService.prototype, 'getUserById').resolves(mockNonAdminUser);
-      const repoStub = sinon.stub(DataRequestRepository.prototype, 'findDataRequests').resolves([]);
-
-      const result = await service.findDataRequests();
-
-      expect(repoStub).to.have.been.calledOnceWith(undefined, mockNonAdminUser.system_user_id);
-      expect(result).to.eql([]);
-    });
-
-    it('should pass filters and systemUserId to repository for non-SYSTEM_ADMIN users', async () => {
-      const mockDB = getMockDBConnection({
-        systemUserId: () => mockNonAdminUser.system_user_id
-      });
-      const service = new DataRequestService(mockDB);
-
+      const systemUserId = mockDataRequest.requested_by;
       const filters = { status: 'REQUESTED' as const };
+      const stub = sinon
+        .stub(DataRequestRepository.prototype, 'findDataRequestsByTeamMembership')
+        .resolves([mockFlatDataRequest]);
 
-      sinon.stub(UserService.prototype, 'getUserById').resolves(mockNonAdminUser);
-      const repoStub = sinon.stub(DataRequestRepository.prototype, 'findDataRequests').resolves([mockFlatDataRequest]);
+      await service.findDataRequestsBySystemUserId(systemUserId, filters);
 
-      await service.findDataRequests(filters);
+      expect(stub).to.have.been.calledOnceWith(systemUserId, filters);
+    });
 
-      expect(repoStub).to.have.been.calledOnceWith(filters, mockNonAdminUser.system_user_id);
+    it('should return empty array when user has no team memberships with data requests', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
+
+      sinon.stub(DataRequestRepository.prototype, 'findDataRequestsByTeamMembership').resolves([]);
+
+      const result = await service.findDataRequestsBySystemUserId(999);
+
+      expect(result).to.eql([]);
     });
   });
 

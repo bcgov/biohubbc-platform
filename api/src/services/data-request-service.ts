@@ -1,4 +1,3 @@
-import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
 import { HTTP404 } from '../errors/http-error';
 import {
@@ -15,7 +14,6 @@ import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamService } from './access-policy/team-service';
 import { DataRequestStatusService } from './data-request-status-service';
 import { DBService } from './db-service';
-import { UserService } from './user-service';
 
 /**
  * Service for managing data requests.
@@ -60,26 +58,30 @@ export class DataRequestService extends DBService {
   }
 
   /**
-   * Find all data requests, optionally filtered by date range, requested_by, team_id, or status.
-   * For non-SYSTEM_ADMIN users, results are scoped to data requests in teams the user is a member of.
+   * Find all data requests without user scoping, optionally filtered by date range, requested_by, team_id, or status.
    *
    * @param {DataRequestFilters} [filters]
    * @return {Promise<DataRequestWithStatus[]>}
    * @memberof DataRequestService
    */
   async findDataRequests(filters?: DataRequestFilters): Promise<DataRequestWithStatus[]> {
-    const systemUserId = this.connection.systemUserId();
-    const userService = new UserService(this.connection);
-    const user = await userService.getUserById(systemUserId);
+    const dataRequests = await this.dataRequestRepository.findDataRequests(filters);
+    return dataRequests.map(_transformFlatDataRequestToNested);
+  }
 
-    const isSystemAdmin = user.role_names.includes(SYSTEM_ROLE.SYSTEM_ADMIN);
-
-    if (isSystemAdmin) {
-      const dataRequests = await this.dataRequestRepository.findDataRequests(filters);
-      return dataRequests.map(_transformFlatDataRequestToNested);
-    }
-
-    const dataRequests = await this.dataRequestRepository.findDataRequests(filters, systemUserId);
+  /**
+   * Find all data requests in teams the user is a member of, optionally filtered by date range, requested_by, team_id, or status.
+   *
+   * @param {number} systemUserId
+   * @param {DataRequestFilters} [filters]
+   * @return {Promise<DataRequestWithStatus[]>}
+   * @memberof DataRequestService
+   */
+  async findDataRequestsBySystemUserId(
+    systemUserId: number,
+    filters?: DataRequestFilters
+  ): Promise<DataRequestWithStatus[]> {
+    const dataRequests = await this.dataRequestRepository.findDataRequestsByTeamMembership(systemUserId, filters);
     return dataRequests.map(_transformFlatDataRequestToNested);
   }
 
