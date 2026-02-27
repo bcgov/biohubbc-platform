@@ -8,7 +8,12 @@ import { SubmissionValidationService } from '../services/submission-validation-s
 import { getMockDBConnection } from '../__mocks__/db';
 import { JobQueues } from './jobs';
 import * as pgBossService from './pg-boss-service';
-import { publishMalwareScanJob, publishProcessDownloadJob, publishProcessSubmissionFeaturesJob } from './publisher';
+import {
+  publishIndexSubmissionFeaturesJob,
+  publishMalwareScanJob,
+  publishProcessDownloadJob,
+  publishProcessSubmissionFeaturesJob
+} from './publisher';
 
 describe('publisher', () => {
   afterEach(() => {
@@ -312,6 +317,100 @@ describe('publisher', () => {
       const result = await publishMalwareScanJob(getMockDBConnection(), {
         artifactSecurityId: 'artifact-security-000'
       });
+
+      expect(result.status).to.equal('error');
+      expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
+    });
+  });
+
+  describe('publishIndexSubmissionFeaturesJob', () => {
+    it('publishes an index submission features job', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('index-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      const data = { submissionId: 777 };
+      const result = await publishIndexSubmissionFeaturesJob(mockConnection, data);
+
+      expect(createQueueStub.calledOnce).to.be.true;
+      expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
+      expect(sendStub.calledOnce).to.be.true;
+      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
+      expect(sendStub.firstCall.args[1]).to.deep.equal(data);
+      expect(result.status).to.equal('published');
+      expect((result as { status: 'published'; jobId: string }).jobId).to.equal('index-job-id');
+    });
+
+    it('uses index submission features options with 10 minute timeout', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('index-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 777 });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.retryLimit).to.equal(3);
+      expect(options.retryDelay).to.equal(60);
+      expect(options.retryBackoff).to.equal(true);
+      expect(options.expireInSeconds).to.equal(60 * 10); // 10 minutes
+    });
+
+    it('passes db option using caller connection for transactional job insert', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('index-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 777 });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.db).to.exist;
+      expect(options.db.executeSql).to.be.a('function');
+    });
+
+    it('uses singletonKey based on submissionId to prevent duplicates', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('index-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 456 });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.singletonKey).to.equal('submission-idx-456');
+    });
+
+    it('returns duplicate status when send returns null', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves(null);
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      const result = await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 777 });
+
+      expect(result.status).to.equal('duplicate');
+      expect((result as { status: 'duplicate'; message: string }).message).to.equal(
+        'Job already exists for this submission'
+      );
+    });
+
+    it('returns error status when pg-boss throws', async () => {
+      const mockConnection = getMockDBConnection();
+      sinon.stub(pgBossService, 'getPgBoss').throws(new Error('pg-boss not initialized'));
+
+      const result = await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 777 });
 
       expect(result.status).to.equal('error');
       expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');

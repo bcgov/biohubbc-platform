@@ -14,7 +14,7 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
-import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
+import { ITeam } from 'interfaces/useTeamsApi.interface';
 import { useState } from 'react';
 
 /**
@@ -34,7 +34,7 @@ export interface ITeamPoliciesContainerProps {
   /** Callback when sort changes */
   setSortModel: (model: GridSortModel) => void;
   /** Currently selected team from TeamsContainer (null if none selected) */
-  selectedTeam: ITeamWithMembers | null;
+  selectedTeam: ITeam | null;
   /** Currently selected policy from ActivePoliciesList (null if none selected) */
   selectedPolicy: IPolicy | null;
   /** Callback to refresh the team-policies list after create/delete */

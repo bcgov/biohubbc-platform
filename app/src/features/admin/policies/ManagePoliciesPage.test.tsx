@@ -2,7 +2,7 @@ import { cleanup, fireEvent, waitFor } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
-import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
+import { ITeam } from 'interfaces/useTeamsApi.interface';
 import { MemoryRouter } from 'react-router';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -16,14 +16,14 @@ interface MockActivePoliciesListProps {
 }
 
 interface MockTeamsContainerProps {
-  teams: ITeamWithMembers[];
+  teams: ITeam[];
   onSelectTeam: (id: string | null) => void;
   selectedTeamId: string | null;
 }
 
 interface MockTeamPoliciesContainerProps {
   teamPolicies: ITeamPolicyDetails[];
-  selectedTeam: ITeamWithMembers | null;
+  selectedTeam: ITeam | null;
   selectedPolicy: IPolicy | null;
 }
 
@@ -91,8 +91,8 @@ const mockPolicies = [
 ];
 
 const mockTeams = [
-  { team_id: 't1', name: 'Team Alpha', description: 'First team', members: [] },
-  { team_id: 't2', name: 'Team Beta', description: 'Second team', members: [] }
+  { team_id: 't1', name: 'Team Alpha', description: 'First team', member_count: 0 },
+  { team_id: 't2', name: 'Team Beta', description: 'Second team', member_count: 0 }
 ];
 
 const mockTeamPolicies = [

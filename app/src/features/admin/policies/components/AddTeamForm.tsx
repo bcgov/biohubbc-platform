@@ -14,7 +14,7 @@ export interface IAddTeamFormValues {
   /** Optional description */
   description: string;
   /** Array of system user IDs for team members */
-  member_user_ids: number[];
+  system_user_ids: number[];
 }
 
 /**
@@ -31,7 +31,7 @@ export interface IAddTeamFormProps {
 export const AddTeamFormInitialValues: IAddTeamFormValues = {
   name: '',
   description: '',
-  member_user_ids: []
+  system_user_ids: []
 };
 
 /**
@@ -40,7 +40,7 @@ export const AddTeamFormInitialValues: IAddTeamFormValues = {
 export const AddTeamFormYupSchema = yup.object().shape({
   name: yup.string().required('Team name is required').max(250, 'Team name must be 250 characters or less'),
   description: yup.string().max(1000, 'Description must be 1000 characters or less'),
-  member_user_ids: yup.array().of(yup.number())
+  system_user_ids: yup.array().of(yup.number())
 });
 
 /**
@@ -81,8 +81,8 @@ export const AddTeamForm = ({ initialUsers }: IAddTeamFormProps) => {
       />
 
       <TeamMemberSelect
-        selectedUserIds={values.member_user_ids}
-        onChange={(userIds) => setFieldValue('member_user_ids', userIds)}
+        selectedUserIds={values.system_user_ids}
+        onChange={(userIds) => setFieldValue('system_user_ids', userIds)}
         initialUsers={initialUsers}
       />
     </Box>

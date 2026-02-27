@@ -7,23 +7,24 @@ export interface ITeamMember {
   team_member_id: string;
   system_user_id: number;
   user_identifier: string;
+  email?: string | null;
 }
 
 /**
- * Team with its members.
+ * Team summary.
  */
-export interface ITeamWithMembers {
+export interface ITeam {
   team_id: string;
   name: string;
   description: string | null;
-  members: ITeamMember[];
+  member_count: number;
 }
 
 /**
  * Paginated teams response.
  */
 export interface ITeamsResponse {
-  teams: ITeamWithMembers[];
+  teams: ITeam[];
   pagination: ApiPaginationResponseParams;
 }
 
@@ -33,7 +34,7 @@ export interface ITeamsResponse {
 export interface ICreateTeamRequest {
   name: string;
   description?: string;
-  member_user_ids?: number[];
+  system_user_ids?: number[];
 }
 
 /**
@@ -42,7 +43,7 @@ export interface ICreateTeamRequest {
 export interface IUpdateTeamRequest {
   name?: string;
   description?: string;
-  member_user_ids?: number[];
+  system_user_ids?: number[];
 }
 
 /**
@@ -58,4 +59,11 @@ export interface IAvailableUser {
  */
 export interface IAvailableUsersResponse {
   users: IAvailableUser[];
+}
+
+/**
+ * Team members response.
+ */
+export interface ITeamMembersResponse {
+  members: ITeamMember[];
 }

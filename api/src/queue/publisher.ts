@@ -4,6 +4,7 @@ import { DownloadService } from '../services/download/download-service';
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
+import { IIndexSubmissionFeaturesJobData } from './jobs/index-submission-features-job';
 import { IMalwareScanJobData } from './jobs/malware-scan-job';
 import { IProcessDownloadJobData } from './jobs/process-download-job';
 import { IProcessSubmissionFeaturesJobData } from './jobs/process-submission-features-job';
@@ -327,6 +328,80 @@ export const publishProcessDownloadJob = async (
       label: 'publishProcessDownloadJob',
       message: 'Failed to publish job',
       downloadId: data.downloadId,
+      error
+    });
+
+    return { status: 'error', message: errorMessage };
+  }
+};
+
+/**
+ * Options for index submission features jobs.
+ * Same timeout as validation — indexing should complete within minutes.
+ */
+const INDEX_SUBMISSION_FEATURES_OPTIONS: IPublishOptions = {
+  retryLimit: 3,
+  retryDelay: 60,
+  retryBackoff: true,
+  expireInSeconds: 60 * 10 // 10 minutes
+};
+
+/**
+ * Publish an index submission features job to the queue.
+ *
+ * Queues async search indexing for a submission's features. Uses the caller's
+ * DB connection via pg-boss's `db` option so the job insert participates in
+ * the same transaction — if the caller rolls back, the job is never visible.
+ *
+ * @param {IDBConnection} connection Database connection for transactional job insert
+ * @param {IIndexSubmissionFeaturesJobData} data Job data containing submissionId
+ * @param {IPublishOptions} [options={}] Job options
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
+ */
+export const publishIndexSubmissionFeaturesJob = async (
+  connection: IDBConnection,
+  data: IIndexSubmissionFeaturesJobData,
+  options: IPublishOptions = {}
+): Promise<PublishJobResult> => {
+  try {
+    const boss = getPgBoss();
+    const mergedOptions = { ...INDEX_SUBMISSION_FEATURES_OPTIONS, ...options };
+
+    await boss.createQueue(JobQueues.INDEX_SUBMISSION_FEATURES);
+
+    // Use singletonKey to prevent duplicate concurrent indexing jobs for the same submission
+    // Pass caller's connection via db option so job insert is part of the same transaction
+    const jobId = await boss.send(JobQueues.INDEX_SUBMISSION_FEATURES, data, {
+      ...mergedOptions,
+      singletonKey: `submission-idx-${data.submissionId}`,
+      db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
+    });
+
+    if (jobId) {
+      defaultLog.info({
+        label: 'publishIndexSubmissionFeaturesJob',
+        message: 'Index submission features job published',
+        jobId,
+        submissionId: data.submissionId
+      });
+
+      return { status: 'published', jobId };
+    }
+
+    defaultLog.warn({
+      label: 'publishIndexSubmissionFeaturesJob',
+      message: 'Job not published (duplicate or throttled)',
+      submissionId: data.submissionId
+    });
+
+    return { status: 'duplicate', message: 'Job already exists for this submission' };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    defaultLog.error({
+      label: 'publishIndexSubmissionFeaturesJob',
+      message: 'Failed to publish job',
+      submissionId: data.submissionId,
       error
     });
 
