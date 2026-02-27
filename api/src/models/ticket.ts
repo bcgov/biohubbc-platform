@@ -1,0 +1,71 @@
+import { z } from 'zod';
+import { TicketComment } from './ticket-comment';
+import { TicketReference } from './ticket-reference';
+import { TicketStatus as TicketStatusRecord } from './ticket-status';
+
+export const TicketPriority = z.enum(['low', 'medium', 'high', 'critical']);
+export type TicketPriority = z.infer<typeof TicketPriority>;
+
+export const TicketStatus = z.enum(['open', 'closed']);
+export type TicketStatus = z.infer<typeof TicketStatus>;
+
+export interface TicketFilters {
+  team_id?: string;
+  status?: TicketStatus;
+}
+
+export const Ticket = z.object({
+  ticket_id: z.string().uuid(),
+  ticket_slug: z.string().regex(/^\d{8}$/),
+  subject: z.string(),
+  description: z.string().nullable(),
+  team_id: z.string().uuid(),
+  create_date: z.string(),
+  priority: TicketPriority,
+  status: TicketStatus
+});
+
+export type Ticket = z.infer<typeof Ticket>;
+
+export const TicketSlug = Ticket.pick({ ticket_slug: true });
+export type TicketSlug = z.infer<typeof TicketSlug>;
+
+export const CreateTicketRequest = z.object({
+  subject: z.string().max(100),
+  description: z.string().max(2000).nullable(),
+  priority: TicketPriority
+});
+
+export type CreateTicketRequest = z.infer<typeof CreateTicketRequest>;
+
+export type CreateTicketPayload = CreateTicketRequest & {
+  team_id: string;
+  ticket_slug: string;
+};
+
+export const UpdateTicketRequest = z.object({
+  subject: z.string().max(100).optional(),
+  description: z.string().max(2000).nullable().optional(),
+  priority: TicketPriority.optional(),
+  status: TicketStatus.optional()
+});
+
+export type UpdateTicketRequest = z.infer<typeof UpdateTicketRequest>;
+
+export const UpdateTicketStatusRequest = z.object({
+  status: TicketStatus
+});
+
+export type UpdateTicketStatusRequest = z.infer<typeof UpdateTicketStatusRequest>;
+
+export * from './ticket-comment';
+export * from './ticket-reference';
+export * from './ticket-status';
+
+export const TicketWithHistory = Ticket.extend({
+  status_history: z.array(TicketStatusRecord),
+  comments: z.array(TicketComment),
+  references: z.array(TicketReference)
+});
+
+export type TicketWithHistory = z.infer<typeof TicketWithHistory>;
