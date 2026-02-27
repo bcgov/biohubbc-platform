@@ -24,6 +24,67 @@ import {
 chai.use(sinonChai);
 
 describe('SubmissionRepository', () => {
+  describe('insertSubmissionFeatureRecord', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const mockDatasetProperties = {
+        name: 'dataset name',
+        start_date: '2023-12-22'
+      };
+
+      try {
+        await submissionRepository.insertSubmissionFeatureRecord(
+          1,
+          '123-456-789',
+          1,
+          '123-456-799',
+          'name',
+          mockDatasetProperties
+        );
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission feature record');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ submission_feature_id: 5 }] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+    const mockDatasetProperties = {
+        name: 'dataset name',
+        start_date: '2023-12-22'
+      };
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.insertSubmissionFeatureRecord(
+          1,
+          '123-456-789',
+          1,
+          '123-456-799',
+          'name',
+          mockDatasetProperties
+      );
+
+      expect(response.submission_feature_id).to.equal(5);
+    });
+  });
+
   describe('insertSubmissionRecord', () => {
     afterEach(() => {
       sinon.restore();

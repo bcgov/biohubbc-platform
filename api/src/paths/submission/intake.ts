@@ -11,6 +11,8 @@ import { SubmissionService } from '../../services/submission-service';
 import { ValidationService } from '../../services/validation-service';
 import { getServiceClientSystemUser } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
+import { UploadService } from '../../services/upload/upload-service';
+import { UploadStatusEnum } from '../../models/upload';
 
 const defaultLog = getLogger('paths/submission/intake');
 
@@ -167,8 +169,19 @@ export function submissionIntake(): RequestHandler {
         serviceClientSystemUser.user_identifier
       );
 
+      /*
+      Added to make backward compatible.
+      Assumption is this code is legacy and will not run and will be removed.
+      */
+      const uploadService = new UploadService(connection);
+      const { upload_id } = await uploadService.insertUpload({
+        upload_status: UploadStatusEnum.COMPLETED,
+        record_end_date: new Date().toISOString(),
+        s3_upload_id: ''
+      });
+
       // insert each submission feature record
-      await submissionService.insertSubmissionFeatureRecords(submissionRecord.submission_id, [submissionFeature]);
+      await submissionService.insertSubmissionFeatureRecords(submissionRecord.submission_id, upload_id, [submissionFeature]);
 
       // Index the submission feature record properties
       await searchFeatureService.indexFeaturesBySubmissionId(submissionRecord.submission_id);

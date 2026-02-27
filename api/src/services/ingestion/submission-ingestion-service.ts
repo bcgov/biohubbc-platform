@@ -48,7 +48,12 @@ export class SubmissionIngestionService extends DBService {
    * @memberof SubmissionIngestionService
    */
   async processSubmission(submissionId: number): Promise<IValidationResult> {
-    const objectKey = await this.getTarballObjectKey(submissionId);
+    const submissionUploads = await this.submissionUploadService.getSubmissionUploadsBySubmissionId(submissionId);
+    if (submissionUploads.length === 0) {
+      throw new Error(`No uploads found for submission ${submissionId}`);
+    }
+    const uploadId = submissionUploads[0].upload_id;
+    const objectKey = await this.getTarballObjectKey(uploadId);
 
     // ================================================================
     // PASS 1: VALIDATE (zero side effects)
@@ -91,7 +96,7 @@ export class SubmissionIngestionService extends DBService {
 
     // Delete existing features (idempotency for job retries), then insert
     await this.ingestionRepository.deleteSubmissionFeatures(submissionId);
-    await this.insertFlatFeatures(submissionId, allBlocks, dataByteSizeMap);
+    await this.insertFlatFeatures(submissionId, uploadId, allBlocks, dataByteSizeMap);
 
     return { valid: true, errors: [] };
   }
@@ -103,12 +108,14 @@ export class SubmissionIngestionService extends DBService {
    *
    * @private
    * @param {number} submissionId - The submission ID
+   * @param {string} uploadId - The upload ID
    * @param {IFlattenedBlock[]} features - Features to insert
    * @param {Map<string, number>} dataByteSizeMap - Pre-computed byte sizes per feature UUID
    * @memberof SubmissionIngestionService
    */
   private async insertFlatFeatures(
     submissionId: number,
+    uploadId: string,
     features: IFlattenedBlock[],
     dataByteSizeMap: Map<string, number>
   ): Promise<void> {
@@ -118,6 +125,7 @@ export class SubmissionIngestionService extends DBService {
     for (const feature of features) {
       const result = await this.ingestionRepository.insertSubmissionFeatureRecord(
         submissionId,
+        uploadId,
         null, // parent set in pass 2
         feature.id,
         feature.type,
@@ -144,19 +152,15 @@ export class SubmissionIngestionService extends DBService {
    * Traverses: submission → submission_upload → upload_archive → artifact → object_key
    *
    * @private
-   * @param {number} submissionId - The submission ID
+   * @param {string} uploadId - The upload ID
    * @returns {Promise<string>} The S3 object key
    * @memberof SubmissionIngestionService
    */
-  private async getTarballObjectKey(submissionId: number): Promise<string> {
-    const submissionUploads = await this.submissionUploadService.getSubmissionUploadsBySubmissionId(submissionId);
-    if (submissionUploads.length === 0) {
-      throw new Error(`No uploads found for submission ${submissionId}`);
-    }
+  private async getTarballObjectKey(uploadId: string): Promise<string> {
 
-    const uploadArchives = await this.uploadArchiveService.getUploadArchivesByUploadId(submissionUploads[0].upload_id);
+    const uploadArchives = await this.uploadArchiveService.getUploadArchivesByUploadId(uploadId);
     if (uploadArchives.length === 0) {
-      throw new Error(`No archives found for upload ${submissionUploads[0].upload_id}`);
+      throw new Error(`No archives found for upload ${uploadId}`);
     }
 
     const artifact = await this.artifactService.getArtifact(uploadArchives[0].artifact_id);

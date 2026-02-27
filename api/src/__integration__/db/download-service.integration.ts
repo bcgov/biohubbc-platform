@@ -68,10 +68,18 @@ describe('DownloadPipelineService (integration)', function () {
     const systemUserId = connection.systemUserId();
     const dataJson = JSON.stringify(data);
 
+    const uploadResult = await connection.sql(SQL`
+      INSERT INTO upload (upload_status, record_end_date, create_user)
+      VALUES ('completed', now(), ${systemUserId})
+      RETURNING upload_id;
+    `);
+    const uploadId = uploadResult.rows[0].upload_id;
+
     const result = await connection.sql(SQL`
-      INSERT INTO submission_feature (submission_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, create_user)
+      INSERT INTO submission_feature (submission_id, upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, create_user)
       VALUES (
         ${submissionId},
+        ${uploadId},
         (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName} LIMIT 1),
         ${parentFeatureId ?? null},
         ${dataJson}::jsonb,

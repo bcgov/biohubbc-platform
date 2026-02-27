@@ -172,6 +172,14 @@ describe('Download Worker', function () {
 
     const dataJson = JSON.stringify(data);
 
+    const [upload] = await db('biohub.upload')
+      .insert({
+        upload_status: 'completed',
+        record_end_date: db.fn.now(),
+        create_user: SYSTEM_USER_ID
+      })
+      .returning('upload_id');
+
     const [row] = await db('biohub.submission_feature')
       .insert({
         submission_id: submissionId,
@@ -179,6 +187,7 @@ describe('Download Worker', function () {
         parent_submission_feature_id: parentFeatureId ?? null,
         data: dataJson,
         data_byte_size: db.raw(`octet_length(?::jsonb::text) + 500`, [dataJson]),
+        upload_id: upload.upload_id,
         create_user: SYSTEM_USER_ID
       })
       .returning('submission_feature_id');
@@ -542,12 +551,20 @@ describe('DownloadPipelineService download pipeline (system)', function () {
 
     const dataJson = JSON.stringify(data);
 
+    const uploadResult = await connection.sql(SQL`
+      INSERT INTO upload (upload_status, record_end_date, create_user)
+      VALUES ('completed', now(), ${systemUserId})
+      RETURNING upload_id;
+    `);
+    const uploadId = uploadResult.rows[0].upload_id;
+
     // Use separate SQL for with/without parent to avoid null handling issues with sql-template-strings
     if (parentFeatureId !== undefined) {
       const result = await connection.sql(SQL`
-        INSERT INTO submission_feature (submission_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, create_user)
+        INSERT INTO submission_feature (submission_id, upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, create_user)
         VALUES (
           ${submissionId},
+          ${uploadId},
           (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName} LIMIT 1),
           ${parentFeatureId},
           ${dataJson}::jsonb,
@@ -560,9 +577,10 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     }
 
     const result = await connection.sql(SQL`
-      INSERT INTO submission_feature (submission_id, feature_type_id, data, data_byte_size, create_user)
+      INSERT INTO submission_feature (submission_id, upload_id, feature_type_id, data, data_byte_size, create_user)
       VALUES (
         ${submissionId},
+        ${uploadId},
         (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName} LIMIT 1),
         ${dataJson}::jsonb,
         octet_length(${dataJson}::jsonb::text) + 500,

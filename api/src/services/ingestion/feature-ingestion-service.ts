@@ -30,11 +30,12 @@ export class FeatureIngestionService extends DBService {
    * Idempotent: soft-deletes existing features before inserting, safe for job retries.
    *
    * @param {number} submissionId - The submission to add features to
+   * @param {string} uploadId - The upload that produced these features
    * @param {IFlattenedBlock[]} features - Flat array of features with UUID references
    * @returns {Promise<IValidationResult>} Validation result with valid flag and any errors
    * @memberof FeatureIngestionService
    */
-  async ingestFeatures(submissionId: number, features: IFlattenedBlock[]): Promise<IValidationResult> {
+  async ingestFeatures(submissionId: number, uploadId: string, features: IFlattenedBlock[]): Promise<IValidationResult> {
     // 1. Validate all features
     const validationResult = await this.featureValidationService.validateFlatSubmissionFeatures(features);
 
@@ -48,7 +49,7 @@ export class FeatureIngestionService extends DBService {
     await submissionRepository.deleteSubmissionFeatureRelationships(submissionId);
 
     // 3. Insert features (two-pass for parent references, Pass 3 for content relationships)
-    await this.insertFlatFeatures(submissionId, features);
+    await this.insertFlatFeatures(submissionId, uploadId, features);
 
     return { valid: true, errors: [] };
   }
@@ -61,10 +62,11 @@ export class FeatureIngestionService extends DBService {
    *
    * @private
    * @param {number} submissionId - The submission ID
+   * @param {string} uploadId - The upload ID
    * @param {IFlattenedBlock[]} features - Features to insert
    * @memberof FeatureIngestionService
    */
-  private async insertFlatFeatures(submissionId: number, features: IFlattenedBlock[]): Promise<void> {
+  private async insertFlatFeatures(submissionId: number, uploadId: string, features: IFlattenedBlock[]): Promise<void> {
     const submissionRepository = new SubmissionRepository(this.connection);
     const uuidToDbId = new Map<string, number>();
 
@@ -72,6 +74,7 @@ export class FeatureIngestionService extends DBService {
     for (const feature of features) {
       const result = await submissionRepository.insertSubmissionFeatureRecord(
         submissionId,
+        uploadId,
         null, // parent set in pass 2
         feature.id,
         feature.type,

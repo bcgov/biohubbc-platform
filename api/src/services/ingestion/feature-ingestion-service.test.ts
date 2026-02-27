@@ -98,7 +98,7 @@ describe('FeatureIngestionService', () => {
         createValidFeature({ id: 'uuid-2', parent: 'uuid-1', content: [] })
       ];
 
-      const result = await service.ingestFeatures(1, features);
+      const result = await service.ingestFeatures(1, 'some-uuid', features);
 
       expect(result.valid).to.be.true;
       expect(result.errors).to.have.length(0);
@@ -117,7 +117,7 @@ describe('FeatureIngestionService', () => {
 
       const features: IFlattenedBlock[] = [createValidFeature({ type: 'unknown_type' })];
 
-      const result = await service.ingestFeatures(1, features);
+      const result = await service.ingestFeatures(1, 'some-uuid', features);
 
       expect(result.valid).to.be.false;
       expect(result.errors).to.have.length.greaterThan(0);
@@ -134,7 +134,7 @@ describe('FeatureIngestionService', () => {
 
       const features: IFlattenedBlock[] = [createValidFeature({ type: 'invalid_type' })];
 
-      const result = await service.ingestFeatures(1, features);
+      const result = await service.ingestFeatures(1, 'some-uuid', features);
 
       expect(result.valid).to.be.false;
       expect(deleteStub).to.not.have.been.called;
@@ -159,7 +159,7 @@ describe('FeatureIngestionService', () => {
 
       const features: IFlattenedBlock[] = [createValidFeature({ id: 'uuid-root', parent: null })];
 
-      const result = await service.ingestFeatures(1, features);
+      const result = await service.ingestFeatures(1, 'some-uuid', features);
 
       expect(result.valid).to.be.true;
       expect(insertStub).to.have.been.calledOnce;
@@ -189,7 +189,7 @@ describe('FeatureIngestionService', () => {
         createValidFeature({ id: 'grandchild', parent: 'child1', content: [] })
       ];
 
-      const result = await service.ingestFeatures(1, features);
+      const result = await service.ingestFeatures(1, 'some-uuid', features);
 
       expect(result.valid).to.be.true;
       expect(insertStub).to.have.been.calledThrice;
@@ -221,7 +221,7 @@ describe('FeatureIngestionService', () => {
         createValidFeature({ id: 'ccc-333' })
       ];
 
-      const result = await service.ingestFeatures(1, features);
+      const result = await service.ingestFeatures(1, 'some-uuid', features);
 
       expect(result.valid).to.be.true;
     });
@@ -258,10 +258,11 @@ describe('FeatureIngestionService', () => {
         parent: null
       };
 
-      await service.ingestFeatures(42, [feature]);
+      await service.ingestFeatures(42, 'some-uuid', [feature]);
 
       expect(insertStub).to.have.been.calledOnceWithExactly(
         42, // submissionId
+        'some-uuid', // uploadId
         null, // parent (null in pass 1)
         'test-uuid-123', // feature.id
         'dataset', // feature.type
@@ -278,7 +279,7 @@ describe('FeatureIngestionService', () => {
       const insertStub = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord');
       const updateParentStub = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent');
 
-      const result = await service.ingestFeatures(1, []);
+      const result = await service.ingestFeatures(1, 'some-uuid', []);
 
       expect(result.valid).to.be.true;
       expect(insertStub).to.not.have.been.called;
@@ -308,7 +309,7 @@ describe('FeatureIngestionService', () => {
         createValidFeature({ id: 'feat-3', parent: null })
       ];
 
-      const result = await service.ingestFeatures(1, features);
+      const result = await service.ingestFeatures(1, 'some-uuid', features);
 
       expect(result.valid).to.be.true;
       expect(insertStub).to.have.been.calledThrice;
@@ -340,7 +341,7 @@ describe('FeatureIngestionService', () => {
         createValidFeature({ id: 'level-3', parent: 'level-2' })
       ];
 
-      const result = await service.ingestFeatures(1, features);
+      const result = await service.ingestFeatures(1, 'some-uuid', features);
 
       expect(result.valid).to.be.true;
       expect(updateParentStub).to.have.been.calledThrice;
@@ -374,7 +375,7 @@ describe('FeatureIngestionService', () => {
         createValidFeature({ id: 'child-3', parent: 'parent' })
       ];
 
-      const result = await service.ingestFeatures(1, features);
+      const result = await service.ingestFeatures(1, 'some-uuid', features);
 
       expect(result.valid).to.be.true;
       expect(updateParentStub).to.have.been.calledThrice;
@@ -465,11 +466,11 @@ describe('FeatureIngestionService', () => {
         createValidFeature({ id: 'feat-2', properties: propsMinimal })
       ];
 
-      const result = await service.ingestFeatures(1, features);
+      const result = await service.ingestFeatures(1, 'some-uuid', features);
 
       expect(result.valid).to.be.true;
-      expect(insertStub.firstCall.args[4]).to.deep.equal(propsWithMultipleFields);
-      expect(insertStub.secondCall.args[4]).to.deep.equal(propsMinimal);
+      expect(insertStub.firstCall.args[5]).to.deep.equal(propsWithMultipleFields);
+      expect(insertStub.secondCall.args[5]).to.deep.equal(propsMinimal);
     });
 
     it('should call deleteSubmissionFeatures and deleteSubmissionFeatureRelationships before inserting', async () => {
@@ -504,7 +505,7 @@ describe('FeatureIngestionService', () => {
 
       const features: IFlattenedBlock[] = [createValidFeature()];
 
-      await service.ingestFeatures(1, features);
+      await service.ingestFeatures(1, 'some-uuid', features);
 
       expect(callOrder[0]).to.equal('delete');
       expect(callOrder[1]).to.equal('deleteRelationships');
@@ -540,7 +541,7 @@ describe('FeatureIngestionService', () => {
         createValidFeature({ id: 'uuid-2', content: [], parent: 'uuid-1' })
       ];
 
-      await service.ingestFeatures(1, features);
+      await service.ingestFeatures(1, 'some-uuid', features);
 
       expect(insertStub).to.have.been.calledTwice;
       expect(insertRelationshipsStub).to.not.have.been.called;
@@ -576,7 +577,7 @@ describe('FeatureIngestionService', () => {
         createValidFeature({ id: 'child-3', parent: 'parent', content: [] })
       ];
 
-      await service.ingestFeatures(1, features);
+      await service.ingestFeatures(1, 'some-uuid', features);
 
       expect(insertRelationshipsStub).to.have.been.calledOnceWith([
         { source_feature_id: 10, target_feature_id: 20 },
@@ -616,7 +617,7 @@ describe('FeatureIngestionService', () => {
         createValidFeature({ id: 'c', parent: 'b' })
       ];
 
-      await service.ingestFeatures(1, features);
+      await service.ingestFeatures(1, 'some-uuid', features);
 
       // Verify order: all 3 inserts, then 2 parent updates
       expect(callOrder).to.deep.equal(['insert', 'insert', 'insert', 'updateParent', 'updateParent']);
