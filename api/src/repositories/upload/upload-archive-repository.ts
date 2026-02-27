@@ -27,7 +27,10 @@ export class UploadArchiveRepository extends BaseRepository {
     const response = await this.connection.sql(sqlStatement, UploadArchive);
 
     if (response.rowCount === 0) {
-      throw new ApiNotFoundError('Upload archive not found', ['UploadArchiveRepository->getUploadArchive', { uploadArchiveId }]);
+      throw new ApiNotFoundError('Upload archive not found', [
+        'UploadArchiveRepository->getUploadArchive',
+        { uploadArchiveId }
+      ]);
     }
 
     if (response.rowCount !== 1) {

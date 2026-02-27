@@ -26,7 +26,10 @@ export class ContributorRepository extends BaseRepository {
     const response = await this.connection.sql(sql, GetContributor);
 
     if (response.rowCount === 0) {
-      throw new ApiNotFoundError('Contributor not found', ['ContributorRepository->getContributorByClientId', { clientId }]);
+      throw new ApiNotFoundError('Contributor not found', [
+        'ContributorRepository->getContributorByClientId',
+        { clientId }
+      ]);
     }
 
     if (response.rowCount !== 1) {

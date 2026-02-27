@@ -88,7 +88,10 @@ export class DataRequestRepository extends BaseRepository {
     const response = await this.connection.knex(query, FlatDataRequestWithStatus);
 
     if (response.rowCount === 0) {
-      throw new ApiNotFoundError('Data request not found', ['DataRequestRepository->getDataRequestById', { dataRequestId }]);
+      throw new ApiNotFoundError('Data request not found', [
+        'DataRequestRepository->getDataRequestById',
+        { dataRequestId }
+      ]);
     }
 
     if (response.rowCount !== 1) {

@@ -125,7 +125,10 @@ export class CodeRepository extends BaseRepository {
     const response = await this.connection.sql(sqlStatement, FeaturePropertyCode);
 
     if (response.rowCount === 0) {
-      throw new ApiNotFoundError('Feature property not found', ['CodeRepository->getFeaturePropertyByName', { featurePropertyName }]);
+      throw new ApiNotFoundError('Feature property not found', [
+        'CodeRepository->getFeaturePropertyByName',
+        { featurePropertyName }
+      ]);
     }
 
     if (response.rowCount !== 1) {
