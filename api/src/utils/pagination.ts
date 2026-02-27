@@ -25,7 +25,7 @@ const makePaginationOptionsFromSource = (source: Record<string, unknown>): ApiPa
 
   const sort = typeof source.sort === 'string' ? source.sort : undefined;
   const orderRaw = typeof source.order === 'string' ? source.order.toLowerCase() : undefined;
-  const order = orderRaw === 'asc' || orderRaw === 'desc' ? (orderRaw as 'asc' | 'desc') : undefined;
+  const order = orderRaw === 'asc' || orderRaw === 'desc' ? orderRaw : undefined;
 
   return ensureCompletePaginationOptions({ page, limit, sort, order });
 };
