@@ -4,34 +4,36 @@ import { ApiPaginationOptions, ApiPaginationResults } from '../zod-schema/pagina
 export const DEFAULT_PAGINATION_PAGE = 1;
 export const DEFAULT_PAGINATION_LIMIT = 25;
 
-const toNumber = (value: unknown): number | undefined =>
-  typeof value === 'string' || typeof value === 'number' ? Number(value) : undefined;
+const toNumber = (value: unknown): number | undefined => {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  return typeof value === 'number' ? value : Number(value);
+};
 
 /**
  * Shared pagination extractor from a generic object.
  * Works with query params or body params.
  *
  * @param {Record<string, unknown>} source - Object containing pagination keys
- * @return {Partial<ApiPaginationOptions>}
+ * @return {ApiPaginationOptions}
  */
-const makePaginationOptionsFromSource = (source: Record<string, unknown>): Partial<ApiPaginationOptions> => {
+const makePaginationOptionsFromSource = (source: Record<string, unknown>): ApiPaginationOptions => {
   const page = toNumber(source.page);
   const limit = toNumber(source.limit);
 
-  const order =
-    typeof source.order === 'string' && (source.order.toLowerCase() === 'asc' || source.order.toLowerCase() === 'desc')
-      ? (source.order.toLowerCase() as 'asc' | 'desc')
-      : undefined;
-
   const sort = typeof source.sort === 'string' ? source.sort : undefined;
+  const orderRaw = typeof source.order === 'string' ? source.order.toLowerCase() : undefined;
+  const order = orderRaw === 'asc' || orderRaw === 'desc' ? (orderRaw as 'asc' | 'desc') : undefined;
 
-  return { page, limit, sort, order };
+  return ensureCompletePaginationOptions({ page, limit, sort, order });
 };
 
 /**
- * Normalizes partial pagination options to include default page and limit values.
+ * Returns complete pagination options by applying runtime defaults for omitted values.
  */
-export const normalizePaginationOptions = (
+export const ensureCompletePaginationOptions = (
   pagination: Partial<ApiPaginationOptions> = {}
 ): ApiPaginationOptions => ({
   page: pagination.page ?? DEFAULT_PAGINATION_PAGE,
@@ -43,14 +45,14 @@ export const normalizePaginationOptions = (
 /**
  * Extracts pagination from query parameters
  */
-export const makePaginationOptionsFromRequest = (request: Request): Partial<ApiPaginationOptions> => {
+export const makePaginationOptionsFromRequest = (request: Request): ApiPaginationOptions => {
   return makePaginationOptionsFromSource(request.query);
 };
 
 /**
  * Extracts pagination from request body
  */
-export const makePaginationOptionsFromBody = (request: Request): Partial<ApiPaginationOptions> => {
+export const makePaginationOptionsFromBody = (request: Request): ApiPaginationOptions => {
   return makePaginationOptionsFromSource(request.body.pagination ?? {});
 };
 
@@ -67,28 +69,14 @@ export const makePaginationResponse = (
   total: number,
   pagination?: Partial<ApiPaginationOptions>
 ): ApiPaginationResults => {
-  const normalizedPagination = normalizePaginationOptions(pagination);
-  const effectiveLimit = normalizedPagination.limit;
+  const { page, limit, sort, order } = ensureCompletePaginationOptions(pagination);
 
   return {
     total,
-    per_page: effectiveLimit,
-    current_page: normalizedPagination.page,
-    last_page: Math.max(1, Math.ceil(total / effectiveLimit)),
-    sort: normalizedPagination.sort,
-    order: normalizedPagination.order
+    per_page: limit,
+    current_page: page,
+    last_page: Math.max(1, Math.ceil(total / limit)),
+    sort,
+    order
   };
 };
-
-/**
- * Returns `ApiPaginationOptions` if the given pagination object contains all of the necessary request params needed to
- * facilitate pagination, otherwise returns `undefined`.
- *
- * Used in conjunction with the output of `makePaginationOptionsFromRequest`.
- *
- * @param {Partial<ApiPaginationOptions>} pagination
- * @returns {boolean}
- */
-export const ensureCompletePaginationOptions = (
-  pagination?: Partial<ApiPaginationOptions>
-): ApiPaginationOptions => normalizePaginationOptions(pagination);
