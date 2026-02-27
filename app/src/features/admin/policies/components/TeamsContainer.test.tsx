@@ -1,7 +1,7 @@
 import { fireEvent } from '@testing-library/react';
 import { GridColDef } from '@mui/x-data-grid';
 import { useApi } from 'hooks/useApi';
-import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
+import { ITeam } from 'interfaces/useTeamsApi.interface';
 import { MemoryRouter } from 'react-router';
 import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -9,7 +9,7 @@ import { ITeamsContainerProps, TeamsContainer } from './TeamsContainer';
 
 // Types for DataGrid mock
 interface MockDataGridProps {
-  rows: ITeamWithMembers[];
+  rows: ITeam[];
   columns: GridColDef[];
   localeText?: { noRowsLabel?: string };
 }
@@ -25,7 +25,7 @@ vi.mock('@mui/x-data-grid', () => ({
           <div key={row.team_id} data-testid={`row-${row.team_id}`}>
             <span>{row.name}</span>
             <span>{row.description || '-'}</span>
-            <span>{row.members?.length ?? 0}</span>
+            <span>{row.member_count}</span>
             {/* Render actions column */}
             {columns.find((c) => c.field === 'actions')?.renderCell?.({ row } as never)}
           </div>
@@ -38,21 +38,18 @@ vi.mock('@mui/x-data-grid', () => ({
 vi.mock('../../../../hooks/useApi');
 const mockBiohubApi = useApi as Mock;
 
-const mockTeams: ITeamWithMembers[] = [
+const mockTeams: ITeam[] = [
   {
     team_id: 'team-1',
     name: 'Alpha Team',
     description: 'First team',
-    members: [{ team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' }]
+    member_count: 1
   },
   {
     team_id: 'team-2',
     name: 'Beta Team',
     description: null,
-    members: [
-      { team_member_id: 'tm-2', system_user_id: 2, user_identifier: 'bob' },
-      { team_member_id: 'tm-3', system_user_id: 3, user_identifier: 'charlie' }
-    ]
+    member_count: 2
   }
 ];
 
@@ -191,7 +188,7 @@ describe('TeamsContainer', () => {
         expect(mockCreateTeam).toHaveBeenCalledWith({
           name: 'New Team',
           description: 'A new team',
-          member_user_ids: []
+          system_user_ids: []
         });
       });
 
@@ -274,7 +271,7 @@ describe('TeamsContainer', () => {
         expect(mockUpdateTeam).toHaveBeenCalledWith('team-1', {
           name: 'Updated Team',
           description: 'First team',
-          member_user_ids: [1]
+          system_user_ids: []
         });
       });
 

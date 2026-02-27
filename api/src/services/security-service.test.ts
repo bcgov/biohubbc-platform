@@ -211,7 +211,7 @@ describe('SecurityService', () => {
         expect(deleteSecurityRuleFromArtifactStub).to.have.been.calledOnceWith(1, 3);
 
         expect(applySecurityRulesToArtifactStub).to.have.callCount(2);
-        expect(applySecurityRulesToArtifactStub).to.have.been.calledWith(1, 1);
+        expect(applySecurityRulesToArtifactStub.firstCall.args).to.eql([1, 1]);
         expect(applySecurityRulesToArtifactStub).to.have.been.calledWith(1, 2);
       });
     });

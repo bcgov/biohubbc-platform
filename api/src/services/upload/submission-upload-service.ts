@@ -55,11 +55,11 @@ export class SubmissionUploadService extends DBService {
    * Retrieves a submission_upload record by upload_id (reverse lookup).
    *
    * @param {string} uploadId The upload_id to look up
-   * @return {Promise<SubmissionUpload | null>} The submission upload record, or null if not found
+   * @return {Promise<SubmissionUpload | null>} The submission upload record
    * @memberof SubmissionUploadService
    */
-  async findSubmissionUploadByUploadId(uploadId: string): Promise<SubmissionUpload | null> {
-    return this.submissionUploadRepository.findSubmissionUploadByUploadId(uploadId);
+  async getSubmissionUploadByUploadId(uploadId: string): Promise<SubmissionUpload> {
+    return this.submissionUploadRepository.getSubmissionUploadByUploadId(uploadId);
   }
 
   /**

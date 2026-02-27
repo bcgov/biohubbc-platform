@@ -1,19 +1,14 @@
-import { z } from 'zod';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { CreateTeamMember, TeamMember, UpdateTeamMember } from '../../models/team-member';
+import {
+  CreateTeamMember,
+  TeamMember,
+  TeamMemberByUserFilter,
+  TeamMemberWithUser,
+  UpdateTeamMember
+} from '../../models/team-member';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
-
-/**
- * A team member with user details.
- */
-export const TeamMemberWithUser = z.object({
-  team_member_id: z.string().uuid(),
-  system_user_id: z.number(),
-  user_identifier: z.string()
-});
-
-export type TeamMemberWithUser = z.infer<typeof TeamMemberWithUser>;
 
 /**
  * A repository class for accessing team member data.
@@ -90,7 +85,8 @@ export class TeamMemberRepository extends BaseRepository {
     const query = knex
       .table('team_member')
       .select(['team_member_id', 'system_user_id', 'team_id'])
-      .where('team_id', teamId);
+      .where('team_id', teamId)
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, TeamMember);
 
@@ -155,23 +151,124 @@ export class TeamMemberRepository extends BaseRepository {
   }
 
   /**
+   * Soft delete all team members for a team
+   *
+   * @param {string} teamId
+   * @return {Promise<void>}
+   * @memberof TeamMemberRepository
+   */
+  async deleteAllTeamMembers(teamId: string): Promise<void> {
+    const knex = getKnex();
+    const query = knex
+      .table('team_member')
+      .update({
+        record_end_date: knex.fn.now()
+      })
+      .where('team_id', teamId)
+      .returning(['team_id']);
+
+    const response = await this.connection.knex(query);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to delete all team members', [
+        'TeamMemberRepository->deleteAllTeamMembers',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+  }
+
+  /**
    * Get team members with user details for a given team.
    *
    * @param {string} teamId - The ID of the team.
    * @return {Promise<TeamMemberWithUser[]>}
    * @memberof TeamMemberRepository
    */
-  async getTeamMembersWithUsers(teamId: string): Promise<TeamMemberWithUser[]> {
+  async getTeamMembersWithUsers(teamId: string, pagination?: ApiPaginationOptions): Promise<TeamMemberWithUser[]> {
     const knex = getKnex();
+    const sortFieldMap: Record<string, string> = {
+      user_identifier: 'su.user_identifier',
+      system_user_id: 'tm.system_user_id'
+    };
+    const sortField = sortFieldMap[pagination?.sort || ''] || 'su.user_identifier';
     const query = knex
       .table('team_member as tm')
-      .select(['tm.team_member_id', 'tm.system_user_id', 'su.user_identifier'])
+      .select(['tm.team_member_id', 'tm.system_user_id', 'su.user_identifier', 'su.email'])
       .innerJoin('system_user as su', 'tm.system_user_id', 'su.system_user_id')
       .where('tm.team_id', teamId)
       .whereNull('tm.record_end_date')
-      .orderBy('su.user_identifier', 'asc');
+      .orderBy(sortField, pagination?.order || 'asc');
+
+    if (pagination) {
+      query.offset((pagination.page - 1) * pagination.limit).limit(pagination.limit);
+    }
 
     const response = await this.connection.knex(query, TeamMemberWithUser);
     return response.rows;
+  }
+
+  /**
+   * Get a single team member with user details for a team and system user.
+   *
+   * @param {string} teamId - The ID of the team.
+   * @param {number} systemUserId - The system user ID.
+   * @return {Promise<TeamMemberWithUser | null>}
+   * @memberof TeamMemberRepository
+   */
+  async getTeamMemberWithUser(teamMemberData: TeamMemberByUserFilter): Promise<TeamMemberWithUser | null> {
+    const knex = getKnex();
+    const query = knex
+      .table('team_member as tm')
+      .select(['tm.team_member_id', 'tm.system_user_id', 'su.user_identifier', 'su.email'])
+      .innerJoin('system_user as su', 'tm.system_user_id', 'su.system_user_id')
+      .where('tm.team_id', teamMemberData.team_id)
+      .where('tm.system_user_id', teamMemberData.system_user_id)
+      .whereNull('tm.record_end_date')
+      .first();
+
+    const response = await this.connection.knex(query, TeamMemberWithUser);
+    return response.rows[0] ?? null;
+  }
+
+  /**
+   * Get a single active team member for a team and system user.
+   *
+   * @param {TeamMemberByUserFilter} teamMemberData - Team and system user identifiers.
+   * @return {Promise<TeamMember | null>}
+   * @memberof TeamMemberRepository
+   */
+  async getTeamMemberByTeamAndUser(teamMemberData: TeamMemberByUserFilter): Promise<TeamMember | null> {
+    const knex = getKnex();
+    const query = knex
+      .table('team_member')
+      .select(['team_member_id', 'system_user_id', 'team_id'])
+      .where('team_id', teamMemberData.team_id)
+      .where('system_user_id', teamMemberData.system_user_id)
+      .whereNull('record_end_date')
+      .first();
+
+    const response = await this.connection.knex(query, TeamMember);
+    return response.rows[0] ?? null;
+  }
+
+  /**
+   * Get count of active team members for a given team.
+   *
+   * @param {string} teamId - The ID of the team.
+   * @return {Promise<number>}
+   * @memberof TeamMemberRepository
+   */
+  async getTeamMembersWithUsersCount(teamId: string): Promise<number> {
+    const knex = getKnex();
+    const query = knex
+      .table('team_member as tm')
+      .innerJoin('system_user as su', 'tm.system_user_id', 'su.system_user_id')
+      .where('tm.team_id', teamId)
+      .whereNull('tm.record_end_date')
+      .count('* as count')
+      .first();
+
+    const response = await this.connection.knex(query);
+    return Number(response.rows[0]?.count || 0);
   }
 }

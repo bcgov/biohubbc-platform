@@ -2,11 +2,11 @@ import { IDBConnection } from '../../database/db';
 import { parseFeatureUrn } from '../../database/urn-utils';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
-import { makePaginationResponse } from '../../utils/pagination';
-import { ApiPaginationOptions, ApiPaginationResults } from '../../zod-schema/pagination';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
 import {
   CreatePolicyStatementInput,
+  PolicyFilters,
   PolicyStatementWithConditions,
   PolicyWithStatements
 } from './policy-service.interface';
@@ -48,13 +48,26 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Retrieve policies
+   * Retrieve policies with optional filters and pagination.
    *
+   * @param {PolicyFilters} [filters] - Optional filter set.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
    * @return {Promise<Policy[]>}
    * @memberof PolicyService
    */
-  getPolicies(): Promise<Policy[]> {
-    return this.policyRepository.getPolicies();
+  getPolicies(filters?: PolicyFilters, pagination?: ApiPaginationOptions): Promise<Policy[]> {
+    return this.policyRepository.getPolicies(filters, pagination);
+  }
+
+  /**
+   * Retrieve count of policies matching optional filters.
+   *
+   * @param {PolicyFilters} [filters] - Optional filter set.
+   * @return {Promise<number>}
+   * @memberof PolicyService
+   */
+  getPoliciesCount(filters?: PolicyFilters): Promise<number> {
+    return this.policyRepository.getPoliciesCount(filters);
   }
 
   /**
@@ -94,21 +107,18 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Get all policies with their statements, with pagination and search.
+   * Get policies with their statements and conditions.
    *
-   * @param {string} [search] - Optional search term to filter by policy name.
-   * @param {ApiPaginationOptions} pagination - Pagination options.
-   * @return {Promise<{ policies: PolicyWithStatements[]; pagination: ApiPaginationResults }>}
+   * @param {PolicyFilters} [filters] - Optional filter set.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
+   * @return {Promise<PolicyWithStatements[]>}
    * @memberof PolicyService
    */
   async getPoliciesWithStatements(
-    search: string | undefined,
-    pagination: ApiPaginationOptions
-  ): Promise<{
-    policies: PolicyWithStatements[];
-    pagination: ApiPaginationResults;
-  }> {
-    const { policies, total } = await this.policyRepository.getPoliciesWithPagination(search, pagination);
+    filters?: PolicyFilters,
+    pagination?: ApiPaginationOptions
+  ): Promise<PolicyWithStatements[]> {
+    const policies = await this.policyRepository.getPolicies(filters, pagination);
 
     const policiesWithStatements = await Promise.all(
       policies.map(async (policy) => ({
@@ -117,10 +127,7 @@ export class PolicyService extends DBService {
       }))
     );
 
-    return {
-      policies: policiesWithStatements,
-      pagination: makePaginationResponse(total, pagination)
-    };
+    return policiesWithStatements;
   }
 
   /**

@@ -1,6 +1,9 @@
+import { Knex } from 'knex';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
+import { CountResult } from '../../models/count';
 import { CreateTeam, Team, UpdateTeam } from '../../models/team';
+import { TeamFilters } from '../../services/access-policy/team-service.interface';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
@@ -27,7 +30,7 @@ export class TeamRepository extends BaseRepository {
         name: teamData.name,
         description: teamData.description
       })
-      .returning(['team_id', 'name', 'description']);
+      .returning(['team_id', 'name', 'description', knex.raw('0::int as member_count')]);
 
     const response = await this.connection.knex(query, Team);
 
@@ -51,14 +54,18 @@ export class TeamRepository extends BaseRepository {
   async getTeam(teamId: string): Promise<Team> {
     const knex = getKnex();
     const query = knex
-      .table('team')
-      .select(['team_id', 'name', 'description'])
-      .where('team_id', teamId)
-      .whereNull('record_end_date');
+      .from('team as t')
+      .leftJoin('team_member as tm', function () {
+        this.on('t.team_id', '=', 'tm.team_id').andOnNull('tm.record_end_date');
+      })
+      .select(['t.team_id', 't.name', 't.description', knex.raw('COUNT(tm.team_member_id)::int as member_count')])
+      .whereNull('t.record_end_date')
+      .where('t.team_id', teamId)
+      .groupBy(['t.team_id', 't.name', 't.description']);
 
     const response = await this.connection.knex(query, Team);
 
-    if (response.rowCount !== 1) {
+    if (response.rows.length !== 1) {
       throw new ApiExecuteSQLError('Failed to get team', [
         'TeamRepository->getTeam',
         'rowCount was null or undefined, expected rowCount = 1'
@@ -69,14 +76,28 @@ export class TeamRepository extends BaseRepository {
   }
 
   /**
-   * Get all team records.
+   * Get teams with optional search and pagination, including active member count.
    *
-   * @return {Promise<Team[]>} - A list of all team records.
+   * @param {TeamFilters} [filters] - Optional filter set.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
+   * @return {Promise<Team[]>}
    * @memberof TeamRepository
    */
-  async getTeams(): Promise<Team[]> {
+  async getTeams(filters?: TeamFilters, pagination?: ApiPaginationOptions): Promise<Team[]> {
     const knex = getKnex();
-    const query = knex.table('team').select(['team_id', 'name', 'description']).whereNull('record_end_date');
+    const baseQuery = this.applyFilters(knex.table('team as t').whereNull('t.record_end_date'), filters);
+
+    const query = baseQuery
+      .clone()
+      .leftJoin('team_member as tm', function () {
+        this.on('t.team_id', '=', 'tm.team_id').andOnNull('tm.record_end_date');
+      })
+      .select(['t.team_id', 't.name', 't.description', knex.raw('COUNT(tm.team_member_id)::int as member_count')])
+      .groupBy(['t.team_id', 't.name', 't.description']);
+
+    if (pagination) {
+      this.applyPagination(query, pagination);
+    }
 
     const response = await this.connection.knex(query, Team);
 
@@ -84,44 +105,19 @@ export class TeamRepository extends BaseRepository {
   }
 
   /**
-   * Get teams with pagination and optional search.
+   * Get count of teams matching optional search criteria.
    *
-   * @param {string} [search] - Optional search term to filter by team name.
-   * @param {ApiPaginationOptions} pagination - Pagination options.
-   * @return {Promise<{ teams: Team[]; total: number }>}
+   * @param {TeamFilters} [filters] - Optional filter set.
+   * @return {Promise<number>}
    * @memberof TeamRepository
    */
-  async getTeamsWithPagination(
-    search: string | undefined,
-    pagination: ApiPaginationOptions
-  ): Promise<{ teams: Team[]; total: number }> {
+  async getTeamsCount(filters?: TeamFilters): Promise<number> {
     const knex = getKnex();
+    const baseQuery = this.applyFilters(knex.table('team as t').whereNull('t.record_end_date'), filters);
 
-    let baseQuery = knex.table('team').whereNull('record_end_date');
-
-    if (search) {
-      baseQuery = baseQuery.whereILike('name', `%${search}%`);
-    }
-
-    // Build count query
-    const countQuery = baseQuery.clone().count('* as count').first();
-
-    // Build paginated query (1-indexed pagination)
-    const paginatedQuery = baseQuery
-      .clone()
-      .select(['team_id', 'name', 'description'])
-      .orderBy(pagination.sort || 'name', pagination.order || 'asc')
-      .offset((pagination.page - 1) * pagination.limit)
-      .limit(pagination.limit);
-
-    // Execute both queries in parallel
-    const [countResult, response] = await Promise.all([
-      this.connection.knex(countQuery),
-      this.connection.knex(paginatedQuery, Team)
-    ]);
-    const total = Number(countResult.rows[0]?.count || 0);
-
-    return { teams: response.rows, total };
+    const countQuery = baseQuery.clone().select(knex.raw('coalesce(count(*), 0)::integer as count')).first();
+    const countResult = await this.connection.knex(countQuery, CountResult);
+    return countResult.rows[0].count;
   }
 
   /**
@@ -129,10 +125,10 @@ export class TeamRepository extends BaseRepository {
    *
    * @param {string} teamId - The ID of the team to update.
    * @param {UpdateTeam} teamData - The data to update.
-   * @return {Promise<Team>} - The updated team record.
+   * @return {Promise<void>}
    * @memberof TeamRepository
    */
-  async updateTeam(teamId: string, teamData: UpdateTeam): Promise<Team> {
+  async updateTeam(teamId: string, teamData: UpdateTeam): Promise<void> {
     const knex = getKnex();
     const query = knex
       .table('team')
@@ -141,10 +137,9 @@ export class TeamRepository extends BaseRepository {
         description: teamData.description,
         record_end_date: teamData.record_end_date
       })
-      .where('team_id', teamId)
-      .returning(['team_id', 'name', 'description']);
+      .where('team_id', teamId);
 
-    const response = await this.connection.knex(query, Team);
+    const response = await this.connection.knex(query);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to update team', [
@@ -152,8 +147,6 @@ export class TeamRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
-
-    return response.rows[0];
   }
 
   /**
@@ -181,5 +174,24 @@ export class TeamRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
+  }
+
+  /**
+   * Apply team list filters to the provided query.
+   *
+   * @param {Knex.QueryBuilder} query - Base query to filter.
+   * @param {TeamFilters} [filters] - Optional filter set.
+   * @return {Knex.QueryBuilder} Filtered query.
+   */
+  private applyFilters(query: Knex.QueryBuilder, filters?: TeamFilters): Knex.QueryBuilder {
+    if (!filters) {
+      return query;
+    }
+
+    if (filters.search) {
+      query.whereILike('t.name', `%${filters.search}%`);
+    }
+
+    return query;
   }
 }

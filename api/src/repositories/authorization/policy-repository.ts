@@ -1,9 +1,12 @@
+import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { getKnex } from '../../database/db';
 import { FeatureUrn } from '../../database/urn-utils.interface';
 import { ApiExecuteSQLError } from '../../errors/api-error';
+import { CountResult } from '../../models/count';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyEffect } from '../../models/policy-statement';
+import { PolicyFilters } from '../../services/access-policy/policy-service.interface';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
@@ -53,72 +56,57 @@ export class PolicyRepository extends BaseRepository {
    * @memberof PolicyRepository
    */
   async getPolicy(policyId: string): Promise<Policy> {
-    const knex = getKnex();
-    const query = knex.table('policy').select(['policy_id', 'name', 'description']).where('policy_id', policyId);
+    const response = await this.getPolicies({ policyId });
 
-    const response = await this.connection.knex(query, Policy);
-
-    if (response.rowCount !== 1) {
+    if (response.length !== 1) {
       throw new ApiExecuteSQLError('Failed to get policy', [
         'PolicyRepository->getPolicy',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
 
-    return response.rows[0];
+    return response[0];
   }
 
   /**
-   * Get all policy records.
+   * Get policies with optional search and pagination.
    *
-   * @return {Promise<Policy[]>} - A list of all policy records.
+   * @param {PolicyFilters} [filters] - Optional filter set.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
+   * @return {Promise<Policy[]>}
    * @memberof PolicyRepository
    */
-  async getPolicies(): Promise<Policy[]> {
+  async getPolicies(filters?: PolicyFilters, pagination?: ApiPaginationOptions): Promise<Policy[]> {
     const knex = getKnex();
-    const query = knex.table('policy').select(['policy_id', 'name', 'description']);
+    const query = this.applyFilters(knex.table('policy').whereNull('record_end_date'), filters).select([
+      'policy_id',
+      'name',
+      'description'
+    ]);
+
+    if (pagination) {
+      this.applyPagination(query, pagination);
+    }
 
     const response = await this.connection.knex(query, Policy);
-
     return response.rows;
   }
 
   /**
-   * Get policies with pagination and optional search.
+   * Get count of policies matching optional filters.
    *
-   * @param {string} [search] - Optional search term to filter by policy name.
-   * @param {ApiPaginationOptions} pagination - Pagination options.
-   * @return {Promise<{ policies: Policy[]; total: number }>} - Paginated policies and total count.
+   * @param {PolicyFilters} [filters] - Optional filter set.
+   * @return {Promise<number>}
    * @memberof PolicyRepository
    */
-  async getPoliciesWithPagination(
-    search: string | undefined,
-    pagination: ApiPaginationOptions
-  ): Promise<{ policies: Policy[]; total: number }> {
+  async getPoliciesCount(filters?: PolicyFilters): Promise<number> {
     const knex = getKnex();
+    const query = this.applyFilters(knex.table('policy').whereNull('record_end_date'), filters)
+      .select(knex.raw('coalesce(count(*), 0)::integer as count'))
+      .first();
 
-    let baseQuery = knex.table('policy').where('record_end_date', null);
-
-    if (search) {
-      baseQuery = baseQuery.whereILike('name', `%${search}%`);
-    }
-
-    // Get total count
-    const countQuery = baseQuery.clone().count('* as count').first();
-    const countResult = await this.connection.knex(countQuery);
-    const total = Number(countResult.rows[0]?.count || 0);
-
-    // Get paginated results (page is 1-indexed, so offset = (page - 1) * limit)
-    const paginatedQuery = baseQuery
-      .clone()
-      .select(['policy_id', 'name', 'description'])
-      .orderBy(pagination.sort || 'name', pagination.order || 'asc')
-      .offset((pagination.page - 1) * pagination.limit)
-      .limit(pagination.limit);
-
-    const response = await this.connection.knex(paginatedQuery, Policy);
-
-    return { policies: response.rows, total };
+    const response = await this.connection.knex(query, CountResult);
+    return response.rows[0].count;
   }
 
   /**
@@ -222,5 +210,28 @@ export class PolicyRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
+  }
+
+  /**
+   * Apply policy list filters to the provided query.
+   *
+   * @param {Knex.QueryBuilder} query - Base query to filter.
+   * @param {PolicyFilters} [filters] - Optional filter set.
+   * @return {Knex.QueryBuilder} Filtered query.
+   */
+  private applyFilters(query: Knex.QueryBuilder, filters?: PolicyFilters): Knex.QueryBuilder {
+    if (!filters) {
+      return query;
+    }
+
+    if (filters.search) {
+      query.whereILike('name', `%${filters.search}%`);
+    }
+
+    if (filters.policyId) {
+      query.where('policy_id', filters.policyId);
+    }
+
+    return query;
   }
 }
