@@ -40,8 +40,7 @@ export const POST: Operation = [
 ];
 
 GET.apiDoc = {
-  description:
-    'Find all data request records, optionally filtered by date range, requested_by, team_id, or status',
+  description: 'Find all data request records, optionally filtered by date range, requested_by, team_id, or status',
   tags: ['data-request'],
   security: [
     {
@@ -138,9 +137,10 @@ export function findDataRequests(): RequestHandler {
       await connection.open();
 
       const filters = parseQueryParams(req);
+      const systemUserId = connection.systemUserId();
 
       const dataRequestService = new DataRequestService(connection);
-      const dataRequests = await dataRequestService.findDataRequests(filters);
+      const dataRequests = await dataRequestService.findDataRequestsBySystemUserId(systemUserId, filters);
 
       await connection.commit();
 
