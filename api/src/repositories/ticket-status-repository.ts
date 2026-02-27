@@ -9,7 +9,7 @@ import { BaseRepository } from './base-repository';
  */
 export class TicketStatusRepository extends BaseRepository {
   /**
-   * Insert an immutable status history entry for a ticket.
+   * Insert an immutable status entry for a ticket.
    *
    * @param {string} ticketId - Ticket UUID.
    * @param {TicketStatusEnum} status - Status value to append.
@@ -27,7 +27,7 @@ export class TicketStatusRepository extends BaseRepository {
         ${status}
       )
       RETURNING
-        ticket_status_history_id,
+        ticket_status_id,
         ticket_id,
         (
           SELECT su.user_identifier
@@ -51,7 +51,7 @@ export class TicketStatusRepository extends BaseRepository {
   }
 
   /**
-   * Get status history rows for a ticket ordered oldest first.
+   * Get status history for a ticket
    *
    * @param {string} ticketId - Ticket UUID.
    * @return {Promise<TicketStatus[]>} Status rows.
@@ -60,7 +60,7 @@ export class TicketStatusRepository extends BaseRepository {
   async getTicketStatus(ticketId: string): Promise<TicketStatus[]> {
     const sqlStatement = SQL`
       SELECT
-        tsh.ticket_status_history_id,
+        tsh.ticket_status_id,
         tsh.ticket_id,
         su.user_identifier,
         tsh.create_date,

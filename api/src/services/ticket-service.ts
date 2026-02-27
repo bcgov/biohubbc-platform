@@ -4,18 +4,18 @@ import { HTTP400 } from '../errors/http-error';
 import { Team } from '../models/team';
 import { CreateTicketRequest, Ticket, TicketFilters, TicketWithHistory, UpdateTicketRequest } from '../models/ticket';
 import { CreateTicketReferenceRequest, TicketReference } from '../models/ticket-reference';
-import { TicketCommentRepository } from '../repositories/ticket-comment-repository';
 import { TicketRepository } from '../repositories/ticket-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
 import { DBService } from './db-service';
+import { TicketCommentService } from './ticket-comment-service';
 import { TicketReferenceService } from './ticket-reference-service';
 import { TicketStatusService } from './ticket-status-service';
 
 export class TicketService extends DBService {
   teamService: TeamService;
   ticketRepository: TicketRepository;
-  ticketCommentRepository: TicketCommentRepository;
+  ticketCommentService: TicketCommentService;
   ticketStatusService: TicketStatusService;
   ticketReferenceService: TicketReferenceService;
 
@@ -29,13 +29,13 @@ export class TicketService extends DBService {
     super(connection);
     this.teamService = new TeamService(connection);
     this.ticketRepository = new TicketRepository(connection);
-    this.ticketCommentRepository = new TicketCommentRepository(connection);
+    this.ticketCommentService = new TicketCommentService(connection);
     this.ticketStatusService = new TicketStatusService(connection);
     this.ticketReferenceService = new TicketReferenceService(connection);
   }
 
   /**
-   * Create a new ticket and write its initial status history entry.
+   * Create a new ticket and write its initial status entry.
    *
    * @param {CreateTicketRequest} ticket - Ticket payload to create.
    * @return {Promise<Ticket>} The newly created ticket.
@@ -79,14 +79,14 @@ export class TicketService extends DBService {
    * @memberof TicketService
    */
   async getTicket(ticketId: string): Promise<TicketWithHistory> {
-    const [ticket, status_history, comments, references] = await Promise.all([
+    const [ticket, statuses, comments, references] = await Promise.all([
       this.ticketRepository.getTicketById(ticketId),
       this.ticketStatusService.getTicketStatus(ticketId),
-      this.ticketCommentRepository.getTicketComments(ticketId),
+      this.ticketCommentService.getTicketComments(ticketId),
       this.ticketReferenceService.getTicketReferencesForTicket(ticketId)
     ]);
 
-    return { ...ticket, status_history, comments, references };
+    return { ...ticket, statuses, comments, references };
   }
 
   /**

@@ -121,7 +121,7 @@ describe('TicketService', () => {
     it('returns ticket payload with separate status and comment logs when resolved by UUID', async () => {
       const statusLog: TicketStatus[] = [
         {
-          ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
+          ticket_status_id: '33333333-3333-3333-3333-333333333333',
           ticket_id: mockTicket.ticket_id,
           user_identifier: 'Sarah',
           create_date: '2026-02-25T00:00:00.000Z',
@@ -166,7 +166,7 @@ describe('TicketService', () => {
       expect(getReferenceLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(result).to.eql({
         ...mockTicket,
-        status_history: statusLog,
+        statuses: statusLog,
         comments: commentLog,
         references: referenceLog
       });

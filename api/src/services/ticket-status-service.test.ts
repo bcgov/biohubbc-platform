@@ -16,7 +16,7 @@ describe('TicketStatusService', () => {
   const mockTicketId = '11111111-1111-1111-1111-111111111111';
 
   const mockStatusRow: TicketStatus = {
-    ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
+    ticket_status_id: '33333333-3333-3333-3333-333333333333',
     ticket_id: mockTicketId,
     user_identifier: 'Sarah',
     create_date: '2026-02-25T00:00:00.000Z',

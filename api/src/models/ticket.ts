@@ -31,8 +31,8 @@ export const TicketSlug = Ticket.pick({ ticket_slug: true });
 export type TicketSlug = z.infer<typeof TicketSlug>;
 
 export const CreateTicketRequest = z.object({
-  subject: z.string().max(100),
-  description: z.string().max(2000).nullable(),
+  subject: z.string(),
+  description: z.string().nullable(),
   priority: TicketPriority
 });
 
@@ -44,8 +44,8 @@ export type CreateTicketPayload = CreateTicketRequest & {
 };
 
 export const UpdateTicketRequest = z.object({
-  subject: z.string().max(100).optional(),
-  description: z.string().max(2000).nullable().optional(),
+  subject: z.string().optional(),
+  description: z.string().nullable().optional(),
   priority: TicketPriority.optional(),
   status: TicketStatus.optional()
 });
@@ -63,7 +63,7 @@ export * from './ticket-reference';
 export * from './ticket-status';
 
 export const TicketWithHistory = Ticket.extend({
-  status_history: z.array(TicketStatusRecord),
+  statuses: z.array(TicketStatusRecord),
   comments: z.array(TicketComment),
   references: z.array(TicketReference)
 });

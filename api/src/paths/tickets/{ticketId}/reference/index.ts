@@ -51,7 +51,7 @@ POST.apiDoc = {
     }
   },
   responses: {
-    200: {
+    201: {
       description: 'Ticket reference created successfully',
       content: {
         'application/json': {
@@ -76,7 +76,7 @@ export function createTicketReference(): RequestHandler {
 
       await connection.commit();
 
-      return res.status(200).json(createdReference);
+      return res.status(201).json(createdReference);
     } catch (error) {
       defaultLog.error({ label: 'createTicketReference', message: 'error', error });
       await connection.rollback();

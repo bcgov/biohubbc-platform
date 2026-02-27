@@ -51,7 +51,7 @@ POST.apiDoc = {
     }
   },
   responses: {
-    200: {
+    201: {
       description: 'Ticket comment created successfully',
       content: {
         'application/json': {
@@ -79,7 +79,7 @@ export function createTicketComment(): RequestHandler {
 
       await connection.commit();
 
-      return res.status(200).json(createdComment);
+      return res.status(201).json(createdComment);
     } catch (error) {
       defaultLog.error({ label: 'createTicketComment', message: 'error', error });
       await connection.rollback();

@@ -92,7 +92,7 @@ export async function up(knex: Knex): Promise<void> {
     --------------------------------------------------------------------------------
 
     CREATE TABLE ticket_status (
-      ticket_status_history_id uuid DEFAULT gen_random_uuid() NOT NULL,
+      ticket_status_id uuid DEFAULT gen_random_uuid() NOT NULL,
       ticket_id uuid NOT NULL,
       status ticket_status_type NOT NULL,
       record_end_date timestamptz(6),
@@ -101,7 +101,7 @@ export async function up(knex: Knex): Promise<void> {
       update_date timestamptz(6),
       update_user integer,
       revision_count integer DEFAULT 0 NOT NULL,
-      CONSTRAINT ticket_status_pk PRIMARY KEY (ticket_status_history_id),
+      CONSTRAINT ticket_status_pk PRIMARY KEY (ticket_status_id),
       CONSTRAINT ticket_status_ticket_fk FOREIGN KEY (ticket_id) REFERENCES ticket(ticket_id)
     );
 
@@ -109,7 +109,7 @@ export async function up(knex: Knex): Promise<void> {
       ON ticket_status(ticket_id, create_date DESC);
 
     COMMENT ON TABLE ticket_status IS 'Immutable append-only log of ticket status transitions.';
-    COMMENT ON COLUMN ticket_status.ticket_status_history_id IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN ticket_status.ticket_status_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN ticket_status.ticket_id IS 'Foreign key to the ticket.';
     COMMENT ON COLUMN ticket_status.status IS 'Ticket status after the transition.';
     COMMENT ON COLUMN ticket_status.record_end_date IS 'Timestamp for soft delete; null when record is active.';

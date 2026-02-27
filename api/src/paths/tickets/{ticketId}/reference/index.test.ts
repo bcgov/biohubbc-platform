@@ -49,7 +49,7 @@ describe('paths/tickets/{ticketId}/reference', () => {
       target_ticket_id: targetTicketId,
       relationship: 'relates_to'
     });
-    expect(mockRes.statusValue).to.equal(200);
+    expect(mockRes.statusValue).to.equal(201);
     expect(mockRes.jsonValue).to.eql(createdReference);
   });
 });

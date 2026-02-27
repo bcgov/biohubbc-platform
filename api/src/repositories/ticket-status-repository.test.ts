@@ -35,7 +35,7 @@ describe('TicketStatusRepository', () => {
 
     it('returns inserted status history row', async () => {
       const mockRow: TicketStatus = {
-        ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
+        ticket_status_id: '33333333-3333-3333-3333-333333333333',
         ticket_id: mockTicketId,
         user_identifier: 'Sarah',
         create_date: '2026-02-25T00:00:00.000Z',
@@ -54,7 +54,7 @@ describe('TicketStatusRepository', () => {
     it('returns rows ordered by query', async () => {
       const rows: TicketStatus[] = [
         {
-          ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
+          ticket_status_id: '33333333-3333-3333-3333-333333333333',
           ticket_id: mockTicketId,
           user_identifier: 'Sarah',
           create_date: '2026-02-25T00:00:00.000Z',

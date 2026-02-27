@@ -34,7 +34,7 @@ export class TicketStatusService extends DBService {
   }
 
   /**
-   * Get status history rows for a ticket ordered oldest first.
+   * Get status history for a ticket
    *
    * @param {string} ticketId - Ticket UUID.
    * @return {Promise<TicketStatus[]>} Status rows.

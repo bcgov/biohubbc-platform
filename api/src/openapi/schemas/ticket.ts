@@ -72,7 +72,7 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
     'create_date',
     'priority',
     'status',
-    'status_history',
+    'statuses',
     'comments',
     'references'
   ],
@@ -85,13 +85,14 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
     create_date: { type: 'string', format: 'date-time' },
     priority: { type: 'string', enum: TicketPriorityEnum },
     status: { type: 'string', enum: TicketStatusEnum },
-    status_history: {
+    statuses: {
+      description: 'Status change history for the ticket.',
       type: 'array',
       items: {
         type: 'object',
-        required: ['ticket_status_history_id', 'ticket_id', 'user_identifier', 'create_date', 'status'],
+        required: ['ticket_status_id', 'ticket_id', 'user_identifier', 'create_date', 'status'],
         properties: {
-          ticket_status_history_id: { type: 'string', format: 'uuid' },
+          ticket_status_id: { type: 'string', format: 'uuid' },
           ticket_id: { type: 'string', format: 'uuid' },
           user_identifier: { type: 'string' },
           create_date: { type: 'string', format: 'date-time' },
@@ -174,15 +175,13 @@ export const CreateTicketReferenceRequestSchema: OpenAPIV3.SchemaObject = {
 
 export const TicketStatusSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['ticket_id', 'user_identifier', 'create_date'],
+  required: ['ticket_status_id', 'ticket_id', 'user_identifier', 'create_date', 'status'],
   properties: {
-    ticket_status_history_id: { type: 'string', format: 'uuid', nullable: true },
-    ticket_comment_id: { type: 'string', format: 'uuid', nullable: true },
+    ticket_status_id: { type: 'string', format: 'uuid' },
     ticket_id: { type: 'string', format: 'uuid' },
     user_identifier: { type: 'string' },
     create_date: { type: 'string', format: 'date-time' },
-    status: { type: 'string', enum: TicketStatusEnum, nullable: true },
-    comment: { type: 'string', nullable: true }
+    status: { type: 'string', enum: TicketStatusEnum }
   }
 };
 
