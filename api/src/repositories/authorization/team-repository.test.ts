@@ -4,7 +4,6 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { Team } from '../../models/team';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { TeamRepository } from './team-repository';
 
@@ -47,7 +46,7 @@ describe('TeamRepository', () => {
 
   describe('getTeam', () => {
     it('returns a team by ID', async () => {
-      const mockRows = [{ team_id: 1, name: 'Team A', description: 'Description A' }];
+      const mockRows = [{ team_id: 1, name: 'Team A', description: 'Description A', member_count: 3 }];
       const mockResponse = {
         rowCount: 1,
         rows: mockRows
@@ -75,10 +74,10 @@ describe('TeamRepository', () => {
   });
 
   describe('getTeams', () => {
-    it('returns all teams', async () => {
+    it('returns all teams with member_count', async () => {
       const mockRows = [
-        { team_id: 1, name: 'Team A', description: 'Description A' },
-        { team_id: 2, name: 'Team B', description: 'Description B' }
+        { team_id: 1, name: 'Team A', description: 'Description A', member_count: 0 },
+        { team_id: 2, name: 'Team B', description: 'Description B', member_count: 2 }
       ];
       const mockResponse = {
         rowCount: 2,
@@ -93,7 +92,10 @@ describe('TeamRepository', () => {
     });
 
     it('returns empty array if no teams', async () => {
-      const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
+      const mockResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as Promise<QueryResult<any>>;
       const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
       const repository = new TeamRepository(mockConnection);
 
@@ -102,92 +104,128 @@ describe('TeamRepository', () => {
     });
   });
 
-  describe('getTeamsWithPagination', () => {
-    it('returns paginated teams with total count', async () => {
-      const mockTeams: Team[] = [
-        { team_id: '11111111-1111-1111-1111-111111111111', name: 'Team Alpha', description: 'First team' },
-        { team_id: '22222222-2222-2222-2222-222222222222', name: 'Team Beta', description: 'Second team' }
+  describe('getTeams with pagination', () => {
+    it('returns paginated teams', async () => {
+      const mockTeams = [
+        {
+          team_id: '11111111-1111-1111-1111-111111111111',
+          name: 'Team Alpha',
+          description: 'First team',
+          member_count: 1
+        },
+        {
+          team_id: '22222222-2222-2222-2222-222222222222',
+          name: 'Team Beta',
+          description: 'Second team',
+          member_count: 0
+        }
       ];
 
-      // First call returns count, second returns teams
-      const knexStub = sinon.stub();
-      knexStub.onFirstCall().resolves({ rows: [{ count: '5' }] });
-      knexStub.onSecondCall().resolves({ rows: mockTeams });
+      const mockResponse = {
+        rowCount: 2,
+        rows: mockTeams
+      } as unknown as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
 
       const repository = new TeamRepository(mockDBConnection);
-      const result = await repository.getTeamsWithPagination(undefined, { page: 1, limit: 2 });
+      const result = await repository.getTeams(undefined, { page: 1, limit: 2 });
 
-      expect(result.teams).to.eql(mockTeams);
-      expect(result.total).to.equal(5);
+      expect(result).to.eql(mockTeams);
     });
 
     it('filters by search term', async () => {
       const mockTeams = [{ team_id: 'uuid-1', name: 'Research Team', description: 'Research group' }];
 
-      const knexStub = sinon.stub();
-      knexStub.onFirstCall().resolves({ rows: [{ count: '1' }] });
-      knexStub.onSecondCall().resolves({ rows: mockTeams });
+      const mockResponse = {
+        rowCount: 1,
+        rows: mockTeams
+      } as unknown as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
 
       const repository = new TeamRepository(mockDBConnection);
-      const result = await repository.getTeamsWithPagination('Research', { page: 1, limit: 50 });
+      const result = await repository.getTeams({ search: 'Research' }, { page: 1, limit: 50 });
 
-      expect(result.teams).to.eql(mockTeams);
-      expect(result.total).to.equal(1);
+      expect(result).to.eql(mockTeams);
     });
 
     it('returns empty array when no teams exist', async () => {
-      const knexStub = sinon.stub();
-      knexStub.onFirstCall().resolves({ rows: [{ count: '0' }] });
-      knexStub.onSecondCall().resolves({ rows: [] });
+      const mockResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
 
       const repository = new TeamRepository(mockDBConnection);
-      const result = await repository.getTeamsWithPagination(undefined, { page: 1, limit: 50 });
+      const result = await repository.getTeams(undefined, { page: 1, limit: 50 });
 
-      expect(result.teams).to.eql([]);
-      expect(result.total).to.equal(0);
+      expect(result).to.eql([]);
     });
 
     it('calculates correct offset for page > 1', async () => {
       const mockTeams = [{ team_id: 'uuid-3', name: 'Team Gamma', description: 'Third team' }];
 
-      const knexStub = sinon.stub();
-      knexStub.onFirstCall().resolves({ rows: [{ count: '10' }] });
-      knexStub.onSecondCall().resolves({ rows: mockTeams });
+      const mockResponse = {
+        rowCount: 1,
+        rows: mockTeams
+      } as unknown as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
 
       const repository = new TeamRepository(mockDBConnection);
-      const result = await repository.getTeamsWithPagination(undefined, { page: 2, limit: 3 });
+      const result = await repository.getTeams(undefined, { page: 2, limit: 3 });
 
-      // Page 2 with limit 3 should offset by 3 ((2-1) * 3) for 1-indexed pagination
-      expect(result.teams).to.eql(mockTeams);
-      expect(result.total).to.equal(10);
+      expect(result).to.eql(mockTeams);
+    });
+  });
+
+  describe('getTeamsCount', () => {
+    it('returns count for matching teams', async () => {
+      const mockResponse = {
+        rowCount: 1,
+        rows: [{ count: 2 }]
+      } as unknown as Promise<QueryResult<any>>;
+      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
+      const repository = new TeamRepository(mockConnection);
+
+      const result = await repository.getTeamsCount();
+
+      expect(result).to.equal(2);
+    });
+
+    it('returns 0 when count query has no rows', async () => {
+      const mockResponse = {
+        rowCount: 1,
+        rows: [{ count: 0 }]
+      } as unknown as Promise<QueryResult<any>>;
+      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
+      const repository = new TeamRepository(mockConnection);
+
+      const result = await repository.getTeamsCount({ search: 'Research' });
+
+      expect(result).to.equal(0);
     });
   });
 
   describe('updateTeam', () => {
-    it('returns updated team record', async () => {
-      const mockRows = [{ team_id: 1, name: 'Team A Updated', description: 'Updated Desc' }];
+    it('updates team record', async () => {
       const mockResponse = {
-        rowCount: 1,
-        rows: mockRows
+        rowCount: 1
       } as unknown as Promise<QueryResult<any>>;
 
-      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
+      const knexStub = sinon.stub().resolves(mockResponse);
+      const mockConnection = getMockDBConnection({ knex: knexStub });
       const repository = new TeamRepository(mockConnection);
 
-      const result = await repository.updateTeam('1', {
+      await repository.updateTeam('1', {
         name: 'Team A Updated',
         description: 'Updated Desc',
         record_end_date: new Date().toISOString()
       });
-      expect(result).to.eql(mockRows[0]);
+
+      expect(knexStub).to.have.been.calledOnce;
     });
 
     it('throws error if update fails', async () => {

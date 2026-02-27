@@ -3,6 +3,7 @@ import { getAPIUserDBConnection } from '../../database/db';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { getLogger } from '../../utils/logger';
+import { publishIndexSubmissionFeaturesJob } from '../publisher';
 
 const defaultLog = getLogger('queue/jobs/process-submission-features-job');
 
@@ -23,7 +24,6 @@ export interface IProcessSubmissionFeaturesJobData {
  * 2. Extracts and validates features
  * 3. Inserts feature records
  * 4. Indexes features for search
- * 5. Calculates and adds geographic regions
  *
  * @param {PgBoss.Job<IProcessSubmissionFeaturesJobData>[]} jobs The jobs to process
  * @return {*}  {Promise<void>}
@@ -77,6 +77,18 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IProcessSub
       // Update validation status to completed
       await submissionValidationService.updateSubmissionValidationStatus(job.id, 'completed');
       await connection.commit();
+
+      // Publish indexing job (fire-and-forget — failure here doesn't affect validation).
+      // Validation success is the critical path; indexing can be retried independently via admin endpoint.
+      const indexResult = await publishIndexSubmissionFeaturesJob(connection, { submissionId });
+      if (indexResult.status !== 'published') {
+        defaultLog.warn({
+          label: 'processSubmissionFeaturesJobHandler',
+          message: 'Index submission features job not published',
+          submissionId,
+          indexResult
+        });
+      }
 
       defaultLog.info({
         label: 'processSubmissionFeaturesJobHandler',

@@ -162,7 +162,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
       expect(mockRes.jsonValue).to.eql(mockUpdatedPolicy);
     });
 
-    it('should call service.updatePolicyWithStatements with empty statements array', async () => {
+    it('should call service.updatePolicyWithStatements with provided empty statements array', async () => {
       const dbConnectionObj = getMockDBConnection({
         commit: sinon.stub(),
         rollback: sinon.stub(),
@@ -188,7 +188,8 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         policyId: '123'
       };
       mockReq.body = {
-        name: 'Policy No Statements'
+        name: 'Policy No Statements',
+        statements: []
       };
 
       const requestHandler = updatePolicy();

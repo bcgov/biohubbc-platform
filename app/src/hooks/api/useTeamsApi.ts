@@ -1,10 +1,11 @@
 import { AxiosInstance } from 'axios';
 import {
-  ITeamWithMembers,
+  ITeam,
   ITeamsResponse,
   ICreateTeamRequest,
   IUpdateTeamRequest,
-  IAvailableUsersResponse
+  IAvailableUsersResponse,
+  ITeamMembersResponse
 } from 'interfaces/useTeamsApi.interface';
 import { ApiPaginationRequestOptions, ApiSearchParams } from 'types/pagination';
 
@@ -36,9 +37,9 @@ export const useTeamsApi = (axios: AxiosInstance) => {
    * Get a single team by ID.
    *
    * @param {string} teamId
-   * @return {*} {Promise<ITeamWithMembers>}
+   * @return {*} {Promise<ITeam>}
    */
-  const getTeam = async (teamId: string): Promise<ITeamWithMembers> => {
+  const getTeam = async (teamId: string): Promise<ITeam> => {
     const { data } = await axios.get(`/api/administrative/teams/${teamId}`);
 
     return data;
@@ -48,9 +49,9 @@ export const useTeamsApi = (axios: AxiosInstance) => {
    * Create a new team.
    *
    * @param {ICreateTeamRequest} team
-   * @return {*} {Promise<ITeamWithMembers>}
+   * @return {*} {Promise<ITeam>}
    */
-  const createTeam = async (team: ICreateTeamRequest): Promise<ITeamWithMembers> => {
+  const createTeam = async (team: ICreateTeamRequest): Promise<ITeam> => {
     const { data } = await axios.post('/api/administrative/teams', team);
 
     return data;
@@ -61,9 +62,9 @@ export const useTeamsApi = (axios: AxiosInstance) => {
    *
    * @param {string} teamId
    * @param {IUpdateTeamRequest} team
-   * @return {*} {Promise<ITeamWithMembers>}
+   * @return {*} {Promise<ITeam>}
    */
-  const updateTeam = async (teamId: string, team: IUpdateTeamRequest): Promise<ITeamWithMembers> => {
+  const updateTeam = async (teamId: string, team: IUpdateTeamRequest): Promise<ITeam> => {
     const { data } = await axios.put(`/api/administrative/teams/${teamId}`, team);
 
     return data;
@@ -93,12 +94,27 @@ export const useTeamsApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Get members for a team.
+   *
+   * @param {string} teamId
+   * @return {*} {Promise<ITeamMembersResponse>}
+   */
+  const getTeamMembers = async (teamId: string): Promise<ITeamMembersResponse> => {
+    const { data } = await axios.get(`/api/administrative/teams/${teamId}/member`, {
+      params: { page: 1, limit: 1000 }
+    });
+
+    return data;
+  };
+
   return {
     getTeams,
     getTeam,
     createTeam,
     updateTeam,
     deleteTeam,
-    getAvailableUsers
+    getAvailableUsers,
+    getTeamMembers
   };
 };

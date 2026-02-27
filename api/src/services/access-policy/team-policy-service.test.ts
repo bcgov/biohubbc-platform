@@ -61,9 +61,41 @@ describe('TeamPolicyService', () => {
     });
   });
 
-  describe('getTeamPolicies', () => {
-    it('should call repository.getTeamPolicies and return the records for a team', async () => {
-      const mockTeamPolicies: TeamPolicy[] = [
+  describe('createTeamPolicies', () => {
+    it('should create unique policies in bulk when none exist', async () => {
+      const getExistingStub = sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([]);
+
+      const insertStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy');
+      insertStub.onCall(0).resolves({
+        team_policy_id: '11111111-1111-1111-1111-111111111111',
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '33333333-3333-3333-3333-333333333333'
+      });
+      insertStub.onCall(1).resolves({
+        team_policy_id: '44444444-4444-4444-4444-444444444444',
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '55555555-5555-5555-5555-555555555555'
+      });
+
+      const result = await service.createTeamPolicies('22222222-2222-2222-2222-222222222222', [
+        '33333333-3333-3333-3333-333333333333',
+        '55555555-5555-5555-5555-555555555555'
+      ]);
+
+      expect(getExistingStub).to.have.been.calledOnceWith('22222222-2222-2222-2222-222222222222', {
+        policyIds: ['33333333-3333-3333-3333-333333333333', '55555555-5555-5555-5555-555555555555']
+      });
+
+      expect(insertStub).to.have.been.calledTwice;
+      expect(insertStub.firstCall).to.have.been.calledWith({
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '33333333-3333-3333-3333-333333333333'
+      });
+      expect(insertStub.secondCall).to.have.been.calledWith({
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '55555555-5555-5555-5555-555555555555'
+      });
+      expect(result).to.eql([
         {
           team_policy_id: '11111111-1111-1111-1111-111111111111',
           team_id: '22222222-2222-2222-2222-222222222222',
@@ -74,11 +106,71 @@ describe('TeamPolicyService', () => {
           team_id: '22222222-2222-2222-2222-222222222222',
           policy_id: '55555555-5555-5555-5555-555555555555'
         }
+      ]);
+    });
+
+    it('should skip policies that already exist and de-duplicate input policy ids', async () => {
+      const getExistingStub = sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([
+        {
+          team_policy_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          team_id: '22222222-2222-2222-2222-222222222222',
+          policy_id: '33333333-3333-3333-3333-333333333333',
+          team_name: 'Team 1',
+          policy_name: 'Policy A'
+        }
+      ]);
+
+      const insertStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy').resolves({
+        team_policy_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '55555555-5555-5555-5555-555555555555'
+      });
+
+      const result = await service.createTeamPolicies('22222222-2222-2222-2222-222222222222', [
+        '33333333-3333-3333-3333-333333333333',
+        '33333333-3333-3333-3333-333333333333',
+        '55555555-5555-5555-5555-555555555555'
+      ]);
+
+      expect(getExistingStub).to.have.been.calledOnceWith('22222222-2222-2222-2222-222222222222', {
+        policyIds: ['33333333-3333-3333-3333-333333333333', '55555555-5555-5555-5555-555555555555']
+      });
+      expect(insertStub).to.have.been.calledOnceWith({
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '55555555-5555-5555-5555-555555555555'
+      });
+      expect(result).to.eql([
+        {
+          team_policy_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+          team_id: '22222222-2222-2222-2222-222222222222',
+          policy_id: '55555555-5555-5555-5555-555555555555'
+        }
+      ]);
+    });
+  });
+
+  describe('getPoliciesByTeamId', () => {
+    it('should call repository.getPoliciesByTeamId and return the records for a team', async () => {
+      const mockTeamPolicies: TeamPolicyDetails[] = [
+        {
+          team_policy_id: '11111111-1111-1111-1111-111111111111',
+          team_id: '22222222-2222-2222-2222-222222222222',
+          policy_id: '33333333-3333-3333-3333-333333333333',
+          team_name: 'Team 1',
+          policy_name: 'Policy A'
+        },
+        {
+          team_policy_id: '44444444-4444-4444-4444-444444444444',
+          team_id: '22222222-2222-2222-2222-222222222222',
+          policy_id: '55555555-5555-5555-5555-555555555555',
+          team_name: 'Team 1',
+          policy_name: 'Policy B'
+        }
       ];
 
-      const stub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves(mockTeamPolicies);
+      const stub = sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves(mockTeamPolicies);
 
-      const result = await service.getTeamPolicies('22222222-2222-2222-2222-222222222222');
+      const result = await service.getPoliciesByTeamId('22222222-2222-2222-2222-222222222222');
 
       expect(stub).to.have.been.calledWith('22222222-2222-2222-2222-222222222222');
       expect(result).to.eql(mockTeamPolicies);
@@ -86,7 +178,7 @@ describe('TeamPolicyService', () => {
   });
 
   describe('getAllTeamPolicies', () => {
-    it('should call repository.getAllTeamPolicies and return all team-policy associations with names', async () => {
+    it('should call repository.getTeamPolicies and return all team-policy associations with names', async () => {
       const mockTeamPolicies: TeamPolicyDetails[] = [
         {
           team_policy_id: '11111111-1111-1111-1111-111111111111',
@@ -97,12 +189,25 @@ describe('TeamPolicyService', () => {
         }
       ];
 
-      const stub = sinon.stub(TeamPolicyRepository.prototype, 'getAllTeamPolicies').resolves(mockTeamPolicies);
+      const stub = sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicies').resolves(mockTeamPolicies);
 
       const result = await service.getAllTeamPolicies();
+      const filters = undefined;
+      const pagination = undefined;
 
       expect(stub).to.have.been.calledOnce;
+      expect(stub).to.have.been.calledWith(filters, pagination);
       expect(result).to.eql(mockTeamPolicies);
+    });
+  });
+
+  describe('getAllTeamPoliciesCount', () => {
+    it('should call repository.getAllTeamPoliciesCount and return count', async () => {
+      const stub = sinon.stub(TeamPolicyRepository.prototype, 'getAllTeamPoliciesCount').resolves(2);
+      const result = await service.getAllTeamPoliciesCount({ search: 'Team' });
+
+      expect(stub).to.have.been.calledWith({ search: 'Team' });
+      expect(result).to.equal(2);
     });
   });
 

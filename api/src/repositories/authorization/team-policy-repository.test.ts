@@ -78,10 +78,9 @@ describe('TeamPolicyRepository', () => {
 
   describe('getTeamPolicies', () => {
     it('returns all team policies', async () => {
-      const mockTeamId = '11';
       const mockRows = [
-        { team_policy_id: 1, team_id: mockTeamId, policy_id: '123abc' },
-        { team_policy_id: 2, team_id: mockTeamId, policy_id: '456xyz' }
+        { team_policy_id: 1, team_id: '11', policy_id: '123abc', team_name: 'Team 1', policy_name: 'Policy A' },
+        { team_policy_id: 2, team_id: '11', policy_id: '456xyz', team_name: 'Team 1', policy_name: 'Policy B' }
       ];
       const mockResponse = {
         rowCount: 2,
@@ -91,7 +90,7 @@ describe('TeamPolicyRepository', () => {
       const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
 
       const repository = new TeamPolicyRepository(mockConnection);
-      const result = await repository.getTeamPolicies(mockTeamId);
+      const result = await repository.getTeamPolicies();
 
       expect(result).to.eql(mockRows);
     });
@@ -101,14 +100,11 @@ describe('TeamPolicyRepository', () => {
       const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
 
       const repository = new TeamPolicyRepository(mockConnection);
-      const result = await repository.getTeamPolicies('15');
+      const result = await repository.getTeamPolicies();
 
       expect(result).to.eql([]);
     });
-  });
-
-  describe('getAllTeamPolicies', () => {
-    it('returns all team-policy associations with names', async () => {
+    it('returns all active team-policy associations with pagination options', async () => {
       const mockRows = [
         {
           team_policy_id: '11111111-1111-1111-1111-111111111111',
@@ -124,21 +120,62 @@ describe('TeamPolicyRepository', () => {
       } as unknown as Promise<QueryResult<any>>;
 
       const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
-
       const repository = new TeamPolicyRepository(mockConnection);
-      const result = await repository.getAllTeamPolicies();
+
+      const result = await repository.getTeamPolicies({ search: 'Test' }, { page: 1, limit: 10 });
+
+      expect(result).to.eql(mockRows);
+    });
+  });
+
+  describe('getPoliciesByTeamId', () => {
+    it('returns active team policies for a team filtered by policy ids', async () => {
+      const mockRows = [
+        {
+          team_policy_id: '11111111-1111-1111-1111-111111111111',
+          team_id: '22222222-2222-2222-2222-222222222222',
+          policy_id: '33333333-3333-3333-3333-333333333333',
+          team_name: 'Test Team',
+          policy_name: 'Test Policy'
+        }
+      ];
+      const mockResponse = {
+        rowCount: 1,
+        rows: mockRows
+      } as unknown as Promise<QueryResult<any>>;
+      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
+      const repository = new TeamPolicyRepository(mockConnection);
+
+      const result = await repository.getPoliciesByTeamId('22222222-2222-2222-2222-222222222222', {
+        policyIds: ['33333333-3333-3333-3333-333333333333', '55555555-5555-5555-5555-555555555555']
+      });
 
       expect(result).to.eql(mockRows);
     });
 
-    it('returns empty array if no team-policy associations exist', async () => {
-      const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
-      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
+    it('does not apply policy id filter when policyIds is empty', async () => {
+      const mockRows = [
+        {
+          team_policy_id: '11111111-1111-1111-1111-111111111111',
+          team_id: '22222222-2222-2222-2222-222222222222',
+          policy_id: '33333333-3333-3333-3333-333333333333',
+          team_name: 'Test Team',
+          policy_name: 'Test Policy'
+        }
+      ];
+      const mockResponse = {
+        rowCount: 1,
+        rows: mockRows
+      } as unknown as Promise<QueryResult<any>>;
 
+      const knexStub = sinon.stub().resolves(mockResponse);
+      const mockConnection = getMockDBConnection({ knex: knexStub });
       const repository = new TeamPolicyRepository(mockConnection);
-      const result = await repository.getAllTeamPolicies();
 
-      expect(result).to.eql([]);
+      const result = await repository.getPoliciesByTeamId('22222222-2222-2222-2222-222222222222', { policyIds: [] });
+
+      expect(result).to.eql(mockRows);
+      expect(knexStub).to.have.been.calledOnce;
     });
   });
 

@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { CreateDataRequest, DataRequest, FlatDataRequestWithStatus, UpdateDataRequest } from '../models/data-request';
 import { DataRequestStatus, DataRequestStatusEnum } from '../models/data-request-status';
-import { TeamMember } from '../models/team-member';
+import { TeamMemberWithUser } from '../models/team-member';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { TeamMemberService } from './access-policy/team-member-service';
@@ -43,10 +43,11 @@ describe('DataRequestService', () => {
     request_status: 'REQUESTED'
   };
 
-  const mockTeamMember: TeamMember = {
+  const mockTeamMember: TeamMemberWithUser = {
     team_member_id: 'd4e5f6a7-b8c9-0123-defa-234567890123',
     system_user_id: 1,
-    team_id: mockDataRequest.team_id
+    user_identifier: 'user_1',
+    email: 'user_1@test.com'
   };
 
   describe('findDataRequestById', () => {
@@ -225,7 +226,7 @@ describe('DataRequestService', () => {
       const newTeamId = 'e5f6a7b8-c9d0-1234-efab-345678901234';
       const teamStub = sinon
         .stub(TeamService.prototype, 'createTeam')
-        .resolves({ team_id: newTeamId, name: 'test', description: null });
+        .resolves({ team_id: newTeamId, name: 'test', description: null, member_count: 0 });
       const memberStub = sinon.stub(TeamMemberService.prototype, 'createTeamMember').resolves(mockTeamMember);
       sinon.stub(DataRequestRepository.prototype, 'createDataRequest').resolves({
         ...mockDataRequest,

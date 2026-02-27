@@ -170,4 +170,37 @@ describe('TeamMemberRepository', () => {
       }
     });
   });
+
+  describe('deleteAllTeamMembers', () => {
+    it('soft deletes all team members successfully', async () => {
+      const mockResponse = {
+        rowCount: 1,
+        rows: [{ team_id: 'team-1' }]
+      } as unknown as Promise<QueryResult<any>>;
+
+      const knexStub = sinon.stub().resolves(mockResponse);
+      const mockConnection = getMockDBConnection({
+        knex: knexStub
+      });
+
+      const repository = new TeamMemberRepository(mockConnection);
+      await repository.deleteAllTeamMembers('team-1');
+
+      expect(knexStub).to.have.been.calledOnce;
+    });
+
+    it('throws error if delete fails', async () => {
+      const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
+      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+      const repository = new TeamMemberRepository(mockConnection);
+
+      try {
+        await repository.deleteAllTeamMembers('1');
+        expect.fail();
+      } catch (error) {
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to delete all team members');
+      }
+    });
+  });
 });
