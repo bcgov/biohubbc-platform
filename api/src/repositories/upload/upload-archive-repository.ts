@@ -1,5 +1,5 @@
 import { SQL } from 'sql-template-strings';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CreateUploadArchive, UpdateUploadArchive, UploadArchive } from '../../models/upload-archive';
 import { BaseRepository } from '../base-repository';
 
@@ -26,10 +26,14 @@ export class UploadArchiveRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, UploadArchive);
 
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Upload archive not found', ['UploadArchiveRepository->getUploadArchive', { uploadArchiveId }]);
+    }
+
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get upload archive record', [
+      throw new ApiExecuteSQLError('Unexpected row count', [
         'UploadArchiveRepository->getUploadArchive',
-        `rowCount was ${response.rowCount}, expected 1`
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 
@@ -100,10 +104,17 @@ export class UploadArchiveRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, UploadArchive);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get upload archive record', [
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Upload archive not found', [
         'UploadArchiveRepository->getUploadArchiveByArtifactId',
-        `rowCount was ${response.rowCount}, expected 1`
+        { artifactId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'UploadArchiveRepository->getUploadArchiveByArtifactId',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 

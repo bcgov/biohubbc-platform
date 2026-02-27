@@ -101,7 +101,7 @@ describe('PolicyStatementRepository', () => {
         await repository.getPolicyStatement('1');
         expect.fail();
       } catch (error) {
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get policy statement');
+        expect((error as ApiExecuteSQLError).message).to.equal('Policy statement not found');
       }
     });
   });

@@ -77,7 +77,7 @@ describe('PolicyRepository', () => {
         await repository.getPolicy('1');
         expect.fail();
       } catch (error) {
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get policy');
+        expect((error as ApiExecuteSQLError).message).to.equal('Policy not found');
       }
     });
   });

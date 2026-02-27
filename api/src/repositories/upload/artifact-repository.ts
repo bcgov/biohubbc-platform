@@ -1,6 +1,6 @@
 import { SQL } from 'sql-template-strings';
 import z from 'zod';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { Artifact, CreateArtifact, UpdateArtifact } from '../../models/artifact';
 import { BaseRepository } from '../base-repository';
 
@@ -30,10 +30,14 @@ export class ArtifactRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, Artifact);
 
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Artifact not found', ['ArtifactRepository->getArtifact', { artifactId }]);
+    }
+
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get artifact record', [
+      throw new ApiExecuteSQLError('Unexpected row count', [
         'ArtifactRepository->getArtifact',
-        `rowCount was ${response.rowCount}, expected 1`
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 

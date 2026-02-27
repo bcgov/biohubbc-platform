@@ -73,7 +73,7 @@ describe('TeamMemberRepository', () => {
         await repository.getTeamMember('1');
         expect.fail();
       } catch (error) {
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get team member');
+        expect((error as ApiExecuteSQLError).message).to.equal('Team member not found');
       }
     });
   });

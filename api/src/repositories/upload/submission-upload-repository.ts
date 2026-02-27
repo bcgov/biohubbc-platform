@@ -1,6 +1,6 @@
 import { SQL } from 'sql-template-strings';
 import { getKnex } from '../../database/db';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   CreateSubmissionUpload,
   SubmissionUpload,
@@ -32,10 +32,17 @@ export class SubmissionUploadRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, SubmissionUpload);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get submission_upload record', [
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Submission upload not found', [
         'SubmissionUploadRepository->getSubmissionUpload',
-        `rowCount was ${response.rowCount}, expected 1`
+        { submissionUploadId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'SubmissionUploadRepository->getSubmissionUpload',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 
@@ -203,10 +210,17 @@ export class SubmissionUploadRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, SubmissionUpload);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get submission upload record', [
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Submission upload not found', [
         'SubmissionUploadRepository->getSubmissionUploadByUploadId',
-        `rowCount was ${response.rowCount}, expected 1`
+        { uploadId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'SubmissionUploadRepository->getSubmissionUploadByUploadId',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 

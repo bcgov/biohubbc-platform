@@ -1,6 +1,6 @@
 import { Knex } from 'knex';
 import { getKnex } from '../../database/db';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CountResult } from '../../models/count';
 import { CreateTeamPolicy, TeamPolicy, TeamPolicyDetails, UpdateTeamPolicy } from '../../models/team-policy';
 import { TeamPolicyFilters } from '../../services/access-policy/team-policy-service.interface';
@@ -60,10 +60,14 @@ export class TeamPolicyRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, TeamPolicy);
 
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Team policy not found', ['TeamPolicyRepository->getTeamPolicy', { teamPolicyId }]);
+    }
+
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get team policy', [
+      throw new ApiExecuteSQLError('Unexpected row count', [
         'TeamPolicyRepository->getTeamPolicy',
-        'rowCount was null or undefined, expected rowCount = 1'
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 

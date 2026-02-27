@@ -68,7 +68,7 @@ describe('TeamRepository', () => {
         await repository.getTeam('1');
         expect.fail();
       } catch (error) {
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get team');
+        expect((error as ApiExecuteSQLError).message).to.equal('Team not found');
       }
     });
   });

@@ -78,9 +78,6 @@ GET.apiDoc = {
         }
       }
     },
-    404: {
-      description: 'Data request not found'
-    },
     ...defaultErrorResponses
   }
 };
@@ -115,9 +112,6 @@ PUT.apiDoc = {
     200: {
       description: 'Data request updated successfully'
     },
-    404: {
-      description: 'Data request not found'
-    },
     ...defaultErrorResponses
   }
 };
@@ -144,9 +138,6 @@ DELETE.apiDoc = {
   responses: {
     200: {
       description: 'Data request deleted successfully'
-    },
-    404: {
-      description: 'Data request not found'
     },
     ...defaultErrorResponses
   }

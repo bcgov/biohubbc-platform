@@ -8,6 +8,9 @@ export const defaultErrorResponses = {
   403: {
     $ref: '#/components/responses/403'
   },
+  404: {
+    $ref: '#/components/responses/404'
+  },
   409: {
     $ref: '#/components/responses/409'
   },

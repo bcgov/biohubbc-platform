@@ -53,7 +53,7 @@ describe('CartRepository', () => {
         await repo.getCartById('cart-1');
         throw new Error('Expected to throw');
       } catch (err) {
-        expect((err as Error).message).to.equal('Failed to get cart');
+        expect((err as Error).message).to.equal('Cart not found');
       }
     });
   });

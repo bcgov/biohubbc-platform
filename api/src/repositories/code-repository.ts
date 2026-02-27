@@ -1,6 +1,6 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { BaseRepository } from './base-repository';
 
 const FeatureTypeCode = z.object({
@@ -124,10 +124,14 @@ export class CodeRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, FeaturePropertyCode);
 
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Feature property not found', ['CodeRepository->getFeaturePropertyByName', { featurePropertyName }]);
+    }
+
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get feature property record', [
+      throw new ApiExecuteSQLError('Unexpected row count', [
         'CodeRepository->getFeaturePropertyByName',
-        'rowCount !== 1, expected rowCount === 1'
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 

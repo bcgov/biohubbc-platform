@@ -55,7 +55,7 @@ describe('DataRequestStatusRepository', () => {
         await repo.getDataRequestStatusById(mockDataRequestStatus.data_request_status_id);
         throw new Error('Expected to throw');
       } catch (err) {
-        expect((err as Error).message).to.equal('Failed to get data request status');
+        expect((err as Error).message).to.equal('Data request status not found');
       }
     });
   });
@@ -94,7 +94,7 @@ describe('DataRequestStatusRepository', () => {
         await repo.getDataRequestStatusByDataRequestId(mockDataRequestStatus.data_request_id);
         throw new Error('Expected to throw');
       } catch (err) {
-        expect((err as Error).message).to.equal('Failed to get data request status');
+        expect((err as Error).message).to.equal('Data request status not found');
       }
     });
   });

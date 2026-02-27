@@ -1,5 +1,5 @@
 import { getKnex } from '../database/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import {
   CreateDataRequest,
   DataRequest,
@@ -87,10 +87,14 @@ export class DataRequestRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, FlatDataRequestWithStatus);
 
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Data request not found', ['DataRequestRepository->getDataRequestById', { dataRequestId }]);
+    }
+
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get data request', [
+      throw new ApiExecuteSQLError('Unexpected row count', [
         'DataRequestRepository->getDataRequestById',
-        'rowCount !== 1'
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 

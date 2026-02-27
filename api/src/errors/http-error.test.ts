@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import { DatabaseError } from 'pg';
-import { ApiError, ApiErrorType } from './api-error';
+import { ApiError, ApiErrorType, ApiNotFoundError } from './api-error';
 import { ensureHTTPError, HTTP400, HTTP401, HTTP403, HTTP409, HTTP500, HTTPError, isAjvError } from './http-error';
 
 describe('HTTPError', () => {
@@ -54,6 +54,16 @@ describe('ensureHTTPError', () => {
 
     expect(ensuredError.status).to.equal(500);
     expect(ensuredError.message).to.equal('an api error message');
+  });
+
+  it('returns HTTP404 when an ApiNotFoundError is provided', function () {
+    const apiError = new ApiNotFoundError('not found');
+
+    const ensuredError = ensureHTTPError(apiError);
+
+    expect(ensuredError).to.be.instanceof(HTTPError);
+    expect(ensuredError.status).to.equal(404);
+    expect(ensuredError.message).to.equal('not found');
   });
 
   it('returns a HTTPError when a DatabaseError provided', function () {

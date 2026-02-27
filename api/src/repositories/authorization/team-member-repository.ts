@@ -1,5 +1,5 @@
 import { getKnex } from '../../database/db';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   CreateTeamMember,
   TeamMember,
@@ -63,10 +63,14 @@ export class TeamMemberRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, TeamMember);
 
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Team member not found', ['TeamMemberRepository->getTeamMember', { teamMemberId }]);
+    }
+
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get team member', [
+      throw new ApiExecuteSQLError('Unexpected row count', [
         'TeamMemberRepository->getTeamMember',
-        'rowCount was null or undefined, expected rowCount = 1'
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 

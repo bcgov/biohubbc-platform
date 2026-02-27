@@ -96,7 +96,7 @@ describe('CodeRepository', () => {
 
         expect.fail();
       } catch (error) {
-        expect((error as Error).message).to.equal('Failed to get feature property record');
+        expect((error as Error).message).to.equal('Feature property not found');
       }
     });
 
