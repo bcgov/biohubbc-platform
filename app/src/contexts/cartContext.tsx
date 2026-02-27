@@ -194,7 +194,18 @@ const makeSnapshot = (state: CartState): CartSnapshot => ({
  */
 const isCartAccessError = (error: unknown): boolean => {
   const status = (error as APIError)?.status;
-  return status === 401 || status === 403;
+  return status === 401 || status === 403 || status === 404;
+};
+
+/**
+ * Returns true when an API error indicates the cached cart ID is no longer valid.
+ *
+ * This handles stale session cart IDs that can happen after cart deletion,
+ * checkout, expiry, or backend cleanup.
+ */
+const isInvalidCachedCartError = (error: unknown): boolean => {
+  const status = (error as APIError | undefined)?.status;
+  return status === 401 || status === 403 || status === 404;
 };
 
 /**
@@ -268,6 +279,9 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
   // Tracks whether we've attempted to claim the current cart.
   // Prevents duplicate claim attempts during the same session.
   const hasClaimedCurrentCart = useRef(false);
+  // When we already have cart data (e.g. createCart response),
+  // skip the immediate follow-up load to avoid a redundant getCartById call.
+  const skipNextLoadForCartId = useRef<string | null>(null);
 
   useEffect(() => {
     cartApiRef.current = api.cart;
@@ -287,6 +301,36 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
     hasClaimedCurrentCart.current = false;
   }, [state.cartId]);
 
+  /**
+   * Clears the cached cart ID from session storage and local state.
+   *
+   * This is used when a persisted cart ID no longer resolves to an accessible cart.
+   */
+  const clearCachedCartId = useCallback(() => {
+    setStoredCartId(null);
+    dispatch({ type: 'SET_CART_ID', payload: null });
+  }, [setStoredCartId]);
+
+  /**
+   * Claims the cart for authenticated users when the cart is currently unowned.
+   */
+  const claimCartIfNeeded = useCallback(
+    async (cartId: string, systemUserId: number | null): Promise<void> => {
+      if (!authStateContext.auth.isAuthenticated || systemUserId !== null || hasClaimedCurrentCart.current) {
+        return;
+      }
+
+      try {
+        hasClaimedCurrentCart.current = true;
+        await cartApiRef.current.assignCartToCurrentUser(cartId);
+      } catch (error) {
+        hasClaimedCurrentCart.current = false;
+        console.error('Failed to claim cart for authenticated user:', error);
+      }
+    },
+    [authStateContext.auth.isAuthenticated]
+  );
+
   // Effect: Load cart data when cartId changes
   // This runs whenever a cart ID is set (from session storage or after creation).
   // If no cart ID exists, it resets the cart state to empty.
@@ -296,6 +340,11 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
 
     if (!cartId) {
       dispatch({ type: 'RESET' });
+      return;
+    }
+
+    if (skipNextLoadForCartId.current === cartId) {
+      skipNextLoadForCartId.current = null;
       return;
     }
 
@@ -316,21 +365,14 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
         // Claim anonymous carts for authenticated users after a successful load.
         // Keeping this in the load-success path avoids claim/load request races.
         // Only claim carts that are currently unowned.
-        if (
-          authStateContext.auth.isAuthenticated &&
-          response.cart.system_user_id === null &&
-          !hasClaimedCurrentCart.current
-        ) {
-          try {
-            hasClaimedCurrentCart.current = true;
-            await cartApiRef.current.assignCartToCurrentUser(cartId);
-          } catch (error) {
-            hasClaimedCurrentCart.current = false;
-            console.error('Failed to claim cart for authenticated user:', error);
-          }
-        }
+        await claimCartIfNeeded(cartId, response.cart.system_user_id);
       } catch (error) {
         if (!isMounted) {
+          return;
+        }
+
+        if (isInvalidCachedCartError(error)) {
+          clearCachedCartId();
           return;
         }
 
@@ -343,7 +385,8 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
     return () => {
       isMounted = false;
     };
-  }, [authStateContext.auth.isAuthenticated, state.cartId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claimCartIfNeeded, state.cartId]);
 
   /**
    * Updates the cart ID in both session storage and local state.
@@ -366,7 +409,7 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
    *
    * Used when:
    * 1. User adds to cart for the first time (pass features to add)
-   * 2. An addToCart request fails with 401/403 (pass features to retry with)
+   * 2. An addToCart request fails with 401/403/404 (pass features to retry with)
    *
    * Creates the cart and adds features in a single API call.
    *
@@ -382,16 +425,18 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
           features: features.map((feature) => feature.submission_feature_id)
         });
 
+        skipNextLoadForCartId.current = response.cart.cart_id;
         setCartId(response.cart.cart_id);
         hasClaimedCurrentCart.current = false;
 
         // Update state with the response from cart creation
         dispatch({ type: 'LOAD_SUCCESS', payload: response });
+        await claimCartIfNeeded(response.cart.cart_id, response.cart.system_user_id);
       } finally {
         operationInProgress.current = false;
       }
     },
-    [setCartId]
+    [claimCartIfNeeded, setCartId]
   );
 
   // Adds features with optimistic updates and rollback on failure.

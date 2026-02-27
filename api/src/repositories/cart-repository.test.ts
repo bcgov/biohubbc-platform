@@ -19,7 +19,8 @@ describe('CartRepository', () => {
       const mockCart: Cart = {
         cart_id: 'cart-1',
         cart_status: CartStatus.ACTIVE,
-        system_user_id: 1
+        system_user_id: 1,
+        record_end_date: null
       };
 
       const mockQueryResponse = {
@@ -65,7 +66,8 @@ describe('CartRepository', () => {
       const mockCart: Cart = {
         cart_id: 'cart-1',
         cart_status: CartStatus.ABANDONED,
-        system_user_id: 1
+        system_user_id: 1,
+        record_end_date: null
       };
 
       const mockQueryResponse = {
@@ -107,7 +109,8 @@ describe('CartRepository', () => {
       const mockCart: Cart = {
         cart_id: 'cart-1',
         cart_status: CartStatus.ACTIVE,
-        system_user_id: 1
+        system_user_id: 1,
+        record_end_date: null
       };
 
       const mockQueryResponse = {

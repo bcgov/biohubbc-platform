@@ -20,7 +20,9 @@ export class CartRepository extends BaseRepository {
    */
   async findCartById(cartId: string): Promise<Cart | null> {
     const knex = getKnex();
-    const query = knex('cart').where('cart_id', cartId).select('cart_id', 'cart_status', 'system_user_id');
+    const query = knex('cart')
+      .where('cart_id', cartId)
+      .select('cart_id', 'cart_status', 'system_user_id', 'record_end_date');
 
     const response = await this.connection.knex(query, Cart);
 
@@ -36,7 +38,9 @@ export class CartRepository extends BaseRepository {
    */
   async getCartById(cartId: string): Promise<Cart> {
     const knex = getKnex();
-    const query = knex('cart').where('cart_id', cartId).select('cart_id', 'cart_status', 'system_user_id');
+    const query = knex('cart')
+      .where('cart_id', cartId)
+      .select('cart_id', 'cart_status', 'system_user_id', 'record_end_date');
 
     const response = await this.connection.knex(query, Cart);
 
@@ -68,7 +72,7 @@ export class CartRepository extends BaseRepository {
         system_user_id: systemUserId,
         cart_status: CartStatus.ACTIVE
       })
-      .returning(['cart_id', 'cart_status', 'system_user_id']);
+      .returning(['cart_id', 'cart_status', 'system_user_id', 'record_end_date']);
 
     const response = await this.connection.knex(query, Cart);
 

@@ -1,3 +1,4 @@
+import dayjs from 'dayjs';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { IDBConnection } from '../../database/db';
 import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
@@ -257,6 +258,18 @@ export class AuthorizationService extends DBService {
 
     // Cart does not exist
     if (!cart) {
+      return false;
+    }
+
+    // Only active carts are accessible
+    if (cart.cart_status !== 'active') {
+      return false;
+    }
+
+    // Deny access to carts whose validity window has ended
+    const recordEndDate = cart.record_end_date ? dayjs(cart.record_end_date) : null;
+    const cartValidityEnded = recordEndDate !== null && (!recordEndDate.isValid() || !recordEndDate.isAfter(dayjs()));
+    if (cartValidityEnded) {
       return false;
     }
 
