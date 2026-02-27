@@ -226,8 +226,8 @@ describe('UploadIngestionService', () => {
 
       const publishStub = publisher.publishMalwareScanJob as sinon.SinonStub;
       expect(publishStub.callCount).to.equal(mockSecurityRecords.length);
-      expect(publishStub.firstCall.args[0]).to.deep.equal({ artifactSecurityId: 'artifact-security-1' });
-      expect(publishStub.secondCall.args[0]).to.deep.equal({ artifactSecurityId: 'artifact-security-2' });
+      expect(publishStub.firstCall.args[1]).to.deep.equal({ artifactSecurityId: 'artifact-security-1' });
+      expect(publishStub.secondCall.args[1]).to.deep.equal({ artifactSecurityId: 'artifact-security-2' });
       expect(s3ClientStub.send).to.have.been.calledOnce;
     });
 
