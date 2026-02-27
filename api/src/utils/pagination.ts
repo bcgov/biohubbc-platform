@@ -1,6 +1,9 @@
 import { Request } from 'express';
 import { ApiPaginationOptions, ApiPaginationResults } from '../zod-schema/pagination';
 
+export const DEFAULT_PAGINATION_PAGE = 1;
+export const DEFAULT_PAGINATION_LIMIT = 25;
+
 const toNumber = (value: unknown): number | undefined =>
   typeof value === 'string' || typeof value === 'number' ? Number(value) : undefined;
 
@@ -24,6 +27,18 @@ const makePaginationOptionsFromSource = (source: Record<string, unknown>): Parti
 
   return { page, limit, sort, order };
 };
+
+/**
+ * Normalizes partial pagination options to include default page and limit values.
+ */
+export const normalizePaginationOptions = (
+  pagination: Partial<ApiPaginationOptions> = {}
+): ApiPaginationOptions => ({
+  page: pagination.page ?? DEFAULT_PAGINATION_PAGE,
+  limit: pagination.limit ?? DEFAULT_PAGINATION_LIMIT,
+  sort: pagination.sort,
+  order: pagination.order
+});
 
 /**
  * Extracts pagination from query parameters
@@ -52,13 +67,16 @@ export const makePaginationResponse = (
   total: number,
   pagination?: Partial<ApiPaginationOptions>
 ): ApiPaginationResults => {
+  const normalizedPagination = normalizePaginationOptions(pagination);
+  const effectiveLimit = normalizedPagination.limit;
+
   return {
     total,
-    per_page: pagination?.limit ?? total,
-    current_page: pagination?.page ?? 1,
-    last_page: pagination?.limit ? Math.max(1, Math.ceil(total / pagination.limit)) : 1,
-    sort: pagination?.sort,
-    order: pagination?.order
+    per_page: effectiveLimit,
+    current_page: normalizedPagination.page,
+    last_page: Math.max(1, Math.ceil(total / effectiveLimit)),
+    sort: normalizedPagination.sort,
+    order: normalizedPagination.order
   };
 };
 
@@ -72,17 +90,5 @@ export const makePaginationResponse = (
  * @returns {boolean}
  */
 export const ensureCompletePaginationOptions = (
-  pagination: Partial<ApiPaginationOptions>
-): ApiPaginationOptions | undefined => {
-  // Type guard: ensures both properties exist
-  if (pagination.limit !== undefined && pagination.page !== undefined) {
-    return {
-      limit: pagination.limit,
-      page: pagination.page,
-      order: pagination.order,
-      sort: pagination.sort
-    };
-  }
-
-  return undefined;
-};
+  pagination?: Partial<ApiPaginationOptions>
+): ApiPaginationOptions => normalizePaginationOptions(pagination);
