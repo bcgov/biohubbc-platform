@@ -3,7 +3,7 @@ import { GridColDef } from '@mui/x-data-grid';
 import { useApi } from 'hooks/useApi';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
-import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
+import { ITeam } from 'interfaces/useTeamsApi.interface';
 import { MemoryRouter } from 'react-router';
 import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -56,10 +56,10 @@ const mockTeamPolicies: ITeamPolicyDetails[] = [
   }
 ];
 
-const mockTeams: ITeamWithMembers[] = [
-  { team_id: 'team-1', name: 'Alpha Team', description: 'First team', members: [] },
-  { team_id: 'team-2', name: 'Beta Team', description: 'Second team', members: [] },
-  { team_id: 'team-3', name: 'Gamma Team', description: 'Third team', members: [] }
+const mockTeams: ITeam[] = [
+  { team_id: 'team-1', name: 'Alpha Team', description: 'First team', member_count: 0 },
+  { team_id: 'team-2', name: 'Beta Team', description: 'Second team', member_count: 0 },
+  { team_id: 'team-3', name: 'Gamma Team', description: 'Third team', member_count: 0 }
 ];
 
 const mockPolicies: IPolicy[] = [
