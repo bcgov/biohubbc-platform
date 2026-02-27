@@ -14,7 +14,7 @@ describe('paths/tickets/{ticketId}/status', () => {
     sinon.restore();
   });
 
-  it('POST status delegates to updateTicket with status payload', async () => {
+  it('PUT status delegates to updateTicket with status payload', async () => {
     const mockDBConnection = getMockDBConnection({
       commit: sinon.stub(),
       rollback: sinon.stub(),

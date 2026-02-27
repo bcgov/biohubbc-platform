@@ -10,14 +10,14 @@ import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/tickets/{ticketId}/status');
 
-export const POST: Operation = [
+export const PUT: Operation = [
   authorizeRequestHandler(() => ({
     and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }]
   })),
   updateTicketStatus()
 ];
 
-POST.apiDoc = {
+PUT.apiDoc = {
   description: 'Change the status of a ticket',
   tags: ['tickets'],
   security: [{ Bearer: [] }],
