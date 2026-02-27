@@ -70,8 +70,9 @@ export class TeamAuthorizationService extends DBService {
       return false;
     }
 
+    // return false if the team membership has expired
     if (record.record_end_date !== null && new Date(record.record_end_date) <= new Date()) {
-      throw new HTTP401('Access Denied');
+      return false;
     }
 
     return true;
