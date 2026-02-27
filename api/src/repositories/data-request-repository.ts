@@ -18,9 +18,9 @@ import { BaseRepository } from './base-repository';
  */
 export class DataRequestRepository extends BaseRepository {
   /**
-   * Find all data requests, optionally filtered by date range, requested_by, team_ids, or status.
+   * Find all data requests without user scoping, optionally filtered by date range, requested_by, team_id, or status.
    *
-   * @param {DataRequestFilters} [filters] - Optional filters (date_from, date_to, requested_by, team_ids, status).
+   * @param {DataRequestFilters} [filters] - Optional filters (date_from, date_to, requested_by, team_id, status).
    * @return {Promise<FlatDataRequestWithStatus[]>}
    * @memberof DataRequestRepository
    */
@@ -56,8 +56,56 @@ export class DataRequestRepository extends BaseRepository {
     if (filters?.team_id) {
       queryBuilder.where('dr.team_id', filters.team_id);
     }
-    if (filters?.team_ids && filters.team_ids.length > 0) {
-      queryBuilder.whereIn('dr.team_id', filters.team_ids);
+
+    const response = await this.connection.knex(queryBuilder, FlatDataRequestWithStatus);
+    return response.rows;
+  }
+
+  /**
+   * Find all data requests in teams the user is a member of, optionally filtered by date range, requested_by, team_id, or status.
+   *
+   * @param {number} systemUserId - The system user ID to scope results by team membership.
+   * @param {DataRequestFilters} [filters] - Optional filters (date_from, date_to, requested_by, team_id, status).
+   * @return {Promise<FlatDataRequestWithStatus[]>}
+   * @memberof DataRequestRepository
+   */
+  async findDataRequestsByTeamMembership(
+    systemUserId: number,
+    filters?: DataRequestFilters
+  ): Promise<FlatDataRequestWithStatus[]> {
+    const knex = getKnex();
+
+    const queryBuilder = knex('data_request as dr')
+      .select(
+        'dr.data_request_id',
+        'dr.team_id',
+        'dr.reason',
+        'dr.requested_by',
+        'drs.data_request_status_id',
+        'drs.comment_id',
+        'drs.request_status'
+      )
+      .join('data_request_status as drs', 'drs.data_request_id', 'dr.data_request_id')
+      .join('team_member as tm', 'tm.team_id', 'dr.team_id')
+      .where('tm.system_user_id', systemUserId)
+      .whereNull('dr.record_end_date')
+      .whereNull('drs.record_end_date')
+      .whereNull('tm.record_end_date');
+
+    if (filters?.status) {
+      queryBuilder.where('drs.request_status', filters.status);
+    }
+    if (filters?.date_from) {
+      queryBuilder.where('dr.create_date', '>=', filters.date_from);
+    }
+    if (filters?.date_to) {
+      queryBuilder.where('dr.create_date', '<=', filters.date_to);
+    }
+    if (filters?.requested_by) {
+      queryBuilder.where('dr.requested_by', filters.requested_by);
+    }
+    if (filters?.team_id) {
+      queryBuilder.where('dr.team_id', filters.team_id);
     }
 
     const response = await this.connection.knex(queryBuilder, FlatDataRequestWithStatus);
