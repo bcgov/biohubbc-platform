@@ -42,8 +42,7 @@ export const TeamPolicyForm = (props: ITeamPolicyFormProps) => {
         onChange={handleChange}
         onBlur={handleBlur}
         error={touched.team_id && Boolean(errors.team_id)}
-        helperText={touched.team_id && errors.team_id}
-      >
+        helperText={touched.team_id && errors.team_id}>
         {teams.map((team) => (
           <MenuItem key={team.team_id} value={team.team_id}>
             {team.name}
@@ -61,8 +60,7 @@ export const TeamPolicyForm = (props: ITeamPolicyFormProps) => {
         onChange={handleChange}
         onBlur={handleBlur}
         error={touched.policy_id && Boolean(errors.policy_id)}
-        helperText={touched.policy_id && errors.policy_id}
-      >
+        helperText={touched.policy_id && errors.policy_id}>
         {policies.map((policy) => (
           <MenuItem key={policy.policy_id} value={policy.policy_id}>
             {policy.name}

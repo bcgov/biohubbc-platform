@@ -371,9 +371,7 @@ export const PoliciesContainer: React.FC<React.PropsWithChildren<IPoliciesContai
                 sx={{ width: 250 }}
               />
             </Stack>
-          }
-        >
-
+          }>
           <ServerPaginatedDataGrid<IPolicy>
             dataTestId="active-policies-table"
             rows={policies}

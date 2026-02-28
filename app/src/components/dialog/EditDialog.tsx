@@ -97,13 +97,12 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
           <DialogActions>
             <Button
               loading={props.isLoading}
-              disabled={!formikProps.isValid}
               onClick={formikProps.submitForm}
               color="primary"
               variant="contained"
               autoFocus
               data-testid="edit-dialog-save-button">
-              {props.dialogSaveButtonLabel || 'Save Changes'}
+              {props.isLoading ? '' : props.dialogSaveButtonLabel || 'Save Changes'}
             </Button>
             <Button onClick={props.onCancel} color="primary" variant="outlined" data-testid="edit-dialog-cancel-button">
               Cancel

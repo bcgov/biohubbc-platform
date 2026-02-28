@@ -384,9 +384,7 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
               sx={{ width: 250 }}
             />
           </Stack>
-        }
-      >
-
+        }>
         <ServerPaginatedDataGrid<ITeam>
           dataTestId="teams-table"
           rows={teams}

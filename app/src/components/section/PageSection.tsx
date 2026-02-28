@@ -34,8 +34,7 @@ export const PageSection = (props: IPageSectionProps) => {
             startIcon={<Icon path={mdiPlus} size={0.8} />}
             data-testid={`${id}-add-button`}
             disabled={addDisabled}
-            onClick={onAdd}
-          >
+            onClick={onAdd}>
             {addLabel}
           </Button>
         </Stack>

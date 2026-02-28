@@ -316,16 +316,14 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
         id="assignments"
         label={
           <>
-            Assignments
+            Assignments{' '}
             <Typography sx={{ fontSize: 'inherit' }} component="span" color="textSecondary">
               ({rowCount})
             </Typography>
           </>
         }
         onAdd={() => setOpenCreateDialog(true)}
-        addDisabled={teamOptions.length === 0 || policies.length === 0}
-      >
-
+        addDisabled={teamOptions.length === 0 || policies.length === 0}>
         <ServerPaginatedDataGrid<ITeamPolicyDetails>
           dataTestId="team-policies-table"
           rows={teamPolicies}
