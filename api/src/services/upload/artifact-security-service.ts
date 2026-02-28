@@ -116,6 +116,7 @@ export class ArtifactSecurityService extends DBService {
     const submissionUpload = await submissionUploadService.getSubmissionUploadByUploadId(uploadArchive.upload_id);
 
     await publishProcessSubmissionFeaturesJob(this.connection, {
+      uploadId: uploadArchive.upload_id,
       submissionId: submissionUpload.submission_id
     });
   }

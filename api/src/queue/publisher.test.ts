@@ -36,7 +36,7 @@ describe('publisher', () => {
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
         .resolves({ submission_validation_id: 1 });
 
-      const data = { submissionId: 123 };
+      const data = { uploadId: 'upload-uuid-1', submissionId: 123 };
       const result = await publishProcessSubmissionFeaturesJob(mockConnection, data);
 
       expect(createQueueStub.calledOnce).to.be.true;
@@ -65,7 +65,7 @@ describe('publisher', () => {
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
         .resolves({ submission_validation_id: 1 });
 
-      await publishProcessSubmissionFeaturesJob(mockConnection, { submissionId: 123 });
+      await publishProcessSubmissionFeaturesJob(mockConnection, { uploadId: 'upload-uuid-1', submissionId: 123 });
 
       const options = sendStub.firstCall.args[2];
       expect(options.retryLimit).to.equal(3);
@@ -86,7 +86,11 @@ describe('publisher', () => {
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
         .resolves({ submission_validation_id: 1 });
 
-      await publishProcessSubmissionFeaturesJob(mockConnection, { submissionId: 123 }, { retryLimit: 5 });
+      await publishProcessSubmissionFeaturesJob(
+        mockConnection,
+        { uploadId: 'upload-uuid-1', submissionId: 123 },
+        { retryLimit: 5 }
+      );
 
       const options = sendStub.firstCall.args[2];
       expect(options.retryLimit).to.equal(5);
@@ -104,7 +108,10 @@ describe('publisher', () => {
 
       const createValidationStub = sinon.stub(SubmissionValidationService.prototype, 'createSubmissionValidation');
 
-      const result = await publishProcessSubmissionFeaturesJob(mockConnection, { submissionId: 123 });
+      const result = await publishProcessSubmissionFeaturesJob(mockConnection, {
+        uploadId: 'upload-uuid-1',
+        submissionId: 123
+      });
 
       expect(result.status).to.equal('duplicate');
       expect((result as { status: 'duplicate'; message: string }).message).to.equal(
@@ -125,7 +132,7 @@ describe('publisher', () => {
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
         .resolves({ submission_validation_id: 1 });
 
-      await publishProcessSubmissionFeaturesJob(mockConnection, { submissionId: 456 });
+      await publishProcessSubmissionFeaturesJob(mockConnection, { uploadId: 'upload-uuid-2', submissionId: 456 });
 
       const options = sendStub.firstCall.args[2];
       expect(options.singletonKey).to.equal('submission-456');
@@ -137,7 +144,10 @@ describe('publisher', () => {
       sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId').resolves(null);
       sinon.stub(pgBossService, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
-      const result = await publishProcessSubmissionFeaturesJob(mockConnection, { submissionId: 123 });
+      const result = await publishProcessSubmissionFeaturesJob(mockConnection, {
+        uploadId: 'upload-uuid-1',
+        submissionId: 123
+      });
 
       expect(result.status).to.equal('error');
       expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
@@ -155,7 +165,10 @@ describe('publisher', () => {
         .stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId')
         .resolves(mockValidationRecord);
 
-      const result = await publishProcessSubmissionFeaturesJob(mockConnection, { submissionId: 123 });
+      const result = await publishProcessSubmissionFeaturesJob(mockConnection, {
+        uploadId: 'upload-uuid-1',
+        submissionId: 123
+      });
 
       expect(result.status).to.equal('blocked');
       expect((result as { status: 'blocked'; existingStatus: string }).existingStatus).to.equal('pending');
@@ -180,7 +193,10 @@ describe('publisher', () => {
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
         .resolves({ submission_validation_id: 2 });
 
-      const result = await publishProcessSubmissionFeaturesJob(mockConnection, { submissionId: 123 });
+      const result = await publishProcessSubmissionFeaturesJob(mockConnection, {
+        uploadId: 'upload-uuid-1',
+        submissionId: 123
+      });
 
       expect(result.status).to.equal('published');
       expect((result as { status: 'published'; jobId: string }).jobId).to.equal('new-job-id');
@@ -198,7 +214,10 @@ describe('publisher', () => {
         .stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId')
         .resolves(mockCompletedRecord);
 
-      const result = await publishProcessSubmissionFeaturesJob(mockConnection, { submissionId: 123 });
+      const result = await publishProcessSubmissionFeaturesJob(mockConnection, {
+        uploadId: 'upload-uuid-1',
+        submissionId: 123
+      });
 
       expect(result.status).to.equal('blocked');
       expect((result as { status: 'blocked'; existingStatus: string }).existingStatus).to.equal('completed');
@@ -223,7 +242,10 @@ describe('publisher', () => {
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
         .resolves({ submission_validation_id: 2 });
 
-      const result = await publishProcessSubmissionFeaturesJob(mockConnection, { submissionId: 123 });
+      const result = await publishProcessSubmissionFeaturesJob(mockConnection, {
+        uploadId: 'upload-uuid-1',
+        submissionId: 123
+      });
 
       expect(result.status).to.equal('published');
       expect((result as { status: 'published'; jobId: string }).jobId).to.equal('new-job-id');

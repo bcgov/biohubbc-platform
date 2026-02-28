@@ -9,10 +9,15 @@ const defaultLog = getLogger('queue/jobs/process-submission-features-job');
 
 /**
  * Process submission features job data interface.
- * Contains the submission ID for async processing of slow operations.
+ *
+ * The trigger (ArtifactSecurityService) naturally has upload_id from the upload_archive record
+ * and derives submissionId from submission_upload. Both are passed in the job payload so the
+ * handler needs zero additional DB lookups for keying.
  */
 export interface IProcessSubmissionFeaturesJobData {
-  /** The submission ID to process */
+  /** The upload ID (UUID) — the processing unit for ingestion */
+  uploadId: string;
+  /** The submission ID — provided by the trigger to avoid a DB lookup in the handler */
   submissionId: number;
 }
 
