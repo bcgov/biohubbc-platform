@@ -9,7 +9,7 @@ import TextField from '@mui/material/TextField';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
-import CustomDataGrid from 'components/data-grid/CustomDataGrid';
+import ServerPaginatedDataGrid from 'components/data-grid/ServerPaginatedDataGrid';
 import EditDialog from 'components/dialog/EditDialog';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
@@ -394,27 +394,21 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
 
         <Divider flexItem />
 
-        <CustomDataGrid
-          data-testid="teams-table"
+        <ServerPaginatedDataGrid<ITeam>
+          dataTestId="teams-table"
           rows={teams}
           columns={columns}
           getRowId={(row) => row.team_id}
-          paginationMode="server"
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[10, 25, 50]}
-          sortingMode="server"
-          sortingOrder={['asc', 'desc']}
-          sortModel={sortModel}
-          onSortModelChange={setSortModel}
+          noRowsMessage="No Teams"
           rowCount={rowCount}
+          paginationModel={paginationModel}
+          setPaginationModel={setPaginationModel}
+          sortModel={sortModel}
+          setSortModel={setSortModel}
           rowSelectionModel={rowSelectionModel}
           onRowSelectionModelChange={handleRowSelectionChange}
           checkboxSelection
           disableMultipleRowSelection
-          disableColumnSelector
-          disableColumnMenu
-          localeText={{ noRowsLabel: 'No Teams' }}
         />
       </Box>
 

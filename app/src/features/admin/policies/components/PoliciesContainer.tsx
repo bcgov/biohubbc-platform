@@ -12,7 +12,7 @@ import TextField from '@mui/material/TextField';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
-import CustomDataGrid from 'components/data-grid/CustomDataGrid';
+import ServerPaginatedDataGrid from 'components/data-grid/ServerPaginatedDataGrid';
 import EditDialog from 'components/dialog/EditDialog';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
@@ -31,9 +31,9 @@ import {
 } from './AddPolicyForm';
 
 /**
- * Props for the ActivePoliciesList component.
+ * Props for the PoliciesContainer component.
  */
-export interface IActivePoliciesListProps extends IServerPaginationProps {
+export interface IPoliciesContainerProps extends IServerPaginationProps {
   /** Array of policies to display in the table */
   policies: IPolicy[];
   /** Callback to refresh the policies list after create/update/delete */
@@ -58,10 +58,10 @@ export interface IActivePoliciesListProps extends IServerPaginationProps {
  * - Edit existing policies via dialog
  * - Delete policies with confirmation
  *
- * @param {IActivePoliciesListProps} props - Component props
+ * @param {IPoliciesContainerProps} props - Component props
  * @returns {React.ReactElement} The policies list component
  */
-export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListProps>> = (props) => {
+export const PoliciesContainer: React.FC<React.PropsWithChildren<IPoliciesContainerProps>> = (props) => {
   const biohubApi = useApi();
   const {
     policies,
@@ -421,27 +421,21 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
 
           <Divider flexItem />
 
-          <CustomDataGrid
-            data-testid="active-policies-table"
+          <ServerPaginatedDataGrid<IPolicy>
+            dataTestId="active-policies-table"
             rows={policies}
             columns={columns}
             getRowId={(row) => row.policy_id}
-            paginationMode="server"
-            paginationModel={paginationModel}
-            onPaginationModelChange={setPaginationModel}
-            pageSizeOptions={[10, 25, 50]}
-            sortingMode="server"
-            sortingOrder={['asc', 'desc']}
-            sortModel={sortModel}
-            onSortModelChange={setSortModel}
+            noRowsMessage="No Policies"
             rowCount={rowCount}
+            paginationModel={paginationModel}
+            setPaginationModel={setPaginationModel}
+            sortModel={sortModel}
+            setSortModel={setSortModel}
             rowSelectionModel={rowSelectionModel}
             onRowSelectionModelChange={handleRowSelectionChange}
             checkboxSelection
             disableMultipleRowSelection
-            disableColumnSelector
-            disableColumnMenu
-            localeText={{ noRowsLabel: 'No Policies' }}
           />
         </Paper>
       </Container>

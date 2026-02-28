@@ -6,7 +6,7 @@ import Divider from '@mui/material/Divider';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
-import CustomDataGrid from 'components/data-grid/CustomDataGrid';
+import ServerPaginatedDataGrid from 'components/data-grid/ServerPaginatedDataGrid';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
@@ -35,7 +35,7 @@ export interface ITeamPoliciesContainerProps {
   setSortModel: (model: GridSortModel) => void;
   /** Currently selected team from TeamsContainer (null if none selected) */
   selectedTeam: ITeam | null;
-  /** Currently selected policy from ActivePoliciesList (null if none selected) */
+  /** Currently selected policy from PoliciesContainer (null if none selected) */
   selectedPolicy: IPolicy | null;
   /** Callback to refresh the team-policies list after create/delete */
   refresh: () => void;
@@ -278,31 +278,17 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
 
       <Divider flexItem />
 
-      <CustomDataGrid
-        data-testid="team-policies-table"
+      <ServerPaginatedDataGrid<ITeamPolicyDetails>
+        dataTestId="team-policies-table"
         rows={teamPolicies}
         columns={columns}
         getRowId={(row) => row.team_policy_id}
-        paginationMode="server"
-        paginationModel={paginationModel}
-        onPaginationModelChange={setPaginationModel}
-        pageSizeOptions={[10, 25, 50]}
-        sortingMode="server"
-        sortingOrder={['asc', 'desc']}
-        sortModel={sortModel}
-        onSortModelChange={setSortModel}
+        noRowsMessage="No Team-Policy Assignments"
         rowCount={rowCount}
-        disableRowSelectionOnClick
-        disableColumnSelector
-        disableColumnMenu
-        localeText={{ noRowsLabel: 'No Team-Policy Assignments' }}
-        sx={{
-          border: 'none',
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontWeight: 700,
-            textTransform: 'uppercase'
-          }
-        }}
+        paginationModel={paginationModel}
+        setPaginationModel={setPaginationModel}
+        sortModel={sortModel}
+        setSortModel={setSortModel}
       />
     </Box>
   );

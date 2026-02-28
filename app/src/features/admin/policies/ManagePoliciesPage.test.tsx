@@ -9,7 +9,7 @@ import { Mock } from 'vitest';
 import { ManagePoliciesPage } from './ManagePoliciesPage';
 
 // Types for mock component props
-interface MockActivePoliciesListProps {
+interface MockPoliciesContainerProps {
   policies: IPolicy[];
   onSelectPolicy: (id: string | null) => void;
   selectedPolicyId: string | null;
@@ -28,8 +28,8 @@ interface MockTeamPoliciesContainerProps {
 }
 
 // Mock child components - we test them separately, here we test page logic
-vi.mock('./components/ActivePoliciesList', () => ({
-  ActivePoliciesList: ({ policies, onSelectPolicy, selectedPolicyId }: MockActivePoliciesListProps) => (
+vi.mock('./components/PoliciesContainer', () => ({
+  PoliciesContainer: ({ policies, onSelectPolicy, selectedPolicyId }: MockPoliciesContainerProps) => (
     <div data-testid="active-policies-list">
       {policies.map((p) => (
         <div

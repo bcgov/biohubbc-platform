@@ -4,7 +4,7 @@ import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { MemoryRouter } from 'react-router';
 import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
-import { ActivePoliciesList, IActivePoliciesListProps } from './ActivePoliciesList';
+import { PoliciesContainer, IPoliciesContainerProps } from './PoliciesContainer';
 
 // Types for DataGrid mock
 interface MockDataGridProps {
@@ -55,7 +55,7 @@ const mockUseApi = {
   }
 };
 
-const defaultProps: IActivePoliciesListProps = {
+const defaultProps: IPoliciesContainerProps = {
   policies: [],
   rowCount: 0,
   paginationModel: { page: 0, pageSize: 10 },
@@ -69,15 +69,15 @@ const defaultProps: IActivePoliciesListProps = {
   onSelectPolicy: vi.fn()
 };
 
-const renderComponent = (props: Partial<IActivePoliciesListProps> = {}) => {
+const renderComponent = (props: Partial<IPoliciesContainerProps> = {}) => {
   return render(
     <MemoryRouter initialEntries={['/']}>
-      <ActivePoliciesList {...defaultProps} {...props} />
+      <PoliciesContainer {...defaultProps} {...props} />
     </MemoryRouter>
   );
 };
 
-describe('ActivePoliciesList', () => {
+describe('PoliciesContainer', () => {
   beforeEach(() => {
     mockBiohubApi.mockImplementation(() => mockUseApi);
   });

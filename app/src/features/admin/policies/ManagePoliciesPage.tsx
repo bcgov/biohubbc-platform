@@ -8,7 +8,7 @@ import useDataLoader from 'hooks/useDataLoader';
 import { toApiPagination, useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiPaginationRequestOptions } from 'types/pagination';
-import { ActivePoliciesList } from './components/ActivePoliciesList';
+import { PoliciesContainer } from './components/PoliciesContainer';
 import { TeamPoliciesContainer } from './components/TeamPoliciesContainer';
 import { TeamsContainer } from './components/TeamsContainer';
 
@@ -109,7 +109,7 @@ export const ManagePoliciesPage = () => {
     <>
       <PageHeader label="Manage Policies" />
       <Box py={4}>
-        <ActivePoliciesList
+        <PoliciesContainer
           policies={policies.data}
           rowCount={policies.rowCount}
           paginationModel={policies.paginationModel}
