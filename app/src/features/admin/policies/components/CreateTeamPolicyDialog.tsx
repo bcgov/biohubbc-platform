@@ -1,11 +1,7 @@
 import EditDialog from 'components/dialog/EditDialog';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { ITeam } from 'interfaces/useTeamsApi.interface';
-import {
-  ITeamPolicyFormValues,
-  TeamPolicyForm,
-  TeamPolicyFormYupSchema
-} from './TeamPolicyForm';
+import { ITeamPolicyFormValues, TeamPolicyForm, TeamPolicyFormYupSchema } from './TeamPolicyForm';
 
 export interface ICreateTeamPolicyDialogProps {
   open: boolean;
@@ -17,15 +13,8 @@ export interface ICreateTeamPolicyDialogProps {
   onSave: (values: ITeamPolicyFormValues) => void;
 }
 
-export const CreateTeamPolicyDialog: React.FC<ICreateTeamPolicyDialogProps> = ({
-  open,
-  isLoading,
-  teams,
-  policies,
-  initialValues,
-  onCancel,
-  onSave
-}) => {
+export const CreateTeamPolicyDialog = (props: ICreateTeamPolicyDialogProps) => {
+  const { open, isLoading, teams, policies, initialValues, onCancel, onSave } = props;
   return (
     <EditDialog<ITeamPolicyFormValues>
       open={open}

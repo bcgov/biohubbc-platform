@@ -1,19 +1,16 @@
-import { mdiDotsVertical, mdiMagnify, mdiPencilOutline, mdiPlus, mdiTrashCanOutline } from '@mdi/js';
+import { mdiDotsVertical, mdiMagnify, mdiPencilOutline, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Container from '@mui/material/Container';
-import Divider from '@mui/material/Divider';
 import InputAdornment from '@mui/material/InputAdornment';
-import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
-import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import ServerPaginatedDataGrid from 'components/data-grid/ServerPaginatedDataGrid';
 import EditDialog from 'components/dialog/EditDialog';
+import PageSection from 'components/section/PageSection';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
@@ -107,6 +104,27 @@ export const PoliciesContainer: React.FC<React.PropsWithChildren<IPoliciesContai
     dialogContext.setSnackbar({ ...textDialogProps, open: true });
   };
 
+  const showApiErrorDialog = (title: string, text: string, error: unknown) => {
+    const apiError = error as APIError;
+    dialogContext.setErrorDialog({
+      open: true,
+      dialogTitle: title,
+      dialogText: text,
+      dialogError: apiError.message,
+      dialogErrorDetails: apiError.errors,
+      onClose: () => {
+        dialogContext.setErrorDialog({ open: false });
+      },
+      onOk: () => {
+        dialogContext.setErrorDialog({ open: false });
+      }
+    });
+  };
+
+  const closeDeletePolicyDialog = () => {
+    dialogContext.setYesNoDialog({ open: false });
+  };
+
   /**
    * Open a confirmation dialog to delete a policy.
    *
@@ -123,17 +141,12 @@ export const PoliciesContainer: React.FC<React.PropsWithChildren<IPoliciesContai
       yesButtonLabel: 'Delete Policy',
       noButtonLabel: 'Cancel',
       yesButtonProps: { color: 'error' },
-      onClose: () => {
-        dialogContext.setYesNoDialog({ open: false });
-      },
-      onNo: () => {
-        dialogContext.setYesNoDialog({ open: false });
-      },
+      onClose: closeDeletePolicyDialog,
+      onNo: closeDeletePolicyDialog,
       open: true,
-      onYes: () => {
-        deletePolicy(row).then(() => {
-          dialogContext.setYesNoDialog({ open: false });
-        });
+      onYes: async () => {
+        await deletePolicy(row);
+        closeDeletePolicyDialog();
       }
     });
   };
@@ -152,31 +165,12 @@ export const PoliciesContainer: React.FC<React.PropsWithChildren<IPoliciesContai
       await biohubApi.policies.deletePolicy(policy.policy_id);
 
       showSnackBar({
-        snackbarMessage: (
-          <Typography variant="body2" component="div">
-            Policy <strong>{policy.name}</strong> deleted.
-          </Typography>
-        ),
-        open: true
+        snackbarMessage: 'Deleted policy'
       });
 
       props.refresh();
     } catch (error) {
-      const apiError = error as APIError;
-
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: 'Error Deleting Policy',
-        dialogText: 'An error occurred while deleting the policy.',
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
-        onClose: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        onOk: () => {
-          dialogContext.setErrorDialog({ open: false });
-        }
-      });
+      showApiErrorDialog('Error Deleting Policy', 'An error occurred while deleting the policy.', error);
     }
   };
 
@@ -215,28 +209,10 @@ export const PoliciesContainer: React.FC<React.PropsWithChildren<IPoliciesContai
       props.refresh();
 
       showSnackBar({
-        snackbarMessage: (
-          <Typography variant="body2" component="div">
-            Policy <strong>{values.name}</strong> created.
-          </Typography>
-        )
+        snackbarMessage: 'Created policy'
       });
     } catch (error) {
-      const apiError = error as APIError;
-
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: 'Failed to Create Policy',
-        dialogText: 'An error occurred while creating the policy.',
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
-        onClose: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        onOk: () => {
-          dialogContext.setErrorDialog({ open: false });
-        }
-      });
+      showApiErrorDialog('Failed to Create Policy', 'An error occurred while creating the policy.', error);
     } finally {
       setIsLoading(false);
     }
@@ -272,28 +248,10 @@ export const PoliciesContainer: React.FC<React.PropsWithChildren<IPoliciesContai
       props.refresh();
 
       showSnackBar({
-        snackbarMessage: (
-          <Typography variant="body2" component="div">
-            Policy <strong>{values.name}</strong> updated.
-          </Typography>
-        )
+        snackbarMessage: 'Updated policy'
       });
     } catch (error) {
-      const apiError = error as APIError;
-
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: 'Failed to Update Policy',
-        dialogText: 'An error occurred while updating the policy.',
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
-        onClose: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        onOk: () => {
-          dialogContext.setErrorDialog({ open: false });
-        }
-      });
+      showApiErrorDialog('Failed to Update Policy', 'An error occurred while updating the policy.', error);
     } finally {
       setIsLoading(false);
     }
@@ -383,14 +341,18 @@ export const PoliciesContainer: React.FC<React.PropsWithChildren<IPoliciesContai
   return (
     <>
       <Container maxWidth="xl">
-        <Paper>
-          <Toolbar disableGutters sx={{ px: 2 }}>
-            <Typography variant="h4" component="h2" flexGrow={1}>
+        <PageSection
+          id="policies"
+          label={
+            <>
               Active Policies{' '}
               <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
                 ({rowCount})
               </Typography>
-            </Typography>
+            </>
+          }
+          onAdd={() => setOpenAddPolicyDialog(true)}
+          headerContent={
             <Stack gap={1} direction="row" alignItems="center">
               <TextField
                 size="small"
@@ -408,18 +370,9 @@ export const PoliciesContainer: React.FC<React.PropsWithChildren<IPoliciesContai
                 }}
                 sx={{ width: 250 }}
               />
-              <Button
-                variant="contained"
-                color="primary"
-                data-testid="add-policy-button"
-                startIcon={<Icon path={mdiPlus} size={0.8} />}
-                onClick={() => setOpenAddPolicyDialog(true)}>
-                Add
-              </Button>
             </Stack>
-          </Toolbar>
-
-          <Divider flexItem />
+          }
+        >
 
           <ServerPaginatedDataGrid<IPolicy>
             dataTestId="active-policies-table"
@@ -437,7 +390,7 @@ export const PoliciesContainer: React.FC<React.PropsWithChildren<IPoliciesContai
             checkboxSelection
             disableMultipleRowSelection
           />
-        </Paper>
+        </PageSection>
       </Container>
 
       <EditDialog

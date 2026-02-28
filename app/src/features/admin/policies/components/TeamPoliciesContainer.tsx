@@ -1,21 +1,19 @@
-import { mdiDotsVertical, mdiPencilOutline, mdiPlus, mdiTrashCanOutline } from '@mdi/js';
+import { mdiDotsVertical, mdiPencilOutline, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Divider from '@mui/material/Divider';
-import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import ServerPaginatedDataGrid from 'components/data-grid/ServerPaginatedDataGrid';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
+import PageSection from 'components/section/PageSection';
 import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
+import useDataLoader from 'hooks/useDataLoader';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
 import { ITeam } from 'interfaces/useTeamsApi.interface';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 import { CreateTeamPolicyDialog } from './CreateTeamPolicyDialog';
 import { EditTeamPolicyDialog } from './EditTeamPolicyDialog';
@@ -45,6 +43,13 @@ export interface ITeamPoliciesContainerProps {
   refresh: () => void;
 }
 
+const ASSIGNMENT_OPTIONS_PAGINATION: ApiPaginationRequestOptions = {
+  page: 1,
+  limit: 25,
+  sort: 'name',
+  order: 'asc'
+};
+
 /**
  * Container component for managing team-policy associations.
  *
@@ -70,50 +75,50 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
   const biohubApi = useApi();
   const dialogContext = useDialogContext();
 
-  const [teams, setTeams] = useState<ITeam[]>([]);
-  const [policies, setPolicies] = useState<IPolicy[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [editingTeamPolicy, setEditingTeamPolicy] = useState<ITeamPolicyDetails | null>(null);
 
+  const showApiErrorDialog = useCallback(
+    (title: string, text: string, error: unknown) => {
+      const apiError = error as APIError;
+      dialogContext.setErrorDialog({
+        open: true,
+        dialogTitle: title,
+        dialogText: text,
+        dialogError: apiError.message,
+        dialogErrorDetails: apiError.errors,
+        onClose: () => {
+          dialogContext.setErrorDialog({ open: false });
+        },
+        onOk: () => {
+          dialogContext.setErrorDialog({ open: false });
+        }
+      });
+    },
+    [dialogContext]
+  );
+
+  const teamsDataLoader = useDataLoader(
+    () => biohubApi.teams.getTeams(undefined, ASSIGNMENT_OPTIONS_PAGINATION),
+    (error) => showApiErrorDialog('Failed to Load Assignment Options', 'An error occurred while loading teams.', error)
+  );
+
+  const policiesDataLoader = useDataLoader(
+    () => biohubApi.policies.getPolicies(undefined, ASSIGNMENT_OPTIONS_PAGINATION),
+    (error) =>
+      showApiErrorDialog('Failed to Load Assignment Options', 'An error occurred while loading policies.', error)
+  );
+
   useEffect(() => {
-    const pagination: ApiPaginationRequestOptions = {
-      page: 1,
-      limit: 25,
-      sort: 'name',
-      order: 'asc'
-    };
+    teamsDataLoader.load();
+    policiesDataLoader.load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    const loadAssignmentOptions = async () => {
-      try {
-        const [teamsResponse, policiesResponse] = await Promise.all([
-          biohubApi.teams.getTeams(undefined, pagination),
-          biohubApi.policies.getPolicies(undefined, pagination)
-        ]);
-
-        setTeams(teamsResponse.teams);
-        setPolicies(policiesResponse.policies);
-      } catch (error) {
-        const apiError = error as APIError;
-        dialogContext.setErrorDialog({
-          open: true,
-          dialogTitle: 'Failed to Load Assignment Options',
-          dialogText: 'An error occurred while loading teams and policies.',
-          dialogError: apiError.message,
-          dialogErrorDetails: apiError.errors,
-          onClose: () => {
-            dialogContext.setErrorDialog({ open: false });
-          },
-          onOk: () => {
-            dialogContext.setErrorDialog({ open: false });
-          }
-        });
-      }
-    };
-
-    loadAssignmentOptions();
-  }, [biohubApi.policies, biohubApi.teams, dialogContext]);
+  const teams = useMemo(() => teamsDataLoader.data?.teams ?? [], [teamsDataLoader.data?.teams]);
+  const policies = useMemo(() => policiesDataLoader.data?.policies ?? [], [policiesDataLoader.data?.policies]);
 
   const teamOptions = useMemo(() => {
     const map = new Map<string, ITeam>();
@@ -143,24 +148,6 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
     dialogContext.setSnackbar({ ...textDialogProps, open: true });
   };
 
-  /**
-   * Get dynamic header text based on selection state.
-   *
-   * @returns {string} Header text describing what's being shown
-   */
-  const getHeaderText = (): string => {
-    if (selectedTeam && selectedPolicy) {
-      return `Assignment: ${selectedTeam.name} + ${selectedPolicy.name}`;
-    }
-    if (selectedTeam) {
-      return `Policies for "${selectedTeam.name}"`;
-    }
-    if (selectedPolicy) {
-      return `Teams with "${selectedPolicy.name}"`;
-    }
-    return 'Team-Policy Assignments';
-  };
-
   const handleCreate = async (values: ITeamPolicyFormValues) => {
     setIsSaving(true);
 
@@ -177,21 +164,11 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
         snackbarMessage: 'Created assignment'
       });
     } catch (error) {
-      const apiError = error as APIError;
-
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: 'Failed to Create Assignment',
-        dialogText: 'An error occurred while creating the team-policy assignment.',
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
-        onClose: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        onOk: () => {
-          dialogContext.setErrorDialog({ open: false });
-        }
-      });
+      showApiErrorDialog(
+        'Failed to Create Assignment',
+        'An error occurred while creating the team-policy assignment.',
+        error
+      );
     } finally {
       setIsSaving(false);
     }
@@ -233,21 +210,11 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
         snackbarMessage: 'Updated assignment'
       });
     } catch (error) {
-      const apiError = error as APIError;
-
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: 'Failed to Update Assignment',
-        dialogText: 'An error occurred while updating the team-policy assignment.',
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
-        onClose: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        onOk: () => {
-          dialogContext.setErrorDialog({ open: false });
-        }
-      });
+      showApiErrorDialog(
+        'Failed to Update Assignment',
+        'An error occurred while updating the team-policy assignment.',
+        error
+      );
     } finally {
       setIsSaving(false);
     }
@@ -298,21 +265,7 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
 
       refresh();
     } catch (error) {
-      const apiError = error as APIError;
-
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: 'Error Removing Assignment',
-        dialogText: 'An error occurred while removing the policy assignment.',
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
-        onClose: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        onOk: () => {
-          dialogContext.setErrorDialog({ open: false });
-        }
-      });
+      showApiErrorDialog('Error Removing Assignment', 'An error occurred while removing the policy assignment.', error);
     }
   };
 
@@ -359,26 +312,19 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
 
   return (
     <>
-      <Box>
-        <Toolbar disableGutters sx={{ px: 2 }}>
-          <Typography variant="h4" component="h2" flexGrow={1}>
-            {getHeaderText()}{' '}
+      <PageSection
+        id="assignments"
+        label={
+          <>
+            Assignments
             <Typography sx={{ fontSize: 'inherit' }} component="span" color="textSecondary">
               ({rowCount})
             </Typography>
-          </Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<Icon path={mdiPlus} size={0.8} />}
-            onClick={() => setOpenCreateDialog(true)}
-            data-testid="add-assignment-button"
-            disabled={teamOptions.length === 0 || policies.length === 0}>
-            Add
-          </Button>
-        </Toolbar>
-
-        <Divider flexItem />
+          </>
+        }
+        onAdd={() => setOpenCreateDialog(true)}
+        addDisabled={teamOptions.length === 0 || policies.length === 0}
+      >
 
         <ServerPaginatedDataGrid<ITeamPolicyDetails>
           dataTestId="team-policies-table"
@@ -392,7 +338,7 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
           sortModel={sortModel}
           setSortModel={setSortModel}
         />
-      </Box>
+      </PageSection>
 
       <CreateTeamPolicyDialog
         open={openCreateDialog}

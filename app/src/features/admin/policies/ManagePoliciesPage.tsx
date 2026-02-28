@@ -1,6 +1,5 @@
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
-import Paper from '@mui/material/Paper';
 import { GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import { PageHeader } from 'components/header/PageHeader';
 import { useApi } from 'hooks/useApi';
@@ -124,37 +123,33 @@ export const ManagePoliciesPage = () => {
         />
 
         <Container maxWidth="xl" sx={{ mt: 4 }}>
-          <Paper>
-            <TeamsContainer
-              teams={teams.data}
-              rowCount={teams.rowCount}
-              paginationModel={teams.paginationModel}
-              setPaginationModel={teams.handlePaginationChange}
-              sortModel={teams.sortModel}
-              setSortModel={teams.handleSortChange}
-              refresh={teams.refresh}
-              searchTerm={teams.searchTerm}
-              onSearch={teams.handleSearch}
-              selectedTeamId={selectedTeamId}
-              onSelectTeam={handleSelectTeam}
-            />
-          </Paper>
+          <TeamsContainer
+            teams={teams.data}
+            rowCount={teams.rowCount}
+            paginationModel={teams.paginationModel}
+            setPaginationModel={teams.handlePaginationChange}
+            sortModel={teams.sortModel}
+            setSortModel={teams.handleSortChange}
+            refresh={teams.refresh}
+            searchTerm={teams.searchTerm}
+            onSearch={teams.handleSearch}
+            selectedTeamId={selectedTeamId}
+            onSelectTeam={handleSelectTeam}
+          />
         </Container>
 
         <Container maxWidth="xl" sx={{ mt: 4 }}>
-          <Paper>
-            <TeamPoliciesContainer
-              teamPolicies={filteredTeamPolicies}
-              rowCount={teamPoliciesDataLoader.data?.pagination.total ?? 0}
-              paginationModel={teamPoliciesPaginationModel}
-              setPaginationModel={handleTeamPoliciesPaginationChange}
-              sortModel={teamPoliciesSortModel}
-              setSortModel={handleTeamPoliciesSortChange}
-              selectedTeam={selectedTeam}
-              selectedPolicy={selectedPolicy}
-              refresh={refreshTeamPolicies}
-            />
-          </Paper>
+          <TeamPoliciesContainer
+            teamPolicies={filteredTeamPolicies}
+            rowCount={teamPoliciesDataLoader.data?.pagination.total ?? 0}
+            paginationModel={teamPoliciesPaginationModel}
+            setPaginationModel={handleTeamPoliciesPaginationChange}
+            sortModel={teamPoliciesSortModel}
+            setSortModel={handleTeamPoliciesSortChange}
+            selectedTeam={selectedTeam}
+            selectedPolicy={selectedPolicy}
+            refresh={refreshTeamPolicies}
+          />
         </Container>
       </Box>
     </>

@@ -1,16 +1,13 @@
-import { mdiDotsVertical, mdiMagnify, mdiPencilOutline, mdiPlus, mdiTrashCanOutline } from '@mdi/js';
+import { mdiDotsVertical, mdiMagnify, mdiPencilOutline, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Divider from '@mui/material/Divider';
 import InputAdornment from '@mui/material/InputAdornment';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
-import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import ServerPaginatedDataGrid from 'components/data-grid/ServerPaginatedDataGrid';
 import EditDialog from 'components/dialog/EditDialog';
+import PageSection from 'components/section/PageSection';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
@@ -357,14 +354,18 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
 
   return (
     <>
-      <Box>
-        <Toolbar disableGutters sx={{ px: 2 }}>
-          <Typography variant="h4" component="h2" flexGrow={1}>
+      <PageSection
+        id="teams"
+        label={
+          <>
             Teams{' '}
             <Typography sx={{ fontSize: 'inherit' }} component="span" color="textSecondary">
               ({rowCount})
             </Typography>
-          </Typography>
+          </>
+        }
+        onAdd={() => setOpenAddTeamDialog(true)}
+        headerContent={
           <Stack gap={1} direction="row" alignItems="center">
             <TextField
               size="small"
@@ -382,17 +383,9 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
               }}
               sx={{ width: 250 }}
             />
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<Icon path={mdiPlus} size={0.8} />}
-              onClick={() => setOpenAddTeamDialog(true)}>
-              Add
-            </Button>
           </Stack>
-        </Toolbar>
-
-        <Divider flexItem />
+        }
+      >
 
         <ServerPaginatedDataGrid<ITeam>
           dataTestId="teams-table"
@@ -410,7 +403,7 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
           checkboxSelection
           disableMultipleRowSelection
         />
-      </Box>
+      </PageSection>
 
       <EditDialog
         isLoading={isLoading}

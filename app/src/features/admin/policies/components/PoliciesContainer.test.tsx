@@ -132,7 +132,7 @@ describe('PoliciesContainer', () => {
       const { getByTestId, getByText } = renderComponent();
 
       // Step 2: Click Add button
-      fireEvent.click(getByTestId('add-policy-button'));
+      fireEvent.click(getByTestId('policies-add-button'));
 
       // Step 3: Verify dialog opens
       await waitFor(() => {
@@ -153,7 +153,7 @@ describe('PoliciesContainer', () => {
       const { getByTestId, getByLabelText, getByRole } = renderComponent({ refresh: mockRefresh });
 
       // Step 4: Click "Add" button to open dialog
-      fireEvent.click(getByTestId('add-policy-button'));
+      fireEvent.click(getByTestId('policies-add-button'));
 
       // Step 5: Wait for dialog to appear (async rendering)
       await waitFor(() => {

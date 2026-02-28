@@ -26,7 +26,8 @@ export const TeamPolicyFormYupSchema = yup.object().shape({
   policy_id: yup.string().required('Policy is required')
 });
 
-export const TeamPolicyForm: React.FC<ITeamPolicyFormProps> = ({ teams, policies }) => {
+export const TeamPolicyForm = (props: ITeamPolicyFormProps) => {
+  const { teams, policies } = props;
   const { values, errors, touched, handleChange, handleBlur } = useFormikContext<ITeamPolicyFormValues>();
 
   return (
