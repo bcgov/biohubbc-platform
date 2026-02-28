@@ -106,6 +106,11 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
    * @param {ITeam} team - The team to delete
    */
   const handleDeleteTeamClick = (team: ITeam) => {
+    const handleConfirmDelete = () => {
+      deleteTeam(team);
+      dialogContext.setYesNoDialog({ open: false });
+    };
+
     dialogContext.setYesNoDialog({
       dialogTitle: 'Delete team?',
       dialogContent: (
@@ -123,10 +128,7 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
         dialogContext.setYesNoDialog({ open: false });
       },
       open: true,
-      onYes: async () => {
-        await deleteTeam(team);
-        dialogContext.setYesNoDialog({ open: false });
-      }
+      onYes: handleConfirmDelete
     });
   };
 

@@ -172,6 +172,11 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
    * @param {ITeamPolicyDetails} teamPolicy - The association to delete
    */
   const handleDeleteClick = (teamPolicy: ITeamPolicyDetails) => {
+    const handleConfirmDelete = () => {
+      handleDelete(teamPolicy);
+      dialogContext.setYesNoDialog({ open: false });
+    };
+
     dialogContext.setYesNoDialog({
       dialogTitle: 'Remove assignment?',
       dialogContent: (
@@ -189,10 +194,7 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
         dialogContext.setYesNoDialog({ open: false });
       },
       open: true,
-      onYes: async () => {
-        await handleDelete(teamPolicy);
-        dialogContext.setYesNoDialog({ open: false });
-      }
+      onYes: handleConfirmDelete
     });
   };
 

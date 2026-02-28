@@ -131,6 +131,11 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
    * @param {IPolicy} row - The policy to delete
    */
   const handleDeletePolicyClick = (row: IPolicy) => {
+    const handleConfirmDelete = () => {
+      deletePolicy(row);
+      closeDeletePolicyDialog();
+    };
+
     dialogContext.setYesNoDialog({
       dialogTitle: 'Delete policy?',
       dialogContent: (
@@ -144,10 +149,7 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
       onClose: closeDeletePolicyDialog,
       onNo: closeDeletePolicyDialog,
       open: true,
-      onYes: async () => {
-        await deletePolicy(row);
-        closeDeletePolicyDialog();
-      }
+      onYes: handleConfirmDelete
     });
   };
 
