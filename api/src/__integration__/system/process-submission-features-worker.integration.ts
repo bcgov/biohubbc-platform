@@ -239,13 +239,13 @@ describe('Process Submission Features Worker', function () {
       }
     ]);
 
-    const { submissionId } = await setupSubmissionWithTar(tarBuffer);
+    const { submissionId, uploadId } = await setupSubmissionWithTar(tarBuffer);
 
     // Publish job (needs IDBConnection for submission_validation tracking)
     const connection = getAPIUserDBConnection();
     try {
       await connection.open();
-      const result = await publishProcessSubmissionFeaturesJob(connection, { submissionId });
+      const result = await publishProcessSubmissionFeaturesJob(connection, { uploadId, submissionId });
       await connection.commit();
       expect(result.status).to.equal('published');
     } finally {
@@ -286,12 +286,12 @@ describe('Process Submission Features Worker', function () {
       }
     ]);
 
-    const { submissionId } = await setupSubmissionWithTar(tarBuffer);
+    const { submissionId, uploadId } = await setupSubmissionWithTar(tarBuffer);
 
     const connection = getAPIUserDBConnection();
     try {
       await connection.open();
-      const result = await publishProcessSubmissionFeaturesJob(connection, { submissionId });
+      const result = await publishProcessSubmissionFeaturesJob(connection, { uploadId, submissionId });
       await connection.commit();
       expect(result.status).to.equal('published');
     } finally {

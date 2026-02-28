@@ -12,10 +12,10 @@ import {
   processDownloadJobHandler
 } from './jobs/process-download-job';
 import {
-  IProcessSubmissionFeaturesJobData,
   processSubmissionFeaturesFailedHandler,
   processSubmissionFeaturesJobHandler
 } from './jobs/process-submission-features-job';
+import { SubmissionUploadRef } from '../models/submission-upload';
 import { getPgBoss } from './pg-boss-service';
 
 const defaultLog = getLogger('queue/worker');
@@ -52,13 +52,13 @@ export const registerWorkers = async (): Promise<void> => {
   });
 
   // Register process submission features job handler
-  await boss.work<IProcessSubmissionFeaturesJobData>(
+  await boss.work<SubmissionUploadRef>(
     JobQueues.PROCESS_SUBMISSION_FEATURES,
     processSubmissionFeaturesJobHandler
   );
 
   // Register dead letter queue handler for failed jobs
-  await boss.work<IProcessSubmissionFeaturesJobData>(
+  await boss.work<SubmissionUploadRef>(
     JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED,
     processSubmissionFeaturesFailedHandler
   );

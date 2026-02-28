@@ -1,4 +1,5 @@
 import SQL from 'sql-template-strings';
+import { SubmissionUploadRef } from '../models/submission-upload';
 import {
   SubmissionValidationId,
   SubmissionValidationRecord,
@@ -15,17 +16,21 @@ import { BaseRepository } from './base-repository';
  */
 export class SubmissionValidationRepository extends BaseRepository {
   /**
-   * Create a new submission validation record.
+   * Create a new submission validation record keyed by upload_id.
+   * Each upload gets its own validation record to track ingestion status independently.
    *
-   * @param {number} submissionId - The submission ID.
+   * @param {SubmissionUploadRef} upload - The upload and submission identifiers.
    * @param {string} jobId - The pg-boss job UUID.
    * @return {Promise<{ submission_validation_id: number }>} The created record ID.
    * @memberof SubmissionValidationRepository
    */
-  async createSubmissionValidation(submissionId: number, jobId: string): Promise<{ submission_validation_id: number }> {
+  async createSubmissionValidation(
+    upload: SubmissionUploadRef,
+    jobId: string
+  ): Promise<{ submission_validation_id: number }> {
     const sql = SQL`
-      INSERT INTO submission_validation (submission_id, job_id, status)
-      VALUES (${submissionId}, ${jobId}::uuid, 'pending')
+      INSERT INTO submission_validation (upload_id, submission_id, job_id, status)
+      VALUES (${upload.uploadId}::uuid, ${upload.submissionId}, ${jobId}::uuid, 'pending')
       RETURNING submission_validation_id;
     `;
 
@@ -65,17 +70,17 @@ export class SubmissionValidationRepository extends BaseRepository {
   }
 
   /**
-   * Get the most recent submission validation record for a submission.
+   * Get the most recent submission validation record for an upload.
    *
-   * @param {number} submissionId - The submission ID.
+   * @param {string} uploadId - The upload ID (UUID).
    * @return {Promise<SubmissionValidationRecord | null>}
    * @memberof SubmissionValidationRepository
    */
-  async getSubmissionValidationBySubmissionId(submissionId: number): Promise<SubmissionValidationRecord | null> {
+  async getSubmissionValidationByUploadId(uploadId: string): Promise<SubmissionValidationRecord | null> {
     const sql = SQL`
       SELECT submission_validation_id, job_id, status
       FROM submission_validation
-      WHERE submission_id = ${submissionId}
+      WHERE upload_id = ${uploadId}::uuid
       ORDER BY create_date DESC
       LIMIT 1;
     `;
@@ -86,19 +91,19 @@ export class SubmissionValidationRepository extends BaseRepository {
   }
 
   /**
-   * Update the most recent submission validation status by submission ID.
+   * Update the most recent submission validation status by upload ID.
    *
    * Used by Dead Letter Queue handler where the original job ID is not available.
    * Scoped to the latest record so manual retries don't corrupt historical records.
    *
-   * @param {number} submissionId - The submission ID.
+   * @param {string} uploadId - The upload ID (UUID).
    * @param {SubmissionValidationStatus} status - The new status.
    * @param {Record<string, unknown>} [metadata] - Optional metadata (e.g., error details).
    * @return {Promise<void>}
    * @memberof SubmissionValidationRepository
    */
-  async updateSubmissionValidationStatusBySubmissionId(
-    submissionId: number,
+  async updateSubmissionValidationStatusByUploadId(
+    uploadId: string,
     status: SubmissionValidationStatus,
     metadata?: Record<string, unknown>
   ): Promise<void> {
@@ -111,7 +116,7 @@ export class SubmissionValidationRepository extends BaseRepository {
       WHERE submission_validation_id = (
         SELECT submission_validation_id
         FROM submission_validation
-        WHERE submission_id = ${submissionId}
+        WHERE upload_id = ${uploadId}::uuid
         ORDER BY create_date DESC
         LIMIT 1
       );

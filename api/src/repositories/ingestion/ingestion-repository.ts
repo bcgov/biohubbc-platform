@@ -90,6 +90,8 @@ export class IngestionRepository extends BaseRepository {
   }
 
   /**
+   * Soft-deletes features for a specific upload only.
+   * Multiple uploads produce features under the same submission_id.
    * Delete all submission features for a submission (soft delete).
    * Used for idempotency - allows job retries to start fresh.
    *

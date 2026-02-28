@@ -32,3 +32,13 @@ export type UpdateSubmissionUpload = z.infer<typeof UpdateSubmissionUpload>;
 export interface SubmissionUploadFilters {
   role?: UploadArtifactRoleEnum;
 }
+
+/**
+ * The upload + submission identifier pair used across the ingestion pipeline.
+ * Both IDs travel together through publisher, job handler, validation tracking,
+ * and feature insertion. The trigger resolves both before publishing.
+ */
+export interface SubmissionUploadRef {
+  uploadId: string;
+  submissionId: number;
+}

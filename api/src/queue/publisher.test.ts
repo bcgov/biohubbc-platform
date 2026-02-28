@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import { DownloadRecord } from '../models/download';
+import { SubmissionUploadRef } from '../models/submission-upload';
 import { SubmissionValidationRecord } from '../models/submission-validation';
 import { DownloadService } from '../services/download/download-service';
 import { SubmissionValidationService } from '../services/submission-validation-service';
@@ -30,13 +31,13 @@ describe('publisher', () => {
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
       // No existing validation record
-      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId').resolves(null);
+      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationByUploadId').resolves(null);
 
       const createValidationStub = sinon
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
         .resolves({ submission_validation_id: 1 });
 
-      const data = { uploadId: 'upload-uuid-1', submissionId: 123 };
+      const data: SubmissionUploadRef = { uploadId: 'upload-uuid-1', submissionId: 123 };
       const result = await publishProcessSubmissionFeaturesJob(mockConnection, data);
 
       expect(createQueueStub.calledOnce).to.be.true;
@@ -47,9 +48,9 @@ describe('publisher', () => {
       expect(result.status).to.equal('published');
       expect((result as { status: 'published'; jobId: string }).jobId).to.equal('features-job-id');
 
-      // Verify submission validation was created
+      // Verify submission validation was created with SubmissionUploadRef and jobId
       expect(createValidationStub.calledOnce).to.be.true;
-      expect(createValidationStub.firstCall.args[0]).to.equal(123);
+      expect(createValidationStub.firstCall.args[0]).to.deep.equal(data);
       expect(createValidationStub.firstCall.args[1]).to.equal('features-job-id');
     });
 
@@ -60,7 +61,7 @@ describe('publisher', () => {
       const mockBoss = { send: sendStub, createQueue: createQueueStub };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
-      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId').resolves(null);
+      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationByUploadId').resolves(null);
       sinon
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
         .resolves({ submission_validation_id: 1 });
@@ -81,7 +82,7 @@ describe('publisher', () => {
       const mockBoss = { send: sendStub, createQueue: createQueueStub };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
-      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId').resolves(null);
+      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationByUploadId').resolves(null);
       sinon
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
         .resolves({ submission_validation_id: 1 });
@@ -104,7 +105,7 @@ describe('publisher', () => {
       const mockBoss = { send: sendStub, createQueue: createQueueStub };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
-      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId').resolves(null);
+      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationByUploadId').resolves(null);
 
       const createValidationStub = sinon.stub(SubmissionValidationService.prototype, 'createSubmissionValidation');
 
@@ -127,7 +128,7 @@ describe('publisher', () => {
       const mockBoss = { send: sendStub, createQueue: createQueueStub };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
-      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId').resolves(null);
+      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationByUploadId').resolves(null);
       sinon
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
         .resolves({ submission_validation_id: 1 });
@@ -141,7 +142,7 @@ describe('publisher', () => {
     it('returns error status when pg-boss throws', async () => {
       const mockConnection = getMockDBConnection();
 
-      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId').resolves(null);
+      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationByUploadId').resolves(null);
       sinon.stub(pgBossService, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
       const result = await publishProcessSubmissionFeaturesJob(mockConnection, {
@@ -162,7 +163,7 @@ describe('publisher', () => {
         status: 'pending'
       };
       sinon
-        .stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId')
+        .stub(SubmissionValidationService.prototype, 'getSubmissionValidationByUploadId')
         .resolves(mockValidationRecord);
 
       const result = await publishProcessSubmissionFeaturesJob(mockConnection, {
@@ -187,7 +188,7 @@ describe('publisher', () => {
         status: 'invalid'
       };
       sinon
-        .stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId')
+        .stub(SubmissionValidationService.prototype, 'getSubmissionValidationByUploadId')
         .resolves(mockInvalidValidationRecord);
       sinon
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
@@ -211,7 +212,7 @@ describe('publisher', () => {
         status: 'completed'
       };
       sinon
-        .stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId')
+        .stub(SubmissionValidationService.prototype, 'getSubmissionValidationByUploadId')
         .resolves(mockCompletedRecord);
 
       const result = await publishProcessSubmissionFeaturesJob(mockConnection, {
@@ -236,7 +237,7 @@ describe('publisher', () => {
         status: 'failed'
       };
       sinon
-        .stub(SubmissionValidationService.prototype, 'getSubmissionValidationBySubmissionId')
+        .stub(SubmissionValidationService.prototype, 'getSubmissionValidationByUploadId')
         .resolves(mockFailedValidationRecord);
       sinon
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')

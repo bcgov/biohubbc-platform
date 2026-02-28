@@ -13,7 +13,7 @@ export async function up(knex: Knex): Promise<void> {
       ADD COLUMN upload_id uuid;
 
     ALTER TABLE submission_validation
-      ADD CONSTRAINT submission_validation_fk1
+      ADD CONSTRAINT submission_validation_fk2
         FOREIGN KEY (upload_id) REFERENCES upload(upload_id);
 
     CREATE INDEX submission_validation_idx4
@@ -28,7 +28,7 @@ export async function down(knex: Knex): Promise<void> {
     SET SEARCH_PATH = biohub, public;
 
     ALTER TABLE submission_validation
-      DROP CONSTRAINT IF EXISTS submission_validation_fk1;
+      DROP CONSTRAINT IF EXISTS submission_validation_fk2;
 
     ALTER TABLE submission_validation
       DROP COLUMN IF EXISTS upload_id;

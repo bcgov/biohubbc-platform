@@ -1,5 +1,6 @@
 import PgBoss from 'pg-boss';
 import { getAPIUserDBConnection } from '../../database/db';
+import { SubmissionUploadRef } from '../../models/submission-upload';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { getLogger } from '../../utils/logger';
@@ -7,19 +8,6 @@ import { publishIndexSubmissionFeaturesJob } from '../publisher';
 
 const defaultLog = getLogger('queue/jobs/process-submission-features-job');
 
-/**
- * Process submission features job data interface.
- *
- * The trigger (ArtifactSecurityService) naturally has upload_id from the upload_archive record
- * and derives submissionId from submission_upload. Both are passed in the job payload so the
- * handler needs zero additional DB lookups for keying.
- */
-export interface IProcessSubmissionFeaturesJobData {
-  /** The upload ID (UUID) — the processing unit for ingestion */
-  uploadId: string;
-  /** The submission ID — provided by the trigger to avoid a DB lookup in the handler */
-  submissionId: number;
-}
 
 /**
  * Process submission features job handler.
@@ -30,10 +18,10 @@ export interface IProcessSubmissionFeaturesJobData {
  * 3. Inserts feature records
  * 4. Indexes features for search
  *
- * @param {PgBoss.Job<IProcessSubmissionFeaturesJobData>[]} jobs The jobs to process
+ * @param {PgBoss.Job<SubmissionUploadRef>[]} jobs The jobs to process
  * @return {*}  {Promise<void>}
  */
-export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IProcessSubmissionFeaturesJobData> = async (
+export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionUploadRef> = async (
   jobs
 ) => {
   for (const job of jobs) {
@@ -127,22 +115,23 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IProcessSub
  * This handler is called after all retries are exhausted. It updates the
  * submission validation status to 'failed' with error details.
  *
- * @param {PgBoss.Job<IProcessSubmissionFeaturesJobData>[]} jobs The failed jobs
+ * @param {PgBoss.Job<SubmissionUploadRef>[]} jobs The failed jobs
  * @return {*}  {Promise<void>}
  */
-export const processSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IProcessSubmissionFeaturesJobData> = async (
+export const processSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<SubmissionUploadRef> = async (
   jobs
 ) => {
   for (const job of jobs) {
-    const { submissionId } = job.data;
+    const { uploadId, submissionId } = job.data;
 
     // Cast to access output field available on failed jobs
-    const jobOutput = (job as PgBoss.JobWithMetadata<IProcessSubmissionFeaturesJobData>).output;
+    const jobOutput = (job as PgBoss.JobWithMetadata<SubmissionUploadRef>).output;
 
     defaultLog.warn({
       label: 'processSubmissionFeaturesFailedHandler',
       message: 'Processing failed job from dead letter queue',
       jobId: job.id,
+      uploadId,
       submissionId,
       output: jobOutput
     });
@@ -155,8 +144,8 @@ export const processSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IProcess
       const submissionValidationService = new SubmissionValidationService(connection);
 
       // Update validation status to failed (all retries exhausted)
-      // Use submissionId since DLQ job has a new job ID, not the original
-      await submissionValidationService.updateSubmissionValidationStatusBySubmissionId(submissionId, 'failed', {
+      // Use uploadId since DLQ job has a new job ID, not the original
+      await submissionValidationService.updateSubmissionValidationStatusByUploadId(uploadId, 'failed', {
         error: jobOutput ?? 'Job failed after all retries'
       });
 

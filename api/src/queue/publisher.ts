@@ -7,7 +7,7 @@ import { JobQueues } from './jobs';
 import { IIndexSubmissionFeaturesJobData } from './jobs/index-submission-features-job';
 import { IMalwareScanJobData } from './jobs/malware-scan-job';
 import { IProcessDownloadJobData } from './jobs/process-download-job';
-import { IProcessSubmissionFeaturesJobData } from './jobs/process-submission-features-job';
+import { SubmissionUploadRef } from '../models/submission-upload';
 import { getPgBoss } from './pg-boss-service';
 
 const defaultLog = getLogger('queue/publisher');
@@ -86,22 +86,20 @@ const PROCESS_DOWNLOAD_OPTIONS: IPublishOptions = {
  * which allows retrying failed jobs.
  *
  * @param {IDBConnection} connection Database connection for submission validation tracking
- * @param {IProcessSubmissionFeaturesJobData} data Job data containing submissionId
+ * @param {SubmissionUploadRef} data Job data containing submissionId
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success, blocked, duplicate, or error
  */
 export const publishProcessSubmissionFeaturesJob = async (
   connection: IDBConnection,
-  data: IProcessSubmissionFeaturesJobData,
+  data: SubmissionUploadRef,
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
   try {
     const submissionValidationService = new SubmissionValidationService(connection);
 
-    // Check for existing validation record
-    const existingValidation = await submissionValidationService.getSubmissionValidationBySubmissionId(
-      data.submissionId
-    );
+    // Check for existing validation record by upload ID
+    const existingValidation = await submissionValidationService.getSubmissionValidationByUploadId(data.uploadId);
 
     if (existingValidation) {
       // Only allow retry if status is 'failed' or 'invalid'
@@ -144,7 +142,7 @@ export const publishProcessSubmissionFeaturesJob = async (
     // jobId is null when pg-boss rejects the job (e.g., duplicate singletonKey still active)
     if (jobId) {
       // Create submission validation record for tracking
-      await submissionValidationService.createSubmissionValidation(data.submissionId, jobId);
+      await submissionValidationService.createSubmissionValidation(data, jobId);
 
       defaultLog.info({
         label: 'publishProcessSubmissionFeaturesJob',
