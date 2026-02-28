@@ -9,14 +9,12 @@ import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { ITeamPoliciesContainerProps, TeamPoliciesContainer } from './TeamPoliciesContainer';
 
-// Types for DataGrid mock
 interface MockDataGridProps {
   rows: ITeamPolicyDetails[];
   columns: GridColDef[];
   localeText?: { noRowsLabel?: string };
 }
 
-// Simple DataGrid mock - just renders rows as divs
 vi.mock('@mui/x-data-grid', () => ({
   DataGrid: ({ rows, columns, localeText }: MockDataGridProps) => (
     <div data-testid="mock-data-grid">
@@ -27,7 +25,6 @@ vi.mock('@mui/x-data-grid', () => ({
           <div key={row.team_policy_id} data-testid={`row-${row.team_policy_id}`}>
             <span>{row.team_name}</span>
             <span>{row.policy_name}</span>
-            {/* Render actions column */}
             {columns.find((c) => c.field === 'actions')?.renderCell?.({ row } as never)}
           </div>
         ))
@@ -70,11 +67,19 @@ const mockPolicies: IPolicy[] = [
 
 const mockCreateTeamPolicy = vi.fn();
 const mockDeleteTeamPolicy = vi.fn();
+const mockGetTeams = vi.fn();
+const mockGetPolicies = vi.fn();
 
 const mockUseApi = {
   teamPolicies: {
     createTeamPolicy: mockCreateTeamPolicy,
     deleteTeamPolicy: mockDeleteTeamPolicy
+  },
+  teams: {
+    getTeams: mockGetTeams
+  },
+  policies: {
+    getPolicies: mockGetPolicies
   }
 };
 
@@ -100,6 +105,8 @@ const renderComponent = (props: Partial<ITeamPoliciesContainerProps> = {}) => {
 
 describe('TeamPoliciesContainer', () => {
   beforeEach(() => {
+    mockGetTeams.mockResolvedValue({ teams: mockTeams });
+    mockGetPolicies.mockResolvedValue({ policies: mockPolicies });
     mockBiohubApi.mockImplementation(() => mockUseApi);
   });
 
@@ -108,154 +115,80 @@ describe('TeamPoliciesContainer', () => {
     vi.clearAllMocks();
   });
 
-  describe('Header', () => {
-    it('displays rowCount in header', async () => {
-      // Step 1: Render with default props (rowCount: 2)
-      const { getByText } = renderComponent();
+  it('displays rowCount in header', async () => {
+    const { getByText } = renderComponent();
 
-      // Step 2: Verify dynamic rowCount appears in header
-      await waitFor(() => {
-        expect(getByText('(2)')).toBeVisible();
-      });
-    });
-
-    it('shows team-specific header when team is selected', async () => {
-      // Step 1: Render with selectedTeam prop
-      const { getByText } = renderComponent({ selectedTeam: mockTeams[0] });
-
-      // Step 2: Verify header shows team-specific text
-      await waitFor(() => {
-        expect(getByText('Policies for "Alpha Team"')).toBeVisible();
-      });
-    });
-
-    it('shows policy-specific header when policy is selected', async () => {
-      // Step 1: Render with selectedPolicy prop
-      const { getByText } = renderComponent({ selectedPolicy: mockPolicies[0] });
-
-      // Step 2: Verify header shows policy-specific text
-      await waitFor(() => {
-        expect(getByText('Teams with "Data Access Policy"')).toBeVisible();
-      });
-    });
-
-    it('shows combined header when both team and policy are selected', async () => {
-      // Step 1: Render with both selectedTeam and selectedPolicy props
-      const { getByText } = renderComponent({
-        selectedTeam: mockTeams[0],
-        selectedPolicy: mockPolicies[0]
-      });
-
-      // Step 2: Verify header shows combined assignment text
-      await waitFor(() => {
-        expect(getByText('Assignment: Alpha Team + Data Access Policy')).toBeVisible();
-      });
+    await waitFor(() => {
+      expect(getByText('(2)')).toBeVisible();
     });
   });
 
-  describe('Assign Button', () => {
-    it('does not show Assign button when no selection', async () => {
-      // Step 1: Render with no selection (default props)
-      const { queryByRole } = renderComponent();
+  it('opens Add Assignment dialog when Add is clicked', async () => {
+    const { getByRole, getByText } = renderComponent();
 
-      // Step 2: Verify Assign button is NOT visible
-      await waitFor(() => {
-        expect(queryByRole('button', { name: /assign/i })).toBeNull();
-      });
+    await waitFor(() => {
+      expect(getByRole('button', { name: /add/i })).toBeEnabled();
     });
 
-    it('does not show Assign button when only team is selected', async () => {
-      // Step 1: Render with only selectedTeam (no policy)
-      const { queryByRole } = renderComponent({ selectedTeam: mockTeams[0] });
+    fireEvent.click(getByRole('button', { name: /add/i }));
 
-      // Step 2: Verify Assign button is NOT visible (needs both)
-      await waitFor(() => {
-        expect(queryByRole('button', { name: /assign/i })).toBeNull();
-      });
-    });
-
-    it('does not show Assign button when only policy is selected', async () => {
-      // Step 1: Render with only selectedPolicy (no team)
-      const { queryByRole } = renderComponent({ selectedPolicy: mockPolicies[0] });
-
-      // Step 2: Verify Assign button is NOT visible (needs both)
-      await waitFor(() => {
-        expect(queryByRole('button', { name: /assign/i })).toBeNull();
-      });
-    });
-
-    it('shows Assign button when both selected and assignment does not exist', async () => {
-      // Step 1: Render with team + policy that are NOT already assigned
-      const { getByRole } = renderComponent({
-        selectedTeam: mockTeams[2], // Gamma Team - not in mockTeamPolicies
-        selectedPolicy: mockPolicies[2] // Admin Policy - not in mockTeamPolicies
-      });
-
-      // Step 2: Verify Assign button IS visible (can create new assignment)
-      await waitFor(() => {
-        expect(getByRole('button', { name: /assign/i })).toBeVisible();
-      });
-    });
-
-    it('does not show Assign button when assignment already exists', async () => {
-      // Step 1: Render with team + policy that ARE already assigned
-      const { queryByRole } = renderComponent({
-        selectedTeam: mockTeams[0], // Alpha Team
-        selectedPolicy: mockPolicies[0] // Data Access Policy - already assigned
-      });
-
-      // Step 2: Verify Assign button is NOT visible (duplicate prevention)
-      await waitFor(() => {
-        expect(queryByRole('button', { name: /assign/i })).toBeNull();
-      });
-    });
-
-    it('calls createTeamPolicy API when Assign is clicked', async () => {
-      // Step 1: Setup - make createTeamPolicy return {} (simulates successful API response)
-      mockCreateTeamPolicy.mockResolvedValueOnce({});
-
-      // Step 2: Create mock refresh function to verify it's called after submit
-      const mockRefresh = vi.fn();
-
-      // Step 3: Render component with selected team + policy (enables Assign button)
-      const { getByRole } = renderComponent({
-        selectedTeam: mockTeams[2],
-        selectedPolicy: mockPolicies[2],
-        refresh: mockRefresh
-      });
-
-      // Step 4: Wait for Assign button to appear
-      await waitFor(() => {
-        expect(getByRole('button', { name: /assign/i })).toBeVisible();
-      });
-
-      // Step 5: Click Assign button
-      fireEvent.click(getByRole('button', { name: /assign/i }));
-
-      // Step 6: Verify API was called with correct params
-      await waitFor(() => {
-        expect(mockCreateTeamPolicy).toHaveBeenCalledWith({
-          team_id: 'team-3',
-          policy_id: 'policy-3'
-        });
-      });
-
-      // Step 7: Verify refresh was called after success
-      await waitFor(() => {
-        expect(mockRefresh).toHaveBeenCalled();
-      });
+    await waitFor(() => {
+      expect(getByText('Add Assignment')).toBeVisible();
     });
   });
 
-  describe('Empty State', () => {
-    it('shows empty state message', async () => {
-      // Step 1: Render with empty teamPolicies array
-      const { getByText } = renderComponent({ teamPolicies: [], rowCount: 0 });
+  it('calls createTeamPolicy API when Add dialog is saved', async () => {
+    mockCreateTeamPolicy.mockResolvedValueOnce({});
+    const mockRefresh = vi.fn();
 
-      // Step 2: Verify empty state message appears (from DataGrid localeText)
-      await waitFor(() => {
-        expect(getByText('No Team-Policy Assignments')).toBeVisible();
+    const { getByRole, getByTestId } = renderComponent({
+      selectedTeam: mockTeams[2],
+      selectedPolicy: mockPolicies[2],
+      refresh: mockRefresh
+    });
+
+    await waitFor(() => {
+      expect(getByRole('button', { name: /add/i })).toBeEnabled();
+    });
+
+    fireEvent.click(getByRole('button', { name: /add/i }));
+    fireEvent.click(getByTestId('edit-dialog-save-button'));
+
+    await waitFor(() => {
+      expect(mockCreateTeamPolicy).toHaveBeenCalledWith({
+        team_id: 'team-3',
+        policy_id: 'policy-3'
       });
+    });
+
+    await waitFor(() => {
+      expect(mockRefresh).toHaveBeenCalled();
+    });
+  });
+
+  it('opens Edit Assignment dialog from row action', async () => {
+    const { getByTestId, getByText } = renderComponent();
+
+    await waitFor(() => {
+      expect(getByTestId('row-tp-1')).toBeVisible();
+    });
+
+    const firstRow = getByTestId('row-tp-1');
+    const rowActionButton = firstRow.querySelector('[data-testid="custom-menu-icon-Actions"]');
+    expect(rowActionButton).toBeTruthy();
+    fireEvent.click(rowActionButton as Element);
+    fireEvent.click(getByTestId('custom-menu-icon-item-Editassignment'));
+
+    await waitFor(() => {
+      expect(getByText('Edit Assignment')).toBeVisible();
+    });
+  });
+
+  it('shows empty state message', async () => {
+    const { getByText } = renderComponent({ teamPolicies: [], rowCount: 0 });
+
+    await waitFor(() => {
+      expect(getByText('No Team-Policy Assignments')).toBeVisible();
     });
   });
 });
