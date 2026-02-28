@@ -1,10 +1,10 @@
-import { mdiDotsVertical, mdiPencilOutline, mdiTrashCanOutline } from '@mdi/js';
+import { mdiDotsVertical, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Typography from '@mui/material/Typography';
 import { GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import ServerPaginatedDataGrid from 'components/data-grid/ServerPaginatedDataGrid';
-import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import PageSection from 'components/section/PageSection';
+import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
@@ -16,7 +16,6 @@ import { ITeam } from 'interfaces/useTeamsApi.interface';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 import { CreateTeamPolicyDialog } from './CreateTeamPolicyDialog';
-import { EditTeamPolicyDialog } from './EditTeamPolicyDialog';
 import { ITeamPolicyFormValues, TeamPolicyFormInitialValues } from './TeamPolicyForm';
 
 /**
@@ -54,7 +53,7 @@ const ASSIGNMENT_OPTIONS_PAGINATION: ApiPaginationRequestOptions = {
  * Container component for managing team-policy associations.
  *
  * Displays filtered team-policy assignments based on selection in parent containers.
- * Supports adding, editing, and removing assignments.
+ * Supports adding and removing assignments.
  *
  * @param {ITeamPoliciesContainerProps} props - Component props
  * @returns {React.ReactElement} The team-policies container component
@@ -77,8 +76,6 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
 
   const [isSaving, setIsSaving] = useState(false);
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
-  const [openEditDialog, setOpenEditDialog] = useState(false);
-  const [editingTeamPolicy, setEditingTeamPolicy] = useState<ITeamPolicyDetails | null>(null);
 
   const showApiErrorDialog = useCallback(
     (title: string, text: string, error: unknown) => {
@@ -134,11 +131,6 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
     policy_id: selectedPolicy?.policy_id ?? TeamPolicyFormInitialValues.policy_id
   };
 
-  const editInitialValues: ITeamPolicyFormValues = {
-    team_id: editingTeamPolicy?.team_id ?? TeamPolicyFormInitialValues.team_id,
-    policy_id: editingTeamPolicy?.policy_id ?? TeamPolicyFormInitialValues.policy_id
-  };
-
   /**
    * Display a snackbar notification.
    *
@@ -167,52 +159,6 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
       showApiErrorDialog(
         'Failed to Create Assignment',
         'An error occurred while creating the team-policy assignment.',
-        error
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleEditClick = (teamPolicy: ITeamPolicyDetails) => {
-    setEditingTeamPolicy(teamPolicy);
-    setOpenEditDialog(true);
-  };
-
-  const handleEdit = async (values: ITeamPolicyFormValues) => {
-    if (!editingTeamPolicy) {
-      return;
-    }
-
-    const hasChanges = values.team_id !== editingTeamPolicy.team_id || values.policy_id !== editingTeamPolicy.policy_id;
-
-    if (!hasChanges) {
-      setOpenEditDialog(false);
-      setEditingTeamPolicy(null);
-      return;
-    }
-
-    setIsSaving(true);
-
-    try {
-      await biohubApi.teamPolicies.createTeamPolicy({
-        team_id: values.team_id,
-        policy_id: values.policy_id
-      });
-
-      await biohubApi.teamPolicies.deleteTeamPolicy(editingTeamPolicy.team_policy_id);
-
-      setOpenEditDialog(false);
-      setEditingTeamPolicy(null);
-      refresh();
-
-      showSnackBar({
-        snackbarMessage: 'Updated assignment'
-      });
-    } catch (error) {
-      showApiErrorDialog(
-        'Failed to Update Assignment',
-        'An error occurred while updating the team-policy assignment.',
         error
       );
     } finally {
@@ -295,11 +241,6 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
           buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
           menuItems={[
             {
-              menuIcon: <Icon path={mdiPencilOutline} size={0.875} />,
-              menuLabel: 'Edit assignment',
-              menuOnClick: () => handleEditClick(params.row)
-            },
-            {
               menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
               menuLabel: 'Remove assignment',
               menuOnClick: () => handleDeleteClick(params.row)
@@ -346,19 +287,6 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
         initialValues={createInitialValues}
         onCancel={() => setOpenCreateDialog(false)}
         onSave={handleCreate}
-      />
-
-      <EditTeamPolicyDialog
-        open={openEditDialog}
-        isLoading={isSaving}
-        teams={teamOptions}
-        policies={policies}
-        initialValues={editInitialValues}
-        onCancel={() => {
-          setOpenEditDialog(false);
-          setEditingTeamPolicy(null);
-        }}
-        onSave={handleEdit}
       />
     </>
   );

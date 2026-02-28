@@ -166,24 +166,6 @@ describe('TeamPoliciesContainer', () => {
     });
   });
 
-  it('opens Edit Assignment dialog from row action', async () => {
-    const { getByTestId, getByText } = renderComponent();
-
-    await waitFor(() => {
-      expect(getByTestId('row-tp-1')).toBeVisible();
-    });
-
-    const firstRow = getByTestId('row-tp-1');
-    const rowActionButton = firstRow.querySelector('[data-testid="custom-menu-icon-Actions"]');
-    expect(rowActionButton).toBeTruthy();
-    fireEvent.click(rowActionButton as Element);
-    fireEvent.click(getByTestId('custom-menu-icon-item-Editassignment'));
-
-    await waitFor(() => {
-      expect(getByText('Edit Assignment')).toBeVisible();
-    });
-  });
-
   it('shows empty state message', async () => {
     const { getByText } = renderComponent({ teamPolicies: [], rowCount: 0 });
 
