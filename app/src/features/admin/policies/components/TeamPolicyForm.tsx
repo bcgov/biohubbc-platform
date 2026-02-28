@@ -26,6 +26,12 @@ export const TeamPolicyFormYupSchema = yup.object().shape({
   policy_id: yup.string().required('Policy is required')
 });
 
+/**
+ * Form fields for selecting team and policy when creating/editing assignments.
+ *
+ * @param {ITeamPolicyFormProps} props
+ * @returns {JSX.Element}
+ */
 export const TeamPolicyForm = (props: ITeamPolicyFormProps) => {
   const { teams, policies } = props;
   const { values, errors, touched, handleChange, handleBlur } = useFormikContext<ITeamPolicyFormValues>();

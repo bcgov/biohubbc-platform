@@ -13,6 +13,12 @@ export interface ICreateTeamPolicyDialogProps {
   onSave: (values: ITeamPolicyFormValues) => void;
 }
 
+/**
+ * Dialog for creating a team-policy assignment.
+ *
+ * @param {ICreateTeamPolicyDialogProps} props
+ * @returns {JSX.Element}
+ */
 export const CreateTeamPolicyDialog = (props: ICreateTeamPolicyDialogProps) => {
   const { open, isLoading, teams, policies, initialValues, onCancel, onSave } = props;
   return (

@@ -26,6 +26,16 @@ interface IServerPaginatedDataGridProps<T extends GridValidRowModel> {
   disableMultipleRowSelection?: boolean;
 }
 
+/**
+ * Reusable server-side paginated data grid wrapper.
+ *
+ * Encapsulates common server pagination/sorting wiring for `CustomDataGrid`
+ * and exposes strongly-typed row behavior.
+ *
+ * @template T
+ * @param {IServerPaginatedDataGridProps<T>} props
+ * @returns {JSX.Element}
+ */
 export const ServerPaginatedDataGrid = <T extends GridValidRowModel>({
   rows,
   columns,

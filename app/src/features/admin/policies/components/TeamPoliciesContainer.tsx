@@ -59,7 +59,7 @@ const ASSIGNMENT_OPTIONS_PAGINATION: ApiPaginationRequestOptions = {
  * @param {ITeamPoliciesContainerProps} props - Component props
  * @returns {React.ReactElement} The team-policies container component
  */
-export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (props) => {
+export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
   const {
     teamPolicies,
     rowCount,

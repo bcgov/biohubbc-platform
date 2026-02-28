@@ -13,6 +13,12 @@ export interface IEditTeamPolicyDialogProps {
   onSave: (values: ITeamPolicyFormValues) => void;
 }
 
+/**
+ * Dialog for editing an existing team-policy assignment.
+ *
+ * @param {IEditTeamPolicyDialogProps} props
+ * @returns {JSX.Element}
+ */
 export const EditTeamPolicyDialog = (props: IEditTeamPolicyDialogProps) => {
   const { open, isLoading, teams, policies, initialValues, onCancel, onSave } = props;
   return (

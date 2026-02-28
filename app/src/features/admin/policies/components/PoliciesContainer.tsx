@@ -58,7 +58,7 @@ export interface IPoliciesContainerProps extends IServerPaginationProps {
  * @param {IPoliciesContainerProps} props - Component props
  * @returns {React.ReactElement} The policies list component
  */
-export const PoliciesContainer: React.FC<React.PropsWithChildren<IPoliciesContainerProps>> = (props) => {
+export const PoliciesContainer = (props: IPoliciesContainerProps) => {
   const biohubApi = useApi();
   const {
     policies,

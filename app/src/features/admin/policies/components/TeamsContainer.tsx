@@ -49,7 +49,7 @@ export interface ITeamsContainerProps extends IServerPaginationProps {
  * @param {ITeamsContainerProps} props - Component props
  * @returns {React.ReactElement} The teams container component
  */
-export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
+export const TeamsContainer = (props: ITeamsContainerProps) => {
   const {
     teams,
     rowCount,
@@ -123,10 +123,9 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
         dialogContext.setYesNoDialog({ open: false });
       },
       open: true,
-      onYes: () => {
-        deleteTeam(team).then(() => {
-          dialogContext.setYesNoDialog({ open: false });
-        });
+      onYes: async () => {
+        await deleteTeam(team);
+        dialogContext.setYesNoDialog({ open: false });
       }
     });
   };
@@ -145,11 +144,7 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
       await biohubApi.teams.deleteTeam(team.team_id);
 
       showSnackBar({
-        snackbarMessage: (
-          <Typography variant="body2" component="div">
-            Team <strong>{team.name}</strong> deleted.
-          </Typography>
-        ),
+        snackbarMessage: 'Deleted team',
         open: true
       });
 
@@ -208,11 +203,7 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
       refresh();
 
       showSnackBar({
-        snackbarMessage: (
-          <Typography variant="body2" component="div">
-            Team <strong>{values.name}</strong> created.
-          </Typography>
-        )
+        snackbarMessage: 'Created team'
       });
     } catch (error) {
       const apiError = error as APIError;
@@ -260,11 +251,7 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
       refresh();
 
       showSnackBar({
-        snackbarMessage: (
-          <Typography variant="body2" component="div">
-            Team <strong>{values.name}</strong> updated.
-          </Typography>
-        )
+        snackbarMessage: 'Updated team'
       });
     } catch (error) {
       const apiError = error as APIError;

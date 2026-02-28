@@ -17,6 +17,15 @@ export interface IPageSectionProps extends PropsWithChildren {
   headerContent?: ReactNode;
 }
 
+/**
+ * Reusable page section layout for admin list screens.
+ *
+ * Renders a titled paper section with a standardized Add button and
+ * customizable header/children content.
+ *
+ * @param {IPageSectionProps} props
+ * @returns {JSX.Element}
+ */
 export const PageSection = (props: IPageSectionProps) => {
   const { id, label, onAdd, addDisabled = false, addLabel = 'Add', headerContent, children } = props;
 
