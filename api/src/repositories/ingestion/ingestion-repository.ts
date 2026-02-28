@@ -90,8 +90,26 @@ export class IngestionRepository extends BaseRepository {
   }
 
   /**
-   * Soft-deletes features for a specific upload only.
-   * Multiple uploads produce features under the same submission_id.
+   * Soft-delete features scoped to a specific upload.
+   * Multiple uploads produce features under the same submission_id;
+   * re-ingesting one upload must not affect features from other uploads.
+   *
+   * @param {string} uploadId The upload ID (UUID).
+   * @return {Promise<void>}
+   * @memberof IngestionRepository
+   */
+  async deleteSubmissionFeaturesByUploadId(uploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission_feature
+      SET record_end_date = NOW()
+      WHERE upload_id = ${uploadId}
+        AND record_end_date IS NULL;
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
    * Delete all submission features for a submission (soft delete).
    * Used for idempotency - allows job retries to start fresh.
    *

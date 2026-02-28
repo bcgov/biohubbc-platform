@@ -1,6 +1,7 @@
 import dayjs from 'dayjs';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { IFlattenedBlock } from '../../models/submission-feature';
+import { SubmissionUploadRef } from '../../models/submission-upload';
 import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
 import { extractAndUploadMedia, extractBlocksFromArchive, IUploadedMediaFile } from '../../utils/biohub-tar-parser';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
@@ -8,7 +9,6 @@ import { getLogger } from '../../utils/logger';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
-import { SubmissionUploadService } from '../upload/submission-upload-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
 import { FeatureValidationService } from './feature-validation-service';
 import { IValidationError, IValidationResult, ValidationErrorType } from './feature-validation-service.interface';
@@ -30,7 +30,6 @@ const CSV_ROW_OVERHEAD_BYTES = 500;
 export class SubmissionIngestionService extends DBService {
   featureValidationService = new FeatureValidationService(this.connection);
   ingestionRepository = new IngestionRepository(this.connection);
-  submissionUploadService = new SubmissionUploadService(this.connection);
   uploadArchiveService = new UploadArchiveService(this.connection);
   artifactService = new ArtifactService(this.connection);
   objectStorageService = new ObjectStorageService();
@@ -43,16 +42,12 @@ export class SubmissionIngestionService extends DBService {
    * Idempotent: safe for pg-boss retries. Existing features are soft-deleted before
    * re-insertion, artifact inserts use ON CONFLICT DO NOTHING, and S3 PUTs overwrite.
    *
-   * @param {number} submissionId - The submission to process
+   * @param {SubmissionUploadRef} upload - The upload and submission identifiers.
    * @returns {Promise<IValidationResult>} Validation result
    * @memberof SubmissionIngestionService
    */
-  async processSubmission(submissionId: number): Promise<IValidationResult> {
-    const submissionUploads = await this.submissionUploadService.getSubmissionUploadsBySubmissionId(submissionId);
-    if (submissionUploads.length === 0) {
-      throw new Error(`No uploads found for submission ${submissionId}`);
-    }
-    const uploadId = submissionUploads[0].upload_id;
+  async processSubmission(upload: SubmissionUploadRef): Promise<IValidationResult> {
+    const { submissionId, uploadId } = upload;
     const objectKey = await this.getTarballObjectKey(uploadId);
 
     // ================================================================
@@ -94,8 +89,8 @@ export class SubmissionIngestionService extends DBService {
       });
     }
 
-    // Delete existing features (idempotency for job retries), then insert
-    await this.ingestionRepository.deleteSubmissionFeatures(submissionId);
+    // Clear previous features for this upload before re-inserting (admin re-trigger or re-upload)
+    await this.ingestionRepository.deleteSubmissionFeaturesByUploadId(uploadId);
     await this.insertFlatFeatures(submissionId, uploadId, allBlocks, dataByteSizeMap);
 
     return { valid: true, errors: [] };

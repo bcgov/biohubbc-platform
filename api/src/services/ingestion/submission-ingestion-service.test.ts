@@ -4,7 +4,7 @@ import { Readable } from 'node:stream';
 import sinon from 'sinon';
 import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
 import { IFlattenedBlock } from '../../models/submission-feature';
-import { SubmissionUpload } from '../../models/submission-upload';
+import { SubmissionUploadRef } from '../../models/submission-upload';
 import { UploadArchive } from '../../models/upload-archive';
 import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
 import * as biohubTarParser from '../../utils/biohub-tar-parser';
@@ -13,7 +13,6 @@ import * as fileUtils from '../../utils/file-utils';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
-import { SubmissionUploadService } from '../upload/submission-upload-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
 import { FeatureValidationService } from './feature-validation-service';
 import { IValidationError, ValidationErrorType } from './feature-validation-service.interface';
@@ -98,6 +97,7 @@ describe('SubmissionIngestionService', () => {
 
   describe('processSubmission', () => {
     const submissionId = 123;
+    const upload: SubmissionUploadRef = { submissionId, uploadId: 'upload-1' };
     const mockObjectKey = 'submissions/123/uploads/upload-1.tar';
 
     // Shared mock data
@@ -118,12 +118,6 @@ describe('SubmissionIngestionService', () => {
       const blocks = blocksOverride ?? mockBlocks;
       const mockReadable = Readable.from(Buffer.alloc(0));
 
-      const mockSubmissionUpload: SubmissionUpload = {
-        submission_upload_id: 'su-1',
-        submission_id: submissionId,
-        upload_id: 'upload-1'
-      };
-
       const mockUploadArchive: UploadArchive = {
         upload_archive_id: 'archive-1',
         upload_id: 'upload-1',
@@ -140,10 +134,6 @@ describe('SubmissionIngestionService', () => {
         checksum_sha256: null,
         uploaded_at: '2025-01-01T00:00:00Z'
       };
-
-      const getSubmissionUploadsStub = sinon
-        .stub(SubmissionUploadService.prototype, 'getSubmissionUploadsBySubmissionId')
-        .resolves([mockSubmissionUpload]);
 
       const getUploadArchivesStub = sinon
         .stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId')
@@ -168,8 +158,8 @@ describe('SubmissionIngestionService', () => {
         .stub(FeatureValidationService.prototype, 'validateFlatSubmissionFeatures')
         .resolves({ valid: true, errors: [] });
 
-      const deleteSubmissionFeaturesStub = sinon
-        .stub(IngestionRepository.prototype, 'deleteSubmissionFeatures')
+      const deleteSubmissionFeaturesByUploadIdStub = sinon
+        .stub(IngestionRepository.prototype, 'deleteSubmissionFeaturesByUploadId')
         .resolves();
 
       const insertSubmissionFeatureRecordStub = sinon
@@ -187,14 +177,13 @@ describe('SubmissionIngestionService', () => {
       const getBucketNameStub = sinon.stub(fileUtils, 'getObjectStoreBucketName').returns('test-bucket');
 
       return {
-        getSubmissionUploadsStub,
         getUploadArchivesStub,
         getArtifactStub,
         getFileStreamStub,
         extractBlocksStub,
         extractAndUploadMediaStub,
         validateStub,
-        deleteSubmissionFeaturesStub,
+        deleteSubmissionFeaturesByUploadIdStub,
         insertSubmissionFeatureRecordStub,
         updateSubmissionFeatureParentStub,
         insertArtifactStub,
@@ -207,7 +196,7 @@ describe('SubmissionIngestionService', () => {
       const dbConnection = getMockDBConnection();
       const service = new SubmissionIngestionService(dbConnection);
 
-      const result = await service.processSubmission(submissionId);
+      const result = await service.processSubmission(upload);
 
       expect(result).to.eql({ valid: true, errors: [] });
 
@@ -230,8 +219,8 @@ describe('SubmissionIngestionService', () => {
       expect(stubs.insertArtifactStub.calledOnce).to.be.true;
 
       // Features deleted and inserted
-      expect(stubs.deleteSubmissionFeaturesStub.calledOnce).to.be.true;
-      expect(stubs.deleteSubmissionFeaturesStub.getCall(0).args[0]).to.equal(submissionId);
+      expect(stubs.deleteSubmissionFeaturesByUploadIdStub.calledOnce).to.be.true;
+      expect(stubs.deleteSubmissionFeaturesByUploadIdStub.getCall(0).args[0]).to.equal('upload-1');
       expect(stubs.insertSubmissionFeatureRecordStub.callCount).to.equal(2);
     });
 
@@ -250,14 +239,14 @@ describe('SubmissionIngestionService', () => {
       const dbConnection = getMockDBConnection();
       const service = new SubmissionIngestionService(dbConnection);
 
-      const result = await service.processSubmission(submissionId);
+      const result = await service.processSubmission(upload);
 
       expect(result).to.eql({ valid: false, errors: [mockError] });
 
       // Pass 2 methods should NOT be called
       expect(stubs.extractAndUploadMediaStub.called).to.be.false;
       expect(stubs.insertArtifactStub.called).to.be.false;
-      expect(stubs.deleteSubmissionFeaturesStub.called).to.be.false;
+      expect(stubs.deleteSubmissionFeaturesByUploadIdStub.called).to.be.false;
       expect(stubs.insertSubmissionFeatureRecordStub.called).to.be.false;
     });
 
@@ -280,7 +269,7 @@ describe('SubmissionIngestionService', () => {
       const dbConnection = getMockDBConnection();
       const service = new SubmissionIngestionService(dbConnection);
 
-      const result = await service.processSubmission(submissionId);
+      const result = await service.processSubmission(upload);
 
       expect(result.valid).to.be.false;
       expect(result.errors.length).to.be.greaterThan(0);
@@ -302,7 +291,7 @@ describe('SubmissionIngestionService', () => {
       const dbConnection = getMockDBConnection();
       const service = new SubmissionIngestionService(dbConnection);
 
-      await service.processSubmission(submissionId);
+      await service.processSubmission(upload);
 
       // insertArtifact called twice — once per media file
       expect(stubs.insertArtifactStub.callCount).to.equal(2);
@@ -337,7 +326,7 @@ describe('SubmissionIngestionService', () => {
       const dbConnection = getMockDBConnection();
       const service = new SubmissionIngestionService(dbConnection);
 
-      await service.processSubmission(submissionId);
+      await service.processSubmission(upload);
 
       expect(stubs.getFileStreamStub.callCount).to.equal(2);
       expect(stubs.getFileStreamStub.getCall(0).args[0]).to.equal(BucketType.MAIN);
@@ -364,7 +353,7 @@ describe('SubmissionIngestionService', () => {
       const dbConnection = getMockDBConnection();
       const service = new SubmissionIngestionService(dbConnection);
 
-      await service.processSubmission(submissionId);
+      await service.processSubmission(upload);
 
       // Find the insertSubmissionFeatureRecord call for file-1
       const fileInsertCall = Array.from({ length: stubs.insertSubmissionFeatureRecordStub.callCount }, (_, i) =>
@@ -388,7 +377,7 @@ describe('SubmissionIngestionService', () => {
       const dbConnection = getMockDBConnection();
       const service = new SubmissionIngestionService(dbConnection);
 
-      await service.processSubmission(submissionId);
+      await service.processSubmission(upload);
 
       // Find insert calls by feature UUID (3rd arg)
       const obsInsertCall = Array.from({ length: stubs.insertSubmissionFeatureRecordStub.callCount }, (_, i) =>
@@ -411,59 +400,14 @@ describe('SubmissionIngestionService', () => {
       expect(fileInsertCall!.args[6]).to.equal(expectedFileSize);
     });
 
-    it('getTarballObjectKey failure throws', async () => {
-      const dbError = new Error('Database connection failed');
-
-      sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadsBySubmissionId').rejects(dbError);
-
-      // Stub methods that should NOT be called
-      const extractBlocksStub = sinon.stub(biohubTarParser, 'extractBlocksFromArchive');
-      const extractAndUploadMediaStub = sinon.stub(biohubTarParser, 'extractAndUploadMedia');
-      const validateStub = sinon.stub(FeatureValidationService.prototype, 'validateFlatSubmissionFeatures');
-      const deleteStub = sinon.stub(IngestionRepository.prototype, 'deleteSubmissionFeatures');
-
-      const dbConnection = getMockDBConnection();
-      const service = new SubmissionIngestionService(dbConnection);
-
-      try {
-        await service.processSubmission(submissionId);
-        expect.fail('Expected processSubmission to throw');
-      } catch (error) {
-        expect((error as Error).message).to.equal('Database connection failed');
-      }
-
-      // No downstream methods should have been called
-      expect(extractBlocksStub.called).to.be.false;
-      expect(extractAndUploadMediaStub.called).to.be.false;
-      expect(validateStub.called).to.be.false;
-      expect(deleteStub.called).to.be.false;
-    });
-
-    it('throws when submission has no uploads', async () => {
-      sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadsBySubmissionId').resolves([]);
-
-      const dbConnection = getMockDBConnection();
-      const service = new SubmissionIngestionService(dbConnection);
-
-      try {
-        await service.processSubmission(submissionId);
-        expect.fail('Expected processSubmission to throw');
-      } catch (error) {
-        expect((error as Error).message).to.equal(`No uploads found for submission ${submissionId}`);
-      }
-    });
-
     it('throws when upload has no archives', async () => {
-      sinon
-        .stub(SubmissionUploadService.prototype, 'getSubmissionUploadsBySubmissionId')
-        .resolves([{ submission_upload_id: 'su-1', submission_id: submissionId, upload_id: 'upload-1' }]);
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([]);
 
       const dbConnection = getMockDBConnection();
       const service = new SubmissionIngestionService(dbConnection);
 
       try {
-        await service.processSubmission(submissionId);
+        await service.processSubmission(upload);
         expect.fail('Expected processSubmission to throw');
       } catch (error) {
         expect((error as Error).message).to.equal('No archives found for upload upload-1');
@@ -476,7 +420,7 @@ describe('SubmissionIngestionService', () => {
       const service = new SubmissionIngestionService(dbConnection);
 
       // Run processSubmission (simulating a re-run, same as happy path — no cleanup needed)
-      const result = await service.processSubmission(submissionId);
+      const result = await service.processSubmission(upload);
 
       expect(result).to.eql({ valid: true, errors: [] });
 
@@ -485,7 +429,7 @@ describe('SubmissionIngestionService', () => {
       expect(stubs.validateStub.calledOnce).to.be.true;
       expect(stubs.extractAndUploadMediaStub.calledOnce).to.be.true;
       expect(stubs.insertArtifactStub.calledOnce).to.be.true;
-      expect(stubs.deleteSubmissionFeaturesStub.calledOnce).to.be.true;
+      expect(stubs.deleteSubmissionFeaturesByUploadIdStub.calledOnce).to.be.true;
       expect(stubs.insertSubmissionFeatureRecordStub.callCount).to.equal(2);
 
       // getFileStream called twice (pass 1 and pass 2)
