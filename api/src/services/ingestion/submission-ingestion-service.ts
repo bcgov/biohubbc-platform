@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { IFlattenedBlock } from '../../models/submission-feature';
-import { SubmissionUploadRef } from '../../models/submission-upload';
+import { IngestionJobData } from '../../models/submission-upload';
 import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
 import { extractAndUploadMedia, extractBlocksFromArchive, IUploadedMediaFile } from '../../utils/biohub-tar-parser';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
@@ -42,26 +42,33 @@ export class SubmissionIngestionService extends DBService {
    * Idempotent: safe for pg-boss retries. Existing features are soft-deleted before
    * re-insertion, artifact inserts use ON CONFLICT DO NOTHING, and S3 PUTs overwrite.
    *
-   * @param {SubmissionUploadRef} upload - The upload and submission identifiers.
+   * @param {IngestionJobData} upload - The upload and submission identifiers.
    * @returns {Promise<IValidationResult>} Validation result
    * @memberof SubmissionIngestionService
    */
-  async processSubmission(upload: SubmissionUploadRef): Promise<IValidationResult> {
+  async processSubmission(upload: IngestionJobData): Promise<IValidationResult> {
     const { submissionId, uploadId } = upload;
+
+    // Resolve the S3 key for the uploaded tarball: submission → upload_archive → artifact → object_key
     const objectKey = await this.getTarballObjectKey(uploadId);
 
     // ================================================================
     // PASS 1: VALIDATE (zero side effects)
+    // Two-pass architecture: validate everything before writing anything,
+    // so a validation failure never leaves partial data behind.
     // ================================================================
 
+    // Stream 1: parse the tarball into flat feature blocks and a set of media filenames
     const tarStream1 = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
     const { allBlocks, mediaFileNames } = await extractBlocksFromArchive(tarStream1);
 
+    // Validate feature structure: types exist in feature_type, required properties present, types correct
     const featureValidation = await this.featureValidationService.validateFlatSubmissionFeatures(allBlocks);
     if (!featureValidation.valid) {
       return featureValidation;
     }
 
+    // Validate media integrity: every file/report block's filename must have a matching file in the archive
     const mediaErrors = validateMediaReferences(allBlocks, mediaFileNames);
     if (mediaErrors.length > 0) {
       return { valid: false, errors: mediaErrors };
@@ -69,15 +76,26 @@ export class SubmissionIngestionService extends DBService {
 
     // ================================================================
     // PASS 2: INGEST (DB writes + S3 uploads)
+    // All validation passed — safe to write. From here, operations are
+    // idempotent: S3 PUTs overwrite, artifact inserts use ON CONFLICT DO
+    // NOTHING, and features are soft-deleted before re-insertion.
     // ================================================================
 
+    // Stream 2: re-stream the tarball to extract and upload media files to S3
+    // (tar streams are single-pass, so we need a fresh stream)
     const tarStream2 = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
     const s3KeyPrefix = `submissions/${submissionId}/media`;
     const uploadedMediaFiles = await extractAndUploadMedia(tarStream2, this.objectStorageService, s3KeyPrefix);
 
+    // Stamp each file/report block with its S3 artifact_key so downstream
+    // consumers (download pipeline, UI) can locate the file without a join
     this.setArtifactKeys(allBlocks, uploadedMediaFiles);
+
+    // Pre-compute data_byte_size per feature for download size estimation
+    // (avoids fetching full JSONB at query time — see data_byte_size column docs)
     const dataByteSizeMap = this.computeDataByteSizeMap(allBlocks, uploadedMediaFiles);
 
+    // Create artifact records for each uploaded media file
     for (const [, mediaFile] of uploadedMediaFiles) {
       await this.artifactService.insertArtifact({
         bucket: getObjectStoreBucketName(),
@@ -89,7 +107,9 @@ export class SubmissionIngestionService extends DBService {
       });
     }
 
-    // Clear previous features for this upload before re-inserting (admin re-trigger or re-upload)
+    // Soft-delete previous features for this upload, then insert fresh ones.
+    // Scoped by uploadId (not submissionId) so re-triggering one upload
+    // doesn't wipe features from a different upload in the same submission.
     await this.ingestionRepository.deleteSubmissionFeaturesByUploadId(uploadId);
     await this.insertFlatFeatures(submissionId, uploadId, allBlocks, dataByteSizeMap);
 

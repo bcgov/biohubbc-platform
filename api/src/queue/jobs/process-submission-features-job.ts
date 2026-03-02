@@ -1,13 +1,12 @@
 import PgBoss from 'pg-boss';
 import { getAPIUserDBConnection } from '../../database/db';
-import { SubmissionUploadRef } from '../../models/submission-upload';
+import { IngestionJobData } from '../../models/submission-upload';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { getLogger } from '../../utils/logger';
 import { publishIndexSubmissionFeaturesJob } from '../publisher';
 
 const defaultLog = getLogger('queue/jobs/process-submission-features-job');
-
 
 /**
  * Process submission features job handler.
@@ -18,19 +17,18 @@ const defaultLog = getLogger('queue/jobs/process-submission-features-job');
  * 3. Inserts feature records
  * 4. Indexes features for search
  *
- * @param {PgBoss.Job<SubmissionUploadRef>[]} jobs The jobs to process
+ * @param {PgBoss.Job<IngestionJobData>[]} jobs The jobs to process
  * @return {*}  {Promise<void>}
  */
-export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionUploadRef> = async (
-  jobs
-) => {
+export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IngestionJobData> = async (jobs) => {
   for (const job of jobs) {
-    const { submissionId } = job.data;
+    const { uploadId, submissionId } = job.data;
 
     defaultLog.info({
       label: 'processSubmissionFeaturesJobHandler',
       message: 'Processing submission features job',
       jobId: job.id,
+      uploadId,
       submissionId
     });
 
@@ -47,7 +45,7 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
 
       // Process the submission (two-pass: validate → ingest)
       const submissionIngestionService = new SubmissionIngestionService(connection);
-      const result = await submissionIngestionService.processSubmission(submissionId);
+      const result = await submissionIngestionService.processSubmission(job.data);
 
       if (!result.valid) {
         // Validation failure — permanent condition, don't retry
@@ -100,8 +98,8 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
         error
       });
 
-      // Don't update status to 'failed' here - pg-boss will retry
-      // Status will be set to 'failed' by Dead Letter Queue handler after all retries exhausted
+      // Don't update status to 'failed' here — rethrow so pg-boss moves the job to DLQ.
+      // DLQ handler sets the validation status to 'failed'.
       throw error;
     } finally {
       connection.release();
@@ -115,17 +113,15 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
  * This handler is called after all retries are exhausted. It updates the
  * submission validation status to 'failed' with error details.
  *
- * @param {PgBoss.Job<SubmissionUploadRef>[]} jobs The failed jobs
+ * @param {PgBoss.Job<IngestionJobData>[]} jobs The failed jobs
  * @return {*}  {Promise<void>}
  */
-export const processSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<SubmissionUploadRef> = async (
-  jobs
-) => {
+export const processSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IngestionJobData> = async (jobs) => {
   for (const job of jobs) {
     const { uploadId, submissionId } = job.data;
 
     // Cast to access output field available on failed jobs
-    const jobOutput = (job as PgBoss.JobWithMetadata<SubmissionUploadRef>).output;
+    const jobOutput = (job as PgBoss.JobWithMetadata<IngestionJobData>).output;
 
     defaultLog.warn({
       label: 'processSubmissionFeaturesFailedHandler',

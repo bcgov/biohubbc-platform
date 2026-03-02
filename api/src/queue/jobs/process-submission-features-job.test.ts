@@ -3,12 +3,12 @@ import { describe } from 'mocha';
 import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import * as db from '../../database/db';
+import { IngestionJobData } from '../../models/submission-upload';
 import { ValidationErrorType } from '../../services/ingestion/feature-validation-service.interface';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { getMockDBConnection } from '../../__mocks__/db';
 import * as publisher from '../publisher';
-import { SubmissionUploadRef } from '../../models/submission-upload';
 import {
   processSubmissionFeaturesFailedHandler,
   processSubmissionFeaturesJobHandler
@@ -25,7 +25,7 @@ describe('process-submission-features-job', () => {
         id: jobId,
         name: 'process-submission-features',
         data: { uploadId, submissionId }
-      } as PgBoss.Job<SubmissionUploadRef>);
+      } as PgBoss.Job<IngestionJobData>);
 
     it('processes submission successfully', async () => {
       const mockDBConnection = getMockDBConnection();
@@ -77,7 +77,7 @@ describe('process-submission-features-job', () => {
       await processSubmissionFeaturesJobHandler(mockJobs);
 
       expect(processStub.calledOnce).to.be.true;
-      expect(processStub.firstCall.args[0]).to.equal(456);
+      expect(processStub.firstCall.args[0]).to.deep.equal({ uploadId: 'test-upload-id', submissionId: 456 });
     });
 
     it('updates status to invalid on validation failure and does not throw', async () => {
@@ -187,7 +187,7 @@ describe('process-submission-features-job', () => {
         open: openStub
       } as any);
 
-      const mockJobs: PgBoss.Job<SubmissionUploadRef>[] = [];
+      const mockJobs: PgBoss.Job<IngestionJobData>[] = [];
 
       await processSubmissionFeaturesJobHandler(mockJobs);
 
@@ -351,7 +351,7 @@ describe('process-submission-features-job', () => {
         name: '__state__completed__process-submission-features',
         data: { uploadId, submissionId },
         output
-      } as PgBoss.JobWithMetadata<SubmissionUploadRef>);
+      } as PgBoss.JobWithMetadata<IngestionJobData>);
 
     it('updates status to failed with error from job output', async () => {
       const mockDBConnection = getMockDBConnection();

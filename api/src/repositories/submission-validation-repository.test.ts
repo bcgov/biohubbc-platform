@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { SubmissionUploadRef } from '../models/submission-upload';
+import { IngestionJobData } from '../models/submission-upload';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionValidationRepository } from './submission-validation-repository';
 
@@ -27,7 +27,7 @@ describe('SubmissionValidationRepository', () => {
 
       const repository = new SubmissionValidationRepository(mockDBConnection);
 
-      const upload: SubmissionUploadRef = { uploadId: '550e8400-e29b-41d4-a716-446655440000', submissionId: 1 };
+      const upload: IngestionJobData = { uploadId: '550e8400-e29b-41d4-a716-446655440000', submissionId: 1 };
       const result = await repository.createSubmissionValidation(upload, '123e4567-e89b-12d3-a456-426614174000');
 
       expect(result).to.eql({ submission_validation_id: 1 });
@@ -49,7 +49,7 @@ describe('SubmissionValidationRepository', () => {
 
       const repository = new SubmissionValidationRepository(mockDBConnection);
 
-      const upload: SubmissionUploadRef = { uploadId: '550e8400-e29b-41d4-a716-446655440000', submissionId: 1 };
+      const upload: IngestionJobData = { uploadId: '550e8400-e29b-41d4-a716-446655440000', submissionId: 1 };
       await repository.createSubmissionValidation(upload, '123e4567-e89b-12d3-a456-426614174000');
 
       expect(sqlStub.calledOnce).to.be.true;

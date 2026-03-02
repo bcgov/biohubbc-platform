@@ -38,7 +38,7 @@ export interface SubmissionUploadFilters {
  * Both IDs travel together through publisher, job handler, validation tracking,
  * and feature insertion. The trigger resolves both before publishing.
  */
-export interface SubmissionUploadRef {
+export interface IngestionJobData {
   uploadId: string;
   submissionId: number;
 }

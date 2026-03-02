@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import { DownloadRecord } from '../models/download';
-import { SubmissionUploadRef } from '../models/submission-upload';
+import { IngestionJobData } from '../models/submission-upload';
 import { SubmissionValidationRecord } from '../models/submission-validation';
 import { DownloadService } from '../services/download/download-service';
 import { SubmissionValidationService } from '../services/submission-validation-service';
@@ -37,7 +37,7 @@ describe('publisher', () => {
         .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
         .resolves({ submission_validation_id: 1 });
 
-      const data: SubmissionUploadRef = { uploadId: 'upload-uuid-1', submissionId: 123 };
+      const data: IngestionJobData = { uploadId: 'upload-uuid-1', submissionId: 123 };
       const result = await publishProcessSubmissionFeaturesJob(mockConnection, data);
 
       expect(createQueueStub.calledOnce).to.be.true;
@@ -48,13 +48,13 @@ describe('publisher', () => {
       expect(result.status).to.equal('published');
       expect((result as { status: 'published'; jobId: string }).jobId).to.equal('features-job-id');
 
-      // Verify submission validation was created with SubmissionUploadRef and jobId
+      // Verify submission validation was created with IngestionJobData and jobId
       expect(createValidationStub.calledOnce).to.be.true;
       expect(createValidationStub.firstCall.args[0]).to.deep.equal(data);
       expect(createValidationStub.firstCall.args[1]).to.equal('features-job-id');
     });
 
-    it('uses process submission features specific options with 10 minute timeout', async () => {
+    it('uses retryLimit: 0 — no automatic retries for ingestion jobs', async () => {
       const mockConnection = getMockDBConnection();
       const sendStub = sinon.stub().resolves('features-job-id');
       const createQueueStub = sinon.stub().resolves();
@@ -69,10 +69,10 @@ describe('publisher', () => {
       await publishProcessSubmissionFeaturesJob(mockConnection, { uploadId: 'upload-uuid-1', submissionId: 123 });
 
       const options = sendStub.firstCall.args[2];
-      expect(options.retryLimit).to.equal(3);
-      expect(options.retryDelay).to.equal(60);
-      expect(options.retryBackoff).to.equal(true);
-      expect(options.expireInSeconds).to.equal(60 * 10); // 10 minutes (not 1 hour)
+      expect(options.retryLimit).to.equal(0);
+      expect(options.retryDelay).to.equal(0);
+      expect(options.retryBackoff).to.equal(false);
+      expect(options.expireInSeconds).to.equal(60 * 10); // 10 minutes
     });
 
     it('merges provided options with process submission features defaults', async () => {
@@ -137,6 +137,25 @@ describe('publisher', () => {
 
       const options = sendStub.firstCall.args[2];
       expect(options.singletonKey).to.equal('submission-456');
+    });
+
+    it('passes db option to boss.send for transactional publishing', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('features-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(SubmissionValidationService.prototype, 'getSubmissionValidationByUploadId').resolves(null);
+      sinon
+        .stub(SubmissionValidationService.prototype, 'createSubmissionValidation')
+        .resolves({ submission_validation_id: 1 });
+
+      await publishProcessSubmissionFeaturesJob(mockConnection, { uploadId: 'upload-uuid-1', submissionId: 123 });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.db).to.exist;
+      expect(options.db.executeSql).to.be.a('function');
     });
 
     it('returns error status when pg-boss throws', async () => {

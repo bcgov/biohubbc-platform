@@ -1,5 +1,6 @@
 import { IDBConnection } from '../database/db';
 import { DownloadStatusEnum } from '../models/download-status';
+import { IngestionJobData } from '../models/submission-upload';
 import { DownloadService } from '../services/download/download-service';
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getLogger } from '../utils/logger';
@@ -7,7 +8,6 @@ import { JobQueues } from './jobs';
 import { IIndexSubmissionFeaturesJobData } from './jobs/index-submission-features-job';
 import { IMalwareScanJobData } from './jobs/malware-scan-job';
 import { IProcessDownloadJobData } from './jobs/process-download-job';
-import { SubmissionUploadRef } from '../models/submission-upload';
 import { getPgBoss } from './pg-boss-service';
 
 const defaultLog = getLogger('queue/publisher');
@@ -44,12 +44,16 @@ export type PublishJobResult =
 
 /**
  * Options for process submission features jobs.
- * Shorter timeout since indexing/regions should complete in minutes.
+ *
+ * retryLimit: 0 — no automatic retries. Retries risk processing uploads out of sequence:
+ * a failed job for upload A could retry after upload B has been processed, silently
+ * overwriting newer features with stale data. Users retry explicitly by creating a new
+ * upload (POST).
  */
 const PROCESS_SUBMISSION_FEATURES_OPTIONS: IPublishOptions = {
-  retryLimit: 3,
-  retryDelay: 60,
-  retryBackoff: true,
+  retryLimit: 0,
+  retryDelay: 0,
+  retryBackoff: false,
   expireInSeconds: 60 * 10 // 10 minutes
 };
 
@@ -86,13 +90,13 @@ const PROCESS_DOWNLOAD_OPTIONS: IPublishOptions = {
  * which allows retrying failed jobs.
  *
  * @param {IDBConnection} connection Database connection for submission validation tracking
- * @param {SubmissionUploadRef} data Job data containing submissionId
+ * @param {IngestionJobData} data Job data containing submissionId
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success, blocked, duplicate, or error
  */
 export const publishProcessSubmissionFeaturesJob = async (
   connection: IDBConnection,
-  data: SubmissionUploadRef,
+  data: IngestionJobData,
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
   try {
@@ -133,10 +137,18 @@ export const publishProcessSubmissionFeaturesJob = async (
     // Ensure queue exists before sending jobs
     await boss.createQueue(JobQueues.PROCESS_SUBMISSION_FEATURES);
 
+    const db = {
+      executeSql: async (text: string, values: any[]) => {
+        const result = await connection.query(text, values);
+        return { rows: result.rows, rowCount: result.rowCount };
+      }
+    };
+
     // Use singletonKey to prevent duplicate concurrent jobs for the same submission
     const jobId = await boss.send(JobQueues.PROCESS_SUBMISSION_FEATURES, data, {
       ...mergedOptions,
-      singletonKey: `submission-${data.submissionId}`
+      singletonKey: `submission-${data.submissionId}`,
+      db
     });
 
     // jobId is null when pg-boss rejects the job (e.g., duplicate singletonKey still active)

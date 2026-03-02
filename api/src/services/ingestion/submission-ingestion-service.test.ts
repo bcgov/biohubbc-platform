@@ -4,7 +4,7 @@ import { Readable } from 'node:stream';
 import sinon from 'sinon';
 import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
 import { IFlattenedBlock } from '../../models/submission-feature';
-import { SubmissionUploadRef } from '../../models/submission-upload';
+import { IngestionJobData } from '../../models/submission-upload';
 import { UploadArchive } from '../../models/upload-archive';
 import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
 import * as biohubTarParser from '../../utils/biohub-tar-parser';
@@ -97,7 +97,7 @@ describe('SubmissionIngestionService', () => {
 
   describe('processSubmission', () => {
     const submissionId = 123;
-    const upload: SubmissionUploadRef = { submissionId, uploadId: 'upload-1' };
+    const upload: IngestionJobData = { submissionId, uploadId: 'upload-1' };
     const mockObjectKey = 'submissions/123/uploads/upload-1.tar';
 
     // Shared mock data

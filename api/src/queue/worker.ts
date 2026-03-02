@@ -1,3 +1,4 @@
+import { IngestionJobData } from '../models/submission-upload';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
 import {
@@ -15,7 +16,6 @@ import {
   processSubmissionFeaturesFailedHandler,
   processSubmissionFeaturesJobHandler
 } from './jobs/process-submission-features-job';
-import { SubmissionUploadRef } from '../models/submission-upload';
 import { getPgBoss } from './pg-boss-service';
 
 const defaultLog = getLogger('queue/worker');
@@ -33,12 +33,15 @@ export const registerWorkers = async (): Promise<void> => {
   // Create dead letter queue first (must exist before main queue references it)
   await boss.createQueue(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
 
-  // Create main queue with dead letter queue and retry configuration
+  // Create main queue with dead letter queue and retry configuration.
+  // policy: 'short' — enforces singleton_key uniqueness for queued (created) jobs.
+  // Without this, the default 'standard' policy ignores singletonKey entirely.
   await boss.createQueue(JobQueues.PROCESS_SUBMISSION_FEATURES, {
     deadLetter: JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED,
-    retryLimit: 2,
-    retryDelay: 60,
-    retryBackoff: true
+    retryLimit: 0,
+    retryDelay: 0,
+    retryBackoff: false,
+    policy: 'short'
   });
 
   // Create dead letter queue first (must exist before main queue references it)
@@ -52,13 +55,10 @@ export const registerWorkers = async (): Promise<void> => {
   });
 
   // Register process submission features job handler
-  await boss.work<SubmissionUploadRef>(
-    JobQueues.PROCESS_SUBMISSION_FEATURES,
-    processSubmissionFeaturesJobHandler
-  );
+  await boss.work<IngestionJobData>(JobQueues.PROCESS_SUBMISSION_FEATURES, processSubmissionFeaturesJobHandler);
 
   // Register dead letter queue handler for failed jobs
-  await boss.work<SubmissionUploadRef>(
+  await boss.work<IngestionJobData>(
     JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED,
     processSubmissionFeaturesFailedHandler
   );

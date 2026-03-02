@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
-import { SubmissionUploadRef } from '../models/submission-upload';
+import { IngestionJobData } from '../models/submission-upload';
 import { SubmissionValidationRepository } from '../repositories/submission-validation-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionValidationService } from './submission-validation-service';
@@ -20,11 +20,8 @@ describe('SubmissionValidationService', () => {
         .stub(SubmissionValidationRepository.prototype, 'createSubmissionValidation')
         .resolves({ submission_validation_id: 1 });
 
-      const ids: SubmissionUploadRef = { uploadId: '550e8400-e29b-41d4-a716-446655440000', submissionId: 123 };
-      const result = await service.createSubmissionValidation(
-        ids,
-        'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
-      );
+      const ids: IngestionJobData = { uploadId: '550e8400-e29b-41d4-a716-446655440000', submissionId: 123 };
+      const result = await service.createSubmissionValidation(ids, 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11');
 
       expect(createStub.calledOnce).to.be.true;
       expect(createStub.firstCall.args[0]).to.deep.equal(ids);

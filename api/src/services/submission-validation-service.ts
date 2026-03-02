@@ -1,5 +1,5 @@
 import { IDBConnection } from '../database/db';
-import { SubmissionUploadRef } from '../models/submission-upload';
+import { IngestionJobData } from '../models/submission-upload';
 import { SubmissionValidationRecord, SubmissionValidationStatus } from '../models/submission-validation';
 import { SubmissionValidationRepository } from '../repositories/submission-validation-repository';
 import { DBService } from './db-service';
@@ -22,13 +22,13 @@ export class SubmissionValidationService extends DBService {
   /**
    * Create a new submission validation record keyed by upload_id.
    *
-   * @param {SubmissionUploadRef} upload - The upload and submission identifiers.
+   * @param {IngestionJobData} upload - The upload and submission identifiers.
    * @param {string} jobId - The pg-boss job UUID.
    * @return {Promise<{ submission_validation_id: number }>} The created record ID.
    * @memberof SubmissionValidationService
    */
   async createSubmissionValidation(
-    upload: SubmissionUploadRef,
+    upload: IngestionJobData,
     jobId: string
   ): Promise<{ submission_validation_id: number }> {
     return this.submissionValidationRepository.createSubmissionValidation(upload, jobId);

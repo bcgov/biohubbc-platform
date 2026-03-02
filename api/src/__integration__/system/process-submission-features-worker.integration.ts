@@ -8,9 +8,9 @@ import { randomUUID } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import * as tar from 'tar-stream';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
-import { initPgBoss, stopPgBoss } from '../../queue/pg-boss-service';
+import { JobQueues } from '../../queue/jobs';
+import { getPgBoss, initPgBoss, stopPgBoss } from '../../queue/pg-boss-service';
 import { publishProcessSubmissionFeaturesJob } from '../../queue/publisher';
-
 import { ValidationErrorType } from '../../services/ingestion/feature-validation-service.interface';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
@@ -83,6 +83,16 @@ describe('Process Submission Features Worker', function () {
     initDBPool(defaultPoolConfig);
 
     await initPgBoss();
+
+    // Ensure queue exists with 'short' policy (enforces singletonKey uniqueness).
+    // createQueue is ON CONFLICT DO NOTHING, so if the queue already exists with 'standard'
+    // policy from a previous startup, we must update it directly.
+    const boss = getPgBoss();
+    await boss.createQueue(JobQueues.PROCESS_SUBMISSION_FEATURES);
+    await db.raw(
+      `UPDATE pgboss.queue SET policy = 'short' WHERE name = ? AND policy != 'short'`,
+      [JobQueues.PROCESS_SUBMISSION_FEATURES]
+    );
   });
 
   after(async () => {
@@ -266,6 +276,40 @@ describe('Process Submission Features Worker', function () {
     expect(features.some((f: { feature_type_name: string }) => f.feature_type_name === 'dataset')).to.be.true;
   });
 
+  it('should prevent concurrent jobs for same submission via singleton key', async () => {
+    // Singleton key is `submission-${submissionId}` (not per-upload). Prod runs 2 worker replicas —
+    // per-upload keys would allow two uploads for the same submission to process simultaneously,
+    // causing conflicting feature writes.
+    //
+    // Tests pg-boss singleton enforcement directly: two sends with the same key back-to-back,
+    // the second should return null (ON CONFLICT DO NOTHING). Requires queue policy = 'short'.
+
+    const boss = getPgBoss();
+    const testSubmissionId = Date.now(); // unique per run, avoids collisions
+    const singletonKey = `submission-${testSubmissionId}`;
+
+    // Send first job — should succeed
+    const jobId1 = await boss.send(
+      JobQueues.PROCESS_SUBMISSION_FEATURES,
+      { uploadId: randomUUID(), submissionId: testSubmissionId },
+      { singletonKey, expireInSeconds: 5 }
+    );
+    expect(jobId1).to.not.be.null;
+
+    // Send second job with same singleton key — should be rejected
+    const jobId2 = await boss.send(
+      JobQueues.PROCESS_SUBMISSION_FEATURES,
+      { uploadId: randomUUID(), submissionId: testSubmissionId },
+      { singletonKey, expireInSeconds: 5 }
+    );
+    expect(jobId2).to.be.null;
+
+    // Clean up: cancel the test job so it doesn't interfere with other tests
+    if (jobId1) {
+      await boss.cancel(JobQueues.PROCESS_SUBMISSION_FEATURES, jobId1);
+    }
+  });
+
   it('should mark submission as invalid for unknown feature type', async () => {
     const datasetId = randomUUID();
     const featureId = randomUUID();
@@ -346,7 +390,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
    * Insert the full FK chain and upload a TAR to S3.
    * Same chain as the worker test's setupSubmissionWithTar, using connection.sql() for rollback cleanup.
    */
-  async function setupSubmissionWithTar(tarBuffer: Buffer): Promise<{ submissionId: number }> {
+  async function setupSubmissionWithTar(tarBuffer: Buffer): Promise<{ submissionId: number; uploadId: string }> {
     const objectKey = `${TEST_PREFIX}/${Date.now()}/archive.tar`;
 
     await storageService.uploadBuffer(BucketType.MAIN, tarBuffer, 'application/x-tar', objectKey);
@@ -396,7 +440,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
           VALUES (${uploadId}, ${artifactId}, 'feature')`
     );
 
-    return { submissionId };
+    return { submissionId, uploadId };
   }
 
   it('should process a valid submission and create features', async () => {
@@ -436,8 +480,8 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
     ]);
 
-    const { submissionId } = await setupSubmissionWithTar(tarBuffer);
-    const result = await service.processSubmission(submissionId);
+    const { submissionId, uploadId } = await setupSubmissionWithTar(tarBuffer);
+    const result = await service.processSubmission({ submissionId, uploadId });
 
     expect(result.valid).to.be.true;
     expect(result.errors).to.have.lengthOf(0);
@@ -481,8 +525,8 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
     ]);
 
-    const { submissionId } = await setupSubmissionWithTar(tarBuffer);
-    const result = await service.processSubmission(submissionId);
+    const { submissionId, uploadId } = await setupSubmissionWithTar(tarBuffer);
+    const result = await service.processSubmission({ submissionId, uploadId });
 
     expect(result.valid).to.be.false;
     expect(result.errors.some((e) => e.type === ValidationErrorType.INVALID_FEATURE_TYPE)).to.be.true;
@@ -532,8 +576,8 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       { name: 'files/photo.jpg', content: 'fake-image-bytes' }
     ]);
 
-    const { submissionId } = await setupSubmissionWithTar(tarBuffer);
-    const result = await service.processSubmission(submissionId);
+    const { submissionId, uploadId } = await setupSubmissionWithTar(tarBuffer);
+    const result = await service.processSubmission({ submissionId, uploadId });
 
     // Track S3 media upload for cleanup
     s3KeysToCleanup.push(`submissions/${submissionId}/media/photo.jpg`);
@@ -606,8 +650,8 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       // No files/missing.pdf in archive
     ]);
 
-    const { submissionId } = await setupSubmissionWithTar(tarBuffer);
-    const result = await service.processSubmission(submissionId);
+    const { submissionId, uploadId } = await setupSubmissionWithTar(tarBuffer);
+    const result = await service.processSubmission({ submissionId, uploadId });
 
     expect(result.valid).to.be.false;
     expect(result.errors.some((e) => e.type === ValidationErrorType.MISSING_MEDIA_FILE)).to.be.true;
@@ -645,8 +689,8 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
     ]);
 
-    const { submissionId } = await setupSubmissionWithTar(tarBuffer);
-    const result = await service.processSubmission(submissionId);
+    const { submissionId, uploadId } = await setupSubmissionWithTar(tarBuffer);
+    const result = await service.processSubmission({ submissionId, uploadId });
 
     expect(result.valid).to.be.true;
 
@@ -695,8 +739,8 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
     ]);
 
-    const { submissionId } = await setupSubmissionWithTar(tarBuffer);
-    const result = await service.processSubmission(submissionId);
+    const { submissionId, uploadId } = await setupSubmissionWithTar(tarBuffer);
+    const result = await service.processSubmission({ submissionId, uploadId });
 
     expect(result.valid).to.be.false;
     expect(result.errors.length).to.be.greaterThan(1);

@@ -1,5 +1,5 @@
 import SQL from 'sql-template-strings';
-import { SubmissionUploadRef } from '../models/submission-upload';
+import { IngestionJobData } from '../models/submission-upload';
 import {
   SubmissionValidationId,
   SubmissionValidationRecord,
@@ -19,13 +19,13 @@ export class SubmissionValidationRepository extends BaseRepository {
    * Create a new submission validation record keyed by upload_id.
    * Each upload gets its own validation record to track ingestion status independently.
    *
-   * @param {SubmissionUploadRef} upload - The upload and submission identifiers.
+   * @param {IngestionJobData} upload - The upload and submission identifiers.
    * @param {string} jobId - The pg-boss job UUID.
    * @return {Promise<{ submission_validation_id: number }>} The created record ID.
    * @memberof SubmissionValidationRepository
    */
   async createSubmissionValidation(
-    upload: SubmissionUploadRef,
+    upload: IngestionJobData,
     jobId: string
   ): Promise<{ submission_validation_id: number }> {
     const sql = SQL`
