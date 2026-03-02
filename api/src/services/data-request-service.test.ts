@@ -147,6 +147,55 @@ describe('DataRequestService', () => {
     });
   });
 
+  describe('findDataRequestsBySystemUserId', () => {
+    it('should call findDataRequestsByTeamMembership with systemUserId and return transformed results', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
+
+      const systemUserId = mockDataRequest.requested_by;
+      const stub = sinon
+        .stub(DataRequestRepository.prototype, 'findDataRequestsByTeamMembership')
+        .resolves([mockFlatDataRequest]);
+
+      const result = await service.findDataRequestsBySystemUserId(systemUserId);
+
+      expect(stub).to.have.been.calledOnceWith(systemUserId, undefined);
+      expect(result).to.have.length(1);
+      expect(result[0].data_request_status).to.deep.equal({
+        data_request_status_id: mockFlatDataRequest.data_request_status_id,
+        data_request_id: mockFlatDataRequest.data_request_id,
+        comment_id: mockFlatDataRequest.comment_id,
+        request_status: mockFlatDataRequest.request_status
+      });
+    });
+
+    it('should pass filters to findDataRequestsByTeamMembership', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
+
+      const systemUserId = mockDataRequest.requested_by;
+      const filters = { status: 'REQUESTED' as const };
+      const stub = sinon
+        .stub(DataRequestRepository.prototype, 'findDataRequestsByTeamMembership')
+        .resolves([mockFlatDataRequest]);
+
+      await service.findDataRequestsBySystemUserId(systemUserId, filters);
+
+      expect(stub).to.have.been.calledOnceWith(systemUserId, filters);
+    });
+
+    it('should return empty array when user has no team memberships with data requests', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
+
+      sinon.stub(DataRequestRepository.prototype, 'findDataRequestsByTeamMembership').resolves([]);
+
+      const result = await service.findDataRequestsBySystemUserId(999);
+
+      expect(result).to.eql([]);
+    });
+  });
+
   describe('createDataRequest', () => {
     it('should create a data request with provided team_id and return it with status', async () => {
       const mockDB = getMockDBConnection();
