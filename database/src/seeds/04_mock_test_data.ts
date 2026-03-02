@@ -65,24 +65,35 @@ const insertRecord = async (knex: Knex) => {
   const isPublished = isReviewed && Math.random() > 0.5;
   const submission_id = await insertSubmissionRecord(knex, isReviewed, isPublished);
 
+  const upload_id = await insertUploadRecord(knex);
+
   // Dataset
-  const parent_submission_feature_id1 = await insertDatasetRecord(knex, { submission_id });
+  const parent_submission_feature_id1 = await insertDatasetRecord(knex, { submission_id, upload_id });
 
   // Sample Sites and their children
   const sampleSitePromises = Array.from({ length: 10 }).map(async () => {
     const parent_submission_feature_id2 = await insertSampleSiteRecord(knex, {
       submission_id,
+      upload_id,
       parent_submission_feature_id: parent_submission_feature_id1
     });
 
     // Animals
     const animalPromises = Array.from({ length: 2 }).map(() =>
-      insertAnimalRecord(knex, { submission_id, parent_submission_feature_id: parent_submission_feature_id2 })
+      insertAnimalRecord(knex, {
+        submission_id,
+        upload_id,
+        parent_submission_feature_id: parent_submission_feature_id2
+      })
     );
 
     // Observations
     const observationPromises = Array.from({ length: 20 }).map(() =>
-      insertObservationRecord(knex, { submission_id, parent_submission_feature_id: parent_submission_feature_id2 })
+      insertObservationRecord(knex, {
+        submission_id,
+        upload_id,
+        parent_submission_feature_id: parent_submission_feature_id2
+      })
     );
 
     // Wait for all animals and observations for this sample site
@@ -91,7 +102,11 @@ const insertRecord = async (knex: Knex) => {
 
   // Telemetry
   const telemetryPromises = Array.from({ length: 100 }).map(() =>
-    insertTelemetryRecord(knex, { submission_id, parent_submission_feature_id: parent_submission_feature_id1 })
+    insertTelemetryRecord(knex, {
+      submission_id,
+      upload_id,
+      parent_submission_feature_id: parent_submission_feature_id1
+    })
   );
 
   // Wait for all sample sites and telemetry to complete concurrently
@@ -109,10 +124,14 @@ export const insertSubmissionRecord = async (
   return submission_id;
 };
 
-export const insertDatasetRecord = async (knex: Knex, options: { submission_id: number }): Promise<number> => {
+export const insertDatasetRecord = async (
+  knex: Knex,
+  options: { submission_id: number; upload_id: string }
+): Promise<number> => {
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
+      upload_id: options.upload_id,
       parent_submission_feature_id: null,
       feature_type: 'dataset',
       data: {
@@ -151,13 +170,26 @@ export const insertDatasetRecord = async (knex: Knex, options: { submission_id: 
   return submission_feature_id;
 };
 
+export const insertUploadRecord = async (knex: Knex): Promise<string> => {
+  const [{ upload_id }] = await knex('upload')
+    .insert({
+      upload_status: 'completed',
+      create_user: 1,
+      record_end_date: new Date()
+    })
+    .returning('upload_id');
+
+  return upload_id;
+};
+
 export const insertSampleSiteRecord = async (
   knex: Knex,
-  options: { submission_id: number; parent_submission_feature_id: number }
+  options: { submission_id: number; upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
+      upload_id: options.upload_id,
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'sample_site',
       data: {
@@ -182,11 +214,12 @@ export const insertSampleSiteRecord = async (
 
 export const insertObservationRecord = async (
   knex: Knex,
-  options: { submission_id: number; parent_submission_feature_id: number }
+  options: { submission_id: number; upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
+      upload_id: options.upload_id,
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'species_observation',
       data: {
@@ -224,11 +257,12 @@ export const insertObservationRecord = async (
 
 const insertAnimalRecord = async (
   knex: Knex,
-  options: { submission_id: number; parent_submission_feature_id: number }
+  options: { submission_id: number; upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
+      upload_id: options.upload_id,
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'animal',
       data: {
@@ -298,6 +332,7 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
 
 export const insertSubmissionFeature = (options: {
   submission_id: number;
+  upload_id: string;
   parent_submission_feature_id: number | null;
   feature_type: 'dataset' | 'sample_site' | 'species_observation' | 'animal' | 'artifact' | 'telemetry';
   data: { [key: string]: any };
@@ -305,6 +340,7 @@ export const insertSubmissionFeature = (options: {
     INSERT INTO submission_feature
     (
         submission_id,
+        upload_id,
         parent_submission_feature_id,
         feature_type_id,
         source_id,
@@ -314,6 +350,7 @@ export const insertSubmissionFeature = (options: {
     values
     (
         ${options.submission_id},
+        '${options.upload_id}',
         ${options.parent_submission_feature_id},
         (select feature_type_id from feature_type where name = '${options.feature_type}'),
         public.gen_random_uuid(),
@@ -452,7 +489,7 @@ const randomIntFromInterval = (min: number, max: number) => {
 
 export const insertTelemetryRecord = async (
   knex: Knex,
-  options: { submission_id: number; parent_submission_feature_id: number }
+  options: { submission_id: number; upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
   const telemetryData = {
     device_id: faker.string.alphanumeric({ length: 8 }),
@@ -467,6 +504,7 @@ export const insertTelemetryRecord = async (
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
+      upload_id: options.upload_id,
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'telemetry',
       data: telemetryData

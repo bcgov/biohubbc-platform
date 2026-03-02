@@ -369,10 +369,10 @@ describe('SubmissionIngestionService', () => {
       // Find the insertSubmissionFeatureRecord call for file-1
       const fileInsertCall = Array.from({ length: stubs.insertSubmissionFeatureRecordStub.callCount }, (_, i) =>
         stubs.insertSubmissionFeatureRecordStub.getCall(i)
-      ).find((call) => call.args[2] === 'file-1');
+      ).find((call) => call.args[3] === 'file-1');
 
       expect(fileInsertCall).to.not.be.undefined;
-      const insertedProps = fileInsertCall!.args[4];
+      const insertedProps = fileInsertCall!.args[5];
       expect(insertedProps.artifact_key).to.equal('submissions/123/media/photo.jpg');
       expect(insertedProps).to.not.have.property('artifact_id');
     });
@@ -393,22 +393,22 @@ describe('SubmissionIngestionService', () => {
       // Find insert calls by feature UUID (3rd arg)
       const obsInsertCall = Array.from({ length: stubs.insertSubmissionFeatureRecordStub.callCount }, (_, i) =>
         stubs.insertSubmissionFeatureRecordStub.getCall(i)
-      ).find((call) => call.args[2] === 'obs-1');
+      ).find((call) => call.args[3] === 'obs-1');
 
       const fileInsertCall = Array.from({ length: stubs.insertSubmissionFeatureRecordStub.callCount }, (_, i) =>
         stubs.insertSubmissionFeatureRecordStub.getCall(i)
-      ).find((call) => call.args[2] === 'file-1');
+      ).find((call) => call.args[3] === 'file-1');
 
       // For the observation block: JSONB size + 500 overhead, no artifact
       const obsProps = blocks.find((b) => b.id === 'obs-1')!.properties;
       const expectedObsSize = Buffer.byteLength(JSON.stringify(obsProps)) + 500;
-      expect(obsInsertCall!.args[5]).to.equal(expectedObsSize);
+      expect(obsInsertCall!.args[6]).to.equal(expectedObsSize);
 
       // For the file block: JSONB size + 500 overhead + 5000 artifact byte size
       // Note: properties will have been enriched with artifact_key by this point
       const fileBlock = blocks.find((b) => b.id === 'file-1')!;
       const expectedFileSize = Buffer.byteLength(JSON.stringify(fileBlock.properties)) + 500 + 5000;
-      expect(fileInsertCall!.args[5]).to.equal(expectedFileSize);
+      expect(fileInsertCall!.args[6]).to.equal(expectedFileSize);
     });
 
     it('getTarballObjectKey failure throws', async () => {
