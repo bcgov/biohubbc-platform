@@ -89,7 +89,29 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
-   * Deletes a submission_upload record by ID.
+   * Soft-deletes a single active submission_upload record by ID.
+   *
+   * @param {string} submissionUploadId The ID of the record to soft-delete
+   * @return {Promise<void>}
+   * @memberof SubmissionUploadService
+   */
+  async softDeleteSubmissionUpload(submissionUploadId: string): Promise<void> {
+    return this.submissionUploadRepository.softDeleteSubmissionUpload(submissionUploadId);
+  }
+
+  /**
+   * Soft-deletes all active submission_upload records for a given submission.
+   *
+   * @param {number} submissionId The submission whose uploads should be soft-deleted
+   * @return {Promise<number>} The number of records soft-deleted
+   * @memberof SubmissionUploadService
+   */
+  async softDeleteSubmissionUploadsBySubmissionId(submissionId: number): Promise<number> {
+    return this.submissionUploadRepository.softDeleteSubmissionUploadsBySubmissionId(submissionId);
+  }
+
+  /**
+   * Hard-deletes a submission_upload record by ID.
    *
    * @param {string} submissionUploadId The ID of the artifact to delete
    * @return {Promise<void>}

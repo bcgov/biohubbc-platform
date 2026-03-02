@@ -12,7 +12,7 @@ import { BaseRepository } from '../base-repository';
 
 export class SubmissionUploadRepository extends BaseRepository {
   /**
-   * Get a single submission_upload record by ID.
+   * Get a single active submission_upload record by ID.
    *
    * @param {string} submissionUploadId - The ID of the submission_upload record.
    * @returns {Promise<SubmissionUpload>} - The requested submission_upload record.
@@ -28,7 +28,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       FROM
         submission_upload
       WHERE
-        submission_upload_id = ${submissionUploadId};
+        submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUpload);
@@ -73,7 +74,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       )
       .from('submission_upload')
       .join('upload_artifact as ua', 'ua.upload_id', 'submission_upload.upload_id')
-      .where('submission_upload.submission_id', submissionId);
+      .where('submission_upload.submission_id', submissionId)
+      .whereNull('submission_upload.record_end_date');
 
     if (filters?.role) {
       query = query.andWhere('role', filters.role);
@@ -192,7 +194,7 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
-   * Get a submission_upload record by upload_id (reverse lookup).
+   * Get an active submission_upload record by upload_id (reverse lookup).
    *
    * @param {string} uploadId - The upload_id to look up.
    * @returns {Promise<SubmissionUpload>} - The submission_upload record.
@@ -208,7 +210,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       FROM
         submission_upload
       WHERE
-        upload_id = ${uploadId};
+        upload_id = ${uploadId}
+        AND record_end_date IS NULL;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUpload);
@@ -231,7 +234,50 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
-   * Delete a submission_upload record by ID.
+   * Soft-delete a single active submission_upload record by setting record_end_date to now.
+   *
+   * @param {string} submissionUploadId - The ID of the submission_upload record to soft-delete.
+   * @throws {ApiExecuteSQLError} - If no active record is found.
+   */
+  async softDeleteSubmissionUpload(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission_upload
+      SET record_end_date = NOW()
+      WHERE submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to soft-delete submission_upload record', [
+        'SubmissionUploadRepository->softDeleteSubmissionUpload',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
+    }
+  }
+
+  /**
+   * Soft-delete all active submission_upload records for a given submission.
+   *
+   * @param {number} submissionId - The submission ID whose uploads should be soft-deleted.
+   * @returns {Promise<number>} - The number of records soft-deleted.
+   */
+  async softDeleteSubmissionUploadsBySubmissionId(submissionId: number): Promise<number> {
+    const sqlStatement = SQL`
+      UPDATE submission_upload
+      SET record_end_date = NOW()
+      WHERE submission_id = ${submissionId}
+        AND record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    return response.rowCount ?? 0;
+  }
+
+  /**
+   * Hard-delete a submission_upload record by ID.
    *
    * @param {string} submissionUploadId - The ID of the submission_upload record to delete.
    * @throws {ApiExecuteSQLError} - If the deletion fails.

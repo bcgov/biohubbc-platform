@@ -1,6 +1,6 @@
 import { CompleteMultipartUploadCommand } from '@aws-sdk/client-s3';
 import dayjs from 'dayjs';
-import { HTTP401 } from '../../errors/http-error';
+import { HTTP401, HTTP404 } from '../../errors/http-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
@@ -13,6 +13,7 @@ import { DBService } from '../db-service';
 import { SubmissionService } from '../submission-service';
 import { ArtifactSecurityService } from './artifact-security-service';
 import { ArtifactService } from './artifact-service';
+import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 import { SubmissionUploadService } from './submission-upload-service';
 import { UploadArchiveService } from './upload-archive-service';
 import { UploadArtifactService } from './upload-artifact-service';
@@ -34,10 +35,11 @@ export class UploadIngestionService extends DBService {
   artifactService = new ArtifactService(this.connection);
   uploadArchiveService = new UploadArchiveService(this.connection);
   submissionUploadService = new SubmissionUploadService(this.connection);
+  submissionUploadReviewStatusService = new SubmissionUploadReviewStatusService(this.connection);
   artifactSecurityService = new ArtifactSecurityService(this.connection);
 
   /**
-   * Create a new archive upload
+   * Create a new archive upload along with a new submission record.
    *
    * @param {number} bytes
    * @param {ICreateSubmission} submission
@@ -47,21 +49,69 @@ export class UploadIngestionService extends DBService {
     // 1. Create submission (intent)
     const { submission_id } = await this.submissionService.insertSubmissionRecord(submission);
 
-    // 2. Create upload session
+    // 2. Use UUID from submission table only (not submission_upload or submission_upload_status)
+    const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submission_id);
+    const submissionUuidFromTable = submissionRecord.uuid;
+
+    return this._startArchiveUploadForSubmission(bytes, submission_id, submissionUuidFromTable);
+  }
+
+  /**
+   * Create a new archive upload for an existing submission (append mode).
+   * Does not create a new submission record. Identifies submission by UUID.
+   *
+   * @param {number} bytes
+   * @param {string} submissionUuid - Submission UUID (submission.uuid).
+   * @returns {Promise<PresignedUploadUrlResponse>}
+   * @throws {HTTP404} If no submission exists for the given UUID.
+   */
+  async startArchiveUploadForExistingSubmissionByUuid(
+    bytes: number,
+    submissionUuid: string
+  ): Promise<PresignedUploadUrlResponse> {
+    const byUuid = await this.submissionService.getSubmissionIdByUUID(submissionUuid);
+    if (!byUuid) {
+      throw new HTTP404('Submission not found');
+    }
+    const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(byUuid.submission_id);
+    return this._startArchiveUploadForSubmission(bytes, byUuid.submission_id, submissionRecord.uuid);
+  }
+
+  /**
+   * Internal helper: creates a new upload session, submission_upload record, review status,
+   * artifact, upload_archive, and presigned URLs for the given submissionId.
+   *
+   * @param {number} bytes
+   * @param {number} submissionId - Integer PK for DB operations
+   * @param {string} submissionUuid - UUID returned to client as submissionId
+   * @returns {Promise<PresignedUploadUrlResponse>}
+   */
+  async _startArchiveUploadForSubmission(
+    bytes: number,
+    submissionId: number,
+    _submissionUuid: string
+  ): Promise<PresignedUploadUrlResponse> {
+    // 1. Create upload session
     const { upload_id } = await this.uploadService.insertUpload({
       upload_status: UploadStatusEnum.PENDING,
       record_end_date: dayjs().add(30, 'minute').toISOString(),
       s3_upload_id: null
     });
 
-    // 3. Bind submission → upload
-    await this.submissionUploadService.insertSubmissionUpload({
-      submission_id,
+    // 2. Bind submission → upload
+    const { submission_upload_id } = await this.submissionUploadService.insertSubmissionUpload({
+      submission_id: submissionId,
       upload_id
     });
 
+    // 3. Create initial review status (submitted = unreviewed)
+    await this.submissionUploadReviewStatusService.insertSubmissionUploadReviewStatus({
+      submission_upload_id,
+      status: 'submitted'
+    });
+
     // 4. Create placeholder artifact for archive
-    const key = `submissions/${submission_id}/uploads/${upload_id}.tar`;
+    const key = `submissions/${submissionId}/uploads/${upload_id}.tar`;
     const artifact = await this.artifactService.insertArtifact({
       bucket: getSecurityObjectStoreBucketName(),
       artifact_status: ArtifactStatusEnum.PENDING,
@@ -75,7 +125,7 @@ export class UploadIngestionService extends DBService {
     const { upload_archive_id } = await this.uploadArchiveService.insertUploadArchive({
       upload_id,
       artifact_id: artifact.artifact_id,
-      archive_status: ProcessStatusStatusEnum.DRAFT // Draft indicates that the archive record is not ready for processing
+      archive_status: ProcessStatusStatusEnum.DRAFT
     });
 
     // 6. Initialize multipart upload
@@ -93,8 +143,13 @@ export class UploadIngestionService extends DBService {
     // 7. Persist S3 upload ID
     await this.uploadService.updateUpload(upload_id, { s3_upload_id: s3UploadId });
 
+    // 8. Submission UUID must come from submission table only (never upload_id or submission_upload_id)
+    const submissionRow = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
+    const submissionIdForResponse = submissionRow.uuid;
+
     return {
-      submissionId: submission_id,
+      submissionId: submissionIdForResponse,
+      submissionUploadId: submission_upload_id,
       uploadId: upload_id,
       uploadArchiveId: upload_archive_id,
       s3UploadId,
