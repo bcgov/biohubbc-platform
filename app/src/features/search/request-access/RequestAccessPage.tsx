@@ -2,6 +2,7 @@ import { Alert, Box, Button, Container, Paper, Typography } from '@mui/material'
 import { Formik, FormikProps } from 'formik';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
+import { useDialogContext } from 'hooks/useContext';
 import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PrimaryButton } from 'components/button/PrimaryButton';
@@ -14,20 +15,23 @@ import RequestAccessForm, {
 
 export const RequestAccessPage = () => {
   const api = useApi();
+  const dialogContext = useDialogContext();
   const formikRef = useRef<FormikProps<IRequestAccessFormValues>>(null);
   const [searchParams] = useSearchParams();
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleSubmit = async (values: IRequestAccessFormValues) => {
     setIsLoading(true);
-    setSubmitError(null);
     try {
       await api.dataRequest.createDataRequest({ reason: values.reason });
       setIsSubmitted(true);
     } catch (error) {
-      setSubmitError((error as APIError).message ?? 'An unexpected error occurred. Please try again.');
+      dialogContext.setErrorDialog({
+        dialogTitle: 'An Error Occurred',
+        dialogText: (error as APIError).message ?? 'An unexpected error occurred. Please try again.',
+        open: true
+      });
     } finally {
       setIsLoading(false);
     }
@@ -51,11 +55,6 @@ export const RequestAccessPage = () => {
   return (
     <Container maxWidth="sm" sx={{ py: 6 }}>
       <Paper sx={{ p: 4 }}>
-        {submitError && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setSubmitError(null)}>
-            {submitError}
-          </Alert>
-        )}
         <Typography variant="h2" sx={{ mb: 1 }}>
           Request Access
         </Typography>
