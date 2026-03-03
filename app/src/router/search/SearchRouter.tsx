@@ -1,4 +1,5 @@
 import { CartContextProvider } from 'contexts/cartContext';
+import { RequestAccessPage } from 'features/search/request-access/RequestAccessPage';
 import { SearchResultPage } from 'features/search/result/SearchResultPage';
 import { SearchPage } from 'features/search/SearchPage';
 import { SubmissionFeaturePage } from 'features/submissions/page/features/SubmissionFeaturePage';
@@ -33,6 +34,16 @@ export const SearchRouter = () => {
               <SearchResultPage />
             </CartContextProvider>
           </SearchLayout>
+        }
+      />
+
+      <Route
+        path="/request-access"
+        element={
+          <BaseLayout>
+            <PageTitle title="Request Access" description="Request access to secured data" />
+            <RequestAccessPage />
+          </BaseLayout>
         }
       />
 
