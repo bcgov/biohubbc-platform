@@ -89,10 +89,9 @@ describe('Process Submission Features Worker', function () {
     // policy from a previous startup, we must update it directly.
     const boss = getPgBoss();
     await boss.createQueue(JobQueues.PROCESS_SUBMISSION_FEATURES);
-    await db.raw(
-      `UPDATE pgboss.queue SET policy = 'short' WHERE name = ? AND policy != 'short'`,
-      [JobQueues.PROCESS_SUBMISSION_FEATURES]
-    );
+    await db.raw(`UPDATE pgboss.queue SET policy = 'short' WHERE name = ? AND policy != 'short'`, [
+      JobQueues.PROCESS_SUBMISSION_FEATURES
+    ]);
   });
 
   after(async () => {
