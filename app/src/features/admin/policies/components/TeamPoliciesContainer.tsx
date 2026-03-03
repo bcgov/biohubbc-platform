@@ -4,7 +4,7 @@ import InputAdornment from '@mui/material/InputAdornment';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
+import { GridColDef } from '@mui/x-data-grid';
 import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
 import { PageSection } from 'components/section/PageSection';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
@@ -14,26 +14,17 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
 import { useCallback, useState } from 'react';
+import { IServerPaginationProps } from 'types/pagination';
 import { CreateTeamPolicyDialog } from './CreateTeamPolicyDialog';
 import { ITeamPolicyFormValues } from './TeamPolicyForm';
 
 /**
  * Props for the TeamPoliciesContainer component.
  */
-export interface ITeamPoliciesContainerProps {
+export interface ITeamPoliciesContainerProps extends IServerPaginationProps {
   /** Array of team-policy associations to display (pre-filtered by parent) */
   teamPolicies: ITeamPolicyDetails[];
-  /** Total number of team-policy associations (for server-side pagination) */
-  rowCount: number;
-  /** Current pagination model from parent */
-  paginationModel: GridPaginationModel;
-  /** Callback when pagination changes */
-  setPaginationModel: (model: GridPaginationModel) => void;
-  /** Current sort model from parent */
-  sortModel: GridSortModel;
-  /** Callback when sort changes */
-  setSortModel: (model: GridSortModel) => void;
-  /** Callback to refresh the team-policies list after create/delete */
+  /** Callback to refresh the team-policies list after create/update/delete */
   refresh: () => void;
   /** Current search term for filtering assignments */
   searchTerm: string;
@@ -92,7 +83,7 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
   /**
    * Display a snackbar notification.
    *
-   * @param {Partial<ISnackbarProps>} [textDialogProps] - Optional snackbar configuration
+   * @param {Partial<ISnackbarProps>} [textDialogProps]
    */
   const showSnackBar = (textDialogProps?: Partial<ISnackbarProps>) => {
     dialogContext.setSnackbar({ ...textDialogProps, open: true });
@@ -135,7 +126,7 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
     dialogContext.setYesNoDialog({
       dialogTitle: 'Remove assignment?',
       dialogContent: (
-        <Typography variant="body1" component="div" color="textSecondary">
+        <Typography component="div" color="textSecondary">
           Remove policy <strong>{teamPolicy.policy_name}</strong> from team <strong>{teamPolicy.team_name}</strong>?
         </Typography>
       ),
