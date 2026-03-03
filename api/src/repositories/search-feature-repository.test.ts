@@ -668,4 +668,84 @@ describe('SearchFeatureRepository', () => {
       expect(response).to.equal(0);
     });
   });
+
+  describe('searchFeatureIdsByFilters', () => {
+    it('should return empty array for empty filters', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+
+      const mockDBConnection = getMockDBConnection({
+        knex: knexSpy
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      const response = await repository.searchFeatureIdsByFilters({} as any);
+
+      expect(response).to.deep.equal([]);
+      expect(knexSpy.callCount).to.equal(0);
+    });
+
+    it('should return empty array for undefined filters', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+
+      const mockDBConnection = getMockDBConnection({
+        knex: knexSpy
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      const response = await repository.searchFeatureIdsByFilters(undefined as any);
+
+      expect(response).to.deep.equal([]);
+      expect(knexSpy.callCount).to.equal(0);
+    });
+
+    it('should return flat number array of submission_feature_ids for matching filters', async () => {
+      const mockQueryResponse = {
+        rowCount: 2,
+        rows: [{ submission_feature_id: 1 }, { submission_feature_id: 2 }]
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => mockQueryResponse
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      const response = await repository.searchFeatureIdsByFilters({ keyword: 'moose' });
+
+      expect(response).to.deep.equal([1, 2]);
+    });
+
+    it('should return empty array when DB returns no rows', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => mockQueryResponse
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      const response = await repository.searchFeatureIdsByFilters({ keyword: 'nonexistent' });
+
+      expect(response).to.deep.equal([]);
+    });
+
+    it('should call connection.knex exactly once', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 1, rows: [{ submission_feature_id: 10 }] });
+
+      const mockDBConnection = getMockDBConnection({
+        knex: knexSpy
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeatureIdsByFilters({ feature_types: ['dataset'] });
+
+      expect(knexSpy.callCount).to.equal(1);
+    });
+  });
 });

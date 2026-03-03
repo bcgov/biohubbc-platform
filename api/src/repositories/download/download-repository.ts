@@ -4,6 +4,7 @@ import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { DownloadFeatureSummary, DownloadId, DownloadRecord } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { ISearchFeaturesFilters } from '../../services/search-feature-service.interface';
 import { BaseRepository } from '../base-repository';
 
 const IsAuthorized = z.object({ authorized: z.boolean() });
@@ -24,6 +25,7 @@ export class DownloadRepository extends BaseRepository {
    * @param {string | null} dataRequestId - The data request that originated this download. Null for non-request downloads.
    * @param {number} [fragmentSizeBytes] - Target fragment size in bytes. Defaults to FRAGMENT_SIZE_THRESHOLD (200 MB).
    * @param {number | null} [systemUserId] - The user who created this download. Null for anonymous downloads.
+   * @param {ISearchFeaturesFilters} [searchFilters] - Original search filters for traceability. Null for cart-based downloads.
    * @return {Promise<DownloadId>} The created record ID.
    * @memberof DownloadRepository
    */
@@ -31,13 +33,16 @@ export class DownloadRepository extends BaseRepository {
     teamId: string | null,
     dataRequestId: string | null,
     fragmentSizeBytes?: number,
-    systemUserId?: number | null
+    systemUserId?: number | null,
+    searchFilters?: ISearchFeaturesFilters
   ): Promise<DownloadId> {
     const sizeBytes = fragmentSizeBytes ?? FRAGMENT_SIZE_THRESHOLD;
 
     const sql = SQL`
-      INSERT INTO download (team_id, data_request_id, download_status, fragment_size_bytes, system_user_id)
-      VALUES (${teamId}, ${dataRequestId}, 'pending', ${sizeBytes}, ${systemUserId ?? null})
+      INSERT INTO download (team_id, data_request_id, download_status, fragment_size_bytes, system_user_id, search_filters)
+      VALUES (${teamId}, ${dataRequestId}, 'pending', ${sizeBytes}, ${systemUserId ?? null}, ${
+      searchFilters ? JSON.stringify(searchFilters) : null
+    }::jsonb)
       RETURNING download_id;
     `;
 

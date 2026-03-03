@@ -65,6 +65,18 @@ export class SearchFeatureService extends DBService {
   }
 
   /**
+   * Returns submission feature IDs matching the provided search filters.
+   * Delegates to repository for the CTE-based query.
+   *
+   * @param {ISearchFeaturesFilters} filters - Search filters (keyword, feature_types, species, properties)
+   * @returns {Promise<number[]>} Array of matching submission_feature_id values
+   */
+  async getSearchFeatureIds(filters: ISearchFeaturesFilters): Promise<number[]> {
+    defaultLog.debug({ label: 'getSearchFeatureIds', filters });
+    return this.searchFeatureRepository.searchFeatureIdsByFilters(filters);
+  }
+
+  /**
    * Creates search indexes for datetime, number, spatial and string properties belonging to
    * all features found for the given submission.
    *

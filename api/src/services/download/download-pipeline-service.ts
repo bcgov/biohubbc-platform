@@ -20,6 +20,7 @@ import { getLogger } from '../../utils/logger';
 import { CodeService } from '../code-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { ISearchFeaturesFilters } from '../search-feature-service.interface';
 
 const defaultLog = getLogger('services/download-pipeline-service');
 
@@ -69,6 +70,7 @@ export class DownloadPipelineService extends DBService {
    * @param {number[]} submissionFeatureIds - The submission feature IDs to include.
    * @param {string} [dataRequestId] - The data request that originated this download.
    * @param {number} [fragmentSizeMb] - Target fragment size in MB (500, 1000, or 5000). Defaults to 500.
+   * @param {ISearchFeaturesFilters} [searchFilters] - Original search filters for traceability. Null for cart-based downloads.
    * @return {Promise<DownloadId>} The created download record ID.
    * @memberof DownloadPipelineService
    */
@@ -76,7 +78,8 @@ export class DownloadPipelineService extends DBService {
     teamId: string | null,
     submissionFeatureIds: number[],
     dataRequestId?: string,
-    fragmentSizeMb?: number
+    fragmentSizeMb?: number,
+    searchFilters?: ISearchFeaturesFilters
   ): Promise<DownloadId> {
     const fragmentSizeBytes = fragmentSizeMb ? fragmentSizeMb * 1024 * 1024 : undefined;
     const systemUserId = this.connection.systemUserId() || null;
@@ -85,7 +88,8 @@ export class DownloadPipelineService extends DBService {
       teamId,
       dataRequestId ?? null,
       fragmentSizeBytes,
-      systemUserId
+      systemUserId,
+      searchFilters
     );
 
     await this.downloadRepository.createDownloadFeatures(downloadId.download_id, submissionFeatureIds);
