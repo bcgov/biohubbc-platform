@@ -1,7 +1,8 @@
 import { mdiLock } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Alert, Box, Button, Typography } from '@mui/material';
+import { Box, Button, Typography } from '@mui/material';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
+import { AlertBanner } from 'components/notifications/AlertBanner';
 import { SkeletonList } from 'components/loading/SkeletonLoaders';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
 import { APIError } from 'hooks/api/useAxios';
@@ -74,8 +75,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload }: Searc
       }>
       <>
         {hasSecuredResults && (
-          <Alert
-            severity="info"
+          <AlertBanner
             icon={<Icon path={mdiLock} size={0.875} />}
             action={
               <Button color="inherit" size="small" onClick={handleRequestAccess}>
@@ -84,7 +84,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload }: Searc
             }
             sx={{ mx: 2, mt: 2 }}>
             Some records in these results are secured. You can request access to view and download them.
-          </Alert>
+          </AlertBanner>
         )}
         <ComponentSwitch<SEARCH_RESULT_OPTION_VIEW>
           switch={view}
