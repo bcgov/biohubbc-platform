@@ -8,9 +8,17 @@ import {
   UpdateDataRequest
 } from '../models/data-request';
 import { DataRequestStatusEnum } from '../models/data-request-status';
+import { PolicyEffect } from '../models/policy-statement';
 import { DataRequestRepository } from '../repositories/data-request-repository';
-import { _generateDataRequestTeamName, _transformFlatDataRequestToNested } from '../utils/data-request';
+import {
+  _generateDataRequestPolicyName,
+  _generateDataRequestTeamName,
+  _getDataRequestPolicyExpiryDate,
+  _transformFlatDataRequestToNested
+} from '../utils/data-request';
+import { PolicyService } from './access-policy/policy-service';
 import { TeamMemberService } from './access-policy/team-member-service';
+import { TeamPolicyService } from './access-policy/team-policy-service';
 import { TeamService } from './access-policy/team-service';
 import { DataRequestStatusService } from './data-request-status-service';
 import { DBService } from './db-service';
@@ -87,7 +95,9 @@ export class DataRequestService extends DBService {
 
   /**
    * Create a new data request.
-   * If teamId is undefined, a new team is created first and its id is used for the data request.
+   *
+   * Creates a team for the requester, a wildcard access policy expiring in 30 days
+   * linked to the team, and auto-approves the request.
    *
    * @param {number} requestedBy - system user id
    * @param {CreateDataRequest} payload
@@ -109,19 +119,30 @@ export class DataRequestService extends DBService {
 
     const dataRequest = await this.dataRequestRepository.createDataRequest(requestedBy, payloadWithTeamId);
 
+    const policyService = new PolicyService(this.connection);
+    const policy = await policyService.createPolicyWithStatements(
+      {
+        name: _generateDataRequestPolicyName(),
+        description: `Auto-generated policy for data request ${dataRequest.data_request_id}`,
+        record_end_date: _getDataRequestPolicyExpiryDate()
+      },
+      [{ effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:*:*' }]
+    );
+
+    const teamPolicyService = new TeamPolicyService(this.connection);
+    await teamPolicyService.createTeamPolicy({ team_id: resolvedTeamId, policy_id: policy.policy_id });
+
     const dataRequestStatusService = new DataRequestStatusService(this.connection);
     const dataRequestStatus = await dataRequestStatusService.createDataRequestStatus(
       dataRequest.data_request_id,
-      DataRequestStatusEnum.enum.REQUESTED,
+      DataRequestStatusEnum.enum.APPROVED,
       undefined
     );
 
-    const response = {
+    return {
       ...dataRequest,
       data_request_status: dataRequestStatus
     };
-
-    return response;
   }
 
   /**
