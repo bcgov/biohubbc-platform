@@ -20,7 +20,20 @@ export class TeamPolicyService extends DBService {
    * @return {Promise<TeamPolicy>} - The created team policy record.
    * @memberof TeamPolicyService
    */
-  createTeamPolicy(teamPolicyData: CreateTeamPolicy): Promise<TeamPolicy> {
+  async createTeamPolicy(teamPolicyData: CreateTeamPolicy): Promise<TeamPolicy> {
+    const existingPolicies = await this.teamPolicyRepository.getPoliciesByTeamId(teamPolicyData.team_id, {
+      policyIds: [teamPolicyData.policy_id]
+    });
+
+    if (existingPolicies.length > 0) {
+      const existingPolicy = existingPolicies[0];
+      return {
+        team_policy_id: existingPolicy.team_policy_id,
+        team_id: existingPolicy.team_id,
+        policy_id: existingPolicy.policy_id
+      };
+    }
+
     return this.teamPolicyRepository.insertTeamPolicy(teamPolicyData);
   }
 
@@ -34,6 +47,7 @@ export class TeamPolicyService extends DBService {
    */
   async createTeamPolicies(teamId: string, policyIds: string[]): Promise<TeamPolicy[]> {
     const uniquePolicyIds = [...new Set(policyIds)];
+
     if (!uniquePolicyIds.length) {
       return [];
     }
@@ -46,7 +60,9 @@ export class TeamPolicyService extends DBService {
     const policyIdsToCreate = uniquePolicyIds.filter((policyId) => !existingPolicyIds.has(policyId));
 
     return Promise.all(
-      policyIdsToCreate.map((policyId) => this.createTeamPolicy({ team_id: teamId, policy_id: policyId }))
+      policyIdsToCreate.map((policyId) =>
+        this.teamPolicyRepository.insertTeamPolicy({ team_id: teamId, policy_id: policyId })
+      )
     );
   }
 

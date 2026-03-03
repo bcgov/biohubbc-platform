@@ -1,15 +1,16 @@
 import { GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import { useCallback, useEffect, useState } from 'react';
+import { ApiPaginationRequestOptions } from 'types/pagination';
 import useDataLoader from './useDataLoader';
 import useDebounce from './useDebounce';
-import { ApiPaginationRequestOptions } from 'types/pagination';
+import { toApiPagination } from 'utils/pagination';
 
 /**
  * Configuration options for the useServerPaginatedDataGrid hook.
  */
 export interface IUseServerPaginatedDataGridOptions<TData, TResponse> {
   /** Function to fetch data from the API */
-  fetcher: (search: string | undefined, pagination: ApiPaginationRequestOptions) => Promise<TResponse>;
+  fetcher: (search: string, pagination: ApiPaginationRequestOptions) => Promise<TResponse>;
   /** Function to extract the data array from the API response */
   extractData: (response: TResponse) => TData[];
   /** Function to extract the total count from the API response */
@@ -47,22 +48,6 @@ export interface IUseServerPaginatedDataGridReturn<TData> {
   /** Refresh data with current params */
   refresh: () => void;
 }
-
-/**
- * Helper to convert GridPaginationModel and GridSortModel to API pagination options.
- */
-export const toApiPagination = (
-  paginationModel: GridPaginationModel,
-  sortModel: GridSortModel
-): ApiPaginationRequestOptions => {
-  const sort = sortModel[0];
-  return {
-    page: paginationModel.page + 1, // API uses 1-indexed pages
-    limit: paginationModel.pageSize,
-    sort: sort?.field,
-    order: sort?.sort as 'asc' | 'desc' | undefined
-  };
-};
 
 /**
  * Custom hook for server-side paginated DataGrid with search and sort.
@@ -105,13 +90,14 @@ export const useServerPaginatedDataGrid = <TData, TResponse>(
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
   // Data loader
-  const dataLoader = useDataLoader((search: string | undefined, pagination: ApiPaginationRequestOptions) =>
+  const dataLoader = useDataLoader((search: string, pagination: ApiPaginationRequestOptions) =>
     fetcher(search, pagination)
   );
 
   // Load data on mount
   useEffect(() => {
-    dataLoader.load(debouncedSearchTerm || undefined, toApiPagination(paginationModel, sortModel));
+    const apiPagination = toApiPagination(paginationModel, sortModel);
+    dataLoader.load(debouncedSearchTerm, apiPagination);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -120,8 +106,9 @@ export const useServerPaginatedDataGrid = <TData, TResponse>(
   const debouncedRefresh = useDebounce((term: string) => {
     setDebouncedSearchTerm(term);
     setPaginationModel((prev) => ({ ...prev, page: 0 }));
-    dataLoader.refresh(term || undefined, {
-      ...toApiPagination(paginationModel, sortModel),
+    const apiPagination = toApiPagination(paginationModel, sortModel);
+    dataLoader.refresh(term, {
+      ...apiPagination,
       page: 1
     });
   }, debounceMs);
@@ -139,7 +126,8 @@ export const useServerPaginatedDataGrid = <TData, TResponse>(
   const handlePaginationChange = useCallback(
     (model: GridPaginationModel) => {
       setPaginationModel(model);
-      dataLoader.refresh(debouncedSearchTerm || undefined, toApiPagination(model, sortModel));
+      const apiPagination = toApiPagination(model, sortModel);
+      dataLoader.refresh(debouncedSearchTerm, apiPagination);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sortModel, debouncedSearchTerm]
@@ -149,7 +137,8 @@ export const useServerPaginatedDataGrid = <TData, TResponse>(
   const handleSortChange = useCallback(
     (model: GridSortModel) => {
       setSortModel(model);
-      dataLoader.refresh(debouncedSearchTerm || undefined, toApiPagination(paginationModel, model));
+      const apiPagination = toApiPagination(paginationModel, model);
+      dataLoader.refresh(debouncedSearchTerm, apiPagination);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [paginationModel, debouncedSearchTerm]
@@ -157,7 +146,8 @@ export const useServerPaginatedDataGrid = <TData, TResponse>(
 
   // Manual refresh with current params
   const refresh = useCallback(() => {
-    dataLoader.refresh(debouncedSearchTerm || undefined, toApiPagination(paginationModel, sortModel));
+    const apiPagination = toApiPagination(paginationModel, sortModel);
+    dataLoader.refresh(debouncedSearchTerm, apiPagination);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearchTerm, paginationModel, sortModel]);
 
@@ -178,5 +168,3 @@ export const useServerPaginatedDataGrid = <TData, TResponse>(
     refresh
   };
 };
-
-export default useServerPaginatedDataGrid;

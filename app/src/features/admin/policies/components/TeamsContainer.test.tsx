@@ -80,9 +80,7 @@ const defaultProps: ITeamsContainerProps = {
   setSortModel: vi.fn(),
   refresh: vi.fn(),
   searchTerm: '',
-  onSearch: vi.fn(),
-  selectedTeamId: null,
-  onSelectTeam: vi.fn()
+  onSearch: vi.fn()
 };
 
 const renderComponent = (props: Partial<ITeamsContainerProps> = {}) => {
