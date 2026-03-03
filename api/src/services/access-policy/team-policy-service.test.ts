@@ -30,6 +30,7 @@ describe('TeamPolicyService', () => {
         policy_id: '33333333-3333-3333-3333-333333333333'
       };
 
+      const getExistingStub = sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([]);
       const stub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy').resolves(mockTeamPolicy);
 
       const input: CreateTeamPolicy = {
@@ -39,8 +40,43 @@ describe('TeamPolicyService', () => {
 
       const result = await service.createTeamPolicy(input);
 
+      expect(getExistingStub).to.have.been.calledWith('22222222-2222-2222-2222-222222222222', {
+        policyIds: ['33333333-3333-3333-3333-333333333333']
+      });
       expect(stub).to.have.been.calledWith(input);
       expect(result).to.eql(mockTeamPolicy);
+    });
+
+    it('should return existing team policy and skip insert when association already exists', async () => {
+      const existingTeamPolicy: TeamPolicyDetails = {
+        team_policy_id: '11111111-1111-1111-1111-111111111111',
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '33333333-3333-3333-3333-333333333333',
+        team_name: 'Team A',
+        policy_name: 'Policy A'
+      };
+
+      const getExistingStub = sinon
+        .stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId')
+        .resolves([existingTeamPolicy]);
+      const insertStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy');
+
+      const input: CreateTeamPolicy = {
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '33333333-3333-3333-3333-333333333333'
+      };
+
+      const result = await service.createTeamPolicy(input);
+
+      expect(getExistingStub).to.have.been.calledWith('22222222-2222-2222-2222-222222222222', {
+        policyIds: ['33333333-3333-3333-3333-333333333333']
+      });
+      expect(insertStub).to.not.have.been.called;
+      expect(result).to.eql({
+        team_policy_id: '11111111-1111-1111-1111-111111111111',
+        team_id: '22222222-2222-2222-2222-222222222222',
+        policy_id: '33333333-3333-3333-3333-333333333333'
+      });
     });
   });
 

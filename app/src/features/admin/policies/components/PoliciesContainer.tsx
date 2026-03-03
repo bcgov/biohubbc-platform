@@ -1,19 +1,16 @@
-import { mdiDotsVertical, mdiMagnify, mdiPencilOutline, mdiPlus, mdiTrashCanOutline } from '@mdi/js';
+import { mdiDotsVertical, mdiMagnify, mdiPencilOutline, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Container from '@mui/material/Container';
-import Divider from '@mui/material/Divider';
 import InputAdornment from '@mui/material/InputAdornment';
-import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
-import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
-import CustomDataGrid from 'components/data-grid/CustomDataGrid';
-import EditDialog from 'components/dialog/EditDialog';
+import { GridColDef } from '@mui/x-data-grid';
+import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
+import { EditDialog } from 'components/dialog/EditDialog';
+import { PageSection } from 'components/section/PageSection';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
@@ -31,9 +28,9 @@ import {
 } from './AddPolicyForm';
 
 /**
- * Props for the ActivePoliciesList component.
+ * Props for the PoliciesContainer component.
  */
-export interface IActivePoliciesListProps extends IServerPaginationProps {
+export interface IPoliciesContainerProps extends IServerPaginationProps {
   /** Array of policies to display in the table */
   policies: IPolicy[];
   /** Callback to refresh the policies list after create/update/delete */
@@ -42,10 +39,6 @@ export interface IActivePoliciesListProps extends IServerPaginationProps {
   searchTerm: string;
   /** Callback when search term changes */
   onSearch: (term: string) => void;
-  /** Currently selected policy ID for filtering team-policy assignments */
-  selectedPolicyId: string | null;
-  /** Callback when a policy row is selected/deselected */
-  onSelectPolicy: (policyId: string | null) => void;
 }
 
 /**
@@ -58,38 +51,12 @@ export interface IActivePoliciesListProps extends IServerPaginationProps {
  * - Edit existing policies via dialog
  * - Delete policies with confirmation
  *
- * @param {IActivePoliciesListProps} props - Component props
+ * @param {IPoliciesContainerProps} props - Component props
  * @returns {React.ReactElement} The policies list component
  */
-export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePoliciesListProps>> = (props) => {
+export const PoliciesContainer = (props: IPoliciesContainerProps) => {
   const biohubApi = useApi();
-  const {
-    policies,
-    rowCount,
-    paginationModel,
-    setPaginationModel,
-    sortModel,
-    setSortModel,
-    selectedPolicyId,
-    onSelectPolicy
-  } = props;
-
-  /**
-   * Handle row selection changes in the DataGrid.
-   * Extracts the selected policy ID and calls the parent callback.
-   *
-   * @param {GridRowSelectionModel} model - The new selection model from DataGrid
-   */
-  const handleRowSelectionChange = (model: GridRowSelectionModel) => {
-    const ids = model && 'ids' in model ? Array.from(model.ids) : [];
-    const newSelectedId = (ids[0] as string) || null;
-    onSelectPolicy(newSelectedId);
-  };
-
-  const rowSelectionModel: GridRowSelectionModel = {
-    type: 'include',
-    ids: selectedPolicyId ? new Set([selectedPolicyId]) : new Set()
-  };
+  const { policies, rowCount, paginationModel, setPaginationModel, sortModel, setSortModel } = props;
 
   const dialogContext = useDialogContext();
 
@@ -107,12 +74,38 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
     dialogContext.setSnackbar({ ...textDialogProps, open: true });
   };
 
+  const showApiErrorDialog = (title: string, text: string, error: unknown) => {
+    const apiError = error as APIError;
+    dialogContext.setErrorDialog({
+      open: true,
+      dialogTitle: title,
+      dialogText: text,
+      dialogError: apiError.message,
+      dialogErrorDetails: apiError.errors,
+      onClose: () => {
+        dialogContext.setErrorDialog({ open: false });
+      },
+      onOk: () => {
+        dialogContext.setErrorDialog({ open: false });
+      }
+    });
+  };
+
+  const closeDeletePolicyDialog = () => {
+    dialogContext.setYesNoDialog({ open: false });
+  };
+
   /**
    * Open a confirmation dialog to delete a policy.
    *
    * @param {IPolicy} row - The policy to delete
    */
   const handleDeletePolicyClick = (row: IPolicy) => {
+    const handleConfirmDelete = () => {
+      deletePolicy(row);
+      closeDeletePolicyDialog();
+    };
+
     dialogContext.setYesNoDialog({
       dialogTitle: 'Delete policy?',
       dialogContent: (
@@ -123,18 +116,10 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
       yesButtonLabel: 'Delete Policy',
       noButtonLabel: 'Cancel',
       yesButtonProps: { color: 'error' },
-      onClose: () => {
-        dialogContext.setYesNoDialog({ open: false });
-      },
-      onNo: () => {
-        dialogContext.setYesNoDialog({ open: false });
-      },
+      onClose: closeDeletePolicyDialog,
+      onNo: closeDeletePolicyDialog,
       open: true,
-      onYes: () => {
-        deletePolicy(row).then(() => {
-          dialogContext.setYesNoDialog({ open: false });
-        });
-      }
+      onYes: handleConfirmDelete
     });
   };
 
@@ -152,31 +137,12 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
       await biohubApi.policies.deletePolicy(policy.policy_id);
 
       showSnackBar({
-        snackbarMessage: (
-          <Typography variant="body2" component="div">
-            Policy <strong>{policy.name}</strong> deleted.
-          </Typography>
-        ),
-        open: true
+        snackbarMessage: 'Deleted policy'
       });
 
       props.refresh();
     } catch (error) {
-      const apiError = error as APIError;
-
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: 'Error Deleting Policy',
-        dialogText: 'An error occurred while deleting the policy.',
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
-        onClose: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        onOk: () => {
-          dialogContext.setErrorDialog({ open: false });
-        }
-      });
+      showApiErrorDialog('Error Deleting Policy', 'An error occurred while deleting the policy.', error);
     }
   };
 
@@ -215,28 +181,10 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
       props.refresh();
 
       showSnackBar({
-        snackbarMessage: (
-          <Typography variant="body2" component="div">
-            Policy <strong>{values.name}</strong> created.
-          </Typography>
-        )
+        snackbarMessage: 'Created policy'
       });
     } catch (error) {
-      const apiError = error as APIError;
-
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: 'Failed to Create Policy',
-        dialogText: 'An error occurred while creating the policy.',
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
-        onClose: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        onOk: () => {
-          dialogContext.setErrorDialog({ open: false });
-        }
-      });
+      showApiErrorDialog('Failed to Create Policy', 'An error occurred while creating the policy.', error);
     } finally {
       setIsLoading(false);
     }
@@ -272,28 +220,10 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
       props.refresh();
 
       showSnackBar({
-        snackbarMessage: (
-          <Typography variant="body2" component="div">
-            Policy <strong>{values.name}</strong> updated.
-          </Typography>
-        )
+        snackbarMessage: 'Updated policy'
       });
     } catch (error) {
-      const apiError = error as APIError;
-
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: 'Failed to Update Policy',
-        dialogText: 'An error occurred while updating the policy.',
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
-        onClose: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        onOk: () => {
-          dialogContext.setErrorDialog({ open: false });
-        }
-      });
+      showApiErrorDialog('Failed to Update Policy', 'An error occurred while updating the policy.', error);
     } finally {
       setIsLoading(false);
     }
@@ -383,14 +313,18 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
   return (
     <>
       <Container maxWidth="xl">
-        <Paper>
-          <Toolbar disableGutters sx={{ px: 2 }}>
-            <Typography variant="h4" component="h2" flexGrow={1}>
+        <PageSection
+          id="policies"
+          label={
+            <>
               Active Policies{' '}
               <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
                 ({rowCount})
               </Typography>
-            </Typography>
+            </>
+          }
+          onAdd={() => setOpenAddPolicyDialog(true)}
+          headerContent={
             <Stack gap={1} direction="row" alignItems="center">
               <TextField
                 size="small"
@@ -408,42 +342,21 @@ export const ActivePoliciesList: React.FC<React.PropsWithChildren<IActivePolicie
                 }}
                 sx={{ width: 250 }}
               />
-              <Button
-                variant="contained"
-                color="primary"
-                data-testid="add-policy-button"
-                startIcon={<Icon path={mdiPlus} size={0.8} />}
-                onClick={() => setOpenAddPolicyDialog(true)}>
-                Add
-              </Button>
             </Stack>
-          </Toolbar>
-
-          <Divider flexItem />
-
-          <CustomDataGrid
-            data-testid="active-policies-table"
+          }>
+          <ServerPaginatedDataGrid<IPolicy>
+            dataTestId="active-policies-table"
             rows={policies}
             columns={columns}
             getRowId={(row) => row.policy_id}
-            paginationMode="server"
-            paginationModel={paginationModel}
-            onPaginationModelChange={setPaginationModel}
-            pageSizeOptions={[10, 25, 50]}
-            sortingMode="server"
-            sortingOrder={['asc', 'desc']}
-            sortModel={sortModel}
-            onSortModelChange={setSortModel}
+            noRowsMessage="No Policies"
             rowCount={rowCount}
-            rowSelectionModel={rowSelectionModel}
-            onRowSelectionModelChange={handleRowSelectionChange}
-            checkboxSelection
-            disableMultipleRowSelection
-            disableColumnSelector
-            disableColumnMenu
-            localeText={{ noRowsLabel: 'No Policies' }}
+            paginationModel={paginationModel}
+            setPaginationModel={setPaginationModel}
+            sortModel={sortModel}
+            setSortModel={setSortModel}
           />
-        </Paper>
+        </PageSection>
       </Container>
 
       <EditDialog

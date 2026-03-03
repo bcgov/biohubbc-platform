@@ -1,56 +1,47 @@
-import { mdiDotsVertical, mdiPlus, mdiTrashCanOutline } from '@mdi/js';
+import { mdiDotsVertical, mdiMagnify, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Divider from '@mui/material/Divider';
-import Toolbar from '@mui/material/Toolbar';
+import InputAdornment from '@mui/material/InputAdornment';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
-import CustomDataGrid from 'components/data-grid/CustomDataGrid';
+import { GridColDef } from '@mui/x-data-grid';
+import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
+import { PageSection } from 'components/section/PageSection';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
-import { ITeam } from 'interfaces/useTeamsApi.interface';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { IServerPaginationProps } from 'types/pagination';
+import { CreateTeamPolicyDialog } from './CreateTeamPolicyDialog';
+import { ITeamPolicyFormValues } from './TeamPolicyForm';
 
 /**
  * Props for the TeamPoliciesContainer component.
  */
-export interface ITeamPoliciesContainerProps {
+export interface ITeamPoliciesContainerProps extends IServerPaginationProps {
   /** Array of team-policy associations to display (pre-filtered by parent) */
   teamPolicies: ITeamPolicyDetails[];
-  /** Total number of team-policy associations (for server-side pagination) */
-  rowCount: number;
-  /** Current pagination model from parent */
-  paginationModel: GridPaginationModel;
-  /** Callback when pagination changes */
-  setPaginationModel: (model: GridPaginationModel) => void;
-  /** Current sort model from parent */
-  sortModel: GridSortModel;
-  /** Callback when sort changes */
-  setSortModel: (model: GridSortModel) => void;
-  /** Currently selected team from TeamsContainer (null if none selected) */
-  selectedTeam: ITeam | null;
-  /** Currently selected policy from ActivePoliciesList (null if none selected) */
-  selectedPolicy: IPolicy | null;
-  /** Callback to refresh the team-policies list after create/delete */
+  /** Callback to refresh the team-policies list after create/update/delete */
   refresh: () => void;
+  /** Current search term for filtering assignments */
+  searchTerm: string;
+  /** Callback when search term changes */
+  onSearch: (term: string) => void;
 }
 
 /**
  * Container component for managing team-policy associations.
  *
  * Displays filtered team-policy assignments based on selection in parent containers.
- * When both a team and policy are selected, shows an "Assign" button to create the association.
+ * Supports adding and removing assignments.
  *
  * @param {ITeamPoliciesContainerProps} props - Component props
  * @returns {React.ReactElement} The team-policies container component
  */
-export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (props) => {
+export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
   const {
     teamPolicies,
     rowCount,
@@ -58,84 +49,24 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
     setPaginationModel,
     sortModel,
     setSortModel,
-    selectedTeam,
-    selectedPolicy,
-    refresh
+    refresh,
+    searchTerm,
+    onSearch
   } = props;
 
   const biohubApi = useApi();
   const dialogContext = useDialogContext();
 
-  const [isAssigning, setIsAssigning] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [openCreateDialog, setOpenCreateDialog] = useState(false);
 
-  // Check if the selected team-policy combination already exists
-  const assignmentExists =
-    selectedTeam &&
-    selectedPolicy &&
-    teamPolicies.some((tp) => tp.team_id === selectedTeam.team_id && tp.policy_id === selectedPolicy.policy_id);
-
-  // Can assign when both are selected and assignment doesn't exist
-  const canAssign = selectedTeam && selectedPolicy && !assignmentExists;
-
-  /**
-   * Display a snackbar notification.
-   *
-   * @param {Partial<ISnackbarProps>} [textDialogProps] - Optional snackbar configuration
-   */
-  const showSnackBar = (textDialogProps?: Partial<ISnackbarProps>) => {
-    dialogContext.setSnackbar({ ...textDialogProps, open: true });
-  };
-
-  /**
-   * Get dynamic header text based on selection state.
-   *
-   * @returns {string} Header text describing what's being shown
-   */
-  const getHeaderText = (): string => {
-    if (selectedTeam && selectedPolicy) {
-      return `Assignment: ${selectedTeam.name} + ${selectedPolicy.name}`;
-    }
-    if (selectedTeam) {
-      return `Policies for "${selectedTeam.name}"`;
-    }
-    if (selectedPolicy) {
-      return `Teams with "${selectedPolicy.name}"`;
-    }
-    return 'Team-Policy Assignments';
-  };
-
-  /**
-   * Handle creating a new team-policy association.
-   */
-  const handleAssign = async () => {
-    if (!selectedTeam || !selectedPolicy) {
-      return;
-    }
-
-    setIsAssigning(true);
-
-    try {
-      await biohubApi.teamPolicies.createTeamPolicy({
-        team_id: selectedTeam.team_id,
-        policy_id: selectedPolicy.policy_id
-      });
-
-      refresh();
-
-      showSnackBar({
-        snackbarMessage: (
-          <Typography variant="body2" component="div">
-            Assigned <strong>{selectedPolicy.name}</strong> to <strong>{selectedTeam.name}</strong>.
-          </Typography>
-        )
-      });
-    } catch (error) {
+  const showApiErrorDialog = useCallback(
+    (title: string, text: string, error: unknown) => {
       const apiError = error as APIError;
-
       dialogContext.setErrorDialog({
         open: true,
-        dialogTitle: 'Failed to Assign Policy',
-        dialogText: 'An error occurred while assigning the policy to the team.',
+        dialogTitle: title,
+        dialogText: text,
         dialogError: apiError.message,
         dialogErrorDetails: apiError.errors,
         onClose: () => {
@@ -145,8 +76,39 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
           dialogContext.setErrorDialog({ open: false });
         }
       });
+    },
+    [dialogContext]
+  );
+
+  /**
+   * Display a snackbar notification.
+   *
+   * @param {Partial<ISnackbarProps>} [textDialogProps]
+   */
+  const showSnackBar = (textDialogProps?: Partial<ISnackbarProps>) => {
+    dialogContext.setSnackbar({ ...textDialogProps, open: true });
+  };
+
+  const handleCreate = async (values: ITeamPolicyFormValues) => {
+    setIsSaving(true);
+
+    try {
+      await biohubApi.teamPolicies.createTeamPolicies(values.team_id, { policies: values.policies });
+
+      setOpenCreateDialog(false);
+      refresh();
+
+      showSnackBar({
+        snackbarMessage: 'Created assignments'
+      });
+    } catch (error) {
+      showApiErrorDialog(
+        'Failed to Create Assignment',
+        'An error occurred while creating the team-policy assignment.',
+        error
+      );
     } finally {
-      setIsAssigning(false);
+      setIsSaving(false);
     }
   };
 
@@ -156,10 +118,15 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
    * @param {ITeamPolicyDetails} teamPolicy - The association to delete
    */
   const handleDeleteClick = (teamPolicy: ITeamPolicyDetails) => {
+    const handleConfirmDelete = () => {
+      handleDelete(teamPolicy);
+      dialogContext.setYesNoDialog({ open: false });
+    };
+
     dialogContext.setYesNoDialog({
       dialogTitle: 'Remove assignment?',
       dialogContent: (
-        <Typography variant="body1" component="div" color="textSecondary">
+        <Typography component="div" color="textSecondary">
           Remove policy <strong>{teamPolicy.policy_name}</strong> from team <strong>{teamPolicy.team_name}</strong>?
         </Typography>
       ),
@@ -173,11 +140,7 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
         dialogContext.setYesNoDialog({ open: false });
       },
       open: true,
-      onYes: () => {
-        deleteTeamPolicy(teamPolicy).then(() => {
-          dialogContext.setYesNoDialog({ open: false });
-        });
-      }
+      onYes: handleConfirmDelete
     });
   };
 
@@ -186,39 +149,20 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
    *
    * @param {ITeamPolicyDetails} teamPolicy - The association to delete
    */
-  const deleteTeamPolicy = async (teamPolicy: ITeamPolicyDetails) => {
+  const handleDelete = async (teamPolicy: ITeamPolicyDetails) => {
     try {
       await biohubApi.teamPolicies.deleteTeamPolicy(teamPolicy.team_policy_id);
 
       showSnackBar({
-        snackbarMessage: (
-          <Typography variant="body2" component="div">
-            Removed <strong>{teamPolicy.policy_name}</strong> from <strong>{teamPolicy.team_name}</strong>.
-          </Typography>
-        )
+        snackbarMessage: 'Removed assignment'
       });
 
       refresh();
     } catch (error) {
-      const apiError = error as APIError;
-
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: 'Error Removing Assignment',
-        dialogText: 'An error occurred while removing the policy assignment.',
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
-        onClose: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        onOk: () => {
-          dialogContext.setErrorDialog({ open: false });
-        }
-      });
+      showApiErrorDialog('Error Removing Assignment', 'An error occurred while removing the policy assignment.', error);
     }
   };
 
-  // DataGrid columns
   const columns: GridColDef<ITeamPolicyDetails>[] = [
     {
       field: 'team_name',
@@ -256,54 +200,59 @@ export const TeamPoliciesContainer: React.FC<ITeamPoliciesContainerProps> = (pro
   ];
 
   return (
-    <Box>
-      <Toolbar disableGutters sx={{ px: 2 }}>
-        <Typography variant="h4" component="h2" flexGrow={1}>
-          {getHeaderText()}{' '}
-          <Typography sx={{ fontSize: 'inherit' }} component="span" color="textSecondary">
-            ({rowCount})
-          </Typography>
-        </Typography>
-        {canAssign && (
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<Icon path={mdiPlus} size={0.8} />}
-            onClick={handleAssign}
-            disabled={isAssigning}>
-            Assign
-          </Button>
-        )}
-      </Toolbar>
+    <>
+      <PageSection
+        id="assignments"
+        label={
+          <>
+            Assignments{' '}
+            <Typography sx={{ fontSize: 'inherit' }} component="span" color="textSecondary">
+              ({rowCount})
+            </Typography>
+          </>
+        }
+        onAdd={() => setOpenCreateDialog(true)}
+        headerContent={
+          <Stack gap={1} direction="row" alignItems="center">
+            <TextField
+              size="small"
+              placeholder="Search by team or policy"
+              value={searchTerm}
+              onChange={(e) => onSearch(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Icon path={mdiMagnify} size={0.875} />
+                    </InputAdornment>
+                  )
+                }
+              }}
+              sx={{ width: 250 }}
+            />
+          </Stack>
+        }>
+        <ServerPaginatedDataGrid<ITeamPolicyDetails>
+          dataTestId="team-policies-table"
+          rows={teamPolicies}
+          columns={columns}
+          getRowId={(row) => row.team_policy_id}
+          noRowsMessage="No Team-Policy Assignments"
+          rowCount={rowCount}
+          paginationModel={paginationModel}
+          setPaginationModel={setPaginationModel}
+          sortModel={sortModel}
+          setSortModel={setSortModel}
+        />
+      </PageSection>
 
-      <Divider flexItem />
-
-      <CustomDataGrid
-        data-testid="team-policies-table"
-        rows={teamPolicies}
-        columns={columns}
-        getRowId={(row) => row.team_policy_id}
-        paginationMode="server"
-        paginationModel={paginationModel}
-        onPaginationModelChange={setPaginationModel}
-        pageSizeOptions={[10, 25, 50]}
-        sortingMode="server"
-        sortingOrder={['asc', 'desc']}
-        sortModel={sortModel}
-        onSortModelChange={setSortModel}
-        rowCount={rowCount}
-        disableRowSelectionOnClick
-        disableColumnSelector
-        disableColumnMenu
-        localeText={{ noRowsLabel: 'No Team-Policy Assignments' }}
-        sx={{
-          border: 'none',
-          '& .MuiDataGrid-columnHeaderTitle': {
-            fontWeight: 700,
-            textTransform: 'uppercase'
-          }
-        }}
+      <CreateTeamPolicyDialog
+        open={openCreateDialog}
+        isLoading={isSaving}
+        onLoadError={showApiErrorDialog}
+        onCancel={() => setOpenCreateDialog(false)}
+        onSave={handleCreate}
       />
-    </Box>
+    </>
   );
 };
