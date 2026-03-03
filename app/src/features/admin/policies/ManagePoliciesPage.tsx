@@ -16,8 +16,7 @@ import { TeamsContainer } from './components/TeamsContainer';
 /**
  * Admin page for managing policies, teams, and team-policy assignments.
  *
- * Assignments are created directly from the Add Assignment dialog.
- * Team and policy grids are for management only and do not drive assignment filtering.
+ * @returns {*}
  */
 export const ManagePoliciesPage = () => {
   const biohubApi = useApi();
@@ -53,8 +52,7 @@ export const ManagePoliciesPage = () => {
   useEffect(() => {
     const apiPagination = toApiPagination(teamPoliciesPaginationModel, teamPoliciesSortModel);
     teamPoliciesDataLoader.load(debouncedTeamPoliciesSearchTerm, apiPagination);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [debouncedTeamPoliciesSearchTerm, teamPoliciesDataLoader, teamPoliciesPaginationModel, teamPoliciesSortModel]);
 
   const debouncedTeamPoliciesRefresh = useDebounce((searchTerm: string) => {
     setDebouncedTeamPoliciesSearchTerm(searchTerm);

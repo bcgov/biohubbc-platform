@@ -1,21 +1,12 @@
+import { GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import { ApiPaginationRequestOptions } from 'types/pagination';
-
-export interface IDataGridPaginationModelLike {
-  page: number;
-  pageSize: number;
-}
-
-export interface IDataGridSortModelItemLike {
-  field: string;
-  sort?: 'asc' | 'desc' | null;
-}
 
 /**
  * Converts DataGrid-style pagination/sort state into API pagination options.
  */
 export const toApiPagination = (
-  paginationModel: IDataGridPaginationModelLike,
-  sortModel: ReadonlyArray<IDataGridSortModelItemLike>
+  paginationModel: GridPaginationModel,
+  sortModel: GridSortModel
 ): ApiPaginationRequestOptions => {
   const sort = sortModel[0];
 

@@ -31,7 +31,7 @@ interface ITestResponse {
 
 // Default hook options for tests
 const createDefaultOptions = (overrides = {}) => ({
-  fetcher: vi.fn<(search: string | undefined, pagination: any) => Promise<ITestResponse>>().mockResolvedValue({
+  fetcher: vi.fn<(search: string, pagination: any) => Promise<ITestResponse>>().mockResolvedValue({
     items: [{ id: '1', name: 'Test' }],
     pagination: { total: 1 }
   }),
@@ -132,7 +132,7 @@ describe('useServerPaginatedDataGrid', () => {
       renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
       expect(mockLoad).toHaveBeenCalledWith(
-        undefined, // no search term
+        '', // no search term
         expect.objectContaining({
           page: 1,
           limit: 10,
@@ -145,7 +145,7 @@ describe('useServerPaginatedDataGrid', () => {
     it('uses custom defaultPageSize in initial load', () => {
       renderHook(() => useServerPaginatedDataGrid(createDefaultOptions({ defaultPageSize: 50 })));
 
-      expect(mockLoad).toHaveBeenCalledWith(undefined, expect.objectContaining({ limit: 50 }));
+      expect(mockLoad).toHaveBeenCalledWith('', expect.objectContaining({ limit: 50 }));
     });
   });
 
@@ -299,7 +299,7 @@ describe('useServerPaginatedDataGrid', () => {
 
       // Should be called immediately, not debounced
       expect(mockRefresh).toHaveBeenCalledWith(
-        undefined,
+        '',
         expect.objectContaining({
           page: 3, // 0-indexed page 2 = API page 3
           limit: 10
@@ -355,7 +355,7 @@ describe('useServerPaginatedDataGrid', () => {
       });
 
       expect(mockRefresh).toHaveBeenCalledWith(
-        undefined,
+        '',
         expect.objectContaining({
           sort: 'updated_at',
           order: 'asc'
@@ -381,7 +381,7 @@ describe('useServerPaginatedDataGrid', () => {
 
       // Page should be preserved
       expect(mockRefresh).toHaveBeenCalledWith(
-        undefined,
+        '',
         expect.objectContaining({
           page: 3 // page 2 (0-indexed) = API page 3
         })
