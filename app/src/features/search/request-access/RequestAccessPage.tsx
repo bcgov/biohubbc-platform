@@ -4,7 +4,6 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { URL_PARAMS } from 'constants/query-params';
 import { PrimaryButton } from 'components/button/PrimaryButton';
 import { SecondaryButton } from 'components/button/SecondaryButton';
 import RequestAccessForm, {

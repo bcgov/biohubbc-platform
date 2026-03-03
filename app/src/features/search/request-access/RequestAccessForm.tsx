@@ -11,7 +11,11 @@ export const requestAccessFormInitialValues: IRequestAccessFormValues = {
 };
 
 export const requestAccessFormYupSchema = yup.object().shape({
-  reason: yup.string().min(1, 'A reason is required').max(2000, 'Cannot exceed 2000 characters').required('A reason is required')
+  reason: yup
+    .string()
+    .min(1, 'A reason is required')
+    .max(2000, 'Cannot exceed 2000 characters')
+    .required('A reason is required')
 });
 
 const RequestAccessForm = () => {
