@@ -89,5 +89,3 @@ export const ServerPaginatedDataGrid = <T extends GridValidRowModel>({
     />
   );
 };
-
-export default ServerPaginatedDataGrid;

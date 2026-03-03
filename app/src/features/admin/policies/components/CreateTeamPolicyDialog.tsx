@@ -1,4 +1,4 @@
-import EditDialog from 'components/dialog/EditDialog';
+import { EditDialog } from 'components/dialog/EditDialog';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { ITeam } from 'interfaces/useTeamsApi.interface';
 import { ITeamPolicyFormValues, TeamPolicyForm, TeamPolicyFormYupSchema } from './TeamPolicyForm';
@@ -37,5 +37,3 @@ export const CreateTeamPolicyDialog = (props: ICreateTeamPolicyDialogProps) => {
     />
   );
 };
-
-export default CreateTeamPolicyDialog;

@@ -64,9 +64,7 @@ const defaultProps: IPoliciesContainerProps = {
   setSortModel: vi.fn(),
   refresh: vi.fn(),
   searchTerm: '',
-  onSearch: vi.fn(),
-  selectedPolicyId: null,
-  onSelectPolicy: vi.fn()
+  onSearch: vi.fn()
 };
 
 const renderComponent = (props: Partial<IPoliciesContainerProps> = {}) => {

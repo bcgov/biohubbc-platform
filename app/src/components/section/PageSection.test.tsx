@@ -27,14 +27,14 @@ describe('PageSection', () => {
     expect(onAdd).toHaveBeenCalledTimes(1);
   });
 
-  it('disables add button when addDisabled is true', () => {
+  it('always enables add button', () => {
     const { getByTestId } = render(
-      <PageSection id="teams" label="Teams" onAdd={vi.fn()} addDisabled>
+      <PageSection id="teams" label="Teams" onAdd={vi.fn()}>
         <div>Content</div>
       </PageSection>
     );
 
-    expect(getByTestId('teams-add-button')).toBeDisabled();
+    expect(getByTestId('teams-add-button')).toBeEnabled();
   });
 
   it('renders headerContent beside add button', () => {
@@ -45,5 +45,15 @@ describe('PageSection', () => {
     );
 
     expect(getByPlaceholderText('Search by team name')).toBeVisible();
+  });
+
+  it('does not render add button when onAdd is not provided', () => {
+    const { queryByTestId } = render(
+      <PageSection id="teams" label="Teams">
+        <div>Content</div>
+      </PageSection>
+    );
+
+    expect(queryByTestId('teams-add-button')).toBeNull();
   });
 });

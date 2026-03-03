@@ -11,8 +11,7 @@ import { PropsWithChildren, ReactNode } from 'react';
 export interface IPageSectionProps extends PropsWithChildren {
   id: string;
   label: ReactNode;
-  onAdd: () => void;
-  addDisabled?: boolean;
+  onAdd?: () => void;
   addLabel?: string;
   headerContent?: ReactNode;
 }
@@ -27,7 +26,7 @@ export interface IPageSectionProps extends PropsWithChildren {
  * @returns {JSX.Element}
  */
 export const PageSection = (props: IPageSectionProps) => {
-  const { id, label, onAdd, addDisabled = false, addLabel = 'Add', headerContent, children } = props;
+  const { id, label, onAdd, addLabel = 'Add', headerContent, children } = props;
 
   return (
     <Paper>
@@ -37,15 +36,16 @@ export const PageSection = (props: IPageSectionProps) => {
         </Typography>
         <Stack gap={1} direction="row" alignItems="center">
           {headerContent}
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<Icon path={mdiPlus} size={0.8} />}
-            data-testid={`${id}-add-button`}
-            disabled={addDisabled}
-            onClick={onAdd}>
-            {addLabel}
-          </Button>
+          {onAdd && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<Icon path={mdiPlus} size={0.8} />}
+              data-testid={`${id}-add-button`}
+              onClick={onAdd}>
+              {addLabel}
+            </Button>
+          )}
         </Stack>
       </Toolbar>
 
@@ -55,5 +55,3 @@ export const PageSection = (props: IPageSectionProps) => {
     </Paper>
   );
 };
-
-export default PageSection;

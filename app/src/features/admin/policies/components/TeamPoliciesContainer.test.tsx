@@ -90,8 +90,6 @@ const defaultProps: ITeamPoliciesContainerProps = {
   setPaginationModel: vi.fn(),
   sortModel: [{ field: 'team_name', sort: 'asc' }],
   setSortModel: vi.fn(),
-  selectedTeam: null,
-  selectedPolicy: null,
   refresh: vi.fn()
 };
 
@@ -141,17 +139,17 @@ describe('TeamPoliciesContainer', () => {
     mockCreateTeamPolicy.mockResolvedValueOnce({});
     const mockRefresh = vi.fn();
 
-    const { getByRole, getByTestId } = renderComponent({
-      selectedTeam: mockTeams[2],
-      selectedPolicy: mockPolicies[2],
-      refresh: mockRefresh
-    });
+    const { getByRole, getByTestId } = renderComponent({ refresh: mockRefresh });
 
     await waitFor(() => {
       expect(getByRole('button', { name: /add/i })).toBeEnabled();
     });
 
     fireEvent.click(getByRole('button', { name: /add/i }));
+    fireEvent.mouseDown(getByRole('combobox', { name: 'Team' }));
+    fireEvent.click(getByRole('option', { name: 'Gamma Team' }));
+    fireEvent.mouseDown(getByRole('combobox', { name: 'Policy' }));
+    fireEvent.click(getByRole('option', { name: 'Admin Policy' }));
     fireEvent.click(getByTestId('edit-dialog-save-button'));
 
     await waitFor(() => {

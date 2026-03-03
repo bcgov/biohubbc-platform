@@ -76,5 +76,3 @@ export const TeamPolicyForm = (props: ITeamPolicyFormProps) => {
     </Box>
   );
 };
-
-export default TeamPolicyForm;

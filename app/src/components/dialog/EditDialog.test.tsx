@@ -1,5 +1,5 @@
 import { fireEvent, waitFor } from '@testing-library/react';
-import EditDialog from 'components/dialog/EditDialog';
+import { EditDialog } from 'components/dialog/EditDialog';
 import CustomTextFieldFormik from 'components/fields/CustomTextFieldFormik';
 import { useFormikContext } from 'formik';
 import { render } from 'test-helpers/test-utils';

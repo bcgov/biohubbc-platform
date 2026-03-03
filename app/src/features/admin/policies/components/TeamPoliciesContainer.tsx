@@ -2,17 +2,15 @@ import { mdiDotsVertical, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Typography from '@mui/material/Typography';
 import { GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
-import ServerPaginatedDataGrid from 'components/data-grid/ServerPaginatedDataGrid';
-import PageSection from 'components/section/PageSection';
+import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
+import { PageSection } from 'components/section/PageSection';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
-import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
-import { ITeam } from 'interfaces/useTeamsApi.interface';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 import { CreateTeamPolicyDialog } from './CreateTeamPolicyDialog';
@@ -34,10 +32,6 @@ export interface ITeamPoliciesContainerProps {
   sortModel: GridSortModel;
   /** Callback when sort changes */
   setSortModel: (model: GridSortModel) => void;
-  /** Currently selected team from TeamsContainer (null if none selected) */
-  selectedTeam: ITeam | null;
-  /** Currently selected policy from PoliciesContainer (null if none selected) */
-  selectedPolicy: IPolicy | null;
   /** Callback to refresh the team-policies list after create/delete */
   refresh: () => void;
 }
@@ -59,17 +53,7 @@ const ASSIGNMENT_OPTIONS_PAGINATION: ApiPaginationRequestOptions = {
  * @returns {React.ReactElement} The team-policies container component
  */
 export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
-  const {
-    teamPolicies,
-    rowCount,
-    paginationModel,
-    setPaginationModel,
-    sortModel,
-    setSortModel,
-    selectedTeam,
-    selectedPolicy,
-    refresh
-  } = props;
+  const { teamPolicies, rowCount, paginationModel, setPaginationModel, sortModel, setSortModel, refresh } = props;
 
   const biohubApi = useApi();
   const dialogContext = useDialogContext();
@@ -117,18 +101,9 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
   const teams = useMemo(() => teamsDataLoader.data?.teams ?? [], [teamsDataLoader.data?.teams]);
   const policies = useMemo(() => policiesDataLoader.data?.policies ?? [], [policiesDataLoader.data?.policies]);
 
-  const teamOptions = useMemo(() => {
-    const map = new Map<string, ITeam>();
-    teams.forEach((team) => map.set(team.team_id, team));
-    if (selectedTeam) {
-      map.set(selectedTeam.team_id, selectedTeam);
-    }
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [selectedTeam, teams]);
-
   const createInitialValues: ITeamPolicyFormValues = {
-    team_id: selectedTeam?.team_id ?? TeamPolicyFormInitialValues.team_id,
-    policy_id: selectedPolicy?.policy_id ?? TeamPolicyFormInitialValues.policy_id
+    team_id: TeamPolicyFormInitialValues.team_id,
+    policy_id: TeamPolicyFormInitialValues.policy_id
   };
 
   /**
@@ -265,8 +240,7 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
             </Typography>
           </>
         }
-        onAdd={() => setOpenCreateDialog(true)}
-        addDisabled={teamOptions.length === 0 || policies.length === 0}>
+        onAdd={() => setOpenCreateDialog(true)}>
         <ServerPaginatedDataGrid<ITeamPolicyDetails>
           dataTestId="team-policies-table"
           rows={teamPolicies}
@@ -284,7 +258,7 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
       <CreateTeamPolicyDialog
         open={openCreateDialog}
         isLoading={isSaving}
-        teams={teamOptions}
+        teams={teams}
         policies={policies}
         initialValues={createInitialValues}
         onCancel={() => setOpenCreateDialog(false)}

@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
-import { useServerPaginatedDataGrid, toApiPagination } from './useServerPaginatedDataGrid';
+import { toApiPagination } from 'utils/pagination';
+import { useServerPaginatedDataGrid } from './useServerPaginatedDataGrid';
 
 // Mock useDataLoader
 const mockLoad = vi.fn();

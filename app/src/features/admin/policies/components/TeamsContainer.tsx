@@ -4,10 +4,10 @@ import InputAdornment from '@mui/material/InputAdornment';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
-import ServerPaginatedDataGrid from 'components/data-grid/ServerPaginatedDataGrid';
-import EditDialog from 'components/dialog/EditDialog';
-import PageSection from 'components/section/PageSection';
+import { GridColDef } from '@mui/x-data-grid';
+import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
+import { EditDialog } from 'components/dialog/EditDialog';
+import { PageSection } from 'components/section/PageSection';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
@@ -30,10 +30,6 @@ export interface ITeamsContainerProps extends IServerPaginationProps {
   searchTerm: string;
   /** Callback when search term changes */
   onSearch: (term: string) => void;
-  /** Currently selected team ID for filtering team-policy assignments */
-  selectedTeamId: string | null;
-  /** Callback when a team row is selected/deselected */
-  onSelectTeam: (teamId: string | null) => void;
 }
 
 /**
@@ -41,7 +37,6 @@ export interface ITeamsContainerProps extends IServerPaginationProps {
  *
  * Provides functionality to:
  * - View teams in a searchable, paginated table
- * - Select a team to filter team-policy assignments
  * - Create new teams via dialog
  * - Edit existing teams via dialog
  * - Delete teams with confirmation
@@ -59,9 +54,7 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
     setSortModel,
     refresh,
     searchTerm,
-    onSearch,
-    selectedTeamId,
-    onSelectTeam
+    onSearch
   } = props;
 
   const biohubApi = useApi();
@@ -72,24 +65,6 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
   const [openEditTeamDialog, setOpenEditTeamDialog] = useState(false);
   const [editingTeam, setEditingTeam] = useState<ITeam | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  /**
-   * Handle row selection changes in the DataGrid.
-   * Extracts the selected team ID and calls the parent callback.
-   *
-   * @param {GridRowSelectionModel} model - The new selection model from DataGrid
-   */
-  const handleRowSelectionChange = (model: GridRowSelectionModel) => {
-    const ids = model && 'ids' in model ? Array.from(model.ids) : [];
-    const newSelectedId = (ids[0] as string) || null;
-    onSelectTeam(newSelectedId);
-  };
-
-  // Convert selectedTeamId to DataGrid selection model format
-  const rowSelectionModel: GridRowSelectionModel = {
-    type: 'include',
-    ids: selectedTeamId ? new Set([selectedTeamId]) : new Set()
-  };
 
   /**
    * Display a snackbar notification.
@@ -149,12 +124,6 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
         snackbarMessage: 'Deleted team',
         open: true
       });
-
-      // Clear selection if deleted team was selected
-      if (selectedTeamId === team.team_id) {
-        onSelectTeam(null);
-      }
-
       refresh();
     } catch (error) {
       const apiError = error as APIError;
@@ -385,10 +354,6 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
           setPaginationModel={setPaginationModel}
           sortModel={sortModel}
           setSortModel={setSortModel}
-          rowSelectionModel={rowSelectionModel}
-          onRowSelectionModelChange={handleRowSelectionChange}
-          checkboxSelection
-          disableMultipleRowSelection
         />
       </PageSection>
 

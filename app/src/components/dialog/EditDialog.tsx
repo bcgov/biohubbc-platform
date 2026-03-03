@@ -118,5 +118,3 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
     </Formik>
   );
 };
-
-export default EditDialog;

@@ -7,10 +7,10 @@ import InputAdornment from '@mui/material/InputAdornment';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
-import ServerPaginatedDataGrid from 'components/data-grid/ServerPaginatedDataGrid';
-import EditDialog from 'components/dialog/EditDialog';
-import PageSection from 'components/section/PageSection';
+import { GridColDef } from '@mui/x-data-grid';
+import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
+import { EditDialog } from 'components/dialog/EditDialog';
+import { PageSection } from 'components/section/PageSection';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
@@ -39,10 +39,6 @@ export interface IPoliciesContainerProps extends IServerPaginationProps {
   searchTerm: string;
   /** Callback when search term changes */
   onSearch: (term: string) => void;
-  /** Currently selected policy ID for filtering team-policy assignments */
-  selectedPolicyId: string | null;
-  /** Callback when a policy row is selected/deselected */
-  onSelectPolicy: (policyId: string | null) => void;
 }
 
 /**
@@ -60,33 +56,7 @@ export interface IPoliciesContainerProps extends IServerPaginationProps {
  */
 export const PoliciesContainer = (props: IPoliciesContainerProps) => {
   const biohubApi = useApi();
-  const {
-    policies,
-    rowCount,
-    paginationModel,
-    setPaginationModel,
-    sortModel,
-    setSortModel,
-    selectedPolicyId,
-    onSelectPolicy
-  } = props;
-
-  /**
-   * Handle row selection changes in the DataGrid.
-   * Extracts the selected policy ID and calls the parent callback.
-   *
-   * @param {GridRowSelectionModel} model - The new selection model from DataGrid
-   */
-  const handleRowSelectionChange = (model: GridRowSelectionModel) => {
-    const ids = model && 'ids' in model ? Array.from(model.ids) : [];
-    const newSelectedId = (ids[0] as string) || null;
-    onSelectPolicy(newSelectedId);
-  };
-
-  const rowSelectionModel: GridRowSelectionModel = {
-    type: 'include',
-    ids: selectedPolicyId ? new Set([selectedPolicyId]) : new Set()
-  };
+  const { policies, rowCount, paginationModel, setPaginationModel, sortModel, setSortModel } = props;
 
   const dialogContext = useDialogContext();
 
@@ -385,10 +355,6 @@ export const PoliciesContainer = (props: IPoliciesContainerProps) => {
             setPaginationModel={setPaginationModel}
             sortModel={sortModel}
             setSortModel={setSortModel}
-            rowSelectionModel={rowSelectionModel}
-            onRowSelectionModelChange={handleRowSelectionChange}
-            checkboxSelection
-            disableMultipleRowSelection
           />
         </PageSection>
       </Container>
