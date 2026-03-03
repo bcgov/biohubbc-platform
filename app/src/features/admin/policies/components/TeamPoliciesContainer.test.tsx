@@ -90,7 +90,9 @@ const defaultProps: ITeamPoliciesContainerProps = {
   setPaginationModel: vi.fn(),
   sortModel: [{ field: 'team_name', sort: 'asc' }],
   setSortModel: vi.fn(),
-  refresh: vi.fn()
+  refresh: vi.fn(),
+  searchTerm: '',
+  onSearch: vi.fn()
 };
 
 const renderComponent = (props: Partial<ITeamPoliciesContainerProps> = {}) => {
@@ -133,6 +135,23 @@ describe('TeamPoliciesContainer', () => {
     await waitFor(() => {
       expect(getByText('Add Assignment')).toBeVisible();
     });
+  });
+
+  it('displays controlled search term value', async () => {
+    const { getByPlaceholderText } = renderComponent({ searchTerm: 'Alpha' });
+
+    await waitFor(() => {
+      expect(getByPlaceholderText('Search by team or policy')).toHaveValue('Alpha');
+    });
+  });
+
+  it('calls onSearch when input changes', () => {
+    const mockOnSearch = vi.fn();
+    const { getByPlaceholderText } = renderComponent({ onSearch: mockOnSearch });
+
+    fireEvent.change(getByPlaceholderText('Search by team or policy'), { target: { value: 'Security' } });
+
+    expect(mockOnSearch).toHaveBeenCalledWith('Security');
   });
 
   it('calls createTeamPolicies API when Add dialog is saved', async () => {

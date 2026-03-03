@@ -199,6 +199,7 @@ describe('ManagePoliciesPage', () => {
 
       await waitFor(() => {
         expect(mockGetTeamPolicies).toHaveBeenCalledWith(
+          { search: '' },
           expect.objectContaining({
             page: 1,
             limit: 10,

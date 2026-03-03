@@ -1,5 +1,8 @@
-import { mdiDotsVertical, mdiTrashCanOutline } from '@mdi/js';
+import { mdiDotsVertical, mdiMagnify, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
+import InputAdornment from '@mui/material/InputAdornment';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
@@ -32,6 +35,10 @@ export interface ITeamPoliciesContainerProps {
   setSortModel: (model: GridSortModel) => void;
   /** Callback to refresh the team-policies list after create/delete */
   refresh: () => void;
+  /** Current search term for filtering assignments */
+  searchTerm: string;
+  /** Callback when search term changes */
+  onSearch: (term: string) => void;
 }
 
 /**
@@ -44,7 +51,17 @@ export interface ITeamPoliciesContainerProps {
  * @returns {React.ReactElement} The team-policies container component
  */
 export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
-  const { teamPolicies, rowCount, paginationModel, setPaginationModel, sortModel, setSortModel, refresh } = props;
+  const {
+    teamPolicies,
+    rowCount,
+    paginationModel,
+    setPaginationModel,
+    sortModel,
+    setSortModel,
+    refresh,
+    searchTerm,
+    onSearch
+  } = props;
 
   const biohubApi = useApi();
   const dialogContext = useDialogContext();
@@ -203,7 +220,27 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
             </Typography>
           </>
         }
-        onAdd={() => setOpenCreateDialog(true)}>
+        onAdd={() => setOpenCreateDialog(true)}
+        headerContent={
+          <Stack gap={1} direction="row" alignItems="center">
+            <TextField
+              size="small"
+              placeholder="Search by team or policy"
+              value={searchTerm}
+              onChange={(e) => onSearch(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Icon path={mdiMagnify} size={0.875} />
+                    </InputAdornment>
+                  )
+                }
+              }}
+              sx={{ width: 250 }}
+            />
+          </Stack>
+        }>
         <ServerPaginatedDataGrid<ITeamPolicyDetails>
           dataTestId="team-policies-table"
           rows={teamPolicies}

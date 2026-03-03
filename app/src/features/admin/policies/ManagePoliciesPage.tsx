@@ -4,13 +4,14 @@ import { GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import { PageHeader } from 'components/header/PageHeader';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
+import useDebounce from 'hooks/useDebounce';
 import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiPaginationRequestOptions } from 'types/pagination';
+import { toApiPagination } from 'utils/pagination';
 import { PoliciesContainer } from './components/PoliciesContainer';
 import { TeamPoliciesContainer } from './components/TeamPoliciesContainer';
 import { TeamsContainer } from './components/TeamsContainer';
-import { toApiPagination } from 'utils/pagination';
 
 /**
  * Admin page for managing policies, teams, and team-policy assignments.
@@ -42,42 +43,60 @@ export const ManagePoliciesPage = () => {
   const [teamPoliciesSortModel, setTeamPoliciesSortModel] = useState<GridSortModel>([
     { field: 'team_name', sort: 'asc' }
   ]);
+  const [teamPoliciesSearchTerm, setTeamPoliciesSearchTerm] = useState('');
+  const [debouncedTeamPoliciesSearchTerm, setDebouncedTeamPoliciesSearchTerm] = useState('');
 
-  const teamPoliciesDataLoader = useDataLoader((pagination: ApiPaginationRequestOptions) =>
-    biohubApi.teamPolicies.getTeamPolicies(pagination)
+  const teamPoliciesDataLoader = useDataLoader((search: string, pagination: ApiPaginationRequestOptions) =>
+    biohubApi.teamPolicies.getTeamPolicies({ search }, pagination)
   );
 
   useEffect(() => {
     const apiPagination = toApiPagination(teamPoliciesPaginationModel, teamPoliciesSortModel);
-    teamPoliciesDataLoader.load(apiPagination);
+    teamPoliciesDataLoader.load(debouncedTeamPoliciesSearchTerm, apiPagination);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const debouncedTeamPoliciesRefresh = useDebounce((searchTerm: string) => {
+    setDebouncedTeamPoliciesSearchTerm(searchTerm);
+    const resetPaginationModel = { ...teamPoliciesPaginationModel, page: 0 };
+    setTeamPoliciesPaginationModel(resetPaginationModel);
+    const apiPagination = toApiPagination(resetPaginationModel, teamPoliciesSortModel);
+    teamPoliciesDataLoader.refresh(searchTerm, apiPagination);
+  }, 300);
 
   const handleTeamPoliciesPaginationChange = useCallback(
     (model: GridPaginationModel) => {
       setTeamPoliciesPaginationModel(model);
       const apiPagination = toApiPagination(model, teamPoliciesSortModel);
-      teamPoliciesDataLoader.refresh(apiPagination);
+      teamPoliciesDataLoader.refresh(debouncedTeamPoliciesSearchTerm, apiPagination);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [teamPoliciesSortModel]
+    [teamPoliciesSortModel, debouncedTeamPoliciesSearchTerm]
   );
 
   const handleTeamPoliciesSortChange = useCallback(
     (model: GridSortModel) => {
       setTeamPoliciesSortModel(model);
       const apiPagination = toApiPagination(teamPoliciesPaginationModel, model);
-      teamPoliciesDataLoader.refresh(apiPagination);
+      teamPoliciesDataLoader.refresh(debouncedTeamPoliciesSearchTerm, apiPagination);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [teamPoliciesPaginationModel]
+    [teamPoliciesPaginationModel, debouncedTeamPoliciesSearchTerm]
   );
 
   const refreshTeamPolicies = useCallback(() => {
     const apiPagination = toApiPagination(teamPoliciesPaginationModel, teamPoliciesSortModel);
-    teamPoliciesDataLoader.refresh(apiPagination);
+    teamPoliciesDataLoader.refresh(debouncedTeamPoliciesSearchTerm, apiPagination);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teamPoliciesPaginationModel, teamPoliciesSortModel]);
+  }, [teamPoliciesPaginationModel, teamPoliciesSortModel, debouncedTeamPoliciesSearchTerm]);
+
+  const handleTeamPoliciesSearch = useCallback(
+    (searchTerm: string) => {
+      setTeamPoliciesSearchTerm(searchTerm);
+      debouncedTeamPoliciesRefresh(searchTerm);
+    },
+    [debouncedTeamPoliciesRefresh]
+  );
 
   return (
     <>
@@ -118,6 +137,8 @@ export const ManagePoliciesPage = () => {
             sortModel={teamPoliciesSortModel}
             setSortModel={handleTeamPoliciesSortChange}
             refresh={refreshTeamPolicies}
+            searchTerm={teamPoliciesSearchTerm}
+            onSearch={handleTeamPoliciesSearch}
           />
         </Container>
       </Box>
