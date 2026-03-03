@@ -4,10 +4,13 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { CreateDataRequest, DataRequest, FlatDataRequestWithStatus, UpdateDataRequest } from '../models/data-request';
 import { DataRequestStatus, DataRequestStatusEnum } from '../models/data-request-status';
+import { PolicyEffect } from '../models/policy-statement';
 import { TeamMemberWithUser } from '../models/team-member';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import { getMockDBConnection } from '../__mocks__/db';
+import { PolicyService } from './access-policy/policy-service';
 import { TeamMemberService } from './access-policy/team-member-service';
+import { TeamPolicyService } from './access-policy/team-policy-service';
 import { TeamService } from './access-policy/team-service';
 import { DataRequestService } from './data-request-service';
 import { DataRequestStatusService } from './data-request-status-service';
@@ -197,26 +200,88 @@ describe('DataRequestService', () => {
   });
 
   describe('createDataRequest', () => {
-    it('should create a data request with provided team_id and return it with status', async () => {
+    const mockApprovedStatus: DataRequestStatus = {
+      ...mockDataRequestStatus,
+      request_status: 'APPROVED'
+    };
+
+    const mockPolicy = {
+      policy_id: 'f6a7b8c9-d0e1-2345-fabc-456789012345',
+      name: 'Data request policy - uuid',
+      description: null,
+      statements: []
+    };
+
+    const mockTeamPolicy = {
+      team_policy_id: '12345678-abcd-ef01-2345-678901234567',
+      team_id: mockDataRequest.team_id,
+      policy_id: mockPolicy.policy_id
+    };
+
+    const stubCreateDataRequestDependencies = (
+      overrides: {
+        teamId?: string;
+        createNewTeam?: boolean;
+      } = {}
+    ) => {
+      const { teamId = mockDataRequest.team_id, createNewTeam = false } = overrides;
+
+      if (createNewTeam) {
+        sinon
+          .stub(TeamService.prototype, 'createTeam')
+          .resolves({ team_id: teamId, name: 'test', description: null, member_count: 1 });
+        sinon.stub(TeamMemberService.prototype, 'createTeamMember').resolves(mockTeamMember);
+      }
+
+      sinon
+        .stub(DataRequestRepository.prototype, 'createDataRequest')
+        .resolves({ ...mockDataRequest, team_id: teamId });
+      sinon.stub(PolicyService.prototype, 'createPolicyWithStatements').resolves(mockPolicy);
+      sinon.stub(TeamPolicyService.prototype, 'createTeamPolicy').resolves({ ...mockTeamPolicy, team_id: teamId });
+      sinon.stub(DataRequestStatusService.prototype, 'createDataRequestStatus').resolves(mockApprovedStatus);
+    };
+
+    it('should create a data request with provided team_id, create a policy, and auto-approve', async () => {
       const mockDB = getMockDBConnection();
       const service = new DataRequestService(mockDB);
 
-      const payload: CreateDataRequest = { reason: 'New research project', team_id: mockDataRequest.team_id };
-      const createStub = sinon.stub(DataRequestRepository.prototype, 'createDataRequest').resolves(mockDataRequest);
-      const statusStub = sinon
-        .stub(DataRequestStatusService.prototype, 'createDataRequestStatus')
-        .resolves(mockDataRequestStatus);
+      const payload: CreateDataRequest = {
+        reason: 'New research project',
+        team_id: mockDataRequest.team_id
+      };
+
+      stubCreateDataRequestDependencies();
+
+      const createStub = DataRequestRepository.prototype.createDataRequest as sinon.SinonStub;
+      const policyStub = PolicyService.prototype.createPolicyWithStatements as sinon.SinonStub;
+      const teamPolicyStub = TeamPolicyService.prototype.createTeamPolicy as sinon.SinonStub;
+      const statusStub = DataRequestStatusService.prototype.createDataRequestStatus as sinon.SinonStub;
 
       const result = await service.createDataRequest(mockDataRequest.requested_by, payload);
 
-      expect(createStub).to.have.been.calledOnceWith(mockDataRequest.requested_by, payload);
+      expect(createStub).to.have.been.calledOnceWith(mockDataRequest.requested_by, {
+        ...payload,
+        team_id: mockDataRequest.team_id
+      });
+
+      expect(policyStub).to.have.been.calledOnce;
+      const policyArgs = policyStub.firstCall.args;
+      expect(policyArgs[1]).to.deep.equal([{ effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:*:*' }]);
+      expect(policyArgs[0]).to.have.property('record_end_date').that.is.a('string');
+
+      expect(teamPolicyStub).to.have.been.calledOnceWith({
+        team_id: mockDataRequest.team_id,
+        policy_id: mockPolicy.policy_id
+      });
+
       expect(statusStub).to.have.been.calledOnceWith(
         mockDataRequest.data_request_id,
-        DataRequestStatusEnum.enum.REQUESTED,
+        DataRequestStatusEnum.enum.APPROVED,
         undefined
       );
+
       expect(result.data_request_id).to.equal(mockDataRequest.data_request_id);
-      expect(result.data_request_status).to.deep.equal(mockDataRequestStatus);
+      expect(result.data_request_status.request_status).to.equal('APPROVED');
     });
 
     it('should create a new team when payload.team_id is undefined', async () => {
@@ -224,17 +289,15 @@ describe('DataRequestService', () => {
       const service = new DataRequestService(mockDB);
 
       const newTeamId = 'e5f6a7b8-c9d0-1234-efab-345678901234';
-      const teamStub = sinon
-        .stub(TeamService.prototype, 'createTeam')
-        .resolves({ team_id: newTeamId, name: 'test', description: null, member_count: 0 });
-      const memberStub = sinon.stub(TeamMemberService.prototype, 'createTeamMember').resolves(mockTeamMember);
-      sinon.stub(DataRequestRepository.prototype, 'createDataRequest').resolves({
-        ...mockDataRequest,
-        team_id: newTeamId
-      });
-      sinon.stub(DataRequestStatusService.prototype, 'createDataRequestStatus').resolves(mockDataRequestStatus);
+      stubCreateDataRequestDependencies({ teamId: newTeamId, createNewTeam: true });
 
-      const payload: CreateDataRequest = { reason: 'New research project' };
+      const teamStub = TeamService.prototype.createTeam as sinon.SinonStub;
+      const memberStub = TeamMemberService.prototype.createTeamMember as sinon.SinonStub;
+      const teamPolicyStub = TeamPolicyService.prototype.createTeamPolicy as sinon.SinonStub;
+
+      const payload: CreateDataRequest = {
+        reason: 'New research project'
+      };
       await service.createDataRequest(mockDataRequest.requested_by, payload);
 
       expect(teamStub).to.have.been.calledOnce;
@@ -242,13 +305,20 @@ describe('DataRequestService', () => {
         system_user_id: mockDataRequest.requested_by,
         team_id: newTeamId
       });
+      expect(teamPolicyStub).to.have.been.calledOnceWith({
+        team_id: newTeamId,
+        policy_id: mockPolicy.policy_id
+      });
     });
 
     it('should propagate repository errors', async () => {
       const mockDB = getMockDBConnection();
       const service = new DataRequestService(mockDB);
 
-      const payload: CreateDataRequest = { reason: 'Test', team_id: mockDataRequest.team_id };
+      const payload: CreateDataRequest = {
+        reason: 'Test',
+        team_id: mockDataRequest.team_id
+      };
       sinon.stub(DataRequestRepository.prototype, 'createDataRequest').rejects(new Error('DB error'));
 
       try {
