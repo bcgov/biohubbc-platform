@@ -1,5 +1,6 @@
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
+import { ICustomMultiAutocompleteOption } from 'components/fields/CustomMultiAutocomplete';
+import { CustomMultiAutocompleteFormik } from 'components/fields/CustomMultiAutocompleteFormik';
 import { SearchAutocomplete } from 'features/search/result/sidebar/search/components/section/autocomplete/SearchAutocomplete';
 import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
 import { useFormikContext } from 'formik';
@@ -9,7 +10,7 @@ import yup from 'utils/YupSchema';
 
 export interface ITeamPolicyFormValues {
   team_id: string;
-  policy_id: string;
+  policies: string[];
 }
 
 export interface ITeamPolicyFormProps {
@@ -21,12 +22,12 @@ export interface ITeamPolicyFormProps {
 
 export const TeamPolicyFormInitialValues: ITeamPolicyFormValues = {
   team_id: '',
-  policy_id: ''
+  policies: []
 };
 
 export const TeamPolicyFormYupSchema = yup.object().shape({
   team_id: yup.string().required('Team is required'),
-  policy_id: yup.string().required('Policy is required')
+  policies: yup.array().of(yup.string().required()).min(1, 'At least one policy is required').required()
 });
 
 /**
@@ -37,21 +38,19 @@ export const TeamPolicyFormYupSchema = yup.object().shape({
  */
 export const TeamPolicyForm = (props: ITeamPolicyFormProps) => {
   const { teams, policies, onTeamSearch, onPolicySearch } = props;
-  const { values, errors, touched, setFieldValue } = useFormikContext<ITeamPolicyFormValues>();
+  const { values, setFieldValue } = useFormikContext<ITeamPolicyFormValues>();
 
   const teamOptions: SidebarOption[] = teams.map((team) => ({
     label: team.name,
     value: team.team_id
   }));
 
-  const policyOptions: SidebarOption[] = policies.map((policy) => ({
+  const policyOptions: ICustomMultiAutocompleteOption[] = policies.map((policy) => ({
     label: policy.name,
     value: policy.policy_id
   }));
 
   const selectedTeamOption = teamOptions.find((team) => team.value === values.team_id) ?? null;
-  const selectedPolicyOption = policyOptions.find((policy) => policy.value === values.policy_id) ?? null;
-
   return (
     <Box display="flex" flexDirection="column" gap={3} mt={1}>
       <Box>
@@ -60,36 +59,22 @@ export const TeamPolicyForm = (props: ITeamPolicyFormProps) => {
           value={selectedTeamOption}
           showStartAdornment={false}
           label="Team"
-          placeholder="Search team"
           onInputChange={onTeamSearch}
           onChange={(option) => {
             setFieldValue('team_id', option?.value ?? '');
           }}
         />
-        {touched.team_id && errors.team_id && (
-          <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
-            {errors.team_id}
-          </Typography>
-        )}
       </Box>
 
       <Box>
-        <SearchAutocomplete
+        <CustomMultiAutocompleteFormik
+          name="policies"
           options={policyOptions}
-          value={selectedPolicyOption}
           label="Policy"
-          showStartAdornment={false}
-          placeholder="Search policy"
-          onInputChange={onPolicySearch}
-          onChange={(option) => {
-            setFieldValue('policy_id', option?.value ?? '');
-          }}
+          required
+          chipVisible
+          onSearchInput={onPolicySearch}
         />
-        {touched.policy_id && errors.policy_id && (
-          <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
-            {errors.policy_id}
-          </Typography>
-        )}
       </Box>
     </Box>
   );

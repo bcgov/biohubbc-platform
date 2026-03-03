@@ -22,7 +22,7 @@ export interface ICustomMultiAutocompleteFormikProps extends Omit<
   filterLimit?: number;
   chipVisible?: boolean;
   placeholder?: string;
-  handleSearchResults?: (input: string) => Promise<void>;
+  onSearchInput?: (input: string) => void;
 }
 
 /**
@@ -31,18 +31,18 @@ export interface ICustomMultiAutocompleteFormikProps extends Omit<
  * @param {ICustomMultiAutocompleteFormikProps} props
  * @return {*}
  */
-const CustomMultiAutocompleteFormik: React.FC<ICustomMultiAutocompleteFormikProps> = (props) => {
+export const CustomMultiAutocompleteFormik: React.FC<ICustomMultiAutocompleteFormikProps> = (props) => {
   const { getFieldMeta, setFieldValue, submitCount } = useFormikContext<any>();
   const {
     id,
     name,
     options: incomingOptions,
-    handleSearchResults,
+    onSearchInput,
     label,
     required,
     filterLimit,
     chipVisible,
-    placeholder = 'Begin typing to filter results...',
+    placeholder,
     ...rest
   } = props;
 
@@ -59,12 +59,6 @@ const CustomMultiAutocompleteFormik: React.FC<ICustomMultiAutocompleteFormikProp
     setOptions(sortAutocompleteOptions(selectedOptions, incomingOptions));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incomingOptions]);
-
-  useEffect(() => {
-    if (handleSearchResults) {
-      handleSearchResults(inputValue);
-    }
-  }, [handleSearchResults, inputValue]);
 
   return (
     <CustomMultiAutocomplete
@@ -113,8 +107,12 @@ const CustomMultiAutocompleteFormik: React.FC<ICustomMultiAutocompleteFormikProp
       onInputChange={(event: React.ChangeEvent<any>, newValue: string, reason: AutocompleteInputChangeReason) => {
         if (event?.type === 'blur') {
           setInputValue('');
-        } else if (reason !== 'reset') {
+          return;
+        }
+
+        if (reason !== 'reset') {
           setInputValue(newValue);
+          onSearchInput?.(newValue);
         }
       }}
       renderInput={(params) => (
@@ -123,7 +121,6 @@ const CustomMultiAutocompleteFormik: React.FC<ICustomMultiAutocompleteFormikProp
           required={required}
           label={label}
           placeholder={placeholder}
-          InputLabelProps={{ shrink: true }}
           error={showError}
           helperText={showError ? error : undefined}
           onKeyDown={(event: any) => {
@@ -136,5 +133,3 @@ const CustomMultiAutocompleteFormik: React.FC<ICustomMultiAutocompleteFormikProp
     />
   );
 };
-
-export default CustomMultiAutocompleteFormik;
