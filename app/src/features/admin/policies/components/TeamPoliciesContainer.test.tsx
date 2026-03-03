@@ -146,9 +146,16 @@ describe('TeamPoliciesContainer', () => {
     });
 
     fireEvent.click(getByRole('button', { name: /add/i }));
-    fireEvent.mouseDown(getByRole('combobox', { name: 'Team' }));
+    fireEvent.keyDown(getByRole('combobox', { name: 'Team' }), { key: 'ArrowDown' });
+    await waitFor(() => {
+      expect(getByRole('option', { name: 'Gamma Team' })).toBeVisible();
+    });
     fireEvent.click(getByRole('option', { name: 'Gamma Team' }));
-    fireEvent.mouseDown(getByRole('combobox', { name: 'Policy' }));
+
+    fireEvent.keyDown(getByRole('combobox', { name: 'Policy' }), { key: 'ArrowDown' });
+    await waitFor(() => {
+      expect(getByRole('option', { name: 'Admin Policy' })).toBeVisible();
+    });
     fireEvent.click(getByRole('option', { name: 'Admin Policy' }));
     fireEvent.click(getByTestId('edit-dialog-save-button'));
 

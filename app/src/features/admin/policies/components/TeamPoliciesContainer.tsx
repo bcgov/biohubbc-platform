@@ -9,12 +9,10 @@ import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import useDataLoader from 'hooks/useDataLoader';
 import { ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ApiPaginationRequestOptions } from 'types/pagination';
+import { useCallback, useState } from 'react';
 import { CreateTeamPolicyDialog } from './CreateTeamPolicyDialog';
-import { ITeamPolicyFormValues, TeamPolicyFormInitialValues } from './TeamPolicyForm';
+import { ITeamPolicyFormValues } from './TeamPolicyForm';
 
 /**
  * Props for the TeamPoliciesContainer component.
@@ -35,13 +33,6 @@ export interface ITeamPoliciesContainerProps {
   /** Callback to refresh the team-policies list after create/delete */
   refresh: () => void;
 }
-
-const ASSIGNMENT_OPTIONS_PAGINATION: ApiPaginationRequestOptions = {
-  page: 1,
-  limit: 25,
-  sort: 'name',
-  order: 'asc'
-};
 
 /**
  * Container component for managing team-policy associations.
@@ -80,31 +71,6 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
     },
     [dialogContext]
   );
-
-  const teamsDataLoader = useDataLoader(
-    () => biohubApi.teams.getTeams(undefined, ASSIGNMENT_OPTIONS_PAGINATION),
-    (error) => showApiErrorDialog('Failed to Load Assignment Options', 'An error occurred while loading teams.', error)
-  );
-
-  const policiesDataLoader = useDataLoader(
-    () => biohubApi.policies.getPolicies(undefined, ASSIGNMENT_OPTIONS_PAGINATION),
-    (error) =>
-      showApiErrorDialog('Failed to Load Assignment Options', 'An error occurred while loading policies.', error)
-  );
-
-  useEffect(() => {
-    teamsDataLoader.load();
-    policiesDataLoader.load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const teams = useMemo(() => teamsDataLoader.data?.teams ?? [], [teamsDataLoader.data?.teams]);
-  const policies = useMemo(() => policiesDataLoader.data?.policies ?? [], [policiesDataLoader.data?.policies]);
-
-  const createInitialValues: ITeamPolicyFormValues = {
-    team_id: TeamPolicyFormInitialValues.team_id,
-    policy_id: TeamPolicyFormInitialValues.policy_id
-  };
 
   /**
    * Display a snackbar notification.
@@ -258,9 +224,7 @@ export const TeamPoliciesContainer = (props: ITeamPoliciesContainerProps) => {
       <CreateTeamPolicyDialog
         open={openCreateDialog}
         isLoading={isSaving}
-        teams={teams}
-        policies={policies}
-        initialValues={createInitialValues}
+        onLoadError={showApiErrorDialog}
         onCancel={() => setOpenCreateDialog(false)}
         onSave={handleCreate}
       />

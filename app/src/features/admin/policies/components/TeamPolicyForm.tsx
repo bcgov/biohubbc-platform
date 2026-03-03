@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box';
-import MenuItem from '@mui/material/MenuItem';
-import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import { SearchAutocomplete } from 'features/search/result/sidebar/search/components/section/autocomplete/SearchAutocomplete';
+import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
 import { useFormikContext } from 'formik';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { ITeam } from 'interfaces/useTeamsApi.interface';
@@ -14,6 +15,8 @@ export interface ITeamPolicyFormValues {
 export interface ITeamPolicyFormProps {
   teams: ITeam[];
   policies: IPolicy[];
+  onTeamSearch: (search: string) => void;
+  onPolicySearch: (search: string) => void;
 }
 
 export const TeamPolicyFormInitialValues: ITeamPolicyFormValues = {
@@ -33,46 +36,61 @@ export const TeamPolicyFormYupSchema = yup.object().shape({
  * @returns {JSX.Element}
  */
 export const TeamPolicyForm = (props: ITeamPolicyFormProps) => {
-  const { teams, policies } = props;
-  const { values, errors, touched, handleChange, handleBlur } = useFormikContext<ITeamPolicyFormValues>();
+  const { teams, policies, onTeamSearch, onPolicySearch } = props;
+  const { values, errors, touched, setFieldValue } = useFormikContext<ITeamPolicyFormValues>();
+
+  const teamOptions: SidebarOption[] = teams.map((team) => ({
+    label: team.name,
+    value: team.team_id
+  }));
+
+  const policyOptions: SidebarOption[] = policies.map((policy) => ({
+    label: policy.name,
+    value: policy.policy_id
+  }));
+
+  const selectedTeamOption = teamOptions.find((team) => team.value === values.team_id) ?? null;
+  const selectedPolicyOption = policyOptions.find((policy) => policy.value === values.policy_id) ?? null;
 
   return (
     <Box display="flex" flexDirection="column" gap={3} mt={1}>
-      <TextField
-        select
-        name="team_id"
-        label="Team"
-        fullWidth
-        required
-        value={values.team_id}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        error={touched.team_id && Boolean(errors.team_id)}
-        helperText={touched.team_id && errors.team_id}>
-        {teams.map((team) => (
-          <MenuItem key={team.team_id} value={team.team_id}>
-            {team.name}
-          </MenuItem>
-        ))}
-      </TextField>
+      <Box>
+        <SearchAutocomplete
+          options={teamOptions}
+          value={selectedTeamOption}
+          showStartAdornment={false}
+          label="Team"
+          placeholder="Search team"
+          onInputChange={onTeamSearch}
+          onChange={(option) => {
+            setFieldValue('team_id', option?.value ?? '');
+          }}
+        />
+        {touched.team_id && errors.team_id && (
+          <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
+            {errors.team_id}
+          </Typography>
+        )}
+      </Box>
 
-      <TextField
-        select
-        name="policy_id"
-        label="Policy"
-        fullWidth
-        required
-        value={values.policy_id}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        error={touched.policy_id && Boolean(errors.policy_id)}
-        helperText={touched.policy_id && errors.policy_id}>
-        {policies.map((policy) => (
-          <MenuItem key={policy.policy_id} value={policy.policy_id}>
-            {policy.name}
-          </MenuItem>
-        ))}
-      </TextField>
+      <Box>
+        <SearchAutocomplete
+          options={policyOptions}
+          value={selectedPolicyOption}
+          label="Policy"
+          showStartAdornment={false}
+          placeholder="Search policy"
+          onInputChange={onPolicySearch}
+          onChange={(option) => {
+            setFieldValue('policy_id', option?.value ?? '');
+          }}
+        />
+        {touched.policy_id && errors.policy_id && (
+          <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
+            {errors.policy_id}
+          </Typography>
+        )}
+      </Box>
     </Box>
   );
 };
