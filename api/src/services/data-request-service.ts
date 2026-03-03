@@ -9,6 +9,7 @@ import {
 } from '../models/data-request';
 import { DataRequestStatusEnum } from '../models/data-request-status';
 import { PolicyEffect } from '../models/policy-statement';
+import { Team } from '../models/team';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import {
   _generateDataRequestPolicyName,
@@ -105,9 +106,13 @@ export class DataRequestService extends DBService {
    * @memberof DataRequestService
    */
   async createDataRequest(requestedBy: number, payload: CreateDataRequest): Promise<DataRequestWithStatus> {
-    const resolvedTeamId = payload.team_id
-      ? payload.team_id
-      : await this.createAndReturnTeamIdForDataRequest(requestedBy);
+    let resolvedTeamId: string;
+    if (payload.team_id) {
+      resolvedTeamId = payload.team_id;
+    } else {
+      const team = await this.createAndReturnTeamForDataRequest(requestedBy);
+      resolvedTeamId = team.team_id;
+    }
     const payloadWithTeamId = { ...payload, team_id: resolvedTeamId };
 
     const dataRequest = await this.dataRequestRepository.createDataRequest(requestedBy, payloadWithTeamId);
@@ -116,6 +121,7 @@ export class DataRequestService extends DBService {
     await this.linkTeamToPolicy(resolvedTeamId, policy.policy_id);
 
     const dataRequestStatusService = new DataRequestStatusService(this.connection);
+    // initially defaults status to APPROVED for development
     const dataRequestStatus = await dataRequestStatusService.createDataRequestStatus(
       dataRequest.data_request_id,
       DataRequestStatusEnum.enum.APPROVED,
@@ -165,18 +171,18 @@ export class DataRequestService extends DBService {
 
   /**
    * Creates a Team and TeamMember for the system user
-   * returns the team_id
+   * returns the Team
    *
    * @param {number} requestedBy - system user id
-   * @return {Promise<string>} team_id to use for the data request
+   * @return {Promise<Team>} team to use for the data request
    * @private
    */
-  private async createAndReturnTeamIdForDataRequest(requestedBy: number): Promise<string> {
+  private async createAndReturnTeamForDataRequest(requestedBy: number): Promise<Team> {
     const teamService = new TeamService(this.connection);
     const team = await teamService.createTeam({ name: _generateDataRequestTeamName() });
     const teamMemberService = new TeamMemberService(this.connection);
     await teamMemberService.createTeamMember({ system_user_id: requestedBy, team_id: team.team_id });
-    return team.team_id;
+    return team;
   }
 
   /**
