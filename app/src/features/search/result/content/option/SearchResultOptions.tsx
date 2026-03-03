@@ -57,9 +57,9 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload }: Searc
     [removeFromCart, dialogContext]
   );
 
-  const handleRequestAccess = useCallback(() => {
+  const handleRequestAccess = () => {
     navigate(`/search/request-access?${searchParams.toString()}`);
-  }, [navigate, searchParams]);
+  };
 
   return (
     <LoadingGuard
@@ -96,7 +96,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload }: Searc
                 onDownload={onDownload}
                 onAddToCart={handleAddToCart}
                 onRemoveFromCart={handleRemoveFromCart}
-                onRowSelectionModelChange={() => {}}
+                onRowSelectionModelChange={() => { }}
               />
             ),
             list: (
