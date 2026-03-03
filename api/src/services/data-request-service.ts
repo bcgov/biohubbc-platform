@@ -129,6 +129,41 @@ export class DataRequestService extends DBService {
   }
 
   /**
+   * Update an existing data request.
+   *
+   * @param {string} dataRequestId
+   * @param {UpdateDataRequest} payload
+   * @return {Promise<void>}
+   * @memberof DataRequestService
+   */
+  async updateDataRequest(dataRequestId: string, payload: UpdateDataRequest): Promise<void> {
+    const dataRequest = await this.dataRequestRepository.findDataRequestById(dataRequestId);
+
+    if (!dataRequest) {
+      throw new HTTP404('Data request not found');
+    }
+
+    return await this.dataRequestRepository.updateDataRequest(dataRequestId, payload);
+  }
+
+  /**
+   * Soft delete a data request by setting the record_end_date.
+   *
+   * @param {string} dataRequestId
+   * @return {Promise<void>}
+   * @memberof DataRequestService
+   */
+  async deleteDataRequest(dataRequestId: string): Promise<void> {
+    const dataRequest = await this.dataRequestRepository.findDataRequestById(dataRequestId);
+
+    if (!dataRequest) {
+      throw new HTTP404('Data request not found');
+    }
+
+    return this.dataRequestRepository.deleteDataRequest(dataRequestId);
+  }
+
+  /**
    * Creates a Team and TeamMember for the system user
    * returns the team_id
    *
@@ -174,40 +209,5 @@ export class DataRequestService extends DBService {
   private async linkTeamToPolicy(teamId: string, policyId: string): Promise<void> {
     const teamPolicyService = new TeamPolicyService(this.connection);
     await teamPolicyService.createTeamPolicy({ team_id: teamId, policy_id: policyId });
-  }
-
-  /**
-   * Update an existing data request.
-   *
-   * @param {string} dataRequestId
-   * @param {UpdateDataRequest} payload
-   * @return {Promise<void>}
-   * @memberof DataRequestService
-   */
-  async updateDataRequest(dataRequestId: string, payload: UpdateDataRequest): Promise<void> {
-    const dataRequest = await this.dataRequestRepository.findDataRequestById(dataRequestId);
-
-    if (!dataRequest) {
-      throw new HTTP404('Data request not found');
-    }
-
-    return await this.dataRequestRepository.updateDataRequest(dataRequestId, payload);
-  }
-
-  /**
-   * Soft delete a data request by setting the record_end_date.
-   *
-   * @param {string} dataRequestId
-   * @return {Promise<void>}
-   * @memberof DataRequestService
-   */
-  async deleteDataRequest(dataRequestId: string): Promise<void> {
-    const dataRequest = await this.dataRequestRepository.findDataRequestById(dataRequestId);
-
-    if (!dataRequest) {
-      throw new HTTP404('Data request not found');
-    }
-
-    return this.dataRequestRepository.deleteDataRequest(dataRequestId);
   }
 }
