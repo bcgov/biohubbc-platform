@@ -89,7 +89,8 @@ GET.apiDoc = {
                 type: 'integer'
               },
               estimated_total_size_bytes: {
-                type: 'integer',
+                type: 'string',
+                format: 'int64',
                 nullable: true
               },
               started_at: {
@@ -122,11 +123,13 @@ GET.apiDoc = {
                       nullable: true
                     },
                     file_size_bytes: {
-                      type: 'integer',
+                      type: 'string',
+                      format: 'int64',
                       nullable: true
                     },
                     estimated_size_bytes: {
-                      type: 'integer',
+                      type: 'string',
+                      format: 'int64',
                       nullable: true
                     },
                     feature_count: {

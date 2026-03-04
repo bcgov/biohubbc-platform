@@ -66,6 +66,7 @@ export class DownloadPipelineService extends DBService {
    * For authenticated users, `system_user_id` is set on the download record directly.
    * For anonymous users, `system_user_id` is null (UUID is the credential).
    *
+   * @param {number | null} systemUserId - The user that owns this download. Null for anonymous downloads (UUID is the credential).
    * @param {string | null} teamId - The team that owns this download. Null for anonymous downloads.
    * @param {number[]} submissionFeatureIds - The submission feature IDs to include.
    * @param {string} [dataRequestId] - The data request that originated this download.
@@ -75,6 +76,7 @@ export class DownloadPipelineService extends DBService {
    * @memberof DownloadPipelineService
    */
   async createDownloadRequest(
+    systemUserId: number | null,
     teamId: string | null,
     submissionFeatureIds: number[],
     dataRequestId?: string,
@@ -82,7 +84,6 @@ export class DownloadPipelineService extends DBService {
     searchFilters?: ISearchFeaturesFilters
   ): Promise<DownloadId> {
     const fragmentSizeBytes = fragmentSizeMb ? fragmentSizeMb * 1024 * 1024 : undefined;
-    const systemUserId = this.connection.systemUserId() || null;
 
     const downloadId = await this.downloadRepository.createDownload(
       teamId,

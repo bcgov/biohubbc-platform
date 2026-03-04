@@ -194,10 +194,15 @@ export function createDownload(): RequestHandler {
         throw new HTTP400('No features match the filter criteria');
       }
 
+      // Anonymous downloads: system_user_id is null (UUID is the credential).
+      // Matches the cart checkout pattern (cart/{cartId}/checkout/index.ts:98).
+      const systemUserId = isAuthenticated ? connection.systemUserId() : null;
+
       // Create download with search filters stored for traceability.
       // teamId is null: downloads from search are user-owned, not team-based.
       const pipelineService = new DownloadPipelineService(connection);
       const downloadId = await pipelineService.createDownloadRequest(
+        systemUserId,
         null,
         submissionFeatureIds,
         undefined,

@@ -544,7 +544,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
    * Helper: run the full download pipeline and return the resulting zip.
    */
   async function executeAndGetZip(featureIds: number[]): Promise<{ zip: AdmZip; downloadId: string }> {
-    const { download_id } = await service.createDownloadRequest(null, featureIds);
+    const { download_id } = await service.createDownloadRequest(null, null, featureIds);
 
     // Run the three-phase pipeline within the test transaction
     await service.planDownloadIfNeeded(download_id);

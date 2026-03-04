@@ -80,10 +80,11 @@ describe('paths/download/index', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(createDownloadRequestStub.firstCall.args[4]).to.eql({ feature_types: ['dataset'] });
+      // args[5] = searchFilters
+      expect(createDownloadRequestStub.firstCall.args[5]).to.eql({ feature_types: ['dataset'] });
     });
 
-    it('should pass teamId=null, dataRequestId=undefined to createDownloadRequest', async () => {
+    it('should pass systemUserId=null, teamId=null, dataRequestId=undefined for anonymous', async () => {
       const dbConnectionObj = getMockDBConnection();
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
@@ -102,8 +103,10 @@ describe('paths/download/index', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
+      // args[0] = systemUserId (null for anonymous), args[1] = teamId (null), args[3] = dataRequestId (undefined)
       expect(createDownloadRequestStub.firstCall.args[0]).to.equal(null);
-      expect(createDownloadRequestStub.firstCall.args[2]).to.equal(undefined);
+      expect(createDownloadRequestStub.firstCall.args[1]).to.equal(null);
+      expect(createDownloadRequestStub.firstCall.args[3]).to.equal(undefined);
     });
 
     it('should pass filters to getSearchFeatureIds', async () => {
