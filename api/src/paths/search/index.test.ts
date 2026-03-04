@@ -5,7 +5,6 @@ import sinonChai from 'sinon-chai';
 import * as db from '../../database/db';
 import { SearchService } from '../../services/search-service';
 import { SearchResponseWithCounts } from '../../services/search-service.interface';
-import { ensureCompletePaginationOptions } from '../../utils/pagination';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as search from './index';
 
@@ -31,7 +30,7 @@ describe('search', () => {
     taxonomy: { data: [], total: 0 }
   };
 
-  const defaultPaginationNumbers = { page: 1, limit: 2 };
+  const defaultPaginationNumbers = { page: 1, limit: 2, sort: undefined, order: undefined };
 
   afterEach(() => {
     sinon.restore();
@@ -56,7 +55,7 @@ describe('search', () => {
 
     expect(mockSearch).to.have.been.calledOnceWith(
       { keyword: 'moose habitat', feature_type_name: undefined },
-      ensureCompletePaginationOptions(defaultPaginationNumbers)
+      defaultPaginationNumbers
     );
 
     expect(mockRes.statusValue).to.equal(200);
@@ -82,7 +81,7 @@ describe('search', () => {
 
     expect(mockSearch).to.have.been.calledOnceWith(
       { keyword: 'moose', feature_type_name: 'dataset' },
-      ensureCompletePaginationOptions(defaultPaginationNumbers)
+      defaultPaginationNumbers
     );
 
     expect(mockRes.statusValue).to.equal(200);
@@ -90,7 +89,7 @@ describe('search', () => {
   });
 
   it('should return search results with custom pagination', async () => {
-    const customNumbers = { page: 2, limit: 5 };
+    const customNumbers = { page: 2, limit: 5, sort: undefined, order: undefined };
     const dbConnectionObj = getMockDBConnection({
       open: sinon.stub().resolves(),
       commit: sinon.stub().resolves(),
@@ -109,7 +108,7 @@ describe('search', () => {
 
     expect(mockSearch).to.have.been.calledOnceWith(
       { keyword: 'wildlife', feature_type_name: undefined },
-      ensureCompletePaginationOptions(customNumbers)
+      customNumbers
     );
 
     expect(mockRes.statusValue).to.equal(200);
@@ -135,7 +134,7 @@ describe('search', () => {
 
     expect(mockSearch).to.have.been.calledOnceWith(
       { keyword: '', feature_type_name: undefined },
-      ensureCompletePaginationOptions(defaultPaginationNumbers)
+      defaultPaginationNumbers
     );
 
     expect(mockRes.statusValue).to.equal(200);

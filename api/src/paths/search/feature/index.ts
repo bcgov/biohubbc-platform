@@ -9,11 +9,7 @@ import {
 import { SearchFeatureService } from '../../../services/search-feature-service';
 import { ISearchFeaturesFilters } from '../../../services/search-feature-service.interface';
 import { getLogger } from '../../../utils/logger';
-import {
-  ensureCompletePaginationOptions,
-  makePaginationOptionsFromBody,
-  makePaginationResponse
-} from '../../../utils/pagination';
+import { makePaginationOptionsFromBody, makePaginationResponse } from '../../../utils/pagination';
 
 const defaultLog = getLogger('paths/search/feature');
 
@@ -53,7 +49,7 @@ export function searchFeatures(): RequestHandler {
       const pagination = makePaginationOptionsFromBody(req);
 
       const [features, count] = await Promise.all([
-        service.searchFeatures(filters, ensureCompletePaginationOptions(pagination)),
+        service.searchFeatures(filters, pagination),
         service.getSearchFeaturesCount(filters)
       ]);
       await connection.commit();
