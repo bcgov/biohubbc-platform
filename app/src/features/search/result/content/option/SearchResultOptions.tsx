@@ -95,7 +95,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload }: Searc
                 onDownload={onDownload}
                 onAddToCart={handleAddToCart}
                 onRemoveFromCart={handleRemoveFromCart}
-                onRowSelectionModelChange={() => { }}
+                onRowSelectionModelChange={() => {}}
               />
             ),
             list: (
