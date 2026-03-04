@@ -1,6 +1,6 @@
 import { Knex } from 'knex';
 import { getKnex } from '../../database/db';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CountResult } from '../../models/count';
 import { CreateTeam, Team, UpdateTeam } from '../../models/team';
 import { TeamFilters } from '../../services/access-policy/team-service.interface';
@@ -65,10 +65,14 @@ export class TeamRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, Team);
 
-    if (response.rows.length !== 1) {
-      throw new ApiExecuteSQLError('Failed to get team', [
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Team not found', ['TeamRepository->getTeam', { teamId }]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
         'TeamRepository->getTeam',
-        'rowCount was null or undefined, expected rowCount = 1'
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 

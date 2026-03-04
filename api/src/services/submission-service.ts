@@ -87,11 +87,16 @@ export class SubmissionService extends DBService {
    * Insert submission features.
    *
    * @param {number} submissionId
+   * @param {string} uploadId - The upload that produced these features.
    * @param {ISubmissionFeature[]} submissionFeatures
    * @return {*}  {Promise<void>}
    * @memberof SubmissionService
    */
-  async insertSubmissionFeatureRecords(submissionId: number, submissionFeatures: ISubmissionFeature[]): Promise<void> {
+  async insertSubmissionFeatureRecords(
+    submissionId: number,
+    uploadId: string,
+    submissionFeatures: ISubmissionFeature[]
+  ): Promise<void> {
     try {
       // Generate paths to all non-null nodes which contain a 'child_features' property
       const submissionFeatureJsonPaths: string[] = JSONPath({
@@ -127,6 +132,7 @@ export class SubmissionService extends DBService {
         // Validate the submissionFeature object
         const response = await this.ingestionRepository.insertSubmissionFeatureRecord(
           submissionId,
+          uploadId,
           parentSubmissionFeatureId,
           featureNode.id,
           featureNode.type,

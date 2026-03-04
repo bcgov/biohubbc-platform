@@ -5,6 +5,7 @@ export enum ApiErrorType {
   EXECUTE_SQL = 'Error executing SQL query',
   GENERAL = 'Error',
   CONFLICT = 'Conflict',
+  NOT_FOUND = 'Not Found',
   UNKNOWN = 'Unknown Error'
 }
 
@@ -52,6 +53,19 @@ export class ApiUnknownError extends ApiError {
 export class ApiConflictError extends ApiError {
   constructor(message: string, errors?: (string | object)[]) {
     super(ApiErrorType.CONFLICT, message, errors);
+  }
+}
+
+/**
+ * Api could not find a requested resource.
+ *
+ * @export
+ * @class ApiNotFoundError
+ * @extends {ApiError}
+ */
+export class ApiNotFoundError extends ApiError {
+  constructor(message: string, errors?: (string | object)[]) {
+    super(ApiErrorType.NOT_FOUND, message, errors);
   }
 }
 

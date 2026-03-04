@@ -2,7 +2,7 @@ import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { getKnex } from '../../database/db';
 import { FeatureUrn } from '../../database/urn-utils.interface';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CountResult } from '../../models/count';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyEffect } from '../../models/policy-statement';
@@ -58,10 +58,14 @@ export class PolicyRepository extends BaseRepository {
   async getPolicy(policyId: string): Promise<Policy> {
     const response = await this.getPolicies({ policyId });
 
+    if (response.length === 0) {
+      throw new ApiNotFoundError('Policy not found', ['PolicyRepository->getPolicy', { policyId }]);
+    }
+
     if (response.length !== 1) {
-      throw new ApiExecuteSQLError('Failed to get policy', [
+      throw new ApiExecuteSQLError('Unexpected row count', [
         'PolicyRepository->getPolicy',
-        'rowCount was null or undefined, expected rowCount = 1'
+        `expected rowCount=1, actual rowCount=${response.length}`
       ]);
     }
 

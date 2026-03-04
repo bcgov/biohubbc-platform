@@ -1,5 +1,5 @@
 import { SQL } from 'sql-template-strings';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CreateUploadArtifact, UpdateUploadArtifact, UploadArtifact } from '../../models/upload-artifact';
 import { BaseRepository } from '../base-repository';
 
@@ -9,7 +9,8 @@ export class UploadArtifactRepository extends BaseRepository {
    *
    * @param {string} uploadArtifactId - The ID of the upload artifact to retrieve.
    * @returns {Promise<UploadArtifact>} - The upload artifact record.
-   * @throws {ApiExecuteSQLError} - Throws an error if the upload artifact is not found.
+   * @throws {ApiNotFoundError} - If the upload artifact is not found.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
    */
   async getUploadArtifact(uploadArtifactId: string): Promise<UploadArtifact> {
     const sqlStatement = SQL`
@@ -27,10 +28,17 @@ export class UploadArtifactRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, UploadArtifact);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get upload artifact record', [
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Upload artifact not found', [
         'UploadArtifactRepository->getUploadArtifact',
-        `rowCount was ${response.rowCount}, expected 1`
+        { uploadArtifactId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'UploadArtifactRepository->getUploadArtifact',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 

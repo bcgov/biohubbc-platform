@@ -1,5 +1,5 @@
 import { SQL } from 'sql-template-strings';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CreateUpload, UpdateUpload, Upload } from '../../models/upload';
 import { BaseRepository } from '../base-repository';
 
@@ -26,10 +26,14 @@ export class UploadRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, Upload);
 
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Upload not found', ['UploadRepository->getUpload', { uploadId }]);
+    }
+
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get upload record', [
+      throw new ApiExecuteSQLError('Unexpected row count', [
         'UploadRepository->getUpload',
-        `rowCount was ${response.rowCount}, expected 1`
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 

@@ -1,6 +1,6 @@
 import { Knex } from 'knex';
 import { getKnex, IDBConnection } from '../database/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { SubmissionUploadStatus } from '../models/submission-upload-status';
 import { BaseRepository } from './base-repository';
 
@@ -26,10 +26,16 @@ export class SubmissionUploadStatusRepository extends BaseRepository {
   async getSubmissionUploadStatusById(submissionId: number): Promise<SubmissionUploadStatus> {
     const queryBuilder = this._makeGetSubmissionUploadStatusQuery(submissionId);
     const response = await this.connection.knex(queryBuilder, SubmissionUploadStatus);
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to get submission upload status', [
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Submission upload status not found', [
         'SubmissionUploadStatusRepository->getSubmissionUploadStatusById',
-        'rowCount was null or undefined, expected rowCount != 0'
+        { submissionId }
+      ]);
+    }
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'SubmissionUploadStatusRepository->getSubmissionUploadStatusById',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
     return response.rows[0];

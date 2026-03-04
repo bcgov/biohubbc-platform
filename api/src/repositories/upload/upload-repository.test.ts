@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CreateUpload, UpdateUpload, Upload, UploadStatusEnum } from '../../models/upload';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { UploadRepository } from './upload-repository';
@@ -25,8 +25,8 @@ describe('UploadRepository', () => {
         await repo.getUpload('upload-id-1');
         expect.fail();
       } catch (error) {
-        expect(error).to.be.instanceOf(ApiExecuteSQLError);
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get upload record');
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as ApiNotFoundError).message).to.equal('Upload not found');
       }
     });
 

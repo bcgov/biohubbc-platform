@@ -1,5 +1,5 @@
 import { getKnex } from '../database/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { DataRequestStatus, DataRequestStatusEnum, UpdateDataRequestStatus } from '../models/data-request-status';
 import { BaseRepository } from './base-repository';
 
@@ -27,10 +27,17 @@ export class DataRequestStatusRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, DataRequestStatus);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get data request status', [
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Data request status not found', [
         'DataRequestStatusRepository->getDataRequestStatusById',
-        'rowCount !== 1'
+        { dataRequestStatusId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'DataRequestStatusRepository->getDataRequestStatusById',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 
@@ -53,10 +60,17 @@ export class DataRequestStatusRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, DataRequestStatus);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get data request status', [
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Data request status not found', [
         'DataRequestStatusRepository->getDataRequestStatusByDataRequestId',
-        'rowCount !== 1'
+        { dataRequestId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'DataRequestStatusRepository->getDataRequestStatusByDataRequestId',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 
@@ -90,7 +104,7 @@ export class DataRequestStatusRepository extends BaseRepository {
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to create data request status', [
-        'DataRequestRepository->createDataRequestStatus',
+        'DataRequestStatusRepository->createDataRequestStatus',
         'rowCount !== 1'
       ]);
     }
