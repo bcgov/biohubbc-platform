@@ -93,4 +93,43 @@ describe('CommentRepository', () => {
       }
     });
   });
+
+  describe('updateComment', () => {
+    it('should update and return the comment', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [mockComment]
+      } as unknown as QueryResult<any>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => mockQueryResponse
+      });
+
+      const repo = new CommentRepository(mockDBConnection);
+
+      const result = await repo.updateComment(mockComment.comment_id, { comment: mockComment.comment });
+
+      expect(result).to.eql(mockComment);
+    });
+
+    it('should throw error when rowCount !== 1', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as QueryResult<any>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => mockQueryResponse
+      });
+
+      const repo = new CommentRepository(mockDBConnection);
+
+      try {
+        await repo.updateComment(mockComment.comment_id, { comment: 'Updated comment' });
+        throw new Error('Expected to throw');
+      } catch (err) {
+        expect((err as Error).message).to.equal('Failed to update comment');
+      }
+    });
+  });
 });
