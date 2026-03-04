@@ -119,9 +119,10 @@ export function getCartWithFeaturesById(): RequestHandler {
 
       const pagination = makePaginationOptionsFromRequest(req);
 
-      const cart = await cartService.getCartById(cartId);
-
-      const paginatedFeatures = await cartSubmissionFeatureService.getPaginatedCartFeaturesResponse(cartId, pagination);
+      const [cart, paginatedFeatures] = await Promise.all([
+        cartService.getCartById(cartId),
+        cartSubmissionFeatureService.getPaginatedCartFeaturesResponse(cartId, pagination)
+      ]);
 
       await connection.commit();
 

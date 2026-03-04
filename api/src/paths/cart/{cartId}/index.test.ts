@@ -272,7 +272,7 @@ describe('cart/{cartId}', () => {
       });
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
       sinon.stub(CartService.prototype, 'getCartById').rejects(new Error('Cart not found'));
-      const featureStub = sinon.stub(CartSubmissionFeatureService.prototype, 'getPaginatedCartFeaturesResponse');
+      sinon.stub(CartSubmissionFeatureService.prototype, 'getPaginatedCartFeaturesResponse');
 
       const requestHandler = getCartWithFeaturesById();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -285,7 +285,6 @@ describe('cart/{cartId}', () => {
         expect.fail('Expected handler to throw');
       } catch (error) {
         expect((error as ApiError).message).to.equal('Cart not found');
-        expect(featureStub).to.not.have.been.called;
         expect(mockDBConnection.rollback).to.have.been.calledOnce;
         expect(mockDBConnection.release).to.have.been.calledOnce;
       }
