@@ -190,14 +190,6 @@ const makeSnapshot = (state: CartState): CartSnapshot => ({
 });
 
 /**
- * Returns true when an API error indicates the current cart can no longer be used.
- */
-const isCartAccessError = (error: unknown): boolean => {
-  const status = (error as APIError)?.status;
-  return status === 401 || status === 403 || status === 404;
-};
-
-/**
  * Returns true when an API error indicates the cached cart ID is no longer valid.
  *
  * This handles stale session cart IDs that can happen after cart deletion,
@@ -476,7 +468,7 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
           dispatch({ type: 'ROLLBACK', payload: previousSnapshot });
         }
 
-        if (previousSnapshot && optimisticAdds.length > 0 && isCartAccessError(error)) {
+        if (previousSnapshot && optimisticAdds.length > 0 && isInvalidCachedCartError(error)) {
           operationInProgress.current = false;
           await _createCart({ features: optimisticAdds });
           return;
