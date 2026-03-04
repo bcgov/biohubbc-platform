@@ -58,7 +58,7 @@ export const RequestAccessPage = () => {
         <Typography variant="h2" sx={{ mb: 1 }}>
           Request Access
         </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+        <Typography color="text.secondary" sx={{ mb: 3 }}>
           You are requesting access to secured records. Please describe why you need access to this data.
         </Typography>
 
