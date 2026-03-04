@@ -23,7 +23,7 @@ export const paginationRequestQueryParamSchema: OpenAPIV3.ParameterObject[] = [
     schema: {
       type: 'integer',
       minimum: 1,
-      maximum: 2000,
+      maximum: 200,
       default: 25,
       description: 'The number of records to show per page. Defaults to 25 when omitted.'
     }
@@ -65,7 +65,7 @@ export const paginationRequestBodySchema: OpenAPIV3.SchemaObject = {
     limit: {
       type: 'integer',
       minimum: 1,
-      maximum: 2000,
+      maximum: 200,
       default: 25,
       description: 'The number of records to return per page'
     },
