@@ -2,6 +2,7 @@ import { IDBConnection } from '../database/db';
 import { HTTP404 } from '../errors/http-error';
 import {
   CreateDataRequest,
+  CreateTeamPolicyParams,
   DataRequestFilters,
   DataRequestWithStatus,
   FlatDataRequestWithStatus,
@@ -115,7 +116,7 @@ export class DataRequestService extends DBService {
     const dataRequest = await this.dataRequestRepository.createDataRequest(payload.requested_by, payloadWithTeamId);
 
     const policy = await this.createPolicy(dataRequest.data_request_id);
-    await this.createTeamPolicy(teamId, policy.policy_id);
+    await this.createTeamPolicy({ teamId, policyId: policy.policy_id });
 
     const dataRequestStatusService = new DataRequestStatusService(this.connection);
     // initially defaults status to APPROVED for development
@@ -204,13 +205,12 @@ export class DataRequestService extends DBService {
   /**
    * Links a team to a policy by creating a team policy record.
    *
-   * @param {string} teamId
-   * @param {string} policyId
+   * @param {CreateTeamPolicyParams} params
    * @return {Promise<void>}
    * @private
    */
-  private async createTeamPolicy(teamId: string, policyId: string): Promise<void> {
+  private async createTeamPolicy(params: CreateTeamPolicyParams): Promise<void> {
     const teamPolicyService = new TeamPolicyService(this.connection);
-    await teamPolicyService.createTeamPolicy({ team_id: teamId, policy_id: policyId });
+    await teamPolicyService.createTeamPolicy({ team_id: params.teamId, policy_id: params.policyId });
   }
 }
