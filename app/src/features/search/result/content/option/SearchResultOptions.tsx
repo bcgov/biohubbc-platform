@@ -57,8 +57,8 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload }: Searc
     [removeFromCart, dialogContext]
   );
 
-  const handleRequestAccess = () => {
-    navigate(`/request-access?${searchParams.toString()}`);
+  const handleDataRequest = () => {
+    navigate(`/data-request?${searchParams.toString()}`);
   };
 
   return (
@@ -78,7 +78,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload }: Searc
           <AlertBanner
             icon={<Icon path={mdiLock} size={0.875} />}
             action={
-              <Button color="inherit" size="small" onClick={handleRequestAccess}>
+              <Button color="inherit" size="small" onClick={handleDataRequest}>
                 Request Access
               </Button>
             }

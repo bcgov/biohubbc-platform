@@ -7,21 +7,22 @@ import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PrimaryButton } from 'components/button/PrimaryButton';
 import { SecondaryButton } from 'components/button/SecondaryButton';
-import RequestAccessForm, {
-  IRequestAccessFormValues,
-  requestAccessFormInitialValues,
-  requestAccessFormYupSchema
-} from './RequestAccessForm';
+import DataRequestForm from './form/DataRequestForm';
+import {
+  IDataRequestFormValues,
+  dataRequestFormInitialValues,
+  dataRequestFormYupSchema
+} from './form/DatatRequestForm.interface';
 
-export const RequestAccessPage = () => {
+export const DataRequestPage = () => {
   const api = useApi();
   const dialogContext = useDialogContext();
-  const formikRef = useRef<FormikProps<IRequestAccessFormValues>>(null);
+  const formikRef = useRef<FormikProps<IDataRequestFormValues>>(null);
   const [searchParams] = useSearchParams();
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (values: IRequestAccessFormValues) => {
+  const handleSubmit = async (values: IDataRequestFormValues) => {
     setIsLoading(true);
     try {
       await api.dataRequest.createDataRequest({ reason: values.reason });
@@ -56,7 +57,7 @@ export const RequestAccessPage = () => {
     <Container maxWidth="sm" sx={{ py: 6 }}>
       <Paper sx={{ p: 4 }}>
         <Typography variant="h2" sx={{ mb: 1 }}>
-          Request Access
+          Data Request
         </Typography>
         <Typography color="text.secondary" sx={{ mb: 3 }}>
           You are requesting access to secured records. Please describe why you need access to this data.
@@ -64,13 +65,13 @@ export const RequestAccessPage = () => {
 
         <Formik
           innerRef={formikRef}
-          initialValues={requestAccessFormInitialValues}
-          validationSchema={requestAccessFormYupSchema}
+          initialValues={dataRequestFormInitialValues}
+          validationSchema={dataRequestFormYupSchema}
           validateOnBlur
           validateOnChange={false}
           onSubmit={handleSubmit}>
           <>
-            <RequestAccessForm />
+            <DataRequestForm />
             <Box display="flex" gap={1}>
               <PrimaryButton loading={isLoading} onClick={() => formikRef.current?.submitForm()}>
                 Submit Request

@@ -37,7 +37,7 @@ export const AppRouter = () => {
 
       {/* Data Request Routes */}
       <Route
-        path="/request-access/*"
+        path="/data-request/*"
         element={
           <>
             <PageTitle title="Data Request" description="Data requests for secured data" />
