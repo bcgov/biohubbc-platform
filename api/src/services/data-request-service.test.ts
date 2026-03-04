@@ -246,6 +246,7 @@ describe('DataRequestService', () => {
       const service = new DataRequestService(mockDB);
 
       const payload: CreateDataRequest = {
+        requested_by: mockDataRequest.requested_by,
         reason: 'New research project',
         team_id: mockDataRequest.team_id
       };
@@ -257,7 +258,7 @@ describe('DataRequestService', () => {
       const teamPolicyStub = TeamPolicyService.prototype.createTeamPolicy as sinon.SinonStub;
       const statusStub = DataRequestStatusService.prototype.createDataRequestStatus as sinon.SinonStub;
 
-      const result = await service.createDataRequest(mockDataRequest.requested_by, payload);
+      const result = await service.createDataRequest(payload);
 
       expect(createStub).to.have.been.calledOnceWith(mockDataRequest.requested_by, {
         ...payload,
@@ -296,9 +297,10 @@ describe('DataRequestService', () => {
       const teamPolicyStub = TeamPolicyService.prototype.createTeamPolicy as sinon.SinonStub;
 
       const payload: CreateDataRequest = {
+        requested_by: mockDataRequest.requested_by,
         reason: 'New research project'
       };
-      await service.createDataRequest(mockDataRequest.requested_by, payload);
+      await service.createDataRequest(payload);
 
       expect(teamStub).to.have.been.calledOnce;
       expect(memberStub).to.have.been.calledOnceWith({
@@ -316,13 +318,14 @@ describe('DataRequestService', () => {
       const service = new DataRequestService(mockDB);
 
       const payload: CreateDataRequest = {
+        requested_by: 1,
         reason: 'Test',
         team_id: mockDataRequest.team_id
       };
       sinon.stub(DataRequestRepository.prototype, 'createDataRequest').rejects(new Error('DB error'));
 
       try {
-        await service.createDataRequest(1, payload);
+        await service.createDataRequest(payload);
         throw new Error('Expected to throw');
       } catch (err) {
         expect(err).to.be.instanceOf(Error);

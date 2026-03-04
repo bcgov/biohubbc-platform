@@ -100,25 +100,22 @@ export class DataRequestService extends DBService {
    * Creates a team for the requester, a wildcard access policy expiring in 30 days
    * linked to the team, and auto-approves the request.
    *
-   * @param {number} requestedBy - system user id
    * @param {CreateDataRequest} payload
    * @return {Promise<DataRequestWithStatus>}
    * @memberof DataRequestService
    */
-  async createDataRequest(requestedBy: number, payload: CreateDataRequest): Promise<DataRequestWithStatus> {
-    let resolvedTeamId: string;
-    if (payload.team_id) {
-      resolvedTeamId = payload.team_id;
-    } else {
-      const team = await this.createAndReturnTeamForDataRequest(requestedBy);
-      resolvedTeamId = team.team_id;
+  async createDataRequest(payload: CreateDataRequest): Promise<DataRequestWithStatus> {
+    let teamId = payload.team_id;
+    if (!teamId) {
+      const team = await this.createTeam(payload.requested_by);
+      teamId = team.team_id;
     }
-    const payloadWithTeamId = { ...payload, team_id: resolvedTeamId };
+    const payloadWithTeamId = { ...payload, team_id: teamId };
 
-    const dataRequest = await this.dataRequestRepository.createDataRequest(requestedBy, payloadWithTeamId);
+    const dataRequest = await this.dataRequestRepository.createDataRequest(payload.requested_by, payloadWithTeamId);
 
-    const policy = await this.createPolicyForDataRequest(dataRequest.data_request_id);
-    await this.linkTeamToPolicy(resolvedTeamId, policy.policy_id);
+    const policy = await this.createPolicy(dataRequest.data_request_id);
+    await this.createTeamPolicy(teamId, policy.policy_id);
 
     const dataRequestStatusService = new DataRequestStatusService(this.connection);
     // initially defaults status to APPROVED for development
@@ -177,7 +174,7 @@ export class DataRequestService extends DBService {
    * @return {Promise<Team>} team to use for the data request
    * @private
    */
-  private async createAndReturnTeamForDataRequest(requestedBy: number): Promise<Team> {
+  private async createTeam(requestedBy: number): Promise<Team> {
     const teamService = new TeamService(this.connection);
     const team = await teamService.createTeam({ name: _generateDataRequestTeamName() });
     const teamMemberService = new TeamMemberService(this.connection);
@@ -192,7 +189,7 @@ export class DataRequestService extends DBService {
    * @return {Promise<{ policy_id: string }>}
    * @private
    */
-  private async createPolicyForDataRequest(dataRequestId: string): Promise<{ policy_id: string }> {
+  private async createPolicy(dataRequestId: string): Promise<{ policy_id: string }> {
     const policyService = new PolicyService(this.connection);
     return policyService.createPolicyWithStatements(
       {
@@ -212,7 +209,7 @@ export class DataRequestService extends DBService {
    * @return {Promise<void>}
    * @private
    */
-  private async linkTeamToPolicy(teamId: string, policyId: string): Promise<void> {
+  private async createTeamPolicy(teamId: string, policyId: string): Promise<void> {
     const teamPolicyService = new TeamPolicyService(this.connection);
     await teamPolicyService.createTeamPolicy({ team_id: teamId, policy_id: policyId });
   }

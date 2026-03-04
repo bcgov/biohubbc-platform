@@ -19,6 +19,7 @@ export const DataRequestFilters = z.object({
 export type DataRequestFilters = z.infer<typeof DataRequestFilters>;
 
 export const CreateDataRequest = z.object({
+  requested_by: z.number().int(),
   reason: z.string(),
   team_id: z.string().uuid().optional()
 });
