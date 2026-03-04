@@ -5,6 +5,7 @@ import { PageTitle } from 'utils/RouteWithMeta';
 import { AdminRouter } from './admin/AdminRouter';
 import { SearchRouter } from './search/SearchRouter';
 import BaseLayout from 'layouts/BaseLayout';
+import { DataRequestRouter } from './data-request/DataRequestRouter';
 
 export const AppRouter = () => {
   return (
@@ -30,6 +31,17 @@ export const AppRouter = () => {
           <>
             <PageTitle title="Admin Panel" description="Administrative interface" />
             <AdminRouter />
+          </>
+        }
+      />
+
+      {/* Data Request Routes */}
+      <Route
+        path="/request-access/*"
+        element={
+          <>
+            <PageTitle title="Data Request" description="Data requests for secured data" />
+            <DataRequestRouter />
           </>
         }
       />

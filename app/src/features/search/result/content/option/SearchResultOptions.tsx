@@ -58,7 +58,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload }: Searc
   );
 
   const handleRequestAccess = () => {
-    navigate(`/search/request-access?${searchParams.toString()}`);
+    navigate(`/request-access?${searchParams.toString()}`);
   };
 
   return (
