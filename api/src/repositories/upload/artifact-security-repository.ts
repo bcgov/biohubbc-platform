@@ -1,5 +1,5 @@
 import { SQL } from 'sql-template-strings';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
 import { BaseRepository } from '../base-repository';
 
@@ -24,10 +24,17 @@ export class ArtifactSecurityRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, ArtifactSecurity);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get security record', [
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Artifact security record not found', [
         'ArtifactSecurityRepository->getArtifactSecurity',
-        'rowCount was null or undefined, expected rowCount = 1'
+        { uploadArtifactSecurityId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'ArtifactSecurityRepository->getArtifactSecurity',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 

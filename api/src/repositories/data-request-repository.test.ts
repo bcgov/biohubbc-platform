@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { ApiNotFoundError } from '../errors/api-error';
 import { CreateDataRequest, DataRequest, UpdateDataRequest } from '../models/data-request';
 import { getMockDBConnection } from '../__mocks__/db';
 import { DataRequestRepository } from './data-request-repository';
@@ -183,7 +184,8 @@ describe('DataRequestRepository', () => {
         await repo.getDataRequestById(mockDataRequest.data_request_id);
         throw new Error('Expected to throw');
       } catch (err) {
-        expect((err as Error).message).to.equal('Failed to get data request');
+        expect(err).to.be.instanceOf(ApiNotFoundError);
+        expect((err as ApiNotFoundError).message).to.equal('Data request not found');
       }
     });
   });

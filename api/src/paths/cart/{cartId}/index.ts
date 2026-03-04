@@ -69,9 +69,6 @@ GET.apiDoc = {
         }
       }
     },
-    404: {
-      description: 'Cart not found'
-    },
     ...defaultErrorResponses
   }
 };

@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
 import { SecurityStatusEnum } from '../../models/security-status';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -32,8 +32,8 @@ describe('ArtifactSecurityRepository', () => {
         await repo.getArtifactSecurity(mockSecurityRecord.artifact_security_id);
         expect.fail('Expected error not thrown');
       } catch (err) {
-        expect(err).to.be.instanceOf(ApiExecuteSQLError);
-        expect((err as ApiExecuteSQLError).message).to.equal('Failed to get security record');
+        expect(err).to.be.instanceOf(ApiNotFoundError);
+        expect((err as ApiNotFoundError).message).to.equal('Artifact security record not found');
       }
     });
 

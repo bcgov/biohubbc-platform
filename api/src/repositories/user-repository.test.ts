@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { getMockDBConnection } from '../__mocks__/db';
 import { UserRepository } from './user-repository';
 
@@ -52,7 +52,7 @@ describe('UserRepository', () => {
         await userRepository.getUserById(1);
         expect.fail();
       } catch (actualError) {
-        expect((actualError as ApiExecuteSQLError).message).to.equal('Failed to get user by id');
+        expect((actualError as ApiNotFoundError).message).to.equal('User not found');
       }
     });
 
