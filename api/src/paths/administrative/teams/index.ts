@@ -9,11 +9,7 @@ import { CreateTeamRequestSchema, TeamSchema, TeamsListResponseSchema } from '..
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { TeamService } from '../../../services/access-policy/team-service';
 import { getLogger } from '../../../utils/logger';
-import {
-  ensureCompletePaginationOptions,
-  makePaginationOptionsFromRequest,
-  makePaginationResponse
-} from '../../../utils/pagination';
+import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../utils/pagination';
 
 const defaultLog = getLogger('paths/administrative/teams');
 
@@ -74,7 +70,7 @@ export function getTeams(): RequestHandler {
       const pagination = makePaginationOptionsFromRequest(req);
 
       const [teams, count] = await Promise.all([
-        teamService.getTeams(filters, ensureCompletePaginationOptions(pagination)),
+        teamService.getTeams(filters, pagination),
         teamService.getTeamsCount(filters)
       ]);
 

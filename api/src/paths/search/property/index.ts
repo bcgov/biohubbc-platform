@@ -9,11 +9,7 @@ import {
 import { PropertySearchService } from '../../../services/property-search-service';
 import { ISearchPropertyFilters } from '../../../services/property-search-service.interface';
 import { getLogger } from '../../../utils/logger';
-import {
-  ensureCompletePaginationOptions,
-  makePaginationOptionsFromBody,
-  makePaginationResponse
-} from '../../../utils/pagination';
+import { makePaginationOptionsFromBody, makePaginationResponse } from '../../../utils/pagination';
 
 const defaultLog = getLogger('paths/search/property');
 
@@ -53,7 +49,7 @@ export function searchProperties(): RequestHandler {
       const pagination = makePaginationOptionsFromBody(req);
 
       const [properties, count] = await Promise.all([
-        service.searchProperty(filters, ensureCompletePaginationOptions(pagination)),
+        service.searchProperty(filters, pagination),
         service.getSearchPropertyCount(filters)
       ]);
       await connection.commit();

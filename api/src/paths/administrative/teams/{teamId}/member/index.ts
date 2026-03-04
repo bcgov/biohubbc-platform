@@ -13,11 +13,7 @@ import {
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
 import { TeamMemberService } from '../../../../../services/access-policy/team-member-service';
 import { getLogger } from '../../../../../utils/logger';
-import {
-  ensureCompletePaginationOptions,
-  makePaginationOptionsFromRequest,
-  makePaginationResponse
-} from '../../../../../utils/pagination';
+import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../../utils/pagination';
 
 const defaultLog = getLogger('paths/administrative/teams/{teamId}/member');
 
@@ -77,7 +73,7 @@ export function getTeamMembers(): RequestHandler {
       const teamMemberService = new TeamMemberService(connection);
 
       const [members, count] = await Promise.all([
-        teamMemberService.getTeamMembersWithUsers(teamId, ensureCompletePaginationOptions(pagination)),
+        teamMemberService.getTeamMembersWithUsers(teamId, pagination),
         teamMemberService.getTeamMembersWithUsersCount(teamId)
       ]);
       await connection.commit();
