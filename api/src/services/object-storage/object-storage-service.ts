@@ -30,6 +30,11 @@ interface BucketConfig {
 export class ObjectStorageService {
   buckets: Map<BucketType, BucketConfig>;
 
+  // Separate clients for presigned URLs that need a public-facing endpoint.
+  // In Docker, the internal endpoint (minio:9000) differs from the external one (localhost:9000).
+  // In deployed environments these are typically the same, so the fallback is the internal client.
+  publicBuckets: Map<BucketType, BucketConfig>;
+
   constructor() {
     // Initialize bucket configurations
     this.buckets = new Map([
@@ -64,6 +69,39 @@ export class ObjectStorageService {
         }
       ]
     ]);
+
+    // Public-facing clients for presigned URLs, only created when a public URL is configured.
+    this.publicBuckets = new Map();
+
+    if (process.env.OBJECT_STORE_URL_PUBLIC) {
+      this.publicBuckets.set(BucketType.MAIN, {
+        client: new S3Client({
+          endpoint: process.env.OBJECT_STORE_URL_PUBLIC,
+          credentials: {
+            accessKeyId: process.env.OBJECT_STORE_ACCESS_KEY_ID!,
+            secretAccessKey: process.env.OBJECT_STORE_SECRET_KEY_ID!
+          },
+          forcePathStyle: true,
+          region: 'ca-central-1'
+        }),
+        name: process.env.OBJECT_STORE_BUCKET_NAME!
+      });
+    }
+
+    if (process.env.QUARANTINE_OBJECT_STORE_URL_PUBLIC) {
+      this.publicBuckets.set(BucketType.QUARANTINE, {
+        client: new S3Client({
+          endpoint: process.env.QUARANTINE_OBJECT_STORE_URL_PUBLIC,
+          credentials: {
+            accessKeyId: process.env.QUARANTINE_OBJECT_STORE_ACCESS_KEY_ID!,
+            secretAccessKey: process.env.QUARANTINE_OBJECT_STORE_SECRET_KEY_ID!
+          },
+          forcePathStyle: true,
+          region: 'ca-central-1'
+        }),
+        name: process.env.QUARANTINE_OBJECT_STORE_BUCKET_NAME!
+      });
+    }
   }
 
   /**
@@ -280,7 +318,7 @@ export class ObjectStorageService {
    * @memberof ObjectStorageService
    */
   async getSignedUrl(bucketType: BucketType, key: string, expiresInSeconds = 300): Promise<string> {
-    const { client, name } = this.getBucket(bucketType);
+    const { client, name } = this.publicBuckets.get(bucketType) ?? this.getBucket(bucketType);
     return getSignedUrl(client, new GetObjectCommand({ Bucket: name, Key: key }), { expiresIn: expiresInSeconds });
   }
 
