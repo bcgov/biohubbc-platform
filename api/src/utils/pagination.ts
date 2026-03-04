@@ -59,17 +59,15 @@ export const makePaginationOptionsFromBody = (request: Request): ApiPaginationOp
 /**
  * Generates the pagination response object from the given pagination request params.
  *
- * Used in conjunction with a the output of `makePaginationOptionsFromRequest`.
+ * Used with complete pagination options from `makePaginationOptionsFromRequest` or
+ * `makePaginationOptionsFromBody`.
  *
  * @param {number} total
- * @param {Partial<ApiPaginationOptions>} [pagination]
+ * @param {ApiPaginationOptions} pagination
  * @returns
  */
-export const makePaginationResponse = (
-  total: number,
-  pagination?: Partial<ApiPaginationOptions>
-): ApiPaginationResults => {
-  const { page, limit, sort, order } = ensureCompletePaginationOptions(pagination);
+export const makePaginationResponse = (total: number, pagination: ApiPaginationOptions): ApiPaginationResults => {
+  const { page, limit, sort, order } = pagination;
 
   return {
     total,

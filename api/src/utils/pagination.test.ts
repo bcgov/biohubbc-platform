@@ -79,10 +79,10 @@ describe('pagination', () => {
   });
 
   describe('makePaginationResponse', () => {
-    it('should handle undefined pagination params and default last_page to 1', () => {
-      const mockPagination: Partial<ApiPaginationOptions> = {
-        limit: undefined,
-        page: undefined,
+    it('should calculate last_page with default pagination options', () => {
+      const mockPagination: ApiPaginationOptions = {
+        limit: 25,
+        page: 1,
         sort: undefined,
         order: undefined
       };
@@ -99,7 +99,7 @@ describe('pagination', () => {
     });
 
     it('should calculate last page correctly when all params are defined', () => {
-      const mockPagination: Partial<ApiPaginationOptions> = {
+      const mockPagination: ApiPaginationOptions = {
         limit: 15,
         page: 3,
         sort: 'name',
@@ -118,7 +118,7 @@ describe('pagination', () => {
     });
 
     it('should handle zero total records', () => {
-      const mockPagination: Partial<ApiPaginationOptions> = {
+      const mockPagination: ApiPaginationOptions = {
         limit: 20,
         page: 1,
         sort: 'name',
