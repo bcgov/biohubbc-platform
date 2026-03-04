@@ -10,7 +10,8 @@ export class ArtifactRepository extends BaseRepository {
    *
    * @param {string} artifactId - The ID of the artifact to retrieve.
    * @returns {Promise<Artifact>} - The artifact record.
-   * @throws {ApiExecuteSQLError} - If the artifact is not found or query fails.
+   * @throws {ApiNotFoundError} - If the artifact is not found.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
    */
   async getArtifact(artifactId: string): Promise<Artifact> {
     const sqlStatement = SQL`

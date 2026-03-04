@@ -9,7 +9,8 @@ export class UploadArchiveRepository extends BaseRepository {
    *
    * @param {string} uploadArchiveId - The ID of the upload archive to retrieve.
    * @returns {Promise<UploadArchive>} - The upload archive record.
-   * @throws {ApiExecuteSQLError} - Throws an error if the upload archive is not found.
+   * @throws {ApiNotFoundError} - If the upload archive is not found.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
    */
   async getUploadArchive(uploadArchiveId: string): Promise<UploadArchive> {
     const sqlStatement = SQL`
@@ -90,7 +91,9 @@ export class UploadArchiveRepository extends BaseRepository {
    * Get upload archive by artifact ID
    *
    * @param {string} artifactId - The ID of the artifact.
-   * @returns {Promise<UploadArchive | null>} - The upload archive or null if not found.
+   * @returns {Promise<UploadArchive>} - The upload archive record.
+   * @throws {ApiNotFoundError} - If the upload archive is not found.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
    */
   async getUploadArchiveByArtifactId(artifactId: string): Promise<UploadArchive> {
     const sqlStatement = SQL`

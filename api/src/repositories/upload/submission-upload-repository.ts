@@ -16,7 +16,8 @@ export class SubmissionUploadRepository extends BaseRepository {
    *
    * @param {string} submissionUploadId - The ID of the submission_upload record.
    * @returns {Promise<SubmissionUpload>} - The requested submission_upload record.
-   * @throws {ApiExecuteSQLError} - If the record is not found or an error occurs.
+   * @throws {ApiNotFoundError} - If the record is not found.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
    */
   async getSubmissionUpload(submissionUploadId: string): Promise<SubmissionUpload> {
     const sqlStatement = SQL`
@@ -194,7 +195,9 @@ export class SubmissionUploadRepository extends BaseRepository {
    * Get a submission_upload record by upload_id (reverse lookup).
    *
    * @param {string} uploadId - The upload_id to look up.
-   * @returns {Promise<SubmissionUpload | null>} - The submission_upload record, or null if not found.
+   * @returns {Promise<SubmissionUpload>} - The submission_upload record.
+   * @throws {ApiNotFoundError} - If the record is not found.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
    */
   async getSubmissionUploadByUploadId(uploadId: string): Promise<SubmissionUpload> {
     const sqlStatement = SQL`

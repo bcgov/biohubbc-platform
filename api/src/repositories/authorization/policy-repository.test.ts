@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { Policy } from '../../models/policy';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { PolicyRepository } from './policy-repository';
@@ -77,7 +77,8 @@ describe('PolicyRepository', () => {
         await repository.getPolicy('1');
         expect.fail();
       } catch (error) {
-        expect((error as ApiExecuteSQLError).message).to.equal('Policy not found');
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as ApiNotFoundError).message).to.equal('Policy not found');
       }
     });
   });
