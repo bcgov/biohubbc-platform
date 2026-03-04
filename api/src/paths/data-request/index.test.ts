@@ -221,7 +221,8 @@ describe('data-request', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(stub).to.have.been.calledOnceWith(mockDBConnection.systemUserId(), {
+      expect(stub).to.have.been.calledOnceWith({
+        requested_by: mockDBConnection.systemUserId(),
         reason: 'Research purposes',
         team_id: mockDataRequestWithStatus.team_id
       });
@@ -248,7 +249,8 @@ describe('data-request', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(stub).to.have.been.calledOnceWith(mockDBConnection.systemUserId(), {
+      expect(stub).to.have.been.calledOnceWith({
+        requested_by: mockDBConnection.systemUserId(),
         reason: 'Research purposes',
         team_id: undefined
       });
