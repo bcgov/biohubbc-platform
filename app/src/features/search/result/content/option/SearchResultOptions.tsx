@@ -13,7 +13,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SearchResultCardLayout } from '../../layout/list/SearchResultCardLayout';
 import { SearchResultTableLayout } from '../../layout/table/SearchResultTableLayout';
 import { SEARCH_RESULT_OPTION_VIEW } from '../../SearchResultPage';
-import { hasSecureResults } from 'utils/search-result-options';
 
 interface SearchResultOptionsProps {
   rows: SearchFeatureResultWithRelevancy[];
@@ -29,7 +28,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload }: Searc
   const [searchParams] = useSearchParams();
 
   const hasResults = rows.length > 0;
-  const hasSecuredResults = hasSecureResults(rows);
+  const hasSecuredResults = rows.some((r) => r.is_secured);
 
   const cartFeatureIds = useMemo(() => {
     return new Set(features.map((f) => f.submission_feature_id));
@@ -96,7 +95,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload }: Searc
                 onDownload={onDownload}
                 onAddToCart={handleAddToCart}
                 onRemoveFromCart={handleRemoveFromCart}
-                onRowSelectionModelChange={() => {}}
+                onRowSelectionModelChange={() => { }}
               />
             ),
             list: (
