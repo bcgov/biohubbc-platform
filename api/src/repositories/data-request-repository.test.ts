@@ -74,7 +74,7 @@ describe('DataRequestRepository', () => {
       expect(result).to.eql([mockDataRequest]);
     });
 
-    it('should return data requests when filtering by multiple filters', async () => {
+    it('should return data requests when filtering by team_id', async () => {
       const mockQueryResponse = {
         rowCount: 1,
         rows: [mockDataRequest]
@@ -89,6 +89,61 @@ describe('DataRequestRepository', () => {
       const result = await repo.findDataRequests({
         team_id: mockDataRequest.team_id,
         requested_by: mockDataRequest.requested_by
+      });
+
+      expect(result).to.eql([mockDataRequest]);
+    });
+  });
+
+  describe('findDataRequestsByTeamMembership', () => {
+    it('should return data requests for a user based on their team memberships', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [mockDataRequest]
+      } as unknown as QueryResult<any>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => mockQueryResponse
+      });
+
+      const repo = new DataRequestRepository(mockDBConnection);
+
+      const result = await repo.findDataRequestsByTeamMembership(mockDataRequest.requested_by);
+
+      expect(result).to.eql([mockDataRequest]);
+    });
+
+    it('should return empty array when user has no team memberships with data requests', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as QueryResult<any>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => mockQueryResponse
+      });
+
+      const repo = new DataRequestRepository(mockDBConnection);
+
+      const result = await repo.findDataRequestsByTeamMembership(999);
+
+      expect(result).to.eql([]);
+    });
+
+    it('should return data requests scoped by team membership when filtering by status', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [mockDataRequest]
+      } as unknown as QueryResult<any>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => mockQueryResponse
+      });
+
+      const repo = new DataRequestRepository(mockDBConnection);
+
+      const result = await repo.findDataRequestsByTeamMembership(mockDataRequest.requested_by, {
+        status: 'REQUESTED'
       });
 
       expect(result).to.eql([mockDataRequest]);

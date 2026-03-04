@@ -58,7 +58,7 @@ export class DataRequestService extends DBService {
   }
 
   /**
-   * Find all data requests, optionally filtered by date range, requested_by, team_id, or status.
+   * Find all data requests without user scoping, optionally filtered by date range, requested_by, team_id, or status.
    *
    * @param {DataRequestFilters} [filters]
    * @return {Promise<DataRequestWithStatus[]>}
@@ -66,7 +66,22 @@ export class DataRequestService extends DBService {
    */
   async findDataRequests(filters?: DataRequestFilters): Promise<DataRequestWithStatus[]> {
     const dataRequests = await this.dataRequestRepository.findDataRequests(filters);
+    return dataRequests.map(_transformFlatDataRequestToNested);
+  }
 
+  /**
+   * Find all data requests in teams the user is a member of, optionally filtered by date range, requested_by, team_id, or status.
+   *
+   * @param {number} systemUserId
+   * @param {DataRequestFilters} [filters]
+   * @return {Promise<DataRequestWithStatus[]>}
+   * @memberof DataRequestService
+   */
+  async findDataRequestsBySystemUserId(
+    systemUserId: number,
+    filters?: DataRequestFilters
+  ): Promise<DataRequestWithStatus[]> {
+    const dataRequests = await this.dataRequestRepository.findDataRequestsByTeamMembership(systemUserId, filters);
     return dataRequests.map(_transformFlatDataRequestToNested);
   }
 
@@ -76,7 +91,6 @@ export class DataRequestService extends DBService {
    *
    * @param {number} requestedBy - system user id
    * @param {CreateDataRequest} payload
-   * @param {string} [teamId]
    * @return {Promise<DataRequestWithStatus>}
    * @memberof DataRequestService
    */

@@ -104,7 +104,7 @@ export class DataRequestStatusRepository extends BaseRepository {
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to create data request status', [
-        'DataRequestRepository->createDataRequestStatus',
+        'DataRequestStatusRepository->createDataRequestStatus',
         'rowCount !== 1'
       ]);
     }

@@ -2,12 +2,14 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getServiceAccountDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
+import { UploadStatusEnum } from '../../models/upload';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { ISubmissionFeature } from '../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { RegionService } from '../../services/region-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
 import { SubmissionService } from '../../services/submission-service';
+import { UploadService } from '../../services/upload/upload-service';
 import { ValidationService } from '../../services/validation-service';
 import { getServiceClientSystemUser } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
@@ -167,8 +169,21 @@ export function submissionIntake(): RequestHandler {
         serviceClientSystemUser.user_identifier
       );
 
+      /*
+      Added to make backward compatible.
+      Assumption is this code is legacy and will not run and will be removed.
+      */
+      const uploadService = new UploadService(connection);
+      const { upload_id } = await uploadService.insertUpload({
+        upload_status: UploadStatusEnum.COMPLETED,
+        record_end_date: new Date().toISOString(),
+        s3_upload_id: ''
+      });
+
       // insert each submission feature record
-      await submissionService.insertSubmissionFeatureRecords(submissionRecord.submission_id, [submissionFeature]);
+      await submissionService.insertSubmissionFeatureRecords(submissionRecord.submission_id, upload_id, [
+        submissionFeature
+      ]);
 
       // Index the submission feature record properties
       await searchFeatureService.indexFeaturesBySubmissionId(submissionRecord.submission_id);

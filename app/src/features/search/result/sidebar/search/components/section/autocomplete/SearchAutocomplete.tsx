@@ -1,7 +1,8 @@
-import { mdiClose, mdiMagnify } from '@mdi/js';
+import { mdiMagnify } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Autocomplete, IconButton, InputAdornment } from '@mui/material';
+import { InputAdornment } from '@mui/material';
 import { AutocompleteProps as MuiAutocompleteProps } from '@mui/material/Autocomplete';
+import CustomAutocomplete from 'components/fields/CustomAutocomplete';
 import CustomTextField from 'components/fields/CustomTextField';
 import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
 import { useState } from 'react';
@@ -13,6 +14,8 @@ interface SearchAutocompleteProps extends Omit<
 > {
   options: SidebarOption[];
   value: SidebarOption | null;
+  label?: string;
+  showStartAdornment?: boolean;
   placeholder?: string;
   onChange: (option: SidebarOption | null) => void;
   onInputChange?: (value: string) => void;
@@ -21,6 +24,8 @@ interface SearchAutocompleteProps extends Omit<
 export const SearchAutocomplete = ({
   options,
   value,
+  label,
+  showStartAdornment = true,
   placeholder = 'Search...',
   onChange,
   onInputChange,
@@ -30,10 +35,9 @@ export const SearchAutocomplete = ({
   const [inputValue, setInputValue] = useState('');
 
   return (
-    <Autocomplete
+    <CustomAutocomplete<string | number>
       {...autocompleteProps}
       fullWidth
-      size="small"
       options={options}
       value={value}
       filterOptions={(x) => x}
@@ -56,21 +60,15 @@ export const SearchAutocomplete = ({
       renderInput={(params) => (
         <CustomTextField
           {...params}
+          label={label}
           placeholder={placeholder}
           InputProps={{
             ...params.InputProps,
-            startAdornment: (
+            startAdornment: showStartAdornment ? (
               <InputAdornment position="start">
                 <Icon path={mdiMagnify} size={1} style={{ opacity: 0.5 }} />
               </InputAdornment>
-            ),
-            endAdornment: value && (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => onChange(null)}>
-                  <Icon path={mdiClose} size={0.7} />
-                </IconButton>
-              </InputAdornment>
-            )
+            ) : undefined
           }}
         />
       )}

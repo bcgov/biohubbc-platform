@@ -17,6 +17,7 @@ export class IngestionRepository extends BaseRepository {
    * Insert a new submission feature record.
    *
    * @param {number} submissionId The ID of the submission.
+   * @param {string} uploadId The ID of the upload that produced these features.
    * @param {(number | null)} parentSubmissionFeatureId The ID of the parent submission feature, or null.
    * @param {(string | null)} featureSourceId The source ID of the feature, or null.
    * @param {string} featureTypeName The name of the feature type.
@@ -27,6 +28,7 @@ export class IngestionRepository extends BaseRepository {
    */
   async insertSubmissionFeatureRecord(
     submissionId: number,
+    uploadId: string,
     parentSubmissionFeatureId: number | null,
     featureSourceId: string | null,
     featureTypeName: string,
@@ -36,6 +38,7 @@ export class IngestionRepository extends BaseRepository {
     const sqlStatement = SQL`
       INSERT INTO submission_feature (
         submission_id,
+        upload_id,
         parent_submission_feature_id,
         source_id,
         feature_type_id,
@@ -44,6 +47,7 @@ export class IngestionRepository extends BaseRepository {
         record_effective_date
       ) VALUES (
         ${submissionId},
+        ${uploadId},
         ${parentSubmissionFeatureId},
         ${featureSourceId},
         (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}),
