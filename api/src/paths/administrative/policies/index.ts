@@ -13,11 +13,7 @@ import {
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { PolicyService } from '../../../services/access-policy/policy-service';
 import { getLogger } from '../../../utils/logger';
-import {
-  ensureCompletePaginationOptions,
-  makePaginationOptionsFromRequest,
-  makePaginationResponse
-} from '../../../utils/pagination';
+import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../utils/pagination';
 
 const defaultLog = getLogger('paths/administrative/policies');
 
@@ -84,7 +80,7 @@ export function getPolicies(): RequestHandler {
       const filters = { search };
       const pagination = makePaginationOptionsFromRequest(req);
       const [policies, count] = await Promise.all([
-        policyService.getPoliciesWithStatements(filters, ensureCompletePaginationOptions(pagination)),
+        policyService.getPoliciesWithStatements(filters, pagination),
         policyService.getPoliciesCount(filters)
       ]);
 
