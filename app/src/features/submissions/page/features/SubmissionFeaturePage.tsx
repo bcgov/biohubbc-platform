@@ -54,8 +54,9 @@ export const SubmissionFeaturePage = () => {
   );
 
   useEffect(() => {
-    featureDataLoader.load();
-  }, [featureDataLoader]);
+    featureDataLoader.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submissionId, submissionFeatureId]);
 
   const isInCart = useMemo(
     () => cartFeatures.some((f) => f.submission_feature_id === Number(submissionFeatureId)),
