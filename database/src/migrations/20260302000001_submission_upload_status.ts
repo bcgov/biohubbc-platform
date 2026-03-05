@@ -15,7 +15,7 @@ export async function up(knex: Knex): Promise<void> {
     CREATE TYPE submission_upload_status_type AS ENUM (
       'submitted',  -- Upload has been submitted and is awaiting admin review
       'approved',   -- Admin has approved the upload
-      'denied'      -- Admin has denied the upload
+      'denied',     -- Admin has denied the upload
       'deleted'     -- Upload has been deleted
     );
 
