@@ -585,6 +585,35 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Get all related submission features with their type names.
+   *
+   * @param {number} submissionFeatureId The submission feature ID.
+   * @return {Promise<RelatedSubmissionFeature[]>}
+   * @memberof SubmissionRepository
+   */
+  async getRelatedSubmissionFeatures(submissionFeatureId: number): Promise<RelatedSubmissionFeature[]> {
+    const sqlStatement = SQL`
+      SELECT DISTINCT
+        sf.submission_feature_id,
+        ft.name as feature_type_name,
+        ft.display_name as feature_type_display_name,
+        sf.data
+      FROM submission_feature sf
+      JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+      WHERE sf.submission_feature_id IN (
+        SELECT source_feature_id FROM submission_feature_feature
+        WHERE target_feature_id = ${submissionFeatureId}
+        UNION
+        SELECT target_feature_id FROM submission_feature_feature
+        WHERE source_feature_id = ${submissionFeatureId}
+      );
+    `;
+
+    const response = await this.connection.sql(sqlStatement, RelatedSubmissionFeature);
+    return response.rows;
+  }
+
+  /**
    * Get feature type id by name.
    *
    * @param {string} name
