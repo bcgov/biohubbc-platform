@@ -422,8 +422,8 @@ describe('Download Worker', function () {
     for (const frag of fragments) {
       expect(frag.fragment_status).to.equal('ready');
       expect(frag.s3_key).to.be.a('string');
-      // Each fragment S3 key uses part naming: download-{id}-part-{n}.zip
-      expect(frag.s3_key).to.match(new RegExp(String.raw`download-${downloadId}-part-\d+\.zip`));
+      // Each fragment S3 key uses part naming: biohub-{id}-part-{n}.zip
+      expect(frag.s3_key).to.match(new RegExp(String.raw`biohub-${downloadId}-part-\d+\.zip`));
       s3Keys.add(frag.s3_key);
       createdS3Keys.push(frag.s3_key);
     }

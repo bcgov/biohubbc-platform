@@ -41,13 +41,13 @@ GET.apiDoc = {
                 type: 'array',
                 items: {
                   type: 'object',
-                  required: ['download_id', 'status', 'create_date', 'feature_count'],
+                  required: ['download_id', 'download_status', 'create_date', 'feature_count'],
                   properties: {
                     download_id: {
                       type: 'string',
                       format: 'uuid'
                     },
-                    status: {
+                    download_status: {
                       type: 'string',
                       enum: ['pending', 'processing', 'ready', 'failed', 'downloaded']
                     },

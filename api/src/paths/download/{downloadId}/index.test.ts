@@ -40,7 +40,7 @@ describe('paths/download/{downloadId}/index', () => {
         {
           fragment_index: 0,
           fragment_status: 'ready',
-          file_name: 'download-aaaa0000-0000-0000-0000-000000000001.zip',
+          file_name: 'biohub-aaaa0000-0000-0000-0000-000000000001.zip',
           file_size_bytes: 12345,
           estimated_size_bytes: 12000,
           feature_count: 3,
@@ -76,7 +76,7 @@ describe('paths/download/{downloadId}/index', () => {
           {
             fragment_index: 0,
             status: 'ready',
-            file_name: 'download-aaaa0000-0000-0000-0000-000000000001.zip',
+            file_name: 'biohub-aaaa0000-0000-0000-0000-000000000001.zip',
             file_size_bytes: 12345,
             estimated_size_bytes: 12000,
             feature_count: 3,

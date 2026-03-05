@@ -326,7 +326,7 @@ describe('DownloadPipelineService', () => {
     });
 
     it('uses multi-fragment naming pattern for downloads with multiple fragments', async () => {
-      // Verifies: S3 key uses download-{id}-part-{n+1}.zip when total_fragments > 1
+      // Verifies: S3 key uses biohub-{id}-part-{n+1}.zip when total_fragments > 1
 
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
@@ -384,7 +384,7 @@ describe('DownloadPipelineService', () => {
 
       expect(uploadStreamStub.calledOnce).to.be.true;
       expect(uploadStreamStub.firstCall.args[3]).to.equal(
-        'downloads/aaaa0000-0000-0000-0000-000000000042/download-aaaa0000-0000-0000-0000-000000000042-part-2.zip'
+        'downloads/aaaa0000-0000-0000-0000-000000000042/biohub-aaaa0000-0000-0000-0000-000000000042-part-2.zip'
       );
     });
   });
@@ -396,8 +396,8 @@ describe('DownloadPipelineService', () => {
 
       const readyFragment = createMockFragment({
         fragment_status: DownloadStatusEnum.READY,
-        s3_key: 'downloads/aaaa0000-0000-0000-0000-000000000042/download-aaaa0000-0000-0000-0000-000000000042.zip',
-        file_name: 'download-aaaa0000-0000-0000-0000-000000000042.zip',
+        s3_key: 'downloads/aaaa0000-0000-0000-0000-000000000042/biohub-aaaa0000-0000-0000-0000-000000000042.zip',
+        file_name: 'biohub-aaaa0000-0000-0000-0000-000000000042.zip',
         file_size_bytes: '512'
       });
 
@@ -639,8 +639,8 @@ describe('DownloadPipelineService', () => {
         fragment_index: 0,
         fragment_status: DownloadStatusEnum.READY,
         s3_key:
-          'downloads/aaaa0000-0000-0000-0000-000000000042/download-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
-        file_name: 'download-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
+          'downloads/aaaa0000-0000-0000-0000-000000000042/biohub-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
+        file_name: 'biohub-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
         file_size_bytes: '2048',
         estimated_size_bytes: '2000',
         feature_count: 3,
@@ -662,7 +662,7 @@ describe('DownloadPipelineService', () => {
       expect(result).to.equal('https://s3.example.com/fragment-url');
       expect(getSignedUrlStub).to.have.been.calledOnceWith(
         BucketType.MAIN,
-        'downloads/aaaa0000-0000-0000-0000-000000000042/download-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
+        'downloads/aaaa0000-0000-0000-0000-000000000042/biohub-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
         SIGNED_URL_EXPIRY_FRAGMENT
       );
     });
@@ -727,7 +727,7 @@ describe('DownloadPipelineService', () => {
         fragment_index: 0,
         fragment_status: DownloadStatusEnum.READY,
         s3_key: null,
-        file_name: 'download-aaaa0000-0000-0000-0000-000000000042.zip',
+        file_name: 'biohub-aaaa0000-0000-0000-0000-000000000042.zip',
         file_size_bytes: '2048',
         estimated_size_bytes: '2000',
         feature_count: 3,

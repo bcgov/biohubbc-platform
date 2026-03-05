@@ -363,8 +363,8 @@ export class DownloadPipelineService extends DBService {
       }
       const isSingleFragment = download.total_fragments === 1;
       const zipFileName = isSingleFragment
-        ? `download-${downloadId}.zip`
-        : `download-${downloadId}-part-${fragment.fragment_index + 1}.zip`;
+        ? `biohub-${downloadId}.zip`
+        : `biohub-${downloadId}-part-${fragment.fragment_index + 1}.zip`;
       const s3Key = `downloads/${downloadId}/${zipFileName}`;
 
       // Create streaming pipeline: archiver → passThrough → S3 upload
