@@ -80,6 +80,15 @@ export const SubmissionFeature = z.object({
 
 export type SubmissionFeature = z.infer<typeof SubmissionFeature>;
 
+export const RelatedSubmissionFeature = z.object({
+  submission_feature_id: z.number(),
+  feature_type_name: z.string(),
+  feature_type_display_name: z.string(),
+  data: z.record(z.any())
+});
+
+export type RelatedSubmissionFeature = z.infer<typeof RelatedSubmissionFeature>;
+
 export const SubmissionFeatureRecordWithTypeAndSecurity = SubmissionFeatureRecord.extend({
   feature_type_name: z.string(),
   feature_type_display_name: z.string(),
