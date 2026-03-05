@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DownloadStatusZod } from './download-status';
+import { SearchFeatureFiltersSchema } from '../services/search-feature-service.interface';
 
 export const DownloadRecord = z.object({
   download_id: z.string(),
@@ -53,3 +54,35 @@ export interface DownloadSizeEstimate {
   /** The features included in this download with per-feature estimated_byte_size. */
   features: DownloadFeatureSummary[];
 }
+
+/**
+ * Payload for creating a new download record.
+ *
+ * Bundles the identifiers and optional configuration that flow from the
+ * pipeline service through to the repository INSERT. 
+ */
+export const CreateDownload = z.object({
+  teamId: z.string().nullable(),
+  dataRequestId: z.string().nullable(),
+  fragmentSizeBytes: z.number().optional(),
+  systemUserId: z.number().nullable().optional(),
+  searchFilters: SearchFeatureFiltersSchema.optional()
+});
+export type CreateDownload = z.infer<typeof CreateDownload>;
+
+/**
+ * Payload for creating a download request through the pipeline.
+ *
+ * Accepted by the pipeline service's public entry point. Includes the feature
+ * selection and optional fragment sizing before the request is persisted and
+ * features are linked.
+ */
+export const CreateDownloadRequest = z.object({
+  systemUserId: z.number().nullable(),
+  teamId: z.string().nullable(),
+  submissionFeatureIds: z.array(z.number()),
+  dataRequestId: z.string().optional(),
+  fragmentSizeMb: z.number().optional(),
+  searchFilters: SearchFeatureFiltersSchema.optional()
+});
+export type CreateDownloadRequest = z.infer<typeof CreateDownloadRequest>;

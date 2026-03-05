@@ -201,14 +201,12 @@ export function createDownload(): RequestHandler {
       // Create download with search filters stored for traceability.
       // teamId is null: downloads from search are user-owned, not team-based.
       const pipelineService = new DownloadPipelineService(connection);
-      const downloadId = await pipelineService.createDownloadRequest(
+      const downloadId = await pipelineService.createDownloadRequest({
         systemUserId,
-        null,
+        teamId: null,
         submissionFeatureIds,
-        undefined,
-        undefined,
-        filters
-      );
+        searchFilters: filters
+      });
 
       // Publish async processing job within the transaction
       await publisher.publishProcessDownloadJob(connection, { downloadId: downloadId.download_id });

@@ -2,9 +2,8 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { DownloadFeatureSummary, DownloadId, DownloadRecord } from '../../models/download';
+import { CreateDownload, DownloadFeatureSummary, DownloadId, DownloadRecord } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { ISearchFeaturesFilters } from '../../services/search-feature-service.interface';
 import { BaseRepository } from '../base-repository';
 
 const IsAuthorized = z.object({ authorized: z.boolean() });
@@ -21,21 +20,12 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Create a new download record.
    *
-   * @param {string | null} teamId - The team that owns this download. Null for anonymous downloads.
-   * @param {string | null} dataRequestId - The data request that originated this download. Null for non-request downloads.
-   * @param {number} [fragmentSizeBytes] - Target fragment size in bytes. Defaults to FRAGMENT_SIZE_THRESHOLD (200 MB).
-   * @param {number | null} [systemUserId] - The user who created this download. Null for anonymous downloads.
-   * @param {ISearchFeaturesFilters} [searchFilters] - Original search filters for traceability. Null for cart-based downloads.
+   * @param {CreateDownload} payload
    * @return {Promise<DownloadId>} The created record ID.
    * @memberof DownloadRepository
    */
-  async createDownload(
-    teamId: string | null,
-    dataRequestId: string | null,
-    fragmentSizeBytes?: number,
-    systemUserId?: number | null,
-    searchFilters?: ISearchFeaturesFilters
-  ): Promise<DownloadId> {
+  async createDownload(payload: CreateDownload): Promise<DownloadId> {
+    const { teamId, dataRequestId, fragmentSizeBytes, systemUserId, searchFilters } = payload;
     const sizeBytes = fragmentSizeBytes ?? FRAGMENT_SIZE_THRESHOLD;
 
     const sql = SQL`

@@ -156,7 +156,12 @@ export class CartService extends DBService {
     }
 
     // Create download record (no data request for cart checkouts)
-    const downloadId = await this.downloadService.createDownload(teamId, null, fragmentSizeBytes, systemUserId);
+    const downloadId = await this.downloadService.createDownload({
+      teamId,
+      dataRequestId: null,
+      fragmentSizeBytes,
+      systemUserId
+    });
 
     // Link features to download
     await this.downloadService.createDownloadFeatures(downloadId.download_id, featureIds);

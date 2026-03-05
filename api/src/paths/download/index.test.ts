@@ -61,7 +61,7 @@ describe('paths/download/index', () => {
       expect(mockRes.jsonValue).to.eql({ download_id: 'uuid-1' });
     });
 
-    it('should pass search filters to createDownloadRequest as 5th arg', async () => {
+    it('should pass search filters to createDownloadRequest', async () => {
       const dbConnectionObj = getMockDBConnection();
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
@@ -80,11 +80,12 @@ describe('paths/download/index', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      // args[5] = searchFilters
-      expect(createDownloadRequestStub.firstCall.args[5]).to.eql({ feature_types: ['dataset'] });
+      expect(createDownloadRequestStub.firstCall.args[0]).to.have.deep.property('searchFilters', {
+        feature_types: ['dataset']
+      });
     });
 
-    it('should pass systemUserId=null, teamId=null, dataRequestId=undefined for anonymous', async () => {
+    it('should pass systemUserId=null, teamId=null for anonymous', async () => {
       const dbConnectionObj = getMockDBConnection();
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
@@ -103,10 +104,9 @@ describe('paths/download/index', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      // args[0] = systemUserId (null for anonymous), args[1] = teamId (null), args[3] = dataRequestId (undefined)
-      expect(createDownloadRequestStub.firstCall.args[0]).to.equal(null);
-      expect(createDownloadRequestStub.firstCall.args[1]).to.equal(null);
-      expect(createDownloadRequestStub.firstCall.args[3]).to.equal(undefined);
+      const opts = createDownloadRequestStub.firstCall.args[0];
+      expect(opts).to.have.property('systemUserId', null);
+      expect(opts).to.have.property('teamId', null);
     });
 
     it('should pass filters to getSearchFeatureIds', async () => {

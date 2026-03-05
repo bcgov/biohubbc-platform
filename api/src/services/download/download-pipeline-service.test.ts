@@ -79,10 +79,10 @@ describe('DownloadPipelineService', () => {
         .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
       sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
 
-      await service.createDownloadRequest(42, null, [10, 20]);
+      await service.createDownloadRequest({ systemUserId: 42, teamId: null, submissionFeatureIds: [10, 20] });
 
       expect(createDownloadStub).to.have.been.calledOnce;
-      expect(createDownloadStub.firstCall.args[3]).to.equal(42);
+      expect(createDownloadStub.firstCall.args[0]).to.have.property('systemUserId', 42);
     });
 
     it('passes null systemUserId for anonymous downloads', async () => {
@@ -94,13 +94,13 @@ describe('DownloadPipelineService', () => {
         .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
       sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
 
-      await service.createDownloadRequest(null, null, [10, 20]);
+      await service.createDownloadRequest({ systemUserId: null, teamId: null, submissionFeatureIds: [10, 20] });
 
       expect(createDownloadStub).to.have.been.calledOnce;
-      expect(createDownloadStub.firstCall.args[3]).to.be.null;
+      expect(createDownloadStub.firstCall.args[0]).to.have.property('systemUserId', null);
     });
 
-    it('passes searchFilters to createDownload as 5th arg', async () => {
+    it('passes searchFilters to createDownload', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
@@ -110,14 +110,20 @@ describe('DownloadPipelineService', () => {
       sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
 
       const filters = { keyword: 'elk' };
-      await service.createDownloadRequest(42, null, [10, 20], undefined, undefined, filters);
+      await service.createDownloadRequest({
+        systemUserId: 42,
+        teamId: null,
+        submissionFeatureIds: [10, 20],
+        searchFilters: filters
+      });
 
       expect(createDownloadStub).to.have.been.calledOnce;
-      expect(createDownloadStub.firstCall.args[3]).to.equal(42);
-      expect(createDownloadStub.firstCall.args[4]).to.deep.equal({ keyword: 'elk' });
+      const opts = createDownloadStub.firstCall.args[0];
+      expect(opts).to.have.property('systemUserId', 42);
+      expect(opts).to.have.deep.property('searchFilters', { keyword: 'elk' });
     });
 
-    it('omitting searchFilters passes undefined as 5th arg', async () => {
+    it('omitting searchFilters passes undefined', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
@@ -126,13 +132,13 @@ describe('DownloadPipelineService', () => {
         .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
       sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
 
-      await service.createDownloadRequest(42, null, [10, 20]);
+      await service.createDownloadRequest({ systemUserId: 42, teamId: null, submissionFeatureIds: [10, 20] });
 
       expect(createDownloadStub).to.have.been.calledOnce;
-      expect(createDownloadStub.firstCall.args[4]).to.be.undefined;
+      expect(createDownloadStub.firstCall.args[0].searchFilters).to.be.undefined;
     });
 
-    it('still creates download features after searchFilters signature change', async () => {
+    it('still creates download features after options refactor', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
@@ -141,7 +147,12 @@ describe('DownloadPipelineService', () => {
         .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
       const createFeaturesStub = sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
 
-      await service.createDownloadRequest(42, null, [10, 20], undefined, undefined, { keyword: 'elk' });
+      await service.createDownloadRequest({
+        systemUserId: 42,
+        teamId: null,
+        submissionFeatureIds: [10, 20],
+        searchFilters: { keyword: 'elk' }
+      });
 
       expect(createFeaturesStub).to.have.been.calledOnce;
       expect(createFeaturesStub.firstCall.args[0]).to.equal('aaaa0000-0000-0000-0000-000000000001');
