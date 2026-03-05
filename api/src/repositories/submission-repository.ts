@@ -73,6 +73,8 @@ export const SubmissionFeature = z.object({
   source_id: z.string().nullable(),
   data: z.record(z.any()),
   feature_type_name: z.string(),
+  feature_type_display_name: z.string(),
+  submission_name: z.string(),
   secured: z.boolean()
 });
 
