@@ -465,6 +465,22 @@ describe('authorizeByTeam', function () {
     sinon.restore();
   });
 
+  const fakeFeature: SubmissionFeature = {
+    submission_feature_id: 1,
+    uuid: 'uuid-1',
+    urn: 'urn:1:Feature:1',
+    submission_id: 1,
+    feature_type_id: 10,
+    source_id: null,
+    data: {},
+    feature_type_name: 'feature',
+    feature_type_display_name: 'Feature',
+    submission_name: 'Test Submission',
+    secured: true
+  };
+
+  const mockPolicies: Policy[] = [{ policy_id: 'policy', description: 'policy description', name: 'Policy Name' }];
+
   const systemUser: SystemUser = {
     system_user_id: 1,
     user_identity_source_id: 2,
