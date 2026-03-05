@@ -1247,6 +1247,8 @@ export class SubmissionRepository extends BaseRepository {
         sf.source_id,
         sf.data,
         ft.name as feature_type_name,
+        ft.display_name as feature_type_display_name,
+        s.name as submission_name,
         EXISTS (
           SELECT 1
           FROM submission_feature_security sfs
@@ -1257,6 +1259,8 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature sf
       JOIN
         feature_type ft ON ft.feature_type_id = sf.feature_type_id
+      JOIN
+        submission s ON s.submission_id = sf.submission_id
       WHERE
         sf.submission_feature_id = ${submissionFeatureId};
     `;
