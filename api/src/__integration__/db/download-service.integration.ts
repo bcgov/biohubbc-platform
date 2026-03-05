@@ -60,7 +60,11 @@ describe('DownloadPipelineService (integration)', function () {
       const featureId1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset A' });
       const featureId2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset B' });
       // Step 2: Create download request through the service (no team for test)
-      const result = await service.createDownloadRequest({ systemUserId: null, teamId: null, submissionFeatureIds: [featureId1, featureId2] });
+      const result = await service.createDownloadRequest({
+        systemUserId: null,
+        teamId: null,
+        submissionFeatureIds: [featureId1, featureId2]
+      });
 
       // Step 3: Verify download record was created with correct initial state
       const download = await crudService.findDownloadById(result.download_id);
@@ -116,7 +120,11 @@ describe('DownloadPipelineService (integration)', function () {
       // Step 1: Create a download
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Test' });
-      const { download_id } = await service.createDownloadRequest({ systemUserId: null, teamId: null, submissionFeatureIds: [featureId] });
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: null,
+        teamId: null,
+        submissionFeatureIds: [featureId]
+      });
 
       // Step 2: Transition to processing
       await service.updateDownloadStatus(download_id, DownloadStatusEnum.PROCESSING);
@@ -155,7 +163,11 @@ describe('DownloadPipelineService (integration)', function () {
         count: 12,
         timestamp: '2024-01-16T14:30:00Z'
       });
-      const { download_id } = await service.createDownloadRequest({ systemUserId: apiUserId, teamId: null, submissionFeatureIds: [featureId1, featureId2] });
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: apiUserId,
+        teamId: null,
+        submissionFeatureIds: [featureId1, featureId2]
+      });
 
       // Step 2: Verify initial state
       const initial = await crudService.findDownloadById(download_id);
@@ -192,7 +204,11 @@ describe('DownloadPipelineService (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Size Test' });
 
-      const { download_id } = await service.createDownloadRequest({ systemUserId: null, teamId: null, submissionFeatureIds: [featureId] });
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: null,
+        teamId: null,
+        submissionFeatureIds: [featureId]
+      });
 
       const sizeData = await crudService.getDownloadFeatureSummaries(download_id, null);
 
@@ -210,7 +226,11 @@ describe('DownloadPipelineService (integration)', function () {
       const securedFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
       await secureFeature(securedFeatureId);
 
-      const { download_id } = await service.createDownloadRequest({ systemUserId: null, teamId: null, submissionFeatureIds: [openFeatureId, securedFeatureId] });
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: null,
+        teamId: null,
+        submissionFeatureIds: [openFeatureId, securedFeatureId]
+      });
 
       const sizeData = await crudService.getDownloadFeatureSummaries(download_id, null);
 
@@ -236,7 +256,11 @@ describe('DownloadPipelineService (integration)', function () {
       );
 
       // Step 2: Create download and plan fragments
-      const { download_id } = await service.createDownloadRequest({ systemUserId: null, teamId: null, submissionFeatureIds: [childFeatureId] });
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: null,
+        teamId: null,
+        submissionFeatureIds: [childFeatureId]
+      });
       const sizeEstimate = await service.estimateDownloadSize(download_id, null);
       await service.planFragments(download_id, sizeEstimate);
 
@@ -276,7 +300,11 @@ describe('DownloadPipelineService (integration)', function () {
       });
 
       // Step 2: Create download and plan fragments
-      const { download_id } = await service.createDownloadRequest({ systemUserId: null, teamId: null, submissionFeatureIds: [rootFeatureId] });
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: null,
+        teamId: null,
+        submissionFeatureIds: [rootFeatureId]
+      });
       const sizeEstimate = await service.estimateDownloadSize(download_id, null);
       await service.planFragments(download_id, sizeEstimate);
 
@@ -387,7 +415,11 @@ describe('DownloadPipelineService (integration)', function () {
   async function createAnonymousDownload(): Promise<string> {
     const submissionId = await createTestSubmission(connection);
     const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Anon' });
-    const { download_id } = await service.createDownloadRequest({ systemUserId: null, teamId: null, submissionFeatureIds: [featureId] });
+    const { download_id } = await service.createDownloadRequest({
+      systemUserId: null,
+      teamId: null,
+      submissionFeatureIds: [featureId]
+    });
     // createDownloadRequest sets system_user_id from connection.systemUserId(),
     // but the API user connection returns a real user id. Clear it for anonymous:
     await connection.sql(SQL`
@@ -439,7 +471,12 @@ describe('DownloadPipelineService (integration)', function () {
       // Create a download with team_id set
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
-      const { download_id } = await service.createDownloadRequest({ systemUserId: null, teamId, submissionFeatureIds: [featureId], dataRequestId });
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: null,
+        teamId,
+        submissionFeatureIds: [featureId],
+        dataRequestId
+      });
 
       // Clear system_user_id but keep team_id
       await connection.sql(SQL`
@@ -463,7 +500,11 @@ describe('DownloadPipelineService (integration)', function () {
       const apiUserId = connection.systemUserId();
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Owned' });
-      const { download_id } = await service.createDownloadRequest({ systemUserId: apiUserId, teamId: null, submissionFeatureIds: [featureId] });
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: apiUserId,
+        teamId: null,
+        submissionFeatureIds: [featureId]
+      });
       await service.getAuthorizedDownload(download_id, apiUserId);
       // No error thrown — authorized
     });
@@ -472,7 +513,11 @@ describe('DownloadPipelineService (integration)', function () {
       const apiUserId = connection.systemUserId();
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Owned' });
-      const { download_id } = await service.createDownloadRequest({ systemUserId: apiUserId, teamId: null, submissionFeatureIds: [featureId] });
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: apiUserId,
+        teamId: null,
+        submissionFeatureIds: [featureId]
+      });
 
       const otherUserId = await createOtherUser();
       try {
@@ -486,7 +531,11 @@ describe('DownloadPipelineService (integration)', function () {
     it('should authorize via download_share (shared path)', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Shared' });
-      const { download_id } = await service.createDownloadRequest({ systemUserId: null, teamId: null, submissionFeatureIds: [featureId] });
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: null,
+        teamId: null,
+        submissionFeatureIds: [featureId]
+      });
 
       // Share with another user
       const otherUserId = await createOtherUser();
@@ -505,7 +554,12 @@ describe('DownloadPipelineService (integration)', function () {
       // Create download linked to data request
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Request' });
-      const { download_id } = await service.createDownloadRequest({ systemUserId: null, teamId, submissionFeatureIds: [featureId], dataRequestId });
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: null,
+        teamId,
+        submissionFeatureIds: [featureId],
+        dataRequestId
+      });
 
       await service.getAuthorizedDownload(download_id, otherUserId);
       // No error thrown — authorized
@@ -520,7 +574,12 @@ describe('DownloadPipelineService (integration)', function () {
 
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Locked' });
-      const { download_id } = await service.createDownloadRequest({ systemUserId: null, teamId, submissionFeatureIds: [featureId], dataRequestId });
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: null,
+        teamId,
+        submissionFeatureIds: [featureId],
+        dataRequestId
+      });
 
       try {
         await service.getAuthorizedDownload(download_id, outsider);
@@ -538,7 +597,11 @@ describe('DownloadPipelineService (integration)', function () {
       const apiUserId = connection.systemUserId();
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Mine' });
-      const { download_id } = await service.createDownloadRequest({ systemUserId: apiUserId, teamId: null, submissionFeatureIds: [featureId] });
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: apiUserId,
+        teamId: null,
+        submissionFeatureIds: [featureId]
+      });
       const downloads = await crudService.getDownloadsByTeamMembership(apiUserId);
       const ids = downloads.map((d) => d.download_id);
       expect(ids).to.include(download_id);
@@ -547,7 +610,11 @@ describe('DownloadPipelineService (integration)', function () {
     it('should return shared downloads', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Shared List' });
-      const { download_id } = await service.createDownloadRequest({ systemUserId: null, teamId: null, submissionFeatureIds: [featureId] });
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: null,
+        teamId: null,
+        submissionFeatureIds: [featureId]
+      });
 
       const otherUserId = await createOtherUser();
       await shareDownload(download_id, otherUserId);
@@ -565,7 +632,12 @@ describe('DownloadPipelineService (integration)', function () {
 
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Team DL' });
-      const { download_id } = await service.createDownloadRequest({ systemUserId: null, teamId, submissionFeatureIds: [featureId], dataRequestId });
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: null,
+        teamId,
+        submissionFeatureIds: [featureId],
+        dataRequestId
+      });
 
       const downloads = await crudService.getDownloadsByTeamMembership(otherUserId);
       const ids = downloads.map((d) => d.download_id);
@@ -575,7 +647,11 @@ describe('DownloadPipelineService (integration)', function () {
     it('should not return downloads the user has no access to', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Private' });
-      const { download_id } = await service.createDownloadRequest({ systemUserId: null, teamId: null, submissionFeatureIds: [featureId] });
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: null,
+        teamId: null,
+        submissionFeatureIds: [featureId]
+      });
 
       const otherUserId = await createOtherUser();
       const downloads = await crudService.getDownloadsByTeamMembership(otherUserId);

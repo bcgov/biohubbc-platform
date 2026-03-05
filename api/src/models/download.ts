@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { DownloadStatusZod } from './download-status';
 import { SearchFeatureFiltersSchema } from '../services/search-feature-service.interface';
+import { DownloadStatusZod } from './download-status';
 
 export const DownloadRecord = z.object({
   download_id: z.string(),
@@ -59,7 +59,7 @@ export interface DownloadSizeEstimate {
  * Payload for creating a new download record.
  *
  * Bundles the identifiers and optional configuration that flow from the
- * pipeline service through to the repository INSERT. 
+ * pipeline service through to the repository INSERT.
  */
 export const CreateDownload = z.object({
   teamId: z.string().nullable(),

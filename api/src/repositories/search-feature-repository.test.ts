@@ -10,7 +10,7 @@ import {
   SpatialSearchableRecord,
   StringSearchableRecord
 } from '../services/search-feature-service.interface';
-import { getMockDBConnection } from '../__mocks__/db';
+import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { SearchFeatureRepository } from './search-feature-repository';
 
 describe('SearchFeatureRepository', () => {
@@ -701,10 +701,7 @@ describe('SearchFeatureRepository', () => {
     });
 
     it('should return flat number array of submission_feature_ids for matching filters', async () => {
-      const mockQueryResponse = {
-        rowCount: 2,
-        rows: [{ submission_feature_id: 1 }, { submission_feature_id: 2 }]
-      } as unknown as Promise<QueryResult<any>>;
+      const mockQueryResponse = mockQueryResult([{ submission_feature_id: 1 }, { submission_feature_id: 2 }], 2);
 
       const mockDBConnection = getMockDBConnection({
         knex: async () => mockQueryResponse
@@ -718,10 +715,7 @@ describe('SearchFeatureRepository', () => {
     });
 
     it('should return empty array when DB returns no rows', async () => {
-      const mockQueryResponse = {
-        rowCount: 0,
-        rows: []
-      } as unknown as Promise<QueryResult<any>>;
+      const mockQueryResponse = mockQueryResult([], 0);
 
       const mockDBConnection = getMockDBConnection({
         knex: async () => mockQueryResponse
