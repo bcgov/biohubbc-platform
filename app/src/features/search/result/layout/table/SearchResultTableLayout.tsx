@@ -8,6 +8,7 @@ interface SearchResultTableLayoutProps {
   results: SearchFeatureResultWithRelevancy[];
   cartFeatureIds: Set<number>;
   onRowSelectionModelChange: (rowSelectionModel: GridRowSelectionModel) => void;
+  onClick?: (result: SearchFeatureResultWithRelevancy) => void;
   onDownload?: (result: SearchFeatureResultWithRelevancy) => void;
   onAddToCart?: (result: SearchFeatureResultWithRelevancy) => void;
   onRemoveFromCart?: (featureId: number) => void;
@@ -17,6 +18,7 @@ export const SearchResultTableLayout = ({
   results,
   cartFeatureIds,
   onRowSelectionModelChange,
+  onClick,
   onDownload,
   onAddToCart,
   onRemoveFromCart
@@ -67,6 +69,7 @@ export const SearchResultTableLayout = ({
                 variant="outlined"
                 onClick={() => {
                   onDownload?.(result);
+                  onClick?.(result);
                 }}>
                 View
               </Button>
@@ -95,7 +98,7 @@ export const SearchResultTableLayout = ({
         }
       }
     ];
-  }, [results, cartFeatureIds, onDownload, onAddToCart, onRemoveFromCart]);
+  }, [results, cartFeatureIds, onDownload, onClick, onAddToCart, onRemoveFromCart]);
 
   return (
     <CustomDataGrid
