@@ -275,7 +275,14 @@ export const SearchResultPage = () => {
           <Divider />
 
           <Box sx={{ flex: 1, overflow: 'auto' }}>
-            <SearchResultOptions rows={rows} isLoading={isLoading} view={view} />
+            <SearchResultOptions
+              rows={rows}
+              isLoading={isLoading}
+              view={view}
+              onClick={(result) =>
+                navigate(`/search/${result.submission_id}/feature/${result.submission_feature_id}`)
+              }
+            />
           </Box>
         </Paper>
       </Box>
