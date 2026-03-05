@@ -84,11 +84,14 @@ export function getSubmissionFeatureById(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
 
-      const feature = await submissionService.getSubmissionFeatureById(submissionFeatureId);
+      const [feature, relatedFeatures] = await Promise.all([
+        submissionService.getSubmissionFeatureById(submissionFeatureId),
+        submissionService.getRelatedSubmissionFeatures(submissionFeatureId)
+      ]);
 
       await connection.commit();
 
-      res.status(200).json({ feature });
+      res.status(200).json({ feature, relatedFeatures });
     } catch (error) {
       defaultLog.error({ label: 'getSubmissionFeatureById', message: 'error', error });
       await connection.rollback();
