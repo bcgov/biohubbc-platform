@@ -1,4 +1,5 @@
 import { IDBConnection } from '../../database/db';
+import { HTTP404 } from '../../errors/http-error';
 import {
   CreateSubmissionUpload,
   SubmissionUpload,
@@ -8,6 +9,7 @@ import {
 import { SubmissionUploadRepository } from '../../repositories/upload/submission-upload-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
+import { SubmissionService } from '../submission-service';
 
 export class SubmissionUploadService extends DBService {
   submissionUploadRepository: SubmissionUploadRepository;
@@ -32,6 +34,37 @@ export class SubmissionUploadService extends DBService {
    */
   async getSubmissionUpload(submissionUploadId: string): Promise<SubmissionUpload> {
     return this.submissionUploadRepository.getSubmissionUpload(submissionUploadId);
+  }
+
+  /**
+   * Retrieves a submission_upload record only if it belongs to the submission identified by the given UUID.
+   * Use this to validate path parameters (submissionId + submissionUploadId) before acting on an upload.
+   *
+   * @param {string} submissionUuid Submission UUID from path (submission.uuid)
+   * @param {string} submissionUploadId Submission upload ID from path
+   * @return {Promise<SubmissionUpload>} The submission upload record
+   * @throws {HTTP404} If the submission does not exist, or the upload does not exist, or the upload does not belong to the submission
+   * @memberof SubmissionUploadService
+   */
+  async getSubmissionUploadForSubmissionOrThrow(
+    submissionUuid: string,
+    submissionUploadId: string
+  ): Promise<SubmissionUpload> {
+    const submissionService = new SubmissionService(this.connection);
+    const byUuid = await submissionService.getSubmissionIdByUUID(submissionUuid);
+    if (!byUuid) {
+      throw new HTTP404('Submission not found.');
+    }
+    let submissionUpload: SubmissionUpload;
+    try {
+      submissionUpload = await this.submissionUploadRepository.getSubmissionUpload(submissionUploadId);
+    } catch {
+      throw new HTTP404('Submission upload not found');
+    }
+    if (submissionUpload.submission_id !== byUuid.submission_id) {
+      throw new HTTP404('Submission upload not found');
+    }
+    return submissionUpload;
   }
 
   /**
