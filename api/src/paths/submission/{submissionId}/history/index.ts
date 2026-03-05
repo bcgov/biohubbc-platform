@@ -43,10 +43,10 @@ GET.apiDoc = {
         }
       }
     },
+    ...defaultErrorResponses,
     404: {
       description: 'Submission not found (invalid submission UUID).'
-    },
-    ...defaultErrorResponses
+    }
   }
 };
 
