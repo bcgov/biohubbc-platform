@@ -195,7 +195,6 @@ export function createDownload(): RequestHandler {
       }
 
       // Anonymous downloads: system_user_id is null (UUID is the credential).
-      // Matches the cart checkout pattern (cart/{cartId}/checkout/index.ts:98).
       const systemUserId = isAuthenticated ? connection.systemUserId() : null;
 
       // Create download with search filters stored for traceability.
