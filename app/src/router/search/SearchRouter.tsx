@@ -41,8 +41,10 @@ export const SearchRouter = () => {
         path="/:submissionId/feature/:submissionFeatureId"
         element={
           <BaseLayout>
-            <PageTitle title="Submission Details" description="Details of a specific submission" />
-            <SubmissionFeaturePage />
+            <CartContextProvider>
+              <PageTitle title="Submission Details" description="Details of a specific submission" />
+              <SubmissionFeaturePage />
+            </CartContextProvider>
           </BaseLayout>
         }
       />
