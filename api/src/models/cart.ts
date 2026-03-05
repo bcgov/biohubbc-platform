@@ -22,7 +22,8 @@ export type CartSubmissionFeature = z.infer<typeof CartSubmissionFeature>;
 export const Cart = z.object({
   cart_id: z.string(),
   system_user_id: z.number().nullable(),
-  cart_status: z.nativeEnum(CartStatus)
+  cart_status: z.nativeEnum(CartStatus),
+  record_end_date: z.string().nullable()
 });
 
 export type Cart = z.infer<typeof Cart>;

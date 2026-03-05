@@ -24,7 +24,8 @@ describe('useCartApi', () => {
         cart: {
           cart_id: '123',
           system_user_id: null,
-          cart_status: 'active'
+          cart_status: 'active',
+          record_end_date: null
         },
         features: [],
         pagination: {
@@ -47,7 +48,8 @@ describe('useCartApi', () => {
         cart: {
           cart_id: '123',
           system_user_id: null,
-          cart_status: 'active'
+          cart_status: 'active',
+          record_end_date: null
         },
         features: [],
         pagination: {
@@ -149,7 +151,8 @@ describe('useCartApi', () => {
         cart: {
           cart_id: '123',
           system_user_id: 1,
-          cart_status: 'active'
+          cart_status: 'active',
+          record_end_date: null
         },
         features: [],
         pagination: {

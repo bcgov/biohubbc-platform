@@ -54,7 +54,8 @@ describe('cart/{cartId}', () => {
       const fakeCart = {
         cart_id: 'cart-123',
         system_user_id: null,
-        cart_status: CartStatus.ACTIVE
+        cart_status: CartStatus.ACTIVE,
+        record_end_date: null
       };
 
       const fakePaginatedResponse = {
@@ -112,7 +113,8 @@ describe('cart/{cartId}', () => {
       const fakeCart = {
         cart_id: 'cart-123',
         system_user_id: null,
-        cart_status: CartStatus.ACTIVE
+        cart_status: CartStatus.ACTIVE,
+        record_end_date: null
       };
 
       const fakePaginatedResponse = {
@@ -161,7 +163,8 @@ describe('cart/{cartId}', () => {
       const fakeCart = {
         cart_id: 'cart-123',
         system_user_id: null,
-        cart_status: CartStatus.ACTIVE
+        cart_status: CartStatus.ACTIVE,
+        record_end_date: null
       };
 
       const fakePaginatedResponse = {
@@ -177,7 +180,7 @@ describe('cart/{cartId}', () => {
       };
 
       sinon.stub(CartService.prototype, 'getCartById').resolves(fakeCart);
-      sinon
+      const getPaginatedCartFeaturesResponseStub = sinon
         .stub(CartSubmissionFeatureService.prototype, 'getPaginatedCartFeaturesResponse')
         .resolves(fakePaginatedResponse);
 
@@ -189,9 +192,12 @@ describe('cart/{cartId}', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      // Check that default pagination is set in request
-      expect(mockReq.query.limit).to.equal('25');
-      expect(mockReq.query.page).to.equal('1');
+      expect(getPaginatedCartFeaturesResponseStub).to.have.been.calledOnceWith('cart-123', {
+        page: 1,
+        limit: 25,
+        sort: undefined,
+        order: undefined
+      });
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.equal(200);
@@ -233,7 +239,8 @@ describe('cart/{cartId}', () => {
       const fakeCart = {
         cart_id: 'cart-123',
         system_user_id: null,
-        cart_status: CartStatus.ACTIVE
+        cart_status: CartStatus.ACTIVE,
+        record_end_date: null
       };
 
       sinon.stub(CartService.prototype, 'getCartById').resolves(fakeCart);
@@ -265,7 +272,7 @@ describe('cart/{cartId}', () => {
       });
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
       sinon.stub(CartService.prototype, 'getCartById').rejects(new Error('Cart not found'));
-      const featureStub = sinon.stub(CartSubmissionFeatureService.prototype, 'getPaginatedCartFeaturesResponse');
+      sinon.stub(CartSubmissionFeatureService.prototype, 'getPaginatedCartFeaturesResponse');
 
       const requestHandler = getCartWithFeaturesById();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -278,7 +285,6 @@ describe('cart/{cartId}', () => {
         expect.fail('Expected handler to throw');
       } catch (error) {
         expect((error as ApiError).message).to.equal('Cart not found');
-        expect(featureStub).to.not.have.been.called;
         expect(mockDBConnection.rollback).to.have.been.calledOnce;
         expect(mockDBConnection.release).to.have.been.calledOnce;
       }

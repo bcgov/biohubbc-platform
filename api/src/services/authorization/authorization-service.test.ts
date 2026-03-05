@@ -541,7 +541,8 @@ describe('authorizeByCart', function () {
   const fakeCart: Cart = {
     cart_id: 'cart-1',
     cart_status: CartStatus.ACTIVE,
-    system_user_id: 1
+    system_user_id: 1,
+    record_end_date: null
   };
 
   const systemUser: SystemUser = {
@@ -569,7 +570,8 @@ describe('authorizeByCart', function () {
     const fakeCart: Cart = {
       cart_id: 'cart-1',
       system_user_id: 1,
-      cart_status: CartStatus.ACTIVE
+      cart_status: CartStatus.ACTIVE,
+      record_end_date: null
     };
 
     sinon.stub(CartService.prototype, 'findCartById').resolves(fakeCart);
@@ -592,7 +594,8 @@ describe('authorizeByCart', function () {
     const fakeCartWithDifferentOwner: Cart = {
       cart_id: 'cart-1',
       cart_status: CartStatus.ACTIVE,
-      system_user_id: 2
+      system_user_id: 2,
+      record_end_date: null
     };
     sinon.stub(CartService.prototype, 'findCartById').resolves(fakeCartWithDifferentOwner);
     sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
@@ -612,7 +615,8 @@ describe('authorizeByCart', function () {
     const fakeUnauthenticatedCart: Cart = {
       cart_id: 'cart-1',
       cart_status: CartStatus.ACTIVE,
-      system_user_id: null // No system_user_id, indicating it's unauthenticated
+      system_user_id: null, // No system_user_id, indicating it's unauthenticated
+      record_end_date: null
     };
     sinon.stub(CartService.prototype, 'findCartById').resolves(fakeUnauthenticatedCart);
     sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
@@ -655,6 +659,108 @@ describe('authorizeByCart', function () {
     });
 
     expect(result).to.be.false;
+  });
+
+  it('returns false if cart is checked out', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(CartService.prototype, 'findCartById').resolves({
+      cart_id: 'cart-1',
+      cart_status: CartStatus.CHECKED_OUT,
+      system_user_id: 1,
+      record_end_date: null
+    });
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByCart({
+      discriminator: 'Cart',
+      cartId: 'cart-1'
+    });
+
+    expect(result).to.be.false;
+  });
+
+  it('returns false if cart is expired', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(CartService.prototype, 'findCartById').resolves({
+      cart_id: 'cart-1',
+      cart_status: CartStatus.EXPIRED,
+      system_user_id: 1,
+      record_end_date: null
+    });
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByCart({
+      discriminator: 'Cart',
+      cartId: 'cart-1'
+    });
+
+    expect(result).to.be.false;
+  });
+
+  it('returns false if cart is abandoned', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(CartService.prototype, 'findCartById').resolves({
+      cart_id: 'cart-1',
+      cart_status: CartStatus.ABANDONED,
+      system_user_id: 1,
+      record_end_date: null
+    });
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByCart({
+      discriminator: 'Cart',
+      cartId: 'cart-1'
+    });
+
+    expect(result).to.be.false;
+  });
+
+  it('returns false if cart record_end_date is in the past', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(CartService.prototype, 'findCartById').resolves({
+      cart_id: 'cart-1',
+      cart_status: CartStatus.ACTIVE,
+      system_user_id: 1,
+      record_end_date: '2000-01-01T00:00:00.000Z'
+    });
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByCart({
+      discriminator: 'Cart',
+      cartId: 'cart-1'
+    });
+
+    expect(result).to.be.false;
+  });
+
+  it('returns true if cart record_end_date is in the future and user owns the cart', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(CartService.prototype, 'findCartById').resolves({
+      cart_id: 'cart-1',
+      cart_status: CartStatus.ACTIVE,
+      system_user_id: 1,
+      record_end_date: '2999-01-01T00:00:00.000Z'
+    });
+
+    const systemUser = { system_user_id: 1 } as SystemUserExtended;
+    sinon.stub(AuthorizationService.prototype, 'getCachedSystemUser').resolves(systemUser);
+
+    const authorizationService = new AuthorizationService(mockDBConnection);
+
+    const result = await authorizationService.authorizeByCart({
+      discriminator: 'Cart',
+      cartId: 'cart-1'
+    });
+
+    expect(result).to.be.true;
   });
 });
 

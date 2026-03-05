@@ -19,6 +19,7 @@ export interface Cart {
   cart_id: string;
   system_user_id: number | null;
   cart_status: 'active' | 'checked_out' | 'expired' | 'abandoned';
+  record_end_date: string | null;
 }
 
 /**
