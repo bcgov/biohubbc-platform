@@ -75,10 +75,7 @@ export function createSubmissionUpload(): RequestHandler {
       const { bytes } = req.body;
 
       const uploadIngestionService = new UploadIngestionService(connection);
-      const result = await uploadIngestionService.startArchiveUploadForExistingSubmissionByUuid(
-        bytes,
-        submissionUuid
-      );
+      const result = await uploadIngestionService.startArchiveUploadForExistingSubmissionByUuid(bytes, submissionUuid);
 
       await connection.commit();
 

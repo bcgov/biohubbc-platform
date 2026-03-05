@@ -60,9 +60,7 @@ export class SubmissionUploadReviewStatusService extends DBService {
    * @param {string} submissionUuid
    * @returns {Promise<SubmissionUploadReviewStatusHistoryRow[]>}
    */
-  async getSubmissionUploadStatusHistory(
-    submissionUuid: string
-  ): Promise<SubmissionUploadReviewStatusHistoryRow[]> {
+  async getSubmissionUploadStatusHistory(submissionUuid: string): Promise<SubmissionUploadReviewStatusHistoryRow[]> {
     return this.submissionUploadReviewStatusRepository.getStatusHistoryBySubmissionUuid(submissionUuid);
   }
 }

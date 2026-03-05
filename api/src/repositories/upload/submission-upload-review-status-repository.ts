@@ -116,9 +116,7 @@ export class SubmissionUploadReviewStatusRepository extends BaseRepository {
    * @param {string} submissionUuid - The submission UUID to look up.
    * @returns {Promise<SubmissionUploadReviewStatusHistoryRow[]>} - All status records for the submission.
    */
-  async getStatusHistoryBySubmissionUuid(
-    submissionUuid: string
-  ): Promise<SubmissionUploadReviewStatusHistoryRow[]> {
+  async getStatusHistoryBySubmissionUuid(submissionUuid: string): Promise<SubmissionUploadReviewStatusHistoryRow[]> {
     const sqlStatement = SQL`
       SELECT
         s.submission_id,

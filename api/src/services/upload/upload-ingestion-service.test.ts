@@ -58,6 +58,9 @@ describe('UploadIngestionService', () => {
       const mockBytes = 5_000_000;
 
       sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({ submission_id: mockSubmissionId });
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves({ uuid: mockSubmission.uuid } as any);
       sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: mockUploadId });
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
@@ -111,6 +114,9 @@ describe('UploadIngestionService', () => {
 
     it('should throw if upload creation fails', async () => {
       sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({ submission_id: 123 });
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves({ uuid: mockSubmission.uuid } as any);
       sinon.stub(UploadService.prototype, 'insertUpload').rejects(new Error('Database error: upload insert failed'));
 
       try {
@@ -123,6 +129,9 @@ describe('UploadIngestionService', () => {
 
     it('should throw if artifact creation fails', async () => {
       sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({ submission_id: 123 });
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves({ uuid: mockSubmission.uuid } as any);
       sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: 'upload-456' });
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
@@ -146,6 +155,9 @@ describe('UploadIngestionService', () => {
 
     it('should throw if presigned URL generation fails', async () => {
       sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({ submission_id: 123 });
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves({ uuid: mockSubmission.uuid } as any);
       sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: 'upload-456' });
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
