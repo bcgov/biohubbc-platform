@@ -1,5 +1,5 @@
 import { IDBConnection } from '../../database/db';
-import { CreateDownload, DownloadFeatureSummary, DownloadId, DownloadRecord } from '../../models/download';
+import { CreateDownload, DownloadFeatureSummary, DownloadId, DownloadListRecord, DownloadRecord } from '../../models/download';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { DBService } from '../db-service';
 
@@ -62,7 +62,7 @@ export class DownloadService extends DBService {
    * @return {Promise<DownloadRecord[]>}
    * @memberof DownloadService
    */
-  async getDownloadsByTeamMembership(systemUserId: number): Promise<DownloadRecord[]> {
+  async getDownloadsByTeamMembership(systemUserId: number): Promise<DownloadListRecord[]> {
     return this.downloadRepository.getDownloadsByTeamMembership(systemUserId);
   }
 

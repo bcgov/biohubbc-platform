@@ -41,7 +41,7 @@ GET.apiDoc = {
                 type: 'array',
                 items: {
                   type: 'object',
-                  required: ['download_id', 'status'],
+                  required: ['download_id', 'status', 'create_date', 'feature_count'],
                   properties: {
                     download_id: {
                       type: 'string',
@@ -50,6 +50,12 @@ GET.apiDoc = {
                     status: {
                       type: 'string',
                       enum: ['pending', 'processing', 'ready', 'failed', 'downloaded']
+                    },
+                    create_date: {
+                      type: 'string'
+                    },
+                    feature_count: {
+                      type: 'integer'
                     },
                     started_at: {
                       type: 'string',

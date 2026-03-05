@@ -2,7 +2,7 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { CreateDownload, DownloadFeatureSummary, DownloadId, DownloadRecord } from '../../models/download';
+import { CreateDownload, DownloadFeatureSummary, DownloadId, DownloadListRecord, DownloadRecord } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { BaseRepository } from '../base-repository';
 
@@ -91,7 +91,8 @@ export class DownloadRepository extends BaseRepository {
         total_fragments,
         completed_fragments,
         estimated_total_size_bytes,
-        fragment_size_bytes
+        fragment_size_bytes,
+        create_date
       FROM download
       WHERE download_id = ${downloadId};
     `;
@@ -113,7 +114,7 @@ export class DownloadRepository extends BaseRepository {
    * @return {Promise<DownloadRecord[]>}
    * @memberof DownloadRepository
    */
-  async getDownloadsByTeamMembership(systemUserId: number): Promise<DownloadRecord[]> {
+  async getDownloadsByTeamMembership(systemUserId: number): Promise<DownloadListRecord[]> {
     const sql = SQL`
       SELECT
         d.download_id,
@@ -128,7 +129,9 @@ export class DownloadRepository extends BaseRepository {
         d.total_fragments,
         d.completed_fragments,
         d.estimated_total_size_bytes,
-        d.fragment_size_bytes
+        d.fragment_size_bytes,
+        d.create_date,
+        (SELECT COUNT(*)::int FROM download_feature df WHERE df.download_id = d.download_id) AS feature_count
       FROM download d
       WHERE
         -- Downloads I created or claimed
@@ -152,7 +155,7 @@ export class DownloadRepository extends BaseRepository {
       ORDER BY d.create_date DESC;
     `;
 
-    const response = await this.connection.sql(sql, DownloadRecord);
+    const response = await this.connection.sql(sql, DownloadListRecord);
 
     return response.rows;
   }

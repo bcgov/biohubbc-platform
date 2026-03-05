@@ -15,9 +15,19 @@ export const DownloadRecord = z.object({
   total_fragments: z.number(),
   completed_fragments: z.number(),
   estimated_total_size_bytes: z.string().nullable(),
-  fragment_size_bytes: z.string()
+  fragment_size_bytes: z.string(),
+  create_date: z.string()
 });
 export type DownloadRecord = z.infer<typeof DownloadRecord>;
+
+/**
+ * Extended download record for the list endpoint.
+ * Includes feature_count — the number of submission_feature records linked to the download (AC #1).
+ */
+export const DownloadListRecord = DownloadRecord.extend({
+  feature_count: z.number()
+});
+export type DownloadListRecord = z.infer<typeof DownloadListRecord>;
 
 export const DownloadId = DownloadRecord.pick({ download_id: true });
 export type DownloadId = z.infer<typeof DownloadId>;

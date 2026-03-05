@@ -168,6 +168,22 @@ describe('DownloadRepository', () => {
     });
   });
 
+  describe('findDownloadById', () => {
+    it('SQL includes create_date in SELECT', async () => {
+      // Verifies: create_date is not accidentally removed during refactor
+
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.findDownloadById('aaaa0000-0000-0000-0000-000000000001');
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('create_date');
+    });
+  });
+
   describe('getDownloadsByTeamMembership', () => {
     it('includes owner path checking system_user_id', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
@@ -181,6 +197,49 @@ describe('DownloadRepository', () => {
       expect(sqlText).to.include('system_user_id');
       const sqlValues = sqlStub.firstCall.args[0].values;
       expect(sqlValues).to.include(123);
+    });
+
+    it('SQL includes feature_count subquery', async () => {
+      // Verifies: Most complex change — catches if subquery is lost or alias changes
+
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.getDownloadsByTeamMembership(123);
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('COUNT(*)');
+      expect(sqlText).to.include('feature_count');
+    });
+
+    it('SQL includes create_date', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.getDownloadsByTeamMembership(123);
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('create_date');
+    });
+
+    it('uses DownloadListRecord zod schema for validation', async () => {
+      // Verifies: Wrong schema would silently strip feature_count during parse
+
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.getDownloadsByTeamMembership(123);
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const zodSchema = sqlStub.firstCall.args[1];
+      // DownloadListRecord extends DownloadRecord with feature_count
+      expect(zodSchema.shape).to.have.property('feature_count');
+      expect(zodSchema.shape).to.have.property('download_id');
     });
   });
 

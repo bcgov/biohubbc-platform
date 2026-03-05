@@ -43,6 +43,7 @@ describe('DownloadPipelineService', () => {
     completed_fragments: 0,
     estimated_total_size_bytes: null,
     fragment_size_bytes: String(FRAGMENT_SIZE_THRESHOLD),
+    create_date: '2025-01-01T00:00:00Z',
     ...overrides
   });
 
