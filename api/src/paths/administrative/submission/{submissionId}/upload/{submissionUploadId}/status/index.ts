@@ -2,13 +2,16 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../../../constants/roles';
 import { getDBConnection } from '../../../../../../../database/db';
+import { HTTP404 } from '../../../../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../../../../openapi/schemas/http-responses';
 import {
   SubmissionUploadReviewStatusResponseSchema,
   UpdateSubmissionUploadReviewStatusRequestSchema
 } from '../../../../../../../openapi/schemas/upload';
 import { authorizeRequestHandler } from '../../../../../../../request-handlers/security/authorization';
+import { SubmissionService } from '../../../../../../../services/submission-service';
 import { SubmissionUploadReviewStatusService } from '../../../../../../../services/upload/submission-upload-review-status-service';
+import { SubmissionUploadService } from '../../../../../../../services/upload/submission-upload-service';
 import { getLogger } from '../../../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/submission/{submissionId}/upload/{submissionUploadId}/status');
@@ -69,7 +72,11 @@ PATCH.apiDoc = {
         }
       }
     },
-    ...defaultErrorResponses
+    ...defaultErrorResponses,
+    404: {
+      description:
+        'Submission not found (invalid submissionId) or submission upload not found (submissionUploadId does not belong to this submission).'
+    }
   }
 };
 
@@ -86,8 +93,25 @@ export function updateSubmissionUploadReviewStatus(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionUploadId } = req.params;
+      const { submissionId: submissionIdParam, submissionUploadId } = req.params;
       const { status } = req.body;
+
+      const submissionService = new SubmissionService(connection);
+      const byUuid = await submissionService.getSubmissionIdByUUID(submissionIdParam);
+      if (!byUuid) {
+        return res.status(404).json({ message: 'Submission not found.' });
+      }
+
+      const submissionUploadService = new SubmissionUploadService(connection);
+      let submissionUpload;
+      try {
+        submissionUpload = await submissionUploadService.getSubmissionUpload(submissionUploadId);
+      } catch {
+        throw new HTTP404('Submission upload not found');
+      }
+      if (submissionUpload.submission_id !== byUuid.submission_id) {
+        throw new HTTP404('Submission upload not found');
+      }
 
       const reviewStatusService = new SubmissionUploadReviewStatusService(connection);
       const result = await reviewStatusService.updateSubmissionUploadReviewStatus(submissionUploadId, { status });

@@ -6,6 +6,7 @@ import { ApiExecuteSQLError } from '../../../../../errors/api-error';
 import { HTTP404, HTTP409 } from '../../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
+import { SubmissionService } from '../../../../../services/submission-service';
 import { SubmissionUploadReviewStatusService } from '../../../../../services/upload/submission-upload-review-status-service';
 import { SubmissionUploadService } from '../../../../../services/upload/submission-upload-service';
 import { getLogger } from '../../../../../utils/logger';
@@ -55,7 +56,8 @@ DELETE.apiDoc = {
     },
     ...defaultErrorResponses,
     404: {
-      description: 'Submission upload not found (invalid submissionUploadId or no status record).'
+      description:
+        'Submission not found (invalid submissionId) or submission upload not found (invalid submissionUploadId, no status record, or upload does not belong to this submission).'
     },
     409: {
       description: 'Cannot delete a submission upload that has already been reviewed (approved or denied).'
@@ -75,7 +77,24 @@ export function deleteSubmissionUpload(): RequestHandler {
     try {
       await connection.open();
 
-      const { submissionUploadId } = req.params;
+      const { submissionId: submissionIdParam, submissionUploadId } = req.params;
+
+      const submissionService = new SubmissionService(connection);
+      const byUuid = await submissionService.getSubmissionIdByUUID(submissionIdParam);
+      if (!byUuid) {
+        return res.status(404).json({ message: 'Submission not found.' });
+      }
+
+      const submissionUploadService = new SubmissionUploadService(connection);
+      let submissionUpload;
+      try {
+        submissionUpload = await submissionUploadService.getSubmissionUpload(submissionUploadId);
+      } catch {
+        throw new HTTP404('Submission upload not found');
+      }
+      if (submissionUpload.submission_id !== byUuid.submission_id) {
+        throw new HTTP404('Submission upload not found');
+      }
 
       const reviewStatusService = new SubmissionUploadReviewStatusService(connection);
       let reviewStatus;
@@ -94,7 +113,6 @@ export function deleteSubmissionUpload(): RequestHandler {
         );
       }
 
-      const submissionUploadService = new SubmissionUploadService(connection);
       await submissionUploadService.softDeleteSubmissionUpload(submissionUploadId);
 
       await reviewStatusService.updateSubmissionUploadReviewStatus(submissionUploadId, { status: 'deleted' });
