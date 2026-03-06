@@ -43,6 +43,7 @@ export function _transformFlatDataRequestToNested(flatDataRequest: FlatDataReque
     reason: flatDataRequest.reason,
     team_id: flatDataRequest.team_id,
     requested_by: flatDataRequest.requested_by,
+    ticket_id: flatDataRequest.ticket_id,
     data_request_status: {
       data_request_status_id: flatDataRequest.data_request_status_id,
       data_request_id: flatDataRequest.data_request_id,
