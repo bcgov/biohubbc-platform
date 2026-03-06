@@ -13,6 +13,7 @@ export type Policy = z.infer<typeof Policy>;
 export interface CreatePolicy {
   name: string;
   description?: string;
+  record_end_date?: string;
 }
 
 export interface UpdatePolicy {

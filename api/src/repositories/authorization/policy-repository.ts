@@ -32,7 +32,8 @@ export class PolicyRepository extends BaseRepository {
       .table('policy')
       .insert({
         name: policyData.name,
-        description: policyData.description
+        description: policyData.description,
+        record_end_date: policyData.record_end_date
       })
       .returning(['policy_id', 'name', 'description']);
 
@@ -147,7 +148,7 @@ export class PolicyRepository extends BaseRepository {
       INNER JOIN policy_urn_parts ps 
         ON ps.policy_id = p.policy_id
       WHERE tm.system_user_id = ${systemUserId}
-        AND p.record_end_date IS NULL
+        AND (p.record_end_date IS NULL OR p.record_end_date > NOW())
         AND (ps.part1 = ${urnParts.submissionId} OR ps.part1 = '*')
         AND (ps.part2 = ${urnParts.featureTypeName} OR ps.part2 = '*')
         AND (ps.part3 = ${urnParts.submissionFeatureId} OR ps.part3 = '*')
