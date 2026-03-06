@@ -133,6 +133,9 @@ SELECT
     public.ST_X(public.ST_GeomFromGeoJSON(sf.data->>'geometry')) AS Longitude,
     (sf.data->>'sign')::text AS sign,
     (sf.data->>'count')::int AS count,
+    (sf.data->>'taxon_id')::int AS taxon_id,
+    t.itis_scientific_name AS scientific_name,
+    t.common_name AS common_name,
     meas.sex,
     meas.life_stage
 FROM biohub.submission_feature sf
@@ -140,6 +143,8 @@ JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
 LEFT JOIN measurements meas
   ON meas.observation_id = sf.submission_feature_id
+LEFT JOIN biohub.taxon t
+  ON t.itis_tsn = (sf.data->>'taxon_id')::int
 WHERE ft.name = 'species_observation'
   AND sf.record_end_date IS NULL
   AND sf.submission_feature_id NOT IN (
@@ -156,6 +161,9 @@ WHERE ft.name = 'species_observation'
     COMMENT ON COLUMN bcgw.observations_public.YEAR IS 'The year of the observation';
     COMMENT ON COLUMN bcgw.observations_public.sign IS 'Type of sign associated with the observation';
     COMMENT ON COLUMN bcgw.observations_public.count IS 'Count value for the observation';
+    COMMENT ON COLUMN bcgw.observations_public.taxon_id IS 'Taxonomic identifier extracted from the observation payload';
+    COMMENT ON COLUMN bcgw.observations_public.scientific_name IS 'Scientific name from taxon table linked via ITIS TSN';
+    COMMENT ON COLUMN bcgw.observations_public.common_name IS 'Common name from taxon table linked via ITIS TSN';
   `);
 }
 
