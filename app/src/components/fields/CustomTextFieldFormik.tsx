@@ -27,7 +27,7 @@ const CustomTextFieldFormik: React.FC<React.PropsWithChildren<ICustomTextFieldFo
       id={name}
       data-testid={name}
       onChange={handleChange}
-      value={get(values, name)}
+      value={get(values, name) ?? ''}
       error={showError}
       helperText={showError ? <>{get(errors, name) as string}</> : undefined}
       {...rest}

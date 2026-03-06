@@ -158,23 +158,27 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                     fontWeight: 700
                   }
                 }}>
-                <MenuItem
-                  tabIndex={1}
-                  component={RouterLink}
-                  to="/"
-                  id="menu_home_sm"
-                  data-testid="collapsed_home-header-item">
+                <MenuItem component={RouterLink} to="/" id="menu_home_sm" data-testid="collapsed_home-header-item">
                   Home
                 </MenuItem>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
                   <MenuItem
-                    tabIndex={1}
                     component={RouterLink}
                     to="/admin/submissions"
                     id="menu_dashboard_sm"
                     onClick={hideMobileMenu}
                     data-testid="collapsed_submissions-header-item">
                     Submissions
+                  </MenuItem>
+                </SystemRoleGuard>
+                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
+                  <MenuItem
+                    component={RouterLink}
+                    to="/admin/tickets"
+                    id="menu_tickets_sm"
+                    onClick={hideMobileMenu}
+                    data-testid="collapsed_tickets-header-item">
+                    Tickets
                   </MenuItem>
                 </SystemRoleGuard>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
@@ -259,6 +263,11 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
                   <RouterLink to="/admin/submissions" id="menu_dashboard" data-testid="submissions-header-item">
                     Submissions
+                  </RouterLink>
+                </SystemRoleGuard>
+                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
+                  <RouterLink to="/admin/tickets" id="menu_tickets" data-testid="tickets-header-item">
+                    Tickets
                   </RouterLink>
                 </SystemRoleGuard>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
