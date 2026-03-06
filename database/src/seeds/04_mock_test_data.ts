@@ -48,6 +48,8 @@ export async function seed(knex: Knex): Promise<void> {
       SET SEARCH_PATH = 'biohub','public';
     `);
 
+    // Ensure there are mock taxonomy records for animals/observations to reference
+    await ensureTaxonomySeed(trx);
     for (let i = 0; i < NUM_MOCK_FEATURE_SUBMISSIONS; i++) {
       await insertRecord(trx); // pass the transaction instead of knex
     }
@@ -212,13 +214,15 @@ export const insertObservationRecord = async (
   knex: Knex,
   options: { submission_id: number; parent_submission_feature_id: number }
 ): Promise<number> => {
+  const taxonId = await getRandomTaxonId(knex);
+
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'species_observation',
       data: {
-        taxon_id: faker.number.int({ min: 10000, max: 99999 }),
+        taxon_id: taxonId,
         geometry: random.point(
           1, // number of features in feature collection
           [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
@@ -243,7 +247,7 @@ export const insertObservationRecord = async (
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
 
-  await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
+  await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id, taxon_id: taxonId })}`);
 
   //   await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
   //   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
@@ -287,6 +291,8 @@ const insertAnimalRecord = async (
   knex: Knex,
   options: { submission_id: number; parent_submission_feature_id: number }
 ): Promise<number> => {
+  const taxonId = await getRandomTaxonId(knex);
+
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
@@ -295,7 +301,7 @@ const insertAnimalRecord = async (
       data: {
         species: faker.animal.type(),
         count: faker.number.int({ min: 0, max: 100 }),
-        taxon_id: faker.number.int({ min: 10000, max: 99999 }),
+        taxon_id: taxonId,
         start_date: faker.date.past().toISOString(),
         end_date: faker.date.future().toISOString()
       }
@@ -314,7 +320,7 @@ const insertAnimalRecord = async (
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
 
-  await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
+  await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id, taxon_id: taxonId })}`);
 
   await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
@@ -423,19 +429,19 @@ const insertSearchNumber = (options: { submission_feature_id: number }) => `
     );
 `;
 
-const insertSearchStringTaxonomy = (options: { submission_feature_id: number }) => `
-    INSERT INTO search_string
-    (
-        submission_feature_id,
-        feature_property_id,
-        value
-    )
-    values
-    (
-        ${options.submission_feature_id},
-        (select feature_property_id from feature_property where name = 'taxon_id'),
-        $$${faker.number.int({ min: 10000, max: 99999 })}$$
-    );
+const insertSearchStringTaxonomy = (options: { submission_feature_id: number; taxon_id?: number }) => `
+  INSERT INTO search_string
+  (
+    submission_feature_id,
+    feature_property_id,
+    value
+  )
+  values
+  (
+    ${options.submission_feature_id},
+    (select feature_property_id from feature_property where name = 'taxon_id'),
+    $$${options.taxon_id ?? faker.number.int({ min: 10000, max: 99999 })}$$
+  );
 `;
 
 const insertSearchStartDatetime = (options: { submission_feature_id: number }) => `
@@ -518,6 +524,48 @@ const insertSpatialPoint = (options: { submission_feature_id: number }) =>
 
 const randomIntFromInterval = (min: number, max: number) => {
   return Math.floor(Math.random() * (max - min + 1) + min);
+};
+
+/**
+ * Ensure the taxonomy table has a set of mock taxon records (itis_tsn + scientific name).
+ */
+const ensureTaxonomySeed = async (knex: Knex) => {
+  const desiredCount = 5;
+
+  const countRes = await knex.raw(`SELECT count(*)::int as c FROM taxon`);
+  const existing = countRes.rows?.[0]?.c || 0;
+
+  if (existing >= desiredCount) {
+    return;
+  }
+
+  const toCreate = desiredCount - existing;
+  const tsnSet = new Set<number>();
+  while (tsnSet.size < toCreate) {
+    tsnSet.add(faker.number.int({ min: 10000, max: 99999 }));
+  }
+
+  const valuesSql = Array.from(tsnSet)
+    .map((tsn) => {
+      const sci = faker.lorem.word().replace(/'/g, "''");
+      const common = faker.animal.type().replace(/'/g, "''");
+      const itisData = JSON.stringify({ source: 'mock' }).replace(/'/g, "''");
+      return `(${tsn}, $$${sci}$$, $$${common}$$, $$${itisData}$$::jsonb, now(), (SELECT system_user_id from "system_user" where user_identifier = 'SIMS'))`;
+    })
+    .join(',\n');
+
+  const sql = `
+    INSERT INTO taxon (itis_tsn, itis_scientific_name, common_name, itis_data, itis_update_date, create_user)
+    VALUES
+    ${valuesSql};
+  `;
+
+  await knex.raw(sql);
+};
+
+const getRandomTaxonId = async (knex: Knex): Promise<number> => {
+  const res = await knex.raw(`SELECT itis_tsn FROM taxon ORDER BY random() LIMIT 1`);
+  return res.rows?.[0]?.itis_tsn ?? faker.number.int({ min: 10000, max: 99999 });
 };
 
 export const insertSubmissionFeatureSecurity = async (
