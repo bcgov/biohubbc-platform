@@ -23,21 +23,17 @@ export const SubmissionFeatureRelated = ({
   isLoading
 }: SubmissionFeatureRelatedProps) => {
   const formatRelatedFeatures = (): ReactNode => {
-    return (
-      relatedFeatures.map((related) => (
-        <ListItem key={related.submission_feature_id} disablePadding divider>
-          <ListItemButton
-            component={RouterLink}
-            to={`/search/${submissionId}/feature/${related.submission_feature_id}`}>
-            <ListItemText
-              primary={related.data?.name || related.feature_type_display_name}
-              secondary={related.feature_type_display_name}
-            />
-          </ListItemButton>
-        </ListItem>
-      )
-      ))
-  }
+    return relatedFeatures.map((related) => (
+      <ListItem key={related.submission_feature_id} disablePadding divider>
+        <ListItemButton component={RouterLink} to={`/search/${submissionId}/feature/${related.submission_feature_id}`}>
+          <ListItemText
+            primary={related.data?.name || related.feature_type_display_name}
+            secondary={related.feature_type_display_name}
+          />
+        </ListItemButton>
+      </ListItem>
+    ));
+  };
   return (
     <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
       <Box p={3}>
@@ -46,9 +42,7 @@ export const SubmissionFeatureRelated = ({
         </Typography>
         <LoadingGuard isLoading={isLoading} isLoadingFallback={<SkeletonList numberOfLines={2} />}>
           {relatedFeatures.length > 0 ? (
-            <List disablePadding>
-              {formatRelatedFeatures()}
-            </List>
+            <List disablePadding>{formatRelatedFeatures()}</List>
           ) : (
             <Typography color="text.secondary">No related features</Typography>
           )}

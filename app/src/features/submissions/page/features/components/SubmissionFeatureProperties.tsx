@@ -27,26 +27,21 @@ export const SubmissionFeatureProperties = ({ data, isLoading }: SubmissionFeatu
   };
 
   const formatPropertyName = (name: string): string => {
-    return name.replace(/_/g, ' ')
-  }
+    return name.replace(/_/g, ' ');
+  };
 
   const renderPropertyRows = (): ReactNode => {
-    return (
-      Object.entries(data)
-        .filter(([key]) => key !== 'geometry')
-        .map(([key, value]) => (
-          <TableRow key={key}>
-            <TableCell
-              component="th"
-              scope="row"
-              sx={{ fontWeight: 700, textTransform: 'capitalize', width: '30%' }}>
-              {formatPropertyName(key)}
-            </TableCell>
-            <TableCell>{formatPropertyValue(value)}</TableCell>
-          </TableRow>
-        ))
-    )
-  }
+    return Object.entries(data)
+      .filter(([key]) => key !== 'geometry')
+      .map(([key, value]) => (
+        <TableRow key={key}>
+          <TableCell component="th" scope="row" sx={{ fontWeight: 700, textTransform: 'capitalize', width: '30%' }}>
+            {formatPropertyName(key)}
+          </TableCell>
+          <TableCell>{formatPropertyValue(value)}</TableCell>
+        </TableRow>
+      ));
+  };
 
   return (
     <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
@@ -57,9 +52,7 @@ export const SubmissionFeatureProperties = ({ data, isLoading }: SubmissionFeatu
         <LoadingGuard isLoading={isLoading} isLoadingFallback={<SkeletonList numberOfLines={3} />}>
           <TableContainer>
             <Table size="small">
-              <TableBody>
-                {renderPropertyRows()}
-              </TableBody>
+              <TableBody>{renderPropertyRows()}</TableBody>
             </Table>
           </TableContainer>
         </LoadingGuard>

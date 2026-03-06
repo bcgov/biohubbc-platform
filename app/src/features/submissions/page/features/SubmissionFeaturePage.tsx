@@ -39,7 +39,7 @@ export const SubmissionFeaturePage = () => {
 
   const isLoading = featureDataLoader.isLoading;
 
-  const isInCart = cartFeatures.some((f) => f.submission_feature_id === Number(submissionFeatureId))
+  const isInCart = cartFeatures.some((f) => f.submission_feature_id === Number(submissionFeatureId));
 
   const handleCartToggle = () => {
     if (!feature) {
@@ -99,9 +99,7 @@ export const SubmissionFeaturePage = () => {
           subheader={
             <Box display="flex" gap={1}>
               <Chip label={feature.feature_type_name} size="small" />
-              {feature.secured && (
-                <Chip icon={<Icon path={mdiLock} size={0.625} />} label="Secured" size="small" />
-              )}
+              {feature.secured && <Chip icon={<Icon path={mdiLock} size={0.625} />} label="Secured" size="small" />}
             </Box>
           }
         />

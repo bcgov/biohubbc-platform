@@ -21,7 +21,13 @@ interface SearchResultCardProps {
   onRemoveFromCart?: (featureId: number) => void;
 }
 
-export const SearchResultCard = ({ result, isInCart, onClick, onAddToCart, onRemoveFromCart }: SearchResultCardProps) => {
+export const SearchResultCard = ({
+  result,
+  isInCart,
+  onClick,
+  onAddToCart,
+  onRemoveFromCart
+}: SearchResultCardProps) => {
   return (
     <Card elevation={0} key={result.uuid}>
       <CardActionArea onClick={() => onClick?.(result)}>

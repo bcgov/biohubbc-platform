@@ -91,7 +91,7 @@ export function getSubmissionFeatureById(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json({ feature, relatedFeatures });
+      return res.status(200).json({ feature, relatedFeatures });
     } catch (error) {
       defaultLog.error({ label: 'getSubmissionFeatureById', message: 'error', error });
       await connection.rollback();
