@@ -4,7 +4,6 @@ import Box from '@mui/material/Box';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
-import CircularProgress from '@mui/material/CircularProgress';
 import Container from '@mui/material/Container';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
@@ -13,7 +12,7 @@ import { PageHeader } from 'components/header/PageHeader';
 import { useApi } from 'hooks/useApi';
 import { useCartContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link as RouterLink, useParams } from 'react-router-dom';
 import { SubmissionFeatureProperties } from './components/SubmissionFeatureProperties';
 import { SubmissionFeatureRelated } from './components/SubmissionFeatureRelated';
@@ -28,29 +27,25 @@ export const SubmissionFeaturePage = () => {
     biohubApi.features.getSubmissionFeatureById(Number(submissionId), Number(submissionFeatureId))
   );
 
+  const loaderRef = useRef(featureDataLoader);
+  loaderRef.current = featureDataLoader;
+
   useEffect(() => {
-    featureDataLoader.refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loaderRef.current.refresh();
   }, [submissionId, submissionFeatureId]);
 
-  const isInCart = useMemo(
-    () => cartFeatures.some((f) => f.submission_feature_id === Number(submissionFeatureId)),
-    [cartFeatures, submissionFeatureId]
-  );
+  const feature = featureDataLoader.data?.feature;
+  const relatedFeatures = featureDataLoader.data?.relatedFeatures;
 
-  if (!featureDataLoader.data) {
-    return (
-      <Container maxWidth="xl">
-        <Box py={6} display="flex" justifyContent="center">
-          <CircularProgress />
-        </Box>
-      </Container>
-    );
-  }
+  const isLoading = featureDataLoader.isLoading;
 
-  const { feature, relatedFeatures } = featureDataLoader.data;
+  const isInCart = cartFeatures.some((f) => f.submission_feature_id === Number(submissionFeatureId))
 
   const handleCartToggle = () => {
+    if (!feature) {
+      return;
+    }
+
     if (isInCart) {
       removeFromCart([feature.submission_feature_id]);
     } else {
@@ -73,46 +68,56 @@ export const SubmissionFeaturePage = () => {
 
   return (
     <>
-      <PageHeader
-        buttons={
-          <Button
-            variant={isInCart ? 'outlined' : 'contained'}
-            startIcon={<Icon path={isInCart ? mdiCheck : mdiPlus} size={0.875} />}
-            onClick={handleCartToggle}>
-            {isInCart ? 'In Cart' : 'Add to Cart'}
-          </Button>
-        }
-        breadcrumbs={
-          <Breadcrumbs aria-label="breadcrumb">
-            <Link component={RouterLink} to="/search" underline="hover" color="inherit">
-              Search
-            </Link>
-            <Link component={RouterLink} to={`/search/${feature.submission_id}`} underline="hover" color="inherit">
-              {feature.submission_name}
-            </Link>
-            <Typography color="text.primary">{feature.feature_type_display_name}</Typography>
-          </Breadcrumbs>
-        }
-        label={
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Typography variant="h1" sx={{ ml: '-2px' }}>
-              {feature.feature_type_display_name}
-            </Typography>
-          </Box>
-        }
-        subheader={
-          <Box display="flex" gap={1}>
-            <Chip label={feature.feature_type_name} size="small" />
-            {feature.secured && (
-              <Chip icon={<Icon path={mdiLock} size={0.625} />} label="Secured" size="small" />
-            )}
-          </Box>
-        }
-      />
+      {feature && (
+        <PageHeader
+          buttons={
+            <Button
+              variant={isInCart ? 'outlined' : 'contained'}
+              startIcon={<Icon path={isInCart ? mdiCheck : mdiPlus} size={0.875} />}
+              onClick={handleCartToggle}>
+              {isInCart ? 'In Cart' : 'Add to Cart'}
+            </Button>
+          }
+          breadcrumbs={
+            <Breadcrumbs aria-label="breadcrumb">
+              <Link component={RouterLink} to="/search" underline="hover" color="inherit">
+                Search
+              </Link>
+              <Link component={RouterLink} to={`/search/${feature.submission_id}`} underline="hover" color="inherit">
+                {feature.submission_name}
+              </Link>
+              <Typography color="text.primary">{feature.feature_type_display_name}</Typography>
+            </Breadcrumbs>
+          }
+          label={
+            <Box display="flex" alignItems="center" gap={1.5}>
+              <Typography variant="h1" sx={{ ml: '-2px' }}>
+                {feature.feature_type_display_name}
+              </Typography>
+            </Box>
+          }
+          subheader={
+            <Box display="flex" gap={1}>
+              <Chip label={feature.feature_type_name} size="small" />
+              {feature.secured && (
+                <Chip icon={<Icon path={mdiLock} size={0.625} />} label="Secured" size="small" />
+              )}
+            </Box>
+          }
+        />
+      )}
       <Container maxWidth="xl">
         <Stack spacing={3} py={4}>
-          <SubmissionFeatureProperties data={feature.data} />
-          <SubmissionFeatureRelated submissionId={feature.submission_id} relatedFeatures={relatedFeatures} />
+          {feature && (
+            <>
+              <SubmissionFeatureProperties data={feature.data} isLoading={isLoading} />
+              <SubmissionFeatureRelated
+                submissionId={feature.submission_id}
+                relatedFeatures={relatedFeatures}
+                isLoading={isLoading}
+              />
+            </>
+          )}
         </Stack>
       </Container>
     </>
