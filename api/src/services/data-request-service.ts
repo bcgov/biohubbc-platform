@@ -100,7 +100,7 @@ export class DataRequestService extends DBService {
   /**
    * Create a new data request.
    *
-   * Creates a team for the requester, at ticket, a wildcard access policy expiring in 30 days
+   * Creates a team for the requester, a ticket, a wildcard access policy expiring in 30 days
    * linked to the team, and auto-approves the request.
    *
    * @param {CreateDataRequest} payload
