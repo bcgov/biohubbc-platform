@@ -131,7 +131,7 @@ describe('DownloadRepository', () => {
       expect(sqlValues).to.include(null);
     });
 
-    it('serializes searchFilters as JSONB in SQL', async () => {
+    it('serializes filters as JSONB in SQL', async () => {
       const sqlStub = sinon
         .stub()
         .resolves(mockQueryResult([{ download_id: 'aaaa0000-0000-0000-0000-000000000001' }], 1));
@@ -139,16 +139,16 @@ describe('DownloadRepository', () => {
 
       const repo = new DownloadRepository(mockDBConnection);
       const filters = { keyword: 'moose' };
-      await repo.createDownload({ teamId: null, dataRequestId: null, systemUserId: null, searchFilters: filters });
+      await repo.createDownload({ teamId: null, dataRequestId: null, systemUserId: null, filters });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('search_filters');
+      expect(sqlText).to.include('filters');
       const sqlValues = sqlStub.firstCall.args[0].values;
       expect(sqlValues).to.include(JSON.stringify(filters));
     });
 
-    it('passes null search_filters when searchFilters is omitted', async () => {
+    it('passes null filters when filters is omitted', async () => {
       const sqlStub = sinon
         .stub()
         .resolves(mockQueryResult([{ download_id: 'aaaa0000-0000-0000-0000-000000000001' }], 1));
@@ -159,12 +159,12 @@ describe('DownloadRepository', () => {
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('search_filters');
-      // Last value before the ::jsonb cast should be null (no searchFilters provided)
+      expect(sqlText).to.include('filters');
+      // Last value before the ::jsonb cast should be null (no filters provided)
       const sqlValues = sqlStub.firstCall.args[0].values;
-      // Values: teamId, dataRequestId, sizeBytes, systemUserId, searchFilters
-      const searchFiltersValue = sqlValues[sqlValues.length - 1];
-      expect(searchFiltersValue).to.be.null;
+      // Values: teamId, dataRequestId, sizeBytes, systemUserId, filters
+      const filtersValue = sqlValues[sqlValues.length - 1];
+      expect(filtersValue).to.be.null;
     });
   });
 

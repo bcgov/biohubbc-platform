@@ -196,9 +196,9 @@ export class SearchFeatureRepository extends BaseRepository {
    * feature IDs for the download pipeline. No pagination — returns ALL matching IDs.
    *
    * @param {ISearchFeaturesFilters} filters - Search filters (keyword, feature_types, species, properties)
-   * @returns {Promise<number[]>} Array of matching submission_feature_id values
+   * @returns {Promise<{ submission_feature_id: number }[]>} Raw rows with submission_feature_id
    */
-  async searchFeatureIdsByFilters(filters: ISearchFeaturesFilters): Promise<number[]> {
+  async searchFeatureIdsByFilters(filters: ISearchFeaturesFilters): Promise<{ submission_feature_id: number }[]> {
     defaultLog.debug({ label: 'searchFeatureIdsByFilters', filters });
 
     if (!filters || Object.keys(filters).length === 0) {
@@ -210,7 +210,7 @@ export class SearchFeatureRepository extends BaseRepository {
     const idsQuery = knex.from(query.as('sf_filtered')).select('submission_feature_id');
     const response = await this.connection.knex(idsQuery);
 
-    return response.rows.map((row: { submission_feature_id: number }) => row.submission_feature_id);
+    return response.rows;
   }
 
   /**

@@ -80,7 +80,7 @@ describe('paths/download/index', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(createDownloadRequestStub.firstCall.args[0]).to.have.deep.property('searchFilters', {
+      expect(createDownloadRequestStub.firstCall.args[0]).to.have.deep.property('filters', {
         feature_types: ['dataset']
       });
     });

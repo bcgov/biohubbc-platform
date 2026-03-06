@@ -73,7 +73,8 @@ export class SearchFeatureService extends DBService {
    */
   async getSearchFeatureIds(filters: ISearchFeaturesFilters): Promise<number[]> {
     defaultLog.debug({ label: 'getSearchFeatureIds', filters });
-    return this.searchFeatureRepository.searchFeatureIdsByFilters(filters);
+    const rows = await this.searchFeatureRepository.searchFeatureIdsByFilters(filters);
+    return rows.map((row) => row.submission_feature_id);
   }
 
   /**

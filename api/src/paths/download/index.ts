@@ -165,7 +165,7 @@ POST.apiDoc = {
  *
  * Bulk download bypasses the shopping cart — search filters are resolved to feature IDs
  * server-side, then a download record is created with all matching features linked.
- * Original filters are stored in `download.search_filters` for traceability (ticket requirement).
+ * Original filters are stored in `download.filters` for traceability (ticket requirement).
  * Uses a dedicated column instead of `metadata` which gets overwritten by the pipeline.
  *
  * OptionalBearer: anonymous users get a download with system_user_id = null
@@ -184,15 +184,17 @@ export function createDownload(): RequestHandler {
 
       const filters: ISearchFeaturesFilters = req.body.filters;
 
-      // Resolve filters to feature IDs via CTE intersection
       const searchFeatureService = new SearchFeatureService(connection);
-      const submissionFeatureIds = await searchFeatureService.getSearchFeatureIds(filters);
 
-      // Empty results → 400. Prevents orphan download records with zero features.
-      // The download pipeline would fail on an empty feature set.
-      if (submissionFeatureIds.length === 0) {
+      // Quick count check before fetching all IDs
+      const featureCount = await searchFeatureService.getSearchFeaturesCount(filters);
+
+      if (featureCount === 0) {
         throw new HTTP400('No features match the filter criteria');
       }
+
+      // Resolve filters to feature IDs via CTE intersection
+      const submissionFeatureIds = await searchFeatureService.getSearchFeatureIds(filters);
 
       // Anonymous downloads: system_user_id is null (UUID is the credential).
       const systemUserId = isAuthenticated ? connection.systemUserId() : null;
@@ -204,7 +206,7 @@ export function createDownload(): RequestHandler {
         systemUserId,
         teamId: null,
         submissionFeatureIds,
-        searchFilters: filters
+        filters
       });
 
       // Publish async processing job within the transaction

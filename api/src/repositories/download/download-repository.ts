@@ -25,13 +25,13 @@ export class DownloadRepository extends BaseRepository {
    * @memberof DownloadRepository
    */
   async createDownload(payload: CreateDownload): Promise<DownloadId> {
-    const { teamId, dataRequestId, fragmentSizeBytes, systemUserId, searchFilters } = payload;
+    const { teamId, dataRequestId, fragmentSizeBytes, systemUserId, filters } = payload;
     const sizeBytes = fragmentSizeBytes ?? FRAGMENT_SIZE_THRESHOLD;
 
     const sql = SQL`
-      INSERT INTO download (team_id, data_request_id, download_status, fragment_size_bytes, system_user_id, search_filters)
+      INSERT INTO download (team_id, data_request_id, download_status, fragment_size_bytes, system_user_id, filters)
       VALUES (${teamId}, ${dataRequestId}, 'pending', ${sizeBytes}, ${systemUserId ?? null}, ${
-      searchFilters ? JSON.stringify(searchFilters) : null
+      filters ? JSON.stringify(filters) : null
     }::jsonb)
       RETURNING download_id;
     `;

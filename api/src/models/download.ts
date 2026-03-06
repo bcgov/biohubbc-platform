@@ -66,7 +66,7 @@ export const CreateDownload = z.object({
   dataRequestId: z.string().nullable(),
   fragmentSizeBytes: z.number().optional(),
   systemUserId: z.number().nullable().optional(),
-  searchFilters: SearchFeatureFiltersSchema.optional()
+  filters: SearchFeatureFiltersSchema.optional()
 });
 export type CreateDownload = z.infer<typeof CreateDownload>;
 
@@ -83,6 +83,6 @@ export const CreateDownloadRequest = z.object({
   submissionFeatureIds: z.array(z.number()),
   dataRequestId: z.string().optional(),
   fragmentSizeMb: z.number().optional(),
-  searchFilters: SearchFeatureFiltersSchema.optional()
+  filters: SearchFeatureFiltersSchema.optional()
 });
 export type CreateDownloadRequest = z.infer<typeof CreateDownloadRequest>;

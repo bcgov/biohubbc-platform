@@ -100,7 +100,7 @@ describe('DownloadPipelineService', () => {
       expect(createDownloadStub.firstCall.args[0]).to.have.property('systemUserId', null);
     });
 
-    it('passes searchFilters to createDownload', async () => {
+    it('passes filters to createDownload', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
@@ -114,16 +114,16 @@ describe('DownloadPipelineService', () => {
         systemUserId: 42,
         teamId: null,
         submissionFeatureIds: [10, 20],
-        searchFilters: filters
+        filters
       });
 
       expect(createDownloadStub).to.have.been.calledOnce;
       const opts = createDownloadStub.firstCall.args[0];
       expect(opts).to.have.property('systemUserId', 42);
-      expect(opts).to.have.deep.property('searchFilters', { keyword: 'elk' });
+      expect(opts).to.have.deep.property('filters', { keyword: 'elk' });
     });
 
-    it('omitting searchFilters passes undefined', async () => {
+    it('omitting filters passes undefined', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
@@ -135,7 +135,7 @@ describe('DownloadPipelineService', () => {
       await service.createDownloadRequest({ systemUserId: 42, teamId: null, submissionFeatureIds: [10, 20] });
 
       expect(createDownloadStub).to.have.been.calledOnce;
-      expect(createDownloadStub.firstCall.args[0].searchFilters).to.be.undefined;
+      expect(createDownloadStub.firstCall.args[0].filters).to.be.undefined;
     });
 
     it('still creates download features after options refactor', async () => {
@@ -151,7 +151,7 @@ describe('DownloadPipelineService', () => {
         systemUserId: 42,
         teamId: null,
         submissionFeatureIds: [10, 20],
-        searchFilters: { keyword: 'elk' }
+        filters: { keyword: 'elk' }
       });
 
       expect(createFeaturesStub).to.have.been.calledOnce;

@@ -70,7 +70,7 @@ export class DownloadPipelineService extends DBService {
    * @memberof DownloadPipelineService
    */
   async createDownloadRequest(payload: CreateDownloadRequest): Promise<DownloadId> {
-    const { systemUserId, teamId, submissionFeatureIds, dataRequestId, fragmentSizeMb, searchFilters } = payload;
+    const { systemUserId, teamId, submissionFeatureIds, dataRequestId, fragmentSizeMb, filters } = payload;
     const fragmentSizeBytes = fragmentSizeMb ? fragmentSizeMb * 1024 * 1024 : undefined;
 
     const downloadId = await this.downloadRepository.createDownload({
@@ -78,7 +78,7 @@ export class DownloadPipelineService extends DBService {
       dataRequestId: dataRequestId ?? null,
       fragmentSizeBytes,
       systemUserId,
-      searchFilters
+      filters
     });
 
     await this.downloadRepository.createDownloadFeatures(downloadId.download_id, submissionFeatureIds);
