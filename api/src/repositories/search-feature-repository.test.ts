@@ -700,7 +700,7 @@ describe('SearchFeatureRepository', () => {
       expect(knexSpy.callCount).to.equal(0);
     });
 
-    it('should return flat number array of submission_feature_ids for matching filters', async () => {
+    it('should return rows with submission_feature_id for matching filters', async () => {
       const mockQueryResponse = mockQueryResult([{ submission_feature_id: 1 }, { submission_feature_id: 2 }], 2);
 
       const mockDBConnection = getMockDBConnection({
@@ -711,7 +711,7 @@ describe('SearchFeatureRepository', () => {
 
       const response = await repository.searchFeatureIdsByFilters({ keyword: 'moose' });
 
-      expect(response).to.deep.equal([1, 2]);
+      expect(response).to.deep.equal([{ submission_feature_id: 1 }, { submission_feature_id: 2 }]);
     });
 
     it('should return empty array when DB returns no rows', async () => {
