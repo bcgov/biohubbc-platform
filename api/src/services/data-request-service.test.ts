@@ -14,6 +14,7 @@ import { TeamPolicyService } from './access-policy/team-policy-service';
 import { TeamService } from './access-policy/team-service';
 import { DataRequestService } from './data-request-service';
 import { DataRequestStatusService } from './data-request-status-service';
+import { TicketService } from './ticket-service';
 
 chai.use(sinonChai);
 
@@ -28,6 +29,7 @@ describe('DataRequestService', () => {
     reason: 'Research purposes',
     team_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
     requested_by: 1,
+    ticket_id: 'd4e5f6a7-b8c9-0123-def0-234567890123',
     comment_id: null,
     request_status: 'REQUESTED'
   };
@@ -36,7 +38,8 @@ describe('DataRequestService', () => {
     data_request_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
     reason: 'Research purposes',
     team_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
-    requested_by: 1
+    requested_by: 1,
+    ticket_id: 'd4e5f6a7-b8c9-0123-def0-234567890123'
   };
 
   const mockDataRequestStatus: DataRequestStatus = {
@@ -233,6 +236,17 @@ describe('DataRequestService', () => {
         sinon.stub(TeamMemberService.prototype, 'createTeamMember').resolves(mockTeamMember);
       }
 
+      sinon.stub(TicketService.prototype, 'createTicket').resolves({
+        ticket_id: mockDataRequest.ticket_id,
+        ticket_slug: '06600000',
+        subject: 'Data Request',
+        description: null,
+        team_id: teamId,
+        create_date: '2026-03-06',
+        priority: 'medium',
+        status: 'open'
+      });
+
       sinon
         .stub(DataRequestRepository.prototype, 'createDataRequest')
         .resolves({ ...mockDataRequest, team_id: teamId });
@@ -262,7 +276,8 @@ describe('DataRequestService', () => {
 
       expect(createStub).to.have.been.calledOnceWith(mockDataRequest.requested_by, {
         ...payload,
-        team_id: mockDataRequest.team_id
+        team_id: mockDataRequest.team_id,
+        ticket_id: mockDataRequest.ticket_id
       });
 
       expect(policyStub).to.have.been.calledOnce;
@@ -283,6 +298,36 @@ describe('DataRequestService', () => {
 
       expect(result.data_request_id).to.equal(mockDataRequest.data_request_id);
       expect(result.data_request_status.request_status).to.equal('APPROVED');
+    });
+
+    it('should create a ticket when creating a data request', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new DataRequestService(mockDB);
+
+      const payload: CreateDataRequest = {
+        requested_by: mockDataRequest.requested_by,
+        reason: 'New research project',
+        team_id: mockDataRequest.team_id
+      };
+
+      stubCreateDataRequestDependencies();
+
+      const createStub = DataRequestRepository.prototype.createDataRequest as sinon.SinonStub;
+      const ticketStub = TicketService.prototype.createTicket as sinon.SinonStub;
+
+      await service.createDataRequest(payload);
+
+      expect(createStub).to.have.been.calledOnceWith(mockDataRequest.requested_by, {
+        ...payload,
+        team_id: mockDataRequest.team_id,
+        ticket_id: mockDataRequest.ticket_id
+      });
+
+      expect(ticketStub).to.have.been.calledOnceWith({
+        subject: 'Data Request',
+        description: payload.reason,
+        priority: 'medium'
+      });
     });
 
     it('should create a new team when payload.team_id is undefined', async () => {
@@ -322,6 +367,16 @@ describe('DataRequestService', () => {
         reason: 'Test',
         team_id: mockDataRequest.team_id
       };
+      sinon.stub(TicketService.prototype, 'createTicket').resolves({
+        ticket_id: mockDataRequest.ticket_id,
+        ticket_slug: '06600000',
+        subject: 'Data Request',
+        description: null,
+        team_id: mockDataRequest.team_id,
+        create_date: '2026-03-06',
+        priority: 'medium',
+        status: 'open'
+      });
       sinon.stub(DataRequestRepository.prototype, 'createDataRequest').rejects(new Error('DB error'));
 
       try {
