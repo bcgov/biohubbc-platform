@@ -1,4 +1,4 @@
-import { mdiPlus } from '@mdi/js';
+import { mdiDownload, mdiPlus } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Button, Stack } from '@mui/material';
 import { SortButton } from 'components/button/SortButton';
@@ -19,6 +19,8 @@ interface SearchResultToolbarProps {
   onSortChange: (sort: string, direction: 'asc' | 'desc') => void;
   viewOptions?: ToggleButtonView<SEARCH_RESULT_OPTION_VIEW>[];
   handleAddAllToCart: () => void;
+  handleDownloadAll: () => void;
+  isDownloading?: boolean;
 }
 
 export const SearchResultToolbar = ({
@@ -28,7 +30,9 @@ export const SearchResultToolbar = ({
   activeSort,
   onSortChange,
   viewOptions,
-  handleAddAllToCart
+  handleAddAllToCart,
+  handleDownloadAll,
+  isDownloading
 }: SearchResultToolbarProps) => {
   const defaultViews: ToggleButtonView<SEARCH_RESULT_OPTION_VIEW>[] = [
     { value: SEARCH_RESULT_OPTION_VIEW.TABLE, label: 'Table' },
@@ -63,6 +67,15 @@ export const SearchResultToolbar = ({
 
       {/* Right: Actions + View */}
       <Stack direction="row" alignItems="center" spacing={1}>
+        <Button
+          size="small"
+          color="primary"
+          onClick={handleDownloadAll}
+          disabled={isDownloading}
+          startIcon={<Icon path={mdiDownload} size={0.8} />}
+          sx={{ flexWrap: 'nowrap', fontWeight: 700 }}>
+          Download All
+        </Button>
         <Button
           size="small"
           color="primary"

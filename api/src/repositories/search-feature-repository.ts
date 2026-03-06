@@ -190,6 +190,30 @@ export class SearchFeatureRepository extends BaseRepository {
   }
 
   /**
+   * Returns submission feature IDs matching the provided search filters.
+   *
+   * Used by POST /api/download to resolve filter criteria into the canonical set of
+   * feature IDs for the download pipeline. No pagination — returns ALL matching IDs.
+   *
+   * @param {ISearchFeaturesFilters} filters - Search filters (keyword, feature_types, species, properties)
+   * @returns {Promise<{ submission_feature_id: number }[]>} Raw rows with submission_feature_id
+   */
+  async searchFeatureIdsByFilters(filters: ISearchFeaturesFilters): Promise<{ submission_feature_id: number }[]> {
+    defaultLog.debug({ label: 'searchFeatureIdsByFilters', filters });
+
+    if (!filters || Object.keys(filters).length === 0) {
+      return [];
+    }
+
+    const knex = getKnex();
+    const query = this.buildSearchQuery(knex, filters);
+    const idsQuery = knex.from(query.as('sf_filtered')).select('submission_feature_id');
+    const response = await this.connection.knex(idsQuery);
+
+    return response.rows;
+  }
+
+  /**
    * Builds the search query combining all filter types and CTEs.
    * @param {Knex} knex - Knex instance
    * @param {ISearchFeaturesFilters} filters - Search filters to apply

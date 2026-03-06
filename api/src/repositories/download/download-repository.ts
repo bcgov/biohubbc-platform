@@ -2,7 +2,7 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { DownloadFeatureSummary, DownloadId, DownloadRecord } from '../../models/download';
+import { CreateDownload, DownloadFeatureSummary, DownloadId, DownloadRecord } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { BaseRepository } from '../base-repository';
 
@@ -20,24 +20,19 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Create a new download record.
    *
-   * @param {string | null} teamId - The team that owns this download. Null for anonymous downloads.
-   * @param {string | null} dataRequestId - The data request that originated this download. Null for non-request downloads.
-   * @param {number} [fragmentSizeBytes] - Target fragment size in bytes. Defaults to FRAGMENT_SIZE_THRESHOLD (200 MB).
-   * @param {number | null} [systemUserId] - The user who created this download. Null for anonymous downloads.
+   * @param {CreateDownload} payload
    * @return {Promise<DownloadId>} The created record ID.
    * @memberof DownloadRepository
    */
-  async createDownload(
-    teamId: string | null,
-    dataRequestId: string | null,
-    fragmentSizeBytes?: number,
-    systemUserId?: number | null
-  ): Promise<DownloadId> {
+  async createDownload(payload: CreateDownload): Promise<DownloadId> {
+    const { teamId, dataRequestId, fragmentSizeBytes, systemUserId, filters } = payload;
     const sizeBytes = fragmentSizeBytes ?? FRAGMENT_SIZE_THRESHOLD;
 
     const sql = SQL`
-      INSERT INTO download (team_id, data_request_id, download_status, fragment_size_bytes, system_user_id)
-      VALUES (${teamId}, ${dataRequestId}, 'pending', ${sizeBytes}, ${systemUserId ?? null})
+      INSERT INTO download (team_id, data_request_id, download_status, fragment_size_bytes, system_user_id, filters)
+      VALUES (${teamId}, ${dataRequestId}, 'pending', ${sizeBytes}, ${systemUserId ?? null}, ${
+      filters ? JSON.stringify(filters) : null
+    }::jsonb)
       RETURNING download_id;
     `;
 
