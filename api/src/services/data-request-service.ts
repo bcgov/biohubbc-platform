@@ -11,6 +11,7 @@ import {
 import { DataRequestStatusEnum } from '../models/data-request-status';
 import { PolicyEffect } from '../models/policy-statement';
 import { Team } from '../models/team';
+import { CreateTicketRequest, Ticket } from '../models/ticket';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import {
   _generateDataRequestPolicyName,
@@ -24,6 +25,7 @@ import { TeamPolicyService } from './access-policy/team-policy-service';
 import { TeamService } from './access-policy/team-service';
 import { DataRequestStatusService } from './data-request-status-service';
 import { DBService } from './db-service';
+import { TicketService } from './ticket-service';
 
 /**
  * Service for managing data requests.
@@ -98,7 +100,7 @@ export class DataRequestService extends DBService {
   /**
    * Create a new data request.
    *
-   * Creates a team for the requester, a wildcard access policy expiring in 30 days
+   * Creates a team for the requester, at ticket, a wildcard access policy expiring in 30 days
    * linked to the team, and auto-approves the request.
    *
    * @param {CreateDataRequest} payload
@@ -111,9 +113,15 @@ export class DataRequestService extends DBService {
       const team = await this.createTeam(payload.requested_by);
       teamId = team.team_id;
     }
-    const payloadWithTeamId = { ...payload, team_id: teamId };
+    const ticket = await this.createTicket({
+      subject: 'Data Request',
+      description: payload.reason,
+      priority: 'medium'
+    });
 
-    const dataRequest = await this.dataRequestRepository.createDataRequest(payload.requested_by, payloadWithTeamId);
+    const payloadWithIds = { ...payload, team_id: teamId, ticket_id: ticket.ticket_id };
+
+    const dataRequest = await this.dataRequestRepository.createDataRequest(payload.requested_by, payloadWithIds);
 
     const policy = await this.createPolicy(dataRequest.data_request_id);
     await this.createTeamPolicy({ teamId, policyId: policy.policy_id });
@@ -165,6 +173,22 @@ export class DataRequestService extends DBService {
     }
 
     return this.dataRequestRepository.deleteDataRequest(dataRequestId);
+  }
+
+  /**
+   * Create a new ticket.
+   *
+   * @param {CreateTicketRequest} params
+   * @return {Promise<Ticket>}
+   * @memberof DataRequestService
+   */
+  private async createTicket(params: CreateTicketRequest): Promise<Ticket> {
+    const { subject, description, priority } = params;
+
+    const ticketService = new TicketService(this.connection);
+    const ticket = await ticketService.createTicket({ subject, description, priority });
+
+    return ticket;
   }
 
   /**
