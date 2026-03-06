@@ -27,7 +27,8 @@ describe('CartService', () => {
       const mockCart: Cart = {
         cart_id: 'cart-1',
         system_user_id: 1,
-        cart_status: CartStatus.ACTIVE
+        cart_status: CartStatus.ACTIVE,
+        record_end_date: null
       };
 
       const mockFeatures: CartSubmissionFeature[] = [
@@ -57,7 +58,8 @@ describe('CartService', () => {
       const mockCart: Cart = {
         cart_id: 'cart-1',
         system_user_id: 1,
-        cart_status: CartStatus.ACTIVE
+        cart_status: CartStatus.ACTIVE,
+        record_end_date: null
       };
 
       const stub = sinon.stub(CartRepository.prototype, 'getCartById').resolves(mockCart);
@@ -77,7 +79,8 @@ describe('CartService', () => {
       const mockCart: Cart = {
         cart_id: 'cart-123',
         system_user_id: 1,
-        cart_status: CartStatus.ACTIVE
+        cart_status: CartStatus.ACTIVE,
+        record_end_date: null
       };
 
       const mockPaginationResponse: CartFeatureListResponse = {
@@ -113,7 +116,8 @@ describe('CartService', () => {
       const mockCart: Cart = {
         cart_id: 'cart-123',
         system_user_id: 1,
-        cart_status: CartStatus.ACTIVE
+        cart_status: CartStatus.ACTIVE,
+        record_end_date: null
       };
 
       const mockFeatures: CartSubmissionFeature[] = [
@@ -163,7 +167,8 @@ describe('CartService', () => {
       const mockCart: Cart = {
         cart_id: 'cart-123',
         system_user_id: 1,
-        cart_status: CartStatus.ACTIVE
+        cart_status: CartStatus.ACTIVE,
+        record_end_date: null
       };
 
       const mockPaginationResponse: CartFeatureListResponse = {
@@ -215,7 +220,8 @@ describe('CartService', () => {
       const mockCart: Cart = {
         cart_id: 'cart-123',
         system_user_id: 1,
-        cart_status: CartStatus.ACTIVE
+        cart_status: CartStatus.ACTIVE,
+        record_end_date: null
       };
 
       sinon.stub(CartRepository.prototype, 'createCart').resolves(mockCart);

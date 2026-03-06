@@ -148,11 +148,40 @@ describe('CartContextProvider', () => {
     });
   });
 
+  it.each([401, 403, 404])('clears stale cached cart id when getCartById returns a %s response', async (statusCode) => {
+    setStoredCartId('stale-cart-id');
+    mockCartApi.getCartById.mockRejectedValueOnce(makeApiError(statusCode, 'Cart unavailable'));
+
+    const { getContext } = await renderProvider(getMockAuthState({ base: SystemUserAuthState }));
+
+    await waitFor(() => {
+      expect(mockSetStoredCartId).toHaveBeenCalledWith(null);
+      expect(getContext().features).toEqual([]);
+      expect(getContext().pagination).toEqual({ total: 0, current_page: 1, last_page: 1 });
+      expect(getContext().error).toBeUndefined();
+      expect(getContext().isLoading).toBe(false);
+    });
+  });
+
+  it('does not clear cached cart id when getCartById returns a 500', async () => {
+    const loadError = makeApiError(500, 'Server error');
+    setStoredCartId('cart-err');
+    mockCartApi.getCartById.mockRejectedValueOnce(loadError);
+
+    const { getContext } = await renderProvider(getMockAuthState({ base: SystemUserAuthState }));
+
+    await waitFor(() => {
+      expect(getContext().error).toBe(loadError);
+      expect(getContext().isLoading).toBe(false);
+    });
+
+    expect(mockSetStoredCartId).not.toHaveBeenCalledWith(null);
+  });
+
   it('creates a cart when adding features with no existing cart', async () => {
     const searchFeature = createMockSearchFeature(1, 'Feature 1');
     const createdFeature = createMockFeature('saved-1', 1, 123, 456, 'Feature 1');
     mockCartApi.createCart.mockResolvedValueOnce(buildCartResponse('new-cart', [createdFeature]));
-    mockCartApi.getCartById.mockResolvedValueOnce(buildCartResponse('new-cart', [createdFeature]));
 
     const { getContext } = await renderProvider(getMockAuthState({ base: UnauthenticatedUserAuthState }));
 
@@ -163,6 +192,7 @@ describe('CartContextProvider', () => {
     expect(mockCartApi.createCart).toHaveBeenCalledTimes(1);
     expect(mockCartApi.createCart).toHaveBeenCalledWith({ features: [1] });
     expect(mockSetStoredCartId).toHaveBeenCalledWith('new-cart');
+    expect(mockCartApi.getCartById).not.toHaveBeenCalled();
 
     await waitFor(() => {
       expect(getContext().features).toHaveLength(1);
@@ -231,16 +261,15 @@ describe('CartContextProvider', () => {
     expect(mockCartApi.addCartFeatures).not.toHaveBeenCalled();
   });
 
-  it('retries addToCart by creating a new cart on 401/403 add failure', async () => {
+  it.each([401, 403, 404])('retries addToCart by creating a new cart on %s add failure', async (statusCode) => {
     const persistedFeature = createMockFeature('saved-1', 1, 101, 201, 'Existing');
     const newFeature = createMockSearchFeature(2, 'New');
+    const recreatedFeature = createMockFeature('saved-2', 2, 102, 202, 'New');
 
     setStoredCartId('cart-1');
     mockCartApi.getCartById.mockResolvedValueOnce(buildCartResponse('cart-1', [persistedFeature]));
-    mockCartApi.addCartFeatures.mockRejectedValueOnce(makeApiError(401));
-    mockCartApi.createCart.mockResolvedValueOnce(
-      buildCartResponse('cart-2', [createMockFeature('saved-2', 2, 102, 202, 'New')])
-    );
+    mockCartApi.addCartFeatures.mockRejectedValueOnce(makeApiError(statusCode));
+    mockCartApi.createCart.mockResolvedValueOnce(buildCartResponse('cart-2', [recreatedFeature]));
 
     const { getContext } = await renderProvider(getMockAuthState({ base: SystemUserAuthState }));
 
@@ -256,6 +285,13 @@ describe('CartContextProvider', () => {
     expect(mockCartApi.createCart).toHaveBeenCalledTimes(1);
     expect(mockCartApi.createCart).toHaveBeenCalledWith({ features: [2] });
     expect(mockSetStoredCartId).toHaveBeenCalledWith('cart-2');
+    expect(mockCartApi.getCartById).toHaveBeenCalledTimes(1);
+
+    await waitFor(() => {
+      expect(getContext().features).toEqual([recreatedFeature]);
+      expect(getContext().pagination.total).toBe(1);
+      expect(getContext().error).toBeUndefined();
+    });
   });
 
   it('rolls back addToCart and rethrows when add fails with a non-auth error', async () => {
@@ -283,6 +319,35 @@ describe('CartContextProvider', () => {
       expect(getContext().features).toEqual([persistedFeature]);
       expect(getContext().pagination.total).toBe(1);
     });
+  });
+
+  it('rolls back addToCart and rethrows when add fails with a non-recoverable 400 error', async () => {
+    const persistedFeature = createMockFeature('saved-1', 1, 101, 201, 'Existing');
+    const newFeature = createMockSearchFeature(2, 'New');
+    const addError = makeApiError(400, 'bad request');
+
+    setStoredCartId('cart-1');
+    mockCartApi.getCartById.mockResolvedValueOnce(buildCartResponse('cart-1', [persistedFeature]));
+    mockCartApi.addCartFeatures.mockRejectedValueOnce(addError);
+
+    const { getContext } = await renderProvider(getMockAuthState({ base: SystemUserAuthState }));
+
+    await waitFor(() => {
+      expect(getContext().features).toEqual([persistedFeature]);
+    });
+
+    await expect(
+      act(async () => {
+        await getContext().addToCart([newFeature]);
+      })
+    ).rejects.toBe(addError);
+
+    await waitFor(() => {
+      expect(getContext().features).toEqual([persistedFeature]);
+      expect(getContext().pagination.total).toBe(1);
+    });
+
+    expect(mockCartApi.createCart).not.toHaveBeenCalled();
   });
 
   it('removes persisted features by cart_submission_feature_id', async () => {

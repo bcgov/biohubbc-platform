@@ -117,19 +117,16 @@ export function getCartWithFeaturesById(): RequestHandler {
       const cartService = new CartService(connection);
       const cartSubmissionFeatureService = new CartSubmissionFeatureService(connection);
 
-      // Return first 25 features from page 1 if pagination not specified
-      req.query.limit = req.query.limit || '25';
-      req.query.page = req.query.page || '1';
-
       const pagination = makePaginationOptionsFromRequest(req);
 
-      const cart = await cartService.getCartById(cartId);
-
-      const paginatedFeatures = await cartSubmissionFeatureService.getPaginatedCartFeaturesResponse(cartId, pagination);
+      const [cart, paginatedFeatures] = await Promise.all([
+        cartService.getCartById(cartId),
+        cartSubmissionFeatureService.getPaginatedCartFeaturesResponse(cartId, pagination)
+      ]);
 
       await connection.commit();
 
-      res.status(200).json({
+      return res.status(200).json({
         ...paginatedFeatures,
         cart
       });
