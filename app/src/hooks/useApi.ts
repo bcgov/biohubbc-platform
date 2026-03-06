@@ -4,6 +4,7 @@ import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
 import { useCartApi } from './api/useCartApi';
 import useCodesApi from './api/useCodesApi';
+import { useDataRequestApi } from './api/useDataRequestApi';
 import { useFeaturesApi } from './api/useFeaturesApi';
 import usePoliciesApi from './api/usePoliciesApi';
 import { useSearchApi } from './api/useSearchApi';
@@ -53,6 +54,8 @@ export const useApi = () => {
 
   const teamPolicies = useTeamPoliciesApi(apiAxios);
 
+  const dataRequest = useDataRequestApi(apiAxios);
+
   return {
     user,
     admin,
@@ -67,6 +70,7 @@ export const useApi = () => {
     search,
     teams,
     cart,
-    teamPolicies
+    teamPolicies,
+    dataRequest
   };
 };

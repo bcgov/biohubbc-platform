@@ -40,7 +40,8 @@ export const POST: Operation = [
 ];
 
 GET.apiDoc = {
-  description: 'Find all data request records, optionally filtered by date range, requested_by, team_id, or status',
+  description:
+    'Find data request records for teams the current user belongs to, optionally filtered by date range, requested_by, team_id, or status',
   tags: ['data-request'],
   security: [
     {
@@ -125,7 +126,7 @@ POST.apiDoc = {
 };
 
 /**
- * Find all data request records, optionally filtered by query params.
+ * Find data request records for teams the current user belongs to, optionally filtered by query params.
  *
  * @returns {RequestHandler}
  */
@@ -172,7 +173,11 @@ export function createDataRequest(): RequestHandler {
 
       const dataRequestService = new DataRequestService(connection);
 
-      const dataRequest = await dataRequestService.createDataRequest(systemUserId, { reason, team_id: teamId });
+      const dataRequest = await dataRequestService.createDataRequest({
+        requested_by: systemUserId,
+        reason,
+        team_id: teamId
+      });
 
       await connection.commit();
 

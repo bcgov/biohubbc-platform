@@ -239,7 +239,10 @@ describe('DataRequestRepository', () => {
 
       const repo = new DataRequestRepository(mockDBConnection);
 
-      const payload: CreateDataRequest = { reason: 'New research project' };
+      const payload: CreateDataRequest = {
+        requested_by: mockDataRequest.requested_by,
+        reason: 'New research project'
+      };
 
       const result = await repo.createDataRequest(mockDataRequest.requested_by, payload);
 
@@ -258,7 +261,10 @@ describe('DataRequestRepository', () => {
 
       const repo = new DataRequestRepository(mockDBConnection);
 
-      const payload: CreateDataRequest = { reason: 'Test' };
+      const payload: CreateDataRequest = {
+        requested_by: mockDataRequest.requested_by,
+        reason: 'Test'
+      };
 
       try {
         await repo.createDataRequest(mockDataRequest.requested_by, payload);
