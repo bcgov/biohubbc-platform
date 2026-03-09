@@ -52,6 +52,53 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
+   * Get a single active submission_upload record by submission UUID and submission_upload_id.
+   * Use to validate that an upload belongs to the given submission (e.g. path parameter validation).
+   *
+   * @param {string} submissionUuid - The submission UUID (submission.uuid).
+   * @param {string} submissionUploadId - The submission_upload_id.
+   * @returns {Promise<SubmissionUpload>} - The requested submission_upload record.
+   * @throws {ApiNotFoundError} - If the record is not found or does not belong to the submission.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
+   */
+  async getSubmissionUploadBySubmissionUuid(
+    submissionUuid: string,
+    submissionUploadId: string
+  ): Promise<SubmissionUpload> {
+    const sqlStatement = SQL`
+      SELECT
+        su.submission_upload_id,
+        su.submission_id,
+        su.upload_id,
+        su.record_end_date
+      FROM
+        submission_upload su
+      INNER JOIN submission s ON s.submission_id = su.submission_id
+      WHERE
+        s.uuid = ${submissionUuid}
+        AND su.submission_upload_id = ${submissionUploadId}
+        AND su.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionUpload);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Submission upload not found', [
+        'SubmissionUploadRepository->getSubmissionUploadBySubmissionUuid',
+        { submissionUuid, submissionUploadId }
+      ]);
+    }
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'SubmissionUploadRepository->getSubmissionUploadBySubmissionUuid',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
    * Retrieves submission_upload records with optional filters and pagination.
    *
    * @param {number} submissionId - The ID of the submission.

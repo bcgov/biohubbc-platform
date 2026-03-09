@@ -1,6 +1,6 @@
 import { CompleteMultipartUploadCommand } from '@aws-sdk/client-s3';
 import dayjs from 'dayjs';
-import { HTTP401, HTTP404 } from '../../errors/http-error';
+import { HTTP401 } from '../../errors/http-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
@@ -63,16 +63,13 @@ export class UploadIngestionService extends DBService {
    * @param {number} bytes
    * @param {string} submissionUuid - Submission UUID (submission.uuid).
    * @returns {Promise<PresignedUploadUrlResponse>}
-   * @throws {HTTP404} If no submission exists for the given UUID.
+   * @throws {ApiNotFoundError} If no submission exists for the given UUID (mapped to 404 by error handler).
    */
   async startArchiveUploadForExistingSubmissionByUuid(
     bytes: number,
     submissionUuid: string
   ): Promise<PresignedUploadUrlResponse> {
     const byUuid = await this.submissionService.getSubmissionIdByUUID(submissionUuid);
-    if (!byUuid) {
-      throw new HTTP404('Submission not found');
-    }
     const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(byUuid.submission_id);
     return this._startArchiveUploadForSubmission(bytes, byUuid.submission_id, submissionRecord.uuid);
   }
@@ -83,13 +80,13 @@ export class UploadIngestionService extends DBService {
    *
    * @param {number} bytes
    * @param {number} submissionId - Integer PK for DB operations
-   * @param {string} submissionUuid - UUID returned to client as submissionId
+   * @param {string} submissionUuid - Submission UUID; used when building response (API returns this as submissionId for client use).
    * @returns {Promise<PresignedUploadUrlResponse>}
    */
   async _startArchiveUploadForSubmission(
     bytes: number,
     submissionId: number,
-    _submissionUuid: string
+    submissionUuid: string
   ): Promise<PresignedUploadUrlResponse> {
     // 1. Create upload session
     const { upload_id } = await this.uploadService.insertUpload({
@@ -143,12 +140,9 @@ export class UploadIngestionService extends DBService {
     // 7. Persist S3 upload ID
     await this.uploadService.updateUpload(upload_id, { s3_upload_id: s3UploadId });
 
-    // 8. Submission UUID must come from submission table only (never upload_id or submission_upload_id)
-    const submissionRow = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
-    const submissionIdForResponse = submissionRow.uuid;
-
+    // 8. Response submissionId is the submission UUID (callers pass it for clarity; API returns it for client use).
     return {
-      submissionId: submissionIdForResponse,
+      submissionId: submissionUuid,
       submissionUploadId: submission_upload_id,
       uploadId: upload_id,
       uploadArchiveId: upload_archive_id,

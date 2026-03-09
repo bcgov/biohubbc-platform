@@ -2,8 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
-import { ApiExecuteSQLError } from '../../../../../errors/api-error';
-import { HTTP404, HTTP409 } from '../../../../../errors/http-error';
+import { HTTP409 } from '../../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
 import { SubmissionUploadReviewStatusService } from '../../../../../services/upload/submission-upload-review-status-service';
@@ -79,18 +78,10 @@ export function deleteSubmissionUpload(): RequestHandler {
       const { submissionId: submissionIdParam, submissionUploadId } = req.params;
 
       const submissionUploadService = new SubmissionUploadService(connection);
-      await submissionUploadService.getSubmissionUploadForSubmissionOrThrow(submissionIdParam, submissionUploadId);
+      await submissionUploadService.getSubmissionUploadBySubmissionUuid(submissionIdParam, submissionUploadId);
 
       const reviewStatusService = new SubmissionUploadReviewStatusService(connection);
-      let reviewStatus;
-      try {
-        reviewStatus = await reviewStatusService.getSubmissionUploadReviewStatus(submissionUploadId);
-      } catch (err) {
-        if (err instanceof ApiExecuteSQLError && err.message === 'Failed to get submission_upload_status record') {
-          throw new HTTP404('Submission upload not found');
-        }
-        throw err;
-      }
+      const reviewStatus = await reviewStatusService.getSubmissionUploadReviewStatus(submissionUploadId);
 
       if (reviewStatus.status !== 'submitted') {
         throw new HTTP409(

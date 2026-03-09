@@ -79,7 +79,7 @@ export function createSubmissionUpload(): RequestHandler {
 
       await connection.commit();
 
-      res.status(201).json(result);
+      return res.status(201).json(result);
     } catch (error) {
       defaultLog.error({ label: 'createSubmissionUpload', message: 'error initializing submission upload', error });
       await connection.rollback();

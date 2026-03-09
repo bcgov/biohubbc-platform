@@ -95,7 +95,7 @@ export function updateSubmissionUploadReviewStatus(): RequestHandler {
       const { status } = req.body;
 
       const submissionUploadService = new SubmissionUploadService(connection);
-      await submissionUploadService.getSubmissionUploadForSubmissionOrThrow(submissionIdParam, submissionUploadId);
+      await submissionUploadService.getSubmissionUploadBySubmissionUuid(submissionIdParam, submissionUploadId);
 
       const reviewStatusService = new SubmissionUploadReviewStatusService(connection);
       const result = await reviewStatusService.updateSubmissionUploadReviewStatus(submissionUploadId, { status });

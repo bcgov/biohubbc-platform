@@ -1,5 +1,5 @@
 import { SQL } from 'sql-template-strings';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   CreateSubmissionUploadReviewStatus,
   SubmissionUploadReviewStatus,
@@ -51,7 +51,8 @@ export class SubmissionUploadReviewStatusRepository extends BaseRepository {
    *
    * @param {string} submissionUploadId - The submission_upload_id to look up.
    * @returns {Promise<SubmissionUploadReviewStatus>} - The status record.
-   * @throws {ApiExecuteSQLError} - If the record is not found.
+   * @throws {ApiNotFoundError} - If the record is not found.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
    */
   async getSubmissionUploadReviewStatus(submissionUploadId: string): Promise<SubmissionUploadReviewStatus> {
     const sqlStatement = SQL`
@@ -67,10 +68,16 @@ export class SubmissionUploadReviewStatusRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadReviewStatus);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get submission_upload_status record', [
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Submission upload status not found', [
         'SubmissionUploadReviewStatusRepository->getSubmissionUploadReviewStatus',
-        `rowCount was ${response.rowCount}, expected 1`
+        { submissionUploadId }
+      ]);
+    }
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'SubmissionUploadReviewStatusRepository->getSubmissionUploadReviewStatus',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 
@@ -135,6 +142,6 @@ export class SubmissionUploadReviewStatusRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, SubmissionUploadReviewStatusHistoryRow);
 
-    return response.rows ?? [];
+    return response.rows;
   }
 }
