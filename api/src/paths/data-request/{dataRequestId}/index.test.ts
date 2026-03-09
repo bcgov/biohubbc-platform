@@ -21,6 +21,7 @@ describe('data-request/{dataRequestId}', () => {
     reason: 'Research purposes',
     team_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
     requested_by: 1,
+    ticket_id: 'd4e5f6a7-b8c9-0123-def0-234567890123',
     data_request_status: {
       data_request_status_id: 'c3d4e5f6-a7b8-9012-cdef-123456789012',
       data_request_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
@@ -33,7 +34,8 @@ describe('data-request/{dataRequestId}', () => {
     data_request_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
     reason: 'Research purposes',
     team_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
-    requested_by: 1
+    requested_by: 1,
+    ticket_id: 'd4e5f6a7-b8c9-0123-def0-234567890123'
   };
 
   describe('getDataRequestById', () => {

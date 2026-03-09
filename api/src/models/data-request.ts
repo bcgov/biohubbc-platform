@@ -5,7 +5,8 @@ export const DataRequest = z.object({
   data_request_id: z.string().uuid(),
   reason: z.string(),
   team_id: z.string().uuid(),
-  requested_by: z.number()
+  requested_by: z.number(),
+  ticket_id: z.string().uuid()
 });
 export type DataRequest = z.infer<typeof DataRequest>;
 
@@ -24,6 +25,11 @@ export const CreateDataRequest = z.object({
   team_id: z.string().uuid().optional()
 });
 export type CreateDataRequest = z.infer<typeof CreateDataRequest>;
+
+export type CreateDataRequestPayload = CreateDataRequest & {
+  team_id: string;
+  ticket_id: string;
+};
 
 export const UpdateDataRequest = z.object({
   reason: z.string().optional()

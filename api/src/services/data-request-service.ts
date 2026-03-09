@@ -24,6 +24,7 @@ import { TeamPolicyService } from './access-policy/team-policy-service';
 import { TeamService } from './access-policy/team-service';
 import { DataRequestStatusService } from './data-request-status-service';
 import { DBService } from './db-service';
+import { TicketService } from './ticket-service';
 
 /**
  * Service for managing data requests.
@@ -98,7 +99,7 @@ export class DataRequestService extends DBService {
   /**
    * Create a new data request.
    *
-   * Creates a team for the requester, a wildcard access policy expiring in 30 days
+   * Creates a team for the requester, a ticket, a wildcard access policy expiring in 30 days
    * linked to the team, and auto-approves the request.
    *
    * @param {CreateDataRequest} payload
@@ -111,9 +112,18 @@ export class DataRequestService extends DBService {
       const team = await this.createTeam(payload.requested_by);
       teamId = team.team_id;
     }
-    const payloadWithTeamId = { ...payload, team_id: teamId };
 
-    const dataRequest = await this.dataRequestRepository.createDataRequest(payload.requested_by, payloadWithTeamId);
+    const ticketSubject = `Data Request - ${payload.reason.split(' ').slice(0, 10).join(' ')}`;
+    const ticketService = new TicketService(this.connection);
+    const ticket = await ticketService.createTicket({
+      subject: ticketSubject,
+      description: null,
+      priority: 'medium'
+    });
+
+    const payloadWithIds = { ...payload, team_id: teamId, ticket_id: ticket.ticket_id };
+
+    const dataRequest = await this.dataRequestRepository.createDataRequest(payload.requested_by, payloadWithIds);
 
     const policy = await this.createPolicy(dataRequest.data_request_id);
     await this.createTeamPolicy({ teamId, policyId: policy.policy_id });
