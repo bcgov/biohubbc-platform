@@ -4,7 +4,7 @@ import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { MemoryRouter } from 'react-router';
 import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
-import { ActivePoliciesList, IActivePoliciesListProps } from './ActivePoliciesList';
+import { PoliciesContainer, IPoliciesContainerProps } from './PoliciesContainer';
 
 // Types for DataGrid mock
 interface MockDataGridProps {
@@ -55,7 +55,7 @@ const mockUseApi = {
   }
 };
 
-const defaultProps: IActivePoliciesListProps = {
+const defaultProps: IPoliciesContainerProps = {
   policies: [],
   rowCount: 0,
   paginationModel: { page: 0, pageSize: 10 },
@@ -64,20 +64,18 @@ const defaultProps: IActivePoliciesListProps = {
   setSortModel: vi.fn(),
   refresh: vi.fn(),
   searchTerm: '',
-  onSearch: vi.fn(),
-  selectedPolicyId: null,
-  onSelectPolicy: vi.fn()
+  onSearch: vi.fn()
 };
 
-const renderComponent = (props: Partial<IActivePoliciesListProps> = {}) => {
+const renderComponent = (props: Partial<IPoliciesContainerProps> = {}) => {
   return render(
     <MemoryRouter initialEntries={['/']}>
-      <ActivePoliciesList {...defaultProps} {...props} />
+      <PoliciesContainer {...defaultProps} {...props} />
     </MemoryRouter>
   );
 };
 
-describe('ActivePoliciesList', () => {
+describe('PoliciesContainer', () => {
   beforeEach(() => {
     mockBiohubApi.mockImplementation(() => mockUseApi);
   });
@@ -132,7 +130,7 @@ describe('ActivePoliciesList', () => {
       const { getByTestId, getByText } = renderComponent();
 
       // Step 2: Click Add button
-      fireEvent.click(getByTestId('add-policy-button'));
+      fireEvent.click(getByTestId('policies-add-button'));
 
       // Step 3: Verify dialog opens
       await waitFor(() => {
@@ -153,7 +151,7 @@ describe('ActivePoliciesList', () => {
       const { getByTestId, getByLabelText, getByRole } = renderComponent({ refresh: mockRefresh });
 
       // Step 4: Click "Add" button to open dialog
-      fireEvent.click(getByTestId('add-policy-button'));
+      fireEvent.click(getByTestId('policies-add-button'));
 
       // Step 5: Wait for dialog to appear (async rendering)
       await waitFor(() => {

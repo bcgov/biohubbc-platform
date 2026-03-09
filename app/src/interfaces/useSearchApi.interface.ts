@@ -52,6 +52,14 @@ export interface ISearchFeaturePropertyGroup {
   conditions: ISearchFeaturePropertyCondition[];
 }
 
+/**
+ * Response from POST /api/download — a download created directly from search filters.
+ * Bypasses the shopping cart; the download UUID is the access credential for anonymous users.
+ */
+export interface CreateDownloadResponse {
+  download_id: string;
+}
+
 /** Request parameters for advanced feature search */
 export interface ISearchFeaturesFilters {
   /** Free-text keyword search across all searchable properties */

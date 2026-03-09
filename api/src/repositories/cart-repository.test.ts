@@ -2,6 +2,7 @@ import chai, { expect } from 'chai';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { ApiNotFoundError } from '../errors/api-error';
 import { Cart, CartStatus, UpdateCart } from '../models/cart';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CartRepository } from './cart-repository';
@@ -18,7 +19,8 @@ describe('CartRepository', () => {
       const mockCart: Cart = {
         cart_id: 'cart-1',
         cart_status: CartStatus.ACTIVE,
-        system_user_id: 1
+        system_user_id: 1,
+        record_end_date: null
       };
 
       const mockQueryResponse = {
@@ -53,7 +55,8 @@ describe('CartRepository', () => {
         await repo.getCartById('cart-1');
         throw new Error('Expected to throw');
       } catch (err) {
-        expect((err as Error).message).to.equal('Failed to get cart');
+        expect(err).to.be.instanceOf(ApiNotFoundError);
+        expect((err as ApiNotFoundError).message).to.equal('Cart not found');
       }
     });
   });
@@ -63,7 +66,8 @@ describe('CartRepository', () => {
       const mockCart: Cart = {
         cart_id: 'cart-1',
         cart_status: CartStatus.ABANDONED,
-        system_user_id: 1
+        system_user_id: 1,
+        record_end_date: null
       };
 
       const mockQueryResponse = {
@@ -105,7 +109,8 @@ describe('CartRepository', () => {
       const mockCart: Cart = {
         cart_id: 'cart-1',
         cart_status: CartStatus.ACTIVE,
-        system_user_id: 1
+        system_user_id: 1,
+        record_end_date: null
       };
 
       const mockQueryResponse = {

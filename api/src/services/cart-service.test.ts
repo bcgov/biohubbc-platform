@@ -27,7 +27,8 @@ describe('CartService', () => {
       const mockCart: Cart = {
         cart_id: 'cart-1',
         system_user_id: 1,
-        cart_status: CartStatus.ACTIVE
+        cart_status: CartStatus.ACTIVE,
+        record_end_date: null
       };
 
       const mockFeatures: CartSubmissionFeature[] = [
@@ -57,7 +58,8 @@ describe('CartService', () => {
       const mockCart: Cart = {
         cart_id: 'cart-1',
         system_user_id: 1,
-        cart_status: CartStatus.ACTIVE
+        cart_status: CartStatus.ACTIVE,
+        record_end_date: null
       };
 
       const stub = sinon.stub(CartRepository.prototype, 'getCartById').resolves(mockCart);
@@ -77,7 +79,8 @@ describe('CartService', () => {
       const mockCart: Cart = {
         cart_id: 'cart-123',
         system_user_id: 1,
-        cart_status: CartStatus.ACTIVE
+        cart_status: CartStatus.ACTIVE,
+        record_end_date: null
       };
 
       const mockPaginationResponse: CartFeatureListResponse = {
@@ -113,7 +116,8 @@ describe('CartService', () => {
       const mockCart: Cart = {
         cart_id: 'cart-123',
         system_user_id: 1,
-        cart_status: CartStatus.ACTIVE
+        cart_status: CartStatus.ACTIVE,
+        record_end_date: null
       };
 
       const mockFeatures: CartSubmissionFeature[] = [
@@ -163,7 +167,8 @@ describe('CartService', () => {
       const mockCart: Cart = {
         cart_id: 'cart-123',
         system_user_id: 1,
-        cart_status: CartStatus.ACTIVE
+        cart_status: CartStatus.ACTIVE,
+        record_end_date: null
       };
 
       const mockPaginationResponse: CartFeatureListResponse = {
@@ -215,7 +220,8 @@ describe('CartService', () => {
       const mockCart: Cart = {
         cart_id: 'cart-123',
         system_user_id: 1,
-        cart_status: CartStatus.ACTIVE
+        cart_status: CartStatus.ACTIVE,
+        record_end_date: null
       };
 
       sinon.stub(CartRepository.prototype, 'createCart').resolves(mockCart);
@@ -260,7 +266,12 @@ describe('CartService', () => {
 
       expect(result).to.deep.equal({ download_id: 'dl-uuid' });
       expect(getIdsStub).to.have.been.calledOnceWith('cart-1');
-      expect(createDownloadStub).to.have.been.calledOnceWith('team-1', null, undefined, 42);
+      expect(createDownloadStub).to.have.been.calledOnceWith({
+        teamId: 'team-1',
+        dataRequestId: null,
+        fragmentSizeBytes: undefined,
+        systemUserId: 42
+      });
       expect(createFeaturesStub).to.have.been.calledOnceWith('dl-uuid', [1, 2, 3]);
       expect(updateCartStub).to.have.been.calledOnceWith('cart-1', {
         cart_status: CartStatus.CHECKED_OUT,
@@ -295,7 +306,12 @@ describe('CartService', () => {
 
       await service.checkoutCart('cart-1', null);
 
-      expect(createDownloadStub).to.have.been.calledOnceWith(null, null, undefined, null);
+      expect(createDownloadStub).to.have.been.calledOnceWith({
+        teamId: null,
+        dataRequestId: null,
+        fragmentSizeBytes: undefined,
+        systemUserId: null
+      });
       expect(updateCartStub).to.have.been.calledOnceWith('cart-1', {
         cart_status: CartStatus.CHECKED_OUT,
         checkout_date: sinon.match.string,
@@ -356,7 +372,12 @@ describe('CartService', () => {
 
       await service.checkoutCart('cart-1', 7);
 
-      expect(createDownloadStub).to.have.been.calledOnceWith('team-1', null, undefined, 7);
+      expect(createDownloadStub).to.have.been.calledOnceWith({
+        teamId: 'team-1',
+        dataRequestId: null,
+        fragmentSizeBytes: undefined,
+        systemUserId: 7
+      });
       expect(updateCartStub).to.have.been.calledOnceWith('cart-1', {
         cart_status: CartStatus.CHECKED_OUT,
         checkout_date: sinon.match.string,
@@ -379,7 +400,12 @@ describe('CartService', () => {
 
       await service.checkoutCart('cart-1', null);
 
-      expect(createDownloadStub).to.have.been.calledOnceWith(null, null, undefined, null);
+      expect(createDownloadStub).to.have.been.calledOnceWith({
+        teamId: null,
+        dataRequestId: null,
+        fragmentSizeBytes: undefined,
+        systemUserId: null
+      });
       expect(updateCartStub).to.have.been.calledOnceWith('cart-1', {
         cart_status: CartStatus.CHECKED_OUT,
         checkout_date: sinon.match.string,

@@ -2,15 +2,25 @@ import { IDBConnection } from '../database/db';
 import { HTTP404 } from '../errors/http-error';
 import {
   CreateDataRequest,
+  CreateTeamPolicyParams,
   DataRequestFilters,
   DataRequestWithStatus,
   FlatDataRequestWithStatus,
   UpdateDataRequest
 } from '../models/data-request';
 import { DataRequestStatusEnum } from '../models/data-request-status';
+import { PolicyEffect } from '../models/policy-statement';
+import { Team } from '../models/team';
 import { DataRequestRepository } from '../repositories/data-request-repository';
-import { _generateDataRequestTeamName, _transformFlatDataRequestToNested } from '../utils/data-request';
+import {
+  _generateDataRequestPolicyName,
+  _generateDataRequestTeamName,
+  _getDataRequestPolicyExpiryDate,
+  _transformFlatDataRequestToNested
+} from '../utils/data-request';
+import { PolicyService } from './access-policy/policy-service';
 import { TeamMemberService } from './access-policy/team-member-service';
+import { TeamPolicyService } from './access-policy/team-policy-service';
 import { TeamService } from './access-policy/team-service';
 import { DataRequestStatusService } from './data-request-status-service';
 import { DBService } from './db-service';
@@ -87,41 +97,39 @@ export class DataRequestService extends DBService {
 
   /**
    * Create a new data request.
-   * If teamId is undefined, a new team is created first and its id is used for the data request.
    *
-   * @param {number} requestedBy - system user id
+   * Creates a team for the requester, a wildcard access policy expiring in 30 days
+   * linked to the team, and auto-approves the request.
+   *
    * @param {CreateDataRequest} payload
    * @return {Promise<DataRequestWithStatus>}
    * @memberof DataRequestService
    */
-  async createDataRequest(requestedBy: number, payload: CreateDataRequest): Promise<DataRequestWithStatus> {
-    let resolvedTeamId = payload.team_id;
-    if (resolvedTeamId === undefined) {
-      const teamService = new TeamService(this.connection);
-      const team = await teamService.createTeam({ name: _generateDataRequestTeamName() });
-      resolvedTeamId = team.team_id;
-
-      const teamMemberService = new TeamMemberService(this.connection);
-      await teamMemberService.createTeamMember({ system_user_id: requestedBy, team_id: resolvedTeamId });
+  async createDataRequest(payload: CreateDataRequest): Promise<DataRequestWithStatus> {
+    let teamId = payload.team_id;
+    if (!teamId) {
+      const team = await this.createTeam(payload.requested_by);
+      teamId = team.team_id;
     }
+    const payloadWithTeamId = { ...payload, team_id: teamId };
 
-    const payloadWithTeamId = { ...payload, team_id: resolvedTeamId };
+    const dataRequest = await this.dataRequestRepository.createDataRequest(payload.requested_by, payloadWithTeamId);
 
-    const dataRequest = await this.dataRequestRepository.createDataRequest(requestedBy, payloadWithTeamId);
+    const policy = await this.createPolicy(dataRequest.data_request_id);
+    await this.createTeamPolicy({ teamId, policyId: policy.policy_id });
 
     const dataRequestStatusService = new DataRequestStatusService(this.connection);
+    // initially defaults status to APPROVED for development
     const dataRequestStatus = await dataRequestStatusService.createDataRequestStatus(
       dataRequest.data_request_id,
-      DataRequestStatusEnum.enum.REQUESTED,
+      DataRequestStatusEnum.enum.APPROVED,
       undefined
     );
 
-    const response = {
+    return {
       ...dataRequest,
       data_request_status: dataRequestStatus
     };
-
-    return response;
   }
 
   /**
@@ -157,5 +165,52 @@ export class DataRequestService extends DBService {
     }
 
     return this.dataRequestRepository.deleteDataRequest(dataRequestId);
+  }
+
+  /**
+   * Creates a Team and TeamMember for the system user
+   * returns the Team
+   *
+   * @param {number} requestedBy - system user id
+   * @return {Promise<Team>} team to use for the data request
+   * @private
+   */
+  private async createTeam(requestedBy: number): Promise<Team> {
+    const teamService = new TeamService(this.connection);
+    const team = await teamService.createTeam({ name: _generateDataRequestTeamName() });
+    const teamMemberService = new TeamMemberService(this.connection);
+    await teamMemberService.createTeamMember({ system_user_id: requestedBy, team_id: team.team_id });
+    return team;
+  }
+
+  /**
+   * Creates an access policy for a data request (expires in 30 days).
+   *
+   * @param {string} dataRequestId
+   * @return {Promise<{ policy_id: string }>}
+   * @private
+   */
+  private async createPolicy(dataRequestId: string): Promise<{ policy_id: string }> {
+    const policyService = new PolicyService(this.connection);
+    return policyService.createPolicyWithStatements(
+      {
+        name: _generateDataRequestPolicyName(),
+        description: `Auto-generated policy for data request ${dataRequestId}`,
+        record_end_date: _getDataRequestPolicyExpiryDate()
+      },
+      [{ effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:*:*' }]
+    );
+  }
+
+  /**
+   * Links a team to a policy by creating a team policy record.
+   *
+   * @param {CreateTeamPolicyParams} params
+   * @return {Promise<void>}
+   * @private
+   */
+  private async createTeamPolicy(params: CreateTeamPolicyParams): Promise<void> {
+    const teamPolicyService = new TeamPolicyService(this.connection);
+    await teamPolicyService.createTeamPolicy({ team_id: params.teamId, policy_id: params.policyId });
   }
 }

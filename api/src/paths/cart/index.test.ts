@@ -51,7 +51,8 @@ describe('cart', () => {
         cart: {
           cart_id: '1111-2222-3333-4444',
           system_user_id: 1,
-          cart_status: CartStatus.ACTIVE
+          cart_status: CartStatus.ACTIVE,
+          record_end_date: null
         },
         features: [],
         pagination: {
@@ -90,7 +91,8 @@ describe('cart', () => {
         cart: {
           cart_id: '1111-2222-3333-4444',
           system_user_id: null,
-          cart_status: CartStatus.ACTIVE
+          cart_status: CartStatus.ACTIVE,
+          record_end_date: null
         },
         features: [],
         pagination: {

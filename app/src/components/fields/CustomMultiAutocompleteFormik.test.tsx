@@ -1,7 +1,7 @@
 import { Formik } from 'formik';
 import { render } from 'test-helpers/test-utils';
 import { sortAutocompleteOptions } from 'utils/autocomplete';
-import CustomMultiAutocompleteFormik from './CustomMultiAutocompleteFormik';
+import { CustomMultiAutocompleteFormik } from './CustomMultiAutocompleteFormik';
 import { ICustomMultiAutocompleteOption } from './CustomMultiAutocomplete';
 
 describe('CustomMultiAutocompleteFormik', () => {

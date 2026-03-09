@@ -5,3 +5,7 @@ export const Comment = z.object({
   comment: z.string()
 });
 export type Comment = z.infer<typeof Comment>;
+
+export interface UpdateComment {
+  comment: string;
+}

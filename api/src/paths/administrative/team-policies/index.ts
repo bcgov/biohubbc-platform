@@ -13,11 +13,7 @@ import {
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { TeamPolicyService } from '../../../services/access-policy/team-policy-service';
 import { getLogger } from '../../../utils/logger';
-import {
-  ensureCompletePaginationOptions,
-  makePaginationOptionsFromRequest,
-  makePaginationResponse
-} from '../../../utils/pagination';
+import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../utils/pagination';
 
 const defaultLog = getLogger('paths/administrative/team-policies');
 
@@ -83,7 +79,7 @@ export function getTeamPolicies(): RequestHandler {
       const filters = { search };
       const pagination = makePaginationOptionsFromRequest(req);
       const [teamPolicies, count] = await Promise.all([
-        teamPolicyService.getAllTeamPolicies(filters, ensureCompletePaginationOptions(pagination)),
+        teamPolicyService.getAllTeamPolicies(filters, pagination),
         teamPolicyService.getAllTeamPoliciesCount(filters)
       ]);
 

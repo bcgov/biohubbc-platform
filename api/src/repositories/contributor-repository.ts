@@ -1,5 +1,5 @@
 import SQL from 'sql-template-strings';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { GetContributor } from '../paths/contributor/index.interface';
 import { BaseRepository } from './base-repository';
 
@@ -25,10 +25,17 @@ export class ContributorRepository extends BaseRepository {
 
     const response = await this.connection.sql(sql, GetContributor);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get contributor', [
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Contributor not found', [
         'ContributorRepository->getContributorByClientId',
-        'rowCount !== 1, expected rowCount === 1'
+        { clientId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'ContributorRepository->getContributorByClientId',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 
@@ -71,7 +78,7 @@ export class ContributorRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to create contributor', [
         'ContributorRepository->createContributor',
-        'rowCount !== 1, expected rowCount === 1'
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 

@@ -1,5 +1,5 @@
 import { DatabaseError } from 'pg';
-import { ApiConflictError, ApiError } from './api-error';
+import { ApiConflictError, ApiError, ApiNotFoundError } from './api-error';
 import { BaseError } from './base-error';
 
 export enum HTTPErrorType {
@@ -151,6 +151,10 @@ export const ensureHTTPError = (error: HTTPError | ApiError | Error | any): HTTP
 
   if (error instanceof ApiConflictError) {
     return HTTP409.fromApiError(error);
+  }
+
+  if (error instanceof ApiNotFoundError) {
+    return HTTP404.fromApiError(error);
   }
 
   if (error instanceof ApiError) {
