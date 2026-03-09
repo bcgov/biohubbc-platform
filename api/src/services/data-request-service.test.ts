@@ -309,6 +309,7 @@ describe('DataRequestService', () => {
         reason: 'New research project',
         team_id: mockDataRequest.team_id
       };
+      const expectedTicketSubject = `Data Request - ${payload.reason.split(' ').slice(0, 10).join(' ')}`;
 
       stubCreateDataRequestDependencies();
 
@@ -324,8 +325,8 @@ describe('DataRequestService', () => {
       });
 
       expect(ticketStub).to.have.been.calledOnceWith({
-        subject: 'Data Request',
-        description: payload.reason,
+        subject: expectedTicketSubject,
+        description: null,
         priority: 'medium'
       });
     });

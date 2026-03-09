@@ -11,7 +11,6 @@ import {
 import { DataRequestStatusEnum } from '../models/data-request-status';
 import { PolicyEffect } from '../models/policy-statement';
 import { Team } from '../models/team';
-import { CreateTicketRequest, Ticket } from '../models/ticket';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import {
   _generateDataRequestPolicyName,
@@ -113,9 +112,12 @@ export class DataRequestService extends DBService {
       const team = await this.createTeam(payload.requested_by);
       teamId = team.team_id;
     }
-    const ticket = await this.createTicket({
-      subject: 'Data Request',
-      description: payload.reason,
+
+    const ticketSubject = `Data Request - ${payload.reason.split(' ').slice(0, 10).join(' ')}`;
+    const ticketService = new TicketService(this.connection);
+    const ticket = await ticketService.createTicket({
+      subject: ticketSubject,
+      description: null,
       priority: 'medium'
     });
 
@@ -173,22 +175,6 @@ export class DataRequestService extends DBService {
     }
 
     return this.dataRequestRepository.deleteDataRequest(dataRequestId);
-  }
-
-  /**
-   * Create a new ticket.
-   *
-   * @param {CreateTicketRequest} params
-   * @return {Promise<Ticket>}
-   * @memberof DataRequestService
-   */
-  private async createTicket(params: CreateTicketRequest): Promise<Ticket> {
-    const { subject, description, priority } = params;
-
-    const ticketService = new TicketService(this.connection);
-    const ticket = await ticketService.createTicket({ subject, description, priority });
-
-    return ticket;
   }
 
   /**
