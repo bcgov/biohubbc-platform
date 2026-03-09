@@ -103,7 +103,6 @@ describe('process-submission-features-job', () => {
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
-
       const updateStatusStub = sinon
         .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus')
         .resolves();
@@ -149,7 +148,6 @@ describe('process-submission-features-job', () => {
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
-
       sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
 
       sinon.stub(SubmissionIngestionService.prototype, 'processSubmission').rejects(testError);
@@ -178,7 +176,6 @@ describe('process-submission-features-job', () => {
         mockConn.release = releaseStub;
         return mockConn;
       });
-
 
       sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
       sinon.stub(SubmissionIngestionService.prototype, 'processSubmission').resolves({ valid: true, errors: [] });
@@ -246,7 +243,6 @@ describe('process-submission-features-job', () => {
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
-
       const updateStatusStub = sinon
         .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus')
         .resolves();
@@ -280,7 +276,6 @@ describe('process-submission-features-job', () => {
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
-
       sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
 
       sinon.stub(SubmissionIngestionService.prototype, 'processSubmission').resolves({ valid: true, errors: [] });
@@ -308,7 +303,6 @@ describe('process-submission-features-job', () => {
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
-
       sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
 
       sinon.stub(SubmissionIngestionService.prototype, 'processSubmission').resolves({ valid: true, errors: [] });
@@ -333,7 +327,6 @@ describe('process-submission-features-job', () => {
       mockDBConnection.release = sinon.stub();
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
-
 
       sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
 

@@ -45,7 +45,7 @@ export type PublishJobResult =
 /**
  * Options for process submission features jobs.
  *
- * Singleton key is per-submission, so retries cannot interleave with a newer upload's job —
+ * Singleton key is per-submission
  * pg-boss won't dequeue a new job for the same singleton key while the current one is active.
  */
 const PROCESS_SUBMISSION_FEATURES_OPTIONS: IPublishOptions = {

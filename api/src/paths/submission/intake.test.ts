@@ -218,7 +218,9 @@ describe('intake', () => {
         serviceClientSystemUser.system_user_id,
         serviceClientSystemUser.user_identifier
       );
-      expect(insertSubmissionFeatureRecordsStub).to.have.been.calledOnceWith(submissionId, 'sub-upload-uuid', [feature1]);
+      expect(insertSubmissionFeatureRecordsStub).to.have.been.calledOnceWith(submissionId, 'sub-upload-uuid', [
+        feature1
+      ]);
       expect(indexFeaturesBySubmissionIdStub).to.have.been.calledOnceWith(submissionId);
       expect(findSubmissionFeaturesStub).to.have.been.calledOnceWith({
         submissionId: submissionId,
