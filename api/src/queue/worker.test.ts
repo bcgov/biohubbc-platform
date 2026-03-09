@@ -74,10 +74,12 @@ describe('worker', () => {
       await registerWorkers();
 
       // Second createQueue call (PROCESS_SUBMISSION_FEATURES) should have DLQ config
+      // policy: 'short' — enforces singletonKey uniqueness for queued jobs
       const queueConfig = createQueueStub.secondCall.args[1];
       expect(queueConfig.deadLetter).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(queueConfig.retryLimit).to.equal(2);
       expect(queueConfig.retryBackoff).to.equal(true);
+      expect(queueConfig.policy).to.equal('short');
     });
 
     it('registers dead letter queue handler for failed jobs', async () => {

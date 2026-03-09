@@ -1,6 +1,7 @@
 import dayjs from 'dayjs';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { IFlattenedBlock } from '../../models/submission-feature';
+import { SubmissionUpload } from '../../models/submission-upload';
 import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
 import { extractAndUploadMedia, extractBlocksFromArchive, IUploadedMediaFile } from '../../utils/biohub-tar-parser';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
@@ -8,7 +9,6 @@ import { getLogger } from '../../utils/logger';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
-import { SubmissionUploadService } from '../upload/submission-upload-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
 import { FeatureValidationService } from './feature-validation-service';
 import { IValidationError, IValidationResult, ValidationErrorType } from './feature-validation-service.interface';
@@ -30,7 +30,6 @@ const CSV_ROW_OVERHEAD_BYTES = 500;
 export class SubmissionIngestionService extends DBService {
   featureValidationService = new FeatureValidationService(this.connection);
   ingestionRepository = new IngestionRepository(this.connection);
-  submissionUploadService = new SubmissionUploadService(this.connection);
   uploadArchiveService = new UploadArchiveService(this.connection);
   artifactService = new ArtifactService(this.connection);
   objectStorageService = new ObjectStorageService();
@@ -43,30 +42,42 @@ export class SubmissionIngestionService extends DBService {
    * Idempotent: safe for pg-boss retries. Existing features are soft-deleted before
    * re-insertion, artifact inserts use ON CONFLICT DO NOTHING, and S3 PUTs overwrite.
    *
-   * @param {number} submissionId - The submission to process
+   * Caller provides the pre-resolved submission_upload bridge record to avoid redundant
+   * lookups — the job handler already resolves it for logging/indexing.
+   * Tarball resolution requires upload_id (upload → upload_archive → artifact → S3 key),
+   * while feature inserts use submission_upload_id (the processing identifier).
+   *
+   * @param {SubmissionUpload} submissionUpload - The pre-resolved bridge record.
    * @returns {Promise<IValidationResult>} Validation result
    * @memberof SubmissionIngestionService
    */
-  async processSubmission(submissionId: number): Promise<IValidationResult> {
-    const submissionUploads = await this.submissionUploadService.getSubmissionUploadsBySubmissionId(submissionId);
-    if (submissionUploads.length === 0) {
-      throw new Error(`No uploads found for submission ${submissionId}`);
-    }
-    const uploadId = submissionUploads[0].upload_id;
+  async processSubmission(submissionUpload: SubmissionUpload): Promise<IValidationResult> {
+    const {
+      submission_upload_id: submissionUploadId,
+      submission_id: submissionId,
+      upload_id: uploadId
+    } = submissionUpload;
+
+    // Resolve the S3 key for the uploaded tarball: upload_id → upload_archive → artifact → object_key
     const objectKey = await this.getTarballObjectKey(uploadId);
 
     // ================================================================
     // PASS 1: VALIDATE (zero side effects)
+    // Two-pass architecture: validate everything before writing anything,
+    // so a validation failure never leaves partial data behind.
     // ================================================================
 
+    // Stream 1: parse the tarball into flat feature blocks and a set of media filenames
     const tarStream1 = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
     const { allBlocks, mediaFileNames } = await extractBlocksFromArchive(tarStream1);
 
+    // Validate feature structure: types exist in feature_type, required properties present, types correct
     const featureValidation = await this.featureValidationService.validateFlatSubmissionFeatures(allBlocks);
     if (!featureValidation.valid) {
       return featureValidation;
     }
 
+    // Validate media integrity: every file/report block's filename must have a matching file in the archive
     const mediaErrors = validateMediaReferences(allBlocks, mediaFileNames);
     if (mediaErrors.length > 0) {
       return { valid: false, errors: mediaErrors };
@@ -74,15 +85,26 @@ export class SubmissionIngestionService extends DBService {
 
     // ================================================================
     // PASS 2: INGEST (DB writes + S3 uploads)
+    // All validation passed — safe to write. From here, operations are
+    // idempotent: S3 PUTs overwrite, artifact inserts use ON CONFLICT DO
+    // NOTHING, and features are soft-deleted before re-insertion.
     // ================================================================
 
+    // Stream 2: re-stream the tarball to extract and upload media files to S3
+    // (tar streams are single-pass, so we need a fresh stream)
     const tarStream2 = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
     const s3KeyPrefix = `submissions/${submissionId}/media`;
     const uploadedMediaFiles = await extractAndUploadMedia(tarStream2, this.objectStorageService, s3KeyPrefix);
 
+    // Stamp each file/report block with its S3 artifact_key so downstream
+    // consumers (download pipeline, UI) can locate the file without a join
     this.setArtifactKeys(allBlocks, uploadedMediaFiles);
+
+    // Pre-compute data_byte_size per feature for download size estimation
+    // (avoids fetching full JSONB at query time — see data_byte_size column docs)
     const dataByteSizeMap = this.computeDataByteSizeMap(allBlocks, uploadedMediaFiles);
 
+    // Create artifact records for each uploaded media file
     for (const [, mediaFile] of uploadedMediaFiles) {
       await this.artifactService.insertArtifact({
         bucket: getObjectStoreBucketName(),
@@ -94,9 +116,11 @@ export class SubmissionIngestionService extends DBService {
       });
     }
 
-    // Delete existing features (idempotency for job retries), then insert
-    await this.ingestionRepository.deleteSubmissionFeatures(submissionId);
-    await this.insertFlatFeatures(submissionId, uploadId, allBlocks, dataByteSizeMap);
+    // Soft-delete previous features for this upload, then insert fresh ones.
+    // Scoped by submissionUploadId (not submissionId) so re-triggering one upload
+    // doesn't wipe features from a different upload in the same submission.
+    await this.ingestionRepository.deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId);
+    await this.insertFlatFeatures(submissionId, submissionUploadId, allBlocks, dataByteSizeMap);
 
     return { valid: true, errors: [] };
   }
@@ -108,14 +132,14 @@ export class SubmissionIngestionService extends DBService {
    *
    * @private
    * @param {number} submissionId - The submission ID
-   * @param {string} uploadId - The upload ID
+   * @param {string} submissionUploadId - The submission_upload_id that produced these features
    * @param {IFlattenedBlock[]} features - Features to insert
    * @param {Map<string, number>} dataByteSizeMap - Pre-computed byte sizes per feature UUID
    * @memberof SubmissionIngestionService
    */
   private async insertFlatFeatures(
     submissionId: number,
-    uploadId: string,
+    submissionUploadId: string,
     features: IFlattenedBlock[],
     dataByteSizeMap: Map<string, number>
   ): Promise<void> {
@@ -125,7 +149,7 @@ export class SubmissionIngestionService extends DBService {
     for (const feature of features) {
       const result = await this.ingestionRepository.insertSubmissionFeatureRecord(
         submissionId,
-        uploadId,
+        submissionUploadId,
         null, // parent set in pass 2
         feature.id,
         feature.type,

@@ -87,14 +87,14 @@ export class SubmissionService extends DBService {
    * Insert submission features.
    *
    * @param {number} submissionId
-   * @param {string} uploadId - The upload that produced these features.
+   * @param {string} submissionUploadId - The submission_upload_id that produced these features.
    * @param {ISubmissionFeature[]} submissionFeatures
    * @return {*}  {Promise<void>}
    * @memberof SubmissionService
    */
   async insertSubmissionFeatureRecords(
     submissionId: number,
-    uploadId: string,
+    submissionUploadId: string,
     submissionFeatures: ISubmissionFeature[]
   ): Promise<void> {
     try {
@@ -132,7 +132,7 @@ export class SubmissionService extends DBService {
         // Validate the submissionFeature object
         const response = await this.ingestionRepository.insertSubmissionFeatureRecord(
           submissionId,
-          uploadId,
+          submissionUploadId,
           parentSubmissionFeatureId,
           featureNode.id,
           featureNode.type,
