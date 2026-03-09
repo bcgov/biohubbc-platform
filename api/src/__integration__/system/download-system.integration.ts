@@ -181,6 +181,14 @@ describe('Download Worker', function () {
       })
       .returning('upload_id');
 
+    const [bridge] = await db('biohub.submission_upload')
+      .insert({
+        submission_id: submissionId,
+        upload_id: upload.upload_id,
+        create_user: SYSTEM_USER_ID
+      })
+      .returning('submission_upload_id');
+
     const [row] = await db('biohub.submission_feature')
       .insert({
         submission_id: submissionId,
@@ -188,7 +196,7 @@ describe('Download Worker', function () {
         parent_submission_feature_id: parentFeatureId ?? null,
         data: dataJson,
         data_byte_size: db.raw(`octet_length(?::jsonb::text) + 500`, [dataJson]),
-        upload_id: upload.upload_id,
+        submission_upload_id: bridge.submission_upload_id,
         create_user: SYSTEM_USER_ID
       })
       .returning('submission_feature_id');

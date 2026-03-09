@@ -39,11 +39,18 @@ export async function createTestFeature(
   `);
   const uploadId = uploadResult.rows[0].upload_id;
 
+  const bridgeResult = await connection.sql(SQL`
+    INSERT INTO submission_upload (submission_id, upload_id, create_user)
+    VALUES (${submissionId}, ${uploadId}, ${systemUserId})
+    RETURNING submission_upload_id;
+  `);
+  const submissionUploadId = bridgeResult.rows[0].submission_upload_id;
+
   const result = await connection.sql(SQL`
-    INSERT INTO submission_feature (submission_id, upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, create_user)
+    INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, create_user)
     VALUES (
       ${submissionId},
-      ${uploadId},
+      ${submissionUploadId},
       (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName} LIMIT 1),
       ${parentFeatureId ?? null},
       ${dataJson}::jsonb,
