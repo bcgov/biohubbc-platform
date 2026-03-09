@@ -97,7 +97,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload, onClick
                 onDownload={onDownload}
                 onAddToCart={handleAddToCart}
                 onRemoveFromCart={handleRemoveFromCart}
-                onRowSelectionModelChange={() => { }}
+                onRowSelectionModelChange={() => {}}
               />
             ),
             list: (

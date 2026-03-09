@@ -19,7 +19,6 @@ export const SearchResultTableLayout = ({
   cartFeatureIds,
   onRowSelectionModelChange,
   onClick,
-  onDownload,
   onAddToCart,
   onRemoveFromCart
 }: SearchResultTableLayoutProps) => {
@@ -68,7 +67,6 @@ export const SearchResultTableLayout = ({
                 size="small"
                 variant="outlined"
                 onClick={() => {
-                  onDownload?.(result);
                   onClick?.(result);
                 }}>
                 View
@@ -98,7 +96,7 @@ export const SearchResultTableLayout = ({
         }
       }
     ];
-  }, [results, cartFeatureIds, onDownload, onClick, onAddToCart, onRemoveFromCart]);
+  }, [results, cartFeatureIds, onClick, onAddToCart, onRemoveFromCart]);
 
   return (
     <CustomDataGrid
