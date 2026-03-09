@@ -10,7 +10,7 @@ import {
   SpatialSearchableRecord,
   StringSearchableRecord
 } from '../services/search-feature-service.interface';
-import { getMockDBConnection } from '../__mocks__/db';
+import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { SearchFeatureRepository } from './search-feature-repository';
 
 describe('SearchFeatureRepository', () => {
@@ -666,6 +666,80 @@ describe('SearchFeatureRepository', () => {
       const response = await repository.searchFeaturesByFiltersCount({});
 
       expect(response).to.equal(0);
+    });
+  });
+
+  describe('searchFeatureIdsByFilters', () => {
+    it('should return empty array for empty filters', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+
+      const mockDBConnection = getMockDBConnection({
+        knex: knexSpy
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      const response = await repository.searchFeatureIdsByFilters({} as any);
+
+      expect(response).to.deep.equal([]);
+      expect(knexSpy.callCount).to.equal(0);
+    });
+
+    it('should return empty array for undefined filters', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 0, rows: [] });
+
+      const mockDBConnection = getMockDBConnection({
+        knex: knexSpy
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      const response = await repository.searchFeatureIdsByFilters(undefined as any);
+
+      expect(response).to.deep.equal([]);
+      expect(knexSpy.callCount).to.equal(0);
+    });
+
+    it('should return rows with submission_feature_id for matching filters', async () => {
+      const mockQueryResponse = mockQueryResult([{ submission_feature_id: 1 }, { submission_feature_id: 2 }], 2);
+
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => mockQueryResponse
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      const response = await repository.searchFeatureIdsByFilters({ keyword: 'moose' });
+
+      expect(response).to.deep.equal([{ submission_feature_id: 1 }, { submission_feature_id: 2 }]);
+    });
+
+    it('should return empty array when DB returns no rows', async () => {
+      const mockQueryResponse = mockQueryResult([], 0);
+
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => mockQueryResponse
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      const response = await repository.searchFeatureIdsByFilters({ keyword: 'nonexistent' });
+
+      expect(response).to.deep.equal([]);
+    });
+
+    it('should call connection.knex exactly once', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 1, rows: [{ submission_feature_id: 10 }] });
+
+      const mockDBConnection = getMockDBConnection({
+        knex: knexSpy
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeatureIdsByFilters({ feature_types: ['dataset'] });
+
+      expect(knexSpy.callCount).to.equal(1);
     });
   });
 });

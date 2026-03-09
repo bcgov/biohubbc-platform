@@ -19,15 +19,21 @@ export class SubmissionValidationService extends DBService {
   }
 
   /**
-   * Create a new submission validation record.
+   * Create a new submission validation record keyed by submission_upload_id.
+   * Each upload event gets its own validation record to track ingestion status independently.
    *
+   * @param {string} submissionUploadId - The submission_upload_id (UUID).
    * @param {number} submissionId - The submission ID.
    * @param {string} jobId - The pg-boss job UUID.
    * @return {Promise<{ submission_validation_id: number }>} The created record ID.
    * @memberof SubmissionValidationService
    */
-  async createSubmissionValidation(submissionId: number, jobId: string): Promise<{ submission_validation_id: number }> {
-    return this.submissionValidationRepository.createSubmissionValidation(submissionId, jobId);
+  async createSubmissionValidation(
+    submissionUploadId: string,
+    submissionId: number,
+    jobId: string
+  ): Promise<{ submission_validation_id: number }> {
+    return this.submissionValidationRepository.createSubmissionValidation(submissionUploadId, submissionId, jobId);
   }
 
   /**
@@ -51,34 +57,37 @@ export class SubmissionValidationService extends DBService {
   }
 
   /**
-   * Get the most recent submission validation record for a submission.
+   * Get the most recent submission validation record for a submission upload.
    *
-   * @param {number} submissionId - The submission ID.
+   * @param {string} submissionUploadId - The submission_upload_id (UUID).
    * @return {Promise<SubmissionValidationRecord | null>}
    * @memberof SubmissionValidationService
    */
-  async getSubmissionValidationBySubmissionId(submissionId: number): Promise<SubmissionValidationRecord | null> {
-    return this.submissionValidationRepository.getSubmissionValidationBySubmissionId(submissionId);
+  async getSubmissionValidationBySubmissionUploadId(
+    submissionUploadId: string
+  ): Promise<SubmissionValidationRecord | null> {
+    return this.submissionValidationRepository.getSubmissionValidationBySubmissionUploadId(submissionUploadId);
   }
 
   /**
-   * Update submission validation status by submission ID.
+   * Update submission validation status by submission_upload_id.
    *
    * Used by Dead Letter Queue handler where the original job ID is not available.
+   * Scoped to the latest record so manual retries don't corrupt historical records.
    *
-   * @param {number} submissionId - The submission ID.
+   * @param {string} submissionUploadId - The submission_upload_id (UUID).
    * @param {SubmissionValidationStatus} status - The new status.
    * @param {Record<string, unknown>} [metadata] - Optional metadata (e.g., error details).
    * @return {Promise<void>}
    * @memberof SubmissionValidationService
    */
-  async updateSubmissionValidationStatusBySubmissionId(
-    submissionId: number,
+  async updateSubmissionValidationStatusBySubmissionUploadId(
+    submissionUploadId: string,
     status: SubmissionValidationStatus,
     metadata?: Record<string, unknown>
   ): Promise<void> {
-    return this.submissionValidationRepository.updateSubmissionValidationStatusBySubmissionId(
-      submissionId,
+    return this.submissionValidationRepository.updateSubmissionValidationStatusBySubmissionUploadId(
+      submissionUploadId,
       status,
       metadata
     );

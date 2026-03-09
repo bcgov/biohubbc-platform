@@ -172,6 +172,7 @@ export const useSearchResults = () => {
     setSearchParams,
     getParam,
     removeSearchParam,
-    pagination: searchDataLoader.data?.pagination
+    pagination: searchDataLoader.data?.pagination,
+    filters: buildRequest(searchParams).filters
   };
 };

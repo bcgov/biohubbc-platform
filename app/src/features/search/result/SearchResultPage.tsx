@@ -2,6 +2,7 @@ import { Box, Divider, Paper } from '@mui/material';
 import { PageHeader } from 'components/header/PageHeader';
 import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
 import { APIError } from 'hooks/api/useAxios';
+import { useApi } from 'hooks/useApi';
 import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -26,12 +27,14 @@ export enum SEARCH_RESULT_OPTION_VIEW {
 
 export const SearchResultPage = () => {
   const navigate = useNavigate();
-  const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination } = useSearchResults();
+  const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination, filters } = useSearchResults();
+  const api = useApi();
   const { codesDataLoader } = useCodesContext();
   const { features, pagination: cartPagination, addToCart, checkout } = useCartContext();
   const dialogContext = useDialogContext();
 
   const [view, setView] = useState<SEARCH_RESULT_OPTION_VIEW>(SEARCH_RESULT_OPTION_VIEW.LIST);
+  const [isDownloading, setIsDownloading] = useState(false);
   const { recommended, handleRefresh: refreshRecommended } = useRecommendedFilters();
 
   /**
@@ -197,6 +200,26 @@ export const SearchResultPage = () => {
     }
   }, [rows, addToCart, dialogContext]);
 
+  /**
+   * Download all features matching the current search filters in one click.
+   * Bypasses the shopping cart — sends filters to POST /api/download which resolves
+   * them to feature IDs server-side and creates a download record.
+   */
+  const handleDownloadAll = useCallback(async () => {
+    try {
+      setIsDownloading(true);
+      await api.search.createDownload(filters);
+      dialogContext.setSnackbar({
+        snackbarMessage: 'Download started. You can track its progress in your downloads.',
+        open: true
+      });
+    } catch (error) {
+      dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [filters, api.search, dialogContext]);
+
   const handleCheckout = useCallback(async () => {
     try {
       const download = await checkout();
@@ -244,6 +267,8 @@ export const SearchResultPage = () => {
               activeSort={activeSort}
               onSortChange={handleSortChange}
               handleAddAllToCart={handleAddAllToCart}
+              handleDownloadAll={handleDownloadAll}
+              isDownloading={isDownloading}
             />
           </Box>
 

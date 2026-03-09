@@ -1,5 +1,5 @@
 import { IDBConnection } from '../../database/db';
-import { DownloadFeatureSummary, DownloadId, DownloadRecord } from '../../models/download';
+import { CreateDownload, DownloadFeatureSummary, DownloadId, DownloadRecord } from '../../models/download';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { DBService } from '../db-service';
 
@@ -24,20 +24,12 @@ export class DownloadService extends DBService {
   /**
    * Create a new download record.
    *
-   * @param {string | null} teamId - The team that owns this download. Null for anonymous downloads.
-   * @param {string | null} dataRequestId - The data request that originated this download. Null for non-request downloads.
-   * @param {number} [fragmentSizeBytes] - Target fragment size in bytes.
-   * @param {number | null} [systemUserId] - The user who created this download. Null for anonymous downloads.
+   * @param {CreateDownload} payload - The download record to create.
    * @return {Promise<DownloadId>} The created record ID.
    * @memberof DownloadService
    */
-  async createDownload(
-    teamId: string | null,
-    dataRequestId: string | null,
-    fragmentSizeBytes?: number,
-    systemUserId?: number | null
-  ): Promise<DownloadId> {
-    return this.downloadRepository.createDownload(teamId, dataRequestId, fragmentSizeBytes, systemUserId);
+  async createDownload(payload: CreateDownload): Promise<DownloadId> {
+    return this.downloadRepository.createDownload(payload);
   }
 
   /**
