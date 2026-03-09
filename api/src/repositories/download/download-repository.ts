@@ -4,12 +4,12 @@ import { z } from 'zod';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { CountResult } from '../../models/count';
 import {
   CreateDownload,
   DownloadFeatureSummary,
   DownloadId,
   DownloadListRecord,
+  DownloadListRow,
   DownloadRecord
 } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
@@ -113,25 +113,25 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Get paginated download records accessible to a user.
+   * Get paginated download records accessible to a user, with total count.
+   *
+   * Uses COUNT(*) OVER() window function to get the total count in the same query,
+   * avoiding a second round-trip that would duplicate the authorization CTE.
    *
    * Three authorization paths (via CTE):
    * - Owner: user created or claimed the download (system_user_id matches).
    * - Shared: user has a direct entry in download_share.
    * - Data request: user is a member of the data request's approved team.
    *
-   * Feature count is a correlated subquery on download_feature (AC #1: "number of features"
-   * means submission_feature records linked to the download, not fragment count).
-   *
    * @param {number} systemUserId - The user ID.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination/sort options.
-   * @return {Promise<DownloadListRecord[]>}
+   * @return {Promise<{ downloads: DownloadListRecord[]; count: number }>}
    * @memberof DownloadRepository
    */
   async getDownloadsByTeamMembership(
     systemUserId: number,
     pagination?: ApiPaginationOptions
-  ): Promise<DownloadListRecord[]> {
+  ): Promise<{ downloads: DownloadListRecord[]; count: number }> {
     const knex = getKnex();
 
     const query = knex
@@ -153,7 +153,8 @@ export class DownloadRepository extends BaseRepository {
         'd.create_date',
         knex.raw(
           '(SELECT COUNT(*)::int FROM download_feature df WHERE df.download_id = d.download_id) AS feature_count'
-        )
+        ),
+        knex.raw('COUNT(*) OVER()::int AS total_count')
       ])
       .from('download as d')
       .innerJoin('authorized_downloads as ad', 'ad.download_id', 'd.download_id');
@@ -167,34 +168,13 @@ export class DownloadRepository extends BaseRepository {
       query.orderBy('d.create_date', 'desc');
     }
 
-    const response = await this.connection.knex(query, DownloadListRecord);
+    const response = await this.connection.knex(query, DownloadListRow);
 
-    return response.rows;
-  }
+    const count = response.rows[0]?.total_count ?? 0;
+    // Strip the total_count column from each row before returning
+    const downloads: DownloadListRecord[] = response.rows.map(({ total_count, ...rest }) => rest);
 
-  /**
-   * Count download records accessible to a user.
-   *
-   * Reuses the same three-path authorization CTE as the data query to ensure
-   * the count matches the paginated result set.
-   *
-   * @param {number} systemUserId - The user ID.
-   * @return {Promise<number>}
-   * @memberof DownloadRepository
-   */
-  async getDownloadsByTeamMembershipCount(systemUserId: number): Promise<number> {
-    const knex = getKnex();
-
-    const query = knex
-      .with('authorized_downloads', this.buildAuthorizedDownloadsCte(systemUserId))
-      .select(knex.raw('coalesce(count(*), 0)::integer as count'))
-      .from('download as d')
-      .innerJoin('authorized_downloads as ad', 'ad.download_id', 'd.download_id')
-      .first();
-
-    const response = await this.connection.knex(query, CountResult);
-
-    return response.rows[0]?.count ?? 0;
+    return { downloads, count };
   }
 
   /**
@@ -205,8 +185,7 @@ export class DownloadRepository extends BaseRepository {
    * 2. Shared — user has a direct entry in download_share
    * 3. Data request — user is a member of the data request's approved team
    *
-   * Used by both getDownloadsByTeamMembership (paginated data) and
-   * getDownloadsByTeamMembershipCount to keep authorization logic in one place.
+   * Used by getDownloadsByTeamMembership and isUserAuthorizedForDownload (inline variant).
    *
    * @private
    */

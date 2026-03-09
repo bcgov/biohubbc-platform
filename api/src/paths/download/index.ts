@@ -101,10 +101,7 @@ export function getDownloads(): RequestHandler {
 
       const downloadService = new DownloadService(connection);
 
-      const [downloads, count] = await Promise.all([
-        downloadService.getDownloadsByTeamMembership(systemUserId, pagination),
-        downloadService.getDownloadsByTeamMembershipCount(systemUserId)
-      ]);
+      const { downloads, count } = await downloadService.getDownloadsByTeamMembership(systemUserId, pagination);
 
       await connection.commit();
 

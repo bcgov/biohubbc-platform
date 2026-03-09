@@ -29,6 +29,15 @@ export const DownloadListRecord = DownloadRecord.extend({
 });
 export type DownloadListRecord = z.infer<typeof DownloadListRecord>;
 
+/**
+ * Internal row shape returned by the paginated list query.
+ * Includes total_count from COUNT(*) OVER() window function — stripped before returning to callers.
+ */
+export const DownloadListRow = DownloadListRecord.extend({
+  total_count: z.number()
+});
+export type DownloadListRow = z.infer<typeof DownloadListRow>;
+
 export const DownloadId = DownloadRecord.pick({ download_id: true });
 export type DownloadId = z.infer<typeof DownloadId>;
 

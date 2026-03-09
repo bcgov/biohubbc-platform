@@ -186,38 +186,41 @@ describe('DownloadRepository', () => {
   });
 
   describe('getDownloadsByTeamMembership', () => {
-    it('returns download records from knex query', async () => {
-      const mockDownloads = [
-        { download_id: 'uuid-1', download_status: 'ready', feature_count: 5 },
-        { download_id: 'uuid-2', download_status: 'pending', feature_count: 0 }
+    it('returns download records and count from knex query', async () => {
+      const mockRows = [
+        { download_id: 'uuid-1', download_status: 'ready', feature_count: 5, total_count: 2 },
+        { download_id: 'uuid-2', download_status: 'pending', feature_count: 0, total_count: 2 }
       ];
       const mockResponse = {
         rowCount: 2,
-        rows: mockDownloads
+        rows: mockRows
       } as unknown as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
       const repo = new DownloadRepository(mockDBConnection);
       const result = await repo.getDownloadsByTeamMembership(123);
 
-      expect(result).to.eql(mockDownloads);
+      expect(result.count).to.equal(2);
+      expect(result.downloads).to.have.length(2);
+      expect(result.downloads[0]).to.not.have.property('total_count');
     });
 
     it('returns paginated results when pagination is provided', async () => {
-      const mockDownloads = [{ download_id: 'uuid-1', feature_count: 3 }];
+      const mockRows = [{ download_id: 'uuid-1', feature_count: 3, total_count: 5 }];
       const mockResponse = {
         rowCount: 1,
-        rows: mockDownloads
+        rows: mockRows
       } as unknown as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
       const repo = new DownloadRepository(mockDBConnection);
       const result = await repo.getDownloadsByTeamMembership(123, { page: 2, limit: 10 });
 
-      expect(result).to.eql(mockDownloads);
+      expect(result.count).to.equal(5);
+      expect(result.downloads).to.have.length(1);
     });
 
-    it('returns empty array when no downloads exist', async () => {
+    it('returns empty array and zero count when no downloads exist', async () => {
       const mockResponse = {
         rowCount: 0,
         rows: []
@@ -227,35 +230,8 @@ describe('DownloadRepository', () => {
       const repo = new DownloadRepository(mockDBConnection);
       const result = await repo.getDownloadsByTeamMembership(123);
 
-      expect(result).to.eql([]);
-    });
-  });
-
-  describe('getDownloadsByTeamMembershipCount', () => {
-    it('returns count of accessible downloads', async () => {
-      const mockResponse = {
-        rowCount: 1,
-        rows: [{ count: 42 }]
-      } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
-      const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.getDownloadsByTeamMembershipCount(123);
-
-      expect(result).to.equal(42);
-    });
-
-    it('returns 0 when no downloads exist', async () => {
-      const mockResponse = {
-        rowCount: 1,
-        rows: [{ count: 0 }]
-      } as unknown as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
-      const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.getDownloadsByTeamMembershipCount(456);
-
-      expect(result).to.equal(0);
+      expect(result.downloads).to.eql([]);
+      expect(result.count).to.equal(0);
     });
   });
 

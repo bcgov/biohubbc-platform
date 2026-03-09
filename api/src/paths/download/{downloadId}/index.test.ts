@@ -6,10 +6,29 @@ import { claimDownloadForCurrentUser, findDownloadById } from '.';
 import * as db from '../../../database/db';
 import { ApiConflictError } from '../../../errors/api-error';
 import { HTTP403, HTTP404, HTTPError } from '../../../errors/http-error';
+import { DownloadRecord } from '../../../models/download';
 import { DownloadPipelineService } from '../../../services/download/download-pipeline-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 
 chai.use(sinonChai);
+
+const makeDownloadRecord = (overrides: Partial<DownloadRecord> = {}): DownloadRecord => ({
+  download_id: 'aaaa0000-0000-0000-0000-000000000001',
+  system_user_id: null,
+  team_id: null,
+  data_request_id: null,
+  download_status: 'ready',
+  metadata: null,
+  started_at: '2025-01-01T00:00:00Z',
+  completed_at: '2025-01-01T00:01:00Z',
+  downloaded_at: null,
+  total_fragments: 1,
+  completed_fragments: 1,
+  estimated_total_size_bytes: '12000',
+  fragment_size_bytes: '209715200',
+  create_date: '2025-01-01T00:00:00Z',
+  ...overrides
+});
 
 describe('paths/download/{downloadId}/index', () => {
   afterEach(() => {
@@ -22,19 +41,7 @@ describe('paths/download/{downloadId}/index', () => {
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const mockDownload = {
-        download_id: 'aaaa0000-0000-0000-0000-000000000001',
-        system_user_id: null,
-        team_id: 'bbbb0000-0000-0000-0000-000000000001',
-        data_request_id: null,
-        download_status: 'ready',
-        total_fragments: 1,
-        completed_fragments: 1,
-        estimated_total_size_bytes: 12000,
-        started_at: '2025-01-01T00:00:00Z',
-        completed_at: '2025-01-01T00:01:00Z',
-        downloaded_at: null
-      };
+      const mockDownload = makeDownloadRecord({ team_id: 'bbbb0000-0000-0000-0000-000000000001' });
 
       const mockFragments = [
         {
@@ -50,7 +57,7 @@ describe('paths/download/{downloadId}/index', () => {
         }
       ];
 
-      sinon.stub(DownloadPipelineService.prototype, 'getAuthorizedDownload').resolves(mockDownload as any);
+      sinon.stub(DownloadPipelineService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
       sinon.stub(DownloadPipelineService.prototype, 'getFragmentsByDownloadId').resolves(mockFragments as any);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -68,7 +75,7 @@ describe('paths/download/{downloadId}/index', () => {
         status: 'ready',
         total_fragments: 1,
         completed_fragments: 1,
-        estimated_total_size_bytes: 12000,
+        estimated_total_size_bytes: '12000',
         started_at: '2025-01-01T00:00:00Z',
         completed_at: '2025-01-01T00:01:00Z',
         downloaded_at: null,
@@ -94,21 +101,9 @@ describe('paths/download/{downloadId}/index', () => {
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
-      const mockDownload = {
-        download_id: 'aaaa0000-0000-0000-0000-000000000001',
-        system_user_id: null,
-        team_id: null,
-        data_request_id: null,
-        download_status: 'ready',
-        total_fragments: 1,
-        completed_fragments: 1,
-        estimated_total_size_bytes: 12000,
-        started_at: '2025-01-01T00:00:00Z',
-        completed_at: '2025-01-01T00:01:00Z',
-        downloaded_at: null
-      };
+      const mockDownload = makeDownloadRecord();
 
-      sinon.stub(DownloadPipelineService.prototype, 'getAuthorizedDownload').resolves(mockDownload as any);
+      sinon.stub(DownloadPipelineService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
       sinon.stub(DownloadPipelineService.prototype, 'getFragmentsByDownloadId').resolves([]);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -129,21 +124,9 @@ describe('paths/download/{downloadId}/index', () => {
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const mockDownload = {
-        download_id: 'aaaa0000-0000-0000-0000-000000000001',
-        system_user_id: 1,
-        team_id: null,
-        data_request_id: null,
-        download_status: 'ready',
-        total_fragments: 1,
-        completed_fragments: 1,
-        estimated_total_size_bytes: 12000,
-        started_at: '2025-01-01T00:00:00Z',
-        completed_at: '2025-01-01T00:01:00Z',
-        downloaded_at: null
-      };
+      const mockDownload = makeDownloadRecord({ system_user_id: 1 });
 
-      sinon.stub(DownloadPipelineService.prototype, 'getAuthorizedDownload').resolves(mockDownload as any);
+      sinon.stub(DownloadPipelineService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
       sinon.stub(DownloadPipelineService.prototype, 'getFragmentsByDownloadId').resolves([]);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -251,19 +234,7 @@ describe('paths/download/{downloadId}/index', () => {
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
-      const mockDownload = {
-        download_id: 'aaaa0000-0000-0000-0000-000000000001',
-        system_user_id: null,
-        team_id: null,
-        data_request_id: null,
-        download_status: 'ready',
-        total_fragments: 2,
-        completed_fragments: 2,
-        estimated_total_size_bytes: 24000,
-        started_at: '2025-01-01T00:00:00Z',
-        completed_at: '2025-01-01T00:01:00Z',
-        downloaded_at: null
-      };
+      const mockDownload = makeDownloadRecord({ total_fragments: 2, completed_fragments: 2, estimated_total_size_bytes: '24000' });
 
       const mockFragments = [
         {
@@ -290,7 +261,7 @@ describe('paths/download/{downloadId}/index', () => {
         }
       ];
 
-      sinon.stub(DownloadPipelineService.prototype, 'getAuthorizedDownload').resolves(mockDownload as any);
+      sinon.stub(DownloadPipelineService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
       sinon.stub(DownloadPipelineService.prototype, 'getFragmentsByDownloadId').resolves(mockFragments as any);
       sinon
         .stub(DownloadPipelineService.prototype, 'getFragmentSignedUrl')
@@ -319,19 +290,7 @@ describe('paths/download/{downloadId}/index', () => {
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const mockDownload = {
-        download_id: 'aaaa0000-0000-0000-0000-000000000001',
-        system_user_id: 1,
-        team_id: null,
-        data_request_id: null,
-        download_status: 'ready',
-        total_fragments: 1,
-        completed_fragments: 1,
-        estimated_total_size_bytes: 12000,
-        started_at: '2025-01-01T00:00:00Z',
-        completed_at: '2025-01-01T00:01:00Z',
-        downloaded_at: null
-      };
+      const mockDownload = makeDownloadRecord({ system_user_id: 1 });
 
       const mockFragments = [
         {
@@ -347,7 +306,7 @@ describe('paths/download/{downloadId}/index', () => {
         }
       ];
 
-      sinon.stub(DownloadPipelineService.prototype, 'getAuthorizedDownload').resolves(mockDownload as any);
+      sinon.stub(DownloadPipelineService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
       sinon.stub(DownloadPipelineService.prototype, 'getFragmentsByDownloadId').resolves(mockFragments as any);
       const getFragmentSignedUrlStub = sinon.stub(DownloadPipelineService.prototype, 'getFragmentSignedUrl');
 
@@ -369,21 +328,15 @@ describe('paths/download/{downloadId}/index', () => {
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
-      const mockDownload = {
-        download_id: 'aaaa0000-0000-0000-0000-000000000001',
-        system_user_id: null,
-        team_id: null,
-        data_request_id: null,
+      const mockDownload = makeDownloadRecord({
         download_status: 'pending',
-        total_fragments: 1,
         completed_fragments: 0,
         estimated_total_size_bytes: null,
         started_at: null,
-        completed_at: null,
-        downloaded_at: null
-      };
+        completed_at: null
+      });
 
-      sinon.stub(DownloadPipelineService.prototype, 'getAuthorizedDownload').resolves(mockDownload as any);
+      sinon.stub(DownloadPipelineService.prototype, 'getAuthorizedDownload').resolves(mockDownload);
       sinon.stub(DownloadPipelineService.prototype, 'getFragmentsByDownloadId').resolves([]);
       const getFragmentSignedUrlStub = sinon.stub(DownloadPipelineService.prototype, 'getFragmentSignedUrl');
 

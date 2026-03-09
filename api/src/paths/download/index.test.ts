@@ -5,6 +5,7 @@ import sinonChai from 'sinon-chai';
 import { createDownload, getDownloads } from '.';
 import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
+import { DownloadListRecord } from '../../models/download';
 import * as publisher from '../../queue/publisher';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadService } from '../../services/download/download-service';
@@ -313,14 +314,31 @@ describe('paths/download/index', () => {
     });
 
     it('should return 200 with paginated downloads', async () => {
-      const mockDownloads = [
-        { download_id: 'uuid-1', download_status: 'ready', create_date: '2026-01-01', feature_count: 5 }
+      const mockDownloads: DownloadListRecord[] = [
+        {
+          download_id: 'uuid-1',
+          system_user_id: 1,
+          team_id: null,
+          data_request_id: null,
+          download_status: 'ready',
+          metadata: null,
+          started_at: '2026-01-01',
+          completed_at: '2026-01-01',
+          downloaded_at: null,
+          total_fragments: 1,
+          completed_fragments: 1,
+          estimated_total_size_bytes: '1000',
+          fragment_size_bytes: '1000',
+          create_date: '2026-01-01',
+          feature_count: 5
+        }
       ];
 
       const mockDBConnection = getMockDBConnection();
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-      sinon.stub(DownloadService.prototype, 'getDownloadsByTeamMembership').resolves(mockDownloads as any);
-      sinon.stub(DownloadService.prototype, 'getDownloadsByTeamMembershipCount').resolves(1);
+      sinon
+        .stub(DownloadService.prototype, 'getDownloadsByTeamMembership')
+        .resolves({ downloads: mockDownloads, count: 1 });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.query = { page: '1', limit: '25' };
@@ -340,8 +358,9 @@ describe('paths/download/index', () => {
     it('should pass pagination options to service', async () => {
       const mockDBConnection = getMockDBConnection();
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-      const getDownloadsStub = sinon.stub(DownloadService.prototype, 'getDownloadsByTeamMembership').resolves([]);
-      const getCountStub = sinon.stub(DownloadService.prototype, 'getDownloadsByTeamMembershipCount').resolves(0);
+      const getDownloadsStub = sinon
+        .stub(DownloadService.prototype, 'getDownloadsByTeamMembership')
+        .resolves({ downloads: [], count: 0 });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.query = { page: '2', limit: '10' };
@@ -356,14 +375,14 @@ describe('paths/download/index', () => {
         sort: undefined,
         order: undefined
       });
-      expect(getCountStub).to.have.been.calledOnce;
     });
 
     it('should apply default pagination when no query params provided', async () => {
       const mockDBConnection = getMockDBConnection();
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-      const getDownloadsStub = sinon.stub(DownloadService.prototype, 'getDownloadsByTeamMembership').resolves([]);
-      sinon.stub(DownloadService.prototype, 'getDownloadsByTeamMembershipCount').resolves(0);
+      const getDownloadsStub = sinon
+        .stub(DownloadService.prototype, 'getDownloadsByTeamMembership')
+        .resolves({ downloads: [], count: 0 });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.query = {};

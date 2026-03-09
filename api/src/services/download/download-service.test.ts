@@ -29,17 +29,17 @@ describe('DownloadService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
-      const stub = sinon.stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership').resolves([]);
+      const stub = sinon
+        .stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership')
+        .resolves({ downloads: [], count: 0 });
 
       const result = await service.getDownloadsByTeamMembership(42);
 
       expect(stub).to.have.been.calledOnceWith(42);
-      expect(result).to.deep.equal([]);
+      expect(result).to.deep.equal({ downloads: [], count: 0 });
     });
 
     it('passes through DownloadListRecord fields including create_date and feature_count', async () => {
-      // Verifies: Service doesn't transform or drop new fields
-
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
@@ -63,13 +63,16 @@ describe('DownloadService', () => {
         }
       ];
 
-      sinon.stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership').resolves(mockRecords);
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership')
+        .resolves({ downloads: mockRecords, count: 1 });
 
       const result = await service.getDownloadsByTeamMembership(42);
 
-      expect(result).to.have.length(1);
-      expect(result[0]).to.have.property('create_date', '2025-01-01T00:00:00Z');
-      expect(result[0]).to.have.property('feature_count', 5);
+      expect(result.downloads).to.have.length(1);
+      expect(result.downloads[0]).to.have.property('create_date', '2025-01-01T00:00:00Z');
+      expect(result.downloads[0]).to.have.property('feature_count', 5);
+      expect(result.count).to.equal(1);
     });
   });
 

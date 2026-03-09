@@ -63,29 +63,18 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * Get paginated download records accessible to a user.
+   * Get paginated download records accessible to a user, with total count.
    *
    * @param {number} systemUserId - The user ID.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination/sort options.
-   * @return {Promise<DownloadListRecord[]>}
+   * @return {Promise<{ downloads: DownloadListRecord[]; count: number }>}
    * @memberof DownloadService
    */
   async getDownloadsByTeamMembership(
     systemUserId: number,
     pagination?: ApiPaginationOptions
-  ): Promise<DownloadListRecord[]> {
+  ): Promise<{ downloads: DownloadListRecord[]; count: number }> {
     return this.downloadRepository.getDownloadsByTeamMembership(systemUserId, pagination);
-  }
-
-  /**
-   * Count download records accessible to a user.
-   *
-   * @param {number} systemUserId - The user ID.
-   * @return {Promise<number>}
-   * @memberof DownloadService
-   */
-  async getDownloadsByTeamMembershipCount(systemUserId: number): Promise<number> {
-    return this.downloadRepository.getDownloadsByTeamMembershipCount(systemUserId);
   }
 
   /**
