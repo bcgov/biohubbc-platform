@@ -94,10 +94,11 @@ export class ArtifactRepository extends BaseRepository {
         ${artifact.checksum_sha256 ?? null},
         ${artifact.uploaded_at ?? null}
       )
-      ON CONFLICT (bucket, object_key) DO NOTHING;
+      ON CONFLICT (bucket, object_key) DO NOTHING
+      RETURNING artifact_id;
     `;
 
-    const response = await this.connection.sql(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, z.object({ artifact_id: z.string().uuid() }));
 
     if (response.rowCount === 1) {
       return response.rows[0];
