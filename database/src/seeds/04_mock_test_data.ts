@@ -70,27 +70,29 @@ const insertRecord = async (knex: Knex) => {
   // Dataset
   const parent_submission_feature_id1 = await insertDatasetRecord(knex, { submission_id });
 
+  // Codeset: create a single codeset feature linked to this submission
+  await insertCodesetRecord(knex, { submission_id });
+
   // Telemetry Deployments
-  const deploymentIds: number[] = [];
-  const deviceInfos: { submission_feature_id: number; device_id: string }[] = [];
+  const deployments: { id: number; devices: { submission_feature_id: number; device_id: string }[] }[] = [];
   for (let i = 0; i < 5; i++) {
     const deploymentId = await insertTelemetryDeployment(knex, {
       submission_id,
       parent_submission_feature_id: parent_submission_feature_id1
     });
-    deploymentIds.push(deploymentId);
-
-    // Devices under deployment
+    const devices: { submission_feature_id: number; device_id: string }[] = [];
     for (let j = 0; j < 2; j++) {
       const deviceInfo = await insertTelemetryDevice(knex, {
         submission_id,
         parent_submission_feature_id: deploymentId
       });
-      deviceInfos.push(deviceInfo);
+      devices.push(deviceInfo);
     }
+    deployments.push({ id: deploymentId, devices });
   }
 
   // Sample Sites and their children
+  const animalIds: number[] = [];
   const sampleSitePromises = Array.from({ length: 10 }).map(async () => {
     const parent_submission_feature_id2 = await insertSampleSiteRecord(knex, {
       submission_id,
@@ -98,9 +100,13 @@ const insertRecord = async (knex: Knex) => {
     });
 
     // Animals
-    const animalPromises = Array.from({ length: 5 }).map(() =>
-      insertAnimalRecord(knex, { submission_id, parent_submission_feature_id: parent_submission_feature_id2 })
-    );
+    const animalPromises = Array.from({ length: 5 }).map(async () => {
+      const animalId = await insertAnimalRecord(knex, {
+        submission_id,
+        parent_submission_feature_id: parent_submission_feature_id2
+      });
+      animalIds.push(animalId);
+    });
 
     // Observations
     const observationPromises = Array.from({ length: 20 }).map(() =>
@@ -112,11 +118,13 @@ const insertRecord = async (knex: Knex) => {
   });
 
   // Telemetry
-  const possibleParents = [...deploymentIds, ...deviceInfos.map((d) => d.submission_feature_id)];
+  const possibleParents = deployments.flatMap((d) => [d.id, ...d.devices.map((dev) => dev.submission_feature_id)]);
   const telemetryPromises = Array.from({ length: 100 }).map(() => {
     const randomParent = possibleParents[Math.floor(Math.random() * possibleParents.length)];
-    const isDevice = deviceInfos.some((d) => d.submission_feature_id === randomParent);
-    const deviceInfo = isDevice ? deviceInfos.find((d) => d.submission_feature_id === randomParent) : undefined;
+    const deployment = deployments.find(
+      (d) => d.id === randomParent || d.devices.some((dev) => dev.submission_feature_id === randomParent)
+    );
+    const deviceInfo = deployment?.devices.find((dev) => dev.submission_feature_id === randomParent);
     return insertTelemetryRecord(knex, {
       submission_id,
       parent_submission_feature_id: randomParent,
@@ -126,6 +134,25 @@ const insertRecord = async (knex: Knex) => {
 
   // Wait for all sample sites and telemetry to complete concurrently
   await Promise.all([...sampleSitePromises, ...telemetryPromises]);
+
+  // Seed submission_feature_feature table
+  for (const deployment of deployments) {
+    for (const device of deployment.devices) {
+      await knex.raw(`
+        INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
+        VALUES (${deployment.id}, ${device.submission_feature_id})
+      `);
+    }
+  }
+
+  // Link animals to random deployments
+  for (const animalId of animalIds) {
+    const randomDeployment = deployments[Math.floor(Math.random() * deployments.length)];
+    await knex.raw(`
+      INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
+      VALUES (${animalId}, ${randomDeployment.id})
+    `);
+  }
 };
 
 export const insertSubmissionRecord = async (
@@ -287,6 +314,52 @@ export const insertMeasurementRecord = async (
   return submission_feature_id;
 };
 
+const insertCodesetRecord = async (knex: Knex, options: { submission_id: number }): Promise<number> => {
+  // build a nested categories object with life_stage and sex
+  const categories: any = {
+    life_stage: {
+      label: 'life_stage',
+      description: 'Stages of life for organisms',
+      codes: {
+        1: { label: 'unknown', description: 'Unknown life stage' },
+        2: { label: 'adult', description: 'Adult' },
+        3: { label: 'subadult', description: 'Subadult' },
+        4: { label: 'juvenile', description: 'Juvenile' },
+        5: { label: 'calf', description: 'Calf' },
+        6: { label: 'pup', description: 'Pup' },
+        7: { label: 'egg', description: 'Egg' }
+      }
+    },
+    sex: {
+      label: 'sex',
+      description: 'Biological sex',
+      codes: {
+        1: { label: 'male', description: 'Male' },
+        2: { label: 'female', description: 'Female' },
+        3: { label: 'hermaphroditic', description: 'Hermaphroditic' },
+        4: { label: 'undefined', description: 'Undefined' }
+      }
+    }
+  };
+
+  const response = await knex.raw(
+    `${insertSubmissionFeature({
+      submission_id: options.submission_id,
+      parent_submission_feature_id: null,
+      feature_type: 'codeset',
+      data: {
+        categories
+      }
+    })}`
+  );
+  const submission_feature_id = response.rows[0].submission_feature_id;
+
+  // optionally add search indices for categories? we'll at least add a search_string for name
+  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
+
+  return submission_feature_id;
+};
+
 const insertAnimalRecord = async (
   knex: Knex,
   options: { submission_id: number; parent_submission_feature_id: number }
@@ -375,7 +448,8 @@ export const insertSubmissionFeature = (options: {
     | 'telemetry'
     | 'telemetry_deployment'
     | 'telemetry_device'
-    | 'measurement';
+    | 'measurement'
+    | 'codeset';
   data: { [key: string]: any };
 }) => `
     INSERT INTO submission_feature
