@@ -70,14 +70,33 @@ describe('DownloadFeatureCard', () => {
   });
 
   describe('multi-fragment download', () => {
-    it('renders part rows with correct labels and download buttons', () => {
+    it('parts are collapsed by default and expand on toggle click', () => {
       const onDownloadFragment = vi.fn();
-      const { getByText, getAllByTestId } = render(
+      const { getByTestId, queryByText } = render(
         <DownloadFeatureCard
           download={makeDownload({ download_id: 'multi-1', total_fragments: 3 })}
           onDownloadFragment={onDownloadFragment}
         />
       );
+
+      // Parts hidden by default
+      expect(queryByText('Part 1 of 3')).not.toBeVisible();
+
+      // Expand
+      fireEvent.click(getByTestId('toggle-parts-button'));
+      expect(queryByText('Part 1 of 3')).toBeVisible();
+    });
+
+    it('renders part rows with correct labels and download buttons when expanded', () => {
+      const onDownloadFragment = vi.fn();
+      const { getByTestId, getByText, getAllByTestId } = render(
+        <DownloadFeatureCard
+          download={makeDownload({ download_id: 'multi-1', total_fragments: 3 })}
+          onDownloadFragment={onDownloadFragment}
+        />
+      );
+
+      fireEvent.click(getByTestId('toggle-parts-button'));
 
       expect(getByText('Part 1 of 3')).toBeVisible();
       expect(getByText('Part 2 of 3')).toBeVisible();

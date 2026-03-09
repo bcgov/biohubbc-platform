@@ -1,3 +1,5 @@
+import { ApiPaginationResponseParams } from 'types/pagination';
+
 /**
  * A download record as returned by GET /api/download.
  */
@@ -16,9 +18,11 @@ export interface DownloadRecord {
 
 /**
  * Response from GET /api/download.
+ * Includes server-side pagination metadata alongside the data array.
  */
 export interface DownloadListResponse {
   downloads: DownloadRecord[];
+  pagination: ApiPaginationResponseParams;
 }
 
 /**

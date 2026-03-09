@@ -1,7 +1,8 @@
-import { mdiDownload } from '@mdi/js';
+import { mdiChevronDown, mdiChevronUp, mdiDownload } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Button, Card, Chip, ChipProps, IconButton, Stack, Typography } from '@mui/material';
+import { Button, Card, Chip, ChipProps, Collapse, IconButton, Link, Stack, Typography } from '@mui/material';
 import { grey } from '@mui/material/colors';
+import { useState } from 'react';
 import { DownloadRecord } from 'interfaces/useDownloadApi.interface';
 import { isDownloadReady } from '../downloads/DownloadSidebarDownloads';
 
@@ -23,6 +24,7 @@ export const DownloadFeatureCard = ({ download, onDownloadFragment, onDownloadAl
   const chipProps = statusChipProps[download.download_status] ?? { color: 'default', label: download.download_status };
   const ready = isDownloadReady(download.download_status);
   const multiFragment = download.total_fragments > 1;
+  const [partsOpen, setPartsOpen] = useState(false);
 
   return (
     <Card variant="outlined" sx={{ width: 1, backgroundColor: grey[50] }}>
@@ -49,37 +51,50 @@ export const DownloadFeatureCard = ({ download, onDownloadFragment, onDownloadAl
           )}
         </Stack>
 
-        {/* Multi-fragment: Download All button + individual parts */}
-        {ready &&
-          multiFragment && (
-            <>
-              {onDownloadAll && (
-                <Button
-                  variant="outlined"
-                  size="small"
-                  fullWidth
-                  data-testid="download-all-button"
-                  onClick={() => onDownloadAll(download.download_id, download.total_fragments)}
-                  startIcon={<Icon path={mdiDownload} size={0.7} />}>
-                  Download all {download.total_fragments} parts
-                </Button>
-              )}
-              {Array.from({ length: download.total_fragments }, (_, i) => (
-                <Stack key={i} direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="caption">
-                    Part {i + 1} of {download.total_fragments}
-                  </Typography>
-                  <IconButton
-                    size="small"
-                    data-testid={`download-part-button-${i}`}
-                    onClick={() => onDownloadFragment(download.download_id, i)}
-                    title={`Download part ${i + 1}`}>
-                    <Icon path={mdiDownload} size={0.7} />
-                  </IconButton>
-                </Stack>
-              ))}
-            </>
-          )}
+        {/* Multi-fragment: Download All button + collapsible individual parts */}
+        {ready && multiFragment && (
+          <>
+            {onDownloadAll && (
+              <Button
+                variant="outlined"
+                size="small"
+                fullWidth
+                data-testid="download-all-button"
+                onClick={() => onDownloadAll(download.download_id, download.total_fragments)}
+                startIcon={<Icon path={mdiDownload} size={0.7} />}>
+                Download all {download.total_fragments} parts
+              </Button>
+            )}
+            <Link
+              component="button"
+              variant="caption"
+              underline="hover"
+              data-testid="toggle-parts-button"
+              onClick={() => setPartsOpen((prev) => !prev)}
+              sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+              {partsOpen ? 'Hide' : 'Show'} individual parts
+              <Icon path={partsOpen ? mdiChevronUp : mdiChevronDown} size={0.6} />
+            </Link>
+            <Collapse in={partsOpen}>
+              <Stack spacing={0.5}>
+                {Array.from({ length: download.total_fragments }, (_, i) => (
+                  <Stack key={i} direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="caption">
+                      Part {i + 1} of {download.total_fragments}
+                    </Typography>
+                    <IconButton
+                      size="small"
+                      data-testid={`download-part-button-${i}`}
+                      onClick={() => onDownloadFragment(download.download_id, i)}
+                      title={`Download part ${i + 1}`}>
+                      <Icon path={mdiDownload} size={0.7} />
+                    </IconButton>
+                  </Stack>
+                ))}
+              </Stack>
+            </Collapse>
+          </>
+        )}
       </Stack>
     </Card>
   );

@@ -51,9 +51,12 @@ describe('DownloadSidebarDownloads', () => {
     cleanup();
   });
 
+  const mockPagination = (overrides = {}) => ({ total: 1, current_page: 1, last_page: 1, ...overrides });
+
   it('renders download cards when data loads', async () => {
     mockGetDownloads.mockResolvedValue({
-      downloads: [makeDownload({ download_id: 'd1' }), makeDownload({ download_id: 'd2' })]
+      downloads: [makeDownload({ download_id: 'd1' }), makeDownload({ download_id: 'd2' })],
+      pagination: mockPagination({ total: 2 })
     });
 
     const { getAllByTestId } = render(<DownloadSidebarDownloads />);
@@ -64,7 +67,7 @@ describe('DownloadSidebarDownloads', () => {
   });
 
   it('shows empty state when no downloads exist', async () => {
-    mockGetDownloads.mockResolvedValue({ downloads: [] });
+    mockGetDownloads.mockResolvedValue({ downloads: [], pagination: mockPagination({ total: 0 }) });
 
     const { getByText } = render(<DownloadSidebarDownloads />);
 
@@ -73,12 +76,12 @@ describe('DownloadSidebarDownloads', () => {
     });
   });
 
-  it('calls getFragmentUrl and opens URL on download click', async () => {
+  it('calls getFragmentUrl and creates iframe on download click', async () => {
     mockGetDownloads.mockResolvedValue({
-      downloads: [makeDownload({ download_id: 'dl-1' })]
+      downloads: [makeDownload({ download_id: 'dl-1' })],
+      pagination: mockPagination()
     });
     mockGetFragmentUrl.mockResolvedValue({ url: 'https://s3.example.com/signed' });
-    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 
     const { getByTestId } = render(<DownloadSidebarDownloads />);
 
@@ -90,9 +93,47 @@ describe('DownloadSidebarDownloads', () => {
 
     await waitFor(() => {
       expect(mockGetFragmentUrl).toHaveBeenCalledWith('dl-1', 0);
-      expect(openSpy).toHaveBeenCalledWith('https://s3.example.com/signed', '_blank', 'noopener,noreferrer');
+      const iframe = document.querySelector('iframe[src="https://s3.example.com/signed"]');
+      expect(iframe).toBeTruthy();
+    });
+  });
+
+  it('passes pagination params to getDownloads', async () => {
+    mockGetDownloads.mockResolvedValue({
+      downloads: [makeDownload()],
+      pagination: mockPagination()
     });
 
-    openSpy.mockRestore();
+    render(<DownloadSidebarDownloads />);
+
+    await waitFor(() => {
+      expect(mockGetDownloads).toHaveBeenCalledWith(expect.objectContaining({ page: 1, limit: 10 }));
+    });
+  });
+
+  it('hides pagination when only one page of results', async () => {
+    mockGetDownloads.mockResolvedValue({
+      downloads: [makeDownload()],
+      pagination: mockPagination({ last_page: 1 })
+    });
+
+    const { queryByRole } = render(<DownloadSidebarDownloads />);
+
+    await waitFor(() => {
+      expect(queryByRole('navigation')).not.toBeInTheDocument();
+    });
+  });
+
+  it('shows pagination when multiple pages exist', async () => {
+    mockGetDownloads.mockResolvedValue({
+      downloads: [makeDownload()],
+      pagination: mockPagination({ total: 25, last_page: 3 })
+    });
+
+    const { getByRole } = render(<DownloadSidebarDownloads />);
+
+    await waitFor(() => {
+      expect(getByRole('navigation')).toBeVisible();
+    });
   });
 });

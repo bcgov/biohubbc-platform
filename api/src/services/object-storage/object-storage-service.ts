@@ -317,9 +317,22 @@ export class ObjectStorageService {
    * @return {*}  {Promise<string>}
    * @memberof ObjectStorageService
    */
-  async getSignedUrl(bucketType: BucketType, key: string, expiresInSeconds = 300): Promise<string> {
+  async getSignedUrl(
+    bucketType: BucketType,
+    key: string,
+    expiresInSeconds = 300,
+    responseContentDisposition?: string
+  ): Promise<string> {
     const { client, name } = this.publicBuckets.get(bucketType) ?? this.getBucket(bucketType);
-    return getSignedUrl(client, new GetObjectCommand({ Bucket: name, Key: key }), { expiresIn: expiresInSeconds });
+    return getSignedUrl(
+      client,
+      new GetObjectCommand({
+        Bucket: name,
+        Key: key,
+        ...(responseContentDisposition && { ResponseContentDisposition: responseContentDisposition })
+      }),
+      { expiresIn: expiresInSeconds }
+    );
   }
 
   /**

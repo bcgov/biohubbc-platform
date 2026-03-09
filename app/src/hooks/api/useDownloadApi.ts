@@ -1,5 +1,6 @@
 import { AxiosInstance } from 'axios';
 import { DownloadListResponse, FragmentUrlResponse } from 'interfaces/useDownloadApi.interface';
+import { ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
  * Returns API methods for download management.
@@ -9,12 +10,13 @@ import { DownloadListResponse, FragmentUrlResponse } from 'interfaces/useDownloa
  */
 export const useDownloadApi = (axios: AxiosInstance) => {
   /**
-   * Get all downloads accessible to the current user.
+   * Get paginated downloads accessible to the current user.
    *
+   * @param {ApiPaginationRequestOptions} [pagination] - Optional pagination params (page, limit, sort, order).
    * @return {Promise<DownloadListResponse>}
    */
-  const getDownloads = async (): Promise<DownloadListResponse> => {
-    const { data } = await axios.get<DownloadListResponse>('/api/download');
+  const getDownloads = async (pagination?: ApiPaginationRequestOptions): Promise<DownloadListResponse> => {
+    const { data } = await axios.get<DownloadListResponse>('/api/download', { params: pagination });
     return data;
   };
 

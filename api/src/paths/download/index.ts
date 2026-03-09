@@ -3,6 +3,7 @@ import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../openapi/schemas/pagination';
 import * as publisher from '../../queue/publisher';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
@@ -10,6 +11,7 @@ import { DownloadService } from '../../services/download/download-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
 import { ISearchFeaturesFilters } from '../../services/search-feature-service.interface';
 import { getLogger } from '../../utils/logger';
+import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../utils/pagination';
 
 const defaultLog = getLogger('paths/download');
 
@@ -21,21 +23,22 @@ export const GET: Operation = [
 ];
 
 GET.apiDoc = {
-  description: "Get the current user's download requests",
+  description: "Get the current user's download requests with pagination",
   tags: ['download'],
   security: [
     {
       Bearer: []
     }
   ],
+  parameters: [...paginationRequestQueryParamSchema],
   responses: {
     200: {
-      description: 'List of download requests',
+      description: 'Paginated list of download requests',
       content: {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['downloads'],
+            required: ['downloads', 'pagination'],
             properties: {
               downloads: {
                 type: 'array',
@@ -67,7 +70,8 @@ GET.apiDoc = {
                     }
                   }
                 }
-              }
+              },
+              pagination: paginationResponseSchema
             }
           }
         }
@@ -93,13 +97,18 @@ export function getDownloads(): RequestHandler {
       await connection.open();
 
       const systemUserId = connection.systemUserId();
+      const pagination = makePaginationOptionsFromRequest(req);
 
       const downloadService = new DownloadService(connection);
-      const downloads = await downloadService.getDownloadsByTeamMembership(systemUserId);
+
+      const [downloads, count] = await Promise.all([
+        downloadService.getDownloadsByTeamMembership(systemUserId, pagination),
+        downloadService.getDownloadsByTeamMembershipCount(systemUserId)
+      ]);
 
       await connection.commit();
 
-      return res.status(200).json({ downloads });
+      return res.status(200).json({ downloads, pagination: makePaginationResponse(count, pagination) });
     } catch (error) {
       defaultLog.error({ label: 'getDownloads', message: 'error', error });
       await connection.rollback();

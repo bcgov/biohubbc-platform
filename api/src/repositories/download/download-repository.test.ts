@@ -1,5 +1,6 @@
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
+import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { DownloadStatusEnum } from '../../models/download-status';
@@ -185,61 +186,76 @@ describe('DownloadRepository', () => {
   });
 
   describe('getDownloadsByTeamMembership', () => {
-    it('includes owner path checking system_user_id', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+    it('returns download records from knex query', async () => {
+      const mockDownloads = [
+        { download_id: 'uuid-1', download_status: 'ready', feature_count: 5 },
+        { download_id: 'uuid-2', download_status: 'pending', feature_count: 0 }
+      ];
+      const mockResponse = {
+        rowCount: 2,
+        rows: mockDownloads
+      } as unknown as Promise<QueryResult<any>>;
 
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.getDownloadsByTeamMembership(123);
+      const result = await repo.getDownloadsByTeamMembership(123);
 
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('system_user_id');
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include(123);
+      expect(result).to.eql(mockDownloads);
     });
 
-    it('SQL includes feature_count subquery', async () => {
-      // Verifies: Most complex change — catches if subquery is lost or alias changes
+    it('returns paginated results when pagination is provided', async () => {
+      const mockDownloads = [{ download_id: 'uuid-1', feature_count: 3 }];
+      const mockResponse = {
+        rowCount: 1,
+        rows: mockDownloads
+      } as unknown as Promise<QueryResult<any>>;
 
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.getDownloadsByTeamMembership(123);
+      const result = await repo.getDownloadsByTeamMembership(123, { page: 2, limit: 10 });
 
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('COUNT(*)');
-      expect(sqlText).to.include('feature_count');
+      expect(result).to.eql(mockDownloads);
     });
 
-    it('SQL includes create_date', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+    it('returns empty array when no downloads exist', async () => {
+      const mockResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as Promise<QueryResult<any>>;
 
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.getDownloadsByTeamMembership(123);
+      const result = await repo.getDownloadsByTeamMembership(123);
 
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('create_date');
+      expect(result).to.eql([]);
+    });
+  });
+
+  describe('getDownloadsByTeamMembershipCount', () => {
+    it('returns count of accessible downloads', async () => {
+      const mockResponse = {
+        rowCount: 1,
+        rows: [{ count: 42 }]
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.getDownloadsByTeamMembershipCount(123);
+
+      expect(result).to.equal(42);
     });
 
-    it('uses DownloadListRecord zod schema for validation', async () => {
-      // Verifies: Wrong schema would silently strip feature_count during parse
+    it('returns 0 when no downloads exist', async () => {
+      const mockResponse = {
+        rowCount: 1,
+        rows: [{ count: 0 }]
+      } as unknown as Promise<QueryResult<any>>;
 
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.getDownloadsByTeamMembership(123);
+      const result = await repo.getDownloadsByTeamMembershipCount(456);
 
-      expect(sqlStub).to.have.been.calledOnce;
-      const zodSchema = sqlStub.firstCall.args[1];
-      // DownloadListRecord extends DownloadRecord with feature_count
-      expect(zodSchema.shape).to.have.property('feature_count');
-      expect(zodSchema.shape).to.have.property('download_id');
+      expect(result).to.equal(0);
     });
   });
 

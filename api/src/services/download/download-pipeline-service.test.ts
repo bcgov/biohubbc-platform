@@ -638,8 +638,7 @@ describe('DownloadPipelineService', () => {
         download_id: 'aaaa0000-0000-0000-0000-000000000042',
         fragment_index: 0,
         fragment_status: DownloadStatusEnum.READY,
-        s3_key:
-          'downloads/aaaa0000-0000-0000-0000-000000000042/biohub-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
+        s3_key: 'downloads/aaaa0000-0000-0000-0000-000000000042/biohub-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
         file_name: 'biohub-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
         file_size_bytes: '2048',
         estimated_size_bytes: '2000',

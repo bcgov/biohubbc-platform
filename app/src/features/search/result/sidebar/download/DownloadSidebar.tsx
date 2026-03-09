@@ -16,8 +16,13 @@ interface DownloadSidebarProps {
   onDownload?: () => void;
 }
 
-export const DownloadSidebar = ({ features, itemCount, activeView, onViewChange, onDownload }: DownloadSidebarProps) => {
-
+export const DownloadSidebar = ({
+  features,
+  itemCount,
+  activeView,
+  onViewChange,
+  onDownload
+}: DownloadSidebarProps) => {
   return (
     <Stack direction="column" height="100%" boxSizing="border-box" sx={{ display: 'flex' }}>
       <Box pb={1}>

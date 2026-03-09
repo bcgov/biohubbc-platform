@@ -1,6 +1,13 @@
 import { IDBConnection } from '../../database/db';
-import { CreateDownload, DownloadFeatureSummary, DownloadId, DownloadListRecord, DownloadRecord } from '../../models/download';
+import {
+  CreateDownload,
+  DownloadFeatureSummary,
+  DownloadId,
+  DownloadListRecord,
+  DownloadRecord
+} from '../../models/download';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
 
 /**
@@ -56,14 +63,29 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * Get all download records accessible to a user.
+   * Get paginated download records accessible to a user.
    *
    * @param {number} systemUserId - The user ID.
-   * @return {Promise<DownloadRecord[]>}
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination/sort options.
+   * @return {Promise<DownloadListRecord[]>}
    * @memberof DownloadService
    */
-  async getDownloadsByTeamMembership(systemUserId: number): Promise<DownloadListRecord[]> {
-    return this.downloadRepository.getDownloadsByTeamMembership(systemUserId);
+  async getDownloadsByTeamMembership(
+    systemUserId: number,
+    pagination?: ApiPaginationOptions
+  ): Promise<DownloadListRecord[]> {
+    return this.downloadRepository.getDownloadsByTeamMembership(systemUserId, pagination);
+  }
+
+  /**
+   * Count download records accessible to a user.
+   *
+   * @param {number} systemUserId - The user ID.
+   * @return {Promise<number>}
+   * @memberof DownloadService
+   */
+  async getDownloadsByTeamMembershipCount(systemUserId: number): Promise<number> {
+    return this.downloadRepository.getDownloadsByTeamMembershipCount(systemUserId);
   }
 
   /**

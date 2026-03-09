@@ -30,7 +30,8 @@ describe('useDownloadApi', () => {
             completed_at: '2026-03-01T00:02:00Z',
             downloaded_at: null
           }
-        ]
+        ],
+        pagination: { total: 1, current_page: 1, last_page: 1 }
       };
 
       mock.onGet('/api/download').reply(200, mockResponse);
@@ -39,6 +40,19 @@ describe('useDownloadApi', () => {
 
       expect(result).toEqual(mockResponse);
       expect(mock.history.get[0].url).toBe('/api/download');
+    });
+
+    it('should pass pagination params as query string', async () => {
+      const mockResponse: DownloadListResponse = {
+        downloads: [],
+        pagination: { total: 0, current_page: 2, last_page: 3 }
+      };
+
+      mock.onGet('/api/download').reply(200, mockResponse);
+
+      await useDownloadApi(axios).getDownloads({ page: 2, limit: 10 });
+
+      expect(mock.history.get[0].params).toEqual({ page: 2, limit: 10 });
     });
   });
 
