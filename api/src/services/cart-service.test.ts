@@ -266,7 +266,12 @@ describe('CartService', () => {
 
       expect(result).to.deep.equal({ download_id: 'dl-uuid' });
       expect(getIdsStub).to.have.been.calledOnceWith('cart-1');
-      expect(createDownloadStub).to.have.been.calledOnceWith('team-1', null, undefined, 42);
+      expect(createDownloadStub).to.have.been.calledOnceWith({
+        teamId: 'team-1',
+        dataRequestId: null,
+        fragmentSizeBytes: undefined,
+        systemUserId: 42
+      });
       expect(createFeaturesStub).to.have.been.calledOnceWith('dl-uuid', [1, 2, 3]);
       expect(updateCartStub).to.have.been.calledOnceWith('cart-1', {
         cart_status: CartStatus.CHECKED_OUT,
@@ -301,7 +306,12 @@ describe('CartService', () => {
 
       await service.checkoutCart('cart-1', null);
 
-      expect(createDownloadStub).to.have.been.calledOnceWith(null, null, undefined, null);
+      expect(createDownloadStub).to.have.been.calledOnceWith({
+        teamId: null,
+        dataRequestId: null,
+        fragmentSizeBytes: undefined,
+        systemUserId: null
+      });
       expect(updateCartStub).to.have.been.calledOnceWith('cart-1', {
         cart_status: CartStatus.CHECKED_OUT,
         checkout_date: sinon.match.string,
@@ -362,7 +372,12 @@ describe('CartService', () => {
 
       await service.checkoutCart('cart-1', 7);
 
-      expect(createDownloadStub).to.have.been.calledOnceWith('team-1', null, undefined, 7);
+      expect(createDownloadStub).to.have.been.calledOnceWith({
+        teamId: 'team-1',
+        dataRequestId: null,
+        fragmentSizeBytes: undefined,
+        systemUserId: 7
+      });
       expect(updateCartStub).to.have.been.calledOnceWith('cart-1', {
         cart_status: CartStatus.CHECKED_OUT,
         checkout_date: sinon.match.string,
@@ -385,7 +400,12 @@ describe('CartService', () => {
 
       await service.checkoutCart('cart-1', null);
 
-      expect(createDownloadStub).to.have.been.calledOnceWith(null, null, undefined, null);
+      expect(createDownloadStub).to.have.been.calledOnceWith({
+        teamId: null,
+        dataRequestId: null,
+        fragmentSizeBytes: undefined,
+        systemUserId: null
+      });
       expect(updateCartStub).to.have.been.calledOnceWith('cart-1', {
         cart_status: CartStatus.CHECKED_OUT,
         checkout_date: sinon.match.string,

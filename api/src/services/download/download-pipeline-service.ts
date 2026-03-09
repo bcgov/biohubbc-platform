@@ -4,7 +4,7 @@ import { FRAGMENT_SIZE_THRESHOLD, SIGNED_URL_EXPIRY_FRAGMENT } from '../../const
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
 import { HTTP403, HTTP404, HTTP409, HTTP500 } from '../../errors/http-error';
-import { DownloadId, DownloadRecord, DownloadSizeEstimate } from '../../models/download';
+import { CreateDownloadRequest, DownloadId, DownloadRecord, DownloadSizeEstimate } from '../../models/download';
 import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
@@ -65,28 +65,21 @@ export class DownloadPipelineService extends DBService {
    * For authenticated users, `system_user_id` is set on the download record directly.
    * For anonymous users, `system_user_id` is null (UUID is the credential).
    *
-   * @param {string | null} teamId - The team that owns this download. Null for anonymous downloads.
-   * @param {number[]} submissionFeatureIds - The submission feature IDs to include.
-   * @param {string} [dataRequestId] - The data request that originated this download.
-   * @param {number} [fragmentSizeMb] - Target fragment size in MB (500, 1000, or 5000). Defaults to 500.
+   * @param {CreateDownloadRequest} payload
    * @return {Promise<DownloadId>} The created download record ID.
    * @memberof DownloadPipelineService
    */
-  async createDownloadRequest(
-    teamId: string | null,
-    submissionFeatureIds: number[],
-    dataRequestId?: string,
-    fragmentSizeMb?: number
-  ): Promise<DownloadId> {
+  async createDownloadRequest(payload: CreateDownloadRequest): Promise<DownloadId> {
+    const { systemUserId, teamId, submissionFeatureIds, dataRequestId, fragmentSizeMb, filters } = payload;
     const fragmentSizeBytes = fragmentSizeMb ? fragmentSizeMb * 1024 * 1024 : undefined;
-    const systemUserId = this.connection.systemUserId() || null;
 
-    const downloadId = await this.downloadRepository.createDownload(
+    const downloadId = await this.downloadRepository.createDownload({
       teamId,
-      dataRequestId ?? null,
+      dataRequestId: dataRequestId ?? null,
       fragmentSizeBytes,
-      systemUserId
-    );
+      systemUserId,
+      filters
+    });
 
     await this.downloadRepository.createDownloadFeatures(downloadId.download_id, submissionFeatureIds);
 

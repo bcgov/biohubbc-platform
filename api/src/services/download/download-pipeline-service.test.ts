@@ -71,9 +71,7 @@ describe('DownloadPipelineService', () => {
 
   describe('createDownloadRequest', () => {
     it('passes systemUserId to createDownload for authenticated users', async () => {
-      const mockDBConnection = getMockDBConnection({
-        systemUserId: () => 42
-      });
+      const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
       const createDownloadStub = sinon
@@ -81,17 +79,14 @@ describe('DownloadPipelineService', () => {
         .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
       sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
 
-      await service.createDownloadRequest(null, [10, 20]);
+      await service.createDownloadRequest({ systemUserId: 42, teamId: null, submissionFeatureIds: [10, 20] });
 
       expect(createDownloadStub).to.have.been.calledOnce;
-      // systemUserId (42) should be passed as the 4th argument
-      expect(createDownloadStub.firstCall.args[3]).to.equal(42);
+      expect(createDownloadStub.firstCall.args[0]).to.have.property('systemUserId', 42);
     });
 
     it('passes null systemUserId for anonymous downloads', async () => {
-      const mockDBConnection = getMockDBConnection({
-        systemUserId: () => null as unknown as number
-      });
+      const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
       const createDownloadStub = sinon
@@ -99,10 +94,69 @@ describe('DownloadPipelineService', () => {
         .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
       sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
 
-      await service.createDownloadRequest(null, [10, 20]);
+      await service.createDownloadRequest({ systemUserId: null, teamId: null, submissionFeatureIds: [10, 20] });
 
       expect(createDownloadStub).to.have.been.calledOnce;
-      expect(createDownloadStub.firstCall.args[3]).to.be.null;
+      expect(createDownloadStub.firstCall.args[0]).to.have.property('systemUserId', null);
+    });
+
+    it('passes filters to createDownload', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const createDownloadStub = sinon
+        .stub(DownloadRepository.prototype, 'createDownload')
+        .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
+      sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
+
+      const filters = { keyword: 'elk' };
+      await service.createDownloadRequest({
+        systemUserId: 42,
+        teamId: null,
+        submissionFeatureIds: [10, 20],
+        filters
+      });
+
+      expect(createDownloadStub).to.have.been.calledOnce;
+      const opts = createDownloadStub.firstCall.args[0];
+      expect(opts).to.have.property('systemUserId', 42);
+      expect(opts).to.have.deep.property('filters', { keyword: 'elk' });
+    });
+
+    it('omitting filters passes undefined', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const createDownloadStub = sinon
+        .stub(DownloadRepository.prototype, 'createDownload')
+        .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
+      sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
+
+      await service.createDownloadRequest({ systemUserId: 42, teamId: null, submissionFeatureIds: [10, 20] });
+
+      expect(createDownloadStub).to.have.been.calledOnce;
+      expect(createDownloadStub.firstCall.args[0].filters).to.be.undefined;
+    });
+
+    it('still creates download features after options refactor', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon
+        .stub(DownloadRepository.prototype, 'createDownload')
+        .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
+      const createFeaturesStub = sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
+
+      await service.createDownloadRequest({
+        systemUserId: 42,
+        teamId: null,
+        submissionFeatureIds: [10, 20],
+        filters: { keyword: 'elk' }
+      });
+
+      expect(createFeaturesStub).to.have.been.calledOnce;
+      expect(createFeaturesStub.firstCall.args[0]).to.equal('aaaa0000-0000-0000-0000-000000000001');
+      expect(createFeaturesStub.firstCall.args[1]).to.deep.equal([10, 20]);
     });
   });
 
