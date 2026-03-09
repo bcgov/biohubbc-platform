@@ -85,10 +85,10 @@ describe('IngestionRepository', () => {
     });
   });
 
-  describe('deleteSubmissionFeaturesByUploadId', () => {
-    it('should scope WHERE by upload_id', async () => {
+  describe('deleteSubmissionFeaturesBySubmissionUploadId', () => {
+    it('should scope WHERE by submission_upload_id', async () => {
       const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
-        expect(sqlStatement.text).to.include('upload_id');
+        expect(sqlStatement.text).to.include('submission_upload_id');
         expect(sqlStatement.text).to.include('record_end_date IS NULL');
         return Promise.resolve({ rowCount: 2, rows: [], command: '', oid: 0, fields: [] });
       });
@@ -96,7 +96,7 @@ describe('IngestionRepository', () => {
 
       const ingestionRepository = new IngestionRepository(mockDBConnection);
 
-      await ingestionRepository.deleteSubmissionFeaturesByUploadId('550e8400-e29b-41d4-a716-446655440000');
+      await ingestionRepository.deleteSubmissionFeaturesBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
 
       expect(sqlStub).to.have.been.calledOnce;
     });

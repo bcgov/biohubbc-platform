@@ -15,9 +15,12 @@ import { ISubmissionFeature } from '../submission-repository';
 export class IngestionRepository extends BaseRepository {
   /**
    * Insert a new submission feature record.
+   * Features belong to a submission (submission_id) but are produced by a specific
+   * upload event (submission_upload_id). This distinction enables multi-upload-per-submission
+   * (append, replace).
    *
    * @param {number} submissionId The ID of the submission.
-   * @param {string} uploadId The ID of the upload that produced these features.
+   * @param {string} submissionUploadId The submission_upload_id that produced these features.
    * @param {(number | null)} parentSubmissionFeatureId The ID of the parent submission feature, or null.
    * @param {(string | null)} featureSourceId The source ID of the feature, or null.
    * @param {string} featureTypeName The name of the feature type.
@@ -28,7 +31,7 @@ export class IngestionRepository extends BaseRepository {
    */
   async insertSubmissionFeatureRecord(
     submissionId: number,
-    uploadId: string,
+    submissionUploadId: string,
     parentSubmissionFeatureId: number | null,
     featureSourceId: string | null,
     featureTypeName: string,
@@ -38,7 +41,7 @@ export class IngestionRepository extends BaseRepository {
     const sqlStatement = SQL`
       INSERT INTO submission_feature (
         submission_id,
-        upload_id,
+        submission_upload_id,
         parent_submission_feature_id,
         source_id,
         feature_type_id,
@@ -47,7 +50,7 @@ export class IngestionRepository extends BaseRepository {
         record_effective_date
       ) VALUES (
         ${submissionId},
-        ${uploadId},
+        ${submissionUploadId},
         ${parentSubmissionFeatureId},
         ${featureSourceId},
         (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}),
@@ -90,19 +93,19 @@ export class IngestionRepository extends BaseRepository {
   }
 
   /**
-   * Soft-delete features scoped to a specific upload.
+   * Soft-delete features scoped to a specific upload event.
    * Multiple uploads produce features under the same submission_id;
    * re-ingesting one upload must not affect features from other uploads.
    *
-   * @param {string} uploadId The upload ID (UUID).
+   * @param {string} submissionUploadId The submission_upload_id (UUID).
    * @return {Promise<void>}
    * @memberof IngestionRepository
    */
-  async deleteSubmissionFeaturesByUploadId(uploadId: string): Promise<void> {
+  async deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sqlStatement = SQL`
       UPDATE submission_feature
       SET record_end_date = NOW()
-      WHERE upload_id = ${uploadId}
+      WHERE submission_upload_id = ${submissionUploadId}
         AND record_end_date IS NULL;
     `;
 

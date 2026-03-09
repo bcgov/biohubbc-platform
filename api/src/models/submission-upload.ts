@@ -34,11 +34,11 @@ export interface SubmissionUploadFilters {
 }
 
 /**
- * The upload + submission identifier pair used across the ingestion pipeline.
- * Both IDs travel together through publisher, job handler, validation tracking,
- * and feature insertion. The trigger resolves both before publishing.
+ * Job payload for the ingestion pipeline. Single identifier eliminates the risk
+ * of submissionId/uploadId getting out of sync — each consumer resolves what
+ * it needs from the submission_upload bridge table.
  */
 export interface IngestionJobData {
-  uploadId: string;
-  submissionId: number;
+  /** The submission_upload_id that triggered this ingestion job */
+  submissionUploadId: string;
 }
