@@ -19,7 +19,7 @@ interface SearchResultOptionsProps {
   isLoading: boolean;
   view: SEARCH_RESULT_OPTION_VIEW;
   onDownload?: (result: SearchFeatureResultWithRelevancy) => void;
-  onClick?: (result: SearchFeatureResultWithRelevancy) => void;
+  onClick: (result: SearchFeatureResultWithRelevancy) => void;
 }
 
 export const SearchResultOptions = ({ rows, isLoading, view, onDownload, onClick }: SearchResultOptionsProps) => {

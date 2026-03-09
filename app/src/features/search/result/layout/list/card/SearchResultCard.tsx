@@ -15,7 +15,7 @@ import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interf
 interface SearchResultCardProps {
   result: SearchFeatureResultWithRelevancy;
   isInCart: boolean;
-  onClick?: (result: SearchFeatureResultWithRelevancy) => void;
+  onClick: (result: SearchFeatureResultWithRelevancy) => void;
   onDownload?: (result: SearchFeatureResultWithRelevancy) => void;
   onAddToCart?: (result: SearchFeatureResultWithRelevancy) => void;
   onRemoveFromCart?: (featureId: number) => void;

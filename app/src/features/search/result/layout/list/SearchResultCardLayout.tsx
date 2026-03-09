@@ -5,7 +5,7 @@ import { SearchResultCard } from './card/SearchResultCard';
 interface SearchResultCardLayoutProps {
   results: SearchFeatureResultWithRelevancy[];
   cartFeatureIds: Set<number>;
-  onClick?: (result: SearchFeatureResultWithRelevancy) => void;
+  onClick: (result: SearchFeatureResultWithRelevancy) => void;
   onDownload?: (result: SearchFeatureResultWithRelevancy) => void;
   onAddToCart?: (result: SearchFeatureResultWithRelevancy) => void;
   onRemoveFromCart?: (featureId: number) => void;
