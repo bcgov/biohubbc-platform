@@ -11,6 +11,26 @@ export function _generateDataRequestTeamName(): string {
 }
 
 /**
+ * Generates a unique policy name for auto-created data request policies.
+ *
+ * @returns {string} A unique policy name.
+ */
+export function _generateDataRequestPolicyName(): string {
+  return `Data request policy - ${uuidv4()}`;
+}
+
+/**
+ * Returns an ISO timestamp string 30 days from now, used as the policy expiry date.
+ *
+ * @returns {string} ISO date string 30 days in the future.
+ */
+export function _getDataRequestPolicyExpiryDate(): string {
+  const expiry = new Date();
+  expiry.setDate(expiry.getDate() + 30);
+  return expiry.toISOString();
+}
+
+/**
  * Transforms a flat data request structure (with status fields at the top level)
  * into a nested structure with a data_request_status object.
  *
@@ -23,6 +43,7 @@ export function _transformFlatDataRequestToNested(flatDataRequest: FlatDataReque
     reason: flatDataRequest.reason,
     team_id: flatDataRequest.team_id,
     requested_by: flatDataRequest.requested_by,
+    ticket_id: flatDataRequest.ticket_id,
     data_request_status: {
       data_request_status_id: flatDataRequest.data_request_status_id,
       data_request_id: flatDataRequest.data_request_id,

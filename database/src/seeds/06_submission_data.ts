@@ -4,7 +4,9 @@ import {
   insertDatasetRecord,
   insertSampleSiteRecord,
   insertSubmissionRecord,
-  insertTelemetryRecord
+  insertSubmissionUploadRecord,
+  insertTelemetryRecord,
+  insertUploadRecord
 } from './04_mock_test_data';
 
 const ENABLE_MOCK_FEATURE_SEEDING = process.env.ENABLE_MOCK_FEATURE_SEEDING === 'true';
@@ -16,6 +18,7 @@ type SecurityStatus = 'clean' | 'pending' | 'infected' | 'error' | 'skipped';
 interface SeedContext {
   submission_id: number;
   upload_id: string;
+  submission_upload_id: string;
   artifacts: { artifact_id: string; role: string }[];
 }
 
@@ -52,30 +55,27 @@ const createSubmissionWithUploads = async (
   reviewed: boolean,
   withArchive: boolean
 ): Promise<SeedContext> => {
-  // --- 1. Create submission & features ---
+  // --- 1. Create upload session ---
+  const upload_id = await insertUploadRecord(knex);
+
+  // --- 2. Create submission & link upload ---
   const submission_id = await insertSubmissionRecord(knex, reviewed, reviewed);
-  const parent_feature_id = await insertDatasetRecord(knex, { submission_id });
+  const submission_upload_id = await insertSubmissionUploadRecord(knex, submission_id, upload_id);
+
+  // --- 3. Create features (requires submission_upload_id for FK) ---
+  const parent_feature_id = await insertDatasetRecord(knex, { submission_id, submission_upload_id });
   await insertSampleSiteRecord(knex, {
     submission_id,
+    submission_upload_id,
     parent_submission_feature_id: parent_feature_id
   });
   await insertTelemetryRecord(knex, {
     submission_id,
+    submission_upload_id,
     parent_submission_feature_id: parent_feature_id
   });
 
-  // --- 2. Create upload session ---
-  const { upload_id } = (
-    await knex('upload')
-      .insert({
-        upload_status: 'completed',
-        create_user: 1,
-        record_end_date: new Date()
-      })
-      .returning('upload_id')
-  )[0];
-
-  // --- 3. Create artifacts and security scans ---
+  // --- 4. Create artifacts and security scans ---
   const artifacts: { artifact_id: string; role: string }[] = [];
 
   if (withArchive) {
@@ -84,14 +84,7 @@ const createSubmissionWithUploads = async (
     await createDirectUpload(knex, upload_id, submission_id, securityLevel, artifacts);
   }
 
-  // --- 4. Link submission to upload ---
-  await knex('submission_upload').insert({
-    submission_id,
-    upload_id,
-    create_user: 1
-  });
-
-  return { submission_id, upload_id, artifacts };
+  return { submission_id, upload_id, submission_upload_id, artifacts };
 };
 
 /**

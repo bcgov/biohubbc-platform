@@ -1,22 +1,19 @@
-import { mdiDotsVertical, mdiMagnify, mdiPencilOutline, mdiPlus, mdiTrashCanOutline } from '@mdi/js';
+import { mdiDotsVertical, mdiMagnify, mdiPencilOutline, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Divider from '@mui/material/Divider';
 import InputAdornment from '@mui/material/InputAdornment';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
-import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import { GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
-import CustomDataGrid from 'components/data-grid/CustomDataGrid';
-import EditDialog from 'components/dialog/EditDialog';
+import { GridColDef } from '@mui/x-data-grid';
+import { ServerPaginatedDataGrid } from 'components/data-grid/ServerPaginatedDataGrid';
+import { EditDialog } from 'components/dialog/EditDialog';
+import { PageSection } from 'components/section/PageSection';
 import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import { ITeamWithMembers } from 'interfaces/useTeamsApi.interface';
+import { ITeam } from 'interfaces/useTeamsApi.interface';
 import { IServerPaginationProps } from 'types/pagination';
 import { useState } from 'react';
 import { AddTeamForm, AddTeamFormInitialValues, AddTeamFormYupSchema, IAddTeamFormValues } from './AddTeamForm';
@@ -26,17 +23,13 @@ import { AddTeamForm, AddTeamFormInitialValues, AddTeamFormYupSchema, IAddTeamFo
  */
 export interface ITeamsContainerProps extends IServerPaginationProps {
   /** Array of teams to display in the table */
-  teams: ITeamWithMembers[];
+  teams: ITeam[];
   /** Callback to refresh the teams list after create/update/delete */
   refresh: () => void;
   /** Current search term for filtering teams */
   searchTerm: string;
   /** Callback when search term changes */
   onSearch: (term: string) => void;
-  /** Currently selected team ID for filtering team-policy assignments */
-  selectedTeamId: string | null;
-  /** Callback when a team row is selected/deselected */
-  onSelectTeam: (teamId: string | null) => void;
 }
 
 /**
@@ -44,7 +37,6 @@ export interface ITeamsContainerProps extends IServerPaginationProps {
  *
  * Provides functionality to:
  * - View teams in a searchable, paginated table
- * - Select a team to filter team-policy assignments
  * - Create new teams via dialog
  * - Edit existing teams via dialog
  * - Delete teams with confirmation
@@ -52,7 +44,7 @@ export interface ITeamsContainerProps extends IServerPaginationProps {
  * @param {ITeamsContainerProps} props - Component props
  * @returns {React.ReactElement} The teams container component
  */
-export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
+export const TeamsContainer = (props: ITeamsContainerProps) => {
   const {
     teams,
     rowCount,
@@ -62,9 +54,7 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
     setSortModel,
     refresh,
     searchTerm,
-    onSearch,
-    selectedTeamId,
-    onSelectTeam
+    onSearch
   } = props;
 
   const biohubApi = useApi();
@@ -73,26 +63,8 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
   // Dialog state
   const [openAddTeamDialog, setOpenAddTeamDialog] = useState(false);
   const [openEditTeamDialog, setOpenEditTeamDialog] = useState(false);
-  const [editingTeam, setEditingTeam] = useState<ITeamWithMembers | null>(null);
+  const [editingTeam, setEditingTeam] = useState<ITeam | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  /**
-   * Handle row selection changes in the DataGrid.
-   * Extracts the selected team ID and calls the parent callback.
-   *
-   * @param {GridRowSelectionModel} model - The new selection model from DataGrid
-   */
-  const handleRowSelectionChange = (model: GridRowSelectionModel) => {
-    const ids = model && 'ids' in model ? Array.from(model.ids) : [];
-    const newSelectedId = (ids[0] as string) || null;
-    onSelectTeam(newSelectedId);
-  };
-
-  // Convert selectedTeamId to DataGrid selection model format
-  const rowSelectionModel: GridRowSelectionModel = {
-    type: 'include',
-    ids: selectedTeamId ? new Set([selectedTeamId]) : new Set()
-  };
 
   /**
    * Display a snackbar notification.
@@ -106,9 +78,14 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
   /**
    * Open confirmation dialog to delete a team.
    *
-   * @param {ITeamWithMembers} team - The team to delete
+   * @param {ITeam} team - The team to delete
    */
-  const handleDeleteTeamClick = (team: ITeamWithMembers) => {
+  const handleDeleteTeamClick = (team: ITeam) => {
+    const handleConfirmDelete = () => {
+      deleteTeam(team);
+      dialogContext.setYesNoDialog({ open: false });
+    };
+
     dialogContext.setYesNoDialog({
       dialogTitle: 'Delete team?',
       dialogContent: (
@@ -126,21 +103,17 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
         dialogContext.setYesNoDialog({ open: false });
       },
       open: true,
-      onYes: () => {
-        deleteTeam(team).then(() => {
-          dialogContext.setYesNoDialog({ open: false });
-        });
-      }
+      onYes: handleConfirmDelete
     });
   };
 
   /**
    * Delete a team via API.
    *
-   * @param {ITeamWithMembers} team - The team to delete
+   * @param {ITeam} team - The team to delete
    * @returns {Promise<void>}
    */
-  const deleteTeam = async (team: ITeamWithMembers) => {
+  const deleteTeam = async (team: ITeam) => {
     if (!team?.team_id) {
       return;
     }
@@ -148,19 +121,9 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
       await biohubApi.teams.deleteTeam(team.team_id);
 
       showSnackBar({
-        snackbarMessage: (
-          <Typography variant="body2" component="div">
-            Team <strong>{team.name}</strong> deleted.
-          </Typography>
-        ),
+        snackbarMessage: 'Deleted team',
         open: true
       });
-
-      // Clear selection if deleted team was selected
-      if (selectedTeamId === team.team_id) {
-        onSelectTeam(null);
-      }
-
       refresh();
     } catch (error) {
       const apiError = error as APIError;
@@ -184,9 +147,9 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
   /**
    * Open the edit dialog for a team.
    *
-   * @param {ITeamWithMembers} team - The team to edit
+   * @param {ITeam} team - The team to edit
    */
-  const handleEditTeamClick = (team: ITeamWithMembers) => {
+  const handleEditTeamClick = (team: ITeam) => {
     setEditingTeam(team);
     setOpenEditTeamDialog(true);
   };
@@ -204,18 +167,14 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
       await biohubApi.teams.createTeam({
         name: values.name,
         description: values.description || undefined,
-        member_user_ids: values.member_user_ids
+        system_user_ids: values.system_user_ids
       });
 
       setOpenAddTeamDialog(false);
       refresh();
 
       showSnackBar({
-        snackbarMessage: (
-          <Typography variant="body2" component="div">
-            Team <strong>{values.name}</strong> created.
-          </Typography>
-        )
+        snackbarMessage: 'Created team'
       });
     } catch (error) {
       const apiError = error as APIError;
@@ -255,7 +214,7 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
       await biohubApi.teams.updateTeam(editingTeam.team_id, {
         name: values.name,
         description: values.description || undefined,
-        member_user_ids: values.member_user_ids
+        system_user_ids: values.system_user_ids
       });
 
       setOpenEditTeamDialog(false);
@@ -263,11 +222,7 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
       refresh();
 
       showSnackBar({
-        snackbarMessage: (
-          <Typography variant="body2" component="div">
-            Team <strong>{values.name}</strong> updated.
-          </Typography>
-        )
+        snackbarMessage: 'Updated team'
       });
     } catch (error) {
       const apiError = error as APIError;
@@ -302,12 +257,12 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
     return {
       name: editingTeam.name,
       description: editingTeam.description || '',
-      member_user_ids: editingTeam.members.map((m) => m.system_user_id)
+      system_user_ids: []
     };
   };
 
   // DataGrid columns
-  const columns: GridColDef<ITeamWithMembers>[] = [
+  const columns: GridColDef<ITeam>[] = [
     {
       field: 'name',
       headerName: 'Name',
@@ -322,11 +277,10 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
       valueGetter: (value) => value || '-'
     },
     {
-      field: 'members',
+      field: 'member_count',
       headerName: 'Members',
       width: 100,
-      sortable: false,
-      valueGetter: (_value, row) => row.members?.length ?? 0
+      valueGetter: (_value, row) => row.member_count
     },
     {
       field: 'actions',
@@ -358,14 +312,18 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
 
   return (
     <>
-      <Box>
-        <Toolbar disableGutters sx={{ px: 2 }}>
-          <Typography variant="h4" component="h2" flexGrow={1}>
+      <PageSection
+        id="teams"
+        label={
+          <>
             Teams{' '}
             <Typography sx={{ fontSize: 'inherit' }} component="span" color="textSecondary">
               ({rowCount})
             </Typography>
-          </Typography>
+          </>
+        }
+        onAdd={() => setOpenAddTeamDialog(true)}
+        headerContent={
           <Stack gap={1} direction="row" alignItems="center">
             <TextField
               size="small"
@@ -383,41 +341,21 @@ export const TeamsContainer: React.FC<ITeamsContainerProps> = (props) => {
               }}
               sx={{ width: 250 }}
             />
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<Icon path={mdiPlus} size={0.8} />}
-              onClick={() => setOpenAddTeamDialog(true)}>
-              Add
-            </Button>
           </Stack>
-        </Toolbar>
-
-        <Divider flexItem />
-
-        <CustomDataGrid
-          data-testid="teams-table"
+        }>
+        <ServerPaginatedDataGrid<ITeam>
+          dataTestId="teams-table"
           rows={teams}
           columns={columns}
           getRowId={(row) => row.team_id}
-          paginationMode="server"
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          pageSizeOptions={[10, 25, 50]}
-          sortingMode="server"
-          sortingOrder={['asc', 'desc']}
-          sortModel={sortModel}
-          onSortModelChange={setSortModel}
+          noRowsMessage="No Teams"
           rowCount={rowCount}
-          rowSelectionModel={rowSelectionModel}
-          onRowSelectionModelChange={handleRowSelectionChange}
-          checkboxSelection
-          disableMultipleRowSelection
-          disableColumnSelector
-          disableColumnMenu
-          localeText={{ noRowsLabel: 'No Teams' }}
+          paginationModel={paginationModel}
+          setPaginationModel={setPaginationModel}
+          sortModel={sortModel}
+          setSortModel={setSortModel}
         />
-      </Box>
+      </PageSection>
 
       <EditDialog
         isLoading={isLoading}

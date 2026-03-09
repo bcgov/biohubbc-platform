@@ -65,14 +65,36 @@ export class SearchFeatureService extends DBService {
   }
 
   /**
+   * Returns submission feature IDs matching the provided search filters.
+   * Delegates to repository for the CTE-based query.
+   *
+   * @param {ISearchFeaturesFilters} filters - Search filters (keyword, feature_types, species, properties)
+   * @returns {Promise<number[]>} Array of matching submission_feature_id values
+   */
+  async getSearchFeatureIds(filters: ISearchFeaturesFilters): Promise<number[]> {
+    defaultLog.debug({ label: 'getSearchFeatureIds', filters });
+    const rows = await this.searchFeatureRepository.searchFeatureIdsByFilters(filters);
+    return rows.map((row) => row.submission_feature_id);
+  }
+
+  /**
    * Creates search indexes for datetime, number, spatial and string properties belonging to
    * all features found for the given submission.
+   *
+   * Deletes existing search records first for idempotency — job retries and manual re-indexing
+   * can run this multiple times for the same submission. Without delete-before-insert, duplicate
+   * records accumulate because the search tables have no unique constraint on
+   * (submission_feature_id, feature_property_id). Upsert was rejected because it can't clean up
+   * orphaned rows when properties are removed between runs.
    *
    * @param {number} submissionId
    * @return {Promise<void>}
    */
   async indexFeaturesBySubmissionId(submissionId: number): Promise<void> {
     defaultLog.debug({ label: 'indexFeaturesBySubmissionId', message: 'start', submissionId });
+
+    // Delete existing search records for idempotency (safe for retries and manual re-indexing)
+    await this.searchFeatureRepository.deleteSearchRecordsBySubmissionId(submissionId);
 
     const datetimeRecords: InsertDatetimeSearchableRecord[] = [];
     const numberRecords: InsertNumberSearchableRecord[] = [];

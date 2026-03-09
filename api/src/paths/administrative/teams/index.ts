@@ -2,25 +2,31 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
+import { CreateTeam } from '../../../models/team';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../../openapi/schemas/pagination';
-import { CreateTeamRequestSchema, TeamsListResponseSchema, TeamWithMembersSchema } from '../../../openapi/schemas/team';
+import { CreateTeamRequestSchema, TeamSchema, TeamsListResponseSchema } from '../../../openapi/schemas/team';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { TeamService } from '../../../services/access-policy/team-service';
 import { getLogger } from '../../../utils/logger';
-import { ApiPaginationOptions } from '../../../zod-schema/pagination';
+import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../utils/pagination';
 
 const defaultLog = getLogger('paths/administrative/teams');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR], discriminator: 'SystemRole' }]
+    and: [
+      {
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        discriminator: 'SystemRole'
+      }
+    ]
   })),
   getTeams()
 ];
 
 GET.apiDoc = {
-  description: 'Get all teams with optional pagination and search.',
+  description: 'Get all teams with optional pagination and search (includes member_count only).',
   tags: ['admin'],
   security: [{ Bearer: [] }],
   parameters: [
@@ -35,8 +41,12 @@ GET.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'List of teams with members',
-      content: { 'application/json': { schema: TeamsListResponseSchema } }
+      description: 'List of teams with member counts',
+      content: {
+        'application/json': {
+          schema: TeamsListResponseSchema
+        }
+      }
     },
     ...defaultErrorResponses
   }
@@ -50,21 +60,23 @@ GET.apiDoc = {
 export function getTeams(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
-
     const search = req.query.search as string | undefined;
-    const pagination: ApiPaginationOptions = {
-      page: Number(req.query.page) || 1,
-      limit: Math.min(Number(req.query.limit) || 10, 100),
-      sort: req.query.sort as string | undefined,
-      order: req.query.order as 'asc' | 'desc' | undefined
-    };
 
     try {
       await connection.open();
+
       const teamService = new TeamService(connection);
-      const result = await teamService.getTeamsWithMembers(search, pagination);
+      const filters = { search };
+      const pagination = makePaginationOptionsFromRequest(req);
+
+      const [teams, count] = await Promise.all([
+        teamService.getTeams(filters, pagination),
+        teamService.getTeamsCount(filters)
+      ]);
+
       await connection.commit();
-      return res.status(200).json(result);
+
+      return res.status(200).json({ teams, pagination: makePaginationResponse(count, pagination) });
     } catch (error) {
       defaultLog.error({ label: 'getTeams', message: 'error', error });
       await connection.rollback();
@@ -77,42 +89,55 @@ export function getTeams(): RequestHandler {
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR], discriminator: 'SystemRole' }]
+    and: [
+      {
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        discriminator: 'SystemRole'
+      }
+    ]
   })),
   createTeam()
 ];
 
 POST.apiDoc = {
-  description: 'Create a new team with members.',
+  description: 'Create a new team.',
   tags: ['admin'],
   security: [{ Bearer: [] }],
   requestBody: {
     required: true,
-    content: { 'application/json': { schema: CreateTeamRequestSchema } }
+    content: {
+      'application/json': {
+        schema: CreateTeamRequestSchema
+      }
+    }
   },
   responses: {
     201: {
       description: 'Team created',
-      content: { 'application/json': { schema: TeamWithMembersSchema } }
+      content: {
+        'application/json': {
+          schema: TeamSchema
+        }
+      }
     },
     ...defaultErrorResponses
   }
 };
 
 /**
- * Create a new team with members.
+ * Create a new team.
  *
  * @returns {RequestHandler}
  */
 export function createTeam(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
-    const { name, description, member_user_ids } = req.body;
+    const { name, description, system_user_ids } = req.body as CreateTeam;
 
     try {
       await connection.open();
       const teamService = new TeamService(connection);
-      const result = await teamService.createTeamWithMembers({ name, description }, member_user_ids || []);
+      const result = await teamService.createTeam({ name, description, system_user_ids });
       await connection.commit();
       return res.status(201).json(result);
     } catch (error) {

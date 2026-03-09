@@ -56,9 +56,23 @@ describe('PolicyService', () => {
       const getPolicyStub = sinon.stub(PolicyRepository.prototype, 'getPolicies').resolves(mockPolicy);
 
       const result = await policyService.getPolicies();
+      const filters = undefined;
+      const pagination = undefined;
 
-      expect(getPolicyStub).to.have.been.called;
+      expect(getPolicyStub).to.have.been.calledOnce;
+      expect(getPolicyStub).to.have.been.calledWith(filters, pagination);
       expect(result).to.eql(mockPolicy);
+    });
+  });
+
+  describe('getPoliciesCount', () => {
+    it('should call repository.getPoliciesCount and return count', async () => {
+      const getPoliciesCountStub = sinon.stub(PolicyRepository.prototype, 'getPoliciesCount').resolves(2);
+
+      const result = await policyService.getPoliciesCount({ search: 'Telemetry' });
+
+      expect(getPoliciesCountStub).to.have.been.calledWith({ search: 'Telemetry' });
+      expect(result).to.equal(2);
     });
   });
 
@@ -109,7 +123,7 @@ describe('PolicyService', () => {
   });
 
   describe('getPoliciesWithStatements', () => {
-    it('should call repository.getPoliciesWithPagination and return policies with statements', async () => {
+    it('should call repository.getPolicies and return policies with statements', async () => {
       const mockPolicies: Policy[] = [
         { policy_id: '1', name: 'Policy 1', description: 'Desc 1' },
         { policy_id: '2', name: 'Policy 2', description: 'Desc 2' }
@@ -127,9 +141,7 @@ describe('PolicyService', () => {
         }
       ];
 
-      const getPoliciesWithPaginationStub = sinon
-        .stub(PolicyRepository.prototype, 'getPoliciesWithPagination')
-        .resolves({ policies: mockPolicies, total: 2 });
+      const getPoliciesStub = sinon.stub(PolicyRepository.prototype, 'getPolicies').resolves(mockPolicies);
       const getPolicyStatementsStub = sinon
         .stub(PolicyStatementRepository.prototype, 'getPolicyStatements')
         .resolves(mockStatements);
@@ -139,30 +151,22 @@ describe('PolicyService', () => {
 
       const result = await policyService.getPoliciesWithStatements(undefined, { page: 1, limit: 10 });
 
-      expect(getPoliciesWithPaginationStub).to.have.been.calledWith(undefined, { page: 1, limit: 10 });
+      expect(getPoliciesStub).to.have.been.calledWith(undefined, { page: 1, limit: 10 });
       expect(getPolicyStatementsStub).to.have.been.called;
       expect(getConditionsStub).to.have.been.called;
-      expect(result).to.eql({
-        policies: [
-          { ...mockPolicies[0], statements: [{ ...mockStatements[0], conditions: mockConditions }] },
-          { ...mockPolicies[1], statements: [{ ...mockStatements[0], conditions: mockConditions }] }
-        ],
-        pagination: { total: 2, per_page: 10, current_page: 1, last_page: 1, sort: undefined, order: undefined }
-      });
+      expect(result).to.eql([
+        { ...mockPolicies[0], statements: [{ ...mockStatements[0], conditions: mockConditions }] },
+        { ...mockPolicies[1], statements: [{ ...mockStatements[0], conditions: mockConditions }] }
+      ]);
     });
 
-    it('should call repository.getPoliciesWithPagination and return empty array when no policies exist', async () => {
-      const getPoliciesWithPaginationStub = sinon
-        .stub(PolicyRepository.prototype, 'getPoliciesWithPagination')
-        .resolves({ policies: [], total: 0 });
+    it('should call repository.getPolicies and return empty array when no policies exist', async () => {
+      const getPoliciesStub = sinon.stub(PolicyRepository.prototype, 'getPolicies').resolves([]);
 
       const result = await policyService.getPoliciesWithStatements(undefined, { page: 1, limit: 10 });
 
-      expect(getPoliciesWithPaginationStub).to.have.been.calledWith(undefined, { page: 1, limit: 10 });
-      expect(result).to.eql({
-        policies: [],
-        pagination: { total: 0, per_page: 10, current_page: 1, last_page: 1, sort: undefined, order: undefined }
-      });
+      expect(getPoliciesStub).to.have.been.calledWith(undefined, { page: 1, limit: 10 });
+      expect(result).to.eql([]);
     });
   });
 

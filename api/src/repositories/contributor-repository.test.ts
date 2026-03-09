@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiExecuteSQLError } from '../../src/errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../src/errors/api-error';
 import { ContributorRepository } from '../../src/repositories/contributor-repository';
 import { getMockDBConnection } from '../../src/__mocks__/db';
 
@@ -125,7 +125,7 @@ describe('ContributorRepository', () => {
       expect(result).to.eql({ contributor_id: 42, client_id: 'my-client-id' });
     });
 
-    it('throws ApiExecuteSQLError when contributor not found', async () => {
+    it('throws ApiNotFoundError when contributor not found', async () => {
       const mockQueryResponse = {
         rowCount: 0,
         rows: []
@@ -141,8 +141,8 @@ describe('ContributorRepository', () => {
         await repository.getContributorByClientId('non-existent-client-id');
         expect.fail('Expected error to be thrown');
       } catch (err) {
-        expect(err).to.be.instanceOf(ApiExecuteSQLError);
-        expect((err as ApiExecuteSQLError).message).to.equal('Failed to get contributor');
+        expect(err).to.be.instanceOf(ApiNotFoundError);
+        expect((err as ApiNotFoundError).message).to.equal('Contributor not found');
       }
     });
   });

@@ -395,8 +395,12 @@ export class SubmissionRepository extends BaseRepository {
 
   /**
    * Insert a new submission feature record.
+   * Features belong to a submission (submission_id) but are produced by a specific
+   * upload event (submission_upload_id). This distinction enables multi-upload-per-submission
+   * (append, replace).
    *
    * @param {number} submissionId The ID of the submission.
+   * @param {string} submissionUploadId The submission_upload_id that produced these features.
    * @param {(number | null)} parentSubmissionFeatureId The ID of the parent submission feature, or null.
    * @param {(string | null)} featureSourceId The source ID of the feature, or null.
    * @param {string} featureTypeName The name of the feature type.
@@ -406,6 +410,7 @@ export class SubmissionRepository extends BaseRepository {
    */
   async insertSubmissionFeatureRecord(
     submissionId: number,
+    submissionUploadId: string,
     parentSubmissionFeatureId: number | null,
     featureSourceId: string | null,
     featureTypeName: string,
@@ -414,6 +419,7 @@ export class SubmissionRepository extends BaseRepository {
     const sqlStatement = SQL`
       INSERT INTO submission_feature (
         submission_id,
+        submission_upload_id,
         parent_submission_feature_id,
         source_id,
         feature_type_id,
@@ -421,6 +427,7 @@ export class SubmissionRepository extends BaseRepository {
         record_effective_date
       ) VALUES (
         ${submissionId},
+        ${submissionUploadId},
         ${parentSubmissionFeatureId},
         ${featureSourceId},
         (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}),

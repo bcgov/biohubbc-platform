@@ -26,7 +26,7 @@ describe('IngestionRepository', () => {
         properties: {}
       };
       try {
-        await ingestionRepository.insertSubmissionFeatureRecord(1, 2, '321', 'type', feature, 0);
+        await ingestionRepository.insertSubmissionFeatureRecord(1, 'some-upload-uuid', 2, '321', 'type', feature, 0);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission feature record');
@@ -50,7 +50,15 @@ describe('IngestionRepository', () => {
         properties: {}
       };
 
-      const response = await ingestionRepository.insertSubmissionFeatureRecord(1, 2, '321', 'type', feature, 0);
+      const response = await ingestionRepository.insertSubmissionFeatureRecord(
+        1,
+        'some-upload-uuid',
+        2,
+        '321',
+        'type',
+        feature,
+        0
+      );
 
       expect(response).to.eql(mockResponse);
     });
@@ -72,6 +80,23 @@ describe('IngestionRepository', () => {
       const ingestionRepository = new IngestionRepository(mockDBConnection);
 
       await ingestionRepository.updateSubmissionFeatureParent(10, 5);
+
+      expect(sqlStub).to.have.been.calledOnce;
+    });
+  });
+
+  describe('deleteSubmissionFeaturesBySubmissionUploadId', () => {
+    it('should scope WHERE by submission_upload_id', async () => {
+      const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
+        expect(sqlStatement.text).to.include('submission_upload_id');
+        expect(sqlStatement.text).to.include('record_end_date IS NULL');
+        return Promise.resolve({ rowCount: 2, rows: [], command: '', oid: 0, fields: [] });
+      });
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const ingestionRepository = new IngestionRepository(mockDBConnection);
+
+      await ingestionRepository.deleteSubmissionFeaturesBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
 
       expect(sqlStub).to.have.been.calledOnce;
     });

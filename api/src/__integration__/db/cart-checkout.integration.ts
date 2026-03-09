@@ -59,10 +59,25 @@ describe('Cart checkout (integration)', function () {
     const systemUserId = connection.systemUserId();
     const dataJson = JSON.stringify(data);
 
+    const uploadResult = await connection.sql(SQL`
+      INSERT INTO upload (upload_status, record_end_date, create_user)
+      VALUES ('completed', now(), ${systemUserId})
+      RETURNING upload_id;
+    `);
+    const uploadId = uploadResult.rows[0].upload_id;
+
+    const bridgeResult = await connection.sql(SQL`
+      INSERT INTO submission_upload (submission_id, upload_id, create_user)
+      VALUES (${submissionId}, ${uploadId}, ${systemUserId})
+      RETURNING submission_upload_id;
+    `);
+    const submissionUploadId = bridgeResult.rows[0].submission_upload_id;
+
     const result = await connection.sql(SQL`
-      INSERT INTO submission_feature (submission_id, feature_type_id, data, data_byte_size, create_user)
+      INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, data, data_byte_size, create_user)
       VALUES (
         ${submissionId},
+        ${submissionUploadId},
         (SELECT feature_type_id FROM feature_type WHERE name = 'dataset' LIMIT 1),
         ${dataJson}::jsonb,
         octet_length(${dataJson}::jsonb::text),

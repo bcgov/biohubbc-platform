@@ -1,6 +1,9 @@
+import { Knex } from 'knex';
 import { getKnex } from '../../database/db';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
+import { CountResult } from '../../models/count';
 import { CreateTeamPolicy, TeamPolicy, TeamPolicyDetails, UpdateTeamPolicy } from '../../models/team-policy';
+import { TeamPolicyFilters } from '../../services/access-policy/team-policy-service.interface';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
@@ -57,10 +60,14 @@ export class TeamPolicyRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, TeamPolicy);
 
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Team policy not found', ['TeamPolicyRepository->getTeamPolicy', { teamPolicyId }]);
+    }
+
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get team policy', [
+      throw new ApiExecuteSQLError('Unexpected row count', [
         'TeamPolicyRepository->getTeamPolicy',
-        'rowCount was null or undefined, expected rowCount = 1'
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 
@@ -68,29 +75,49 @@ export class TeamPolicyRepository extends BaseRepository {
   }
 
   /**
-   * Get all team policy records for a specific team.
+   * Get active team policy records with optional filters and pagination.
    *
-   * @param {string} teamId - The ID of the team whose policies to fetch.
-   * @return {Promise<TeamPolicy[]>} - A list of team policy records for the team.
+   * @param {TeamPolicyFilters} [filters] - Optional filter set.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
+   * @return {Promise<TeamPolicyDetails[]>} - A list of matching active team policy records.
    * @memberof TeamPolicyRepository
    */
-  async getTeamPolicies(teamId: string): Promise<TeamPolicy[]> {
+  async getTeamPolicies(filters?: TeamPolicyFilters, pagination?: ApiPaginationOptions): Promise<TeamPolicyDetails[]> {
     const knex = getKnex();
-    const query = knex.table('team_policy').select(['team_policy_id', 'team_id', 'policy_id']).where('team_id', teamId);
+    const query = knex
+      .select(['tp.team_policy_id', 'tp.team_id', 'tp.policy_id', 't.name as team_name', 'p.name as policy_name'])
+      .from('team_policy as tp')
+      .innerJoin('team as t', 'tp.team_id', 't.team_id')
+      .innerJoin('policy as p', 'tp.policy_id', 'p.policy_id')
+      .whereNull('tp.record_end_date')
+      .whereNull('t.record_end_date')
+      .whereNull('p.record_end_date');
 
-    const response = await this.connection.knex(query, TeamPolicy);
+    this.applyFilters(query, filters);
+
+    if (pagination) {
+      this.applyPagination(query, pagination);
+    }
+
+    const response = await this.connection.knex(query, TeamPolicyDetails);
 
     return response.rows;
   }
 
   /**
-   * Get all active team-policy associations with team and policy names.
-   * Follows SIMS pattern of returning display-ready data.
+   * Get active team policy records for a specific team with optional filters and pagination.
    *
-   * @return {Promise<TeamPolicyDetails[]>} - List of team policy records with names.
+   * @param {string} teamId - Team ID.
+   * @param {TeamPolicyFilters} [filters] - Optional filter set.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
+   * @return {Promise<TeamPolicyDetails[]>} - A list of matching active team policy records.
    * @memberof TeamPolicyRepository
    */
-  async getAllTeamPolicies(): Promise<TeamPolicyDetails[]> {
+  async getPoliciesByTeamId(
+    teamId: string,
+    filters?: TeamPolicyFilters,
+    pagination?: ApiPaginationOptions
+  ): Promise<TeamPolicyDetails[]> {
     const knex = getKnex();
     const query = knex
       .select(['tp.team_policy_id', 'tp.team_id', 'tp.policy_id', 't.name as team_name', 'p.name as policy_name'])
@@ -100,8 +127,13 @@ export class TeamPolicyRepository extends BaseRepository {
       .whereNull('tp.record_end_date')
       .whereNull('t.record_end_date')
       .whereNull('p.record_end_date')
-      .orderBy('t.name')
-      .orderBy('p.name');
+      .where('tp.team_id', teamId);
+
+    this.applyFilters(query, filters);
+
+    if (pagination) {
+      this.applyPagination(query, pagination);
+    }
 
     const response = await this.connection.knex(query, TeamPolicyDetails);
 
@@ -109,46 +141,28 @@ export class TeamPolicyRepository extends BaseRepository {
   }
 
   /**
-   * Get all active team-policy associations with pagination support.
+   * Get count of active team-policy associations matching optional filters.
    *
-   * @param {ApiPaginationOptions} options - Pagination options.
-   * @return {Promise<{ teamPolicies: TeamPolicyDetails[]; total: number }>}
+   * @param {TeamPolicyFilters} [filters] - Optional filter set.
+   * @return {Promise<number>}
    * @memberof TeamPolicyRepository
    */
-  async getAllTeamPoliciesWithPagination(
-    options: ApiPaginationOptions
-  ): Promise<{ teamPolicies: TeamPolicyDetails[]; total: number }> {
+  async getAllTeamPoliciesCount(filters?: TeamPolicyFilters): Promise<number> {
     const knex = getKnex();
+    const query = knex
+      .from('team_policy as tp')
+      .innerJoin('team as t', 'tp.team_id', 't.team_id')
+      .innerJoin('policy as p', 'tp.policy_id', 'p.policy_id')
+      .whereNull('tp.record_end_date')
+      .whereNull('t.record_end_date')
+      .whereNull('p.record_end_date')
+      .select(knex.raw('coalesce(count(*), 0)::integer as count'))
+      .first();
 
-    // Base query for filtering
-    const baseQuery = () =>
-      knex
-        .from('team_policy as tp')
-        .innerJoin('team as t', 'tp.team_id', 't.team_id')
-        .innerJoin('policy as p', 'tp.policy_id', 'p.policy_id')
-        .whereNull('tp.record_end_date')
-        .whereNull('t.record_end_date')
-        .whereNull('p.record_end_date');
+    this.applyFilters(query, filters);
 
-    // Get total count
-    const countQuery = baseQuery().count('* as count').first();
-    const countResult = await this.connection.knex(countQuery);
-    const total = Number(countResult.rows[0]?.count ?? 0);
-
-    // Determine sort column (map frontend field names to SQL columns)
-    const sortColumn = options.sort === 'team_name' ? 't.name' : options.sort === 'policy_name' ? 'p.name' : 't.name';
-    const sortOrder = options.order || 'asc';
-
-    // Get paginated results (page is 1-indexed, so offset = (page - 1) * limit)
-    const dataQuery = baseQuery()
-      .select(['tp.team_policy_id', 'tp.team_id', 'tp.policy_id', 't.name as team_name', 'p.name as policy_name'])
-      .orderBy(sortColumn, sortOrder)
-      .offset((options.page - 1) * options.limit)
-      .limit(options.limit);
-
-    const response = await this.connection.knex(dataQuery, TeamPolicyDetails);
-
-    return { teamPolicies: response.rows, total };
+    const response = await this.connection.knex(query, CountResult);
+    return response.rows[0].count;
   }
 
   /**
@@ -206,5 +220,30 @@ export class TeamPolicyRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
+  }
+
+  /**
+   * Apply team-policy list filters to the provided query.
+   *
+   * @param {Knex.QueryBuilder} query - Base query to filter.
+   * @param {TeamPolicyFilters} [filters] - Optional filter set.
+   * @return {Knex.QueryBuilder} Filtered query.
+   */
+  private applyFilters(query: Knex.QueryBuilder, filters?: TeamPolicyFilters): Knex.QueryBuilder {
+    if (!filters) {
+      return query;
+    }
+
+    if (filters.policyIds?.length) {
+      query.whereIn('tp.policy_id', filters.policyIds);
+    }
+
+    if (filters.search) {
+      query.where((builder) => {
+        builder.whereILike('t.name', `%${filters.search}%`).orWhereILike('p.name', `%${filters.search}%`);
+      });
+    }
+
+    return query;
   }
 }

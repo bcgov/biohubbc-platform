@@ -1,5 +1,5 @@
 import { SQL } from 'sql-template-strings';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CreateUploadArchive, UpdateUploadArchive, UploadArchive } from '../../models/upload-archive';
 import { BaseRepository } from '../base-repository';
 
@@ -9,7 +9,8 @@ export class UploadArchiveRepository extends BaseRepository {
    *
    * @param {string} uploadArchiveId - The ID of the upload archive to retrieve.
    * @returns {Promise<UploadArchive>} - The upload archive record.
-   * @throws {ApiExecuteSQLError} - Throws an error if the upload archive is not found.
+   * @throws {ApiNotFoundError} - If the upload archive is not found.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
    */
   async getUploadArchive(uploadArchiveId: string): Promise<UploadArchive> {
     const sqlStatement = SQL`
@@ -26,10 +27,17 @@ export class UploadArchiveRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, UploadArchive);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get upload archive record', [
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Upload archive not found', [
         'UploadArchiveRepository->getUploadArchive',
-        `rowCount was ${response.rowCount}, expected 1`
+        { uploadArchiveId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'UploadArchiveRepository->getUploadArchive',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 
@@ -83,9 +91,11 @@ export class UploadArchiveRepository extends BaseRepository {
    * Get upload archive by artifact ID
    *
    * @param {string} artifactId - The ID of the artifact.
-   * @returns {Promise<UploadArchive | null>} - The upload archive or null if not found.
+   * @returns {Promise<UploadArchive>} - The upload archive record.
+   * @throws {ApiNotFoundError} - If the upload archive is not found.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
    */
-  async getUploadArchiveByArtifactId(artifactId: string): Promise<UploadArchive | null> {
+  async getUploadArchiveByArtifactId(artifactId: string): Promise<UploadArchive> {
     const sqlStatement = SQL`
       SELECT
         upload_archive_id,
@@ -99,7 +109,22 @@ export class UploadArchiveRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, UploadArchive);
-    return response.rows[0] ?? null;
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Upload archive not found', [
+        'UploadArchiveRepository->getUploadArchiveByArtifactId',
+        { artifactId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'UploadArchiveRepository->getUploadArchiveByArtifactId',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
   }
 
   /**

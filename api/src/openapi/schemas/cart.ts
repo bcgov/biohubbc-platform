@@ -59,7 +59,7 @@ export const GetCartSubmissionFeaturesSchema: OpenAPIV3.SchemaObject = {
 
 export const GetCartSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['cart_id', 'system_user_id', 'cart_status'],
+  required: ['cart_id', 'system_user_id', 'cart_status', 'record_end_date'],
   additionalProperties: false,
   properties: {
     cart_id: { type: 'string', format: 'uuid' },
@@ -67,7 +67,8 @@ export const GetCartSchema: OpenAPIV3.SchemaObject = {
     cart_status: {
       type: 'string',
       enum: ['active', 'checked_out', 'expired', 'abandoned']
-    }
+    },
+    record_end_date: { type: 'string', nullable: true }
   }
 };
 

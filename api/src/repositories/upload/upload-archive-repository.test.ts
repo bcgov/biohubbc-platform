@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { CreateUploadArchive, UpdateUploadArchive, UploadArchive } from '../../models/upload-archive';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -26,8 +26,8 @@ describe('UploadArchiveRepository', () => {
         await repo.getUploadArchive('upload-archive-id-1');
         expect.fail();
       } catch (error) {
-        expect(error).to.be.instanceOf(ApiExecuteSQLError);
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get upload archive record');
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as ApiNotFoundError).message).to.equal('Upload archive not found');
       }
     });
 

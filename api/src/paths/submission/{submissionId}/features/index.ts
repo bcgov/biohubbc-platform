@@ -7,11 +7,7 @@ import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { SubmissionService } from '../../../../services/submission-service';
 import { getLogger } from '../../../../utils/logger';
-import {
-  ensureCompletePaginationOptions,
-  makePaginationOptionsFromRequest,
-  makePaginationResponse
-} from '../../../../utils/pagination';
+import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../utils/pagination';
 
 const defaultLog = getLogger('paths/submission/{submissionId}');
 
@@ -110,7 +106,7 @@ export function getSubmissionFeatures(): RequestHandler {
 
       // Service method must support pagination options
       const [features, count] = await Promise.all([
-        submissionService.getSubmissionFeatures(submissionId, ensureCompletePaginationOptions(paginationOptions)),
+        submissionService.getSubmissionFeatures(submissionId, paginationOptions),
         submissionService.getSubmissionFeaturesCount(submissionId)
       ]);
 

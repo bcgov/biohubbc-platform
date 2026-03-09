@@ -8,6 +8,8 @@ import { SystemUser } from '../../repositories/user-repository';
 import { RegionService } from '../../services/region-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
 import { SubmissionService } from '../../services/submission-service';
+import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
+import { UploadService } from '../../services/upload/upload-service';
 import { ValidationService } from '../../services/validation-service';
 import * as keycloakUtils from '../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
@@ -144,6 +146,12 @@ describe('intake', () => {
           revision_count: 0
         });
 
+      sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: 'some-uuid' });
+
+      sinon
+        .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
+        .resolves({ submission_upload_id: 'sub-upload-uuid' });
+
       const insertSubmissionFeatureRecordsStub = sinon
         .stub(SubmissionService.prototype, 'insertSubmissionFeatureRecords')
         .resolves();
@@ -210,7 +218,9 @@ describe('intake', () => {
         serviceClientSystemUser.system_user_id,
         serviceClientSystemUser.user_identifier
       );
-      expect(insertSubmissionFeatureRecordsStub).to.have.been.calledOnceWith(submissionId, [feature1]);
+      expect(insertSubmissionFeatureRecordsStub).to.have.been.calledOnceWith(submissionId, 'sub-upload-uuid', [
+        feature1
+      ]);
       expect(indexFeaturesBySubmissionIdStub).to.have.been.calledOnceWith(submissionId);
       expect(findSubmissionFeaturesStub).to.have.been.calledOnceWith({
         submissionId: submissionId,

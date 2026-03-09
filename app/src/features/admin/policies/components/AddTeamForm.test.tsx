@@ -42,7 +42,7 @@ describe('AddTeamForm', () => {
     const initialValues = {
       name: 'Test Team',
       description: 'A test description',
-      member_user_ids: []
+      system_user_ids: []
     };
 
     const { getByLabelText } = renderWithFormik(initialValues);
@@ -57,13 +57,13 @@ describe('AddTeamForm', () => {
     expect(AddTeamFormInitialValues).toEqual({
       name: '',
       description: '',
-      member_user_ids: []
+      system_user_ids: []
     });
   });
 
   describe('validation schema', () => {
     it('requires team name', async () => {
-      const result = await AddTeamFormYupSchema.validate({ name: '', description: '', member_user_ids: [] }).catch(
+      const result = await AddTeamFormYupSchema.validate({ name: '', description: '', system_user_ids: [] }).catch(
         (err) => err
       );
 
@@ -75,7 +75,7 @@ describe('AddTeamForm', () => {
       const result = await AddTeamFormYupSchema.validate({
         name: longName,
         description: '',
-        member_user_ids: []
+        system_user_ids: []
       }).catch((err) => err);
 
       expect(result.message).toBe('Team name must be 250 characters or less');
@@ -85,7 +85,7 @@ describe('AddTeamForm', () => {
       const result = await AddTeamFormYupSchema.validate({
         name: 'Valid Team Name',
         description: '',
-        member_user_ids: []
+        system_user_ids: []
       });
 
       expect(result.name).toBe('Valid Team Name');
@@ -96,7 +96,7 @@ describe('AddTeamForm', () => {
       const result = await AddTeamFormYupSchema.validate({
         name: 'Team',
         description: longDescription,
-        member_user_ids: []
+        system_user_ids: []
       }).catch((err) => err);
 
       expect(result.message).toBe('Description must be 1000 characters or less');
@@ -106,7 +106,7 @@ describe('AddTeamForm', () => {
       const result = await AddTeamFormYupSchema.validate({
         name: 'Team',
         description: '',
-        member_user_ids: []
+        system_user_ids: []
       });
 
       expect(result.description).toBe('');
@@ -116,10 +116,10 @@ describe('AddTeamForm', () => {
       const result = await AddTeamFormYupSchema.validate({
         name: 'Team',
         description: '',
-        member_user_ids: [1, 2, 3]
+        system_user_ids: [1, 2, 3]
       });
 
-      expect(result.member_user_ids).toEqual([1, 2, 3]);
+      expect(result.system_user_ids).toEqual([1, 2, 3]);
     });
   });
 });

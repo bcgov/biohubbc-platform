@@ -311,7 +311,7 @@ describe('searchFeatures', () => {
       features: mockResults,
       pagination: {
         total: 1,
-        per_page: 1,
+        per_page: 25,
         current_page: 1,
         last_page: 1,
         sort: undefined,

@@ -146,19 +146,22 @@ export class CartService extends DBService {
     let teamId: string | null = null;
 
     if (systemUserId) {
-      const team = await this.teamService.createTeamWithMembers(
-        {
-          name: `Team for cart ${cartId}`,
-          description: 'Team automatically created for cart checkout'
-        },
-        [systemUserId]
-      );
+      const team = await this.teamService.createTeam({
+        name: `Team for cart ${cartId}`,
+        description: 'Team automatically created for cart checkout',
+        system_user_ids: [systemUserId]
+      });
 
       teamId = team.team_id ?? null;
     }
 
     // Create download record (no data request for cart checkouts)
-    const downloadId = await this.downloadService.createDownload(teamId, null, fragmentSizeBytes, systemUserId);
+    const downloadId = await this.downloadService.createDownload({
+      teamId,
+      dataRequestId: null,
+      fragmentSizeBytes,
+      systemUserId
+    });
 
     // Link features to download
     await this.downloadService.createDownloadFeatures(downloadId.download_id, featureIds);

@@ -1,5 +1,5 @@
 import { SQL } from 'sql-template-strings';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   ArtifactSecurityScanFile,
   CreateArtifactSecurityScanFile,
@@ -29,10 +29,17 @@ export class ArtifactSecurityScanFileRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, ArtifactSecurityScanFile);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get upload artifact security scan file record', [
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Artifact security scan file record not found', [
         'ArtifactSecurityScanFileRepository->getArtifactSecurityScanFile',
-        `rowCount was ${response.rowCount}, expected 1`
+        { uploadArtifactSecurityScanFileId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'ArtifactSecurityScanFileRepository->getArtifactSecurityScanFile',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 

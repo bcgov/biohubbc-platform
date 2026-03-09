@@ -172,6 +172,7 @@ export const SearchSidebarSection = (props: FilterSectionProps) => {
 
       <Box sx={{ mb: 1 }}>
         <SearchAutocomplete
+          size="small"
           options={options}
           placeholder={searchPlaceholder}
           value={null}

@@ -2,7 +2,7 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { getKnex } from '../database/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { SystemUser, SystemUserExtended } from '../models/user';
 import { BaseRepository } from './base-repository';
 
@@ -121,10 +121,14 @@ export class UserRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, SystemUserExtended);
 
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('User not found', ['UserRepository->getUserById', { systemUserId }]);
+    }
+
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get user by id', [
+      throw new ApiExecuteSQLError('Unexpected row count', [
         'UserRepository->getUserById',
-        'rowCount was null or undefined, expected rowCount = 1'
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 

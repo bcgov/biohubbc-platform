@@ -5,7 +5,8 @@ export const DataRequest = z.object({
   data_request_id: z.string().uuid(),
   reason: z.string(),
   team_id: z.string().uuid(),
-  requested_by: z.number()
+  requested_by: z.number(),
+  ticket_id: z.string().uuid()
 });
 export type DataRequest = z.infer<typeof DataRequest>;
 
@@ -19,19 +20,26 @@ export const DataRequestFilters = z.object({
 export type DataRequestFilters = z.infer<typeof DataRequestFilters>;
 
 export const CreateDataRequest = z.object({
+  requested_by: z.number().int(),
   reason: z.string(),
   team_id: z.string().uuid().optional()
 });
 export type CreateDataRequest = z.infer<typeof CreateDataRequest>;
+
+export type CreateDataRequestPayload = CreateDataRequest & {
+  team_id: string;
+  ticket_id: string;
+};
 
 export const UpdateDataRequest = z.object({
   reason: z.string().optional()
 });
 export type UpdateDataRequest = z.infer<typeof UpdateDataRequest>;
 
-// ──────────────────────────────────────────────────────────────────────────────
-// data_request CRUD Responses
-// ──────────────────────────────────────────────────────────────────────────────
+export interface CreateTeamPolicyParams {
+  teamId: string;
+  policyId: string;
+}
 
 export const FlatDataRequestWithStatus = DataRequest.extend(DataRequestStatus.shape);
 export type FlatDataRequestWithStatus = z.infer<typeof FlatDataRequestWithStatus>;

@@ -17,6 +17,7 @@ import { initPgBoss, stopPgBoss } from '../../queue/pg-boss-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadService } from '../../services/download/download-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
+import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
 const TEST_PREFIX = 'dev-artifacts';
 const SYSTEM_USER_ID = 1;
@@ -172,6 +173,22 @@ describe('Download Worker', function () {
 
     const dataJson = JSON.stringify(data);
 
+    const [upload] = await db('biohub.upload')
+      .insert({
+        upload_status: 'completed',
+        record_end_date: db.fn.now(),
+        create_user: SYSTEM_USER_ID
+      })
+      .returning('upload_id');
+
+    const [bridge] = await db('biohub.submission_upload')
+      .insert({
+        submission_id: submissionId,
+        upload_id: upload.upload_id,
+        create_user: SYSTEM_USER_ID
+      })
+      .returning('submission_upload_id');
+
     const [row] = await db('biohub.submission_feature')
       .insert({
         submission_id: submissionId,
@@ -179,6 +196,7 @@ describe('Download Worker', function () {
         parent_submission_feature_id: parentFeatureId ?? null,
         data: dataJson,
         data_byte_size: db.raw(`octet_length(?::jsonb::text) + 500`, [dataJson]),
+        submission_upload_id: bridge.submission_upload_id,
         create_user: SYSTEM_USER_ID
       })
       .returning('submission_feature_id');
@@ -522,57 +540,6 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     connection.release();
   });
 
-  async function createTestSubmission(): Promise<number> {
-    const systemUserId = connection.systemUserId();
-    const result = await connection.sql(SQL`
-      INSERT INTO submission (uuid, system_user_id, source_system, name, description, comment, create_user)
-      VALUES (gen_random_uuid(), ${systemUserId}, 'SIMS', 'Integration Test Submission', 'Test description', 'Test comment', ${systemUserId})
-      RETURNING submission_id;
-    `);
-    return result.rows[0].submission_id;
-  }
-
-  async function createTestFeature(
-    submissionId: number,
-    featureTypeName: string,
-    data: Record<string, unknown>,
-    parentFeatureId?: number
-  ): Promise<number> {
-    const systemUserId = connection.systemUserId();
-
-    const dataJson = JSON.stringify(data);
-
-    // Use separate SQL for with/without parent to avoid null handling issues with sql-template-strings
-    if (parentFeatureId !== undefined) {
-      const result = await connection.sql(SQL`
-        INSERT INTO submission_feature (submission_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, create_user)
-        VALUES (
-          ${submissionId},
-          (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName} LIMIT 1),
-          ${parentFeatureId},
-          ${dataJson}::jsonb,
-          octet_length(${dataJson}::jsonb::text) + 500,
-          ${systemUserId}
-        )
-        RETURNING submission_feature_id;
-      `);
-      return result.rows[0].submission_feature_id;
-    }
-
-    const result = await connection.sql(SQL`
-      INSERT INTO submission_feature (submission_id, feature_type_id, data, data_byte_size, create_user)
-      VALUES (
-        ${submissionId},
-        (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName} LIMIT 1),
-        ${dataJson}::jsonb,
-        octet_length(${dataJson}::jsonb::text) + 500,
-        ${systemUserId}
-      )
-      RETURNING submission_feature_id;
-    `);
-    return result.rows[0].submission_feature_id;
-  }
-
   /**
    * Download a zip from S3, track the key for cleanup, and return an AdmZip instance.
    */
@@ -585,7 +552,11 @@ describe('DownloadPipelineService download pipeline (system)', function () {
    * Helper: run the full download pipeline and return the resulting zip.
    */
   async function executeAndGetZip(featureIds: number[]): Promise<{ zip: AdmZip; downloadId: string }> {
-    const { download_id } = await service.createDownloadRequest(null, featureIds);
+    const { download_id } = await service.createDownloadRequest({
+      systemUserId: null,
+      teamId: null,
+      submissionFeatureIds: featureIds
+    });
 
     // Run the three-phase pipeline within the test transaction
     await service.planDownloadIfNeeded(download_id);
@@ -607,14 +578,14 @@ describe('DownloadPipelineService download pipeline (system)', function () {
   }
 
   it('should produce correct CSV for populated and empty dataset features', async () => {
-    const submissionId = await createTestSubmission();
-    const populatedId = await createTestFeature(submissionId, 'dataset', {
+    const submissionId = await createTestSubmission(connection);
+    const populatedId = await createTestFeature(connection, submissionId, 'dataset', {
       name: 'Solo Dataset',
       start_date: '2024-03-01T00:00:00.000Z',
       end_date: '2024-09-30T00:00:00.000Z',
       geometry: { type: 'Point', coordinates: [-123.37, 48.428] }
     });
-    const emptyId = await createTestFeature(submissionId, 'dataset', {});
+    const emptyId = await createTestFeature(connection, submissionId, 'dataset', {});
 
     const { zip } = await executeAndGetZip([populatedId, emptyId]);
 
@@ -647,14 +618,15 @@ describe('DownloadPipelineService download pipeline (system)', function () {
   });
 
   it('should produce multi-row CSV with sparse data and correct schema columns', async () => {
-    const submissionId = await createTestSubmission();
+    const submissionId = await createTestSubmission(connection);
 
-    const datasetFeatureId = await createTestFeature(submissionId, 'dataset', {
+    const datasetFeatureId = await createTestFeature(connection, submissionId, 'dataset', {
       name: 'Telemetry Parent Dataset'
     });
 
     // Feature 1: sparse — only geometry + timestamp (no dop/elevation)
     const featureId1 = await createTestFeature(
+      connection,
       submissionId,
       'telemetry',
       {
@@ -665,6 +637,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     );
     // Feature 2: fully populated
     const featureId2 = await createTestFeature(
+      connection,
       submissionId,
       'telemetry',
       {
@@ -732,8 +705,8 @@ describe('DownloadPipelineService download pipeline (system)', function () {
   });
 
   it('should produce an error placeholder when file feature references non-existent S3 key', async () => {
-    const submissionId = await createTestSubmission();
-    const featureId = await createTestFeature(submissionId, 'file', {
+    const submissionId = await createTestSubmission(connection);
+    const featureId = await createTestFeature(connection, submissionId, 'file', {
       file: 'non-existent/missing-image.png'
     });
 
@@ -762,7 +735,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
   });
 
   it('should stream multiple file features sequentially without corrupting any entries', async () => {
-    const submissionId = await createTestSubmission();
+    const submissionId = await createTestSubmission(connection);
     const systemUserId = connection.systemUserId();
     const bucketName = process.env.OBJECT_STORE_BUCKET_NAME!;
 
@@ -784,7 +757,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
         VALUES (${bucketName}, ${file.key}, ${file.content.length}, 'uploaded', now(), ${systemUserId});
       `);
 
-      const featureId = await createTestFeature(submissionId, 'file', {
+      const featureId = await createTestFeature(connection, submissionId, 'file', {
         file: file.key
       });
       featureIds.push(featureId);
@@ -821,13 +794,14 @@ describe('DownloadPipelineService download pipeline (system)', function () {
   it('should denormalize non-dataset parent columns into child CSV', async () => {
     // Hierarchy: dataset → telemetry_deployment → telemetry
     // Verifies telemetry CSV includes deployment's columns (not just dataset context)
-    const submissionId = await createTestSubmission();
+    const submissionId = await createTestSubmission(connection);
 
-    const datasetId = await createTestFeature(submissionId, 'dataset', {
+    const datasetId = await createTestFeature(connection, submissionId, 'dataset', {
       name: 'Denorm Test Dataset'
     });
 
     const deploymentId = await createTestFeature(
+      connection,
       submissionId,
       'telemetry_deployment',
       {
@@ -840,6 +814,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     );
 
     const telemetryId = await createTestFeature(
+      connection,
       submissionId,
       'telemetry',
       {

@@ -15,8 +15,12 @@ import { ISubmissionFeature } from '../submission-repository';
 export class IngestionRepository extends BaseRepository {
   /**
    * Insert a new submission feature record.
+   * Features belong to a submission (submission_id) but are produced by a specific
+   * upload event (submission_upload_id). This distinction enables multi-upload-per-submission
+   * (append, replace).
    *
    * @param {number} submissionId The ID of the submission.
+   * @param {string} submissionUploadId The submission_upload_id that produced these features.
    * @param {(number | null)} parentSubmissionFeatureId The ID of the parent submission feature, or null.
    * @param {(string | null)} featureSourceId The source ID of the feature, or null.
    * @param {string} featureTypeName The name of the feature type.
@@ -27,6 +31,7 @@ export class IngestionRepository extends BaseRepository {
    */
   async insertSubmissionFeatureRecord(
     submissionId: number,
+    submissionUploadId: string,
     parentSubmissionFeatureId: number | null,
     featureSourceId: string | null,
     featureTypeName: string,
@@ -36,6 +41,7 @@ export class IngestionRepository extends BaseRepository {
     const sqlStatement = SQL`
       INSERT INTO submission_feature (
         submission_id,
+        submission_upload_id,
         parent_submission_feature_id,
         source_id,
         feature_type_id,
@@ -44,6 +50,7 @@ export class IngestionRepository extends BaseRepository {
         record_effective_date
       ) VALUES (
         ${submissionId},
+        ${submissionUploadId},
         ${parentSubmissionFeatureId},
         ${featureSourceId},
         (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}),
@@ -80,6 +87,26 @@ export class IngestionRepository extends BaseRepository {
       UPDATE submission_feature
       SET parent_submission_feature_id = ${parentSubmissionFeatureId}
       WHERE submission_feature_id = ${submissionFeatureId};
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Soft-delete features scoped to a specific upload event.
+   * Multiple uploads produce features under the same submission_id;
+   * re-ingesting one upload must not affect features from other uploads.
+   *
+   * @param {string} submissionUploadId The submission_upload_id (UUID).
+   * @return {Promise<void>}
+   * @memberof IngestionRepository
+   */
+  async deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission_feature
+      SET record_end_date = NOW()
+      WHERE submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL;
     `;
 
     await this.connection.sql(sqlStatement);

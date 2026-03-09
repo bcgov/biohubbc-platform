@@ -1,6 +1,5 @@
 import { Request, RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../constants/roles';
 import { getDBConnection } from '../../database/db';
 import { DataRequestFilters } from '../../models/data-request';
 import {
@@ -20,8 +19,7 @@ export const GET: Operation = [
     return {
       and: [
         {
-          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
-          discriminator: 'SystemRole'
+          discriminator: 'SystemUser'
         }
       ]
     };
@@ -42,7 +40,8 @@ export const POST: Operation = [
 ];
 
 GET.apiDoc = {
-  description: 'Find all data request records, optionally filtered by date range, requested_by, team_id, or status',
+  description:
+    'Find data request records for teams the current user belongs to, optionally filtered by date range, requested_by, team_id, or status',
   tags: ['data-request'],
   security: [
     {
@@ -72,7 +71,7 @@ GET.apiDoc = {
       in: 'query',
       name: 'team_id',
       required: false,
-      schema: { type: 'string', format: 'uuid', description: 'Filter by team ID' }
+      schema: { type: 'string', format: 'uuid', description: 'Filter by a single team ID' }
     },
     {
       in: 'query',
@@ -127,7 +126,7 @@ POST.apiDoc = {
 };
 
 /**
- * Find all data request records, optionally filtered by query params.
+ * Find data request records for teams the current user belongs to, optionally filtered by query params.
  *
  * @returns {RequestHandler}
  */
@@ -139,9 +138,10 @@ export function findDataRequests(): RequestHandler {
       await connection.open();
 
       const filters = parseQueryParams(req);
+      const systemUserId = connection.systemUserId();
 
       const dataRequestService = new DataRequestService(connection);
-      const dataRequests = await dataRequestService.findDataRequests(filters);
+      const dataRequests = await dataRequestService.findDataRequestsBySystemUserId(systemUserId, filters);
 
       await connection.commit();
 
@@ -173,7 +173,11 @@ export function createDataRequest(): RequestHandler {
 
       const dataRequestService = new DataRequestService(connection);
 
-      const dataRequest = await dataRequestService.createDataRequest(systemUserId, { reason, team_id: teamId });
+      const dataRequest = await dataRequestService.createDataRequest({
+        requested_by: systemUserId,
+        reason,
+        team_id: teamId
+      });
 
       await connection.commit();
 
@@ -190,16 +194,16 @@ export function createDataRequest(): RequestHandler {
 
 /**
  * Parses query params from the request into a filters object for data request list.
- * Returns empty object when no filter params are present.
+ * Query params are strings or undefined per the OpenAPI spec.
  */
 function parseQueryParams(req: Request<unknown, unknown, unknown, DataRequestFilters>): DataRequestFilters {
-  const { date_from, date_to, requested_by, team_id, status } = req.query;
+  const q = req.query;
   const filters: DataRequestFilters = {
-    ...(date_from && { date_from: String(date_from) }),
-    ...(date_to && { date_to: String(date_to) }),
-    ...(requested_by !== undefined && { requested_by: Number(requested_by) }),
-    ...(team_id && { team_id: String(team_id) }),
-    ...(status && { status: String(status) as DataRequestFilters['status'] })
+    date_from: q.date_from ?? undefined,
+    date_to: q.date_to ?? undefined,
+    requested_by: q.requested_by ? Number(q.requested_by) : undefined,
+    team_id: q.team_id ?? undefined,
+    status: q.status ?? undefined
   };
   return filters;
 }

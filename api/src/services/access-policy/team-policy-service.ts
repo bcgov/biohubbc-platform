@@ -1,9 +1,9 @@
 import { IDBConnection } from '../../database/db';
 import { CreateTeamPolicy, TeamPolicy, TeamPolicyDetails, UpdateTeamPolicy } from '../../models/team-policy';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
-import { makePaginationResponse } from '../../utils/pagination';
-import { ApiPaginationOptions, ApiPaginationResults } from '../../zod-schema/pagination';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
+import { TeamPolicyFilters } from './team-policy-service.interface';
 
 export class TeamPolicyService extends DBService {
   teamPolicyRepository: TeamPolicyRepository;
@@ -20,8 +20,50 @@ export class TeamPolicyService extends DBService {
    * @return {Promise<TeamPolicy>} - The created team policy record.
    * @memberof TeamPolicyService
    */
-  createTeamPolicy(teamPolicyData: CreateTeamPolicy): Promise<TeamPolicy> {
+  async createTeamPolicy(teamPolicyData: CreateTeamPolicy): Promise<TeamPolicy> {
+    const existingPolicies = await this.teamPolicyRepository.getPoliciesByTeamId(teamPolicyData.team_id, {
+      policyIds: [teamPolicyData.policy_id]
+    });
+
+    if (existingPolicies.length > 0) {
+      const existingPolicy = existingPolicies[0];
+      return {
+        team_policy_id: existingPolicy.team_policy_id,
+        team_id: existingPolicy.team_id,
+        policy_id: existingPolicy.policy_id
+      };
+    }
+
     return this.teamPolicyRepository.insertTeamPolicy(teamPolicyData);
+  }
+
+  /**
+   * Create team-policy records in bulk for a single team.
+   *
+   * @param {string} teamId - Team ID.
+   * @param {string[]} policyIds - Policy IDs to associate with the team.
+   * @return {Promise<TeamPolicy[]>}
+   * @memberof TeamPolicyService
+   */
+  async createTeamPolicies(teamId: string, policyIds: string[]): Promise<TeamPolicy[]> {
+    const uniquePolicyIds = [...new Set(policyIds)];
+
+    if (!uniquePolicyIds.length) {
+      return [];
+    }
+
+    const existingPolicies = await this.teamPolicyRepository.getPoliciesByTeamId(teamId, {
+      policyIds: uniquePolicyIds
+    });
+    const existingPolicyIds = new Set(existingPolicies.map((teamPolicy) => teamPolicy.policy_id));
+
+    const policyIdsToCreate = uniquePolicyIds.filter((policyId) => !existingPolicyIds.has(policyId));
+
+    return Promise.all(
+      policyIdsToCreate.map((policyId) =>
+        this.teamPolicyRepository.insertTeamPolicy({ team_id: teamId, policy_id: policyId })
+      )
+    );
   }
 
   /**
@@ -39,39 +81,38 @@ export class TeamPolicyService extends DBService {
    * Retrieve all team policy records for a specific team.
    *
    * @param {string} teamId - The ID of the team whose policies to fetch.
-   * @return {Promise<TeamPolicy[]>} - The list of team policy records.
+   * @return {Promise<TeamPolicyDetails[]>} - The list of team policy records.
    * @memberof TeamPolicyService
    */
-  getTeamPolicies(teamId: string): Promise<TeamPolicy[]> {
-    return this.teamPolicyRepository.getTeamPolicies(teamId);
+  getPoliciesByTeamId(
+    teamId: string,
+    filters?: TeamPolicyFilters,
+    pagination?: ApiPaginationOptions
+  ): Promise<TeamPolicyDetails[]> {
+    return this.teamPolicyRepository.getPoliciesByTeamId(teamId, filters, pagination);
   }
 
   /**
    * Get all team-policy associations with team and policy names for display.
    *
+   * @param {TeamPolicyFilters} [filters] - Optional filter set.
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
    * @return {Promise<TeamPolicyDetails[]>} - List of team policy records with names.
    * @memberof TeamPolicyService
    */
-  getAllTeamPolicies(): Promise<TeamPolicyDetails[]> {
-    return this.teamPolicyRepository.getAllTeamPolicies();
+  getAllTeamPolicies(filters?: TeamPolicyFilters, pagination?: ApiPaginationOptions): Promise<TeamPolicyDetails[]> {
+    return this.teamPolicyRepository.getTeamPolicies(filters, pagination);
   }
 
   /**
-   * Get all team-policy associations with pagination support.
+   * Get count of team-policy associations matching optional filters.
    *
-   * @param {ApiPaginationOptions} options - Pagination options.
-   * @return {Promise<{ team_policies: TeamPolicyDetails[]; pagination: ApiPaginationResults }>}
+   * @param {TeamPolicyFilters} [filters] - Optional filter set.
+   * @return {Promise<number>}
    * @memberof TeamPolicyService
    */
-  async getAllTeamPoliciesWithPagination(
-    options: ApiPaginationOptions
-  ): Promise<{ team_policies: TeamPolicyDetails[]; pagination: ApiPaginationResults }> {
-    const { teamPolicies, total } = await this.teamPolicyRepository.getAllTeamPoliciesWithPagination(options);
-
-    return {
-      team_policies: teamPolicies,
-      pagination: makePaginationResponse(total, options)
-    };
+  getAllTeamPoliciesCount(filters?: TeamPolicyFilters): Promise<number> {
+    return this.teamPolicyRepository.getAllTeamPoliciesCount(filters);
   }
 
   /**

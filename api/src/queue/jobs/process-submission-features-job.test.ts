@@ -3,12 +3,13 @@ import { describe } from 'mocha';
 import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import * as db from '../../database/db';
+import { SubmissionUpload } from '../../models/submission-upload';
 import { ValidationErrorType } from '../../services/ingestion/feature-validation-service.interface';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { getMockDBConnection } from '../../__mocks__/db';
+import * as publisher from '../publisher';
 import {
-  IProcessSubmissionFeaturesJobData,
   processSubmissionFeaturesFailedHandler,
   processSubmissionFeaturesJobHandler
 } from './process-submission-features-job';
@@ -18,13 +19,20 @@ describe('process-submission-features-job', () => {
     sinon.restore();
   });
 
+  /** Default bridge record used across tests. */
+  const defaultSubmissionUpload: SubmissionUpload = {
+    submission_upload_id: 'test-sub-upload-id',
+    submission_id: 123,
+    upload_id: 'test-upload-id'
+  };
+
   describe('processSubmissionFeaturesJobHandler', () => {
-    const createMockJob = (submissionId: number, jobId = 'test-job-id') =>
+    const createMockJob = (data: Partial<SubmissionUpload> = {}, jobId = 'test-job-id') =>
       ({
         id: jobId,
         name: 'process-submission-features',
-        data: { submissionId }
-      } as PgBoss.Job<IProcessSubmissionFeaturesJobData>);
+        data: { ...defaultSubmissionUpload, ...data }
+      } as PgBoss.Job<SubmissionUpload>);
 
     it('processes submission successfully', async () => {
       const mockDBConnection = getMockDBConnection();
@@ -41,7 +49,11 @@ describe('process-submission-features-job', () => {
 
       sinon.stub(SubmissionIngestionService.prototype, 'processSubmission').resolves({ valid: true, errors: [] });
 
-      const mockJobs = [createMockJob(123)];
+      sinon
+        .stub(publisher, 'publishIndexSubmissionFeaturesJob')
+        .resolves({ status: 'published', jobId: 'index-job-id' });
+
+      const mockJobs = [createMockJob()];
 
       await processSubmissionFeaturesJobHandler(mockJobs);
 
@@ -49,7 +61,7 @@ describe('process-submission-features-job', () => {
       expect(updateStatusStub.calledWith('test-job-id', 'completed')).to.be.true;
     });
 
-    it('calls processSubmission with correct submissionId', async () => {
+    it('calls processSubmission with the SubmissionUpload from job data', async () => {
       const mockDBConnection = getMockDBConnection();
 
       mockDBConnection.open = sinon.stub().resolves();
@@ -63,12 +75,22 @@ describe('process-submission-features-job', () => {
         .stub(SubmissionIngestionService.prototype, 'processSubmission')
         .resolves({ valid: true, errors: [] });
 
-      const mockJobs = [createMockJob(456)];
+      sinon
+        .stub(publisher, 'publishIndexSubmissionFeaturesJob')
+        .resolves({ status: 'published', jobId: 'index-job-id' });
+
+      const jobData: SubmissionUpload = {
+        submission_upload_id: 'my-sub-upload-id',
+        submission_id: 456,
+        upload_id: 'my-upload-id'
+      };
+      const mockJobs = [createMockJob(jobData)];
 
       await processSubmissionFeaturesJobHandler(mockJobs);
 
       expect(processStub.calledOnce).to.be.true;
-      expect(processStub.firstCall.args[0]).to.equal(456);
+      // Handler passes the job data directly — no DB lookup needed
+      expect(processStub.firstCall.args[0]).to.deep.equal(jobData);
     });
 
     it('updates status to invalid on validation failure and does not throw', async () => {
@@ -100,7 +122,7 @@ describe('process-submission-features-job', () => {
         .stub(SubmissionIngestionService.prototype, 'processSubmission')
         .resolves({ valid: false, errors: validationErrors });
 
-      const mockJobs = [createMockJob(123)];
+      const mockJobs = [createMockJob()];
 
       // Should NOT throw
       await processSubmissionFeaturesJobHandler(mockJobs);
@@ -130,7 +152,7 @@ describe('process-submission-features-job', () => {
 
       sinon.stub(SubmissionIngestionService.prototype, 'processSubmission').rejects(testError);
 
-      const mockJobs = [createMockJob(123)];
+      const mockJobs = [createMockJob()];
 
       try {
         await processSubmissionFeaturesJobHandler(mockJobs);
@@ -158,7 +180,14 @@ describe('process-submission-features-job', () => {
       sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
       sinon.stub(SubmissionIngestionService.prototype, 'processSubmission').resolves({ valid: true, errors: [] });
 
-      const mockJobs = [createMockJob(123, 'job-1'), createMockJob(456, 'job-2')];
+      sinon
+        .stub(publisher, 'publishIndexSubmissionFeaturesJob')
+        .resolves({ status: 'published', jobId: 'index-job-id' });
+
+      const mockJobs = [
+        createMockJob({ submission_upload_id: 'sub-upload-1' }, 'job-1'),
+        createMockJob({ submission_upload_id: 'sub-upload-2' }, 'job-2')
+      ];
 
       await processSubmissionFeaturesJobHandler(mockJobs);
 
@@ -174,7 +203,7 @@ describe('process-submission-features-job', () => {
         open: openStub
       } as any);
 
-      const mockJobs: PgBoss.Job<IProcessSubmissionFeaturesJobData>[] = [];
+      const mockJobs: PgBoss.Job<SubmissionUpload>[] = [];
 
       await processSubmissionFeaturesJobHandler(mockJobs);
 
@@ -190,25 +219,151 @@ describe('process-submission-features-job', () => {
       mockDBConnection.release = releaseStub;
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+
       sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
       sinon.stub(SubmissionIngestionService.prototype, 'processSubmission').resolves({ valid: true, errors: [] });
 
-      const mockJobs = [createMockJob(123)];
+      sinon
+        .stub(publisher, 'publishIndexSubmissionFeaturesJob')
+        .resolves({ status: 'published', jobId: 'index-job-id' });
+
+      const mockJobs = [createMockJob()];
 
       await processSubmissionFeaturesJobHandler(mockJobs);
 
       expect(releaseStub.calledOnce).to.be.true;
     });
+
+    it('publishes indexing job after validation completes', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      mockDBConnection.open = sinon.stub().resolves();
+      mockDBConnection.commit = sinon.stub().resolves();
+      mockDBConnection.release = sinon.stub();
+
+      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+
+      const updateStatusStub = sinon
+        .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus')
+        .resolves();
+
+      sinon.stub(SubmissionIngestionService.prototype, 'processSubmission').resolves({ valid: true, errors: [] });
+
+      const publishStub = sinon
+        .stub(publisher, 'publishIndexSubmissionFeaturesJob')
+        .resolves({ status: 'published', jobId: 'index-job-id' });
+
+      const mockJobs = [createMockJob()];
+
+      await processSubmissionFeaturesJobHandler(mockJobs);
+
+      expect(publishStub.calledOnce).to.be.true;
+      expect(publishStub.firstCall.args[0]).to.equal(mockDBConnection);
+      expect(publishStub.firstCall.args[1]).to.deep.equal({ submissionId: 123 });
+
+      // Publish must happen after 'completed' status update
+      expect(updateStatusStub.calledWith('test-job-id', 'completed')).to.be.true;
+      expect(publishStub.calledAfter(updateStatusStub)).to.be.true;
+    });
+
+    it('validation succeeds even if indexing publish fails (fire-and-forget)', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const commitStub = sinon.stub().resolves();
+
+      mockDBConnection.open = sinon.stub().resolves();
+      mockDBConnection.commit = commitStub;
+      mockDBConnection.release = sinon.stub();
+
+      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+
+      sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
+
+      sinon.stub(SubmissionIngestionService.prototype, 'processSubmission').resolves({ valid: true, errors: [] });
+
+      sinon
+        .stub(publisher, 'publishIndexSubmissionFeaturesJob')
+        .resolves({ status: 'error', message: 'pg-boss unavailable' });
+
+      const mockJobs = [createMockJob()];
+
+      // Should NOT throw — fire-and-forget
+      await processSubmissionFeaturesJobHandler(mockJobs);
+
+      // Connection should still be committed (validation succeeded)
+      expect(commitStub.called).to.be.true;
+    });
+
+    it('validation succeeds when indexing publish returns duplicate', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const commitStub = sinon.stub().resolves();
+
+      mockDBConnection.open = sinon.stub().resolves();
+      mockDBConnection.commit = commitStub;
+      mockDBConnection.release = sinon.stub();
+
+      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+
+      sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
+
+      sinon.stub(SubmissionIngestionService.prototype, 'processSubmission').resolves({ valid: true, errors: [] });
+
+      sinon
+        .stub(publisher, 'publishIndexSubmissionFeaturesJob')
+        .resolves({ status: 'duplicate', message: 'Job already exists for this submission' });
+
+      const mockJobs = [createMockJob()];
+
+      // Should NOT throw — duplicate is acceptable
+      await processSubmissionFeaturesJobHandler(mockJobs);
+
+      expect(commitStub.called).to.be.true;
+    });
+
+    it('does not publish indexing job when validation returns invalid', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      mockDBConnection.open = sinon.stub().resolves();
+      mockDBConnection.commit = sinon.stub().resolves();
+      mockDBConnection.release = sinon.stub();
+
+      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+
+      sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
+
+      sinon.stub(SubmissionIngestionService.prototype, 'processSubmission').resolves({
+        valid: false,
+        errors: [
+          {
+            type: ValidationErrorType.INVALID_PROPERTY_TYPE,
+            featureId: 'feat-1',
+            featureType: 'observation',
+            field: 'count',
+            value: 'abc',
+            message: 'Expected number'
+          }
+        ]
+      });
+
+      const publishStub = sinon
+        .stub(publisher, 'publishIndexSubmissionFeaturesJob')
+        .resolves({ status: 'published', jobId: 'index-job-id' });
+
+      const mockJobs = [createMockJob()];
+
+      await processSubmissionFeaturesJobHandler(mockJobs);
+
+      expect(publishStub.called).to.be.false;
+    });
   });
 
   describe('processSubmissionFeaturesFailedHandler', () => {
-    const createMockFailedJob = (submissionId: number, jobId = 'dlq-job-id', output?: unknown) =>
+    const createMockFailedJob = (data: Partial<SubmissionUpload> = {}, jobId = 'dlq-job-id', output?: unknown) =>
       ({
         id: jobId,
         name: '__state__completed__process-submission-features',
-        data: { submissionId },
+        data: { ...defaultSubmissionUpload, ...data },
         output
-      } as PgBoss.JobWithMetadata<IProcessSubmissionFeaturesJobData>);
+      } as PgBoss.JobWithMetadata<SubmissionUpload>);
 
     it('updates status to failed with error from job output', async () => {
       const mockDBConnection = getMockDBConnection();
@@ -219,19 +374,19 @@ describe('process-submission-features-job', () => {
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
-      const updateStatusBySubmissionIdStub = sinon
-        .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatusBySubmissionId')
+      const updateStatusBySubmissionUploadIdStub = sinon
+        .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatusBySubmissionUploadId')
         .resolves();
 
       const errorOutput = { message: 'Database connection failed' };
-      const mockJobs = [createMockFailedJob(123, 'dlq-job-id', errorOutput)];
+      const mockJobs = [createMockFailedJob({}, 'dlq-job-id', errorOutput)];
 
       await processSubmissionFeaturesFailedHandler(mockJobs);
 
-      expect(updateStatusBySubmissionIdStub.calledOnce).to.be.true;
-      expect(updateStatusBySubmissionIdStub.firstCall.args[0]).to.equal(123);
-      expect(updateStatusBySubmissionIdStub.firstCall.args[1]).to.equal('failed');
-      expect(updateStatusBySubmissionIdStub.firstCall.args[2]).to.deep.equal({ error: errorOutput });
+      expect(updateStatusBySubmissionUploadIdStub.calledOnce).to.be.true;
+      expect(updateStatusBySubmissionUploadIdStub.firstCall.args[0]).to.equal('test-sub-upload-id');
+      expect(updateStatusBySubmissionUploadIdStub.firstCall.args[1]).to.equal('failed');
+      expect(updateStatusBySubmissionUploadIdStub.firstCall.args[2]).to.deep.equal({ error: errorOutput });
     });
 
     it('uses default error message when job output is null', async () => {
@@ -243,15 +398,15 @@ describe('process-submission-features-job', () => {
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
-      const updateStatusBySubmissionIdStub = sinon
-        .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatusBySubmissionId')
+      const updateStatusBySubmissionUploadIdStub = sinon
+        .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatusBySubmissionUploadId')
         .resolves();
 
-      const mockJobs = [createMockFailedJob(123, 'dlq-job-id', null)];
+      const mockJobs = [createMockFailedJob({}, 'dlq-job-id', null)];
 
       await processSubmissionFeaturesFailedHandler(mockJobs);
 
-      expect(updateStatusBySubmissionIdStub.firstCall.args[2]).to.deep.equal({
+      expect(updateStatusBySubmissionUploadIdStub.firstCall.args[2]).to.deep.equal({
         error: 'Job failed after all retries'
       });
     });
@@ -268,10 +423,10 @@ describe('process-submission-features-job', () => {
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
       sinon
-        .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatusBySubmissionId')
+        .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatusBySubmissionUploadId')
         .rejects(testError);
 
-      const mockJobs = [createMockFailedJob(123)];
+      const mockJobs = [createMockFailedJob()];
 
       try {
         await processSubmissionFeaturesFailedHandler(mockJobs);

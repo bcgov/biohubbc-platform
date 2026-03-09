@@ -1,6 +1,6 @@
 import { SQL } from 'sql-template-strings';
 import { getKnex } from '../../database/db';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   CreateSubmissionUpload,
   SubmissionUpload,
@@ -16,7 +16,8 @@ export class SubmissionUploadRepository extends BaseRepository {
    *
    * @param {string} submissionUploadId - The ID of the submission_upload record.
    * @returns {Promise<SubmissionUpload>} - The requested submission_upload record.
-   * @throws {ApiExecuteSQLError} - If the record is not found or an error occurs.
+   * @throws {ApiNotFoundError} - If the record is not found.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
    */
   async getSubmissionUpload(submissionUploadId: string): Promise<SubmissionUpload> {
     const sqlStatement = SQL`
@@ -32,10 +33,17 @@ export class SubmissionUploadRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, SubmissionUpload);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get submission_upload record', [
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Submission upload not found', [
         'SubmissionUploadRepository->getSubmissionUpload',
-        `rowCount was ${response.rowCount}, expected 1`
+        { submissionUploadId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'SubmissionUploadRepository->getSubmissionUpload',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 
@@ -187,9 +195,11 @@ export class SubmissionUploadRepository extends BaseRepository {
    * Get a submission_upload record by upload_id (reverse lookup).
    *
    * @param {string} uploadId - The upload_id to look up.
-   * @returns {Promise<SubmissionUpload | null>} - The submission_upload record, or null if not found.
+   * @returns {Promise<SubmissionUpload>} - The submission_upload record.
+   * @throws {ApiNotFoundError} - If the record is not found.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
    */
-  async findSubmissionUploadByUploadId(uploadId: string): Promise<SubmissionUpload | null> {
+  async getSubmissionUploadByUploadId(uploadId: string): Promise<SubmissionUpload> {
     const sqlStatement = SQL`
       SELECT
         submission_upload_id,
@@ -202,7 +212,22 @@ export class SubmissionUploadRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUpload);
-    return response.rows[0] ?? null;
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Submission upload not found', [
+        'SubmissionUploadRepository->getSubmissionUploadByUploadId',
+        { uploadId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'SubmissionUploadRepository->getSubmissionUploadByUploadId',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
   }
 
   /**

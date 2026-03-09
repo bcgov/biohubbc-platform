@@ -1,5 +1,11 @@
+import { SubmissionUpload } from '../models/submission-upload';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
+import {
+  IIndexSubmissionFeaturesJobData,
+  indexSubmissionFeaturesFailedHandler,
+  indexSubmissionFeaturesJobHandler
+} from './jobs/index-submission-features-job';
 import { IMalwareScanJobData, malwareScanFailedHandler, malwareScanJobHandler } from './jobs/malware-scan-job';
 import {
   IProcessDownloadJobData,
@@ -7,7 +13,6 @@ import {
   processDownloadJobHandler
 } from './jobs/process-download-job';
 import {
-  IProcessSubmissionFeaturesJobData,
   processSubmissionFeaturesFailedHandler,
   processSubmissionFeaturesJobHandler
 } from './jobs/process-submission-features-job';
@@ -28,12 +33,15 @@ export const registerWorkers = async (): Promise<void> => {
   // Create dead letter queue first (must exist before main queue references it)
   await boss.createQueue(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
 
-  // Create main queue with dead letter queue and retry configuration
+  // Create main queue with dead letter queue and retry configuration.
+  // policy: 'short' — enforces singleton_key uniqueness for queued (created) jobs.
+  // Without this, the default 'standard' policy ignores singletonKey entirely.
   await boss.createQueue(JobQueues.PROCESS_SUBMISSION_FEATURES, {
     deadLetter: JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED,
     retryLimit: 2,
     retryDelay: 60,
-    retryBackoff: true
+    retryBackoff: true,
+    policy: 'short'
   });
 
   // Create dead letter queue first (must exist before main queue references it)
@@ -47,13 +55,10 @@ export const registerWorkers = async (): Promise<void> => {
   });
 
   // Register process submission features job handler
-  await boss.work<IProcessSubmissionFeaturesJobData>(
-    JobQueues.PROCESS_SUBMISSION_FEATURES,
-    processSubmissionFeaturesJobHandler
-  );
+  await boss.work<SubmissionUpload>(JobQueues.PROCESS_SUBMISSION_FEATURES, processSubmissionFeaturesJobHandler);
 
   // Register dead letter queue handler for failed jobs
-  await boss.work<IProcessSubmissionFeaturesJobData>(
+  await boss.work<SubmissionUpload>(
     JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED,
     processSubmissionFeaturesFailedHandler
   );
@@ -80,6 +85,29 @@ export const registerWorkers = async (): Promise<void> => {
 
   // Register dead letter queue handler for failed download jobs
   await boss.work<IProcessDownloadJobData>(JobQueues.PROCESS_DOWNLOAD_FAILED, processDownloadFailedHandler);
+
+  // Create dead letter queue first (must exist before main queue references it)
+  await boss.createQueue(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
+
+  // Create main queue with dead letter queue and retry configuration
+  await boss.createQueue(JobQueues.INDEX_SUBMISSION_FEATURES, {
+    deadLetter: JobQueues.INDEX_SUBMISSION_FEATURES_FAILED,
+    retryLimit: 3,
+    retryDelay: 60,
+    retryBackoff: true
+  });
+
+  // Register index submission features job handler
+  await boss.work<IIndexSubmissionFeaturesJobData>(
+    JobQueues.INDEX_SUBMISSION_FEATURES,
+    indexSubmissionFeaturesJobHandler
+  );
+
+  // Register dead letter queue handler for failed index submission features jobs
+  await boss.work<IIndexSubmissionFeaturesJobData>(
+    JobQueues.INDEX_SUBMISSION_FEATURES_FAILED,
+    indexSubmissionFeaturesFailedHandler
+  );
 
   defaultLog.info({
     label: 'registerWorkers',

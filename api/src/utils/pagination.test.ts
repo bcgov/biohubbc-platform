@@ -11,13 +11,13 @@ import {
 
 describe('pagination', () => {
   describe('makePaginationOptionsFromRequest', () => {
-    it('should return undefined options if query params are missing', () => {
+    it('should return default options if query params are missing', () => {
       const mockRequest = { query: {} } as unknown as Request;
 
       const result = makePaginationOptionsFromRequest(mockRequest);
       expect(result).to.eql({
-        limit: undefined,
-        page: undefined,
+        limit: 25,
+        page: 1,
         sort: undefined,
         order: undefined
       });
@@ -44,13 +44,13 @@ describe('pagination', () => {
   });
 
   describe('makePaginationOptionsFromBody', () => {
-    it('should return undefined options if pagination is missing in body', () => {
+    it('should return default options if pagination is missing in body', () => {
       const mockRequest = { body: {} } as unknown as Request;
 
       const result = makePaginationOptionsFromBody(mockRequest);
       expect(result).to.eql({
-        limit: undefined,
-        page: undefined,
+        limit: 25,
+        page: 1,
         sort: undefined,
         order: undefined
       });
@@ -79,10 +79,10 @@ describe('pagination', () => {
   });
 
   describe('makePaginationResponse', () => {
-    it('should handle undefined pagination params and default last_page to 1', () => {
-      const mockPagination: Partial<ApiPaginationOptions> = {
-        limit: undefined,
-        page: undefined,
+    it('should calculate last_page with default pagination options', () => {
+      const mockPagination: ApiPaginationOptions = {
+        limit: 25,
+        page: 1,
         sort: undefined,
         order: undefined
       };
@@ -90,16 +90,16 @@ describe('pagination', () => {
       const result = makePaginationResponse(101, mockPagination);
       expect(result).to.eql({
         total: 101,
-        per_page: 101, // fallback to total
+        per_page: 25,
         current_page: 1,
-        last_page: 1,
+        last_page: 5,
         sort: undefined,
         order: undefined
       });
     });
 
     it('should calculate last page correctly when all params are defined', () => {
-      const mockPagination: Partial<ApiPaginationOptions> = {
+      const mockPagination: ApiPaginationOptions = {
         limit: 15,
         page: 3,
         sort: 'name',
@@ -118,7 +118,7 @@ describe('pagination', () => {
     });
 
     it('should handle zero total records', () => {
-      const mockPagination: Partial<ApiPaginationOptions> = {
+      const mockPagination: ApiPaginationOptions = {
         limit: 20,
         page: 1,
         sort: 'name',
@@ -138,7 +138,7 @@ describe('pagination', () => {
   });
 
   describe('ensureCompletePaginationOptions', () => {
-    it('should return undefined if limit is undefined', () => {
+    it('should default limit when limit is undefined', () => {
       const mockPagination: Partial<ApiPaginationOptions> = {
         limit: undefined,
         page: 1,
@@ -147,10 +147,15 @@ describe('pagination', () => {
       };
 
       const result = ensureCompletePaginationOptions(mockPagination);
-      expect(result).to.equal(undefined);
+      expect(result).to.eql({
+        limit: 25,
+        page: 1,
+        sort: 'name',
+        order: 'desc'
+      });
     });
 
-    it('should return undefined if page is undefined', () => {
+    it('should default page when page is undefined', () => {
       const mockPagination: Partial<ApiPaginationOptions> = {
         limit: 15,
         page: undefined,
@@ -159,7 +164,12 @@ describe('pagination', () => {
       };
 
       const result = ensureCompletePaginationOptions(mockPagination);
-      expect(result).to.equal(undefined);
+      expect(result).to.eql({
+        limit: 15,
+        page: 1,
+        sort: 'name',
+        order: 'desc'
+      });
     });
 
     it('should return pagination if page and limit are defined', () => {

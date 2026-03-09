@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { PolicyConditionOperator } from '../../models/policy-statement-condition';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { PolicyStatementConditionRepository } from './policy-statement-condition-repository';
@@ -105,7 +105,8 @@ describe('PolicyStatementConditionRepository', () => {
         await repository.getPolicyStatementCondition('1');
         expect.fail();
       } catch (error) {
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get policy statement condition');
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as ApiNotFoundError).message).to.equal('Policy statement condition not found');
       }
     });
   });
