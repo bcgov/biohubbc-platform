@@ -1,4 +1,4 @@
-import { IngestionJobData } from '../models/submission-upload';
+import { SubmissionUpload } from '../models/submission-upload';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
 import {
@@ -38,9 +38,9 @@ export const registerWorkers = async (): Promise<void> => {
   // Without this, the default 'standard' policy ignores singletonKey entirely.
   await boss.createQueue(JobQueues.PROCESS_SUBMISSION_FEATURES, {
     deadLetter: JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED,
-    retryLimit: 0,
-    retryDelay: 0,
-    retryBackoff: false,
+    retryLimit: 2,
+    retryDelay: 60,
+    retryBackoff: true,
     policy: 'short'
   });
 
@@ -55,10 +55,10 @@ export const registerWorkers = async (): Promise<void> => {
   });
 
   // Register process submission features job handler
-  await boss.work<IngestionJobData>(JobQueues.PROCESS_SUBMISSION_FEATURES, processSubmissionFeaturesJobHandler);
+  await boss.work<SubmissionUpload>(JobQueues.PROCESS_SUBMISSION_FEATURES, processSubmissionFeaturesJobHandler);
 
   // Register dead letter queue handler for failed jobs
-  await boss.work<IngestionJobData>(
+  await boss.work<SubmissionUpload>(
     JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED,
     processSubmissionFeaturesFailedHandler
   );

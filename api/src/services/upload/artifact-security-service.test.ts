@@ -380,7 +380,12 @@ describe('ArtifactSecurityService', () => {
 
       expect(promoteStub.calledOnceWith('uploads/test.tar')).to.be.true;
       expect(publishStub.calledOnce).to.be.true;
-      expect(publishStub.firstCall.args[1]).to.deep.equal({ uploadId: 'upload-1', submissionId: 123 });
+      // Publisher receives the full SubmissionUpload record
+      expect(publishStub.firstCall.args[1]).to.deep.equal({
+        submission_upload_id: 'su-1',
+        submission_id: 123,
+        upload_id: 'upload-1'
+      });
     });
 
     it('should update scan record to FAILED on error and rethrow', async () => {
@@ -478,7 +483,12 @@ describe('ArtifactSecurityService', () => {
       await service.publishNextPipelineStep(mockUploadArchive);
 
       expect(publishStub.calledOnce).to.be.true;
-      expect(publishStub.firstCall.args[1]).to.deep.equal({ uploadId: 'upload-1', submissionId: 999 });
+      // Publisher now receives the full SubmissionUpload record
+      expect(publishStub.firstCall.args[1]).to.deep.equal({
+        submission_upload_id: 'su-1',
+        submission_id: 999,
+        upload_id: 'upload-1'
+      });
     });
 
     it('should propagate error when submission_upload lookup throws', async () => {

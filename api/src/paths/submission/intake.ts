@@ -9,6 +9,7 @@ import { authorizeRequestHandler } from '../../request-handlers/security/authori
 import { RegionService } from '../../services/region-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
 import { SubmissionService } from '../../services/submission-service';
+import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { UploadService } from '../../services/upload/upload-service';
 import { ValidationService } from '../../services/validation-service';
 import { getServiceClientSystemUser } from '../../utils/keycloak-utils';
@@ -180,8 +181,15 @@ export function submissionIntake(): RequestHandler {
         s3_upload_id: ''
       });
 
+      // Create submission_upload bridge record (required for submission_upload_id FK on features)
+      const submissionUploadService = new SubmissionUploadService(connection);
+      const { submission_upload_id } = await submissionUploadService.insertSubmissionUpload({
+        submission_id: submissionRecord.submission_id,
+        upload_id
+      });
+
       // insert each submission feature record
-      await submissionService.insertSubmissionFeatureRecords(submissionRecord.submission_id, upload_id, [
+      await submissionService.insertSubmissionFeatureRecords(submissionRecord.submission_id, submission_upload_id, [
         submissionFeature
       ]);
 

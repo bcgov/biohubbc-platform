@@ -32,13 +32,3 @@ export type UpdateSubmissionUpload = z.infer<typeof UpdateSubmissionUpload>;
 export interface SubmissionUploadFilters {
   role?: UploadArtifactRoleEnum;
 }
-
-/**
- * Job payload for the ingestion pipeline. Single identifier eliminates the risk
- * of submissionId/uploadId getting out of sync — each consumer resolves what
- * it needs from the submission_upload bridge table.
- */
-export interface IngestionJobData {
-  /** The submission_upload_id that triggered this ingestion job */
-  submissionUploadId: string;
-}

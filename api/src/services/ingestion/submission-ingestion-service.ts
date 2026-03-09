@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { IFlattenedBlock } from '../../models/submission-feature';
-import { IngestionJobData } from '../../models/submission-upload';
+import { SubmissionUpload } from '../../models/submission-upload';
 import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
 import { extractAndUploadMedia, extractBlocksFromArchive, IUploadedMediaFile } from '../../utils/biohub-tar-parser';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
@@ -42,14 +42,23 @@ export class SubmissionIngestionService extends DBService {
    * Idempotent: safe for pg-boss retries. Existing features are soft-deleted before
    * re-insertion, artifact inserts use ON CONFLICT DO NOTHING, and S3 PUTs overwrite.
    *
-   * @param {IngestionJobData} upload - The upload and submission identifiers.
+   * Caller provides the pre-resolved submission_upload bridge record to avoid redundant
+   * lookups — the job handler already resolves it for logging/indexing.
+   * Tarball resolution requires upload_id (upload → upload_archive → artifact → S3 key),
+   * while feature inserts use submission_upload_id (the processing identifier).
+   *
+   * @param {SubmissionUpload} submissionUpload - The pre-resolved bridge record.
    * @returns {Promise<IValidationResult>} Validation result
    * @memberof SubmissionIngestionService
    */
-  async processSubmission(upload: IngestionJobData): Promise<IValidationResult> {
-    const { submissionId, uploadId } = upload;
+  async processSubmission(submissionUpload: SubmissionUpload): Promise<IValidationResult> {
+    const {
+      submission_upload_id: submissionUploadId,
+      submission_id: submissionId,
+      upload_id: uploadId
+    } = submissionUpload;
 
-    // Resolve the S3 key for the uploaded tarball: submission → upload_archive → artifact → object_key
+    // Resolve the S3 key for the uploaded tarball: upload_id → upload_archive → artifact → object_key
     const objectKey = await this.getTarballObjectKey(uploadId);
 
     // ================================================================
@@ -108,10 +117,10 @@ export class SubmissionIngestionService extends DBService {
     }
 
     // Soft-delete previous features for this upload, then insert fresh ones.
-    // Scoped by uploadId (not submissionId) so re-triggering one upload
+    // Scoped by submissionUploadId (not submissionId) so re-triggering one upload
     // doesn't wipe features from a different upload in the same submission.
-    await this.ingestionRepository.deleteSubmissionFeaturesByUploadId(uploadId);
-    await this.insertFlatFeatures(submissionId, uploadId, allBlocks, dataByteSizeMap);
+    await this.ingestionRepository.deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId);
+    await this.insertFlatFeatures(submissionId, submissionUploadId, allBlocks, dataByteSizeMap);
 
     return { valid: true, errors: [] };
   }
@@ -123,14 +132,14 @@ export class SubmissionIngestionService extends DBService {
    *
    * @private
    * @param {number} submissionId - The submission ID
-   * @param {string} uploadId - The upload ID
+   * @param {string} submissionUploadId - The submission_upload_id that produced these features
    * @param {IFlattenedBlock[]} features - Features to insert
    * @param {Map<string, number>} dataByteSizeMap - Pre-computed byte sizes per feature UUID
    * @memberof SubmissionIngestionService
    */
   private async insertFlatFeatures(
     submissionId: number,
-    uploadId: string,
+    submissionUploadId: string,
     features: IFlattenedBlock[],
     dataByteSizeMap: Map<string, number>
   ): Promise<void> {
@@ -140,7 +149,7 @@ export class SubmissionIngestionService extends DBService {
     for (const feature of features) {
       const result = await this.ingestionRepository.insertSubmissionFeatureRecord(
         submissionId,
-        uploadId,
+        submissionUploadId,
         null, // parent set in pass 2
         feature.id,
         feature.type,

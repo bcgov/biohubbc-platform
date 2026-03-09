@@ -1,6 +1,6 @@
 import { IDBConnection } from '../database/db';
 import { DownloadStatusEnum } from '../models/download-status';
-import { IngestionJobData } from '../models/submission-upload';
+import { SubmissionUpload } from '../models/submission-upload';
 import { DownloadService } from '../services/download/download-service';
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getLogger } from '../utils/logger';
@@ -45,15 +45,13 @@ export type PublishJobResult =
 /**
  * Options for process submission features jobs.
  *
- * retryLimit: 0 — no automatic retries. Retries risk processing uploads out of sequence:
- * a failed job for upload A could retry after upload B has been processed, silently
- * overwriting newer features with stale data. Users retry explicitly by creating a new
- * upload (POST).
+ * Singleton key is per-submission, so retries cannot interleave with a newer upload's job —
+ * pg-boss won't dequeue a new job for the same singleton key while the current one is active.
  */
 const PROCESS_SUBMISSION_FEATURES_OPTIONS: IPublishOptions = {
-  retryLimit: 0,
-  retryDelay: 0,
-  retryBackoff: false,
+  retryLimit: 2,
+  retryDelay: 60,
+  retryBackoff: true,
   expireInSeconds: 60 * 10 // 10 minutes
 };
 
@@ -89,21 +87,30 @@ const PROCESS_DOWNLOAD_OPTIONS: IPublishOptions = {
  * Blocks if an existing validation record exists unless status is 'failed',
  * which allows retrying failed jobs.
  *
+ * Caller provides the pre-resolved submission_upload bridge record — avoids
+ * redundant lookups since the caller (ArtifactSecurityService) already has it.
+ * Singleton key is per-submission (not per-upload) to prevent concurrent jobs for the
+ * same submission — two uploads must serialize to avoid conflicting feature writes.
+ *
  * @param {IDBConnection} connection Database connection for submission validation tracking
- * @param {IngestionJobData} data Job data containing submissionId
+ * @param {SubmissionUpload} submissionUpload Pre-resolved bridge record
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success, blocked, duplicate, or error
  */
 export const publishProcessSubmissionFeaturesJob = async (
   connection: IDBConnection,
-  data: IngestionJobData,
+  submissionUpload: SubmissionUpload,
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
+  const { submission_upload_id: submissionUploadId, submission_id: submissionId } = submissionUpload;
+
   try {
     const submissionValidationService = new SubmissionValidationService(connection);
 
-    // Check for existing validation record by upload ID
-    const existingValidation = await submissionValidationService.getSubmissionValidationByUploadId(data.uploadId);
+    // Check for existing validation record by submission_upload_id
+    const existingValidation = await submissionValidationService.getSubmissionValidationBySubmissionUploadId(
+      submissionUploadId
+    );
 
     if (existingValidation) {
       // Only allow retry if status is 'failed' or 'invalid'
@@ -111,7 +118,7 @@ export const publishProcessSubmissionFeaturesJob = async (
         defaultLog.warn({
           label: 'publishProcessSubmissionFeaturesJob',
           message: 'Blocked: validation record already exists',
-          submissionId: data.submissionId,
+          submissionUploadId,
           existingStatus: existingValidation.status,
           existingJobId: existingValidation.job_id
         });
@@ -126,7 +133,7 @@ export const publishProcessSubmissionFeaturesJob = async (
       defaultLog.info({
         label: 'publishProcessSubmissionFeaturesJob',
         message: 'Retrying failed validation',
-        submissionId: data.submissionId,
+        submissionUploadId,
         previousJobId: existingValidation.job_id
       });
     }
@@ -144,23 +151,26 @@ export const publishProcessSubmissionFeaturesJob = async (
       }
     };
 
+    // Full bridge record travels through the queue — handler uses it directly
+    const jobData: SubmissionUpload = submissionUpload;
+
     // Use singletonKey to prevent duplicate concurrent jobs for the same submission
-    const jobId = await boss.send(JobQueues.PROCESS_SUBMISSION_FEATURES, data, {
+    const jobId = await boss.send(JobQueues.PROCESS_SUBMISSION_FEATURES, jobData, {
       ...mergedOptions,
-      singletonKey: `submission-${data.submissionId}`,
+      singletonKey: `submission-${submissionId}`,
       db
     });
 
     // jobId is null when pg-boss rejects the job (e.g., duplicate singletonKey still active)
     if (jobId) {
       // Create submission validation record for tracking
-      await submissionValidationService.createSubmissionValidation(data, jobId);
+      await submissionValidationService.createSubmissionValidation(submissionUploadId, submissionId, jobId);
 
       defaultLog.info({
         label: 'publishProcessSubmissionFeaturesJob',
         message: 'Process submission features job published',
         jobId,
-        submissionId: data.submissionId
+        submissionUploadId
       });
 
       return { status: 'published', jobId };
@@ -168,7 +178,7 @@ export const publishProcessSubmissionFeaturesJob = async (
       defaultLog.warn({
         label: 'publishProcessSubmissionFeaturesJob',
         message: 'Job not published (duplicate or throttled)',
-        submissionId: data.submissionId
+        submissionUploadId
       });
 
       return { status: 'duplicate', message: 'Job already exists for this submission' };
@@ -179,7 +189,7 @@ export const publishProcessSubmissionFeaturesJob = async (
     defaultLog.error({
       label: 'publishProcessSubmissionFeaturesJob',
       message: 'Failed to publish job',
-      submissionId: data.submissionId,
+      submissionUploadId,
       error
     });
 

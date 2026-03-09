@@ -153,6 +153,7 @@ describe('Process Submission Features Worker', function () {
   async function setupSubmissionWithTar(tarBuffer: Buffer): Promise<{
     submissionId: number;
     uploadId: string;
+    submissionUploadId: string;
     artifactId: string;
     objectKey: string;
   }> {
@@ -204,10 +205,12 @@ describe('Process Submission Features Worker', function () {
     });
 
     // 5. submission_upload (links submission to upload)
-    await db('biohub.submission_upload').insert({
-      submission_id: submission.submission_id,
-      upload_id: upload.upload_id
-    });
+    const [submissionUpload] = await db('biohub.submission_upload')
+      .insert({
+        submission_id: submission.submission_id,
+        upload_id: upload.upload_id
+      })
+      .returning('submission_upload_id');
 
     // 6. upload_artifact (required for JOIN in getSubmissionUploadsBySubmissionId)
     await db('biohub.upload_artifact').insert({
@@ -219,6 +222,7 @@ describe('Process Submission Features Worker', function () {
     return {
       submissionId: submission.submission_id,
       uploadId: upload.upload_id,
+      submissionUploadId: submissionUpload.submission_upload_id,
       artifactId: artifact.artifact_id,
       objectKey
     };
@@ -248,13 +252,17 @@ describe('Process Submission Features Worker', function () {
       }
     ]);
 
-    const { submissionId, uploadId } = await setupSubmissionWithTar(tarBuffer);
+    const { submissionId, uploadId, submissionUploadId } = await setupSubmissionWithTar(tarBuffer);
 
     // Publish job (needs IDBConnection for submission_validation tracking)
     const connection = getAPIUserDBConnection();
     try {
       await connection.open();
-      const result = await publishProcessSubmissionFeaturesJob(connection, { uploadId, submissionId });
+      const result = await publishProcessSubmissionFeaturesJob(connection, {
+        submission_upload_id: submissionUploadId,
+        submission_id: submissionId,
+        upload_id: uploadId
+      });
       await connection.commit();
       expect(result.status).to.equal('published');
     } finally {
@@ -329,12 +337,16 @@ describe('Process Submission Features Worker', function () {
       }
     ]);
 
-    const { submissionId, uploadId } = await setupSubmissionWithTar(tarBuffer);
+    const { submissionId, uploadId, submissionUploadId } = await setupSubmissionWithTar(tarBuffer);
 
     const connection = getAPIUserDBConnection();
     try {
       await connection.open();
-      const result = await publishProcessSubmissionFeaturesJob(connection, { uploadId, submissionId });
+      const result = await publishProcessSubmissionFeaturesJob(connection, {
+        submission_upload_id: submissionUploadId,
+        submission_id: submissionId,
+        upload_id: uploadId
+      });
       await connection.commit();
       expect(result.status).to.equal('published');
     } finally {
@@ -389,7 +401,9 @@ describe('SubmissionIngestionService pipeline (system)', function () {
    * Insert the full FK chain and upload a TAR to S3.
    * Same chain as the worker test's setupSubmissionWithTar, using connection.sql() for rollback cleanup.
    */
-  async function setupSubmissionWithTar(tarBuffer: Buffer): Promise<{ submissionId: number; uploadId: string }> {
+  async function setupSubmissionWithTar(
+    tarBuffer: Buffer
+  ): Promise<{ submissionId: number; uploadId: string; submissionUploadId: string }> {
     const objectKey = `${TEST_PREFIX}/${Date.now()}/archive.tar`;
 
     await storageService.uploadBuffer(BucketType.MAIN, tarBuffer, 'application/x-tar', objectKey);
@@ -428,10 +442,12 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     );
 
     // 5. submission_upload
-    await connection.sql(
+    const submissionUploadResult = await connection.sql<{ submission_upload_id: string }>(
       SQL`INSERT INTO biohub.submission_upload (submission_id, upload_id)
-          VALUES (${submissionId}, ${uploadId})`
+          VALUES (${submissionId}, ${uploadId})
+          RETURNING submission_upload_id`
     );
+    const submissionUploadId = submissionUploadResult.rows[0].submission_upload_id;
 
     // 6. upload_artifact
     await connection.sql(
@@ -439,7 +455,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
           VALUES (${uploadId}, ${artifactId}, 'feature')`
     );
 
-    return { submissionId, uploadId };
+    return { submissionId, uploadId, submissionUploadId };
   }
 
   it('should process a valid submission and create features', async () => {
@@ -479,8 +495,12 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
     ]);
 
-    const { submissionId, uploadId } = await setupSubmissionWithTar(tarBuffer);
-    const result = await service.processSubmission({ submissionId, uploadId });
+    const { submissionId, uploadId, submissionUploadId } = await setupSubmissionWithTar(tarBuffer);
+    const result = await service.processSubmission({
+      submission_upload_id: submissionUploadId,
+      submission_id: submissionId,
+      upload_id: uploadId
+    });
 
     expect(result.valid).to.be.true;
     expect(result.errors).to.have.lengthOf(0);
@@ -524,8 +544,12 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
     ]);
 
-    const { submissionId, uploadId } = await setupSubmissionWithTar(tarBuffer);
-    const result = await service.processSubmission({ submissionId, uploadId });
+    const { submissionId, uploadId, submissionUploadId } = await setupSubmissionWithTar(tarBuffer);
+    const result = await service.processSubmission({
+      submission_upload_id: submissionUploadId,
+      submission_id: submissionId,
+      upload_id: uploadId
+    });
 
     expect(result.valid).to.be.false;
     expect(result.errors.some((e) => e.type === ValidationErrorType.INVALID_FEATURE_TYPE)).to.be.true;
@@ -575,8 +599,12 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       { name: 'files/photo.jpg', content: 'fake-image-bytes' }
     ]);
 
-    const { submissionId, uploadId } = await setupSubmissionWithTar(tarBuffer);
-    const result = await service.processSubmission({ submissionId, uploadId });
+    const { submissionId, uploadId, submissionUploadId } = await setupSubmissionWithTar(tarBuffer);
+    const result = await service.processSubmission({
+      submission_upload_id: submissionUploadId,
+      submission_id: submissionId,
+      upload_id: uploadId
+    });
 
     // Track S3 media upload for cleanup
     s3KeysToCleanup.push(`submissions/${submissionId}/media/photo.jpg`);
@@ -649,8 +677,12 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       // No files/missing.pdf in archive
     ]);
 
-    const { submissionId, uploadId } = await setupSubmissionWithTar(tarBuffer);
-    const result = await service.processSubmission({ submissionId, uploadId });
+    const { submissionId, uploadId, submissionUploadId } = await setupSubmissionWithTar(tarBuffer);
+    const result = await service.processSubmission({
+      submission_upload_id: submissionUploadId,
+      submission_id: submissionId,
+      upload_id: uploadId
+    });
 
     expect(result.valid).to.be.false;
     expect(result.errors.some((e) => e.type === ValidationErrorType.MISSING_MEDIA_FILE)).to.be.true;
@@ -688,8 +720,12 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
     ]);
 
-    const { submissionId, uploadId } = await setupSubmissionWithTar(tarBuffer);
-    const result = await service.processSubmission({ submissionId, uploadId });
+    const { submissionId, uploadId, submissionUploadId } = await setupSubmissionWithTar(tarBuffer);
+    const result = await service.processSubmission({
+      submission_upload_id: submissionUploadId,
+      submission_id: submissionId,
+      upload_id: uploadId
+    });
 
     expect(result.valid).to.be.true;
 
@@ -738,8 +774,12 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
     ]);
 
-    const { submissionId, uploadId } = await setupSubmissionWithTar(tarBuffer);
-    const result = await service.processSubmission({ submissionId, uploadId });
+    const { submissionId, uploadId, submissionUploadId } = await setupSubmissionWithTar(tarBuffer);
+    const result = await service.processSubmission({
+      submission_upload_id: submissionUploadId,
+      submission_id: submissionId,
+      upload_id: uploadId
+    });
 
     expect(result.valid).to.be.false;
     expect(result.errors.length).to.be.greaterThan(1);
