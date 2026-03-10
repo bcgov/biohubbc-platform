@@ -18,6 +18,17 @@ export async function up(knex: Knex): Promise<void> {
   await knex.raw(`--sql
     SET SEARCH_PATH = biohub, public;
 
+
+    ----------------------------------------------------------------------------------------
+    -- Allow multiple values for a property
+    ----------------------------------------------------------------------------------------
+
+    ALTER TABLE feature_type_property
+    ADD COLUMN allow_multiple boolean DEFAULT false NOT NULL;
+
+    COMMENT ON COLUMN feature_type_property.allow_multiple IS
+    'Indicates whether a property may have multiple values (arrays).';
+
     ----------------------------------------------------------------------------------------
     -- Create tables
     ----------------------------------------------------------------------------------------
