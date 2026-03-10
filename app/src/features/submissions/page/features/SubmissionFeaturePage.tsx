@@ -77,56 +77,58 @@ export const SubmissionFeaturePage = () => {
     }
   };
 
+  if (!feature) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight={300} p={2}>
+        <Typography color="text.secondary">No data available</Typography>
+      </Box>
+    )
+  }
+
   return (
     <>
-      {feature && (
-        <PageHeader
-          buttons={
-            <Button
-              variant={isInCart ? 'outlined' : 'contained'}
-              startIcon={<Icon path={isInCart ? mdiCheck : mdiPlus} size={0.875} />}
-              onClick={handleCartToggle}>
-              {isInCart ? 'In Cart' : 'Add to Cart'}
-            </Button>
-          }
-          breadcrumbs={
-            <Breadcrumbs aria-label="breadcrumb">
-              <Link component={RouterLink} to="/search" underline="hover" color="inherit">
-                Search
-              </Link>
-              <Link component={RouterLink} to={`/search/${feature.submission_id}`} underline="hover" color="inherit">
-                {feature.submission_name}
-              </Link>
-              <Typography color="text.primary">{feature.feature_type_display_name}</Typography>
-            </Breadcrumbs>
-          }
-          label={
-            <Box display="flex" alignItems="center" gap={1.5}>
-              <Typography variant="h1" sx={{ ml: '-2px' }}>
-                {feature.feature_type_display_name}
-              </Typography>
-            </Box>
-          }
-          subheader={
-            <Box display="flex" gap={1}>
-              <Chip label={feature.feature_type_name} size="small" />
-              {feature.secured && <Chip icon={<Icon path={mdiLock} size={0.625} />} label="Secured" size="small" />}
-            </Box>
-          }
-        />
-      )}
+      <PageHeader
+        buttons={
+          <Button
+            variant={isInCart ? 'outlined' : 'contained'}
+            startIcon={<Icon path={isInCart ? mdiCheck : mdiPlus} size={0.875} />}
+            onClick={handleCartToggle}>
+            {isInCart ? 'In Cart' : 'Add to Cart'}
+          </Button>
+        }
+        breadcrumbs={
+          <Breadcrumbs aria-label="breadcrumb">
+            <Link component={RouterLink} to="/search" underline="hover" color="inherit">
+              Search
+            </Link>
+            <Link component={RouterLink} to={`/search/${feature.submission_id}`} underline="hover" color="inherit">
+              {feature.submission_name}
+            </Link>
+            <Typography color="text.primary">{feature.feature_type_display_name}</Typography>
+          </Breadcrumbs>
+        }
+        label={
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <Typography variant="h1" sx={{ ml: '-2px' }}>
+              {feature.feature_type_display_name}
+            </Typography>
+          </Box>
+        }
+        subheader={
+          <Box display="flex" gap={1}>
+            <Chip label={feature.feature_type_name} size="small" />
+            {feature.secured && <Chip icon={<Icon path={mdiLock} size={0.625} />} label="Secured" size="small" />}
+          </Box>
+        }
+      />
       <Container maxWidth="xl">
         <Stack spacing={3} py={4}>
-          {feature && (
-            <>
-              <SubmissionFeatureProperties data={feature.data} isLoading={isLoading} />
-              <SubmissionFeatureRelated
-                submissionId={feature.submission_id}
-                relatedFeatures={relatedFeatures ?? []}
-                isLoading={isLoading}
-              />
-            </>
-          )}
+          <SubmissionFeatureProperties data={feature.data} isLoading={isLoading} />
+          <SubmissionFeatureRelated
+            submissionId={feature.submission_id}
+            relatedFeatures={relatedFeatures ?? []}
+            isLoading={isLoading}
+          />
         </Stack>
       </Container>
     </>
