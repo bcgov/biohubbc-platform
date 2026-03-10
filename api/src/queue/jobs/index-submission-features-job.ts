@@ -41,7 +41,7 @@ export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmiss
       await connection.open();
 
       const searchFeatureService = new SearchFeatureService(connection);
-      await searchFeatureService.indexFeaturesBySubmissionId(submissionId);
+      await searchFeatureService.indexSubmissionPropertiesBySubmissionId(submissionId);
 
       await connection.commit();
 
