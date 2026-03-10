@@ -18,7 +18,7 @@ interface SubmissionFeatureRelatedProps {
 
 export const SubmissionFeatureRelated = ({
   submissionId,
-  relatedFeatures = [],
+  relatedFeatures,
   isLoading
 }: SubmissionFeatureRelatedProps) => {
   return (

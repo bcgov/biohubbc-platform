@@ -10,6 +10,7 @@ import { ISubmissionFeatureResponse } from 'interfaces/useFeaturesApi.interface'
 export const useFeaturesApi = (axios: AxiosInstance) => {
   /**
    * Get a submission feature by its ID
+   * Also gets related features if there is any
    *
    * @param {number} submissionId
    * @return {Promise<ISubmissionFeatureResponse>}
