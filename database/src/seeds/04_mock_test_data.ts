@@ -41,17 +41,25 @@ export async function seed(knex: Knex): Promise<void> {
     return knex.raw(`SELECT null;`); // dummy query to appease knex
   }
 
-  // Transaction so that the schema and search path is set for the SQL statements in insertRecord()
-  await knex.transaction(async (trx) => {
-    await trx.raw(`
-      SET SCHEMA 'biohub';
-      SET SEARCH_PATH = 'biohub','public';
-    `);
+  await knex.raw(`
+    SET SCHEMA 'biohub';
+    SET SEARCH_PATH = 'biohub','public';
+  `);
 
-    for (let i = 0; i < NUM_MOCK_FEATURE_SUBMISSIONS; i++) {
-      await insertRecord(trx); // pass the transaction instead of knex
-    }
-  });
+  await knex.raw(`
+    INSERT INTO contributor (client_id, description)
+    SELECT 'SIMS', 'Seed contributor'
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM contributor
+      WHERE client_id = 'SIMS'
+        AND record_end_date IS NULL
+    );
+  `);
+
+  for (let i = 0; i < NUM_MOCK_FEATURE_SUBMISSIONS; i++) {
+    await insertRecord(knex);
+  }
 }
 
 /**
@@ -330,7 +338,7 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
       security_review_timestamp,
       publish_timestamp,
       system_user_id,
-      source_system
+      contributor_id
   )
   values
   (
@@ -341,7 +349,7 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
       ${securityReviewTimestamp},
       ${publishTimestamp},
       (SELECT system_user_id from "system_user" where user_identifier = 'SIMS'),
-      'SIMS'
+      (SELECT contributor_id FROM contributor WHERE client_id = 'SIMS' AND record_end_date IS NULL LIMIT 1)
   )
   RETURNING submission_id;
 `;

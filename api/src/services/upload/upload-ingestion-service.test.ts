@@ -32,7 +32,7 @@ describe('UploadIngestionService', () => {
   const mockSubmission: ICreateSubmission = {
     uuid: v4(),
     system_user_id: 1,
-    source_system: 'SIMS',
+    contributor_id: 1,
     name: 'Test Submission',
     description: 'Test Description',
     comment: 'Test Comment'

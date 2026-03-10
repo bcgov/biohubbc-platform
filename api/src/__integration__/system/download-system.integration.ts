@@ -145,7 +145,7 @@ describe('Download Worker', function () {
       .insert({
         uuid: db.raw('gen_random_uuid()'),
         system_user_id: SYSTEM_USER_ID,
-        source_system: 'SIMS',
+        contributor_id: 1,
         name: `${TEST_PREFIX} Download Integration Test`,
         description: 'Test submission for download worker integration test',
         comment: 'Integration test',

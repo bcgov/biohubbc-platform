@@ -38,7 +38,7 @@ export interface ISubmissionRecord {
 export interface ICreateSubmission {
   uuid: string;
   system_user_id: number;
-  source_system: 'SIMS';
+  contributor_id: number;
   name: string;
   description: string;
   comment: string;
@@ -219,7 +219,7 @@ export const SubmissionRecord = z.object({
   security_review_timestamp: z.string().nullable(),
   submitted_timestamp: z.string(),
   system_user_id: z.number(),
-  source_system: z.string(),
+  contributor_id: z.number(),
   name: z.string(),
   description: z.string().nullable(),
   comment: z.string().nullable(),
@@ -311,14 +311,14 @@ export class SubmissionRepository extends BaseRepository {
       INSERT INTO submission (
         uuid,
         system_user_id,
-        source_system,
+        contributor_id,
         name,
         description,
         comment
       ) VALUES (
         ${submissionData.uuid},
         ${submissionData.system_user_id},
-        ${submissionData.source_system},
+        ${submissionData.contributor_id},
         ${submissionData.name},
         ${submissionData.description},
         ${submissionData.comment}
@@ -347,7 +347,7 @@ export class SubmissionRepository extends BaseRepository {
    * @param {string} description A description of the submission. Should not contain any sensitive information.
    * @param {string} comment An internal comment/description of the submission for administrative purposes. May contain
    * sensitive information. Should never be shared with the general public.
-   * @param {string} userIdentifier
+   * @param {number} contributorId
    * @return {*}  {Promise<SubmissionRecord>}
    * @memberof SubmissionRepository
    */
@@ -357,7 +357,7 @@ export class SubmissionRepository extends BaseRepository {
     description: string,
     comment: string,
     systemUserId: number,
-    systemUserIdentifier: string
+    contributorId: number
   ): Promise<SubmissionRecord> {
     const sqlStatement = SQL`
       INSERT INTO submission (
@@ -367,7 +367,7 @@ export class SubmissionRepository extends BaseRepository {
         description,
         comment,
         system_user_id,
-        source_system
+        contributor_id
       ) VALUES (
         ${uuid},
         now(),
@@ -375,10 +375,25 @@ export class SubmissionRepository extends BaseRepository {
         ${description},
         ${comment},
         ${systemUserId},
-        ${systemUserIdentifier}
+        ${contributorId}
       )
       RETURNING
-        *;
+        submission_id,
+        uuid,
+        security_review_timestamp,
+        submitted_timestamp,
+        system_user_id,
+        contributor_id,
+        name,
+        description,
+        comment,
+        publish_timestamp,
+        record_end_date,
+        create_date,
+        create_user,
+        update_date,
+        update_user,
+        revision_count;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecord);
@@ -873,7 +888,7 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.submission_id,
         FilteredRows.uuid,
         FilteredRows.system_user_id,
-        FilteredRows.source_system,
+        FilteredRows.contributor_id,
         FilteredRows.security_review_timestamp,
         FilteredRows.publish_timestamp,
         FilteredRows.submitted_timestamp,
@@ -918,7 +933,7 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.submission_id,
         FilteredRows.uuid,
         FilteredRows.system_user_id,
-        FilteredRows.source_system,
+        FilteredRows.contributor_id,
         FilteredRows.security_review_timestamp,
         FilteredRows.publish_timestamp,
         FilteredRows.submitted_timestamp,
@@ -978,7 +993,7 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.submission_id,
         FilteredRows.uuid,
         FilteredRows.system_user_id,
-        FilteredRows.source_system,
+        FilteredRows.contributor_id,
         FilteredRows.security_review_timestamp,
         FilteredRows.publish_timestamp,
         FilteredRows.submitted_timestamp,
@@ -1028,7 +1043,7 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.submission_id,
         FilteredRows.uuid,
         FilteredRows.system_user_id,
-        FilteredRows.source_system,
+        FilteredRows.contributor_id,
         FilteredRows.security_review_timestamp,
         FilteredRows.publish_timestamp,
         FilteredRows.submitted_timestamp,
@@ -1166,7 +1181,22 @@ export class SubmissionRepository extends BaseRepository {
   async getSubmissionRecordBySubmissionIdWithSecurity(submissionId: number): Promise<SubmissionRecordWithSecurity> {
     const sqlStatement = SQL`
       SELECT
-        submission.*,
+        submission.submission_id,
+        submission.uuid,
+        submission.security_review_timestamp,
+        submission.submitted_timestamp,
+        submission.system_user_id,
+        submission.contributor_id,
+        submission.name,
+        submission.description,
+        submission.comment,
+        submission.publish_timestamp,
+        submission.record_end_date,
+        submission.create_date,
+        submission.create_user,
+        submission.update_date,
+        submission.update_user,
+        submission.revision_count,
         CASE
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
@@ -1357,7 +1387,7 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.submission_id,
         FilteredRows.uuid,
         FilteredRows.system_user_id,
-        FilteredRows.source_system,
+        FilteredRows.contributor_id,
         FilteredRows.security_review_timestamp,
         FilteredRows.publish_timestamp,
         FilteredRows.submitted_timestamp,
@@ -1401,7 +1431,7 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.submission_id,
         FilteredRows.uuid,
         FilteredRows.system_user_id,
-        FilteredRows.source_system,
+        FilteredRows.contributor_id,
         FilteredRows.security_review_timestamp,
         FilteredRows.publish_timestamp,
         FilteredRows.submitted_timestamp,
@@ -1486,7 +1516,7 @@ export class SubmissionRepository extends BaseRepository {
    */
   async patchSubmissionRecord(submissionId: number, patch: PatchSubmissionRecord): Promise<SubmissionRecord> {
     const knex = getKnex();
-    const queryBuilder = knex.table('submission').where('submission_id', submissionId).returning('*');
+    const queryBuilder = knex.table('submission').where('submission_id', submissionId);
 
     // Collect all update operations
     let updateOperations: Record<string, Knex.Raw> = {};
@@ -1524,11 +1554,38 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     // Register all update operations
-    queryBuilder.update(updateOperations);
+    queryBuilder
+      .update(updateOperations)
+      .returning([
+        'submission_id',
+        'uuid',
+        'security_review_timestamp',
+        'submitted_timestamp',
+        'system_user_id',
+        'contributor_id',
+        'name',
+        'description',
+        'comment',
+        'publish_timestamp',
+        'record_end_date',
+        'create_date',
+        'create_user',
+        'update_date',
+        'update_user',
+        'revision_count'
+      ]);
 
-    const response = await this.connection.knex(queryBuilder, SubmissionRecord);
+    const response = await this.connection.knex(queryBuilder);
 
-    return response.rows[0];
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to patch submission record', [
+        'SubmissionRepository->patchSubmissionRecord',
+        `rowCount was ${response.rowCount}, expected rowCount === 1`
+      ]);
+    }
+
+    const submissionRecord = response.rows[0];
+    return submissionRecord as SubmissionRecord;
   }
 
   /**
