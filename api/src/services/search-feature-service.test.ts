@@ -4,7 +4,9 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
+import { SubmissionFeaturePropertyIndexRepository } from '../repositories/submission-feature-property-index-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
+import { TaxonomyRepository } from '../repositories/taxonomy-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CodeService } from './code-service';
 import { SearchFeatureService } from './search-feature-service';
@@ -465,6 +467,242 @@ describe('SearchFeatureService', () => {
 
       expect(deleteStub).to.have.been.calledOnceWith(777);
       expect(insertStub).not.to.have.been.called;
+    });
+  });
+
+  describe('indexSubmissionPropertiesBySubmissionId', () => {
+    it('validates code values against codeset categories codes', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+
+      sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBySubmissionId').resolves([
+        {
+          submission_feature_id: 100,
+          submission_id: 777,
+          feature_type_id: 1,
+          urn: 'urn:777:dataset:100',
+          data: {
+            agency: 'code::32'
+          },
+          source_id: null,
+          uuid: '123-456-789',
+          parent_submission_feature_id: null,
+          record_effective_date: '2024-01-01',
+          record_end_date: null,
+          create_date: '2024-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          feature_type_name: 'dataset',
+          feature_type_display_name: 'Dataset',
+          submission_feature_security_ids: []
+        },
+        {
+          submission_feature_id: 101,
+          submission_id: 777,
+          feature_type_id: 2,
+          urn: 'urn:777:codeset:101',
+          data: {
+            categories: {
+              agency: {
+                label: 'Agency',
+                description: 'Government and non-government agencies',
+                codes: {
+                  '32': {
+                    label: 'Aarde Environmental Ltd.',
+                    description: null
+                  }
+                }
+              }
+            }
+          },
+          source_id: null,
+          uuid: '123-456-780',
+          parent_submission_feature_id: null,
+          record_effective_date: '2024-01-01',
+          record_end_date: null,
+          create_date: '2024-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          feature_type_name: 'codeset',
+          feature_type_display_name: 'Codeset',
+          submission_feature_security_ids: []
+        }
+      ]);
+
+      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
+      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'getFeatureTypePropertyMetadata').resolves([
+        {
+          feature_type_id: 1,
+          feature_type_property_id: 55,
+          feature_property_name: 'agency',
+          feature_property_type_name: 'code',
+          allow_multiple: false
+        }
+      ]);
+      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'getExistingCodeIds').resolves([32]);
+
+      const insertCodeRecordsStub = sinon
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'insertCodeRecords')
+        .resolves();
+
+      await searchFeatureService.indexSubmissionPropertiesBySubmissionId(777);
+
+      expect(insertCodeRecordsStub).to.have.been.calledOnceWith([
+        {
+          submission_feature_id: 100,
+          feature_type_property_id: 55,
+          code_id: 32
+        }
+      ]);
+    });
+
+    it('resolves taxon TSN values and inserts resolved taxon_id records', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+
+      sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBySubmissionId').resolves([
+        {
+          submission_feature_id: 100,
+          submission_id: 777,
+          feature_type_id: 1,
+          urn: 'urn:777:dataset:100',
+          data: {
+            focal_species: [180544, 552421]
+          },
+          source_id: null,
+          uuid: '123-456-789',
+          parent_submission_feature_id: null,
+          record_effective_date: '2024-01-01',
+          record_end_date: null,
+          create_date: '2024-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          feature_type_name: 'dataset',
+          feature_type_display_name: 'Dataset',
+          submission_feature_security_ids: []
+        }
+      ]);
+
+      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
+      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'getFeatureTypePropertyMetadata').resolves([
+        {
+          feature_type_id: 1,
+          feature_type_property_id: 55,
+          feature_property_name: 'focal_species',
+          feature_property_type_name: 'taxon',
+          allow_multiple: true
+        }
+      ]);
+
+      sinon.stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds').resolves([
+        {
+          taxon_id: 2001,
+          itis_tsn: 180544,
+          bc_taxon_code: null,
+          itis_scientific_name: 'sp1',
+          common_name: null,
+          itis_data: {},
+          itis_update_date: '2024-01-01',
+          record_effective_date: '2024-01-01',
+          record_end_date: null,
+          create_date: '2024-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        },
+        {
+          taxon_id: 2002,
+          itis_tsn: 552421,
+          bc_taxon_code: null,
+          itis_scientific_name: 'sp2',
+          common_name: null,
+          itis_data: {},
+          itis_update_date: '2024-01-01',
+          record_effective_date: '2024-01-01',
+          record_end_date: null,
+          create_date: '2024-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        }
+      ]);
+
+      const insertTaxonRecordsStub = sinon
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'insertTaxonRecords')
+        .resolves();
+
+      await searchFeatureService.indexSubmissionPropertiesBySubmissionId(777);
+
+      expect(insertTaxonRecordsStub).to.have.been.calledOnceWith([
+        {
+          submission_feature_id: 100,
+          feature_type_property_id: 55,
+          taxon_id: 2001
+        },
+        {
+          submission_feature_id: 100,
+          feature_type_property_id: 55,
+          taxon_id: 2002
+        }
+      ]);
+    });
+
+    it('throws when taxon TSN cannot be resolved', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+
+      sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBySubmissionId').resolves([
+        {
+          submission_feature_id: 100,
+          submission_id: 777,
+          feature_type_id: 1,
+          urn: 'urn:777:dataset:100',
+          data: {
+            focal_species: [180544]
+          },
+          source_id: null,
+          uuid: '123-456-789',
+          parent_submission_feature_id: null,
+          record_effective_date: '2024-01-01',
+          record_end_date: null,
+          create_date: '2024-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          feature_type_name: 'dataset',
+          feature_type_display_name: 'Dataset',
+          submission_feature_security_ids: []
+        }
+      ]);
+
+      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
+      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'getFeatureTypePropertyMetadata').resolves([
+        {
+          feature_type_id: 1,
+          feature_type_property_id: 55,
+          feature_property_name: 'focal_species',
+          feature_property_type_name: 'taxon',
+          allow_multiple: true
+        }
+      ]);
+
+      sinon.stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds').resolves([]);
+
+      try {
+        await searchFeatureService.indexSubmissionPropertiesBySubmissionId(777);
+        expect.fail();
+      } catch (error) {
+        expect((error as Error).message).to.equal('Failed to resolve taxon value');
+      }
     });
   });
 

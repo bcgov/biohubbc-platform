@@ -37,7 +37,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
 
     sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
-    const indexStub = sinon.stub(SearchFeatureService.prototype, 'indexFeaturesBySubmissionId').resolves();
+    const indexStub = sinon.stub(SearchFeatureService.prototype, 'indexSubmissionPropertiesBySubmissionId').resolves();
 
     await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
 
@@ -57,7 +57,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     const testError = new Error('Indexing failed');
-    sinon.stub(SearchFeatureService.prototype, 'indexFeaturesBySubmissionId').rejects(testError);
+    sinon.stub(SearchFeatureService.prototype, 'indexSubmissionPropertiesBySubmissionId').rejects(testError);
 
     try {
       await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
@@ -82,7 +82,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
 
     sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
-    const indexStub = sinon.stub(SearchFeatureService.prototype, 'indexFeaturesBySubmissionId').resolves();
+    const indexStub = sinon.stub(SearchFeatureService.prototype, 'indexSubmissionPropertiesBySubmissionId').resolves();
 
     await indexSubmissionFeaturesJobHandler([createMockJob(1, 'job-1'), createMockJob(2, 'job-2')]);
 
