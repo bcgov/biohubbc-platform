@@ -7,7 +7,6 @@ import { jsonStringifyObjectProperties } from 'utils/Utils';
 
 interface SubmissionFeaturePropertiesProps {
   data: Record<string, any>;
-  isLoading?: boolean;
 }
 
 const columns: GridColDef[] = [
@@ -24,20 +23,14 @@ const columns: GridColDef[] = [
   }
 ];
 
-type PropertyRow = { id: string; property: string; value: string };
+export const SubmissionFeatureProperties = ({ data }: SubmissionFeaturePropertiesProps) => {
+  const stringifiedProperties = jsonStringifyObjectProperties(data);
 
-export const SubmissionFeatureProperties = ({ data, isLoading }: SubmissionFeaturePropertiesProps) => {
-  let rows: PropertyRow[] = [];
-
-  if (!isLoading) {
-    const stringifiedProperties = jsonStringifyObjectProperties(data);
-
-    rows = Object.entries(stringifiedProperties).map(([key, value]) => ({
-      id: key,
-      property: key.replace(/_/g, ' '),
-      value: value ?? ''
-    }));
-  }
+  const rows = Object.entries(stringifiedProperties).map(([key, value]) => ({
+    id: key,
+    property: key.replace(/_/g, ' '),
+    value: value ?? ''
+  }));
 
   return (
     <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
@@ -48,7 +41,6 @@ export const SubmissionFeatureProperties = ({ data, isLoading }: SubmissionFeatu
         <CustomDataGrid
           rows={rows}
           columns={columns}
-          loading={isLoading}
           noRowsMessage="No properties"
           autoHeight
           hideFooter

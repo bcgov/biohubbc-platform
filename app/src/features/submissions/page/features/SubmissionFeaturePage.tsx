@@ -17,6 +17,8 @@ import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { SubmissionFeatureProperties } from './components/SubmissionFeatureProperties';
 import { SubmissionFeatureRelated } from './components/SubmissionFeatureRelated';
 import { APIError } from 'hooks/api/useAxios';
+import { LoadingGuard } from 'components/loading/LoadingGuard';
+import { SkeletonTable } from 'components/loading/SkeletonLoaders';
 
 export const SubmissionFeaturePage = () => {
   const navigate = useNavigate();
@@ -42,7 +44,7 @@ export const SubmissionFeaturePage = () => {
   loaderRef.current = featureDataLoader;
 
   useEffect(() => {
-    loaderRef.current.refresh();
+    loaderRef.current.refresh()
   }, [submissionId, submissionFeatureId]);
 
   const feature = featureDataLoader.data?.feature;
@@ -86,51 +88,52 @@ export const SubmissionFeaturePage = () => {
   }
 
   return (
-    <>
-      <PageHeader
-        buttons={
-          <Button
-            variant={isInCart ? 'outlined' : 'contained'}
-            startIcon={<Icon path={isInCart ? mdiCheck : mdiPlus} size={0.875} />}
-            onClick={handleCartToggle}>
-            {isInCart ? 'In Cart' : 'Add to Cart'}
-          </Button>
-        }
-        breadcrumbs={
-          <Breadcrumbs aria-label="breadcrumb">
-            <Link component={RouterLink} to="/search" underline="hover" color="inherit">
-              Search
-            </Link>
-            <Link component={RouterLink} to={`/search/${feature.submission_id}`} underline="hover" color="inherit">
-              {feature.submission_name}
-            </Link>
-            <Typography color="text.primary">{feature.feature_type_display_name}</Typography>
-          </Breadcrumbs>
-        }
-        label={
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Typography variant="h1" sx={{ ml: '-2px' }}>
-              {feature.feature_type_display_name}
-            </Typography>
-          </Box>
-        }
-        subheader={
-          <Box display="flex" gap={1}>
-            <Chip label={feature.feature_type_name} size="small" />
-            {feature.secured && <Chip icon={<Icon path={mdiLock} size={0.625} />} label="Secured" size="small" />}
-          </Box>
-        }
-      />
-      <Container maxWidth="xl">
-        <Stack spacing={3} py={4}>
-          <SubmissionFeatureProperties data={feature.data} isLoading={isLoading} />
-          <SubmissionFeatureRelated
-            submissionId={feature.submission_id}
-            relatedFeatures={relatedFeatures ?? []}
-            isLoading={isLoading}
-          />
-        </Stack>
-      </Container>
-    </>
+    <Container maxWidth="xl">
+      <LoadingGuard isLoading={isLoading} isLoadingFallback={<SkeletonTable numberOfLines={6} />}>
+        <PageHeader
+          buttons={
+            <Button
+              variant={isInCart ? 'outlined' : 'contained'}
+              startIcon={<Icon path={isInCart ? mdiCheck : mdiPlus} size={0.875} />}
+              onClick={handleCartToggle}>
+              {isInCart ? 'In Cart' : 'Add to Cart'}
+            </Button>
+          }
+          breadcrumbs={
+            <Breadcrumbs aria-label="breadcrumb">
+              <Link component={RouterLink} to="/search" underline="hover" color="inherit">
+                Search
+              </Link>
+              <Link component={RouterLink} to={`/search/${feature.submission_id}`} underline="hover" color="inherit">
+                {feature.submission_name}
+              </Link>
+              <Typography color="text.primary">{feature.feature_type_display_name}</Typography>
+            </Breadcrumbs>
+          }
+          label={
+            <Box display="flex" alignItems="center" gap={1.5}>
+              <Typography variant="h1" sx={{ ml: '-2px' }}>
+                {feature.feature_type_display_name}
+              </Typography>
+            </Box>
+          }
+          subheader={
+            <Box display="flex" gap={1}>
+              <Chip label={feature.feature_type_name} size="small" />
+              {feature.secured && <Chip icon={<Icon path={mdiLock} size={0.625} />} label="Secured" size="small" />}
+            </Box>
+          }
+        />
+        <Container maxWidth="xl">
+          <Stack spacing={3} py={4}>
+            <SubmissionFeatureProperties data={feature.data} />
+            <SubmissionFeatureRelated
+              submissionId={feature.submission_id}
+              relatedFeatures={relatedFeatures ?? []}
+            />
+          </Stack>
+        </Container>
+      </LoadingGuard>
+    </Container>
   );
 };
