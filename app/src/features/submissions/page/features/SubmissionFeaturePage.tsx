@@ -12,7 +12,7 @@ import { PageHeader } from 'components/header/PageHeader';
 import { useApi } from 'hooks/useApi';
 import { useCartContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { SubmissionFeatureProperties } from './components/SubmissionFeatureProperties';
 import { SubmissionFeatureRelated } from './components/SubmissionFeatureRelated';
@@ -28,29 +28,27 @@ export const SubmissionFeaturePage = () => {
   const { submissionId, submissionFeatureId } = useParams<{ submissionId: string; submissionFeatureId: string }>();
 
   const featureDataLoader = useDataLoader(
-    () => biohubApi.features.getSubmissionFeatureById(
-      Number(submissionId),
-      Number(submissionFeatureId)
-    ),
+    () => biohubApi.features.getSubmissionFeatureById(Number(submissionId), Number(submissionFeatureId)),
     (error: unknown) => {
-      const status = (error as APIError)?.status
+      const status = (error as APIError)?.status;
       if (status === 401 || status === 403) {
         navigate('/forbidden', { replace: true });
       }
     }
   );
 
-  const loaderRef = useRef(featureDataLoader);
-  loaderRef.current = featureDataLoader;
-
   useEffect(() => {
-    loaderRef.current.refresh()
+    featureDataLoader.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionId, submissionFeatureId]);
 
-  const feature = featureDataLoader.data?.feature;
-  const relatedFeatures = featureDataLoader.data?.relatedFeatures;
-
-  const isLoading = featureDataLoader.isLoading;
+  const [feature, relatedFeatures, isLoading] = useMemo(() => {
+    return [
+      featureDataLoader.data?.feature,
+      featureDataLoader.data?.relatedFeatures,
+      featureDataLoader.isLoading
+    ] as const;
+  }, [featureDataLoader.data, featureDataLoader.isLoading]);
 
   const isInCart = cartFeatures.some((f) => f.submission_feature_id === Number(submissionFeatureId));
 
@@ -84,7 +82,7 @@ export const SubmissionFeaturePage = () => {
       <Box display="flex" justifyContent="center" alignItems="center" minHeight={300} p={2}>
         <Typography color="text.secondary">No data available</Typography>
       </Box>
-    )
+    );
   }
 
   return (
@@ -127,10 +125,7 @@ export const SubmissionFeaturePage = () => {
         <Container maxWidth="xl">
           <Stack spacing={3} py={4}>
             <SubmissionFeatureProperties data={feature.data} />
-            <SubmissionFeatureRelated
-              submissionId={feature.submission_id}
-              relatedFeatures={relatedFeatures ?? []}
-            />
+            <SubmissionFeatureRelated submissionId={feature.submission_id} relatedFeatures={relatedFeatures ?? []} />
           </Stack>
         </Container>
       </LoadingGuard>
