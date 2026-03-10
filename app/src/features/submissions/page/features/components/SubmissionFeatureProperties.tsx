@@ -24,14 +24,20 @@ const columns: GridColDef[] = [
   }
 ];
 
-export const SubmissionFeatureProperties = ({ data, isLoading }: SubmissionFeaturePropertiesProps) => {
-  const stringifiedProperties = jsonStringifyObjectProperties(data);
+type PropertyRow = { id: string; property: string; value: string };
 
-  const rows = Object.entries(stringifiedProperties).map(([key, value]) => ({
-    id: key,
-    property: key.replace(/_/g, ' '),
-    value: value ?? ''
-  }));
+export const SubmissionFeatureProperties = ({ data, isLoading }: SubmissionFeaturePropertiesProps) => {
+  let rows: PropertyRow[] = [];
+
+  if (!isLoading) {
+    const stringifiedProperties = jsonStringifyObjectProperties(data);
+
+    rows = Object.entries(stringifiedProperties).map(([key, value]) => ({
+      id: key,
+      property: key.replace(/_/g, ' '),
+      value: value ?? ''
+    }));
+  }
 
   return (
     <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
