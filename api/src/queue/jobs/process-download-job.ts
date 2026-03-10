@@ -75,7 +75,7 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
 
     // Process each fragment
     for (const fragment of fragments) {
-      //Mark fragment as PROCESSING for UI
+      // Mark fragment as PROCESSING for UI
       await withConnection(async (connection) => {
         const pipelineService = new DownloadPipelineService(connection);
         await pipelineService.markFragmentProcessing(fragment.download_fragment_id);

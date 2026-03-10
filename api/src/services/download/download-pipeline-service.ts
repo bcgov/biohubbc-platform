@@ -335,6 +335,13 @@ export class DownloadPipelineService extends DBService {
     await this.updateDownloadStatus(downloadId, DownloadStatusEnum.READY);
   }
 
+  /**
+   * Mark a fragment as processing (sets started_at timestamp).
+   *
+   * @param {number} fragmentId - The fragment ID.
+   * @return {Promise<void>}
+   * @memberof DownloadPipelineService
+   */
   async markFragmentProcessing(fragmentId: number): Promise<void> {
     const now = new Date().toISOString();
     await this.fragmentRepository.updateFragmentStatus(fragmentId, DownloadStatusEnum.PROCESSING, {

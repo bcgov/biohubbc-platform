@@ -463,13 +463,21 @@ describe('DownloadPipelineService (integration)', function () {
 
   /**
    * Helper: create a data_request linked to a team.
+   * Creates a ticket first (required by NOT NULL ticket_id FK added in SIMSBIOHUB-881).
    */
   async function createDataRequest(teamId: string, requestedBy: number): Promise<string> {
     const apiUserId = connection.systemUserId();
 
+    const ticketResult = await connection.sql(SQL`
+      INSERT INTO ticket (ticket_slug, subject, team_id, create_user)
+      VALUES (LPAD(FLOOR(RANDOM() * 100000000)::text, 8, '0'), 'Integration test ticket', ${teamId}, ${apiUserId})
+      RETURNING ticket_id;
+    `);
+    const ticketId = ticketResult.rows[0].ticket_id;
+
     const result = await connection.sql(SQL`
-      INSERT INTO data_request (reason, team_id, requested_by, create_user)
-      VALUES ('Integration test', ${teamId}, ${requestedBy}, ${apiUserId})
+      INSERT INTO data_request (reason, team_id, requested_by, ticket_id, create_user)
+      VALUES ('Integration test', ${teamId}, ${requestedBy}, ${ticketId}, ${apiUserId})
       RETURNING data_request_id;
     `);
 
