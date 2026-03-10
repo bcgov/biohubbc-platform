@@ -234,7 +234,11 @@ describe('paths/download/{downloadId}/index', () => {
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
-      const mockDownload = makeDownloadRecord({ total_fragments: 2, completed_fragments: 2, estimated_total_size_bytes: '24000' });
+      const mockDownload = makeDownloadRecord({
+        total_fragments: 2,
+        completed_fragments: 2,
+        estimated_total_size_bytes: '24000'
+      });
 
       const mockFragments = [
         {

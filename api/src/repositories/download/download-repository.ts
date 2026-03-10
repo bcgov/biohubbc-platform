@@ -172,7 +172,7 @@ export class DownloadRepository extends BaseRepository {
 
     const count = response.rows[0]?.total_count ?? 0;
     // Strip the total_count column from each row before returning
-    const downloads: DownloadListRecord[] = response.rows.map(({ total_count, ...rest }) => rest);
+    const downloads: DownloadListRecord[] = response.rows.map(({ total_count: _total_count, ...rest }) => rest);
 
     return { downloads, count };
   }
