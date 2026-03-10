@@ -13,18 +13,29 @@ import { useApi } from 'hooks/useApi';
 import { useCartContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { useEffect, useRef } from 'react';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { SubmissionFeatureProperties } from './components/SubmissionFeatureProperties';
 import { SubmissionFeatureRelated } from './components/SubmissionFeatureRelated';
+import { APIError } from 'hooks/api/useAxios';
 
 export const SubmissionFeaturePage = () => {
+  const navigate = useNavigate();
   const biohubApi = useApi();
   const { features: cartFeatures, addToCart, removeFromCart } = useCartContext();
 
   const { submissionId, submissionFeatureId } = useParams<{ submissionId: string; submissionFeatureId: string }>();
 
-  const featureDataLoader = useDataLoader(() =>
-    biohubApi.features.getSubmissionFeatureById(Number(submissionId), Number(submissionFeatureId))
+  const featureDataLoader = useDataLoader(
+    () => biohubApi.features.getSubmissionFeatureById(
+      Number(submissionId),
+      Number(submissionFeatureId)
+    ),
+    (error: unknown) => {
+      const status = (error as APIError)?.status
+      if (status === 401 || status === 403) {
+        navigate('/forbidden', { replace: true });
+      }
+    }
   );
 
   const loaderRef = useRef(featureDataLoader);
@@ -111,7 +122,7 @@ export const SubmissionFeaturePage = () => {
               <SubmissionFeatureProperties data={feature.data} isLoading={isLoading} />
               <SubmissionFeatureRelated
                 submissionId={feature.submission_id}
-                relatedFeatures={relatedFeatures}
+                relatedFeatures={relatedFeatures ?? []}
                 isLoading={isLoading}
               />
             </>
