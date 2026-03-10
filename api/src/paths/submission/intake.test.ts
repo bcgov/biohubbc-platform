@@ -5,6 +5,7 @@ import sinonChai from 'sinon-chai';
 import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
 import { SystemUser } from '../../repositories/user-repository';
+import { ContributorService } from '../../services/contributor-service';
 import { RegionService } from '../../services/region-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
 import { SubmissionService } from '../../services/submission-service';
@@ -81,6 +82,7 @@ describe('intake', () => {
         properties: {},
         child_features: []
       };
+      mockReq.keycloak_token = { clientId: 'sims-service-client' };
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
@@ -90,6 +92,40 @@ describe('intake', () => {
         expect(validateSubmissionFeaturesStub).to.have.been.calledOnce;
         expect((error as HTTPError).status).to.equal(400);
         expect((error as HTTPError).message).to.equal('Invalid submission');
+      }
+    });
+
+    it('throws a 400 error when service client id is missing from token', async () => {
+      const dbConnectionObj = getMockDBConnection();
+
+      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
+      sinon.stub(ValidationService.prototype, 'validateSubmissionFeatures').resolves(true);
+
+      const requestHandler = intake.submissionIntake();
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.body = {
+        id: '123-456-789',
+        name: 'test submission',
+        description: 'a test submission',
+        comment: 'a comment',
+        content: {
+          id: '2',
+          type: 'dataset',
+          properties: { name: 'dataset two' },
+          child_features: []
+        }
+      };
+      mockReq.keycloak_token = {};
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (error) {
+        expect((error as HTTPError).status).to.equal(400);
+        expect((error as HTTPError).message).to.equal('Failed to identify known submission source system');
       }
     });
 
@@ -123,6 +159,9 @@ describe('intake', () => {
       const validateSubmissionFeaturesStub = sinon
         .stub(ValidationService.prototype, 'validateSubmissionFeatures')
         .resolves(true);
+      const ensureContributorForSystemUserStub = sinon
+        .stub(ContributorService.prototype, 'ensureContributorForSystemUser')
+        .resolves(11);
 
       const submissionId = 1;
 
@@ -134,7 +173,7 @@ describe('intake', () => {
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
-          source_system: 'SIMS',
+          contributor_id: 11,
           name: 'name',
           description: 'description',
           comment: 'comment',
@@ -210,17 +249,22 @@ describe('intake', () => {
         comment: 'a comment',
         content: feature1
       };
+      mockReq.keycloak_token = { clientId: 'sims-service-client' };
 
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(validateSubmissionFeaturesStub).to.have.been.calledOnceWith([feature1]);
+      expect(ensureContributorForSystemUserStub).to.have.been.calledOnceWith(
+        'sims-service-client',
+        serviceClientSystemUser.system_user_id
+      );
       expect(insertSubmissionRecordWithPotentialConflictStub).to.have.been.calledOnceWith(
         '564-987-789',
         'test submission',
         'a test submission',
         'a comment',
         serviceClientSystemUser.system_user_id,
-        serviceClientSystemUser.user_identifier
+        11
       );
       expect(insertSubmissionFeatureRecordsStub).to.have.been.calledOnceWith(submissionId, 'sub-upload-uuid', [
         feature1

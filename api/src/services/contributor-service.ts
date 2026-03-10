@@ -1,49 +1,56 @@
 import { IDBConnection } from '../database/db';
-import { ApiConflictError } from '../errors/api-error';
-import { CreateContributor, GetContributor } from '../paths/contributor/index.interface';
+import { ContributorRecord } from '../models/contributor';
 import { ContributorRepository } from '../repositories/contributor-repository';
+import { ContributorMemberService } from './contributor-member-service';
 import { DBService } from './db-service';
 
 export class ContributorService extends DBService {
   contributorRepository: ContributorRepository;
+  contributorMemberService: ContributorMemberService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.contributorRepository = new ContributorRepository(connection);
+    this.contributorMemberService = new ContributorMemberService(connection);
   }
 
   /**
    * Get the contributor record for a clientId
    *
    * @param {string} clientId
-   * @returns {Promise<GetContributor>}
+   * @returns {Promise<ContributorRecord>}
    */
-  async getContributorByClientId(clientId: string): Promise<GetContributor> {
+  async getContributorByClientId(clientId: string): Promise<ContributorRecord> {
     return this.contributorRepository.getContributorByClientId(clientId);
   }
 
   /**
-   * Adds a new contributing system and associates it with system users.
+   * Ensure contributor exists.
    *
-   * @param {CreateContributor} contributor - The contributor data including name, description, and member system user IDs.
-   * @returns {Promise<void>}
-   * @memberof ContributorService
+   * @param {string} clientId
+   * @returns {Promise<number>}
    */
-  async addNewContributor(contributor: CreateContributor): Promise<void> {
-    // Check if contributor already exists
-    const exists = await this.contributorRepository.contributorExists(contributor.clientId);
-    if (exists) {
-      throw new ApiConflictError('Contributor already exists', [
-        `A contributor with client_id '${contributor.clientId}' already exists`
-      ]);
+  async ensureContributor(clientId: string): Promise<number> {
+    const contributor = await this.contributorRepository.findContributorByClientId(clientId);
+
+    if (contributor) {
+      return contributor.contributor_id;
     }
 
-    const contributorId = await this.contributorRepository.createContributor(contributor.clientId);
+    return this.contributorRepository.createContributor(clientId);
+  }
 
-    const promises = contributor.members.map((member) =>
-      this.contributorRepository.createContributorMember(contributorId, member.system_user_id)
-    );
+  /**
+   * Ensure contributor exists and ensure relationship with a system user.
+   *
+   * @param {string} clientId
+   * @param {number} systemUserId
+   * @returns {Promise<number>}
+   */
+  async ensureContributorForSystemUser(clientId: string, systemUserId: number): Promise<number> {
+    const contributorId = await this.ensureContributor(clientId);
+    await this.contributorMemberService.ensureContributorMember(contributorId, systemUserId);
 
-    await Promise.all(promises);
+    return contributorId;
   }
 }

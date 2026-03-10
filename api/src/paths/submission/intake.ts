@@ -1,11 +1,12 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getServiceAccountDBConnection } from '../../database/db';
+import { getDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { UploadStatusEnum } from '../../models/upload';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { ISubmissionFeature } from '../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
+import { ContributorService } from '../../services/contributor-service';
 import { RegionService } from '../../services/region-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
 import { SubmissionService } from '../../services/submission-service';
@@ -146,12 +147,13 @@ export function submissionIntake(): RequestHandler {
 
     const submissionFeature: ISubmissionFeature = req.body.content;
 
-    const connection = getServiceAccountDBConnection(serviceClientSystemUser);
+    const connection = getDBConnection(req.keycloak_token!);
 
     try {
       await connection.open();
 
       const submissionService = new SubmissionService(connection);
+      const contributorService = new ContributorService(connection);
       const validationService = new ValidationService(connection);
       const searchFeatureService = new SearchFeatureService(connection);
       const regionService = new RegionService(connection);
@@ -161,6 +163,19 @@ export function submissionIntake(): RequestHandler {
         throw new HTTP400('Invalid submission'); // TODO return details on why the submission is invalid
       }
 
+      const serviceClientId = req.keycloak_token!.clientId;
+
+      if (!serviceClientId) {
+        throw new HTTP400('Failed to identify known submission source system', [
+          'token did not contain a service client id'
+        ]);
+      }
+
+      const contributorId = await contributorService.ensureContributorForSystemUser(
+        serviceClientId,
+        serviceClientSystemUser.system_user_id
+      );
+
       // insert the submission record
       const submissionRecord = await submissionService.insertSubmissionRecordWithPotentialConflict(
         submissionUuid,
@@ -168,7 +183,7 @@ export function submissionIntake(): RequestHandler {
         submissionDescription,
         submissionComment,
         serviceClientSystemUser.system_user_id,
-        serviceClientSystemUser.user_identifier
+        contributorId
       );
 
       /*

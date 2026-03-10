@@ -4,8 +4,10 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { startUpload } from '.';
 import * as db from '../../../../database/db';
+import { ContributorService } from '../../../../services/contributor-service';
 import { UploadIngestionService } from '../../../../services/upload/upload-ingestion-service';
 import { PresignedUploadUrlResponse } from '../../../../services/upload/upload-ingestion-service.interface';
+import * as keycloakUtils from '../../../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 
 chai.use(sinonChai);
@@ -41,6 +43,10 @@ describe('archive upload handler', () => {
     const startArchiveUploadStub = sinon
       .stub(UploadIngestionService.prototype, 'startArchiveUpload')
       .resolves(mockUploadResponse);
+    const ensureContributorForSystemUserStub = sinon
+      .stub(ContributorService.prototype, 'ensureContributorForSystemUser')
+      .resolves(11);
+    sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({ system_user_id: 42 } as any);
 
     const requestHandler = startUpload();
 
@@ -53,7 +59,7 @@ describe('archive upload handler', () => {
       comment: 'comment'
     };
     mockReq.system_user = { system_user_id: 42 };
-    mockReq.keycloak_token = 'mock-token';
+    mockReq.keycloak_token = { clientId: 'sims-service-client' };
 
     await requestHandler(mockReq, mockRes, mockNext);
 
@@ -63,8 +69,10 @@ describe('archive upload handler', () => {
       name: 'name',
       description: 'description',
       comment: 'comment',
-      system_user_id: 42
+      system_user_id: 42,
+      contributor_id: 11
     });
+    expect(ensureContributorForSystemUserStub).to.have.been.calledOnceWith('sims-service-client', 42);
 
     expect(mockRes.statusValue).to.equal(201);
     expect(mockRes.jsonValue).to.deep.equal(mockUploadResponse);
@@ -83,6 +91,8 @@ describe('archive upload handler', () => {
 
     const error = new Error('Upload failed');
     sinon.stub(UploadIngestionService.prototype, 'startArchiveUpload').rejects(error);
+    sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({ system_user_id: 42 } as any);
+    sinon.stub(ContributorService.prototype, 'ensureContributorForSystemUser').resolves(11);
 
     const requestHandler = startUpload();
 
@@ -95,7 +105,7 @@ describe('archive upload handler', () => {
       comment: 'comment'
     };
     mockReq.system_user = { system_user_id: 42 };
-    mockReq.keycloak_token = 'mock-token';
+    mockReq.keycloak_token = { clientId: 'sims-service-client' };
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
@@ -116,6 +126,8 @@ describe('archive upload handler', () => {
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
     const requestHandler = startUpload();
+    sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(null);
+    sinon.stub(ContributorService.prototype, 'ensureContributor').resolves(11);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -126,7 +138,7 @@ describe('archive upload handler', () => {
       comment: 'comment'
     };
     mockReq.system_user = undefined;
-    mockReq.keycloak_token = 'mock-token';
+    mockReq.keycloak_token = {};
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
@@ -159,6 +171,8 @@ describe('archive upload handler', () => {
     } as PresignedUploadUrlResponse);
 
     const requestHandler = startUpload();
+    sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(null);
+    sinon.stub(ContributorService.prototype, 'ensureContributor').resolves(11);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -169,7 +183,7 @@ describe('archive upload handler', () => {
       comment: 'comment'
     };
     mockReq.system_user = { system_user_id: 42 };
-    mockReq.keycloak_token = 'mock-token';
+    mockReq.keycloak_token = { clientId: 'biohub-web' };
 
     await requestHandler(mockReq, mockRes, mockNext);
 
@@ -179,7 +193,41 @@ describe('archive upload handler', () => {
       name: 'name',
       description: 'description',
       comment: 'comment',
-      system_user_id: 42
+      system_user_id: 42,
+      contributor_id: 11
     });
+  });
+
+  it('should throw error when service client id is missing for service account upload', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub(),
+      rollback: sinon.stub(),
+      release: sinon.stub()
+    });
+    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+
+    sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({ system_user_id: 42 } as any);
+
+    const requestHandler = startUpload();
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    mockReq.body = {
+      bytes: 12345,
+      name: 'name',
+      description: 'description',
+      comment: 'comment'
+    };
+    mockReq.system_user = { system_user_id: 42 };
+    mockReq.keycloak_token = {};
+
+    try {
+      await requestHandler(mockReq, mockRes, mockNext);
+      expect.fail('Expected error due to missing service client id');
+    } catch (err) {
+      expect((err as Error).message).to.equal('Failed to identify known submission source system');
+      expect(dbConnectionObj.rollback).to.have.been.calledOnce;
+      expect(dbConnectionObj.release).to.have.been.calledOnce;
+    }
   });
 });
