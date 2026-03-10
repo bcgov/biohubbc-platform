@@ -1,47 +1,37 @@
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
-import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { SkeletonList } from 'components/loading/SkeletonLoaders';
-import { ReactNode } from 'react';
+import { GridColDef } from '@mui/x-data-grid';
+import CustomDataGrid from 'components/data-grid/CustomDataGrid';
+import { jsonStringifyObjectProperties } from 'utils/Utils';
 
 interface SubmissionFeaturePropertiesProps {
   data: Record<string, any>;
   isLoading?: boolean;
 }
 
+const columns: GridColDef[] = [
+  {
+    field: 'property',
+    headerName: 'Property',
+    flex: 0.3,
+    renderCell: (params) => <strong style={{ textTransform: 'capitalize' }}>{params.value}</strong>
+  },
+  {
+    field: 'value',
+    headerName: 'Value',
+    flex: 0.7
+  }
+];
+
 export const SubmissionFeatureProperties = ({ data, isLoading }: SubmissionFeaturePropertiesProps) => {
-  const formatPropertyValue = (value: unknown): string => {
-    if (value === null || value === undefined) {
-      return '';
-    }
-    if (typeof value === 'object') {
-      return JSON.stringify(value);
-    }
-    return String(value);
-  };
+  const stringifiedProperties = jsonStringifyObjectProperties(data);
 
-  const formatPropertyName = (name: string): string => {
-    return name.replace(/_/g, ' ');
-  };
-
-  const renderPropertyRows = (): ReactNode => {
-    return Object.entries(data)
-      .filter(([key]) => key !== 'geometry')
-      .map(([key, value]) => (
-        <TableRow key={key}>
-          <TableCell component="th" scope="row" sx={{ fontWeight: 700, textTransform: 'capitalize', width: '30%' }}>
-            {formatPropertyName(key)}
-          </TableCell>
-          <TableCell>{formatPropertyValue(value)}</TableCell>
-        </TableRow>
-      ));
-  };
+  const rows = Object.entries(stringifiedProperties).map(([key, value]) => ({
+    id: key,
+    property: key.replace(/_/g, ' '),
+    value: value ?? ''
+  }));
 
   return (
     <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
@@ -49,13 +39,14 @@ export const SubmissionFeatureProperties = ({ data, isLoading }: SubmissionFeatu
         <Typography variant="h2" component="h2" mb={2}>
           Properties
         </Typography>
-        <LoadingGuard isLoading={isLoading} isLoadingFallback={<SkeletonList numberOfLines={3} />}>
-          <TableContainer>
-            <Table size="small">
-              <TableBody>{renderPropertyRows()}</TableBody>
-            </Table>
-          </TableContainer>
-        </LoadingGuard>
+        <CustomDataGrid
+          rows={rows}
+          columns={columns}
+          loading={isLoading}
+          noRowsMessage="No properties"
+          autoHeight
+          hideFooter
+        />
       </Box>
     </Paper>
   );
