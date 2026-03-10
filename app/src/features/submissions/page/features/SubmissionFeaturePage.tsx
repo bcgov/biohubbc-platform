@@ -42,13 +42,11 @@ export const SubmissionFeaturePage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionId, submissionFeatureId]);
 
-  const [feature, relatedFeatures, isLoading] = useMemo(() => {
-    return [
-      featureDataLoader.data?.feature,
-      featureDataLoader.data?.relatedFeatures,
-      featureDataLoader.isLoading
-    ] as const;
-  }, [featureDataLoader.data, featureDataLoader.isLoading]);
+  const { data, isLoading } = featureDataLoader;
+
+  const [feature, relatedFeatures] = useMemo(() => {
+    return [data?.feature, data?.relatedFeatures] as const;
+  }, [data]);
 
   const isInCart = cartFeatures.some((f) => f.submission_feature_id === Number(submissionFeatureId));
 
