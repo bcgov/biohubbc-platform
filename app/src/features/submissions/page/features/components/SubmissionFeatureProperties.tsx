@@ -38,13 +38,7 @@ export const SubmissionFeatureProperties = ({ data }: SubmissionFeaturePropertie
         <Typography variant="h2" component="h2" mb={2}>
           Properties
         </Typography>
-        <CustomDataGrid
-          rows={rows}
-          columns={columns}
-          noRowsMessage="No properties"
-          autoHeight
-          hideFooter
-        />
+        <CustomDataGrid rows={rows} columns={columns} noRowsMessage="No properties" autoHeight hideFooter />
       </Box>
     </Paper>
   );
