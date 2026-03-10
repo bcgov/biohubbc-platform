@@ -11,6 +11,7 @@ import { IUploadedMediaFile } from '../../utils/biohub-tar-parser';
 import * as fileUtils from '../../utils/file-utils';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { SubmissionFeatureArtifactService } from '../submission-feature-artifact-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
 import { FeatureValidationService } from './feature-validation-service';
@@ -164,9 +165,17 @@ describe('SubmissionIngestionService', () => {
         .stub(IngestionRepository.prototype, 'deleteSubmissionFeaturesBySubmissionUploadId')
         .resolves();
 
+      const softDeleteBySubmissionUploadIdStub = sinon
+        .stub(SubmissionFeatureArtifactService.prototype, 'softDeleteBySubmissionUploadId')
+        .resolves();
+
       const insertSubmissionFeatureRecordStub = sinon
         .stub(IngestionRepository.prototype, 'insertSubmissionFeatureRecord')
         .resolves({ submission_feature_id: 1 });
+
+      const insertSubmissionFeatureArtifactsStub = sinon
+        .stub(SubmissionFeatureArtifactService.prototype, 'insertSubmissionFeatureArtifacts')
+        .resolves();
 
       const updateSubmissionFeatureParentStub = sinon
         .stub(IngestionRepository.prototype, 'updateSubmissionFeatureParent')
@@ -186,7 +195,9 @@ describe('SubmissionIngestionService', () => {
         extractAndUploadMediaStub,
         validateStub,
         deleteSubmissionFeaturesBySubmissionUploadIdStub,
+        softDeleteBySubmissionUploadIdStub,
         insertSubmissionFeatureRecordStub,
+        insertSubmissionFeatureArtifactsStub,
         updateSubmissionFeatureParentStub,
         insertArtifactStub,
         getBucketNameStub
@@ -221,11 +232,13 @@ describe('SubmissionIngestionService', () => {
       expect(stubs.insertArtifactStub.calledOnce).to.be.true;
 
       // Features deleted by submissionUploadId and inserted
+      expect(stubs.softDeleteBySubmissionUploadIdStub.calledOnce).to.be.true;
       expect(stubs.deleteSubmissionFeaturesBySubmissionUploadIdStub.calledOnce).to.be.true;
       expect(stubs.deleteSubmissionFeaturesBySubmissionUploadIdStub.getCall(0).args[0]).to.equal(
         mockSubmissionUpload.submission_upload_id
       );
       expect(stubs.insertSubmissionFeatureRecordStub.callCount).to.equal(2);
+      expect(stubs.insertSubmissionFeatureArtifactsStub.calledOnce).to.be.true;
     });
 
     it('validation failure: returns errors, no pass 2', async () => {
@@ -250,8 +263,10 @@ describe('SubmissionIngestionService', () => {
       // Pass 2 methods should NOT be called
       expect(stubs.extractAndUploadMediaStub.called).to.be.false;
       expect(stubs.insertArtifactStub.called).to.be.false;
+      expect(stubs.softDeleteBySubmissionUploadIdStub.called).to.be.false;
       expect(stubs.deleteSubmissionFeaturesBySubmissionUploadIdStub.called).to.be.false;
       expect(stubs.insertSubmissionFeatureRecordStub.called).to.be.false;
+      expect(stubs.insertSubmissionFeatureArtifactsStub.called).to.be.false;
     });
 
     it('media reference failure: returns errors, no pass 2', async () => {
@@ -337,6 +352,23 @@ describe('SubmissionIngestionService', () => {
       expect(stubs.getFileStreamStub.getCall(0).args[1]).to.equal(mockObjectKey);
       expect(stubs.getFileStreamStub.getCall(1).args[0]).to.equal(BucketType.MAIN);
       expect(stubs.getFileStreamStub.getCall(1).args[1]).to.equal(mockObjectKey);
+    });
+
+    it('does not create submission_feature_artifact links for non-media feature types', async () => {
+      const nonMediaBlocks: IFlattenedBlock[] = [
+        { id: 'dataset-1', type: 'dataset', properties: { name: 'Dataset' }, content: [], parent: null },
+        { id: 'obs-1', type: 'observation', properties: { species: 'bear' }, content: [], parent: 'dataset-1' }
+      ];
+
+      const stubs = setupHappyPathStubs(nonMediaBlocks);
+      const dbConnection = getMockDBConnection();
+      const service = new SubmissionIngestionService(dbConnection);
+
+      const result = await service.processSubmission(mockSubmissionUpload);
+
+      expect(result).to.eql({ valid: true, errors: [] });
+      expect(stubs.insertSubmissionFeatureRecordStub.callCount).to.equal(2);
+      expect(stubs.insertSubmissionFeatureArtifactsStub.called).to.be.false;
     });
 
     it('setArtifactKeys sets artifact_key on file blocks', async () => {
@@ -433,8 +465,10 @@ describe('SubmissionIngestionService', () => {
       expect(stubs.validateStub.calledOnce).to.be.true;
       expect(stubs.extractAndUploadMediaStub.calledOnce).to.be.true;
       expect(stubs.insertArtifactStub.calledOnce).to.be.true;
+      expect(stubs.softDeleteBySubmissionUploadIdStub.calledOnce).to.be.true;
       expect(stubs.deleteSubmissionFeaturesBySubmissionUploadIdStub.calledOnce).to.be.true;
       expect(stubs.insertSubmissionFeatureRecordStub.callCount).to.equal(2);
+      expect(stubs.insertSubmissionFeatureArtifactsStub.calledOnce).to.be.true;
 
       // getFileStream called twice (pass 1 and pass 2)
       expect(stubs.getFileStreamStub.callCount).to.equal(2);

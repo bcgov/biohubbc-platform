@@ -104,6 +104,7 @@ describe('Process Submission Features Worker', function () {
           .select('submission_feature_id');
         const ids = featureIds.map((r: { submission_feature_id: number }) => r.submission_feature_id);
         if (ids.length) {
+          await db('biohub.submission_feature_artifact').whereIn('submission_feature_id', ids).del();
           await db('biohub.search_string').whereIn('submission_feature_id', ids).del();
           await db('biohub.search_number').whereIn('submission_feature_id', ids).del();
           await db('biohub.search_datetime').whereIn('submission_feature_id', ids).del();
@@ -637,6 +638,20 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     );
     expect(artifacts.rows).to.have.lengthOf(1);
     expect(artifacts.rows[0].object_key).to.include('photo.jpg');
+
+    // Verify explicit submission_feature -> artifact link was created
+    const links = await connection.sql<{ submission_feature_id: number; artifact_id: string }>(
+      SQL`SELECT sfa.submission_feature_id, sfa.artifact_id
+          FROM biohub.submission_feature_artifact sfa
+          JOIN biohub.submission_feature sf ON sf.submission_feature_id = sfa.submission_feature_id
+          JOIN biohub.feature_type ft ON ft.feature_type_id = sf.feature_type_id
+          JOIN biohub.artifact a ON a.artifact_id = sfa.artifact_id
+          WHERE sf.submission_id = ${submissionId}
+            AND ft.name = 'file'
+            AND sfa.record_end_date IS NULL
+            AND a.object_key LIKE ${'submissions/' + submissionId + '/media/%'}`
+    );
+    expect(links.rows).to.have.lengthOf(1);
   });
 
   it('should reject submission with missing media reference', async () => {

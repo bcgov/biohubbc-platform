@@ -8,6 +8,7 @@ import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { getLogger } from '../../utils/logger';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { SubmissionFeatureArtifactService } from '../submission-feature-artifact-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
 import { FeatureValidationService } from './feature-validation-service';
@@ -30,6 +31,7 @@ const CSV_ROW_OVERHEAD_BYTES = 500;
 export class SubmissionIngestionService extends DBService {
   featureValidationService = new FeatureValidationService(this.connection);
   ingestionRepository = new IngestionRepository(this.connection);
+  submissionFeatureArtifactService = new SubmissionFeatureArtifactService(this.connection);
   uploadArchiveService = new UploadArchiveService(this.connection);
   artifactService = new ArtifactService(this.connection);
   objectStorageService = new ObjectStorageService();
@@ -105,8 +107,9 @@ export class SubmissionIngestionService extends DBService {
     const dataByteSizeMap = this.computeDataByteSizeMap(allBlocks, uploadedMediaFiles);
 
     // Create artifact records for each uploaded media file
+    const filenameToArtifactId = new Map<string, string>();
     for (const [, mediaFile] of uploadedMediaFiles) {
-      await this.artifactService.insertArtifact({
+      const artifact = await this.artifactService.insertArtifact({
         bucket: getObjectStoreBucketName(),
         object_key: mediaFile.s3Key,
         byte_size: mediaFile.byteSize,
@@ -114,13 +117,17 @@ export class SubmissionIngestionService extends DBService {
         checksum_sha256: null,
         uploaded_at: dayjs().toISOString()
       });
+      filenameToArtifactId.set(mediaFile.fileName, artifact.artifact_id);
     }
+
+    // Soft-delete previous feature-artifact links for this upload before replacing features.
+    await this.submissionFeatureArtifactService.softDeleteBySubmissionUploadId(submissionUploadId);
 
     // Soft-delete previous features for this upload, then insert fresh ones.
     // Scoped by submissionUploadId (not submissionId) so re-triggering one upload
     // doesn't wipe features from a different upload in the same submission.
     await this.ingestionRepository.deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId);
-    await this.insertFlatFeatures(submissionId, submissionUploadId, allBlocks, dataByteSizeMap);
+    await this.insertFlatFeatures(submissionId, submissionUploadId, allBlocks, dataByteSizeMap, filenameToArtifactId);
 
     return { valid: true, errors: [] };
   }
@@ -141,9 +148,11 @@ export class SubmissionIngestionService extends DBService {
     submissionId: number,
     submissionUploadId: string,
     features: IFlattenedBlock[],
-    dataByteSizeMap: Map<string, number>
+    dataByteSizeMap: Map<string, number>,
+    filenameToArtifactId: Map<string, string>
   ): Promise<void> {
     const uuidToDbId = new Map<string, number>();
+    const pendingFeatureArtifactLinks: Array<{ submission_feature_id: number; artifact_id: string }> = [];
 
     // Pass 1: Insert all features without parent references
     for (const feature of features) {
@@ -157,6 +166,30 @@ export class SubmissionIngestionService extends DBService {
         dataByteSizeMap.get(feature.id) ?? 0
       );
       uuidToDbId.set(feature.id, result.submission_feature_id);
+
+      if (this.isMediaBackedFeature(feature.type)) {
+        const filename = feature.properties['filename'];
+        if (typeof filename !== 'string' || filename.length === 0) {
+          throw new Error(`Media-backed feature '${feature.id}' is missing required 'filename' property`);
+        }
+
+        const artifactId = filenameToArtifactId.get(filename);
+        if (!artifactId) {
+          throw new Error(
+            `No artifact mapping found for media-backed feature '${feature.id}' and filename '${filename}'`
+          );
+        }
+
+        pendingFeatureArtifactLinks.push({
+          submission_feature_id: result.submission_feature_id,
+          artifact_id: artifactId
+        });
+      }
+    }
+
+    // Bulk insert explicit feature -> artifact links to minimize insert round-trips.
+    if (pendingFeatureArtifactLinks.length > 0) {
+      await this.submissionFeatureArtifactService.insertSubmissionFeatureArtifacts(pendingFeatureArtifactLinks);
     }
 
     // Pass 2: Update parent references
@@ -169,6 +202,18 @@ export class SubmissionIngestionService extends DBService {
         }
       }
     }
+  }
+
+  /**
+   * Whether a feature type represents a media-backed extracted file.
+   *
+   * @private
+   * @param {string} featureType
+   * @returns {boolean}
+   * @memberof SubmissionIngestionService
+   */
+  private isMediaBackedFeature(featureType: string): boolean {
+    return featureType === 'file' || featureType === 'report';
   }
 
   /**
