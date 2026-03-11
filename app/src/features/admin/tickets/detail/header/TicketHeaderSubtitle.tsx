@@ -2,7 +2,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
 interface ITicketHeaderSubtitleProps {
-  text?: string;
+  text: string;
   onReadMore?: () => void;
 }
 
@@ -10,26 +10,17 @@ const SUBTITLE_PREVIEW_MAX_LENGTH = 300;
 
 export const TicketHeaderSubtitle = (props: ITicketHeaderSubtitleProps) => {
   const { text, onReadMore } = props;
-
-  if (!text) {
-    return null;
-  }
-
-  const getSubtitlePreview = (value: string) => {
-    if (value.length <= SUBTITLE_PREVIEW_MAX_LENGTH) {
-      return { preview: value, isTruncated: false };
-    }
-
-    return {
-      preview: value.slice(0, SUBTITLE_PREVIEW_MAX_LENGTH).trimEnd(),
-      isTruncated: true
-    };
-  };
-
-  const { preview, isTruncated } = getSubtitlePreview(text);
+  const isTruncated = text.length > SUBTITLE_PREVIEW_MAX_LENGTH;
+  const preview = isTruncated ? text.slice(0, SUBTITLE_PREVIEW_MAX_LENGTH) : text;
 
   return (
-    <Typography color="text.secondary" component="div">
+    <Typography
+      color="text.secondary"
+      component="div"
+      sx={{
+        overflowWrap: 'anywhere',
+        wordBreak: 'break-word'
+      }}>
       {preview}
       {isTruncated ? (
         <>

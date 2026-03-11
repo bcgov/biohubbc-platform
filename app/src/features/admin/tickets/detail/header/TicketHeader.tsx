@@ -88,7 +88,7 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
           </Stack>
         }
         subheader={
-          <Stack spacing={1}>
+          <Stack spacing={2}>
             <Stack direction="row" spacing={1}>
               <Chip label={`${ticket.priority} priority`} sx={{ textTransform: 'capitalize' }} />
               <Chip
@@ -97,7 +97,9 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
                 sx={{ textTransform: 'capitalize' }}
               />
             </Stack>
-            <TicketHeaderSubtitle text={ticket.description ?? undefined} onReadMore={handleReadMoreClick} />
+            {ticket.description ? (
+              <TicketHeaderSubtitle text={ticket.description} onReadMore={handleReadMoreClick} />
+            ) : null}
           </Stack>
         }
       />
