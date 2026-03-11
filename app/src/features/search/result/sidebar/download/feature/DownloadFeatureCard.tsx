@@ -1,18 +1,11 @@
 import { mdiChevronDown, mdiChevronUp, mdiDownload } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Button, Card, Chip, ChipProps, Collapse, IconButton, Link, Stack, Typography } from '@mui/material';
+import { Button, Card, Chip, Collapse, IconButton, Link, Stack, Typography } from '@mui/material';
 import { grey } from '@mui/material/colors';
 import { useState } from 'react';
+import { DOWNLOAD_STATUS_CHIP_PROPS } from 'constants/download';
 import { DownloadRecord } from 'interfaces/useDownloadApi.interface';
 import { isDownloadReady } from '../downloads/DownloadSidebarDownloads';
-
-const statusChipProps: Record<string, { color: ChipProps['color']; label: string }> = {
-  pending: { color: 'default', label: 'Pending' },
-  processing: { color: 'info', label: 'Processing' },
-  ready: { color: 'success', label: 'Ready' },
-  downloaded: { color: 'success', label: 'Downloaded' },
-  failed: { color: 'error', label: 'Failed' }
-};
 
 interface DownloadFeatureCardProps {
   download: DownloadRecord;
@@ -21,7 +14,10 @@ interface DownloadFeatureCardProps {
 }
 
 export const DownloadFeatureCard = ({ download, onDownloadFragment, onDownloadAll }: DownloadFeatureCardProps) => {
-  const chipProps = statusChipProps[download.download_status] ?? { color: 'default', label: download.download_status };
+  const chipProps = DOWNLOAD_STATUS_CHIP_PROPS[download.download_status] ?? {
+    color: 'default',
+    label: download.download_status
+  };
   const ready = isDownloadReady(download.download_status);
   const multiFragment = download.total_fragments > 1;
   const [partsOpen, setPartsOpen] = useState(false);

@@ -28,8 +28,6 @@ export const DownloadSidebarDownloads = () => {
     biohubApi.download.getDownloads(pagination)
   );
 
-  downloadsDataLoader.load({ page: 1, limit: PAGE_SIZE });
-
   useEffect(() => {
     downloadsDataLoader.refresh({ page, limit: PAGE_SIZE });
     // eslint-disable-next-line react-hooks/exhaustive-deps

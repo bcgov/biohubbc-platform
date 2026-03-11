@@ -88,20 +88,9 @@ export class ObjectStorageService {
       });
     }
 
-    if (process.env.QUARANTINE_OBJECT_STORE_URL_PUBLIC) {
-      this.publicBuckets.set(BucketType.QUARANTINE, {
-        client: new S3Client({
-          endpoint: process.env.QUARANTINE_OBJECT_STORE_URL_PUBLIC,
-          credentials: {
-            accessKeyId: process.env.QUARANTINE_OBJECT_STORE_ACCESS_KEY_ID!,
-            secretAccessKey: process.env.QUARANTINE_OBJECT_STORE_SECRET_KEY_ID!
-          },
-          forcePathStyle: true,
-          region: 'ca-central-1'
-        }),
-        name: process.env.QUARANTINE_OBJECT_STORE_BUCKET_NAME!
-      });
-    }
+    // No public client for the quarantine bucket — we only generate presigned PUT URLs
+    // for quarantine (handled by submission-upload-utils), never presigned GET URLs.
+    // Exposing presigned GET URLs for quarantine would let clients download unscanned files.
   }
 
   /**
@@ -323,6 +312,11 @@ export class ObjectStorageService {
     expiresInSeconds = 300,
     responseContentDisposition?: string
   ): Promise<string> {
+    // Quarantine files must never be directly downloadable by clients — only the main bucket serves GET URLs.
+    if (bucketType === BucketType.QUARANTINE) {
+      throw new Error('Presigned GET URLs are not allowed for the quarantine bucket');
+    }
+
     const { client, name } = this.publicBuckets.get(bucketType) ?? this.getBucket(bucketType);
     return getSignedUrl(
       client,
