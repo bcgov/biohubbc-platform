@@ -106,6 +106,19 @@ export class CartSubmissionFeatureService extends DBService {
   }
 
   /**
+   * Returns true if the given submission feature exists in an active cart.
+   *
+   * @param {string} cartId - The ID of the cart
+   * @param {number} submissionFeatureId - The submission feature ID to check
+   * @return {Promise<boolean>}
+   * @memberof CartSubmissionFeatureService
+   */
+  async isSubmissionFeatureInCart(cartId: string, submissionFeatureId: number): Promise<boolean> {
+    const ids = await this.cartSubmissionFeatureRepository.getCartSubmissionFeatureIds(cartId);
+    return ids.includes(submissionFeatureId);
+  }
+
+  /**
    * Returns cart features and pagination payload in the same shape used by cart feature endpoints.
    *
    * @param {string} cartId - The ID of the cart

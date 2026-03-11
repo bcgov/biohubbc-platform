@@ -2,7 +2,8 @@ import { AxiosInstance } from 'axios';
 import {
   CartFeatureListResponse,
   CartWithFeaturesResponse,
-  CheckoutCartResponse
+  CheckoutCartResponse,
+  IsFeatureInCartResponse
 } from 'interfaces/useCartApi.interface';
 import qs from 'qs';
 import { ApiPaginationRequestOptions } from 'types/pagination';
@@ -120,6 +121,21 @@ export const useCartApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Check if a submission feature is in the cart.
+   *
+   * @param {string} cartId - The cart ID to check.
+   * @param {number} submissionFeatureId - The submission feature ID to check for.
+   * @return {Promise<IsFeatureInCartResponse>} Whether the feature is in the cart.
+   */
+  const isFeatureInCart = async (cartId: string, submissionFeatureId: number): Promise<IsFeatureInCartResponse> => {
+    const { data } = await axios.get<IsFeatureInCartResponse>(
+      `/api/cart/${cartId}/feature/${submissionFeatureId}`
+    );
+
+    return data;
+  };
+
+  /**
    * Check out a cart, creating a download from all cart features.
    *
    * @param {string} cartId - The cart to check out.
@@ -138,6 +154,7 @@ export const useCartApi = (axios: AxiosInstance) => {
     addCartFeatures,
     removeCartFeatureById,
     clearCart,
+    isFeatureInCart,
     checkoutCart
   };
 };
