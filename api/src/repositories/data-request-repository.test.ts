@@ -4,7 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiNotFoundError } from '../errors/api-error';
-import { CreateDataRequest, DataRequest, UpdateDataRequest } from '../models/data-request';
+import { CreateDataRequestPayload, DataRequest, UpdateDataRequest } from '../models/data-request';
 import { getMockDBConnection } from '../__mocks__/db';
 import { DataRequestRepository } from './data-request-repository';
 
@@ -19,7 +19,8 @@ describe('DataRequestRepository', () => {
     data_request_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
     reason: 'Research purposes',
     team_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
-    requested_by: 1
+    requested_by: 1,
+    ticket_id: 'd4e5f6a7-b8c9-0123-def0-234567890123'
   };
 
   describe('findDataRequests', () => {
@@ -239,9 +240,11 @@ describe('DataRequestRepository', () => {
 
       const repo = new DataRequestRepository(mockDBConnection);
 
-      const payload: CreateDataRequest = {
+      const payload: CreateDataRequestPayload = {
         requested_by: mockDataRequest.requested_by,
-        reason: 'New research project'
+        reason: 'New research project',
+        team_id: mockDataRequest.team_id,
+        ticket_id: mockDataRequest.ticket_id
       };
 
       const result = await repo.createDataRequest(mockDataRequest.requested_by, payload);
@@ -261,9 +264,11 @@ describe('DataRequestRepository', () => {
 
       const repo = new DataRequestRepository(mockDBConnection);
 
-      const payload: CreateDataRequest = {
+      const payload: CreateDataRequestPayload = {
         requested_by: mockDataRequest.requested_by,
-        reason: 'Test'
+        reason: 'Test',
+        team_id: mockDataRequest.team_id,
+        ticket_id: mockDataRequest.ticket_id
       };
 
       try {

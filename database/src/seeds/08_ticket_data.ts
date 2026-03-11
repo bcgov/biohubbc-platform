@@ -129,6 +129,28 @@ export async function seed(knex: Knex): Promise<void> {
     }
   }
 
+  // Seed data_request records linked to tickets
+  const opsCheckTicket = seededTicketsByKey['ops-check'];
+  const dataFixTicket = seededTicketsByKey['data-fix'];
+
+  if (opsCheckTicket) {
+    await ensureDataRequest(knex, {
+      reason: 'Ops health check data request',
+      teamId,
+      requestedBy: createUser,
+      ticketId: opsCheckTicket.ticket_id
+    });
+  }
+
+  if (dataFixTicket) {
+    await ensureDataRequest(knex, {
+      reason: 'Data correction data request',
+      teamId,
+      requestedBy: createUser,
+      ticketId: dataFixTicket.ticket_id
+    });
+  }
+
   for (const referenceScenario of TICKET_REFERENCE_SCENARIOS) {
     const sourceTicket = seededTicketsByKey[referenceScenario.sourceKey];
     const targetTicket = seededTicketsByKey[referenceScenario.targetKey];
@@ -325,5 +347,43 @@ const ensureTicketReference = async (
     target_ticket_id: targetTicketId,
     relationship,
     create_user: createUser
+  });
+};
+
+const ensureDataRequest = async (
+  knex: Knex,
+  input: { reason: string; teamId: string; requestedBy: number; ticketId: string }
+): Promise<void> => {
+  const existing = await knex('data_request').where({ ticket_id: input.ticketId }).whereNull('record_end_date').first();
+
+  let dataRequestId: string;
+
+  if (existing) {
+    dataRequestId = existing.data_request_id;
+    const hasStatus = await knex('data_request_status')
+      .where({ data_request_id: dataRequestId })
+      .whereNull('record_end_date')
+      .first();
+    if (hasStatus) {
+      return;
+    }
+  } else {
+    const [inserted] = await knex('data_request')
+      .insert({
+        reason: input.reason,
+        team_id: input.teamId,
+        requested_by: input.requestedBy,
+        ticket_id: input.ticketId,
+        create_user: input.requestedBy
+      })
+      .returning(['data_request_id']);
+    dataRequestId = inserted.data_request_id;
+  }
+
+  await knex('data_request_status').insert({
+    data_request_id: dataRequestId,
+    request_status: 'APPROVED',
+    comment_id: null,
+    create_user: input.requestedBy
   });
 };
