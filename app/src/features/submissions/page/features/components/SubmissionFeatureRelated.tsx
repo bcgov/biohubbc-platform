@@ -5,21 +5,17 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
-import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { SkeletonList } from 'components/loading/SkeletonLoaders';
 import { IRelatedSubmissionFeature } from 'interfaces/useFeaturesApi.interface';
 import { Link as RouterLink } from 'react-router-dom';
 
 interface SubmissionFeatureRelatedProps {
-  submissionId: number;
+  submissionId: string | undefined;
   relatedFeatures: IRelatedSubmissionFeature[];
-  isLoading?: boolean;
 }
 
 export const SubmissionFeatureRelated = ({
   submissionId,
-  relatedFeatures,
-  isLoading
+  relatedFeatures
 }: SubmissionFeatureRelatedProps) => {
   return (
     <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
@@ -27,26 +23,26 @@ export const SubmissionFeatureRelated = ({
         <Typography variant="h2" component="h2" mb={2}>
           Related
         </Typography>
-        <LoadingGuard isLoading={isLoading} isLoadingFallback={<SkeletonList numberOfLines={2} />}>
-          {relatedFeatures.length > 0 ? (
-            <List disablePadding>
-              {relatedFeatures.map((related) => (
-                <ListItem key={related.submission_feature_id} disablePadding divider>
-                  <ListItemButton
-                    component={RouterLink}
-                    to={`/search/${submissionId}/feature/${related.submission_feature_id}`}>
-                    <ListItemText
-                      primary={related.data?.name || related.feature_type_display_name}
-                      secondary={related.feature_type_display_name}
-                    />
-                  </ListItemButton>
-                </ListItem>
-              ))}
-            </List>
-          ) : (
+        {submissionId && relatedFeatures.length > 0 ? (
+          <List disablePadding>
+            {relatedFeatures.map((related) => (
+              <ListItem key={related.submission_feature_id} disablePadding divider>
+                <ListItemButton
+                  component={RouterLink}
+                  to={`/search/${submissionId}/feature/${related.submission_feature_id}`}>
+                  <ListItemText
+                    primary={related.data?.name || related.feature_type_display_name}
+                    secondary={related.feature_type_display_name}
+                  />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        ) : (
+          <Box display="flex" justifyContent="center" alignItems="center" minHeight={300} p={2}>
             <Typography color="text.secondary">No related features</Typography>
-          )}
-        </LoadingGuard>
+          </Box>
+        )}
       </Box>
     </Paper>
   );
