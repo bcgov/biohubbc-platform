@@ -30,7 +30,7 @@ export const SearchResultCard = ({
 }: SearchResultCardProps) => {
   return (
     <Card elevation={0} key={result.uuid}>
-      <CardActionArea onClick={() => onClick?.(result)}>
+      <CardActionArea onClick={() => onClick(result)}>
         <CardHeader
           title={
             <Typography

@@ -28,7 +28,7 @@ export const SubmissionFeatureProperties = ({ data }: SubmissionFeaturePropertie
 
   const rows = Object.entries(stringifiedProperties).map(([key, value]) => ({
     id: key,
-    property: key.replace(/_/g, ' '),
+    property: key.replaceAll('_', ' '),
     value: value ?? ''
   }));
 
