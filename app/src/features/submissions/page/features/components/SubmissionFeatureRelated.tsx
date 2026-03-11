@@ -13,10 +13,7 @@ interface SubmissionFeatureRelatedProps {
   relatedFeatures: IRelatedSubmissionFeature[];
 }
 
-export const SubmissionFeatureRelated = ({
-  submissionId,
-  relatedFeatures
-}: SubmissionFeatureRelatedProps) => {
+export const SubmissionFeatureRelated = ({ submissionId, relatedFeatures }: SubmissionFeatureRelatedProps) => {
   return (
     <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
       <Box p={3}>

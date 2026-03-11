@@ -596,7 +596,17 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
       clearCart,
       checkout
     }),
-    [addToCart, checkout, clearCart, removeFromCart, state.cartId, state.features, state.pagination, state.isLoading, state.error]
+    [
+      addToCart,
+      checkout,
+      clearCart,
+      removeFromCart,
+      state.cartId,
+      state.features,
+      state.pagination,
+      state.isLoading,
+      state.error
+    ]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

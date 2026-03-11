@@ -128,9 +128,7 @@ export const useCartApi = (axios: AxiosInstance) => {
    * @return {Promise<IsFeatureInCartResponse>} Whether the feature is in the cart.
    */
   const isFeatureInCart = async (cartId: string, submissionFeatureId: number): Promise<IsFeatureInCartResponse> => {
-    const { data } = await axios.get<IsFeatureInCartResponse>(
-      `/api/cart/${cartId}/feature/${submissionFeatureId}`
-    );
+    const { data } = await axios.get<IsFeatureInCartResponse>(`/api/cart/${cartId}/feature/${submissionFeatureId}`);
 
     return data;
   };

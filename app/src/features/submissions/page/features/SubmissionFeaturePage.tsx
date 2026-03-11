@@ -42,7 +42,10 @@ export const SubmissionFeaturePage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionId, submissionFeatureId]);
 
-  const { feature, relatedFeatures } = useMemo(() => featureDataLoader.data ?? { feature: undefined, relatedFeatures: undefined }, [featureDataLoader.data]);
+  const { feature, relatedFeatures } = useMemo(
+    () => featureDataLoader.data ?? { feature: undefined, relatedFeatures: undefined },
+    [featureDataLoader.data]
+  );
   const isLoading = featureDataLoader.isLoading;
 
   useEffect(() => {
