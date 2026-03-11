@@ -12,12 +12,13 @@ export const useFeaturesApi = (axios: AxiosInstance) => {
    * Get a submission feature by its ID
    * Also gets related features if there is any
    *
-   * @param {number} submissionId
+   * @param {string} submissionId
+   * @param {string} submissionFeatureId
    * @return {Promise<ISubmissionFeatureResponse>}
    */
   const getSubmissionFeatureById = async (
-    submissionId: number,
-    submissionFeatureId: number
+    submissionId: string,
+    submissionFeatureId: string
   ): Promise<ISubmissionFeatureResponse> => {
     const { data } = await axios.get(`api/submission/${submissionId}/features/${submissionFeatureId}`);
 

@@ -29,7 +29,8 @@ export const SubmissionFeaturePage = () => {
   const { submissionId, submissionFeatureId } = useParams<{ submissionId: string; submissionFeatureId: string }>();
 
   const featureDataLoader = useDataLoader(
-    () => biohubApi.features.getSubmissionFeatureById(Number(submissionId), Number(submissionFeatureId)),
+    (submissionId, submissionFeatureId) =>
+      biohubApi.features.getSubmissionFeatureById(submissionId, submissionFeatureId),
     (error: unknown) => {
       const status = (error as APIError)?.status;
       if (status === 401 || status === 403) {
@@ -38,7 +39,7 @@ export const SubmissionFeaturePage = () => {
     }
   );
   useEffect(() => {
-    featureDataLoader.refresh();
+    featureDataLoader.refresh(submissionId, submissionFeatureId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionId, submissionFeatureId]);
 

@@ -33,7 +33,7 @@ describe('useFeaturesApi', () => {
       mock.onGet('api/submission/1/features/10').reply(200, mockResponse);
 
       const api = useFeaturesApi(axios);
-      const result = await api.getSubmissionFeatureById(1, 10);
+      const result = await api.getSubmissionFeatureById('1', '10');
 
       expect(result).toEqual(mockResponse);
     });
