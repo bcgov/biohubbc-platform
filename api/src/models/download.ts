@@ -4,9 +4,6 @@ import { DownloadStatusZod } from './download-status';
 
 export const DownloadRecord = z.object({
   download_id: z.string(),
-  system_user_id: z.number().nullable(),
-  team_id: z.string().nullable(),
-  data_request_id: z.string().nullable(),
   download_status: DownloadStatusZod,
   metadata: z.object({}).passthrough().nullable(),
   started_at: z.string().nullable(),
@@ -77,14 +74,11 @@ export interface DownloadSizeEstimate {
 /**
  * Payload for creating a new download record.
  *
- * Bundles the identifiers and optional configuration that flow from the
- * pipeline service through to the repository INSERT.
+ * Team linking is handled separately via download_team — callers insert
+ * into the join table after creating the download record.
  */
 export const CreateDownload = z.object({
-  teamId: z.string().nullable(),
-  dataRequestId: z.string().nullable(),
   fragmentSizeBytes: z.number().optional(),
-  systemUserId: z.number().nullable().optional(),
   filters: SearchFeatureFiltersSchema.optional()
 });
 export type CreateDownload = z.infer<typeof CreateDownload>;
@@ -94,13 +88,10 @@ export type CreateDownload = z.infer<typeof CreateDownload>;
  *
  * Accepted by the pipeline service's public entry point. Includes the feature
  * selection and optional fragment sizing before the request is persisted and
- * features are linked.
+ * features are linked. Team linking is handled by the caller via download_team.
  */
 export const CreateDownloadRequest = z.object({
-  systemUserId: z.number().nullable(),
-  teamId: z.string().nullable(),
   submissionFeatureIds: z.array(z.number()),
-  dataRequestId: z.string().optional(),
   fragmentSizeMb: z.number().optional(),
   filters: SearchFeatureFiltersSchema.optional()
 });
