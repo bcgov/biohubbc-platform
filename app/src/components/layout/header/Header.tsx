@@ -19,7 +19,7 @@ import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { LoggedInUser, PublicViewUser } from './UserControls';
 
-const Header: React.FC<React.PropsWithChildren> = () => {
+const Header = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   const [open, setOpen] = useState(false);

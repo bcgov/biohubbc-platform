@@ -3,6 +3,7 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { ITicketWithHistory, IUpdateTicketRequest } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
+import { useOptimisticTicketHandlers } from './useOptimisticTicketHandlers';
 
 interface IUseTicketEditDialogProps {
   ticket: ITicketWithHistory;
@@ -18,7 +19,8 @@ export const useTicketEditDialog = (props: IUseTicketEditDialogProps) => {
   const { ticket } = props;
   const api = useApi();
   const dialogContext = useDialogContext();
-  const { ticketId, ticketDataLoader } = useTicketContext();
+  const { ticketId } = useTicketContext();
+  const { handleCommitOptimisticUpdate, handleOptimisticTicketUpdate } = useOptimisticTicketHandlers({ ticket });
 
   const [isSavingTicket, setIsSavingTicket] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -44,28 +46,18 @@ export const useTicketEditDialog = (props: IUseTicketEditDialogProps) => {
       const updatePayload: IUpdateTicketRequest = {
         subject: nextTicket.subject,
         description: nextTicket.description,
-        priority: nextTicket.priority,
-        status: nextTicket.status
+        priority: nextTicket.priority
       };
 
-      ticketDataLoader.setData(nextTicket);
-
-      try {
-        const updatedTicket = await api.tickets.updateTicket(ticketId, updatePayload);
-
-        if (updatedTicket) {
-          ticketDataLoader.setData({
-            ...nextTicket,
-            ...updatedTicket,
-            statuses: nextTicket.statuses,
-            comments: nextTicket.comments,
-            references: nextTicket.references
-          });
-        }
-      } catch (error) {
-        ticketDataLoader.setData(ticket);
-        throw error;
+      if (payload.status !== undefined) {
+        updatePayload.status = nextTicket.status;
       }
+
+      await handleOptimisticTicketUpdate({
+        buildOptimisticTicket: () => nextTicket,
+        handleUpdate: () => api.tickets.updateTicket(ticketId, updatePayload),
+        onCommit: handleCommitOptimisticUpdate
+      });
 
       setIsEditDialogOpen(false);
     } catch (caughtError) {

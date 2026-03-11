@@ -1,5 +1,5 @@
 import { fireEvent, waitFor } from '@testing-library/react';
-import OkDialog from 'components/dialog/OkDialog';
+import { OkDialog } from 'components/dialog/OkDialog';
 import { render } from 'test-helpers/test-utils';
 
 const handleOnClose = vi.fn();
@@ -34,9 +34,8 @@ describe('OkDialog', () => {
   });
 
   it('calls the onClose prop when `Ok` button is clicked', async () => {
-    const { findByText } = renderContainer({ dialogTitle: 'this is a test', dialogText: 'this is text' });
-
-    const okButton = await findByText('Ok', { exact: false });
+    const { getByTestId } = renderContainer({ dialogTitle: 'this is a test', dialogText: 'this is text' });
+    const okButton = getByTestId('ok-button');
 
     fireEvent.click(okButton);
 

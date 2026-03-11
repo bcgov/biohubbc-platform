@@ -6,12 +6,12 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { PageHeader } from 'components/header/PageHeader';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
-import { useDialogContext, useTicketContext } from 'hooks/useContext';
+import { useDialogContext } from 'hooks/useContext';
 import { ITicketWithHistory, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { Link as RouterLink } from 'react-router-dom';
 import { EditTicketDialog } from '../../components/dialog/edit/EditTicketDialog';
+import { useOptimisticTicketHandlers } from '../../hooks/useOptimisticTicketHandlers';
 import { useTicketEditDialog } from '../../hooks/useTicketEditDialog';
-import { useTicketStatusOptimistic } from '../../hooks/useTicketStatusOptimistic';
 import { TicketHeaderSubtitle } from './TicketHeaderSubtitle';
 
 interface ITicketHeaderProps {
@@ -28,9 +28,10 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
   const { ticket } = props;
   const { biohubUserWrapper } = useAuthStateContext();
   const dialogContext = useDialogContext();
-  const { ticketDataLoader } = useTicketContext();
-  const { isSavingTicket, isEditDialogOpen, openEditDialog, closeEditDialog } = useTicketEditDialog({ ticket });
-  const { isSavingStatus, requestStatusChange } = useTicketStatusOptimistic({
+  const { isSavingTicket, isEditDialogOpen, openEditDialog, closeEditDialog, handleEditTicket } = useTicketEditDialog({
+    ticket
+  });
+  const { isSavingStatus, requestStatusChange } = useOptimisticTicketHandlers({
     ticket,
     userIdentifier: biohubUserWrapper.userIdentifier
   });
@@ -47,12 +48,12 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
       return;
     }
 
-    dialogContext.setErrorDialog({
+    dialogContext.setOkDialog({
       open: true,
       dialogTitle: 'Ticket Description',
-      dialogText: ticket.description,
-      onClose: () => dialogContext.setErrorDialog({ open: false }),
-      onOk: () => dialogContext.setErrorDialog({ open: false })
+      dialogText: '',
+      dialogContent: <Typography>{ticket.description}</Typography>,
+      onClose: () => dialogContext.setOkDialog({ open: false })
     });
   };
 
@@ -108,23 +109,10 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
       {isEditDialogOpen ? (
         <EditTicketDialog
           open={isEditDialogOpen}
+          isLoading={isSavingTicket}
           ticket={ticket}
           onClose={closeEditDialog}
-          onSubmit={(updatedTicket) => {
-            const latestTicket = ticketDataLoader.data;
-
-            if (!latestTicket) {
-              return;
-            }
-
-            ticketDataLoader.setData({
-              ...latestTicket,
-              ...updatedTicket,
-              statuses: latestTicket.statuses,
-              comments: latestTicket.comments,
-              references: latestTicket.references
-            });
-          }}
+          onSubmit={handleEditTicket}
         />
       ) : null}
     </>

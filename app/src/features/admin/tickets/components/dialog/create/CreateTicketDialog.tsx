@@ -1,10 +1,8 @@
 import { EditDialog } from 'components/dialog/EditDialog';
-import { TicketPriority } from 'interfaces/useTicketsApi.interface';
+import { TICKET_PRIORITIES } from 'constants/ticket';
 import { useMemo } from 'react';
 import { ITicketFormValues, TicketForm } from '../form/TicketForm';
-import { CreateTicketFormYupSchema } from './CreateDialogYup';
-
-const TICKET_PRIORITIES: TicketPriority[] = ['low', 'medium', 'high', 'critical'];
+import { TicketYupSchema } from '../form/TicketYupSchema';
 
 interface ICreateTicketDialogProps {
   open: boolean;
@@ -46,7 +44,7 @@ export const CreateTicketDialog = (props: ICreateTicketDialogProps) => {
       component={{
         element: <TicketForm priorities={ticketPriorityOptions} />,
         initialValues: CreateTicketFormInitialValues,
-        validationSchema: CreateTicketFormYupSchema
+        validationSchema: TicketYupSchema
       }}
       onCancel={onCancel}
       onSave={onSave}

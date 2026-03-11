@@ -1,4 +1,4 @@
-import OkDialog from 'components/dialog/OkDialog';
+import { OkDialog } from 'components/dialog/OkDialog';
 import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';

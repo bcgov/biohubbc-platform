@@ -77,7 +77,7 @@ export interface IOkDialogProps {
  * @param {*} props
  * @return {*}
  */
-const OkDialog: React.FC<React.PropsWithChildren<IOkDialogProps>> = (props) => {
+export const OkDialog = (props: IOkDialogProps) => {
   if (!props.open) {
     return <></>;
   }
@@ -108,5 +108,3 @@ const OkDialog: React.FC<React.PropsWithChildren<IOkDialogProps>> = (props) => {
     </Dialog>
   );
 };
-
-export default OkDialog;

@@ -13,7 +13,7 @@ import { CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import { IGetTicketsResponse, ITicket, TicketStatus } from 'interfaces/useTicketsApi.interface';
+import { IGetTicketsResponse, ITicket, IUpdateTicketRequest, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { useCallback, useMemo, useState } from 'react';
 import { IServerPaginationProps } from 'types/pagination';
 import { getRelativeTimeLabel } from 'utils/date';
@@ -58,6 +58,7 @@ export const TicketsContainer = (props: ITicketsContainerProps) => {
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditingTicket, setIsEditingTicket] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<ITicket | undefined>();
 
@@ -103,7 +104,7 @@ export const TicketsContainer = (props: ITicketsContainerProps) => {
       dialogContext.setYesNoDialog({
         dialogTitle: 'Remove ticket?',
         dialogContent: (
-          <Typography variant="body1" component="div" color="textSecondary">
+          <Typography component="div" color="textSecondary">
             Removing ticket <strong>#{ticket.ticket_slug}</strong> cannot be undone. Are you sure you want to proceed?
           </Typography>
         ),
@@ -168,7 +169,7 @@ export const TicketsContainer = (props: ITicketsContainerProps) => {
         });
       }
     },
-    [api.tickets, response, dialogContext, setData, rows]
+    [api.tickets, dialogContext, response, rows, setData]
   );
 
   // Create a ticket and append it to the current response for optimistic UX.
@@ -208,23 +209,39 @@ export const TicketsContainer = (props: ITicketsContainerProps) => {
     setIsEditDialogOpen(true);
   }, []);
 
-  // Merge edited ticket fields into the current response payload.
-  const handleEditTicketSave = (updatedTicket: ITicket) => {
-    if (!response) {
+  // Persist edited ticket, then merge API result into the current response payload.
+  const handleEditTicketSave = async (payload: IUpdateTicketRequest) => {
+    if (!response || !selectedTicket) {
       return;
     }
 
-    setData({
-      ...response,
-      tickets: rows.map((ticket) =>
-        ticket.ticket_id === updatedTicket.ticket_id ? { ...ticket, ...updatedTicket } : ticket
-      )
-    });
+    try {
+      setIsEditingTicket(true);
+      const updatedTicket = await api.tickets.updateTicket(selectedTicket.ticket_id, payload);
 
-    dialogContext.setSnackbar({
-      open: true,
-      snackbarMessage: 'Updated ticket'
-    });
+      setData({
+        ...response,
+        tickets: rows.map((ticket) =>
+          ticket.ticket_id === updatedTicket.ticket_id ? { ...ticket, ...updatedTicket } : ticket
+        )
+      });
+
+      setIsEditDialogOpen(false);
+      setSelectedTicket(undefined);
+
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: 'Updated ticket'
+      });
+    } catch (caughtError) {
+      const apiError = caughtError as APIError;
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: apiError.message
+      });
+    } finally {
+      setIsEditingTicket(false);
+    }
   };
 
   const columns: GridColDef<ITicket>[] = useMemo(
@@ -382,6 +399,7 @@ export const TicketsContainer = (props: ITicketsContainerProps) => {
       {selectedTicket ? (
         <EditTicketDialog
           open={isEditDialogOpen}
+          isLoading={isEditingTicket}
           ticket={selectedTicket}
           onClose={() => {
             setIsEditDialogOpen(false);
