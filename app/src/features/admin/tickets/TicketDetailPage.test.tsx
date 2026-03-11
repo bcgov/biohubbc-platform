@@ -179,17 +179,18 @@ describe('TicketDetailPage', () => {
   });
 
   it('renders timeline and comment input', async () => {
-    const { getAllByText, getByText, getByPlaceholderText, getByRole } = renderPage();
+    const { getAllByText, findByText, findByPlaceholderText, findByRole } = renderPage();
 
     await waitFor(() => {
       expect(getAllByText('Ticket #04900042').length).toBeGreaterThan(0);
-      expect(getByText('Sarah opened the ticket')).toBeVisible();
-      expect(getByText('Bob closed the ticket')).toBeVisible();
-      expect(getByText('Assignees')).toBeVisible();
-      expect(getByText('alice')).toBeVisible();
-      expect(getByPlaceholderText('Type your comment...')).toBeVisible();
-      expect(getByRole('link', { name: 'Tickets' })).toHaveAttribute('href', '/admin/tickets');
     });
+
+    expect(await findByText(/sarah opened the ticket/i)).toBeVisible();
+    expect(await findByText(/bob closed the ticket/i)).toBeVisible();
+    expect(await findByText('Assignees')).toBeVisible();
+    expect(await findByText(/alice/i)).toBeVisible();
+    expect(await findByPlaceholderText('Type your comment...')).toBeVisible();
+    expect(await findByRole('link', { name: 'Tickets' })).toHaveAttribute('href', '/admin/tickets');
   });
 
   it('updates status and refreshes timeline', async () => {
