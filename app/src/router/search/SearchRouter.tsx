@@ -2,6 +2,7 @@ import { CartContextProvider } from 'contexts/cartContext';
 import { SearchResultPage } from 'features/search/result/SearchResultPage';
 import { SearchPage } from 'features/search/SearchPage';
 import { SubmissionFeaturePage } from 'features/submissions/page/features/SubmissionFeaturePage';
+import { SubmissionDetailPage } from 'features/submissions/SubmissionDetailPage';
 import BaseLayout from 'layouts/BaseLayout';
 import SearchLayout from 'layouts/SearchLayout';
 import { Navigate, Route, Routes } from 'react-router-dom';
@@ -43,6 +44,16 @@ export const SearchRouter = () => {
           <BaseLayout>
             <PageTitle title="Submission Details" description="Details of a specific submission" />
             <SubmissionFeaturePage />
+          </BaseLayout>
+        }
+      />
+
+      <Route
+        path="/:submissionId"
+        element={
+          <BaseLayout>
+            <PageTitle title="Submission Details" description="Details of a specific submission" />
+            <SubmissionDetailPage />
           </BaseLayout>
         }
       />
