@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 /**
  * Save state between page navigations within the same session.
@@ -40,13 +40,18 @@ export const useSessionStorage = <T>(sessionStorageId: string, initialValue: T):
    *
    * @param {T} newValue - Updated value.
    */
-  const setSessionStorageValue = (newValue: T) => {
-    const parsedValue = typeof newValue === 'string' ? newValue : JSON.stringify(newValue);
-    // set session storage value
-    sessionStorage.setItem(prefixedKey, parsedValue);
-    // set state value
-    setValue(newValue);
-  };
+  // Keep setter identity stable across renders so consumers can safely use it
+  // in dependency arrays (for example cart lifecycle callbacks/effects).
+  const setSessionStorageValue = useCallback(
+    (newValue: T) => {
+      const parsedValue = typeof newValue === 'string' ? newValue : JSON.stringify(newValue);
+      // set session storage value
+      sessionStorage.setItem(prefixedKey, parsedValue);
+      // set state value
+      setValue(newValue);
+    },
+    [prefixedKey]
+  );
 
   return [value, setSessionStorageValue];
 };

@@ -1,0 +1,60 @@
+import { useCallback } from 'react';
+
+export interface IOptimisticMutationContext<TState> {
+  currentState: TState;
+  optimisticState: TState;
+}
+
+export interface IOptimisticMutationSetup<TState> {
+  getData: () => TState;
+  setData: (nextState: TState) => void;
+}
+
+export interface IOptimisticMutationConfig<TState, TApiResult> {
+  optimisticState: TState;
+  mutation: (context: IOptimisticMutationContext<TState>) => Promise<TApiResult>;
+  onSuccess?: (result: TApiResult, context: IOptimisticMutationContext<TState>) => void;
+  onRollback?: (context: IOptimisticMutationContext<TState>) => void;
+}
+
+/**
+ * Generic optimistic mutation engine for any state container.
+ *
+ * Applies optimistic state immediately, executes the async mutation, and
+ * rolls back to `currentState` on failure unless a custom rollback is provided.
+ */
+export const useOptimisticMutation = <TState>(setup: IOptimisticMutationSetup<TState>) => {
+  /**
+   * Executes one optimistic mutation transaction.
+   *
+   * @param buildConfig Builds optimistic mutation config from the current state.
+   * @returns The mutation result.
+   */
+  const handleMutation = useCallback(
+    async <TApiResult>(
+      buildConfig: (currentState: TState) => IOptimisticMutationConfig<TState, TApiResult>
+    ): Promise<TApiResult> => {
+      const currentState = setup.getData();
+      const config = buildConfig(currentState);
+      const context: IOptimisticMutationContext<TState> = {
+        currentState,
+        optimisticState: config.optimisticState
+      };
+
+      setup.setData(config.optimisticState);
+
+      try {
+        const result = await config.mutation(context);
+        config.onSuccess?.(result, context);
+        return result;
+      } catch (error) {
+        setup.setData(currentState);
+        config.onRollback?.(context);
+        throw error;
+      }
+    },
+    [setup]
+  );
+
+  return { handleMutation };
+};
