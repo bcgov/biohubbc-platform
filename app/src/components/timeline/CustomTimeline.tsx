@@ -27,10 +27,6 @@ interface ICustomTimelineProps {
 export const CustomTimeline = (props: ICustomTimelineProps) => {
   const { items } = props;
 
-  if (!items.length) {
-    return null;
-  }
-
   return (
     <Timeline
       sx={{
