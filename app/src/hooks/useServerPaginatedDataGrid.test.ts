@@ -118,10 +118,10 @@ describe('useServerPaginatedDataGrid', () => {
       expect(result.current.searchTerm).toBe('');
     });
 
-    it('starts with empty data array when no response', () => {
+    it('starts with empty rows array when no response', () => {
       const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
-      expect(result.current.data).toEqual([]);
+      expect(result.current.rows).toEqual([]);
       expect(result.current.rowCount).toBe(0);
     });
   });
@@ -170,7 +170,7 @@ describe('useServerPaginatedDataGrid', () => {
 
       const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
-      expect(result.current.data).toEqual(mockItems);
+      expect(result.current.rows).toEqual(mockItems);
     });
 
     it('extracts total count from response using extractTotal', async () => {

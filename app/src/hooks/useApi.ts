@@ -15,6 +15,7 @@ import { useSubmissionsStatusApi } from './api/useSubmissionStatusApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
 import { useTeamPoliciesApi } from './api/useTeamPoliciesApi';
 import { useTeamsApi } from './api/useTeamsApi';
+import { useTicketsApi } from './api/useTicketsApi';
 import useUserApi from './api/useUserApi';
 
 /**
@@ -57,6 +58,8 @@ export const useApi = () => {
 
   const teamPolicies = useTeamPoliciesApi(apiAxios);
 
+  const tickets = useTicketsApi(apiAxios);
+
   const dataRequest = useDataRequestApi(apiAxios);
 
   return {
@@ -75,6 +78,7 @@ export const useApi = () => {
     cart,
     download,
     teamPolicies,
+    tickets,
     dataRequest
   };
 };

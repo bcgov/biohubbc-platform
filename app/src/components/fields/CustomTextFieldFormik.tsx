@@ -16,7 +16,7 @@ export interface ICustomTextFieldFormikProps extends Omit<
  * @param {ICustomTextFieldFormikProps} props
  * @return {*}
  */
-const CustomTextFieldFormik: React.FC<React.PropsWithChildren<ICustomTextFieldFormikProps>> = (props) => {
+const CustomTextFieldFormik = (props: ICustomTextFieldFormikProps) => {
   const { touched, errors, values, handleChange, submitCount } = useFormikContext<any>();
   const { name, ...rest } = props;
   const showError = Boolean(get(errors, name)) && (Boolean(get(touched, name)) || submitCount > 0);
@@ -27,7 +27,7 @@ const CustomTextFieldFormik: React.FC<React.PropsWithChildren<ICustomTextFieldFo
       id={name}
       data-testid={name}
       onChange={handleChange}
-      value={get(values, name)}
+      value={get(values, name) ?? ''}
       error={showError}
       helperText={showError ? <>{get(errors, name) as string}</> : undefined}
       {...rest}
