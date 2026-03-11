@@ -586,6 +586,7 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
 
   const value: ICartContext = useMemo(
     () => ({
+      cartId: state.cartId,
       features: state.features,
       pagination: state.pagination,
       isLoading: state.isLoading,
@@ -595,7 +596,7 @@ export const CartContextProvider: React.FC<React.PropsWithChildren> = ({ childre
       clearCart,
       checkout
     }),
-    [addToCart, checkout, clearCart, removeFromCart, state.features, state.pagination, state.isLoading, state.error]
+    [addToCart, checkout, clearCart, removeFromCart, state.cartId, state.features, state.pagination, state.isLoading, state.error]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
