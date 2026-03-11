@@ -3,7 +3,7 @@ import { DataRequestStatusResponseSchema } from './data-request-status';
 
 export const DataRequestResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['requested_by', 'team_id', 'data_request_id', 'reason', 'data_request_status'],
+  required: ['requested_by', 'team_id', 'data_request_id', 'reason', 'ticket_id', 'data_request_status'],
   additionalProperties: false,
   properties: {
     data_request_id: {
@@ -23,6 +23,11 @@ export const DataRequestResponseSchema: OpenAPIV3.SchemaObject = {
     requested_by: {
       type: 'integer',
       description: 'System user ID of the requester'
+    },
+    ticket_id: {
+      type: 'string',
+      format: 'uuid',
+      description: 'ID of the ticket associated with this data request'
     },
     data_request_status: {
       ...DataRequestStatusResponseSchema,

@@ -2,7 +2,7 @@ import { Knex } from 'knex';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import {
-  CreateDataRequest,
+  CreateDataRequestPayload,
   DataRequest,
   DataRequestFilters,
   FlatDataRequestWithStatus,
@@ -33,6 +33,7 @@ export class DataRequestRepository extends BaseRepository {
         'dr.team_id',
         'dr.reason',
         'dr.requested_by',
+        'dr.ticket_id',
         'drs.data_request_status_id',
         'drs.comment_id',
         'drs.request_status'
@@ -65,6 +66,7 @@ export class DataRequestRepository extends BaseRepository {
         'dr.team_id',
         'dr.reason',
         'dr.requested_by',
+        'dr.ticket_id',
         'drs.data_request_status_id',
         'drs.comment_id',
         'drs.request_status'
@@ -127,6 +129,7 @@ export class DataRequestRepository extends BaseRepository {
         'dr.team_id',
         'dr.reason',
         'dr.requested_by',
+        'dr.ticket_id',
         'drs.data_request_status_id',
         'drs.comment_id',
         'drs.request_status'
@@ -170,6 +173,7 @@ export class DataRequestRepository extends BaseRepository {
         'dr.team_id',
         'dr.reason',
         'dr.requested_by',
+        'dr.ticket_id',
         'drs.data_request_status_id',
         'drs.comment_id',
         'drs.request_status'
@@ -187,19 +191,20 @@ export class DataRequestRepository extends BaseRepository {
    * Create a new data request.
    *
    * @param {number} requestedBy
-   * @param {CreateDataRequest} payload
+   * @param {CreateDataRequestPayload} payload
    * @return {Promise<DataRequest>}
    * @memberof DataRequestRepository
    */
-  async createDataRequest(requestedBy: number, payload: CreateDataRequest): Promise<DataRequest> {
+  async createDataRequest(requestedBy: number, payload: CreateDataRequestPayload): Promise<DataRequest> {
     const knex = getKnex();
     const query = knex('data_request')
       .insert({
         requested_by: requestedBy,
         team_id: payload.team_id,
-        reason: payload.reason
+        reason: payload.reason,
+        ticket_id: payload.ticket_id
       })
-      .returning(['requested_by', 'team_id', 'data_request_id', 'reason']);
+      .returning(['requested_by', 'team_id', 'data_request_id', 'reason', 'ticket_id']);
 
     const response = await this.connection.knex(query, DataRequest);
 
@@ -227,7 +232,7 @@ export class DataRequestRepository extends BaseRepository {
       .where('data_request_id', dataRequestId)
       .whereNull('record_end_date')
       .update(payload)
-      .returning(['data_request_id', 'reason', 'requested_by', 'team_id']);
+      .returning(['data_request_id', 'reason', 'requested_by', 'team_id', 'ticket_id']);
 
     const response = await this.connection.knex(query, DataRequest);
 
