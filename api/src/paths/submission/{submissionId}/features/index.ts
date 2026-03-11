@@ -1,36 +1,23 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../../../openapi/schemas/pagination';
-import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { SubmissionService } from '../../../../services/submission-service';
 import { getLogger } from '../../../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../utils/pagination';
+import { SYSTEM_ROLE } from '../../../../constants/roles';
 
 const defaultLog = getLogger('paths/submission/{submissionId}');
 
-export const GET: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
-          discriminator: 'SystemRole'
-        }
-      ]
-    };
-  }),
-  getSubmissionFeatures()
-];
+export const GET: Operation = [getSubmissionFeatures()];
 
 GET.apiDoc = {
-  description: 'Retrieves a submission record from the submission table',
+  description: 'Retrieves submission features for a logged-in system user.',
   tags: ['submission'],
   security: [
     {
-      Bearer: []
+      OptionalBearer: []
     }
   ],
   parameters: [
@@ -88,7 +75,9 @@ GET.apiDoc = {
 };
 
 /**
- * Retrieves paginated child submission feature records.
+ * Retrieves paginated submission feature records for an authenticated system user.
+ *
+ * Returns all features (secured and unsecured).
  *
  * @returns {RequestHandler}
  */
@@ -104,7 +93,6 @@ export function getSubmissionFeatures(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
 
-      // Service method must support pagination options
       const [features, count] = await Promise.all([
         submissionService.getSubmissionFeatures(submissionId, paginationOptions),
         submissionService.getSubmissionFeaturesCount(submissionId)
