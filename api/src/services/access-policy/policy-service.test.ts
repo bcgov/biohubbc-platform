@@ -10,6 +10,7 @@ import { PolicyStatementConditionRepository } from '../../repositories/authoriza
 import { PolicyStatementRepository } from '../../repositories/authorization/policy-statement-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { PolicyService } from './policy-service';
+import { TeamFeatureService } from './team-feature-service';
 
 chai.use(sinonChai);
 
@@ -114,11 +115,45 @@ describe('PolicyService', () => {
 
   describe('deletePolicy', () => {
     it('should call repository.deletePolicy', async () => {
+      sinon.stub(TeamFeatureService.prototype, 'getTeamIdsForPolicy').resolves([]);
       const stub = sinon.stub(PolicyRepository.prototype, 'deletePolicy').resolves();
+      sinon.stub(TeamFeatureService.prototype, 'refreshCacheForTeam').resolves();
 
       await policyService.deletePolicy('1');
 
       expect(stub).to.have.been.calledWith('1');
+    });
+
+    it('fetches team IDs before delete, then refreshes cache for each team', async () => {
+      const policyId = '11111111-1111-1111-1111-111111111111';
+      const teamIds = ['22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333'];
+      const callOrder: string[] = [];
+
+      sinon.stub(TeamFeatureService.prototype, 'getTeamIdsForPolicy').callsFake(async () => {
+        callOrder.push('getTeamIds');
+        return teamIds;
+      });
+      sinon.stub(PolicyRepository.prototype, 'deletePolicy').callsFake(async () => {
+        callOrder.push('delete');
+      });
+      sinon.stub(TeamFeatureService.prototype, 'refreshCacheForTeam').callsFake(async () => {
+        callOrder.push('refresh');
+      });
+
+      await policyService.deletePolicy(policyId);
+
+      // Verify ordering: fetch teams → delete policy → refresh each team
+      expect(callOrder).to.eql(['getTeamIds', 'delete', 'refresh', 'refresh']);
+    });
+
+    it('does not call refreshCacheForTeam when policy has no teams', async () => {
+      sinon.stub(TeamFeatureService.prototype, 'getTeamIdsForPolicy').resolves([]);
+      sinon.stub(PolicyRepository.prototype, 'deletePolicy').resolves();
+      const refreshStub = sinon.stub(TeamFeatureService.prototype, 'refreshCacheForTeam').resolves();
+
+      await policyService.deletePolicy('1');
+
+      expect(refreshStub).to.not.have.been.called;
     });
   });
 
@@ -266,6 +301,7 @@ describe('PolicyService', () => {
       const insertConditionStub = sinon
         .stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition')
         .resolves(mockCondition);
+      sinon.stub(TeamFeatureService.prototype, 'refreshCacheForPolicy').resolves();
 
       const result = await policyService.createPolicyWithStatements(
         { name: 'New Policy', description: 'Desc' } as CreatePolicy,
@@ -290,6 +326,7 @@ describe('PolicyService', () => {
     it('should call repository.insertPolicy and return policy with empty statements when none provided', async () => {
       const mockPolicy: Policy = { policy_id: '1', name: 'Empty Policy', description: 'No statements' };
       const insertPolicyStub = sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
+      sinon.stub(TeamFeatureService.prototype, 'refreshCacheForPolicy').resolves();
 
       const result = await policyService.createPolicyWithStatements(
         { name: 'Empty Policy', description: 'No statements' } as CreatePolicy,
@@ -298,6 +335,17 @@ describe('PolicyService', () => {
 
       expect(insertPolicyStub).to.have.been.calledWith({ name: 'Empty Policy', description: 'No statements' });
       expect(result).to.eql({ ...mockPolicy, statements: [] });
+    });
+
+    it('refreshes team_feature cache with the correct policy ID', async () => {
+      const mockPolicy: Policy = { policy_id: '1', name: 'Policy', description: null };
+
+      sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
+      const refreshStub = sinon.stub(TeamFeatureService.prototype, 'refreshCacheForPolicy').resolves();
+
+      await policyService.createPolicyWithStatements({ name: 'Policy' } as CreatePolicy, []);
+
+      expect(refreshStub).to.have.been.calledOnceWith('1');
     });
   });
 
@@ -327,6 +375,7 @@ describe('PolicyService', () => {
       const insertStatementStub = sinon
         .stub(PolicyStatementRepository.prototype, 'insertPolicyStatement')
         .resolves(newStatement);
+      sinon.stub(TeamFeatureService.prototype, 'refreshCacheForPolicy').resolves();
 
       const result = await policyService.updatePolicyWithStatements(
         '1',
@@ -356,6 +405,7 @@ describe('PolicyService', () => {
         .stub(PolicyStatementRepository.prototype, 'getPolicyStatements')
         .resolves(existingStatements);
       const deleteStub = sinon.stub(PolicyStatementRepository.prototype, 'deletePolicyStatement').resolves();
+      sinon.stub(TeamFeatureService.prototype, 'refreshCacheForPolicy').resolves();
 
       const result = await policyService.updatePolicyWithStatements(
         '1',
@@ -367,6 +417,18 @@ describe('PolicyService', () => {
       expect(getPolicyStatementsStub).to.have.been.calledWith('1');
       expect(deleteStub).to.have.been.calledTwice;
       expect(result).to.eql({ ...mockPolicy, statements: [] });
+    });
+
+    it('refreshes team_feature cache with the correct policy ID', async () => {
+      const mockPolicy: Policy = { policy_id: '1', name: 'Policy', description: null };
+
+      sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(mockPolicy);
+      sinon.stub(PolicyStatementRepository.prototype, 'getPolicyStatements').resolves([]);
+      const refreshStub = sinon.stub(TeamFeatureService.prototype, 'refreshCacheForPolicy').resolves();
+
+      await policyService.updatePolicyWithStatements('1', { name: 'Policy' } as UpdatePolicy, []);
+
+      expect(refreshStub).to.have.been.calledOnceWith('1');
     });
   });
 });

@@ -3,6 +3,7 @@ import { CreateTeamPolicy, TeamPolicy, TeamPolicyDetails, UpdateTeamPolicy } fro
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
+import { TeamFeatureService } from './team-feature-service';
 import { TeamPolicyFilters } from './team-policy-service.interface';
 
 export class TeamPolicyService extends DBService {
@@ -27,6 +28,11 @@ export class TeamPolicyService extends DBService {
 
     if (existingPolicies.length > 0) {
       const existingPolicy = existingPolicies[0];
+
+      // Refresh cache even on idempotent return — the cache may be stale
+      const teamFeatureService = new TeamFeatureService(this.connection);
+      await teamFeatureService.refreshCacheForTeam(teamPolicyData.team_id);
+
       return {
         team_policy_id: existingPolicy.team_policy_id,
         team_id: existingPolicy.team_id,
@@ -34,7 +40,13 @@ export class TeamPolicyService extends DBService {
       };
     }
 
-    return this.teamPolicyRepository.insertTeamPolicy(teamPolicyData);
+    const result = await this.teamPolicyRepository.insertTeamPolicy(teamPolicyData);
+
+    // Refresh team_feature cache so secured search results reflect the new team-policy association
+    const teamFeatureService = new TeamFeatureService(this.connection);
+    await teamFeatureService.refreshCacheForTeam(teamPolicyData.team_id);
+
+    return result;
   }
 
   /**
@@ -59,11 +71,17 @@ export class TeamPolicyService extends DBService {
 
     const policyIdsToCreate = uniquePolicyIds.filter((policyId) => !existingPolicyIds.has(policyId));
 
-    return Promise.all(
+    const result = await Promise.all(
       policyIdsToCreate.map((policyId) =>
         this.teamPolicyRepository.insertTeamPolicy({ team_id: teamId, policy_id: policyId })
       )
     );
+
+    // Refresh team_feature cache so secured search results reflect the new team-policy associations
+    const teamFeatureService = new TeamFeatureService(this.connection);
+    await teamFeatureService.refreshCacheForTeam(teamId);
+
+    return result;
   }
 
   /**
@@ -130,11 +148,21 @@ export class TeamPolicyService extends DBService {
   /**
    * Delete a team policy record.
    *
+   * Fetches the team_id before deleting so the team_feature cache can be
+   * refreshed afterward — ensuring secured search results stay in sync
+   * when a policy is removed from a team.
+   *
    * @param {string} teamPolicyId - The id of the team policy to delete
    * @return {Promise<void>}
    * @memberof TeamPolicyService
    */
   async deleteTeamPolicy(teamPolicyId: string): Promise<void> {
+    // Fetch team_id before the soft-delete so we know which team's cache to refresh
+    const teamPolicy = await this.teamPolicyRepository.getTeamPolicy(teamPolicyId);
+
     await this.teamPolicyRepository.deleteTeamPolicy(teamPolicyId);
+
+    const teamFeatureService = new TeamFeatureService(this.connection);
+    await teamFeatureService.refreshCacheForTeam(teamPolicy.team_id);
   }
 }

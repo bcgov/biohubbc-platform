@@ -12,6 +12,7 @@ import {
 } from './policy-service.interface';
 import { PolicyStatementConditionService } from './policy-statement-condition-service';
 import { PolicyStatementService } from './policy-statement-service';
+import { TeamFeatureService } from './team-feature-service';
 
 export class PolicyService extends DBService {
   policyRepository: PolicyRepository;
@@ -98,12 +99,26 @@ export class PolicyService extends DBService {
   /**
    * Delete a policy record.
    *
+   * Fetches affected team IDs before soft-deleting, because after the delete
+   * the team_policy JOIN won't find the policy. Then refreshes the team_feature
+   * cache for each affected team so secured search results stay in sync.
+   *
    * @param {string} policyId - The id of the policy to delete
    * @return {Promise<void>}
    * @memberof PolicyService
    */
-  deletePolicy(policyId: string): Promise<void> {
-    return this.policyRepository.deletePolicy(policyId);
+  async deletePolicy(policyId: string): Promise<void> {
+    const teamFeatureService = new TeamFeatureService(this.connection);
+
+    // Must fetch affected teams BEFORE the soft-delete removes the team_policy association
+    const teamIds = await teamFeatureService.getTeamIdsForPolicy(policyId);
+
+    await this.policyRepository.deletePolicy(policyId);
+
+    // Refresh cache for each affected team after the policy is gone
+    for (const teamId of teamIds) {
+      await teamFeatureService.refreshCacheForTeam(teamId);
+    }
   }
 
   /**
@@ -198,6 +213,10 @@ export class PolicyService extends DBService {
       })
     );
 
+    // Refresh team_feature cache so secured search results reflect the new policy statements
+    const teamFeatureService = new TeamFeatureService(this.connection);
+    await teamFeatureService.refreshCacheForPolicy(policy.policy_id);
+
     return { ...policy, statements: createdStatements };
   }
 
@@ -247,6 +266,10 @@ export class PolicyService extends DBService {
         return { ...statement, conditions };
       })
     );
+
+    // Refresh team_feature cache so secured search results reflect the updated policy statements
+    const teamFeatureService = new TeamFeatureService(this.connection);
+    await teamFeatureService.refreshCacheForPolicy(policyId);
 
     return { ...policy, statements: createdStatements };
   }
