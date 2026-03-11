@@ -95,7 +95,7 @@ export function deleteSubmissionUpload(): RequestHandler {
 
       await connection.commit();
 
-      res.status(204).send();
+      return res.status(204).send();
     } catch (error) {
       defaultLog.error({ label: 'deleteSubmissionUpload', message: 'error deleting submission upload', error });
       await connection.rollback();
