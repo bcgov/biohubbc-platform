@@ -5,7 +5,6 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router';
 import { normalizeQueryParam } from 'utils/query-param';
 import { SearchResultOptions } from './content/option/SearchResultOptions';
 import { SearchResultToolbar } from './content/toolbar/SearchResultToolbar';
@@ -13,6 +12,7 @@ import { SearchResultHeader } from './header/SearchResultHeader';
 import { useSearchResults } from './hooks/useSearchResults';
 import { ResultPageContainer } from './layout/ResultPageContainer';
 import { DownloadSidebar } from './sidebar/download/DownloadSidebar';
+import { DOWNLOAD_SIDEBAR_VIEW } from './sidebar/download/toolbar/DownloadSidebarToolbar';
 import { SearchSidebar } from './sidebar/search/SearchSidebar';
 import {
   OmitListedRecommendedState,
@@ -26,7 +26,6 @@ export enum SEARCH_RESULT_OPTION_VIEW {
 }
 
 export const SearchResultPage = () => {
-  const navigate = useNavigate();
   const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination, filters } = useSearchResults();
   const api = useApi();
   const { codesDataLoader } = useCodesContext();
@@ -35,6 +34,7 @@ export const SearchResultPage = () => {
 
   const [view, setView] = useState<SEARCH_RESULT_OPTION_VIEW>(SEARCH_RESULT_OPTION_VIEW.LIST);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadView, setDownloadView] = useState<DOWNLOAD_SIDEBAR_VIEW>(DOWNLOAD_SIDEBAR_VIEW.CART);
   const { recommended, handleRefresh: refreshRecommended } = useRecommendedFilters();
 
   /**
@@ -222,19 +222,16 @@ export const SearchResultPage = () => {
 
   const handleCheckout = useCallback(async () => {
     try {
-      const download = await checkout();
-
-      if (download?.download_id) {
-        // Navigate to the download
-        navigate(`/download/${download.download_id}`);
-      }
+      await checkout();
+      setDownloadView(DOWNLOAD_SIDEBAR_VIEW.DOWNLOADS);
     } catch (error) {
       dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
     }
-  }, [checkout, dialogContext, navigate]);
+  }, [checkout, dialogContext]);
 
   return (
     <ResultPageContainer
+      rightSidebarTitle={downloadView === DOWNLOAD_SIDEBAR_VIEW.CART ? 'Cart' : 'Downloads'}
       leftSidebar={
         <SearchSidebar
           recommended={recommended}
@@ -246,7 +243,13 @@ export const SearchResultPage = () => {
         />
       }
       rightSidebar={
-        <DownloadSidebar features={features} itemCount={cartPagination?.total ?? 0} onDownload={handleCheckout} />
+        <DownloadSidebar
+          features={features}
+          itemCount={cartPagination?.total ?? 0}
+          activeView={downloadView}
+          onViewChange={setDownloadView}
+          onDownload={handleCheckout}
+        />
       }>
       <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
         <PageHeader>

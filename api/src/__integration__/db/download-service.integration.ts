@@ -53,6 +53,38 @@ describe('DownloadPipelineService (integration)', function () {
     `);
   }
 
+  /**
+   * Helper: grant a team access to a specific feature via the RBAC chain.
+   * Creates policy → policy_statement (allow) → team_policy.
+   * The policy_statement trigger auto-decomposes the URN into indexed columns.
+   */
+  async function grantTeamAccess(
+    teamId: string,
+    submissionId: number,
+    featureTypeName: string,
+    featureId: number
+  ): Promise<void> {
+    const userId = connection.systemUserId();
+    const urn = `urn:${submissionId}:${featureTypeName}:${featureId}`;
+
+    const policy = await connection.sql(SQL`
+      INSERT INTO policy (name, create_user)
+      VALUES (${`test-policy-${Date.now()}`}, ${userId})
+      RETURNING policy_id;
+    `);
+    const policyId = policy.rows[0].policy_id;
+
+    await connection.sql(SQL`
+      INSERT INTO policy_statement (policy_id, effect, submission_feature_urn, create_user)
+      VALUES (${policyId}, 'allow', ${urn}, ${userId});
+    `);
+
+    await connection.sql(SQL`
+      INSERT INTO team_policy (team_id, policy_id, create_user)
+      VALUES (${teamId}, ${policyId}, ${userId});
+    `);
+  }
+
   describe('createDownloadRequest', () => {
     it('should create a download record and link submission features', async () => {
       // Step 1: Create a submission with two features
@@ -190,7 +222,7 @@ describe('DownloadPipelineService (integration)', function () {
 
       // Step 5: Verify download appears in user's download list with all timestamps
       const systemUserId = connection.systemUserId();
-      const userDownloads = await crudService.getDownloadsByTeamMembership(systemUserId);
+      const { downloads: userDownloads } = await crudService.getDownloadsByTeamMembership(systemUserId);
       const found = userDownloads.find((d) => d.download_id === download_id);
       expect(found).to.not.be.undefined;
       expect(found!.download_status).to.equal(DownloadStatusEnum.READY);
@@ -236,6 +268,53 @@ describe('DownloadPipelineService (integration)', function () {
 
       expect(sizeData).to.have.length(1);
       expect(sizeData[0].submission_feature_id).to.equal(openFeatureId);
+    });
+
+    it('should exclude secured features when team has no matching policy', async () => {
+      // A team without an ALLOW policy should not see secured features,
+      // even though the download is linked to that team.
+      const submissionId = await createTestSubmission(connection);
+      const openFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
+      const securedFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
+      await secureFeature(securedFeatureId);
+
+      const teamId = await createTeam('No Policy Team');
+
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: null,
+        teamId,
+        submissionFeatureIds: [openFeatureId, securedFeatureId]
+      });
+
+      const sizeData = await crudService.getDownloadFeatureSummaries(download_id, teamId);
+
+      expect(sizeData).to.have.length(1);
+      expect(sizeData[0].submission_feature_id).to.equal(openFeatureId);
+    });
+
+    it('should include secured features when team has a matching ALLOW policy', async () => {
+      // A team with an ALLOW policy targeting the secured feature should see it.
+      const submissionId = await createTestSubmission(connection);
+      const openFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
+      const securedFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
+      await secureFeature(securedFeatureId);
+
+      const teamId = await createTeam('Allowed Team');
+      await grantTeamAccess(teamId, submissionId, 'dataset', securedFeatureId);
+
+      const { download_id } = await service.createDownloadRequest({
+        systemUserId: null,
+        teamId,
+        submissionFeatureIds: [openFeatureId, securedFeatureId]
+      });
+
+      const sizeData = await crudService.getDownloadFeatureSummaries(download_id, teamId);
+
+      // Both features should be returned: open (unsecured) + secured (team has ALLOW)
+      expect(sizeData).to.have.length(2);
+      const featureIds = sizeData.map((f) => f.submission_feature_id);
+      expect(featureIds).to.include(openFeatureId);
+      expect(featureIds).to.include(securedFeatureId);
     });
   });
 
@@ -384,13 +463,21 @@ describe('DownloadPipelineService (integration)', function () {
 
   /**
    * Helper: create a data_request linked to a team.
+   * Creates a ticket first (required by NOT NULL ticket_id FK added in SIMSBIOHUB-881).
    */
   async function createDataRequest(teamId: string, requestedBy: number): Promise<string> {
     const apiUserId = connection.systemUserId();
 
+    const ticketResult = await connection.sql(SQL`
+      INSERT INTO ticket (ticket_slug, subject, team_id, create_user)
+      VALUES (LPAD(FLOOR(RANDOM() * 100000000)::text, 8, '0'), 'Integration test ticket', ${teamId}, ${apiUserId})
+      RETURNING ticket_id;
+    `);
+    const ticketId = ticketResult.rows[0].ticket_id;
+
     const result = await connection.sql(SQL`
-      INSERT INTO data_request (reason, team_id, requested_by, create_user)
-      VALUES ('Integration test', ${teamId}, ${requestedBy}, ${apiUserId})
+      INSERT INTO data_request (reason, team_id, requested_by, ticket_id, create_user)
+      VALUES ('Integration test', ${teamId}, ${requestedBy}, ${ticketId}, ${apiUserId})
       RETURNING data_request_id;
     `);
 
@@ -602,7 +689,7 @@ describe('DownloadPipelineService (integration)', function () {
         teamId: null,
         submissionFeatureIds: [featureId]
       });
-      const downloads = await crudService.getDownloadsByTeamMembership(apiUserId);
+      const { downloads } = await crudService.getDownloadsByTeamMembership(apiUserId);
       const ids = downloads.map((d) => d.download_id);
       expect(ids).to.include(download_id);
     });
@@ -619,7 +706,7 @@ describe('DownloadPipelineService (integration)', function () {
       const otherUserId = await createOtherUser();
       await shareDownload(download_id, otherUserId);
 
-      const downloads = await crudService.getDownloadsByTeamMembership(otherUserId);
+      const { downloads } = await crudService.getDownloadsByTeamMembership(otherUserId);
       const ids = downloads.map((d) => d.download_id);
       expect(ids).to.include(download_id);
     });
@@ -639,7 +726,7 @@ describe('DownloadPipelineService (integration)', function () {
         dataRequestId
       });
 
-      const downloads = await crudService.getDownloadsByTeamMembership(otherUserId);
+      const { downloads } = await crudService.getDownloadsByTeamMembership(otherUserId);
       const ids = downloads.map((d) => d.download_id);
       expect(ids).to.include(download_id);
     });
@@ -654,7 +741,7 @@ describe('DownloadPipelineService (integration)', function () {
       });
 
       const otherUserId = await createOtherUser();
-      const downloads = await crudService.getDownloadsByTeamMembership(otherUserId);
+      const { downloads } = await crudService.getDownloadsByTeamMembership(otherUserId);
       const ids = downloads.map((d) => d.download_id);
       expect(ids).to.not.include(download_id);
     });

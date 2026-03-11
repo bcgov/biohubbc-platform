@@ -464,6 +464,7 @@ describe('publisher', () => {
       completed_fragments: 0,
       estimated_total_size_bytes: null,
       fragment_size_bytes: '524288000',
+      create_date: '2025-01-01T00:00:00Z',
       ...overrides
     });
 

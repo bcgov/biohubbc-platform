@@ -44,6 +44,17 @@ export async function seed(knex: Knex): Promise<void> {
   for (const scenario of scenarios) {
     await createSubmissionWithUploads(knex, scenario.level, scenario.reviewed, scenario.withArchive);
   }
+
+  // Backfill data_byte_size for seeded rows — migration runs before seeds,
+  // so seeded submission_feature rows have NULL data_byte_size
+  await knex.raw(`
+    UPDATE submission_feature sf
+    SET data_byte_size = octet_length(sf.data::text) + 500 + COALESCE(
+      (SELECT a.byte_size FROM artifact a WHERE a.object_key = sf.data->>'artifact_key'),
+      0
+    )
+    WHERE sf.data_byte_size IS NULL;
+  `);
 }
 
 /**
