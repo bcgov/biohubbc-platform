@@ -24,7 +24,7 @@ type SubmissionRow = {
   id: number;
   submission_feature_id: number;
   feature_type_name: string;
-}
+};
 
 const columns: GridColDef[] = [
   { field: 'submission_feature_id', headerName: 'ID', width: 120, sortable: true },
