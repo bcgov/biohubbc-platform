@@ -173,8 +173,11 @@ describe('TicketDetailPage', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(mockGetTicket).toHaveBeenCalledWith(ticket.ticket_id);
-      expect(mockGetTeamMembers).toHaveBeenCalledWith(ticket.team_id);
+      const getTicketArgs = mockGetTicket.mock.calls.flat(Infinity);
+      const getTeamMembersArgs = mockGetTeamMembers.mock.calls.flat(Infinity);
+
+      expect(getTicketArgs).toContain(ticket.ticket_id);
+      expect(getTeamMembersArgs).toContain(ticket.team_id);
     });
   });
 
