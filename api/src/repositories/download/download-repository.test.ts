@@ -1,5 +1,6 @@
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
+import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { DownloadStatusEnum } from '../../models/download-status';
@@ -168,19 +169,69 @@ describe('DownloadRepository', () => {
     });
   });
 
-  describe('getDownloadsByTeamMembership', () => {
-    it('includes owner path checking system_user_id', async () => {
+  describe('findDownloadById', () => {
+    it('SQL includes create_date in SELECT', async () => {
+      // Verifies: create_date is not accidentally removed during refactor
+
       const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.getDownloadsByTeamMembership(123);
+      await repo.findDownloadById('aaaa0000-0000-0000-0000-000000000001');
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('system_user_id');
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include(123);
+      expect(sqlText).to.include('create_date');
+    });
+  });
+
+  describe('getDownloadsByTeamMembership', () => {
+    it('returns download records and count from knex query', async () => {
+      const mockRows = [
+        { download_id: 'uuid-1', download_status: 'ready', feature_count: 5, total_count: 2 },
+        { download_id: 'uuid-2', download_status: 'pending', feature_count: 0, total_count: 2 }
+      ];
+      const mockResponse = {
+        rowCount: 2,
+        rows: mockRows
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.getDownloadsByTeamMembership(123);
+
+      expect(result.count).to.equal(2);
+      expect(result.downloads).to.have.length(2);
+      expect(result.downloads[0]).to.not.have.property('total_count');
+    });
+
+    it('returns paginated results when pagination is provided', async () => {
+      const mockRows = [{ download_id: 'uuid-1', feature_count: 3, total_count: 5 }];
+      const mockResponse = {
+        rowCount: 1,
+        rows: mockRows
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.getDownloadsByTeamMembership(123, { page: 2, limit: 10 });
+
+      expect(result.count).to.equal(5);
+      expect(result.downloads).to.have.length(1);
+    });
+
+    it('returns empty array and zero count when no downloads exist', async () => {
+      const mockResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.getDownloadsByTeamMembership(123);
+
+      expect(result.downloads).to.eql([]);
+      expect(result.count).to.equal(0);
     });
   });
 

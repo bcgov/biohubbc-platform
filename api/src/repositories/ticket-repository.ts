@@ -35,6 +35,14 @@ export class TicketRepository extends BaseRepository {
       query = query.andWhere('status', filters.status);
     }
 
+    if (filters?.search) {
+      const search = `%${filters.search}%`;
+
+      query = query.andWhere((builder) => {
+        builder.whereILike('subject', search).orWhereILike('ticket_slug', search).orWhereILike('description', search);
+      });
+    }
+
     return query;
   }
 

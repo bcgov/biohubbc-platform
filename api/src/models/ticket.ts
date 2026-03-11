@@ -12,6 +12,7 @@ export type TicketStatus = z.infer<typeof TicketStatus>;
 export interface TicketFilters {
   team_id?: string;
   status?: TicketStatus;
+  search?: string;
 }
 
 export const Ticket = z.object({
