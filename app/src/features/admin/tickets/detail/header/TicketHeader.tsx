@@ -44,10 +44,6 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
 
   // Open full ticket description in a dialog when "Read more" is clicked.
   const handleReadMoreClick = () => {
-    if (!ticket.description) {
-      return;
-    }
-
     dialogContext.setOkDialog({
       open: true,
       dialogTitle: 'Ticket Description',

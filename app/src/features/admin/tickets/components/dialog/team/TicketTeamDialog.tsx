@@ -3,8 +3,8 @@ import { SidebarOption } from 'features/search/result/sidebar/search/components/
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import useDebounce from 'hooks/useDebounce';
 import useDataLoader from 'hooks/useDataLoader';
+import useDebounce from 'hooks/useDebounce';
 import { ITeamMember } from 'interfaces/useTeamsApi.interface';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { TicketTeamForm } from './form/TicketTeamForm';
@@ -30,7 +30,21 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
   const dialogContext = useDialogContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const availableUsersLoader = useDataLoader((search?: string) => api.teams.getAvailableUsers(search));
+  const showApiError = useCallback(
+    (error: unknown) => {
+      const apiError = error as APIError;
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: apiError.message
+      });
+    },
+    [dialogContext]
+  );
+
+  const availableUsersLoader = useDataLoader(
+    (search?: string) => api.teams.getAvailableUsers(search),
+    (error) => showApiError(error)
+  );
 
   useEffect(() => {
     if (!open) {
@@ -60,68 +74,69 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
     [availableUsersLoader.data?.users]
   );
 
-  const handleSelectUser = async (option: SidebarOption | null) => {
-    if (!teamId || !option?.value) {
-      return;
-    }
+  const memberSystemUserIds = useMemo(() => new Set(members.map((member) => member.system_user_id)), [members]);
 
-    const selectedUserId = Number(option.value);
-
-    if (members.some((member) => member.system_user_id === selectedUserId)) {
-      return;
-    }
-
-    const optimisticTeamMemberId = `optimistic-${selectedUserId}-${Date.now()}`;
-    const optimisticMember: ITeamMember = {
-      team_member_id: optimisticTeamMemberId,
-      system_user_id: selectedUserId,
-      user_identifier: option.label
-    };
-
-    try {
-      setIsSubmitting(true);
-      onMemberAdd(optimisticMember);
-
-      const createdMember = await api.teams.createTeamMember(teamId, selectedUserId);
-
-      onMemberRemove(optimisticTeamMemberId);
-      onMemberAdd(createdMember);
-    } catch (error) {
-      onMemberRemove(optimisticTeamMemberId);
-      const apiError = error as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleRemoveAssignee = async (teamMemberId: string) => {
-    if (!teamId) {
-      return;
-    }
-
-    const removedMember = members.find((member) => member.team_member_id === teamMemberId);
-
-    try {
-      setIsSubmitting(true);
-      onMemberRemove(teamMemberId);
-      await api.teams.deleteTeamMember(teamId, teamMemberId);
-    } catch (error) {
-      if (removedMember) {
-        onMemberAdd(removedMember);
+  const handleSelectUser = useCallback(
+    async (option: SidebarOption | null) => {
+      if (!teamId || !option) {
+        return;
       }
-      const apiError = error as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+
+      const selectedUserId = Number(option.value);
+
+      // User already exists in the team - return early
+      if (memberSystemUserIds.has(selectedUserId)) {
+        return;
+      }
+
+      const optimisticTeamMemberId = `optimistic-${selectedUserId}-${Date.now()}`;
+      const optimisticMember: ITeamMember = {
+        team_member_id: optimisticTeamMemberId,
+        system_user_id: selectedUserId,
+        user_identifier: option.label
+      };
+
+      try {
+        setIsSubmitting(true);
+        onMemberAdd(optimisticMember);
+
+        const createdMember = await api.teams.createTeamMember(teamId, selectedUserId);
+
+        onMemberRemove(optimisticTeamMemberId);
+        onMemberAdd(createdMember);
+      } catch (error) {
+        onMemberRemove(optimisticTeamMemberId);
+        showApiError(error);
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [api.teams, memberSystemUserIds, onMemberAdd, onMemberRemove, showApiError, teamId]
+  );
+
+  const handleRemoveAssignee = useCallback(
+    async (teamMemberId: string) => {
+      if (!teamId) {
+        return;
+      }
+
+      const removedMember = members.find((member) => member.team_member_id === teamMemberId);
+
+      try {
+        setIsSubmitting(true);
+        onMemberRemove(teamMemberId);
+        await api.teams.deleteTeamMember(teamId, teamMemberId);
+      } catch (error) {
+        if (removedMember) {
+          onMemberAdd(removedMember);
+        }
+        showApiError(error);
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [api.teams, members, onMemberAdd, onMemberRemove, showApiError, teamId]
+  );
 
   return (
     <OkDialog

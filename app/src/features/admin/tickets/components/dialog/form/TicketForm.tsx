@@ -12,10 +12,8 @@ export interface ITicketFormValues {
   priority: TicketPriority;
 }
 
-export type IAutocompleteOption = ICustomAutocompleteOption<TicketPriority>;
-
 interface ITicketFormProps {
-  priorities: IAutocompleteOption[];
+  priorities: ICustomAutocompleteOption<TicketPriority>[];
 }
 
 export const TicketForm = (props: ITicketFormProps) => {

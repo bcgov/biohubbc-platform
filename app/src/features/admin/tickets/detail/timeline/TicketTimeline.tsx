@@ -5,7 +5,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { TICKET_TIMELINE_ICONS } from 'constants/icon';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { CustomTimeline, ICustomTimelineItem } from 'components/timeline';
+import { CustomTimeline, ICustomTimelineItem } from 'components/timeline/CustomTimeline';
 import { ITicketStatusHistory } from 'interfaces/useTicketsApi.interface';
 import { getRelativeTimeLabel } from 'utils/date';
 import { TicketCommentTimelineItem } from './item/TicketCommentTimelineItem';

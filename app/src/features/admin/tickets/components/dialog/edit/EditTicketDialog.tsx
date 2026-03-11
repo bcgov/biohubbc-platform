@@ -10,7 +10,7 @@ interface IEditTicketDialogProps {
   isLoading: boolean;
   ticket: ITicket;
   onClose: () => void;
-  onSubmit: (payload: IUpdateTicketRequest) => Promise<void> | void;
+  onSubmit: (payload: IUpdateTicketRequest) => Promise<void>;
 }
 
 /**
