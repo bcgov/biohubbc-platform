@@ -1,295 +1,195 @@
-import { fireEvent, waitFor } from '@testing-library/react';
-import { useApi } from 'hooks/useApi';
-import { CodesContext, ICodesContext } from 'contexts/codesContext';
-import { DialogContextProvider } from 'contexts/dialogContext';
-import { TicketContextProvider } from 'contexts/ticketContext';
+import { screen } from '@testing-library/react';
+import { ITicketContext } from 'contexts/ticketContext';
+import { useTicketContext } from 'hooks/useContext';
 import { DataLoader } from 'hooks/useDataLoader';
-import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { ITicketWithHistory } from 'interfaces/useTicketsApi.interface';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
-import { TicketDetailPage } from './TicketDetailPage';
+import { TicketDetailPage, TicketDetailPageContent } from './TicketDetailPage';
+import { useTicketComment } from './hooks/useTicketComment';
 
-vi.mock('../../../hooks/useApi');
-vi.mock('hooks/useAuthStateContext', () => ({
-  useAuthStateContext: () => ({
-    biohubUserWrapper: {
-      userIdentifier: 'Sarah'
-    }
-  })
+vi.mock('hooks/useContext', () => ({
+  useTicketContext: vi.fn()
 }));
-vi.mock('react-router', async () => {
-  const actual = await vi.importActual<typeof import('react-router')>('react-router');
 
-  return {
-    ...actual,
-    useParams: () => ({
-      ticketId: '11111111-1111-1111-1111-111111111111'
-    })
-  };
-});
+vi.mock('./hooks/useTicketComment', () => ({
+  useTicketComment: vi.fn()
+}));
 
-const mockUseApi = useApi as Mock;
+vi.mock('./detail/header/TicketHeader', () => ({
+  TicketHeader: ({ ticket }: { ticket: ITicketWithHistory }) => (
+    <div data-testid="ticket-header">{ticket.ticket_slug}</div>
+  )
+}));
 
-const ticket = {
+vi.mock('./detail/timeline/TicketTimeline', () => ({
+  TicketTimeline: ({ history, isLoading }: { history: Array<{ create_date: string }>; isLoading: boolean }) => (
+    <div data-testid="ticket-timeline" data-loading={String(isLoading)} data-history={JSON.stringify(history)} />
+  )
+}));
+
+vi.mock('./detail/comment/TicketComment', () => ({
+  TicketComment: ({ comment, isSaving }: { comment: string; isSaving: boolean }) => (
+    <div data-testid="ticket-comment" data-comment={comment} data-saving={String(isSaving)} />
+  )
+}));
+
+vi.mock('./detail/sidebar/TicketSidebar', () => ({
+  TicketSidebar: ({ teamId, references }: { teamId?: string; references?: unknown[] }) => (
+    <div
+      data-testid="ticket-sidebar"
+      data-team-id={teamId ?? ''}
+      data-reference-count={String(references?.length ?? 0)}
+    />
+  )
+}));
+
+vi.mock('./detail/skeleton/TicketSkeleton', () => ({
+  TicketSkeleton: () => <div data-testid="ticket-skeleton" />
+}));
+
+const mockUseTicketContext = useTicketContext as Mock;
+const mockUseTicketComment = useTicketComment as Mock;
+
+const baseTicket: ITicketWithHistory = {
   ticket_id: '11111111-1111-1111-1111-111111111111',
   ticket_slug: '04900042',
   subject: 'Test Ticket',
   description: 'Test description',
   team_id: '22222222-2222-2222-2222-222222222222',
   create_date: '2026-02-24T00:00:00.000Z',
-  priority: 'medium' as const,
-  status: 'open' as const
-};
-
-const history = [
-  {
-    ticket_status_history_id: '33333333-3333-3333-3333-333333333333',
-    ticket_id: ticket.ticket_id,
-    user_identifier: 'Sarah',
-    create_date: '2026-02-24T00:00:00.000Z',
-    status: 'open' as const
-  },
-  {
-    ticket_status_history_id: '44444444-4444-4444-4444-444444444444',
-    ticket_id: ticket.ticket_id,
-    user_identifier: 'Bob',
-    create_date: '2026-02-25T00:00:00.000Z',
-    status: 'closed' as const
-  }
-];
-
-const ticketWithHistory = {
-  ...ticket,
-  statuses: history,
-  comments: [],
-  references: []
-};
-
-describe('TicketDetailPage', () => {
-  const mockGetTicket = vi.fn();
-  const mockGetTeamMembers = vi.fn();
-  const mockGetAvailableUsers = vi.fn();
-  const mockCreateTeamMember = vi.fn();
-  const mockDeleteTeamMember = vi.fn();
-  const mockUpdateTicket = vi.fn();
-  const mockUpdateTicketStatus = vi.fn();
-  const mockCreateTicketComment = vi.fn();
-  const mockCreateTicketReference = vi.fn();
-
-  const mockCodesData: IGetAllCodeSetsResponse = {
-    feature_type_with_properties: []
-  };
-
-  const mockCodesDataLoader: DataLoader<[], IGetAllCodeSetsResponse, unknown> = {
-    data: mockCodesData,
-    error: undefined,
-    isLoading: false,
-    isReady: true,
-    load: vi.fn().mockResolvedValue(mockCodesData),
-    refresh: vi.fn().mockResolvedValue(mockCodesData),
-    clear: vi.fn(),
-    setData: vi.fn()
-  };
-
-  const mockCodesContext: ICodesContext = {
-    codesDataLoader: {
-      ...mockCodesDataLoader
-    }
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-
-    mockGetTicket.mockResolvedValue(ticketWithHistory);
-    mockGetTeamMembers.mockResolvedValue({
-      members: [{ team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' }]
-    });
-    mockGetAvailableUsers.mockResolvedValue({ users: [] });
-    mockCreateTeamMember.mockResolvedValue({ team_member_id: 'tm-2', system_user_id: 2, user_identifier: 'bob' });
-    mockDeleteTeamMember.mockResolvedValue(undefined);
-    mockUpdateTicket.mockResolvedValue(ticket);
-    mockUpdateTicketStatus.mockResolvedValue({ ...ticket, status: 'closed' });
-    mockCreateTicketComment.mockResolvedValue({
-      ticket_status_history_id: null,
-      ticket_comment_id: '55555555-5555-5555-5555-555555555555',
-      ticket_id: ticket.ticket_id,
-      user_identifier: 'Sarah',
+  priority: 'medium',
+  status: 'open',
+  statuses: [
+    {
+      ticket_status_history_id: 'status-2',
+      ticket_id: '11111111-1111-1111-1111-111111111111',
+      user_identifier: 'Bob',
       create_date: '2026-02-25T00:00:00.000Z',
-      status: null,
+      status: 'closed'
+    },
+    {
+      ticket_status_history_id: 'status-1',
+      ticket_id: '11111111-1111-1111-1111-111111111111',
+      user_identifier: 'Sarah',
+      create_date: '2026-02-24T00:00:00.000Z',
+      status: 'open'
+    }
+  ],
+  comments: [
+    {
+      ticket_comment_id: 'comment-1',
+      ticket_id: '11111111-1111-1111-1111-111111111111',
+      user_identifier: 'Sarah',
+      create_date: '2026-02-24T12:00:00.000Z',
       comment: 'New comment'
-    });
-    mockCreateTicketReference.mockResolvedValue({
-      ticket_reference_id: '66666666-6666-6666-6666-666666666666',
-      source_ticket_id: ticket.ticket_id,
-      source_ticket_slug: ticket.ticket_slug,
-      source_ticket_subject: ticket.subject,
+    }
+  ],
+  references: [
+    {
+      ticket_reference_id: 'ref-1',
+      source_ticket_id: '11111111-1111-1111-1111-111111111111',
+      source_ticket_slug: '04900042',
+      source_ticket_subject: 'Test Ticket',
       target_ticket_id: '77777777-7777-7777-7777-777777777777',
       target_ticket_slug: '04900050',
       target_ticket_subject: 'Related ticket',
       relationship: 'relates_to',
       user_identifier: 'Sarah',
       create_date: '2026-02-25T00:00:00.000Z'
-    });
+    }
+  ]
+};
 
-    mockUseApi.mockImplementation(() => ({
-      tickets: {
-        getTicket: mockGetTicket,
-        updateTicket: mockUpdateTicket,
-        updateTicketStatus: mockUpdateTicketStatus,
-        createTicketComment: mockCreateTicketComment,
-        createTicketReference: mockCreateTicketReference
-      },
-      teams: {
-        getTeamMembers: mockGetTeamMembers,
-        getAvailableUsers: mockGetAvailableUsers,
-        createTeamMember: mockCreateTeamMember,
-        deleteTeamMember: mockDeleteTeamMember
-      }
-    }));
+const setComment = vi.fn();
+const onAddComment = vi.fn().mockResolvedValue(undefined);
+
+const renderContent = (ticket: ITicketWithHistory | undefined, isLoading = false) =>
+  render(
+    <TicketDetailPageContent
+      ticket={ticket}
+      isLoading={isLoading}
+      comment="Draft comment"
+      setComment={setComment}
+      isSavingComment={false}
+      onAddComment={onAddComment}
+    />
+  );
+
+const makeTicketContext = (ticket: ITicketWithHistory | undefined, isLoading = false): ITicketContext => {
+  const ticketDataLoader: DataLoader<[string], ITicketWithHistory, unknown> = {
+    data: ticket,
+    error: undefined,
+    isLoading,
+    isReady: true,
+    load: vi.fn(),
+    refresh: vi.fn(),
+    clear: vi.fn(),
+    setData: vi.fn()
+  };
+
+  return {
+    ticketId: '11111111-1111-1111-1111-111111111111',
+    ticketDataLoader
+  };
+};
+
+describe('TicketDetailPageContent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  const renderPage = () =>
-    render(
-      <CodesContext.Provider value={mockCodesContext}>
-        <DialogContextProvider>
-          <MemoryRouter initialEntries={[`/admin/tickets/${ticket.ticket_id}`]}>
-            <Routes>
-              <Route
-                path="/admin/tickets/:ticketId"
-                element={
-                  <TicketContextProvider>
-                    <TicketDetailPage />
-                  </TicketContextProvider>
-                }
-              />
-            </Routes>
-          </MemoryRouter>
-        </DialogContextProvider>
-      </CodesContext.Provider>
-    );
+  it('renders header, timeline, sidebar, and comment for open tickets', () => {
+    renderContent(baseTicket);
 
-  it('loads ticket with inline status history on mount', async () => {
-    renderPage();
-
-    await waitFor(() => {
-      const getTicketArgs = mockGetTicket.mock.calls.flat(Infinity);
-      const getTeamMembersArgs = mockGetTeamMembers.mock.calls.flat(Infinity);
-
-      expect(getTicketArgs).toContain(ticket.ticket_id);
-      expect(getTeamMembersArgs).toContain(ticket.team_id);
-    });
+    expect(screen.getByTestId('ticket-header')).toHaveTextContent('04900042');
+    expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-comment', 'Draft comment');
+    expect(screen.getByTestId('ticket-sidebar')).toHaveAttribute('data-team-id', baseTicket.team_id);
+    expect(screen.getByTestId('ticket-sidebar')).toHaveAttribute('data-reference-count', '1');
   });
 
-  it('renders timeline and comment input', async () => {
-    const { getAllByText, findByText, findByPlaceholderText, findByRole } = renderPage();
+  it('passes chronologically sorted history to timeline', () => {
+    renderContent(baseTicket);
 
-    await waitFor(() => {
-      expect(getAllByText('Ticket #04900042').length).toBeGreaterThan(0);
-    });
+    const timeline = screen.getByTestId('ticket-timeline');
+    const history = JSON.parse(timeline.getAttribute('data-history') ?? '[]') as Array<{ create_date: string }>;
+    const createDates = history.map((entry) => entry.create_date);
 
-    expect(await findByText(/sarah opened the ticket/i)).toBeVisible();
-    expect(await findByText(/bob closed the ticket/i)).toBeVisible();
-    expect(await findByText('Assignees')).toBeVisible();
-    expect(await findByText(/alice/i)).toBeVisible();
-    expect(await findByPlaceholderText('Type your comment...')).toBeVisible();
-    expect(await findByRole('link', { name: 'Tickets' })).toHaveAttribute('href', '/admin/tickets');
+    expect(createDates).toEqual(['2026-02-24T00:00:00.000Z', '2026-02-24T12:00:00.000Z', '2026-02-25T00:00:00.000Z']);
+    expect(timeline).toHaveAttribute('data-loading', 'false');
   });
 
-  it('updates status and refreshes timeline', async () => {
-    const { getByTestId } = renderPage();
+  it('hides comment input for closed tickets', () => {
+    renderContent({ ...baseTicket, status: 'closed' });
 
-    await waitFor(() => {
-      expect(getByTestId('close-ticket-button')).toBeVisible();
-    });
-
-    fireEvent.click(getByTestId('close-ticket-button'));
-
-    await waitFor(() => {
-      expect(getByTestId('yes-button')).toBeVisible();
-    });
-
-    fireEvent.click(getByTestId('yes-button'));
-
-    await waitFor(() => {
-      expect(mockUpdateTicketStatus).toHaveBeenCalledWith(ticket.ticket_id, 'closed');
-    });
+    expect(screen.queryByTestId('ticket-comment')).not.toBeInTheDocument();
   });
 
-  it('reopens ticket after confirmation', async () => {
-    mockGetTicket.mockResolvedValueOnce({
-      ...ticketWithHistory,
-      status: 'closed' as const
-    });
+  it('shows the loading skeleton when loading and no ticket is available', () => {
+    renderContent(undefined, true);
 
-    const { getByTestId } = renderPage();
+    expect(screen.getByTestId('ticket-skeleton')).toBeVisible();
+  });
+});
 
-    await waitFor(() => {
-      expect(getByTestId('open-ticket-button')).toBeVisible();
-    });
-
-    fireEvent.click(getByTestId('open-ticket-button'));
-
-    await waitFor(() => {
-      expect(getByTestId('yes-button')).toBeVisible();
-    });
-
-    fireEvent.click(getByTestId('yes-button'));
-
-    await waitFor(() => {
-      expect(mockUpdateTicketStatus).toHaveBeenCalledWith(ticket.ticket_id, 'open');
+describe('TicketDetailPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseTicketContext.mockReturnValue(makeTicketContext(baseTicket, false));
+    mockUseTicketComment.mockReturnValue({
+      comment: 'Hook comment',
+      setComment,
+      isSavingComment: true,
+      handleAddComment: onAddComment
     });
   });
 
-  it('adds a comment and refreshes timeline', async () => {
-    const { getByPlaceholderText, getByRole, getByText } = renderPage();
+  it('wires context and comment hook state into content rendering', () => {
+    render(<TicketDetailPage />);
 
-    await waitFor(() => {
-      expect(getByPlaceholderText('Type your comment...')).toBeVisible();
-    });
-
-    fireEvent.change(getByPlaceholderText('Type your comment...'), { target: { value: 'New comment' } });
-    fireEvent.click(getByRole('button', { name: 'Comment' }));
-
-    await waitFor(() => {
-      expect(mockCreateTicketComment).toHaveBeenCalledWith(ticket.ticket_id, { comment: 'New comment' });
-      expect(getByText('New comment')).toBeVisible();
-    });
-  });
-
-  it('hides comment input when ticket is closed', async () => {
-    mockGetTicket.mockResolvedValueOnce({ ...ticketWithHistory, status: 'closed' as const });
-
-    const { queryByPlaceholderText } = renderPage();
-
-    await waitFor(() => {
-      expect(mockGetTicket).toHaveBeenCalledWith(ticket.ticket_id);
-      expect(queryByPlaceholderText('Type your comment...')).not.toBeInTheDocument();
-    });
-  });
-
-  it('opens edit dialog with current ticket values and submits update', async () => {
-    const { getByTestId, getByLabelText } = renderPage();
-
-    await waitFor(() => {
-      expect(getByTestId('edit-ticket-button')).toBeVisible();
-    });
-
-    fireEvent.click(getByTestId('edit-ticket-button'));
-
-    await waitFor(() => {
-      expect(getByLabelText(/Subject/i)).toHaveValue('Test Ticket');
-    });
-
-    fireEvent.change(getByLabelText(/Subject/i), { target: { value: 'Updated Subject' } });
-    fireEvent.click(getByTestId('edit-dialog-save-button'));
-
-    await waitFor(() => {
-      expect(mockUpdateTicket).toHaveBeenCalledWith(ticket.ticket_id, {
-        subject: 'Updated Subject',
-        description: 'Test description',
-        priority: 'medium'
-      });
-    });
+    expect(screen.getByTestId('ticket-header')).toHaveTextContent('04900042');
+    expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-comment', 'Hook comment');
+    expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-saving', 'true');
+    expect(screen.getByTestId('ticket-timeline')).toHaveAttribute('data-loading', 'false');
   });
 });

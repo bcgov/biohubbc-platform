@@ -4,7 +4,8 @@ import Stack from '@mui/material/Stack';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { PageSection } from 'components/section/PageSection';
 import { useTicketContext } from 'hooks/useContext';
-import { useState } from 'react';
+import { ITicketWithHistory } from 'interfaces/useTicketsApi.interface';
+import { Dispatch, SetStateAction } from 'react';
 import { TicketComment } from './detail/comment/TicketComment';
 import { TicketHeader } from './detail/header/TicketHeader';
 import { TicketSidebar } from './detail/sidebar/TicketSidebar';
@@ -13,25 +14,20 @@ import { TicketTimeline } from './detail/timeline/TicketTimeline';
 import { useTicketComment } from './hooks/useTicketComment';
 import { sortChronological } from './utils/sortChronological';
 
-/**
- * Admin ticket detail page for viewing timeline activity and changing ticket status.
- *
- * @return {*}
- */
-export const TicketDetailPage = () => {
-  const { ticketDataLoader } = useTicketContext();
+export interface ITicketDetailPageContentProps {
+  ticket: ITicketWithHistory | undefined;
+  isLoading: boolean;
+  comment: string;
+  setComment: Dispatch<SetStateAction<string>>;
+  isSavingComment: boolean;
+  onAddComment: () => Promise<void>;
+}
 
-  const [isSavingComment, setIsSavingComment] = useState(false);
-  const { comment, setComment, handleAddComment } = useTicketComment({
-    onSavingChange: setIsSavingComment
-  });
-  const ticket = ticketDataLoader.data;
+export const TicketDetailPageContent = (props: ITicketDetailPageContentProps) => {
+  const { ticket, isLoading, comment, setComment, isSavingComment, onAddComment } = props;
 
   return (
-    <LoadingGuard
-      isLoading={ticketDataLoader.isLoading && !ticket}
-      isLoadingFallback={<TicketSkeleton />}
-      isLoadingFallbackDelay={300}>
+    <LoadingGuard isLoading={isLoading && !ticket} isLoadingFallback={<TicketSkeleton />} isLoadingFallbackDelay={300}>
       <>
         {ticket ? <TicketHeader ticket={ticket} /> : null}
 
@@ -49,14 +45,14 @@ export const TicketDetailPage = () => {
               <Stack spacing={4} sx={{ flex: '1 1 0', minWidth: { xs: '100%', md: 560 } }}>
                 <TicketTimeline
                   history={[...(ticket?.statuses ?? []), ...(ticket?.comments ?? [])].sort(sortChronological)}
-                  isLoading={ticketDataLoader.isLoading}
+                  isLoading={isLoading}
                 />
                 {ticket?.status === 'open' ? (
                   <TicketComment
                     comment={comment}
                     setComment={setComment}
                     isSaving={isSavingComment}
-                    onAddComment={handleAddComment}
+                    onAddComment={onAddComment}
                   />
                 ) : null}
               </Stack>
@@ -69,5 +65,26 @@ export const TicketDetailPage = () => {
         </Container>
       </>
     </LoadingGuard>
+  );
+};
+
+/**
+ * Admin ticket detail page for viewing timeline activity and changing ticket status.
+ *
+ * @return {*}
+ */
+export const TicketDetailPage = () => {
+  const { ticketDataLoader } = useTicketContext();
+  const { comment, setComment, isSavingComment, handleAddComment } = useTicketComment();
+
+  return (
+    <TicketDetailPageContent
+      ticket={ticketDataLoader.data}
+      isLoading={ticketDataLoader.isLoading}
+      comment={comment}
+      setComment={setComment}
+      isSavingComment={isSavingComment}
+      onAddComment={handleAddComment}
+    />
   );
 };

@@ -3,20 +3,14 @@ import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import { useApi } from 'hooks/useApi';
 import { ITicketCommentLog } from 'interfaces/useTicketsApi.interface';
-import { Dispatch, SetStateAction, useState } from 'react';
-
-interface IUseTicketCommentProps {
-  onSavingChange: Dispatch<SetStateAction<boolean>>;
-}
+import { useState } from 'react';
 
 /**
  * Comment state and submit behavior for ticket details.
  *
- * @param {IUseTicketCommentProps} props
  * @return {*}
  */
-export const useTicketComment = (props: IUseTicketCommentProps) => {
-  const { onSavingChange } = props;
+export const useTicketComment = () => {
   const api = useApi();
   const { ticketId, ticketDataLoader } = useTicketContext();
   const authStateContext = useAuthStateContext();
@@ -102,7 +96,6 @@ export const useTicketComment = (props: IUseTicketCommentProps) => {
 
     try {
       setIsSavingComment(true);
-      onSavingChange(true);
       appendComment(optimisticComment);
 
       const createdComment = await api.tickets.createTicketComment(ticketId, { comment: trimmedComment });
@@ -132,7 +125,6 @@ export const useTicketComment = (props: IUseTicketCommentProps) => {
       });
     } finally {
       setIsSavingComment(false);
-      onSavingChange(false);
     }
   };
 
