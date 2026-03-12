@@ -152,6 +152,30 @@ describe('CartSubmissionFeatureRepository', () => {
 
       expect(result).to.eql(mockRows);
     });
+
+    it('should return only the matching feature when submissionFeatureId is provided', async () => {
+      const matchingFeature: CartSubmissionFeature = {
+        submission_feature_id: 5,
+        cart_submission_feature_id: 'uuid5',
+        feature_type_name: 'Type1',
+        feature_type_id: 2,
+        secured: false,
+        submission_id: 1
+      };
+
+      const knexStub = sinon.stub().resolves({
+        rowCount: 1,
+        rows: [matchingFeature]
+      } as unknown as QueryResult<any>);
+
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repo = new CartSubmissionFeatureRepository(mockDBConnection);
+
+      const result = await repo.getCartSubmissionFeatures('cart-1', { page: 1, limit: 25 }, 5);
+
+      expect(result).to.eql([matchingFeature]);
+    });
   });
 
   describe('getCartSubmissionFeatureCount', () => {
