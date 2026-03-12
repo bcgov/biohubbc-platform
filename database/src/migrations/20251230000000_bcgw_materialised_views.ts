@@ -20,17 +20,53 @@ WITH deployments AS (
       ON dep.feature_type_id = ft_dep.feature_type_id
     WHERE ft_dep.name = 'telemetry_deployment'
       AND dep.record_end_date IS NULL
+),
+related_targets AS (
+    SELECT
+      sff.source_feature_id AS deployment_id,
+      sff.target_feature_id AS related_feature_id
+    FROM submission_feature_feature sff
+    JOIN deployments d ON sff.source_feature_id = d.submission_feature_id
+),
+related_sources AS (
+    SELECT
+      sff.target_feature_id AS deployment_id,
+      sff.source_feature_id AS related_feature_id
+    FROM submission_feature_feature sff
+    JOIN deployments d ON sff.target_feature_id = d.submission_feature_id
+),
+related_feature_ids AS (
+    SELECT DISTINCT related_feature_id
+    FROM related_targets
+    UNION
+    SELECT DISTINCT related_feature_id
+    FROM related_sources
+),
+related_animals AS (
+    SELECT
+      sf.submission_feature_id,
+      sf.data->>'taxon_id' AS taxon_id,
+      sf.data->>'sex' AS sex,
+      sf.data->>'animal_identifier' AS related_animal_identifier
+    FROM biohub.submission_feature sf
+    JOIN biohub.feature_type ft_animal
+      ON sf.feature_type_id = ft_animal.feature_type_id
+    WHERE ft_animal.name = 'animal'
+      AND sf.record_end_date IS NULL
+      AND sf.submission_feature_id IN (SELECT related_feature_id FROM related_feature_ids)
 )
 SELECT
     sf.submission_feature_id AS Feature_ID,
     d.animal_id,
-    -- Contingent on Feature Array: Add columns Species Code, Species english name, species scientific name, Sex, Ecological Unit
     d.device_key,
     (sf.data->>'timestamp')::timestamptz AS DATETIME,
     (EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz))::int AS YEAR,
     (sf.data->>'latitude')::numeric AS Latitude,
     (sf.data->>'longitude')::numeric AS Longitude,
     (sf.data->>'dop')::numeric AS dop,
+    ra.taxon_id::int AS animal_taxon_id,
+    ra.sex AS animal_sex,
+    ra.related_animal_identifier AS related_animal_identifier,
     CASE
       WHEN sf.submission_feature_id IN (
         SELECT submission_feature_id
@@ -38,15 +74,16 @@ SELECT
       ) THEN 'Secured'
       ELSE 'Open'
     END AS SECURITY
-    -- contingent on feature array: join to dataset and get the survey name and id, and the study area id
 FROM biohub.submission_feature sf
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
 LEFT JOIN deployments d
   ON d.submission_feature_id = sf.parent_submission_feature_id
+LEFT JOIN related_animals ra
+  ON ra.submission_feature_id = d.submission_feature_id
 WHERE ft.name = 'telemetry'
   AND sf.record_end_date IS NULL
-  AND (sf.data->>'timestamp')::timestamptz <= (NOW() - INTERVAL '4 months');
+  AND (sf.data->>'timestamp')::timestamptz <= (NOW() - INTERVAL '3 months');
   `);
 
   await knex.raw(`
@@ -58,6 +95,9 @@ WHERE ft.name = 'telemetry'
     COMMENT ON COLUMN bcgw.telemetry_all.dop IS 'The dilution of precision';
     COMMENT ON COLUMN bcgw.telemetry_all.device_key IS 'The vendor and device serial';
     COMMENT ON COLUMN bcgw.telemetry_all.animal_id IS 'The identifier of the animal wearing the telemetry device';
+    COMMENT ON COLUMN bcgw.telemetry_all.animal_taxon_id IS 'Taxon ID loaded from the linked animal feature via submission_feature_feature relationships';
+    COMMENT ON COLUMN bcgw.telemetry_all.animal_sex IS 'Sex loaded from the linked animal feature via submission_feature_feature relationships';
+    COMMENT ON COLUMN bcgw.telemetry_all.related_animal_identifier IS 'Animal identifier loaded from the linked animal feature via submission_feature_feature relationships';
     COMMENT ON COLUMN bcgw.telemetry_all.SECURITY IS 'The security status of the feature';
   `);
 
@@ -73,30 +113,67 @@ WITH deployments AS (
       ON dep.feature_type_id = ft_dep.feature_type_id
     WHERE ft_dep.name = 'telemetry_deployment'
       AND dep.record_end_date IS NULL
+),
+related_targets AS (
+    SELECT
+      sff.source_feature_id AS deployment_id,
+      sff.target_feature_id AS related_feature_id
+    FROM submission_feature_feature sff
+    JOIN deployments d ON sff.source_feature_id = d.submission_feature_id
+),
+related_sources AS (
+    SELECT
+      sff.target_feature_id AS deployment_id,
+      sff.source_feature_id AS related_feature_id
+    FROM submission_feature_feature sff
+    JOIN deployments d ON sff.target_feature_id = d.submission_feature_id
+),
+related_feature_ids AS (
+    SELECT DISTINCT related_feature_id
+    FROM related_targets
+    UNION
+    SELECT DISTINCT related_feature_id
+    FROM related_sources
+),
+related_animals AS (
+    SELECT
+      sf.submission_feature_id,
+      sf.data->>'taxon_id' AS taxon_id,
+      sf.data->>'sex' AS sex,
+      sf.data->>'animal_identifier' AS related_animal_identifier
+    FROM biohub.submission_feature sf
+    JOIN biohub.feature_type ft_animal
+      ON sf.feature_type_id = ft_animal.feature_type_id
+    WHERE ft_animal.name = 'animal'
+      AND sf.record_end_date IS NULL
+      AND sf.submission_feature_id IN (SELECT related_feature_id FROM related_feature_ids)
 )
 SELECT
     sf.submission_feature_id AS Feature_ID,
     d.animal_id,
-    -- Contingent on Feature Array: Add columns Species Code, Species english name, species scientific name, Sex, Ecological Unit
     d.device_key,
     (sf.data->>'timestamp')::timestamptz AS DATETIME,
     (EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz))::int AS YEAR,
     (sf.data->>'latitude')::numeric AS Latitude,
     (sf.data->>'longitude')::numeric AS Longitude,
-    (sf.data->>'dop')::numeric AS dop
-      -- contingent on feature array: join to dataset and get the survey name and id, and the study area id
+    (sf.data->>'dop')::numeric AS dop,
+    ra.taxon_id::int AS animal_taxon_id,
+    ra.sex AS animal_sex,
+    ra.related_animal_identifier AS related_animal_identifier
 FROM biohub.submission_feature sf
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
 LEFT JOIN deployments d
   ON d.submission_feature_id = sf.parent_submission_feature_id
+LEFT JOIN related_animals ra
+  ON ra.submission_feature_id = d.submission_feature_id
 WHERE ft.name = 'telemetry'
   AND sf.record_end_date IS NULL
   AND sf.submission_feature_id NOT IN (
         SELECT submission_feature_id
         FROM biohub.submission_feature_security
       )
-  AND (sf.data->>'timestamp')::timestamptz <= (NOW() - INTERVAL '4 months');
+  AND (sf.data->>'timestamp')::timestamptz <= (NOW() - INTERVAL '3 months');
   `);
 
   await knex.raw(`
@@ -108,6 +185,9 @@ WHERE ft.name = 'telemetry'
     COMMENT ON COLUMN bcgw.telemetry_public.dop IS 'The dilution of precision';
     COMMENT ON COLUMN bcgw.telemetry_public.device_key IS 'The vendor and device serial';
     COMMENT ON COLUMN bcgw.telemetry_public.animal_id IS 'The identifier of the animal wearing the telemetry device';
+    COMMENT ON COLUMN bcgw.telemetry_public.animal_taxon_id IS 'Taxon ID loaded from the linked animal feature via submission_feature_feature relationships';
+    COMMENT ON COLUMN bcgw.telemetry_public.animal_sex IS 'Sex loaded from the linked animal feature via submission_feature_feature relationships';
+    COMMENT ON COLUMN bcgw.telemetry_public.related_animal_identifier IS 'Animal identifier loaded from the linked animal feature via submission_feature_feature relationships';
   `);
 
   await knex.raw(`
