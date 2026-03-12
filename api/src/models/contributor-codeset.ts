@@ -6,7 +6,7 @@ export const ContributorCodesetSchema = z.object({
   key: z.string(),
   label: z.string(),
   description: z.string().nullable(),
-  version: z.string()
+  external_id: z.string().nullable()
 });
 
 export type ContributorCodeset = z.infer<typeof ContributorCodesetSchema>;
@@ -16,5 +16,5 @@ export interface CreateContributorCodeset {
   key: string;
   label: string;
   description?: string | null;
-  version: string;
+  external_id: string | null;
 }

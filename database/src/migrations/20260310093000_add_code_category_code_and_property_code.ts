@@ -13,7 +13,7 @@ export async function up(knex: Knex): Promise<void> {
       key VARCHAR(128) NOT NULL,
       label VARCHAR(250) NOT NULL,
       description VARCHAR(1000),
-      version VARCHAR(50) NOT NULL,
+      external_id VARCHAR(50),
       record_end_date TIMESTAMPTZ(6),
       create_date TIMESTAMPTZ(6) NOT NULL DEFAULT now(),
       create_user INTEGER NOT NULL,
@@ -30,7 +30,7 @@ export async function up(knex: Knex): Promise<void> {
       key VARCHAR(128) NOT NULL,
       label VARCHAR(250) NOT NULL,
       description VARCHAR(1000),
-      version VARCHAR(50) NOT NULL,
+      external_id VARCHAR(50),
       record_end_date TIMESTAMPTZ(6),
       create_date TIMESTAMPTZ(6) NOT NULL DEFAULT now(),
       create_user INTEGER NOT NULL,
@@ -63,15 +63,15 @@ export async function up(knex: Knex): Promise<void> {
     --------------------------------------------------------------------------------
 
     CREATE INDEX contributor_codeset_idx1 ON contributor_codeset(contributor_id);
-    CREATE UNIQUE INDEX contributor_codeset_nuk1 ON contributor_codeset(contributor_id, key, version);
+    CREATE UNIQUE INDEX contributor_codeset_nuk1 ON contributor_codeset(contributor_id, key);
     CREATE INDEX contributor_codeset_idx2
-      ON contributor_codeset(key, version)
+      ON contributor_codeset(key)
       WHERE record_end_date IS NULL;
 
     CREATE INDEX contributor_codeset_code_idx1 ON contributor_codeset_code(contributor_codeset_id);
-    CREATE UNIQUE INDEX contributor_codeset_code_nuk1 ON contributor_codeset_code(contributor_codeset_id, key, version);
+    CREATE UNIQUE INDEX contributor_codeset_code_nuk1 ON contributor_codeset_code(contributor_codeset_id, key);
     CREATE INDEX contributor_codeset_code_idx2
-      ON contributor_codeset_code(key, version)
+      ON contributor_codeset_code(key)
       WHERE record_end_date IS NULL;
 
     CREATE INDEX submission_feature_property_code_idx1 ON submission_feature_property_code(submission_feature_id);
@@ -89,7 +89,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN contributor_codeset.key IS 'Machine-readable identifier for the code set.';
     COMMENT ON COLUMN contributor_codeset.label IS 'Human-readable code set label.';
     COMMENT ON COLUMN contributor_codeset.description IS 'Optional code set description.';
-    COMMENT ON COLUMN contributor_codeset.version IS 'Code set definition version.';
+    COMMENT ON COLUMN contributor_codeset.external_id IS 'Code set definition external_id.';
     COMMENT ON COLUMN contributor_codeset.record_end_date IS 'Timestamp for soft delete; null when active.';
     COMMENT ON COLUMN contributor_codeset.create_date IS 'The datetime the record was created.';
     COMMENT ON COLUMN contributor_codeset.create_user IS 'The id of the user who created the record.';
@@ -103,7 +103,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN contributor_codeset_code.key IS 'Machine-readable code key, stored as text (varchar(128)).';
     COMMENT ON COLUMN contributor_codeset_code.label IS 'Human-readable code label.';
     COMMENT ON COLUMN contributor_codeset_code.description IS 'Optional code description.';
-    COMMENT ON COLUMN contributor_codeset_code.version IS 'Code definition version.';
+    COMMENT ON COLUMN contributor_codeset_code.external_id IS 'Code definition external_id.';
     COMMENT ON COLUMN contributor_codeset_code.record_end_date IS 'Timestamp for soft delete; null when active.';
     COMMENT ON COLUMN contributor_codeset_code.create_date IS 'The datetime the record was created.';
     COMMENT ON COLUMN contributor_codeset_code.create_user IS 'The id of the user who created the record.';

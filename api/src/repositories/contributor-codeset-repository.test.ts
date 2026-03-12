@@ -17,7 +17,7 @@ describe('ContributorCodesetRepository', () => {
     key: 'life_stage',
     label: 'Life stage',
     description: 'Life stage codes',
-    version: 'v1'
+    external_id: 'v1'
   };
 
   describe('insert', () => {
@@ -31,7 +31,7 @@ describe('ContributorCodesetRepository', () => {
         key: 'life_stage',
         label: 'Life stage',
         description: 'Life stage codes',
-        version: 'v1'
+        external_id: 'v1'
       });
 
       expect(result).to.eql(mockRow);
@@ -47,7 +47,7 @@ describe('ContributorCodesetRepository', () => {
           contributor_id: 10,
           key: 'life_stage',
           label: 'Life stage',
-          version: 'v1'
+          external_id: 'v1'
         });
         expect.fail();
       } catch (error) {
@@ -59,7 +59,7 @@ describe('ContributorCodesetRepository', () => {
       const repository = new ContributorCodesetRepository(
         getMockDBConnection({
           knex: () =>
-            Promise.resolve(mockQueryResult([mockRow, { ...mockRow, contributor_codeset_id: 2, version: 'v2' }]))
+            Promise.resolve(mockQueryResult([mockRow, { ...mockRow, contributor_codeset_id: 2, external_id: 'v2' }]))
         })
       );
 
@@ -69,18 +69,18 @@ describe('ContributorCodesetRepository', () => {
           key: 'life_stage',
           label: 'Life stage',
           description: 'Life stage codes',
-          version: 'v1'
+          external_id: 'v1'
         },
         {
           contributor_id: 10,
           key: 'life_stage',
           label: 'Life stage',
           description: 'Life stage codes',
-          version: 'v2'
+          external_id: 'v2'
         }
       ]);
 
-      expect(result).to.eql([mockRow, { ...mockRow, contributor_codeset_id: 2, version: 'v2' }]);
+      expect(result).to.eql([mockRow, { ...mockRow, contributor_codeset_id: 2, external_id: 'v2' }]);
     });
 
     it('throws on failed multi-insert row count mismatch', async () => {
@@ -95,14 +95,14 @@ describe('ContributorCodesetRepository', () => {
             key: 'life_stage',
             label: 'Life stage',
             description: 'Life stage codes',
-            version: 'v1'
+            external_id: 'v1'
           },
           {
             contributor_id: 10,
             key: 'life_stage',
             label: 'Life stage',
             description: 'Life stage codes',
-            version: 'v2'
+            external_id: 'v2'
           }
         ]);
         expect.fail();
@@ -164,7 +164,7 @@ describe('ContributorCodesetRepository', () => {
         getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow])) })
       );
 
-      const result = await repository.findContributorCodesetByIdentity(10, 'life_stage', 'v1');
+      const result = await repository.findContributorCodesetByIdentity(10, 'life_stage');
       expect(result).to.eql(mockRow);
     });
 
@@ -173,7 +173,7 @@ describe('ContributorCodesetRepository', () => {
         getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([])) })
       );
 
-      const result = await repository.findContributorCodesetByIdentity(10, 'life_stage', 'v1');
+      const result = await repository.findContributorCodesetByIdentity(10, 'life_stage');
       expect(result).to.equal(null);
     });
 
@@ -183,7 +183,7 @@ describe('ContributorCodesetRepository', () => {
       );
 
       try {
-        await repository.findContributorCodesetByIdentity(10, 'life_stage', 'v1');
+        await repository.findContributorCodesetByIdentity(10, 'life_stage');
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(ApiExecuteSQLError);
@@ -196,7 +196,7 @@ describe('ContributorCodesetRepository', () => {
       );
 
       const result = await repository.getContributorCodesetsByIdentities([
-        { contributor_id: 10, key: 'life_stage', version: 'v1' }
+        { contributor_id: 10, key: 'life_stage' }
       ]);
       expect(result).to.eql([mockRow]);
     });

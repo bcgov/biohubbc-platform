@@ -20,7 +20,7 @@ export class ContributorCodesetCodeRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex('contributor_codeset_code')
       .insert(payload)
-      .returning(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'version']);
+      .returning(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'external_id']);
 
     const response = await this.connection.knex(query, ContributorCodesetCodeSchema);
 
@@ -49,7 +49,7 @@ export class ContributorCodesetCodeRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex('contributor_codeset_code')
       .insert(payloads)
-      .returning(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'version']);
+      .returning(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'external_id']);
 
     const response = await this.connection.knex(query, ContributorCodesetCodeSchema);
 
@@ -73,7 +73,7 @@ export class ContributorCodesetCodeRepository extends BaseRepository {
   async getContributorCodesetCodeById(contributorCodesetCodeId: number): Promise<ContributorCodesetCode> {
     const knex = getKnex();
     const query = knex('contributor_codeset_code')
-      .select(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'version'])
+      .select(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'external_id'])
       .where('contributor_codeset_code_id', contributorCodesetCodeId);
 
     const response = await this.connection.knex(query, ContributorCodesetCodeSchema);
@@ -107,7 +107,7 @@ export class ContributorCodesetCodeRepository extends BaseRepository {
   ): Promise<ContributorCodesetCode[]> {
     const knex = getKnex();
     const query = knex('contributor_codeset_code')
-      .select(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'version'])
+      .select(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'external_id'])
       .where('contributor_codeset_id', contributorCodesetId);
 
     const response = await this.connection.knex(query, ContributorCodesetCodeSchema);
@@ -127,11 +127,10 @@ export class ContributorCodesetCodeRepository extends BaseRepository {
   ): Promise<ContributorCodesetCode | null> {
     const knex = getKnex();
     const query = knex('contributor_codeset_code')
-      .select(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'version'])
+      .select(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'external_id'])
       .where({
         contributor_codeset_id: identity.contributor_codeset_id,
-        key: identity.key,
-        version: identity.version
+        key: identity.key
       });
 
     const response = await this.connection.knex(query, ContributorCodesetCodeSchema);
@@ -165,10 +164,10 @@ export class ContributorCodesetCodeRepository extends BaseRepository {
     }
 
     const knex = getKnex();
-    const tuples = identities.map((identity) => [identity.contributor_codeset_id, identity.key, identity.version]);
+    const tuples = identities.map((identity) => [identity.contributor_codeset_id, identity.key]);
     const query = knex('contributor_codeset_code')
-      .select(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'version'])
-      .whereIn(['contributor_codeset_id', 'key', 'version'], tuples);
+      .select(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'external_id'])
+      .whereIn(['contributor_codeset_id', 'key'], tuples);
 
     const response = await this.connection.knex(query, ContributorCodesetCodeSchema);
 

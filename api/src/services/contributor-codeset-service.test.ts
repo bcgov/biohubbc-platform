@@ -20,7 +20,7 @@ describe('ContributorCodesetService', () => {
     key: 'life_stage',
     label: 'Life stage',
     description: 'Life stage codes',
-    version: 'v1'
+    external_id: 'v1'
   };
 
   const createPayload: CreateContributorCodeset = {
@@ -28,7 +28,7 @@ describe('ContributorCodesetService', () => {
     key: 'life_stage',
     label: 'Life stage',
     description: 'Life stage codes',
-    version: 'v1'
+    external_id: 'v1'
   };
 
   const normalizedCreatePayload: CreateContributorCodeset = {
@@ -51,8 +51,7 @@ describe('ContributorCodesetService', () => {
     expect(getStub).to.have.been.calledOnceWith([
       {
         contributor_id: createPayload.contributor_id,
-        key: createPayload.key,
-        version: createPayload.version
+        key: createPayload.key
       }
     ]);
     expect(insertStub).to.have.been.calledOnceWith([normalizedCreatePayload]);
@@ -73,8 +72,7 @@ describe('ContributorCodesetService', () => {
     expect(getStub).to.have.been.calledOnceWith([
       {
         contributor_id: createPayload.contributor_id,
-        key: createPayload.key,
-        version: createPayload.version
+        key: createPayload.key
       }
     ]);
     expect(insertStub).to.not.have.been.called;
@@ -99,8 +97,7 @@ describe('ContributorCodesetService', () => {
     expect(getStub).to.have.been.calledOnceWith([
       {
         contributor_id: createPayload.contributor_id,
-        key: createPayload.key,
-        version: createPayload.version
+        key: createPayload.key
       }
     ]);
     expect(insertStub).to.not.have.been.called;

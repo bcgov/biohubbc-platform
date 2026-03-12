@@ -36,7 +36,7 @@ export class ContributorCodesetService extends DBService {
    * Create contributor_codeset rows in bulk.
    *
    * Rules:
-   * - identity: (contributor_id, key, version)
+   * - identity: (contributor_id, key)
    * - same identity + same metadata => reuse existing
    * - same identity + different metadata => conflict
    *
@@ -97,14 +97,15 @@ export class ContributorCodesetService extends DBService {
    * Compare two contributor codeset definitions for semantic equality.
    *
    * This is used to enforce immutability for an identity by verifying that
-   * repeated submissions with the same `(contributor_id, key, version)` do not
-   * change `label` or `description`.
+   * repeated submissions with the same `(contributor_id, key)` do not
+   * change `external_id`, `label` or `description`.
    */
   private hasSameContributorCodesetDefinition(
     a: ContributorCodesetDefinition,
     b: ContributorCodesetDefinition
   ): boolean {
     return (
+      a.external_id === b.external_id &&
       a.label.toLowerCase() === b.label.toLowerCase() &&
       (a.description?.toLowerCase() ?? null) === (b.description?.toLowerCase() ?? null)
     );
@@ -117,12 +118,11 @@ export class ContributorCodesetService extends DBService {
    * ensures repository lookups always use the same identity fields.
    */
   private toIdentity(
-    payload: Pick<CreateContributorCodeset, 'contributor_id' | 'key' | 'version'>
+    payload: Pick<CreateContributorCodeset, 'contributor_id' | 'key'>
   ): ContributorCodesetIdentity {
     return {
       contributor_id: payload.contributor_id,
-      key: payload.key,
-      version: payload.version
+      key: payload.key
     };
   }
 
@@ -142,7 +142,7 @@ export class ContributorCodesetService extends DBService {
       if (existing && !this.hasSameContributorCodesetDefinition(existing, payload)) {
         throw new ApiConflictError('Contributor codeset definition conflict', [
           'ContributorCodesetService->createCodesets',
-          `Conflicting definitions in batch for contributor codeset (${payload.contributor_id}, ${payload.key}, ${payload.version}). If label or description changed, provide a new unique version.`
+          `Conflicting definitions in batch for contributor codeset (${payload.contributor_id}, ${payload.key}). If metadata changed, provide a new unique key.`
         ]);
       }
 
@@ -175,7 +175,7 @@ export class ContributorCodesetService extends DBService {
       if (!this.hasSameContributorCodesetDefinition(existing, expected)) {
         throw new ApiConflictError('Contributor codeset definition conflict', [
           'ContributorCodesetService->createCodesets',
-          `The contributor codeset (${existing.contributor_id}, ${existing.key}, ${existing.version}) already exists with different metadata. If label or description changed, provide a new unique version.`
+          `The contributor codeset (${existing.contributor_id}, ${existing.key}) already exists with different metadata. If metadata changed, provide a new unique key.`
         ]);
       }
 
@@ -201,7 +201,7 @@ export class ContributorCodesetService extends DBService {
       if (!resolved) {
         throw new ApiConflictError('Contributor codeset definition conflict', [
           'ContributorCodesetService->createCodesets',
-          `Failed to resolve contributor codeset (${payload.contributor_id}, ${payload.key}, ${payload.version})`
+          `Failed to resolve contributor codeset (${payload.contributor_id}, ${payload.key})`
         ]);
       }
 
@@ -213,7 +213,7 @@ export class ContributorCodesetService extends DBService {
    * Normalize contributor codeset metadata to canonical lowercase values.
    *
    * Canonical normalization ensures deterministic comparisons and storage for
-   * immutable `(contributor_id, key, version)` definitions.
+   * immutable `(contributor_id, key)` definitions.
    */
   private normalizeContributorCodesetDefinition(payload: CreateContributorCodeset): CreateContributorCodeset {
     return {
@@ -230,8 +230,8 @@ export class ContributorCodesetService extends DBService {
    * local while delegating string composition to a shared util.
    */
   private toContributorCodesetIdentityKey(
-    payload: Pick<CreateContributorCodeset, 'contributor_id' | 'key' | 'version'>
+    payload: Pick<CreateContributorCodeset, 'contributor_id' | 'key'>
   ): string {
-    return makeIdentityKey(payload.contributor_id, payload.key, payload.version);
+    return makeIdentityKey(payload.contributor_id, payload.key);
   }
 }

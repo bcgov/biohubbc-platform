@@ -4,4 +4,4 @@
  * This is shared by contributor codeset services to avoid duplicating string
  * composition logic while keeping service-specific identity semantics local.
  */
-export const makeIdentityKey = (...parts: Array<string | number>): string => parts.join('::');
+export const makeIdentityKey = (...parts: Array<string | number | null>): string => parts.join('::');

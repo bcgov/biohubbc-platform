@@ -17,7 +17,7 @@ describe('ContributorCodesetCodeRepository', () => {
     key: 'adult',
     label: 'Adult',
     description: 'Adult life stage',
-    version: 'v1'
+    external_id: 'v1'
   };
 
   describe('insert', () => {
@@ -31,7 +31,7 @@ describe('ContributorCodesetCodeRepository', () => {
         key: 'adult',
         label: 'Adult',
         description: 'Adult life stage',
-        version: 'v1'
+        external_id: 'v1'
       });
 
       expect(result).to.eql(mockRow);
@@ -47,7 +47,7 @@ describe('ContributorCodesetCodeRepository', () => {
           contributor_codeset_id: 2,
           key: 'adult',
           label: 'Adult',
-          version: 'v1'
+          external_id: 'v1'
         });
         expect.fail();
       } catch (error) {
@@ -59,7 +59,7 @@ describe('ContributorCodesetCodeRepository', () => {
       const repository = new ContributorCodesetCodeRepository(
         getMockDBConnection({
           knex: () =>
-            Promise.resolve(mockQueryResult([mockRow, { ...mockRow, contributor_codeset_code_id: 2, version: 'v2' }]))
+            Promise.resolve(mockQueryResult([mockRow, { ...mockRow, contributor_codeset_code_id: 2, external_id: 'v2' }]))
         })
       );
 
@@ -69,18 +69,18 @@ describe('ContributorCodesetCodeRepository', () => {
           key: 'adult',
           label: 'Adult',
           description: 'Adult life stage',
-          version: 'v1'
+          external_id: 'v1'
         },
         {
           contributor_codeset_id: 2,
           key: 'adult',
           label: 'Adult',
           description: 'Adult life stage',
-          version: 'v2'
+          external_id: 'v2'
         }
       ]);
 
-      expect(result).to.eql([mockRow, { ...mockRow, contributor_codeset_code_id: 2, version: 'v2' }]);
+      expect(result).to.eql([mockRow, { ...mockRow, contributor_codeset_code_id: 2, external_id: 'v2' }]);
     });
 
     it('throws on failed multi-insert row count mismatch', async () => {
@@ -95,14 +95,14 @@ describe('ContributorCodesetCodeRepository', () => {
             key: 'adult',
             label: 'Adult',
             description: 'Adult life stage',
-            version: 'v1'
+            external_id: 'v1'
           },
           {
             contributor_codeset_id: 2,
             key: 'adult',
             label: 'Adult',
             description: 'Adult life stage',
-            version: 'v2'
+            external_id: 'v2'
           }
         ]);
         expect.fail();
@@ -166,8 +166,7 @@ describe('ContributorCodesetCodeRepository', () => {
 
       const result = await repository.findContributorCodesetCodeByIdentity({
         contributor_codeset_id: 2,
-        key: 'adult',
-        version: 'v1'
+        key: 'adult'
       });
       expect(result).to.eql(mockRow);
     });
@@ -179,8 +178,7 @@ describe('ContributorCodesetCodeRepository', () => {
 
       const result = await repository.findContributorCodesetCodeByIdentity({
         contributor_codeset_id: 2,
-        key: 'adult',
-        version: 'v1'
+        key: 'adult'
       });
       expect(result).to.equal(null);
     });
@@ -193,8 +191,7 @@ describe('ContributorCodesetCodeRepository', () => {
       try {
         await repository.findContributorCodesetCodeByIdentity({
           contributor_codeset_id: 2,
-          key: 'adult',
-          version: 'v1'
+          key: 'adult'
         });
         expect.fail();
       } catch (error) {
@@ -208,7 +205,7 @@ describe('ContributorCodesetCodeRepository', () => {
       );
 
       const result = await repository.getContributorCodesetCodesByIdentities([
-        { contributor_codeset_id: 2, key: 'adult', version: 'v1' }
+        { contributor_codeset_id: 2, key: 'adult' }
       ]);
       expect(result).to.eql([mockRow]);
     });

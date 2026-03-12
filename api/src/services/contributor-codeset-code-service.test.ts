@@ -20,7 +20,7 @@ describe('ContributorCodesetCodeService', () => {
     key: 'adult',
     label: 'Adult',
     description: 'Adult life stage',
-    version: 'v1'
+    external_id: 'v1'
   };
 
   const createPayload: CreateContributorCodesetCode = {
@@ -28,7 +28,7 @@ describe('ContributorCodesetCodeService', () => {
     key: 'adult',
     label: 'Adult',
     description: 'Adult life stage',
-    version: 'v1'
+    external_id: 'v1'
   };
 
   const normalizedCreatePayload: CreateContributorCodesetCode = {
@@ -51,8 +51,7 @@ describe('ContributorCodesetCodeService', () => {
     expect(getStub).to.have.been.calledOnceWith([
       {
         contributor_codeset_id: createPayload.contributor_codeset_id,
-        key: createPayload.key,
-        version: createPayload.version
+        key: createPayload.key
       }
     ]);
     expect(insertStub).to.have.been.calledOnceWith([normalizedCreatePayload]);
@@ -73,8 +72,7 @@ describe('ContributorCodesetCodeService', () => {
     expect(getStub).to.have.been.calledOnceWith([
       {
         contributor_codeset_id: createPayload.contributor_codeset_id,
-        key: createPayload.key,
-        version: createPayload.version
+        key: createPayload.key
       }
     ]);
     expect(insertStub).to.not.have.been.called;
@@ -101,8 +99,7 @@ describe('ContributorCodesetCodeService', () => {
     expect(getStub).to.have.been.calledOnceWith([
       {
         contributor_codeset_id: createPayload.contributor_codeset_id,
-        key: createPayload.key,
-        version: createPayload.version
+        key: createPayload.key
       }
     ]);
     expect(insertStub).to.not.have.been.called;
@@ -195,7 +192,7 @@ describe('ContributorCodesetCodeService', () => {
 
   it('delegates findByIdentity', async () => {
     const service = new ContributorCodesetCodeService(getMockDBConnection());
-    const identity = { contributor_codeset_id: 2, key: 'adult', version: 'v1' };
+    const identity = { contributor_codeset_id: 2, key: 'adult' };
     const stub = sinon
       .stub(ContributorCodesetCodeRepository.prototype, 'findContributorCodesetCodeByIdentity')
       .resolves(mockRow);
