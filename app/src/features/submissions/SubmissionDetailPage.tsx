@@ -1,14 +1,19 @@
 import { mdiLock } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
-import { AlertBanner } from 'components/notifications/AlertBanner';
+import Breadcrumbs from '@mui/material/Breadcrumbs';
+import Chip from '@mui/material/Chip';
 import Container from '@mui/material/Container';
+import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { GridColDef, GridPaginationModel, GridRowParams, GridSortModel, MuiEvent } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
-import BaseHeader from 'components/layout/header/BaseHeader';
+import { PageHeader } from 'components/header/PageHeader';
+import { LoadingGuard } from 'components/loading/LoadingGuard';
+import { SkeletonTable } from 'components/loading/SkeletonLoaders';
+import { AlertBanner } from 'components/notifications/AlertBanner';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import {
@@ -16,9 +21,9 @@ import {
   SubmissionRecordWithSecurity
 } from 'interfaces/useSubmissionsApi.interface';
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
 import { ApiPaginationRequestOptions } from 'types/pagination';
-import { firstOrNull } from 'utils/Utils';
+import { toApiPagination } from 'utils/pagination';
 
 type SubmissionRow = {
   id: number;
@@ -44,13 +49,7 @@ export const SubmissionDetailPage = () => {
   const [sortModel, setSortModel] = useState<GridSortModel>([{ field: 'submission_feature_id', sort: 'asc' }]);
 
   const paginationOptions: ApiPaginationRequestOptions = useMemo(() => {
-    const sort = firstOrNull(sortModel);
-    return {
-      page: paginationModel.page + 1,
-      limit: paginationModel.pageSize,
-      sort: sort?.field,
-      order: sort?.sort as 'asc' | 'desc' | undefined
-    };
+    return toApiPagination(paginationModel, sortModel);
   }, [paginationModel, sortModel]);
 
   const submissionDataLoader = useDataLoader((id: number) => api.submissions.getSubmissionRecordWithSecurity(id));
@@ -99,61 +98,82 @@ export const SubmissionDetailPage = () => {
     return;
   };
 
-  if (!submission && !submissionDataLoader.isLoading) {
-    return null;
-  }
-
   return (
-    <>
-      <BaseHeader
-        title={submission?.name ?? 'Loading...'}
-        subTitle={
-          submission?.description ? (
-            <Typography variant="body1" color="textSecondary">
-              {submission.description}
-            </Typography>
-          ) : undefined
-        }
-      />
-
-      <Container maxWidth="xl">
-        {hasSecuredFeatures && (
-          <AlertBanner icon={<Icon path={mdiLock} size={0.9} />} sx={{ my: 3 }}>
-            This submission contains secured features that are not displayed.
-          </AlertBanner>
-        )}
-
-        <Paper sx={{ my: 3 }}>
-          <Stack gap={2} py={2}>
-            <Box px={2}>
-              <Typography variant="h4">
-                Features{' '}
-                <Typography component="span" color="textSecondary">
-                  ({rowCount})
+    <Box>
+      <LoadingGuard
+        isLoading={submissionDataLoader.isLoading}
+        isLoadingFallback={<SkeletonTable numberOfLines={6} />}
+        hasNoData={!submission}
+        hasNoDataFallback={
+          <Box display="flex" justifyContent="center" alignItems="center" minHeight={300} p={2}>
+            <Typography color="text.secondary">No submission found</Typography>
+          </Box>
+        }>
+        <PageHeader
+          breadcrumbs={
+            <Breadcrumbs aria-label="breadcrumb">
+              <Link component={RouterLink} to="/search" underline="hover" color="inherit">
+                Search
+              </Link>
+              <Typography color="text.primary">{submission?.name}</Typography>
+            </Breadcrumbs>
+          }
+          label={submission?.name ?? ''}
+          subheader={
+            <Box display="flex" flexDirection="column" gap={1}>
+              {submission?.description && (
+                <Typography variant="body1" color="text.secondary">
+                  {submission.description}
                 </Typography>
-              </Typography>
+              )}
+              {hasSecuredFeatures && (
+                <Box display="flex" gap={1}>
+                  <Chip icon={<Icon path={mdiLock} size={0.625} />} label="Contains secured features" size="small" />
+                </Box>
+              )}
             </Box>
+          }
+        />
 
-            <CustomDataGrid
-              autoHeight
-              rows={rows}
-              rowCount={rowCount}
-              onRowClick={handleRowClick}
-              columns={columns}
-              getRowId={(row) => row.submission_feature_id}
-              loading={featureDataLoader.isLoading}
-              pageSizeOptions={[10, 25, 50]}
-              noRowsMessage="No features found for this submission."
-              paginationMode="server"
-              paginationModel={paginationModel}
-              onPaginationModelChange={setPaginationModel}
-              sortingMode="server"
-              sortModel={sortModel}
-              onSortModelChange={setSortModel}
-            />
-          </Stack>
-        </Paper>
-      </Container>
-    </>
+        <Container maxWidth="xl">
+          {hasSecuredFeatures && (
+            <AlertBanner icon={<Icon path={mdiLock} size={0.9} />} sx={{ my: 3 }}>
+              This submission contains secured features that are not displayed.
+            </AlertBanner>
+          )}
+
+          <Paper sx={{ my: 3 }}>
+            <Stack gap={2} py={2}>
+              <Box px={2}>
+                <Typography variant="h4">
+                  Features{' '}
+                  <Typography component="span" color="textSecondary">
+                    ({rowCount})
+                  </Typography>
+                </Typography>
+              </Box>
+
+              <CustomDataGrid
+                autoHeight
+                rows={rows}
+                rowCount={rowCount}
+                onRowClick={handleRowClick}
+                columns={columns}
+                getRowId={(row) => row.submission_feature_id}
+                loading={featureDataLoader.isLoading}
+                pageSizeOptions={[10, 25, 50]}
+                noRowsMessage="No features found for this submission."
+                paginationMode="server"
+                paginationModel={paginationModel}
+                onPaginationModelChange={setPaginationModel}
+                sortingMode="server"
+                sortModel={sortModel}
+                onSortModelChange={setSortModel}
+              />
+            </Stack>
+          </Paper>
+        </Container>
+      </LoadingGuard>
+    </Box>
   );
 };
