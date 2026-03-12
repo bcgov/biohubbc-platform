@@ -16,9 +16,9 @@ export enum ValidationErrorType {
   MISSING_REQUIRED_PROPERTY = 'Missing Required Property',
   /** Property value has wrong type (e.g., string instead of number) */
   INVALID_PROPERTY_TYPE = 'Invalid Property Type',
-  /** Code property token format is invalid */
-  INVALID_CODE_TOKEN = 'Invalid Code Token',
-  /** Code property token does not resolve in provided codeset definitions */
+  /** Code property slug format is invalid */
+  INVALID_CODE_SLUG = 'Invalid Code Slug',
+  /** Code property slug does not resolve in provided codeset definitions */
   INVALID_CODE_REFERENCE = 'Invalid Code Reference',
 
   // Reference errors

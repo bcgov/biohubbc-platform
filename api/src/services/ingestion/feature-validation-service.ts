@@ -2,6 +2,7 @@ import { IDBConnection } from '../../database/db';
 import { FeatureProperty, FeatureTypeWithProperties } from '../../models/feature-type';
 import { IFlattenedBlock } from '../../models/submission-feature';
 import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
+import { parseCodeReference, resolveCodeReference } from '../../utils/code-reference';
 import { GeoJSONFeatureCollectionZodSchema } from '../../zod-schema/geoJsonZodSchema';
 import { DBService } from '../db-service';
 import { IValidationError, IValidationResult, ValidationErrorType } from './feature-validation-service.interface';
@@ -43,7 +44,7 @@ export class FeatureValidationService extends DBService {
    */
   async validateFlatSubmissionFeatures(
     features: IFlattenedBlock[],
-    codesetByCategory: Record<string, unknown> = {}
+    codesets: Record<string, unknown> = {}
   ): Promise<IValidationResult> {
     const errors: IValidationError[] = [];
 
@@ -92,7 +93,7 @@ export class FeatureValidationService extends DBService {
           const propertyErrors = this.validateFeaturePropertyFlat(
             feature,
             featureTypeWithProps.properties,
-            codesetByCategory
+            codesets
           );
           errors.push(...propertyErrors);
         }
@@ -207,7 +208,7 @@ export class FeatureValidationService extends DBService {
   validateFeaturePropertyFlat(
     feature: IFlattenedBlock,
     allowedProperties: FeatureProperty[],
-    codesetByCategory: Record<string, unknown> = {}
+    codesets: Record<string, unknown> = {}
   ): IValidationError[] {
     const errors: IValidationError[] = [];
 
@@ -238,7 +239,7 @@ export class FeatureValidationService extends DBService {
       }
 
       // Check property type
-      const typeError = this.validatePropertyType(feature, prop, value, codesetByCategory);
+      const typeError = this.validatePropertyType(feature, prop, value, codesets);
       if (typeError) {
         errors.push(typeError);
       }
@@ -260,7 +261,7 @@ export class FeatureValidationService extends DBService {
     feature: IFlattenedBlock,
     prop: FeatureProperty,
     value: unknown,
-    codesetByCategory: Record<string, unknown> = {}
+    codesets: Record<string, unknown> = {}
   ): IValidationError | null {
     const createTypeError = (expected: string): IValidationError => ({
       type: ValidationErrorType.INVALID_PROPERTY_TYPE,
@@ -271,7 +272,7 @@ export class FeatureValidationService extends DBService {
     });
 
     if (prop.type_name === 'code') {
-      return this.validateCodeProperty(feature, prop, value, codesetByCategory);
+      return this.validateCodeProperty(feature, prop, value, codesets);
     }
 
     // Type validators return error message if invalid, null if valid
@@ -300,16 +301,17 @@ export class FeatureValidationService extends DBService {
   }
 
   /**
-   * Validate code property token(s) against loaded codeset definitions.
+   * Validate code property slug(s) against loaded codeset definitions.
    *
-   * Accepted token format: `code::<category>::<category-code>`.
-   * Resolution path: `codesetByCategory[category].codes[categoryCode]`.
+   * Accepted slug format: `code::<contributor-codeset-key>::<contributor-codeset-code-key>`.
+   * Resolution path:
+   * `codesets[contributorCodesetKey].codes[contributorCodesetCodeKey]`.
    *
    * @private
    * @param {IFlattenedBlock} feature
    * @param {FeatureProperty} prop
    * @param {unknown} value
-   * @param {Record<string, unknown>} codesetByCategory
+   * @param {Record<string, unknown>} codesets
    * @return {IValidationError | null}
    * @memberof FeatureValidationService
    */
@@ -317,7 +319,7 @@ export class FeatureValidationService extends DBService {
     feature: IFlattenedBlock,
     prop: FeatureProperty,
     value: unknown,
-    codesetByCategory: Record<string, unknown>
+    codesets: Record<string, unknown>
   ): IValidationError | null {
     const values = Array.isArray(value) ? value : [value];
 
@@ -328,31 +330,25 @@ export class FeatureValidationService extends DBService {
           featureId: feature.id,
           featureType: feature.type,
           field: prop.name,
-          message: `Property '${prop.name}' expected type 'code token string', got '${typeof currentValue}'`
+          message: `Property '${prop.name}' expected type 'code slug string', got '${typeof currentValue}'`
         };
       }
 
-      const split = currentValue.trim().split('::');
-      if (split.length !== 3 || split[0] !== 'code' || !split[1] || !split[2]) {
+      const parsed = parseCodeReference(currentValue);
+
+      if (!parsed) {
         return {
-          type: ValidationErrorType.INVALID_CODE_TOKEN,
+          type: ValidationErrorType.INVALID_CODE_SLUG,
           featureId: feature.id,
           featureType: feature.type,
           field: prop.name,
           value: currentValue,
           message:
-            "Invalid code token format. Expected 'code::<category>::<category-code>' and ensure a codeset file is provided."
+            "Invalid code slug format. Expected 'code::<contributor-codeset-key>::<contributor-codeset-code-key>' and ensure a codeset file is provided."
         };
       }
 
-      const categoryKey = split[1];
-      const categoryCodeKey = split[2];
-
-      const category = codesetByCategory[categoryKey];
-      const codes =
-        typeof category === 'object' && category !== null ? (category as Record<string, unknown>)['codes'] : undefined;
-      const resolved =
-        typeof codes === 'object' && codes !== null ? (codes as Record<string, unknown>)[categoryCodeKey] : undefined;
+      const resolved = resolveCodeReference(codesets, parsed);
 
       if (resolved === undefined) {
         return {
@@ -361,7 +357,7 @@ export class FeatureValidationService extends DBService {
           featureType: feature.type,
           field: prop.name,
           value: currentValue,
-          message: `Code token '${currentValue}' not found in codeset. Ensure codeset[${categoryKey}].codes[${categoryCodeKey}] exists.`
+          message: `Code slug '${currentValue}' not found in codeset. Ensure codeset[${parsed.contributorCodesetKey}].codes[${parsed.contributorCodesetCodeKey}] exists.`
         };
       }
     }

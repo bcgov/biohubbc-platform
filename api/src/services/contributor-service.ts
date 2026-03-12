@@ -23,6 +23,26 @@ export class ContributorService extends DBService {
   }
 
   /**
+   * Get the contributor linked to a submission upload.
+   *
+   * @param {string} submissionUploadId
+   * @returns {Promise<GetContributor>}
+   */
+  async getContributorBySubmissionUploadId(submissionUploadId: string): Promise<GetContributor> {
+    return this.contributorRepository.getContributorBySubmissionUploadId(submissionUploadId);
+  }
+
+  /**
+   * Get the contributor linked to a submission.
+   *
+   * @param {number} submissionId
+   * @returns {Promise<GetContributor>}
+   */
+  async getContributorBySubmissionId(submissionId: number): Promise<GetContributor> {
+    return this.contributorRepository.getContributorBySubmissionId(submissionId);
+  }
+
+  /**
    * Adds a new contributing system and associates it with system users.
    *
    * @param {CreateContributor} contributor - The contributor data including name, description, and member system user IDs.

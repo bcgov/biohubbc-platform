@@ -5,6 +5,7 @@ import { IFlattenedBlock } from '../../models/submission-feature';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { UploadArtifactRoleEnum } from '../../models/upload-artifact';
 import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
+import { SubmissionFeaturePropertyIndexRepository } from '../../repositories/submission-feature-property-index-repository';
 import {
   extractAndUploadCodesets,
   extractAndUploadMedia,
@@ -17,6 +18,7 @@ import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
+import { ContributorService } from '../contributor-service';
 import { FeatureValidationService } from './feature-validation-service';
 import { IValidationError, IValidationResult, ValidationErrorType } from './feature-validation-service.interface';
 
@@ -39,6 +41,8 @@ export class SubmissionIngestionService extends DBService {
   ingestionRepository = new IngestionRepository(this.connection);
   uploadArchiveService = new UploadArchiveService(this.connection);
   artifactService = new ArtifactService(this.connection);
+  submissionFeaturePropertyIndexRepository = new SubmissionFeaturePropertyIndexRepository(this.connection);
+  contributorService = new ContributorService(this.connection);
   objectStorageService = new ObjectStorageService();
 
   /**
@@ -76,12 +80,12 @@ export class SubmissionIngestionService extends DBService {
 
     // Stream 1: parse the tarball into flat feature blocks and a set of media filenames
     const tarStream1 = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
-    const { allBlocks, mediaFileNames, codesetByCategory } = await extractBlocksFromArchive(tarStream1);
+    const { allBlocks, mediaFileNames, codesets } = await extractBlocksFromArchive(tarStream1);
 
     // Validate feature structure: types exist in feature_type, required properties present, types correct
     const featureValidation = await this.featureValidationService.validateFlatSubmissionFeatures(
       allBlocks,
-      codesetByCategory
+      codesets
     );
     if (!featureValidation.valid) {
       return featureValidation;
@@ -92,6 +96,14 @@ export class SubmissionIngestionService extends DBService {
     if (mediaErrors.length > 0) {
       return { valid: false, errors: mediaErrors };
     }
+
+    // Persist contributor codeset/category + code definitions before downstream indexing.
+    // This ensures index jobs can resolve code slugs entirely from database state.
+    const contributor = await this.contributorService.getContributorBySubmissionUploadId(submissionUploadId);
+    await this.submissionFeaturePropertyIndexRepository.persistContributorCodesByContributorId(
+      contributor.contributor_id,
+      codesets
+    );
 
     // ================================================================
     // PASS 2: INGEST (DB writes + S3 uploads)

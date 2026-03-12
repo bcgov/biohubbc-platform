@@ -13,6 +13,7 @@ import { getMockDBConnection } from '../../__mocks__/db';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
+import { ContributorService } from '../contributor-service';
 import { FeatureValidationService } from './feature-validation-service';
 import { IValidationError, ValidationErrorType } from './feature-validation-service.interface';
 import { SubmissionIngestionService, validateMediaReferences } from './submission-ingestion-service';
@@ -151,7 +152,7 @@ describe('SubmissionIngestionService', () => {
         blocksByType: new Map(),
         allBlocks: blocks,
         mediaFileNames: mockMediaFileNames,
-        codesetByCategory: {}
+        codesets: {}
       });
 
       const extractAndUploadMediaStub = sinon
@@ -164,6 +165,10 @@ describe('SubmissionIngestionService', () => {
       const validateStub = sinon
         .stub(FeatureValidationService.prototype, 'validateFlatSubmissionFeatures')
         .resolves({ valid: true, errors: [] });
+      const contributorStub = sinon.stub(ContributorService.prototype, 'getContributorBySubmissionUploadId').resolves({
+        contributor_id: 999,
+        client_id: 'test-client'
+      });
 
       const deleteSubmissionFeaturesBySubmissionUploadIdStub = sinon
         .stub(IngestionRepository.prototype, 'deleteSubmissionFeaturesBySubmissionUploadId')
@@ -191,6 +196,7 @@ describe('SubmissionIngestionService', () => {
         extractAndUploadMediaStub,
         extractAndUploadCodesetsStub,
         validateStub,
+        contributorStub,
         deleteSubmissionFeaturesBySubmissionUploadIdStub,
         insertSubmissionFeatureRecordStub,
         updateSubmissionFeatureParentStub,
@@ -277,7 +283,7 @@ describe('SubmissionIngestionService', () => {
         blocksByType: new Map(),
         allBlocks: blocksWithMissing,
         mediaFileNames: new Set(['photo.jpg']),
-        codesetByCategory: {}
+        codesets: {}
       });
 
       const dbConnection = getMockDBConnection();

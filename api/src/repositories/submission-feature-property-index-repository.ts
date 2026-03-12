@@ -3,7 +3,14 @@ import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
-  FeatureTypePropertyMetadataRow,
+  CreateContributorCodeset,
+  CreateContributorCodesetCode,
+  ContributorCodeResolution,
+  ContributorCodeset,
+  ContributorCodesetCode,
+  FeatureTypePropertyMetadata
+} from '../models/submission-feature-property-index';
+import {
   InsertSubmissionFeaturePropertyBoolean,
   InsertSubmissionFeaturePropertyCode,
   InsertSubmissionFeaturePropertyGeometry,
@@ -12,6 +19,7 @@ import {
   InsertSubmissionFeaturePropertyTaxon,
   InsertSubmissionFeaturePropertyTimestamp
 } from '../services/search-feature-service.interface';
+import { CodeReference } from '../utils/code-reference';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
@@ -24,13 +32,44 @@ import { BaseRepository } from './base-repository';
  */
 export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
   /**
+   * Persist contributor codeset definitions and codes in bulk for a submission.
+   *
+   * Why:
+   * - Processing must persist code dependencies so indexing can be DB-only.
+   * - Immutable-definition semantics are enforced during persistence.
+   *
+   * @param {number} contributorId
+   * @param {Record<string, unknown>} codesets
+   * @return {Promise<Map<string, number>>}
+   * @memberof SubmissionFeaturePropertyIndexRepository
+   */
+  async persistContributorCodesByContributorId(
+    contributorId: number,
+    codesets: Record<string, unknown>
+  ): Promise<Map<string, number>> {
+    if (!Object.keys(codesets).length) {
+      return new Map<string, number>();
+    }
+
+    const contributorCodesetDefinitions = this.toContributorCodesetDefinitions(contributorId, codesets);
+    const resolvedCodesets = await this.upsertContributorCodesets(contributorCodesetDefinitions);
+    const contributorCodesetCodeDefinitions = this.toContributorCodesetCodeDefinitions(
+      codesets,
+      resolvedCodesets
+    );
+    const resolvedCodes = await this.upsertContributorCodesetCodes(contributorCodesetCodeDefinitions);
+
+    return this.mapCodesToSlugMap(contributorCodesetCodeDefinitions, resolvedCodes);
+  }
+
+  /**
    * Get active feature type property metadata for provided feature types.
    *
    * @param {number[]} featureTypeIds
-   * @return {Promise<FeatureTypePropertyMetadataRow[]>}
+   * @return {Promise<FeatureTypePropertyMetadata[]>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async getFeatureTypePropertyMetadata(featureTypeIds: number[]): Promise<FeatureTypePropertyMetadataRow[]> {
+  async getFeatureTypePropertyMetadata(featureTypeIds: number[]): Promise<FeatureTypePropertyMetadata[]> {
     if (!featureTypeIds.length) {
       return [];
     }
@@ -51,7 +90,7 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
       .whereNull('fp.record_end_date')
       .whereNull('fpt.record_end_date');
 
-    const response = await this.connection.knex<FeatureTypePropertyMetadataRow>(query);
+    const response = await this.connection.knex(query, FeatureTypePropertyMetadata);
 
     return response.rows;
   }
@@ -64,137 +103,126 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
   async deletePropertyRecordsBySubmissionId(submissionId: number): Promise<void> {
-    const tables = [
-      'submission_feature_property_string',
-      'submission_feature_property_number',
-      'submission_feature_property_boolean',
-      'submission_feature_property_timestamp',
-      'submission_feature_property_code',
-      'submission_feature_property_taxon',
-      'submission_feature_property_geometry'
-    ];
-
     const knex = getKnex();
-    const featureIdSubquery = knex
-      .select('submission_feature_id')
-      .from('submission_feature')
-      .where('submission_id', submissionId);
+    const featureIdsQuery = knex.select('submission_feature_id').from('submission_feature').where('submission_id', submissionId);
 
-    await Promise.all(
-      tables.map((table) =>
-        this.connection.knex(knex(table).whereIn('submission_feature_id', featureIdSubquery).delete())
-      )
-    );
+    const cteFeatureIds = knex.select('submission_feature_id').from('feature_ids');
+
+    const query = knex
+      .with('feature_ids', featureIdsQuery)
+      .with('deleted_string', (qb) => {
+        qb.from('submission_feature_property_string').whereIn('submission_feature_id', cteFeatureIds).delete();
+      })
+      .with('deleted_number', (qb) => {
+        qb.from('submission_feature_property_number').whereIn('submission_feature_id', cteFeatureIds).delete();
+      })
+      .with('deleted_boolean', (qb) => {
+        qb.from('submission_feature_property_boolean').whereIn('submission_feature_id', cteFeatureIds).delete();
+      })
+      .with('deleted_timestamp', (qb) => {
+        qb.from('submission_feature_property_timestamp').whereIn('submission_feature_id', cteFeatureIds).delete();
+      })
+      .with('deleted_code', (qb) => {
+        qb.from('submission_feature_property_code').whereIn('submission_feature_id', cteFeatureIds).delete();
+      })
+      .with('deleted_taxon', (qb) => {
+        qb.from('submission_feature_property_taxon').whereIn('submission_feature_id', cteFeatureIds).delete();
+      })
+      .with('deleted_geometry', (qb) => {
+        qb.from('submission_feature_property_geometry').whereIn('submission_feature_id', cteFeatureIds).delete();
+      })
+      .select(knex.raw('1'));
+
+    await this.connection.knex(query);
   }
 
   /**
-   * Get existing contributor_codeset_code IDs for validation.
-   *
-   * NOTE: This method should be replaced by the redundant method from ContributorCodesetCodeRepository, and the redundant method should be removed from that repository, once available.
+   * Find contributor codeset code rows by ids.
    *
    * @param {number[]} contributorCodesetCodeIds
-   * @return {Promise<number[]>}
+   * @return {Promise<ContributorCodesetCode[]>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async getExistingContributorCodesetCodeIds(contributorCodesetCodeIds: number[]): Promise<number[]> {
+  async findContributorCodesetCodesByIds(contributorCodesetCodeIds: number[]): Promise<ContributorCodesetCode[]> {
     if (!contributorCodesetCodeIds.length) {
       return [];
     }
 
     const knex = getKnex();
     const query = knex('contributor_codeset_code')
-      .select('contributor_codeset_code_id')
+      .select([
+        'contributor_codeset_code_id',
+        'contributor_codeset_id',
+        'key',
+        'version as external_id',
+        'label',
+        'description'
+      ])
       .whereIn('contributor_codeset_code_id', contributorCodesetCodeIds);
-    const response = await this.connection.knex<{ contributor_codeset_code_id: number }>(query);
+    const response = await this.connection.knex(query, ContributorCodesetCode);
 
-    return response.rows.map((row) => row.contributor_codeset_code_id);
+    return response.rows;
   }
 
   /**
-   * Resolve contributor_codeset_code IDs for parsed code tokens in bulk.
+   * Resolve contributor_codeset_code IDs for code references in bulk.
    *
-   * Contributor systems must provide explicit versioned contributor_codeset rows.
-   * This resolver does not invent versions. It resolves a unique active category row
-   * per category key, then upserts contributor_codeset_code rows using that category version.
+   * Why:
+   * - Property indexing must not read codeset artifacts from object storage.
+   * - We load only contributor codesets referenced by the current submission, then map
+   *   slugs to IDs in memory for O(1) assignment while inserting code properties.
    *
-   * @param {number} submissionId
-   * @param {Array<{ categoryKey: string; categoryCodeKey: string }>} tokens
+   * @param {number} contributorId
+   * @param {CodeReference[]} codeReferences
    * @return {Promise<Map<string, number>>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async resolveContributorCodesetCodeIdsByTokens(
-    submissionId: number,
-    tokens: Array<{ categoryKey: string; categoryCodeKey: string }>
+  async resolveContributorCodesetCodeIdsByCodeReferences(
+    contributorId: number,
+    codeReferences: CodeReference[]
   ): Promise<Map<string, number>> {
-    if (!tokens.length) {
+    if (!codeReferences.length) {
       return new Map<string, number>();
     }
 
+    const uniqueContributorCodesetKeys = [...new Set(codeReferences.map((reference) => reference.contributorCodesetKey))];
+
     const knex = getKnex();
+    const codesQuery = knex('contributor_codeset_code as ccc')
+      .select([
+        'ccc.contributor_codeset_code_id',
+        'ccs.key as contributor_codeset_key',
+        'ccc.key as contributor_codeset_code_key'
+      ])
+      .innerJoin('contributor_codeset as ccs', 'ccs.contributor_codeset_id', 'ccc.contributor_codeset_id')
+      .where('ccs.contributor_id', contributorId)
+      .whereNull('ccs.record_end_date')
+      .whereNull('ccc.record_end_date')
+      .whereIn('ccs.key', uniqueContributorCodesetKeys);
 
-    const uniqueCategoryKeys = [...new Set(tokens.map((token) => token.categoryKey))];
-    const uniqueTokenPairs = [...new Set(tokens.map((token) => `${token.categoryKey}::${token.categoryCodeKey}`))].map(
-      (pair) => {
-        const split = pair.split('::');
-        return { categoryKey: split[0], categoryCodeKey: split[1] };
-      }
-    );
+    const codesResponse = await this.connection.knex(codesQuery, ContributorCodeResolution);
+    const slugToRows = new Map<string, typeof codesResponse.rows>();
 
-    // Resolve contributor_id for the submission's source system user.
-    const contributorIdQuery = knex('submission as s')
-      .select('csu.contributor_id')
-      .innerJoin('contributor_system_user as csu', 'csu.system_user_id', 's.system_user_id')
-      .where('s.submission_id', submissionId)
-      .whereNull('s.record_end_date')
-      .whereNull('csu.record_end_date')
-      .first();
-
-    const contributorIdResponse = await this.connection.knex<{ contributor_id: number }>(contributorIdQuery);
-    const contributorId = contributorIdResponse.rows[0]?.contributor_id;
-
-    if (!contributorId) {
-      throw new ApiExecuteSQLError(
-        'Failed to resolve contributor for submission. Ensure the submission system_user is mapped in contributor_system_user.',
-        ['SubmissionFeaturePropertyIndexRepository->resolveContributorCodesetCodeIdsByTokens', { submissionId }]
-      );
+    for (const row of codesResponse.rows) {
+      const slug = `code::${row.contributor_codeset_key}::${row.contributor_codeset_code_key}`;
+      const existing = slugToRows.get(slug) ?? [];
+      existing.push(row);
+      slugToRows.set(slug, existing);
     }
 
-    const contributorCodesetRowsQuery = knex('contributor_codeset')
-      .select('contributor_codeset_id', 'key', 'version')
-      .where('contributor_id', contributorId)
-      .whereNull('record_end_date')
-      .whereIn('key', uniqueCategoryKeys);
-
-    const contributorCodesetRows = await this.connection.knex<{
-      contributor_codeset_id: number;
-      key: string;
-      version: string;
-    }>(contributorCodesetRowsQuery);
-
-    const contributorCodesetRowsByCategory = new Map<
-      string,
-      Array<{ contributor_codeset_id: number; version: string }>
-    >();
-    for (const row of contributorCodesetRows.rows) {
-      const existing = contributorCodesetRowsByCategory.get(row.key) ?? [];
-      existing.push({ contributor_codeset_id: row.contributor_codeset_id, version: row.version });
-      contributorCodesetRowsByCategory.set(row.key, existing);
-    }
-
-    const resolvedContributorCodesetByCategory = new Map<string, { contributor_codeset_id: number; version: string }>();
-    for (const categoryKey of uniqueCategoryKeys) {
-      const matches = contributorCodesetRowsByCategory.get(categoryKey) ?? [];
-
+    const slugToId = new Map<string, number>();
+    for (const reference of codeReferences) {
+      const matches = slugToRows.get(reference.slug) ?? [];
       if (!matches.length) {
         throw new ApiExecuteSQLError(
-          'Missing contributor_codeset category definition with explicit version. Contributors must provide versioned category definitions before code indexing.',
+          'Failed to resolve code slug to contributor_codeset_code_id. Ensure code definitions are ingested for this contributor.',
           [
-            'SubmissionFeaturePropertyIndexRepository->resolveContributorCodesetCodeIdsByTokens',
+            'SubmissionFeaturePropertyIndexRepository->resolveContributorCodesetCodeIdsByCodeReferences',
             {
-              submissionId,
               contributorId,
-              categoryKey,
-              advice: 'Insert contributor_codeset row with (contributor_id, key, version) before indexing.'
+              slug: reference.slug,
+              advice:
+                'Ingest contributor_codeset and contributor_codeset_code definitions first. If metadata changed, provide a new key.'
             }
           ]
         );
@@ -202,85 +230,486 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
 
       if (matches.length > 1) {
         throw new ApiExecuteSQLError(
-          'Multiple active contributor_codeset versions found for category key. A single active version is required to resolve code tokens.',
+          'Ambiguous code slug resolution across multiple rows. Each contributor codeset key and codeset code key must be unique.',
           [
-            'SubmissionFeaturePropertyIndexRepository->resolveContributorCodesetCodeIdsByTokens',
+            'SubmissionFeaturePropertyIndexRepository->resolveContributorCodesetCodeIdsByCodeReferences',
             {
-              submissionId,
               contributorId,
-              categoryKey,
-              versions: matches.map((match) => match.version),
-              advice: 'Retire old versions or explicitly scope to one active version.'
+              slug: reference.slug,
+              advice: 'Use a new key when creating a new external_id.'
             }
           ]
         );
       }
 
-      resolvedContributorCodesetByCategory.set(categoryKey, matches[0]);
+      slugToId.set(reference.slug, matches[0].contributor_codeset_code_id);
     }
 
-    // Upsert contributor_codeset_code rows for category/code pairs.
-    const contributorCodeInserts = uniqueTokenPairs.map((token) => {
-      const resolvedContributorCodeset = resolvedContributorCodesetByCategory.get(token.categoryKey);
+    return slugToId;
+  }
 
-      if (!resolvedContributorCodeset) {
-        throw new ApiExecuteSQLError('Failed to resolve contributor_codeset_id for category key', [
-          'SubmissionFeaturePropertyIndexRepository->resolveContributorCodesetCodeIdsByTokens',
-          { submissionId, categoryKey: token.categoryKey }
+  /**
+   * Build normalized contributor codeset definitions from parsed codeset payload.
+   *
+   * @private
+   * @param {number} contributorId
+   * @param {Record<string, unknown>} codesets
+   * @return {CreateContributorCodeset[]}
+   * @memberof SubmissionFeaturePropertyIndexRepository
+   */
+  private toContributorCodesetDefinitions(
+    contributorId: number,
+    codesets: Record<string, unknown>
+  ): CreateContributorCodeset[] {
+    const definitions: CreateContributorCodeset[] = [];
+
+    for (const [contributorCodesetKey, rawContributorCodeset] of Object.entries(codesets)) {
+      if (typeof rawContributorCodeset !== 'object' || rawContributorCodeset === null) {
+        throw new ApiExecuteSQLError('Invalid contributor codeset payload', [
+          'SubmissionFeaturePropertyIndexRepository->toContributorCodesetDefinitions',
+          { contributorCodesetKey }
         ]);
       }
 
-      return {
-        contributor_codeset_id: resolvedContributorCodeset.contributor_codeset_id,
-        key: token.categoryCodeKey,
-        label: token.categoryCodeKey,
-        description: null,
-        version: resolvedContributorCodeset.version
-      };
-    });
+      const contributorCodeset = rawContributorCodeset as Record<string, unknown>;
+      const externalId =
+        typeof contributorCodeset.external_id === 'string' ? contributorCodeset.external_id.trim() : '';
 
-    await this.connection.knex(
-      knex('contributor_codeset_code')
-        .insert(contributorCodeInserts)
-        .onConflict(['contributor_codeset_id', 'key', 'version'])
-        .ignore()
-    );
+      if (!externalId) {
+        throw new ApiExecuteSQLError('Contributor codeset external_id is required', [
+            'SubmissionFeaturePropertyIndexRepository->toContributorCodesetDefinitions',
+            {
+            contributorCodesetKey,
+            advice: 'Provide contributor codeset external_id in codes/<file>.json at codeset[contributorCodeset].external_id.'
+          }
+        ]);
+      }
 
-    const contributorCodeRowsQuery = knex('contributor_codeset_code as ccc')
-      .select('ccc.contributor_codeset_code_id', 'ccc.key as code_key', 'ccs.key as category_key')
-      .innerJoin('contributor_codeset as ccs', 'ccs.contributor_codeset_id', 'ccc.contributor_codeset_id')
-      .where('ccs.contributor_id', contributorId)
-      .whereNull('ccs.record_end_date')
-      .whereNull('ccc.record_end_date')
-      .whereIn('ccs.key', uniqueCategoryKeys);
+      const label = this.normalizeLabel(contributorCodeset.label, contributorCodesetKey);
+      const description = this.normalizeDescription(contributorCodeset.description);
 
-    const contributorCodeRows = await this.connection.knex<{
-      contributor_codeset_code_id: number;
-      code_key: string;
-      category_key: string;
-    }>(contributorCodeRowsQuery);
-
-    const resolvedByToken = new Map<string, number>();
-    for (const row of contributorCodeRows.rows) {
-      resolvedByToken.set(`code::${row.category_key}::${row.code_key}`, row.contributor_codeset_code_id);
+      definitions.push({
+        contributor_id: contributorId,
+        key: contributorCodesetKey,
+        external_id: externalId,
+        label,
+        description
+      });
     }
 
-    for (const token of uniqueTokenPairs) {
-      const tokenKey = `code::${token.categoryKey}::${token.categoryCodeKey}`;
-      if (!resolvedByToken.has(tokenKey)) {
-        throw new ApiExecuteSQLError('Failed to resolve contributor_codeset_code_id for code token', [
-          'SubmissionFeaturePropertyIndexRepository->resolveContributorCodesetCodeIdsByTokens',
+    return definitions;
+  }
+
+  /**
+   * Build normalized contributor code definitions from parsed codeset payload and resolved categories.
+   *
+   * @private
+   * @param {Record<string, unknown>} codesets
+   * @param {Map<string, ContributorCodeset>} codesetsByIdentity
+   * @return {CreateContributorCodesetCode[]}
+   * @memberof SubmissionFeaturePropertyIndexRepository
+   */
+  private toContributorCodesetCodeDefinitions(
+    codesets: Record<string, unknown>,
+    codesetsByIdentity: Map<string, ContributorCodeset>
+  ): CreateContributorCodesetCode[] {
+    const definitions: CreateContributorCodesetCode[] = [];
+
+    for (const [contributorCodesetKey, rawContributorCodeset] of Object.entries(codesets)) {
+      const contributorCodesetPayload = rawContributorCodeset as Record<string, unknown>;
+      const contributorCodesetExternalId = String(contributorCodesetPayload.external_id ?? '').trim();
+      const contributorCodeset = [...codesetsByIdentity.values()].find((row) => row.key === contributorCodesetKey);
+
+      if (!contributorCodeset) {
+        throw new ApiExecuteSQLError('Failed to resolve contributor codeset row after upsert', [
+          'SubmissionFeaturePropertyIndexRepository->toContributorCodesetCodeDefinitions',
           {
-            submissionId,
-            token: tokenKey,
-            advice:
-              'Ensure contributor_codeset and contributor_codeset_code tables are available and token keys are valid.'
+            contributorCodesetKey,
+            contributorCodesetExternalId
+          }
+        ]);
+      }
+
+      const codes =
+        typeof contributorCodesetPayload.codes === 'object' && contributorCodesetPayload.codes !== null
+          ? (contributorCodesetPayload.codes as Record<string, unknown>)
+          : {};
+
+      for (const [contributorCodesetCodeKey, rawCode] of Object.entries(codes)) {
+        if (typeof rawCode !== 'object' || rawCode === null) {
+          throw new ApiExecuteSQLError('Invalid contributor code payload', [
+            'SubmissionFeaturePropertyIndexRepository->toContributorCodesetCodeDefinitions',
+            {
+              contributorCodesetKey,
+              contributorCodesetCodeKey
+            }
+          ]);
+        }
+
+        const code = rawCode as Record<string, unknown>;
+        const codeExternalId = typeof code.external_id === 'string' ? code.external_id.trim() : '';
+
+        if (!codeExternalId) {
+          throw new ApiExecuteSQLError('Contributor code external_id is required', [
+            'SubmissionFeaturePropertyIndexRepository->toContributorCodesetCodeDefinitions',
+            {
+              contributorCodesetKey,
+              contributorCodesetCodeKey,
+              advice:
+                'Provide contributor codeset code external_id in codeset[contributorCodeset].codes[contributorCodesetCode].external_id.'
+            }
+          ]);
+        }
+
+        definitions.push({
+          contributor_codeset_id: contributorCodeset.contributor_codeset_id,
+          contributor_codeset_key: contributorCodesetKey,
+          key: contributorCodesetCodeKey,
+          external_id: codeExternalId,
+          label: this.normalizeLabel(code.label, contributorCodesetCodeKey),
+          description: this.normalizeDescription(code.description)
+        });
+      }
+    }
+
+    return definitions;
+  }
+
+  /**
+   * Upsert contributor codeset rows with immutable-definition conflict checks.
+   *
+   * @private
+   * @param {CreateContributorCodeset[]} definitions
+   * @return {Promise<Map<string, ContributorCodeset>>}
+   * @memberof SubmissionFeaturePropertyIndexRepository
+   */
+  private async upsertContributorCodesets(
+    definitions: CreateContributorCodeset[]
+  ): Promise<Map<string, ContributorCodeset>> {
+    if (!definitions.length) {
+      return new Map<string, ContributorCodeset>();
+    }
+
+    const contributorId = definitions[0].contributor_id;
+    const keys = [...new Set(definitions.map((item) => item.key))];
+    const knex = getKnex();
+
+    const existingQuery = knex('contributor_codeset')
+      .select(['contributor_codeset_id', 'contributor_id', 'key', 'version as external_id', 'label', 'description'])
+      .where('contributor_id', contributorId)
+      .whereIn('key', keys)
+      .whereNull('record_end_date');
+
+    const existingResponse = await this.connection.knex(existingQuery, ContributorCodeset);
+    this.assertNoContributorCodesetConflicts(existingResponse.rows, definitions);
+
+    const insertQuery = knex('contributor_codeset')
+      .insert(
+        definitions.map((item) => ({
+          contributor_id: item.contributor_id,
+          key: item.key,
+          version: item.external_id,
+          label: item.label,
+          description: item.description
+        }))
+      )
+      .onConflict(['contributor_id', 'key'])
+      .ignore();
+
+    await this.connection.knex(insertQuery);
+
+    const resolvedResponse = await this.connection.knex(existingQuery, ContributorCodeset);
+    this.assertNoContributorCodesetConflicts(resolvedResponse.rows, definitions);
+
+    const byIdentity = new Map<string, ContributorCodeset>();
+    for (const row of resolvedResponse.rows) {
+      byIdentity.set(this.makeContributorCodesetIdentityKey(row), row);
+    }
+
+    return byIdentity;
+  }
+
+  /**
+   * Upsert contributor codeset_code rows with immutable-definition conflict checks.
+   *
+   * @private
+   * @param {CreateContributorCodesetCode[]} definitions
+   * @return {Promise<ContributorCodesetCode[]>}
+   * @memberof SubmissionFeaturePropertyIndexRepository
+   */
+  private async upsertContributorCodesetCodes(
+    definitions: CreateContributorCodesetCode[]
+  ): Promise<ContributorCodesetCode[]> {
+    if (!definitions.length) {
+      return [];
+    }
+
+    const contributorCodesetIds = [...new Set(definitions.map((item) => item.contributor_codeset_id))];
+    const keys = [...new Set(definitions.map((item) => item.key))];
+    const knex = getKnex();
+
+    const existingQuery = knex('contributor_codeset_code')
+      .select([
+        'contributor_codeset_code_id',
+        'contributor_codeset_id',
+        'key',
+        'version as external_id',
+        'label',
+        'description'
+      ])
+      .whereIn('contributor_codeset_id', contributorCodesetIds)
+      .whereIn('key', keys)
+      .whereNull('record_end_date');
+
+    const existingResponse = await this.connection.knex(existingQuery, ContributorCodesetCode);
+    this.assertNoContributorCodesetCodeConflicts(existingResponse.rows, definitions);
+
+    const insertQuery = knex('contributor_codeset_code')
+      .insert(
+        definitions.map((item) => ({
+          contributor_codeset_id: item.contributor_codeset_id,
+          key: item.key,
+          version: item.external_id,
+          label: item.label,
+          description: item.description
+        }))
+      )
+      .onConflict(['contributor_codeset_id', 'key'])
+      .ignore();
+
+    await this.connection.knex(insertQuery);
+
+    const resolvedResponse = await this.connection.knex(existingQuery, ContributorCodesetCode);
+    this.assertNoContributorCodesetCodeConflicts(resolvedResponse.rows, definitions);
+
+    return resolvedResponse.rows;
+  }
+
+  /**
+   * Assert immutable-definition consistency for contributor codeset rows.
+   *
+   * @private
+   * @param {ContributorCodeset[]} existingRows
+   * @param {CreateContributorCodeset[]} definitions
+   * @memberof SubmissionFeaturePropertyIndexRepository
+   */
+  private assertNoContributorCodesetConflicts(
+    existingRows: ContributorCodeset[],
+    definitions: CreateContributorCodeset[]
+  ): void {
+    const byIdentity = new Map<string, CreateContributorCodeset>();
+    for (const definition of definitions) {
+      byIdentity.set(this.makeContributorCodesetIdentityKey(definition), definition);
+    }
+
+    const duplicateKeyRows = new Map<string, ContributorCodeset[]>();
+    for (const row of existingRows) {
+      const k = `${row.contributor_id}::${row.key}`;
+      const existing = duplicateKeyRows.get(k) ?? [];
+      existing.push(row);
+      duplicateKeyRows.set(k, existing);
+    }
+
+    for (const [key, rows] of duplicateKeyRows.entries()) {
+      if (rows.length > 1) {
+        throw new ApiExecuteSQLError('Contributor codeset key must be unique per contributor', [
+          'SubmissionFeaturePropertyIndexRepository->assertNoContributorCodesetConflicts',
+          {
+            key,
+            advice: 'Use a new key when creating a new external_id.'
           }
         ]);
       }
     }
 
-    return resolvedByToken;
+    for (const row of existingRows) {
+      const expected = byIdentity.get(this.makeContributorCodesetIdentityKey(row));
+      if (!expected) {
+        continue;
+      }
+
+      if (
+        row.external_id !== expected.external_id ||
+        row.label !== expected.label ||
+        (row.description ?? null) !== (expected.description ?? null)
+      ) {
+        throw new ApiExecuteSQLError('Contributor codeset definition conflict', [
+          'SubmissionFeaturePropertyIndexRepository->assertNoContributorCodesetConflicts',
+          {
+            contributor_id: row.contributor_id,
+            key: row.key,
+            external_id: row.external_id,
+            advice: 'If external_id or metadata differs, provide a new key.'
+          }
+        ]);
+      }
+    }
+  }
+
+  /**
+   * Assert immutable-definition consistency for contributor code rows.
+   *
+   * @private
+   * @param {ContributorCodesetCode[]} existingRows
+   * @param {CreateContributorCodesetCode[]} definitions
+   * @memberof SubmissionFeaturePropertyIndexRepository
+   */
+  private assertNoContributorCodesetCodeConflicts(
+    existingRows: ContributorCodesetCode[],
+    definitions: CreateContributorCodesetCode[]
+  ): void {
+    const byIdentity = new Map<string, CreateContributorCodesetCode>();
+    for (const definition of definitions) {
+      byIdentity.set(this.makeContributorCodesetCodeIdentityKey(definition), definition);
+    }
+
+    const duplicateKeyRows = new Map<string, ContributorCodesetCode[]>();
+    for (const row of existingRows) {
+      const k = `${row.contributor_codeset_id}::${row.key}`;
+      const existing = duplicateKeyRows.get(k) ?? [];
+      existing.push(row);
+      duplicateKeyRows.set(k, existing);
+    }
+
+    for (const [key, rows] of duplicateKeyRows.entries()) {
+      if (rows.length > 1) {
+        throw new ApiExecuteSQLError('Contributor codeset code key must be unique per contributor codeset', [
+          'SubmissionFeaturePropertyIndexRepository->assertNoContributorCodesetCodeConflicts',
+          {
+            key,
+            advice: 'Use a new key when creating a new external_id.'
+          }
+        ]);
+      }
+    }
+
+    for (const row of existingRows) {
+      const expected = byIdentity.get(this.makeContributorCodesetCodeIdentityKey(row));
+      if (!expected) {
+        continue;
+      }
+
+      if (
+        row.external_id !== expected.external_id ||
+        row.label !== expected.label ||
+        (row.description ?? null) !== (expected.description ?? null)
+      ) {
+        throw new ApiExecuteSQLError('Contributor codeset code definition conflict', [
+          'SubmissionFeaturePropertyIndexRepository->assertNoContributorCodesetCodeConflicts',
+          {
+            contributor_codeset_id: row.contributor_codeset_id,
+            key: row.key,
+            external_id: row.external_id,
+            advice: 'If external_id or metadata differs, provide a new key.'
+          }
+        ]);
+      }
+    }
+  }
+
+  /**
+   * Create identity key for contributor codeset rows.
+   *
+   * @private
+   * @param {{ contributor_id: number; key: string }} payload
+   * @return {string}
+   * @memberof SubmissionFeaturePropertyIndexRepository
+   */
+  private makeContributorCodesetIdentityKey(payload: {
+    contributor_id: number;
+    key: string;
+  }): string {
+    return `${payload.contributor_id}::${payload.key}`;
+  }
+
+  /**
+   * Create identity key for contributor codeset_code rows.
+   *
+   * @private
+   * @param {{ contributor_codeset_id: number; key: string }} payload
+   * @return {string}
+   * @memberof SubmissionFeaturePropertyIndexRepository
+   */
+  private makeContributorCodesetCodeIdentityKey(payload: {
+    contributor_codeset_id: number;
+    key: string;
+  }): string {
+    return `${payload.contributor_codeset_id}::${payload.key}`;
+  }
+
+  /**
+   * Normalize labels to lowercase with deterministic fallback.
+   *
+   * @private
+   * @param {unknown} value
+   * @param {string} fallback
+   * @return {string}
+   * @memberof SubmissionFeaturePropertyIndexRepository
+   */
+  private normalizeLabel(value: unknown, fallback: string): string {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim().toLowerCase();
+    }
+
+    return fallback.toLowerCase();
+  }
+
+  /**
+   * Normalize optional descriptions to lowercase or null.
+   *
+   * @private
+   * @param {unknown} value
+   * @return {(string | null)}
+   * @memberof SubmissionFeaturePropertyIndexRepository
+   */
+  private normalizeDescription(value: unknown): string | null {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim().toLowerCase();
+    }
+
+    return null;
+  }
+
+  /**
+   * Build canonical slug map from resolved code rows and expected definitions.
+   *
+   * @private
+   * @param {CreateContributorCodesetCode[]} definitions
+   * @param {ContributorCodesetCode[]} resolvedRows
+   * @return {Map<string, number>}
+   * @memberof SubmissionFeaturePropertyIndexRepository
+   */
+  private mapCodesToSlugMap(
+    definitions: CreateContributorCodesetCode[],
+    resolvedRows: ContributorCodesetCode[]
+  ): Map<string, number> {
+    const byIdentity = new Map<string, ContributorCodesetCode>();
+
+    for (const row of resolvedRows) {
+      byIdentity.set(this.makeContributorCodesetCodeIdentityKey(row), row);
+    }
+
+    const slugMap = new Map<string, number>();
+
+    for (const definition of definitions) {
+      const resolved = byIdentity.get(this.makeContributorCodesetCodeIdentityKey(definition));
+
+      if (!resolved) {
+        throw new ApiExecuteSQLError('Failed to resolve contributor code row after upsert', [
+          'SubmissionFeaturePropertyIndexRepository->mapCodesToTokenMap',
+          {
+            contributor_codeset_id: definition.contributor_codeset_id,
+            key: definition.key,
+            external_id: definition.external_id
+          }
+        ]);
+      }
+
+      const slug = `code::${definition.contributor_codeset_key}::${definition.key}`;
+      slugMap.set(slug, resolved.contributor_codeset_code_id);
+    }
+
+    return slugMap;
   }
 
   /**

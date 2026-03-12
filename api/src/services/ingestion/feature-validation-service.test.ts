@@ -656,7 +656,7 @@ describe('FeatureValidationService', () => {
       expect(errors).to.have.length(0);
     });
 
-    it('validates code property tokens against loaded codesets', () => {
+    it('validates code property slugs against loaded codesets', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
@@ -679,22 +679,24 @@ describe('FeatureValidationService', () => {
         }
       ];
 
-      const codesetByCategory = {
+      const codesets = {
         agency: {
+          external_id: 'v1',
           codes: {
             aarde: {
+              external_id: 'v1',
               label: 'Aarde Environmental Ltd.'
             }
           }
         }
       };
 
-      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codesetByCategory);
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codesets);
 
       expect(errors).to.have.length(0);
     });
 
-    it('returns INVALID_CODE_TOKEN for malformed code tokens', () => {
+    it('returns INVALID_CODE_SLUG for malformed code slugs', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
@@ -720,10 +722,10 @@ describe('FeatureValidationService', () => {
       const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, {});
 
       expect(errors).to.have.length(1);
-      expect(errors[0].type).to.equal(ValidationErrorType.INVALID_CODE_TOKEN);
+      expect(errors[0].type).to.equal(ValidationErrorType.INVALID_CODE_SLUG);
     });
 
-    it('returns INVALID_CODE_REFERENCE when code token does not exist in codeset', () => {
+    it('returns INVALID_CODE_REFERENCE when code slug does not exist in codeset', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
@@ -746,17 +748,19 @@ describe('FeatureValidationService', () => {
         }
       ];
 
-      const codesetByCategory = {
+      const codesets = {
         agency: {
+          external_id: 'v1',
           codes: {
             aarde: {
+              external_id: 'v1',
               label: 'Aarde Environmental Ltd.'
             }
           }
         }
       };
 
-      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codesetByCategory);
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codesets);
 
       expect(errors).to.have.length(1);
       expect(errors[0].type).to.equal(ValidationErrorType.INVALID_CODE_REFERENCE);

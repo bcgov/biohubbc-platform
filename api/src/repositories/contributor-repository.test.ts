@@ -147,6 +147,134 @@ describe('ContributorRepository', () => {
     });
   });
 
+  describe('getContributorBySubmissionUploadId', () => {
+    it('returns contributor when found', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ contributor_id: 42, client_id: 'my-client-id' }]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => mockQueryResponse
+      });
+
+      const repository = new ContributorRepository(mockDBConnection);
+
+      const result = await repository.getContributorBySubmissionUploadId('00000000-0000-0000-0000-000000000001');
+
+      expect(result).to.eql({ contributor_id: 42, client_id: 'my-client-id' });
+    });
+
+    it('throws ApiNotFoundError when contributor not found for submission upload', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => mockQueryResponse
+      });
+
+      const repository = new ContributorRepository(mockDBConnection);
+
+      try {
+        await repository.getContributorBySubmissionUploadId('00000000-0000-0000-0000-000000000001');
+        expect.fail('Expected error to be thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ApiNotFoundError);
+        expect((err as ApiNotFoundError).message).to.equal('Contributor not found for submission upload');
+      }
+    });
+
+    it('throws ApiExecuteSQLError when rowCount !== 1', async () => {
+      const mockQueryResponse = {
+        rowCount: 2,
+        rows: [
+          { contributor_id: 1, client_id: 'a' },
+          { contributor_id: 2, client_id: 'b' }
+        ]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => mockQueryResponse
+      });
+
+      const repository = new ContributorRepository(mockDBConnection);
+
+      try {
+        await repository.getContributorBySubmissionUploadId('00000000-0000-0000-0000-000000000001');
+        expect.fail('Expected error to be thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ApiExecuteSQLError);
+        expect((err as ApiExecuteSQLError).message).to.equal('Unexpected row count');
+      }
+    });
+  });
+
+  describe('getContributorBySubmissionId', () => {
+    it('returns contributor when found', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ contributor_id: 42, client_id: 'my-client-id' }]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => mockQueryResponse
+      });
+
+      const repository = new ContributorRepository(mockDBConnection);
+
+      const result = await repository.getContributorBySubmissionId(123);
+
+      expect(result).to.eql({ contributor_id: 42, client_id: 'my-client-id' });
+    });
+
+    it('throws ApiNotFoundError when contributor not found for submission', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => mockQueryResponse
+      });
+
+      const repository = new ContributorRepository(mockDBConnection);
+
+      try {
+        await repository.getContributorBySubmissionId(123);
+        expect.fail('Expected error to be thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ApiNotFoundError);
+        expect((err as ApiNotFoundError).message).to.equal('Contributor not found for submission');
+      }
+    });
+
+    it('throws ApiExecuteSQLError when rowCount !== 1', async () => {
+      const mockQueryResponse = {
+        rowCount: 2,
+        rows: [
+          { contributor_id: 1, client_id: 'a' },
+          { contributor_id: 2, client_id: 'b' }
+        ]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => mockQueryResponse
+      });
+
+      const repository = new ContributorRepository(mockDBConnection);
+
+      try {
+        await repository.getContributorBySubmissionId(123);
+        expect.fail('Expected error to be thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ApiExecuteSQLError);
+        expect((err as ApiExecuteSQLError).message).to.equal('Unexpected row count');
+      }
+    });
+  });
+
   describe('contributorMemberExists', () => {
     it('returns true when relationship exists', async () => {
       const mockQueryResponse = {
