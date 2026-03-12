@@ -96,3 +96,9 @@ export const CreateDownloadRequest = z.object({
   filters: SearchFeatureFiltersSchema.optional()
 });
 export type CreateDownloadRequest = z.infer<typeof CreateDownloadRequest>;
+
+export const IsAuthorized = z.object({ authorized: z.boolean() });
+export type IsAuthorized = z.infer<typeof IsAuthorized>;
+
+export const HasTeams = z.object({ has_teams: z.boolean() });
+export type HasTeams = z.infer<typeof HasTeams>;

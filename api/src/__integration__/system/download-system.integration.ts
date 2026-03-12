@@ -559,9 +559,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
    * Helper: run the full download pipeline and return the resulting zip.
    */
   async function executeAndGetZip(featureIds: number[]): Promise<{ zip: AdmZip; downloadId: string }> {
-    const { download_id } = await service.createDownloadRequest({
-      systemUserId: null,
-      teamId: null,
+    const { download_id } = await crudService.createDownloadRequest({
       submissionFeatureIds: featureIds
     });
 
@@ -578,7 +576,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     expect(download!.download_status).to.equal(DownloadStatusEnum.READY);
 
     // s3_key lives on the fragment, not the download record
-    const allFragments = await service.getFragmentsByDownloadId(download_id);
+    const allFragments = await crudService.getFragmentsByDownloadId(download_id);
     expect(allFragments.length).to.be.greaterThanOrEqual(1);
     const zip = await downloadAndTrackZip(allFragments[0].s3_key as string);
     return { zip, downloadId: download_id };
@@ -698,7 +696,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     expect(row2Values[elevationIndex]).to.equal('1203');
 
     // Verify fragment metadata
-    const fragments = await service.getFragmentsByDownloadId(downloadId);
+    const fragments = await crudService.getFragmentsByDownloadId(downloadId);
     expect(fragments).to.have.lengthOf(1);
     expect(fragments[0].fragment_status).to.equal(DownloadStatusEnum.READY);
     expect(fragments[0].fragment_index).to.equal(0);
@@ -708,7 +706,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     expect(fragments[0].feature_count).to.equal(2);
 
     // Verify signed URL
-    const signedUrl = await service.getFragmentSignedUrl(downloadId, 0);
+    const signedUrl = await crudService.getFragmentSignedUrl(downloadId, 0);
     expect(signedUrl).to.be.a('string');
     expect(signedUrl).to.include('download');
   });

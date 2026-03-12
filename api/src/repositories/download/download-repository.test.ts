@@ -257,13 +257,13 @@ describe('DownloadRepository', () => {
     });
   });
 
-  describe('hasDownloadTeams', () => {
+  describe('isDownloadClaimedByTeam', () => {
     it('returns true when download has team associations', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([{ has_teams: true }], 1));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.hasDownloadTeams('aaaa0000-0000-0000-0000-000000000001');
+      const result = await repo.isDownloadClaimedByTeam('aaaa0000-0000-0000-0000-000000000001');
 
       expect(result).to.be.true;
       const sqlText = sqlStub.firstCall.args[0].text;
@@ -276,7 +276,7 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.hasDownloadTeams('aaaa0000-0000-0000-0000-000000000001');
+      const result = await repo.isDownloadClaimedByTeam('aaaa0000-0000-0000-0000-000000000001');
 
       expect(result).to.be.false;
     });
@@ -286,14 +286,14 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.hasDownloadTeams('aaaa0000-0000-0000-0000-000000000001');
+      const result = await repo.isDownloadClaimedByTeam('aaaa0000-0000-0000-0000-000000000001');
 
       expect(result).to.be.false;
     });
   });
 
   describe('getDownloadFeatureSummaries', () => {
-    it('uses pre-computed data_byte_size and JOINs through download_team', async () => {
+    it('includes security filtering and policy chain in a single query', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
@@ -304,19 +304,14 @@ describe('DownloadRepository', () => {
       const sqlText = sqlStub.firstCall.args[0].text;
       expect(sqlText).to.include('data_byte_size');
       expect(sqlText).to.include('estimated_byte_size');
+      // Security filtering via NOT EXISTS / EXISTS
+      expect(sqlText).to.include('submission_feature_security');
+      // Policy chain: download_team → team_member → team_policy → policy_statement
       expect(sqlText).to.include('download_team');
-    });
-
-    it('passes only downloadId as parameter (no teamId)', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      await repo.getDownloadFeatureSummaries('aaaa0000-0000-0000-0000-000000000005');
-
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      // downloadId appears twice (once in WHERE, once in EXISTS subquery)
-      expect(sqlValues.filter((v: string) => v === 'aaaa0000-0000-0000-0000-000000000005')).to.have.length(2);
+      expect(sqlText).to.include('team_member');
+      expect(sqlText).to.include('team_policy');
+      expect(sqlText).to.include('policy_statement');
+      expect(sqlText).to.include("effect = 'allow'");
     });
   });
 });

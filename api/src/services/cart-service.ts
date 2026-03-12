@@ -142,29 +142,24 @@ export class CartService extends DBService {
       throw new HTTP400('Cannot checkout an empty cart');
     }
 
-    // Create team if user is authenticated
-    let teamId: string | null = null;
+    // Create download record (team linking handled separately via download_team)
+    const downloadId = await this.downloadService.createDownload({
+      fragmentSizeBytes
+    });
 
+    // Link features to download
+    await this.downloadService.createDownloadFeatures(downloadId.download_id, featureIds);
+
+    // Create team and link to download for authenticated users.
+    // Anonymous checkouts have no download_team rows — UUID is the credential.
     if (systemUserId) {
       const team = await this.teamService.createTeam({
         name: `Team for cart ${cartId}`,
         description: 'Team automatically created for cart checkout',
         system_user_ids: [systemUserId]
       });
-
-      teamId = team.team_id ?? null;
+      await this.downloadService.createDownloadTeam(downloadId.download_id, team.team_id);
     }
-
-    // Create download record (no data request for cart checkouts)
-    const downloadId = await this.downloadService.createDownload({
-      teamId,
-      dataRequestId: null,
-      fragmentSizeBytes,
-      systemUserId
-    });
-
-    // Link features to download
-    await this.downloadService.createDownloadFeatures(downloadId.download_id, featureIds);
 
     // Mark cart as checked out
     await this.cartRepository.updateCart(cartId, {

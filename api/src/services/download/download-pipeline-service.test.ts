@@ -2,12 +2,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { FRAGMENT_SIZE_THRESHOLD, SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
-import { ApiConflictError } from '../../errors/api-error';
+import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import {
   DownloadFeatureData,
   DownloadFeatureSummary,
-  DownloadId,
   DownloadRecord,
   DownloadSizeEstimate
 } from '../../models/download';
@@ -18,7 +16,7 @@ import { DownloadFragmentRepository } from '../../repositories/download/download
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { CodeService } from '../code-service';
-import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { DownloadPipelineService } from './download-pipeline-service';
 
 chai.use(sinonChai);
@@ -31,9 +29,6 @@ describe('DownloadPipelineService', () => {
   // Helper: create a mock download record
   const createMockDownloadRecord = (overrides?: Partial<DownloadRecord>): DownloadRecord => ({
     download_id: 'aaaa0000-0000-0000-0000-000000000042',
-    system_user_id: null,
-    team_id: null,
-    data_request_id: null,
     download_status: DownloadStatusEnum.PROCESSING,
     metadata: null,
     started_at: null,
@@ -69,128 +64,6 @@ describe('DownloadPipelineService', () => {
       yield features;
     }
   }
-
-  describe('createDownloadRequest', () => {
-    it('passes systemUserId to createDownload for authenticated users', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      const createDownloadStub = sinon
-        .stub(DownloadRepository.prototype, 'createDownload')
-        .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
-      sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
-
-      await service.createDownloadRequest({ systemUserId: 42, teamId: null, submissionFeatureIds: [10, 20] });
-
-      expect(createDownloadStub).to.have.been.calledOnce;
-      expect(createDownloadStub.firstCall.args[0]).to.have.property('systemUserId', 42);
-    });
-
-    it('passes null systemUserId for anonymous downloads', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      const createDownloadStub = sinon
-        .stub(DownloadRepository.prototype, 'createDownload')
-        .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
-      sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
-
-      await service.createDownloadRequest({ systemUserId: null, teamId: null, submissionFeatureIds: [10, 20] });
-
-      expect(createDownloadStub).to.have.been.calledOnce;
-      expect(createDownloadStub.firstCall.args[0]).to.have.property('systemUserId', null);
-    });
-
-    it('passes filters to createDownload', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      const createDownloadStub = sinon
-        .stub(DownloadRepository.prototype, 'createDownload')
-        .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
-      sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
-
-      const filters = { keyword: 'elk' };
-      await service.createDownloadRequest({
-        systemUserId: 42,
-        teamId: null,
-        submissionFeatureIds: [10, 20],
-        filters
-      });
-
-      expect(createDownloadStub).to.have.been.calledOnce;
-      const opts = createDownloadStub.firstCall.args[0];
-      expect(opts).to.have.property('systemUserId', 42);
-      expect(opts).to.have.deep.property('filters', { keyword: 'elk' });
-    });
-
-    it('omitting filters passes undefined', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      const createDownloadStub = sinon
-        .stub(DownloadRepository.prototype, 'createDownload')
-        .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
-      sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
-
-      await service.createDownloadRequest({ systemUserId: 42, teamId: null, submissionFeatureIds: [10, 20] });
-
-      expect(createDownloadStub).to.have.been.calledOnce;
-      expect(createDownloadStub.firstCall.args[0].filters).to.be.undefined;
-    });
-
-    it('still creates download features after options refactor', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      sinon
-        .stub(DownloadRepository.prototype, 'createDownload')
-        .resolves({ download_id: 'aaaa0000-0000-0000-0000-000000000001' } satisfies DownloadId);
-      const createFeaturesStub = sinon.stub(DownloadRepository.prototype, 'createDownloadFeatures').resolves();
-
-      await service.createDownloadRequest({
-        systemUserId: 42,
-        teamId: null,
-        submissionFeatureIds: [10, 20],
-        filters: { keyword: 'elk' }
-      });
-
-      expect(createFeaturesStub).to.have.been.calledOnce;
-      expect(createFeaturesStub.firstCall.args[0]).to.equal('aaaa0000-0000-0000-0000-000000000001');
-      expect(createFeaturesStub.firstCall.args[1]).to.deep.equal([10, 20]);
-    });
-  });
-
-  describe('claimDownload', () => {
-    it('calls repository claimDownload with correct params', async () => {
-      const mockDBConnection = getMockDBConnection({
-        systemUserId: () => 42
-      });
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      const claimStub = sinon.stub(DownloadRepository.prototype, 'claimDownload').resolves(true);
-
-      await service.claimDownload('aaaa0000-0000-0000-0000-000000000001');
-
-      expect(claimStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001', 42);
-    });
-
-    it('throws ApiConflictError when claim fails', async () => {
-      const mockDBConnection = getMockDBConnection({
-        systemUserId: () => 42
-      });
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      sinon.stub(DownloadRepository.prototype, 'claimDownload').resolves(false);
-
-      try {
-        await service.claimDownload('aaaa0000-0000-0000-0000-000000000001');
-        expect.fail('Expected an error');
-      } catch (error) {
-        expect(error).to.be.instanceOf(ApiConflictError);
-      }
-    });
-  });
 
   describe('planDownloadIfNeeded', () => {
     it('throws if download not found', async () => {
@@ -443,38 +316,28 @@ describe('DownloadPipelineService', () => {
 
   describe('estimateDownloadSize', () => {
     it('sums per-feature sizes for totalEstimatedBytes', async () => {
-      // Verifies: totalEstimatedBytes is the sum of per-feature estimated_byte_size
-
-      // Step 1: Setup service with mock connection
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      // Step 2: Stub per-feature query
       const features: DownloadFeatureSummary[] = [
         { submission_feature_id: 1, feature_type_name: 'observation', estimated_byte_size: '120', submission_id: 1 },
         { submission_feature_id: 2, feature_type_name: 'sample', estimated_byte_size: '80', submission_id: 1 }
       ];
       sinon.stub(DownloadRepository.prototype, 'getDownloadFeatureSummaries').resolves(features);
 
-      // Step 3: Call estimateDownloadSize
-      const result = await service.estimateDownloadSize('aaaa0000-0000-0000-0000-000000000001', null);
+      const result = await service.estimateDownloadSize('aaaa0000-0000-0000-0000-000000000001');
 
-      // Step 4: Verify total is sum of per-feature sizes
       expect(result.totalEstimatedBytes).to.equal(200);
       expect(result.features).to.have.length(2);
-      expect(result.features[0].estimated_byte_size).to.equal('120');
-      expect(result.features[1].estimated_byte_size).to.equal('80');
     });
 
     it('returns zero total for empty downloads', async () => {
-      // Verifies: No features → totalEstimatedBytes defaults to 0
-
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
       sinon.stub(DownloadRepository.prototype, 'getDownloadFeatureSummaries').resolves([]);
 
-      const result = await service.estimateDownloadSize('aaaa0000-0000-0000-0000-000000000001', null);
+      const result = await service.estimateDownloadSize('aaaa0000-0000-0000-0000-000000000001');
 
       expect(result.totalEstimatedBytes).to.equal(0);
       expect(result.features).to.have.length(0);
@@ -623,125 +486,5 @@ describe('DownloadPipelineService', () => {
       expect(updateFragmentCountsStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001', 1);
     });
   });
-
-  describe('getFragmentSignedUrl', () => {
-    it('returns signed URL for ready fragment', async () => {
-      // Verifies: Happy path - correct s3_key and expiry passed to getSignedUrl
-
-      // Step 1: Setup service with mock connection
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      // Step 2: Stub to return a READY fragment with s3_key
-      const readyFragment: DownloadFragmentRecord = {
-        download_fragment_id: 1,
-        download_id: 'aaaa0000-0000-0000-0000-000000000042',
-        fragment_index: 0,
-        fragment_status: DownloadStatusEnum.READY,
-        s3_key: 'downloads/aaaa0000-0000-0000-0000-000000000042/biohub-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
-        file_name: 'biohub-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
-        file_size_bytes: '2048',
-        estimated_size_bytes: '2000',
-        feature_count: 3,
-        started_at: '2024-01-01T00:00:00Z',
-        completed_at: '2024-01-01T00:01:00Z',
-        error_message: null
-      };
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([readyFragment]);
-
-      // Step 3: Stub ObjectStorageService.getSignedUrl
-      const getSignedUrlStub = sinon
-        .stub(ObjectStorageService.prototype, 'getSignedUrl')
-        .resolves('https://s3.example.com/fragment-url');
-
-      // Step 4: Call getFragmentSignedUrl
-      const result = await service.getFragmentSignedUrl('aaaa0000-0000-0000-0000-000000000042', 0);
-
-      // Step 5: Verify correct URL returned and correct params passed (including fragment expiry)
-      expect(result).to.equal('https://s3.example.com/fragment-url');
-      expect(getSignedUrlStub).to.have.been.calledOnceWith(
-        BucketType.MAIN,
-        'downloads/aaaa0000-0000-0000-0000-000000000042/biohub-aaaa0000-0000-0000-0000-000000000042-part-1.zip',
-        SIGNED_URL_EXPIRY_FRAGMENT
-      );
-    });
-
-    it('throws when fragment index is not found', async () => {
-      // Verifies: Error thrown when requested fragment_index doesn't exist
-
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([]);
-
-      try {
-        await service.getFragmentSignedUrl('aaaa0000-0000-0000-0000-000000000042', 0);
-        expect.fail('Expected an error to be thrown');
-      } catch (error) {
-        expect((error as Error).message).to.equal(
-          'Fragment 0 not found for download aaaa0000-0000-0000-0000-000000000042'
-        );
-      }
-    });
-
-    it('throws when fragment is not ready', async () => {
-      // Verifies: Error thrown when fragment exists but status is not READY
-
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      const processingFragment: DownloadFragmentRecord = {
-        download_fragment_id: 1,
-        download_id: 'aaaa0000-0000-0000-0000-000000000042',
-        fragment_index: 0,
-        fragment_status: DownloadStatusEnum.PROCESSING,
-        s3_key: null,
-        file_name: null,
-        file_size_bytes: null,
-        estimated_size_bytes: '2000',
-        feature_count: 3,
-        started_at: '2024-01-01T00:00:00Z',
-        completed_at: null,
-        error_message: null
-      };
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([processingFragment]);
-
-      try {
-        await service.getFragmentSignedUrl('aaaa0000-0000-0000-0000-000000000042', 0);
-        expect.fail('Expected an error to be thrown');
-      } catch (error) {
-        expect((error as Error).message).to.equal('Fragment is not ready');
-      }
-    });
-
-    it('throws when fragment is ready but missing s3_key', async () => {
-      // Verifies: Error thrown when fragment is READY but s3_key is null (data integrity issue)
-
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      const readyButNoKey: DownloadFragmentRecord = {
-        download_fragment_id: 1,
-        download_id: 'aaaa0000-0000-0000-0000-000000000042',
-        fragment_index: 0,
-        fragment_status: DownloadStatusEnum.READY,
-        s3_key: null,
-        file_name: 'biohub-aaaa0000-0000-0000-0000-000000000042.zip',
-        file_size_bytes: '2048',
-        estimated_size_bytes: '2000',
-        feature_count: 3,
-        started_at: '2024-01-01T00:00:00Z',
-        completed_at: '2024-01-01T00:01:00Z',
-        error_message: null
-      };
-      sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([readyButNoKey]);
-
-      try {
-        await service.getFragmentSignedUrl('aaaa0000-0000-0000-0000-000000000042', 0);
-        expect.fail('Expected an error to be thrown');
-      } catch (error) {
-        expect((error as Error).message).to.equal('Fragment record missing s3_key');
-      }
-    });
-  });
 });
+

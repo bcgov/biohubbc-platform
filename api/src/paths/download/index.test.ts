@@ -7,7 +7,6 @@ import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
 import { DownloadListRecord } from '../../models/download';
 import * as publisher from '../../queue/publisher';
-import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadService } from '../../services/download/download-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
@@ -48,7 +47,7 @@ describe('paths/download/index', () => {
       sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(3);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeatureIds').resolves([1, 2, 3]);
-      sinon.stub(DownloadPipelineService.prototype, 'createDownloadRequest').resolves({ download_id: 'uuid-1' } as any);
+      sinon.stub(DownloadService.prototype, 'createDownloadRequest').resolves({ download_id: 'uuid-1' } as any);
       sinon.stub(publisher, 'publishProcessDownloadJob').resolves({ status: 'published', jobId: 'job-1' });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -71,7 +70,7 @@ describe('paths/download/index', () => {
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(2);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeatureIds').resolves([10, 20]);
       const createDownloadRequestStub = sinon
-        .stub(DownloadPipelineService.prototype, 'createDownloadRequest')
+        .stub(DownloadService.prototype, 'createDownloadRequest')
         .resolves({ download_id: 'uuid-2' } as any);
       sinon.stub(publisher, 'publishProcessDownloadJob').resolves({ status: 'published', jobId: 'job-1' });
 
@@ -89,14 +88,14 @@ describe('paths/download/index', () => {
       });
     });
 
-    it('should pass systemUserId=null, teamId=null for anonymous', async () => {
+    it('should not include systemUserId or teamId in createDownloadRequest for anonymous', async () => {
       const dbConnectionObj = getMockDBConnection();
 
       sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(3);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeatureIds').resolves([1, 2, 3]);
       const createDownloadRequestStub = sinon
-        .stub(DownloadPipelineService.prototype, 'createDownloadRequest')
+        .stub(DownloadService.prototype, 'createDownloadRequest')
         .resolves({ download_id: 'uuid-1' } as any);
       sinon.stub(publisher, 'publishProcessDownloadJob').resolves({ status: 'published', jobId: 'job-1' });
 
@@ -110,8 +109,8 @@ describe('paths/download/index', () => {
       await requestHandler(mockReq, mockRes, mockNext);
 
       const opts = createDownloadRequestStub.firstCall.args[0];
-      expect(opts).to.have.property('systemUserId', null);
-      expect(opts).to.have.property('teamId', null);
+      expect(opts).to.not.have.property('systemUserId');
+      expect(opts).to.not.have.property('teamId');
     });
 
     it('should pass filters to getSearchFeatureIds', async () => {
@@ -122,7 +121,7 @@ describe('paths/download/index', () => {
       const getSearchFeatureIdsStub = sinon
         .stub(SearchFeatureService.prototype, 'getSearchFeatureIds')
         .resolves([1, 2]);
-      sinon.stub(DownloadPipelineService.prototype, 'createDownloadRequest').resolves({ download_id: 'uuid-1' } as any);
+      sinon.stub(DownloadService.prototype, 'createDownloadRequest').resolves({ download_id: 'uuid-1' } as any);
       sinon.stub(publisher, 'publishProcessDownloadJob').resolves({ status: 'published', jobId: 'job-1' });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -143,8 +142,9 @@ describe('paths/download/index', () => {
       const getDBConnectionStub = sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(1);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeatureIds').resolves([1]);
-      sinon.stub(DownloadPipelineService.prototype, 'createDownloadRequest').resolves({ download_id: 'uuid-1' } as any);
+      sinon.stub(DownloadService.prototype, 'createDownloadRequest').resolves({ download_id: 'uuid-1' } as any);
       sinon.stub(publisher, 'publishProcessDownloadJob').resolves({ status: 'published', jobId: 'job-1' });
+      sinon.stub(DownloadService.prototype, 'linkDownloadToNewTeam').resolves();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -164,7 +164,7 @@ describe('paths/download/index', () => {
       const getAPIUserDBConnectionStub = sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(1);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeatureIds').resolves([1]);
-      sinon.stub(DownloadPipelineService.prototype, 'createDownloadRequest').resolves({ download_id: 'uuid-1' } as any);
+      sinon.stub(DownloadService.prototype, 'createDownloadRequest').resolves({ download_id: 'uuid-1' } as any);
       sinon.stub(publisher, 'publishProcessDownloadJob').resolves({ status: 'published', jobId: 'job-1' });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -213,9 +213,7 @@ describe('paths/download/index', () => {
       sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(2);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeatureIds').resolves([1, 2]);
-      sinon
-        .stub(DownloadPipelineService.prototype, 'createDownloadRequest')
-        .rejects(new Error('Download creation failed'));
+      sinon.stub(DownloadService.prototype, 'createDownloadRequest').rejects(new Error('Download creation failed'));
 
       const publishStub = sinon.stub(publisher, 'publishProcessDownloadJob');
 
@@ -243,7 +241,7 @@ describe('paths/download/index', () => {
       sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(3);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeatureIds').resolves([1, 2, 3]);
-      sinon.stub(DownloadPipelineService.prototype, 'createDownloadRequest').resolves({ download_id: 'uuid-1' } as any);
+      sinon.stub(DownloadService.prototype, 'createDownloadRequest').resolves({ download_id: 'uuid-1' } as any);
       const publishStub = sinon
         .stub(publisher, 'publishProcessDownloadJob')
         .resolves({ status: 'published', jobId: 'job-1' });
@@ -269,7 +267,7 @@ describe('paths/download/index', () => {
       sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(2);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeatureIds').resolves([1, 2]);
-      sinon.stub(DownloadPipelineService.prototype, 'createDownloadRequest').resolves({ download_id: 'uuid-1' } as any);
+      sinon.stub(DownloadService.prototype, 'createDownloadRequest').resolves({ download_id: 'uuid-1' } as any);
       sinon.stub(publisher, 'publishProcessDownloadJob').rejects(new Error('pg-boss unavailable'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -317,9 +315,6 @@ describe('paths/download/index', () => {
       const mockDownloads: DownloadListRecord[] = [
         {
           download_id: 'uuid-1',
-          system_user_id: 1,
-          team_id: null,
-          data_request_id: null,
           download_status: 'ready',
           metadata: null,
           started_at: '2026-01-01',

@@ -1,5 +1,4 @@
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
@@ -9,17 +8,14 @@ import {
   DownloadId,
   DownloadListRecord,
   DownloadListRow,
-  DownloadRecord
+  DownloadRecord,
+  HasTeams,
+  IsAuthorized
 } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
-const IsAuthorized = z.object({ authorized: z.boolean() });
-type IsAuthorized = z.infer<typeof IsAuthorized>;
-
-const HasTeams = z.object({ has_teams: z.boolean() });
-type HasTeams = z.infer<typeof HasTeams>;
 
 /**
  * A repository class for accessing download data.
@@ -267,14 +263,15 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Get lightweight summaries for all authorized features in a download.
+   * Get authorized feature summaries for a download.
    *
-   * Returns feature metadata and pre-computed data_byte_size (no JSONB data column).
-   * Used by estimateDownloadSize and planFragments for bin packing.
+   * Returns features linked via download_feature that the download is authorized to include.
+   * A feature is included if it is unsecured (no active security rule) OR if a user on
+   * the download's ownership team belongs to a policy team with a matching ALLOW statement.
    *
-   * Policy checks are self-contained: JOINs through download_team → team_policy →
-   * policy_statement to determine secured feature access. Anonymous downloads
-   * (no download_team rows) only get unsecured features.
+   * Policy chain: download_team → team_member → (same user's policy teams) →
+   * team_policy → policy_statement. Anonymous downloads (no download_team rows)
+   * only get unsecured features.
    *
    * @param {string} downloadId - The download ID.
    * @return {Promise<DownloadFeatureSummary[]>}
@@ -298,13 +295,16 @@ export class DownloadRepository extends BaseRepository {
             FROM submission_feature_security sfs
             WHERE sfs.submission_feature_id = sf.submission_feature_id
               AND sfs.record_end_date IS NULL
+              AND sfs.record_effective_date <= NOW()
           )
           OR
-          -- Secured features: a team linked to this download has a matching ALLOW policy
+          -- Secured features: a user on this download's ownership team has a policy team with a matching ALLOW
           EXISTS (
             SELECT 1
             FROM download_team dt
-            INNER JOIN team_policy tp ON tp.team_id = dt.team_id AND tp.record_end_date IS NULL
+            INNER JOIN team_member tm_dl ON tm_dl.team_id = dt.team_id AND tm_dl.record_end_date IS NULL
+            INNER JOIN team_member tm_pol ON tm_pol.system_user_id = tm_dl.system_user_id AND tm_pol.record_end_date IS NULL
+            INNER JOIN team_policy tp ON tp.team_id = tm_pol.team_id AND tp.record_end_date IS NULL
             INNER JOIN policy_statement ps ON ps.policy_id = tp.policy_id AND ps.record_end_date IS NULL
             WHERE dt.download_id = ${downloadId}
               AND dt.record_end_date IS NULL
@@ -381,7 +381,7 @@ export class DownloadRepository extends BaseRepository {
    *
    * Single authorization path: download_team → team → team_member.
    * Anonymous downloads (no download_team rows) are not checked here —
-   * callers handle that separately via hasDownloadTeams.
+   * callers handle that separately via isDownloadClaimedByTeam.
    *
    * @param {string} downloadId - The download ID.
    * @param {number} systemUserId - The user ID.
@@ -414,7 +414,7 @@ export class DownloadRepository extends BaseRepository {
    * @return {Promise<boolean>}
    * @memberof DownloadRepository
    */
-  async hasDownloadTeams(downloadId: string): Promise<boolean> {
+  async isDownloadClaimedByTeam(downloadId: string): Promise<boolean> {
     const sql = SQL`
       SELECT EXISTS (
         SELECT 1 FROM download_team dt
