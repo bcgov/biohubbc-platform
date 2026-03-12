@@ -105,7 +105,7 @@ describe('Download services (integration)', function () {
 
     const policy = await connection.sql(SQL`
       INSERT INTO policy (name, create_user)
-      VALUES (${`test-urn-policy-${Date.now()}-${Math.random()}`}, ${userId})
+      VALUES (${`test-urn-policy-${crypto.randomUUID()}`}, ${userId})
       RETURNING policy_id;
     `);
     const policyId = policy.rows[0].policy_id;
