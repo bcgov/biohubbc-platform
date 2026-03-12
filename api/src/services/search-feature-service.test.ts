@@ -482,7 +482,7 @@ describe('SearchFeatureService', () => {
           feature_type_id: 1,
           urn: 'urn:777:dataset:100',
           data: {
-            agency: 'code::32'
+            agency: 'code::agency::aarde'
           },
           source_id: null,
           uuid: '123-456-789',
@@ -497,39 +497,6 @@ describe('SearchFeatureService', () => {
           feature_type_name: 'dataset',
           feature_type_display_name: 'Dataset',
           submission_feature_security_ids: []
-        },
-        {
-          submission_feature_id: 101,
-          submission_id: 777,
-          feature_type_id: 2,
-          urn: 'urn:777:codeset:101',
-          data: {
-            categories: {
-              agency: {
-                label: 'Agency',
-                description: 'Government and non-government agencies',
-                codes: {
-                  '32': {
-                    label: 'Aarde Environmental Ltd.',
-                    description: null
-                  }
-                }
-              }
-            }
-          },
-          source_id: null,
-          uuid: '123-456-780',
-          parent_submission_feature_id: null,
-          record_effective_date: '2024-01-01',
-          record_end_date: null,
-          create_date: '2024-01-01',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0,
-          feature_type_name: 'codeset',
-          feature_type_display_name: 'Codeset',
-          submission_feature_security_ids: []
         }
       ]);
 
@@ -543,7 +510,9 @@ describe('SearchFeatureService', () => {
           allow_multiple: false
         }
       ]);
-      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'getExistingCodeIds').resolves([32]);
+      sinon
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'resolveContributorCodesetCodeIdsByTokens')
+        .resolves(new Map([['code::agency::aarde', 32]]));
 
       const insertCodeRecordsStub = sinon
         .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'insertCodeRecords')
@@ -555,7 +524,7 @@ describe('SearchFeatureService', () => {
         {
           submission_feature_id: 100,
           feature_type_property_id: 55,
-          code_id: 32
+          contributor_codeset_code_id: 32
         }
       ]);
     });

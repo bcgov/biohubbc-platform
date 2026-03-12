@@ -655,6 +655,112 @@ describe('FeatureValidationService', () => {
 
       expect(errors).to.have.length(0);
     });
+
+    it('validates code property tokens against loaded codesets', () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new FeatureValidationService(mockDBConnection);
+
+      const feature: IFlattenedBlock = {
+        id: '14ebb420-4cfa-4be1-99db-8122253e3106',
+        type: 'dataset',
+        properties: { agency: 'code::agency::aarde' },
+        content: [],
+        parent: null
+      };
+
+      const allowedProperties: FeatureProperty[] = [
+        {
+          name: 'agency',
+          display_name: 'Agency',
+          description: '',
+          type_name: 'code',
+          required_value: true,
+          calculated_value: false
+        }
+      ];
+
+      const codesetByCategory = {
+        agency: {
+          codes: {
+            aarde: {
+              label: 'Aarde Environmental Ltd.'
+            }
+          }
+        }
+      };
+
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codesetByCategory);
+
+      expect(errors).to.have.length(0);
+    });
+
+    it('returns INVALID_CODE_TOKEN for malformed code tokens', () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new FeatureValidationService(mockDBConnection);
+
+      const feature: IFlattenedBlock = {
+        id: '14ebb420-4cfa-4be1-99db-8122253e3106',
+        type: 'dataset',
+        properties: { agency: 'code::agency' },
+        content: [],
+        parent: null
+      };
+
+      const allowedProperties: FeatureProperty[] = [
+        {
+          name: 'agency',
+          display_name: 'Agency',
+          description: '',
+          type_name: 'code',
+          required_value: true,
+          calculated_value: false
+        }
+      ];
+
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, {});
+
+      expect(errors).to.have.length(1);
+      expect(errors[0].type).to.equal(ValidationErrorType.INVALID_CODE_TOKEN);
+    });
+
+    it('returns INVALID_CODE_REFERENCE when code token does not exist in codeset', () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new FeatureValidationService(mockDBConnection);
+
+      const feature: IFlattenedBlock = {
+        id: '14ebb420-4cfa-4be1-99db-8122253e3106',
+        type: 'dataset',
+        properties: { agency: 'code::agency::missing' },
+        content: [],
+        parent: null
+      };
+
+      const allowedProperties: FeatureProperty[] = [
+        {
+          name: 'agency',
+          display_name: 'Agency',
+          description: '',
+          type_name: 'code',
+          required_value: true,
+          calculated_value: false
+        }
+      ];
+
+      const codesetByCategory = {
+        agency: {
+          codes: {
+            aarde: {
+              label: 'Aarde Environmental Ltd.'
+            }
+          }
+        }
+      };
+
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codesetByCategory);
+
+      expect(errors).to.have.length(1);
+      expect(errors[0].type).to.equal(ValidationErrorType.INVALID_CODE_REFERENCE);
+    });
   });
 
   describe('findFeatureTypeWithPropertiesCached', () => {

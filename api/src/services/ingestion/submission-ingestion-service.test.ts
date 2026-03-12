@@ -7,7 +7,7 @@ import { IFlattenedBlock } from '../../models/submission-feature';
 import { UploadArchive } from '../../models/upload-archive';
 import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
 import * as biohubTarParser from '../../utils/biohub-tar-parser';
-import { IUploadedMediaFile } from '../../utils/biohub-tar-parser';
+import { IUploadedCodesetFile, IUploadedMediaFile } from '../../utils/biohub-tar-parser';
 import * as fileUtils from '../../utils/file-utils';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
@@ -149,12 +149,16 @@ describe('SubmissionIngestionService', () => {
         datasetId: 'ds-1',
         blocksByType: new Map(),
         allBlocks: blocks,
-        mediaFileNames: mockMediaFileNames
+        mediaFileNames: mockMediaFileNames,
+        codesetByCategory: {}
       });
 
       const extractAndUploadMediaStub = sinon
         .stub(biohubTarParser, 'extractAndUploadMedia')
         .resolves(mockUploadedMedia);
+      const extractAndUploadCodesetsStub = sinon
+        .stub(biohubTarParser, 'extractAndUploadCodesets')
+        .resolves(new Map<string, IUploadedCodesetFile>());
 
       const validateStub = sinon
         .stub(FeatureValidationService.prototype, 'validateFlatSubmissionFeatures')
@@ -184,6 +188,7 @@ describe('SubmissionIngestionService', () => {
         getFileStreamStub,
         extractBlocksStub,
         extractAndUploadMediaStub,
+        extractAndUploadCodesetsStub,
         validateStub,
         deleteSubmissionFeaturesBySubmissionUploadIdStub,
         insertSubmissionFeatureRecordStub,
@@ -202,16 +207,18 @@ describe('SubmissionIngestionService', () => {
 
       expect(result).to.eql({ valid: true, errors: [] });
 
-      // getFileStream called twice (once per pass) with BucketType.MAIN
-      expect(stubs.getFileStreamStub.callCount).to.equal(2);
+      // getFileStream called three times (validate + media upload + codeset upload) with BucketType.MAIN
+      expect(stubs.getFileStreamStub.callCount).to.equal(3);
       expect(stubs.getFileStreamStub.getCall(0).args[0]).to.equal(BucketType.MAIN);
       expect(stubs.getFileStreamStub.getCall(1).args[0]).to.equal(BucketType.MAIN);
+      expect(stubs.getFileStreamStub.getCall(2).args[0]).to.equal(BucketType.MAIN);
 
       // extractBlocksFromArchive called once (pass 1)
       expect(stubs.extractBlocksStub.calledOnce).to.be.true;
 
       // extractAndUploadMedia called once (pass 2)
       expect(stubs.extractAndUploadMediaStub.calledOnce).to.be.true;
+      expect(stubs.extractAndUploadCodesetsStub.calledOnce).to.be.true;
 
       // validateFlatSubmissionFeatures called with the blocks
       expect(stubs.validateStub.calledOnce).to.be.true;
@@ -249,6 +256,7 @@ describe('SubmissionIngestionService', () => {
 
       // Pass 2 methods should NOT be called
       expect(stubs.extractAndUploadMediaStub.called).to.be.false;
+      expect(stubs.extractAndUploadCodesetsStub.called).to.be.false;
       expect(stubs.insertArtifactStub.called).to.be.false;
       expect(stubs.deleteSubmissionFeaturesBySubmissionUploadIdStub.called).to.be.false;
       expect(stubs.insertSubmissionFeatureRecordStub.called).to.be.false;
@@ -267,7 +275,8 @@ describe('SubmissionIngestionService', () => {
         datasetId: 'ds-1',
         blocksByType: new Map(),
         allBlocks: blocksWithMissing,
-        mediaFileNames: new Set(['photo.jpg'])
+        mediaFileNames: new Set(['photo.jpg']),
+        codesetByCategory: {}
       });
 
       const dbConnection = getMockDBConnection();
@@ -281,6 +290,7 @@ describe('SubmissionIngestionService', () => {
 
       // Pass 2 should NOT proceed
       expect(stubs.extractAndUploadMediaStub.called).to.be.false;
+      expect(stubs.extractAndUploadCodesetsStub.called).to.be.false;
     });
 
     it('creates artifact record per uploaded media file', async () => {
@@ -325,18 +335,20 @@ describe('SubmissionIngestionService', () => {
       expect(allInsertedByteSizes).to.include(2000);
     });
 
-    it('downloads tar stream twice (once per pass)', async () => {
+    it('downloads tar stream three times (validate, media upload, codeset upload)', async () => {
       const stubs = setupHappyPathStubs();
       const dbConnection = getMockDBConnection();
       const service = new SubmissionIngestionService(dbConnection);
 
       await service.processSubmission(mockSubmissionUpload);
 
-      expect(stubs.getFileStreamStub.callCount).to.equal(2);
+      expect(stubs.getFileStreamStub.callCount).to.equal(3);
       expect(stubs.getFileStreamStub.getCall(0).args[0]).to.equal(BucketType.MAIN);
       expect(stubs.getFileStreamStub.getCall(0).args[1]).to.equal(mockObjectKey);
       expect(stubs.getFileStreamStub.getCall(1).args[0]).to.equal(BucketType.MAIN);
       expect(stubs.getFileStreamStub.getCall(1).args[1]).to.equal(mockObjectKey);
+      expect(stubs.getFileStreamStub.getCall(2).args[0]).to.equal(BucketType.MAIN);
+      expect(stubs.getFileStreamStub.getCall(2).args[1]).to.equal(mockObjectKey);
     });
 
     it('setArtifactKeys sets artifact_key on file blocks', async () => {
@@ -432,12 +444,13 @@ describe('SubmissionIngestionService', () => {
       expect(stubs.extractBlocksStub.calledOnce).to.be.true;
       expect(stubs.validateStub.calledOnce).to.be.true;
       expect(stubs.extractAndUploadMediaStub.calledOnce).to.be.true;
+      expect(stubs.extractAndUploadCodesetsStub.calledOnce).to.be.true;
       expect(stubs.insertArtifactStub.calledOnce).to.be.true;
       expect(stubs.deleteSubmissionFeaturesBySubmissionUploadIdStub.calledOnce).to.be.true;
       expect(stubs.insertSubmissionFeatureRecordStub.callCount).to.equal(2);
 
-      // getFileStream called twice (pass 1 and pass 2)
-      expect(stubs.getFileStreamStub.callCount).to.equal(2);
+      // getFileStream called three times (pass 1 + media pass + codeset pass)
+      expect(stubs.getFileStreamStub.callCount).to.equal(3);
     });
   });
 });

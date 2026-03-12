@@ -41,7 +41,10 @@ export class FeatureValidationService extends DBService {
    * @return {Promise<IValidationResult>} Validation result with all collected errors
    * @memberof FeatureValidationService
    */
-  async validateFlatSubmissionFeatures(features: IFlattenedBlock[]): Promise<IValidationResult> {
+  async validateFlatSubmissionFeatures(
+    features: IFlattenedBlock[],
+    codesetByCategory: Record<string, unknown> = {}
+  ): Promise<IValidationResult> {
     const errors: IValidationError[] = [];
 
     // First pass: collect all feature IDs and check for duplicates
@@ -86,7 +89,11 @@ export class FeatureValidationService extends DBService {
       if (typeErrors.length === 0) {
         const featureTypeWithProps = await this.findFeatureTypeWithPropertiesCached(feature.type);
         if (featureTypeWithProps) {
-          const propertyErrors = this.validateFeaturePropertyFlat(feature, featureTypeWithProps.properties);
+          const propertyErrors = this.validateFeaturePropertyFlat(
+            feature,
+            featureTypeWithProps.properties,
+            codesetByCategory
+          );
           errors.push(...propertyErrors);
         }
       }
@@ -197,7 +204,11 @@ export class FeatureValidationService extends DBService {
    * @return {IValidationError[]} Array of validation errors (empty if valid)
    * @memberof FeatureValidationService
    */
-  validateFeaturePropertyFlat(feature: IFlattenedBlock, allowedProperties: FeatureProperty[]): IValidationError[] {
+  validateFeaturePropertyFlat(
+    feature: IFlattenedBlock,
+    allowedProperties: FeatureProperty[],
+    codesetByCategory: Record<string, unknown> = {}
+  ): IValidationError[] {
     const errors: IValidationError[] = [];
 
     // Check required properties and types
@@ -227,7 +238,7 @@ export class FeatureValidationService extends DBService {
       }
 
       // Check property type
-      const typeError = this.validatePropertyType(feature, prop, value);
+      const typeError = this.validatePropertyType(feature, prop, value, codesetByCategory);
       if (typeError) {
         errors.push(typeError);
       }
@@ -245,7 +256,12 @@ export class FeatureValidationService extends DBService {
    * @return {IValidationError | null} Validation error if type mismatch, null otherwise
    * @memberof FeatureValidationService
    */
-  validatePropertyType(feature: IFlattenedBlock, prop: FeatureProperty, value: unknown): IValidationError | null {
+  validatePropertyType(
+    feature: IFlattenedBlock,
+    prop: FeatureProperty,
+    value: unknown,
+    codesetByCategory: Record<string, unknown> = {}
+  ): IValidationError | null {
     const createTypeError = (expected: string): IValidationError => ({
       type: ValidationErrorType.INVALID_PROPERTY_TYPE,
       featureId: feature.id,
@@ -253,6 +269,10 @@ export class FeatureValidationService extends DBService {
       field: prop.name,
       message: `Property '${prop.name}' expected type '${expected}', got '${typeof value}'`
     });
+
+    if (prop.type_name === 'code') {
+      return this.validateCodeProperty(feature, prop, value, codesetByCategory);
+    }
 
     // Type validators return error message if invalid, null if valid
     const typeValidators: Record<string, () => string | null> = {
@@ -274,6 +294,76 @@ export class FeatureValidationService extends DBService {
     const expectedType = validator();
     if (expectedType) {
       return createTypeError(expectedType);
+    }
+
+    return null;
+  }
+
+  /**
+   * Validate code property token(s) against loaded codeset definitions.
+   *
+   * Accepted token format: `code::<category>::<category-code>`.
+   * Resolution path: `codesetByCategory[category].codes[categoryCode]`.
+   *
+   * @private
+   * @param {IFlattenedBlock} feature
+   * @param {FeatureProperty} prop
+   * @param {unknown} value
+   * @param {Record<string, unknown>} codesetByCategory
+   * @return {IValidationError | null}
+   * @memberof FeatureValidationService
+   */
+  private validateCodeProperty(
+    feature: IFlattenedBlock,
+    prop: FeatureProperty,
+    value: unknown,
+    codesetByCategory: Record<string, unknown>
+  ): IValidationError | null {
+    const values = Array.isArray(value) ? value : [value];
+
+    for (const currentValue of values) {
+      if (typeof currentValue !== 'string') {
+        return {
+          type: ValidationErrorType.INVALID_PROPERTY_TYPE,
+          featureId: feature.id,
+          featureType: feature.type,
+          field: prop.name,
+          message: `Property '${prop.name}' expected type 'code token string', got '${typeof currentValue}'`
+        };
+      }
+
+      const split = currentValue.trim().split('::');
+      if (split.length !== 3 || split[0] !== 'code' || !split[1] || !split[2]) {
+        return {
+          type: ValidationErrorType.INVALID_CODE_TOKEN,
+          featureId: feature.id,
+          featureType: feature.type,
+          field: prop.name,
+          value: currentValue,
+          message:
+            "Invalid code token format. Expected 'code::<category>::<category-code>' and ensure a codeset file is provided."
+        };
+      }
+
+      const categoryKey = split[1];
+      const categoryCodeKey = split[2];
+
+      const category = codesetByCategory[categoryKey];
+      const codes =
+        typeof category === 'object' && category !== null ? (category as Record<string, unknown>)['codes'] : undefined;
+      const resolved =
+        typeof codes === 'object' && codes !== null ? (codes as Record<string, unknown>)[categoryCodeKey] : undefined;
+
+      if (resolved === undefined) {
+        return {
+          type: ValidationErrorType.INVALID_CODE_REFERENCE,
+          featureId: feature.id,
+          featureType: feature.type,
+          field: prop.name,
+          value: currentValue,
+          message: `Code token '${currentValue}' not found in codeset. Ensure codeset[${categoryKey}].codes[${categoryCodeKey}] exists.`
+        };
+      }
     }
 
     return null;

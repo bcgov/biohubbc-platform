@@ -1,9 +1,16 @@
 import dayjs from 'dayjs';
+import SQL from 'sql-template-strings';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { IFlattenedBlock } from '../../models/submission-feature';
 import { SubmissionUpload } from '../../models/submission-upload';
+import { UploadArtifactRoleEnum } from '../../models/upload-artifact';
 import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
-import { extractAndUploadMedia, extractBlocksFromArchive, IUploadedMediaFile } from '../../utils/biohub-tar-parser';
+import {
+  extractAndUploadCodesets,
+  extractAndUploadMedia,
+  extractBlocksFromArchive,
+  IUploadedMediaFile
+} from '../../utils/biohub-tar-parser';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { getLogger } from '../../utils/logger';
 import { DBService } from '../db-service';
@@ -59,7 +66,7 @@ export class SubmissionIngestionService extends DBService {
     } = submissionUpload;
 
     // Resolve the S3 key for the uploaded tarball: upload_id → upload_archive → artifact → object_key
-    const objectKey = await this.getTarballObjectKey(uploadId);
+    const { objectKey, uploadArchiveId } = await this.getTarballUploadContext(uploadId);
 
     // ================================================================
     // PASS 1: VALIDATE (zero side effects)
@@ -69,10 +76,13 @@ export class SubmissionIngestionService extends DBService {
 
     // Stream 1: parse the tarball into flat feature blocks and a set of media filenames
     const tarStream1 = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
-    const { allBlocks, mediaFileNames } = await extractBlocksFromArchive(tarStream1);
+    const { allBlocks, mediaFileNames, codesetByCategory } = await extractBlocksFromArchive(tarStream1);
 
     // Validate feature structure: types exist in feature_type, required properties present, types correct
-    const featureValidation = await this.featureValidationService.validateFlatSubmissionFeatures(allBlocks);
+    const featureValidation = await this.featureValidationService.validateFlatSubmissionFeatures(
+      allBlocks,
+      codesetByCategory
+    );
     if (!featureValidation.valid) {
       return featureValidation;
     }
@@ -95,6 +105,13 @@ export class SubmissionIngestionService extends DBService {
     const tarStream2 = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
     const s3KeyPrefix = `submissions/${submissionId}/media`;
     const uploadedMediaFiles = await extractAndUploadMedia(tarStream2, this.objectStorageService, s3KeyPrefix);
+    const tarStream3 = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
+    const codesetS3KeyPrefix = `submissions/${submissionId}/codes`;
+    const uploadedCodesetFiles = await extractAndUploadCodesets(
+      tarStream3,
+      this.objectStorageService,
+      codesetS3KeyPrefix
+    );
 
     // Stamp each file/report block with its S3 artifact_key so downstream
     // consumers (download pipeline, UI) can locate the file without a join
@@ -114,6 +131,24 @@ export class SubmissionIngestionService extends DBService {
         checksum_sha256: null,
         uploaded_at: dayjs().toISOString()
       });
+    }
+
+    // Create artifact + upload_artifact(codeset role) records for each extracted codeset file.
+    for (const [, codesetFile] of uploadedCodesetFiles) {
+      const artifact = await this.artifactService.insertArtifact({
+        bucket: getObjectStoreBucketName(),
+        object_key: codesetFile.s3Key,
+        byte_size: codesetFile.byteSize,
+        artifact_status: ArtifactStatusEnum.UPLOADED,
+        checksum_sha256: null,
+        uploaded_at: dayjs().toISOString()
+      });
+
+      await this.connection.sql(SQL`
+        INSERT INTO upload_artifact (upload_id, artifact_id, role, upload_archive_id)
+        VALUES (${uploadId}, ${artifact.artifact_id}, ${UploadArtifactRoleEnum.CODESET}, ${uploadArchiveId})
+        ON CONFLICT (upload_id, artifact_id) DO NOTHING;
+      `);
     }
 
     // Soft-delete previous features for this upload, then insert fresh ones.
@@ -180,14 +215,17 @@ export class SubmissionIngestionService extends DBService {
    * @returns {Promise<string>} The S3 object key
    * @memberof SubmissionIngestionService
    */
-  private async getTarballObjectKey(uploadId: string): Promise<string> {
+  private async getTarballUploadContext(uploadId: string): Promise<{ objectKey: string; uploadArchiveId: string }> {
     const uploadArchives = await this.uploadArchiveService.getUploadArchivesByUploadId(uploadId);
     if (uploadArchives.length === 0) {
       throw new Error(`No archives found for upload ${uploadId}`);
     }
 
     const artifact = await this.artifactService.getArtifact(uploadArchives[0].artifact_id);
-    return artifact.object_key;
+    return {
+      objectKey: artifact.object_key,
+      uploadArchiveId: uploadArchives[0].upload_archive_id
+    };
   }
 
   /**

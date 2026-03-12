@@ -1,10 +1,11 @@
 import { z } from 'zod';
 
-export const UploadArtifactRoleZod = z.enum(['feature', 'attachment']);
+export const UploadArtifactRoleZod = z.enum(['feature', 'attachment', 'codeset']);
 
 export enum UploadArtifactRoleEnum {
   FEATURE = 'feature',
-  ATTACHMENT = 'attachment'
+  ATTACHMENT = 'attachment',
+  CODESET = 'codeset'
 }
 
 /**
