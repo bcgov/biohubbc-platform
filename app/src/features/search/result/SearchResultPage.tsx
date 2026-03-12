@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { normalizeQueryParam } from 'utils/query-param';
 import { SearchResultOptions } from './content/option/SearchResultOptions';
+import { SearchResultPagination } from './content/pagination/SearchResultPagination';
 import { SearchResultToolbar } from './content/toolbar/SearchResultToolbar';
 import { SearchResultHeader } from './header/SearchResultHeader';
 import { useSearchResults } from './hooks/useSearchResults';
@@ -220,6 +221,20 @@ export const SearchResultPage = () => {
     }
   }, [filters, api.search, dialogContext]);
 
+  const handlePageChange = useCallback(
+    (page: number) => {
+      setSearchParams({ [URL_PARAMS.PAGE]: String(page) });
+    },
+    [setSearchParams]
+  );
+
+  const handlePageSizeChange = useCallback(
+    (limit: number) => {
+      setSearchParams({ [URL_PARAMS.LIMIT]: String(limit), [URL_PARAMS.PAGE]: '1' });
+    },
+    [setSearchParams]
+  );
+
   const handleCheckout = useCallback(async () => {
     try {
       const download = await checkout();
@@ -276,6 +291,19 @@ export const SearchResultPage = () => {
 
           <Box sx={{ flex: 1, overflow: 'auto' }}>
             <SearchResultOptions rows={rows} isLoading={isLoading} view={view} />
+          </Box>
+
+          <Divider />
+
+          <Box sx={{ px: 2, py: 1 }}>
+            <SearchResultPagination
+              currentPage={pagination?.current_page ?? 1}
+              pageSize={pagination?.per_page ?? 10}
+              totalCount={pagination?.total ?? 0}
+              lastPage={pagination?.last_page ?? 1}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
           </Box>
         </Paper>
       </Box>
