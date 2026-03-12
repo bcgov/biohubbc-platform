@@ -15,10 +15,21 @@ export interface IExtractedBlocks {
   allBlocks: IFlattenedBlock[];
   /** Filenames found in files/ directory (for media reference validation) */
   mediaFileNames: Set<string>;
+  /** Codeset categories loaded from codeset*.json files. */
+  codesetByCategory: Record<string, unknown>;
 }
 
 export interface IUploadedMediaFile {
   /** Original filename (e.g. "photo.jpg") */
+  fileName: string;
+  /** The S3 key the file was uploaded to */
+  s3Key: string;
+  /** File size in bytes from TAR header */
+  byteSize: number;
+}
+
+export interface IUploadedCodesetFile {
+  /** Original filename (e.g. "agency.json") */
   fileName: string;
   /** The S3 key the file was uploaded to */
   s3Key: string;
@@ -82,6 +93,7 @@ export async function extractBlocksFromArchive(inputStream: Readable): Promise<I
   let datasetId: string | undefined;
   const blocksByType = new Map<string, IFlattenedBlock[]>();
   const mediaFileNames = new Set<string>();
+  const codesetByCategory: Record<string, unknown> = {};
 
   let rejectEntryPromise: (err: unknown) => void;
 
@@ -102,11 +114,23 @@ export async function extractBlocksFromArchive(inputStream: Readable): Promise<I
         if (entryName === '.dataset-id') {
           const buf = await streamToBuffer(stream);
           datasetId = buf.toString('utf-8').trim();
+        } else if (entryName.startsWith('codes/') && header.type === 'file') {
+          // codes/<file> entries define codesets used by code-token validation.
+          const buf = await streamToBuffer(stream);
+          const parsed = JSON.parse(buf.toString('utf-8')) as Record<string, unknown>;
+          const categories =
+            typeof parsed['categories'] === 'object' && parsed['categories'] !== null
+              ? (parsed['categories'] as Record<string, unknown>)
+              : parsed;
+
+          for (const [categoryKey, categoryValue] of Object.entries(categories)) {
+            codesetByCategory[categoryKey] = categoryValue;
+          }
         } else if (entryName.endsWith('.json') && !entryName.includes('/')) {
           // Root-level JSON file → parse as blocks
           const buf = await streamToBuffer(stream);
-          const blocks: IFlattenedBlock[] = JSON.parse(buf.toString('utf-8'));
           const typeName = path.basename(entryName, '.json');
+          const blocks: IFlattenedBlock[] = JSON.parse(buf.toString('utf-8'));
           blocksByType.set(typeName, blocks);
         } else if (entryName.startsWith('files/') && header.type === 'file') {
           // Media file → record filename, drain content
@@ -146,7 +170,7 @@ export async function extractBlocksFromArchive(inputStream: Readable): Promise<I
     allBlocks.push(...blocks);
   }
 
-  return { datasetId, blocksByType, allBlocks, mediaFileNames };
+  return { datasetId, blocksByType, allBlocks, mediaFileNames, codesetByCategory };
 }
 
 /**
@@ -210,6 +234,65 @@ export async function extractAndUploadMedia(
   // Pipe input into the tar extractor. Forward pipeline errors to the entry
   // promise — if inputStream fails before any entries are emitted, the extract
   // 'error' event may not fire and entryPromise would hang indefinitely.
+  pipeline(inputStream, extract).catch((err) => {
+    rejectEntryPromise(err);
+  });
+
+  await entryPromise;
+
+  return uploadedFiles;
+}
+
+/**
+ * Pass 2b: Stream codeset files from a TAR archive to S3.
+ * Only files under `codes/` are uploaded.
+ */
+export async function extractAndUploadCodesets(
+  inputStream: Readable,
+  objectStorageService: ObjectStorageService,
+  s3KeyPrefix: string
+): Promise<Map<string, IUploadedCodesetFile>> {
+  const extract = tar.extract();
+  const uploadedFiles = new Map<string, IUploadedCodesetFile>();
+
+  let rejectEntryPromise: (err: unknown) => void;
+
+  const entryPromise = new Promise<void>((resolve, reject) => {
+    rejectEntryPromise = reject;
+
+    extract.on('entry', async (header, stream, next) => {
+      try {
+        const entryName = stripArchivePrefix(header.name);
+
+        if (entryName.startsWith('codes/') && header.type === 'file') {
+          const fileName = path.basename(entryName);
+          const s3Key = `${s3KeyPrefix}/${fileName}`;
+          const mimetype = mime.getType(fileName) ?? 'application/json';
+          const byteSize = header.size ?? 0;
+
+          const passThrough = new PassThrough();
+
+          const uploadPromise = objectStorageService
+            .uploadStream(BucketType.MAIN, passThrough, mimetype, s3Key)
+            .then(() => {
+              uploadedFiles.set(fileName, { fileName, s3Key, byteSize });
+            });
+
+          stream.pipe(passThrough);
+          uploadPromise.then(() => next()).catch((err) => reject(err));
+        } else {
+          await drainStream(stream);
+          next();
+        }
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+    extract.on('finish', resolve);
+    extract.on('error', reject);
+  });
+
   pipeline(inputStream, extract).catch((err) => {
     rejectEntryPromise(err);
   });

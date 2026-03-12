@@ -16,6 +16,10 @@ export enum ValidationErrorType {
   MISSING_REQUIRED_PROPERTY = 'Missing Required Property',
   /** Property value has wrong type (e.g., string instead of number) */
   INVALID_PROPERTY_TYPE = 'Invalid Property Type',
+  /** Code property token format is invalid */
+  INVALID_CODE_TOKEN = 'Invalid Code Token',
+  /** Code property token does not resolve in provided codeset definitions */
+  INVALID_CODE_REFERENCE = 'Invalid Code Reference',
 
   // Reference errors
   /** Multiple features have the same id */

@@ -109,7 +109,7 @@ export interface InsertSubmissionFeaturePropertyTimestamp {
 export interface InsertSubmissionFeaturePropertyCode {
   submission_feature_id: number;
   feature_type_property_id: number;
-  code_id: number;
+  contributor_codeset_code_id: number;
 }
 
 export interface InsertSubmissionFeaturePropertyTaxon {

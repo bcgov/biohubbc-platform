@@ -6,7 +6,12 @@ import sinonChai from 'sinon-chai';
 import * as tar from 'tar-stream';
 import { IFlattenedBlock } from '../models/submission-feature';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
-import { extractAndUploadMedia, extractBlocksFromArchive, IExtractedBlocks } from './biohub-tar-parser';
+import {
+  extractAndUploadCodesets,
+  extractAndUploadMedia,
+  extractBlocksFromArchive,
+  IExtractedBlocks
+} from './biohub-tar-parser';
 
 chai.use(sinonChai);
 
@@ -124,6 +129,33 @@ describe('biohub-tar-parser', () => {
       const ids = result.allBlocks.map((b) => b.id);
       expect(ids).to.include('obs-1');
       expect(ids).to.include('srv-1');
+    });
+
+    it('parses codes/*.json files into codesetByCategory and excludes them from allBlocks', async () => {
+      const tarBuf = await createTestTar([
+        { name: '.dataset-id', content: 'dataset-uuid' },
+        { name: 'observation.json', content: JSON.stringify([sampleObservation]) },
+        {
+          name: 'codes/agency.json',
+          content: JSON.stringify({
+            agency: {
+              codes: {
+                aarde: { label: 'Aarde Environmental Ltd.' }
+              }
+            }
+          })
+        }
+      ]);
+
+      const result = await extractBlocksFromArchive(bufferToStream(tarBuf));
+
+      expect(result.allBlocks).to.have.length(1);
+      expect(result.codesetByCategory).to.have.property('agency');
+      expect(result.codesetByCategory['agency']).to.deep.equal({
+        codes: {
+          aarde: { label: 'Aarde Environmental Ltd.' }
+        }
+      });
     });
 
     it('collects media filenames from files/ entries', async () => {
@@ -373,6 +405,42 @@ describe('biohub-tar-parser', () => {
       expect(uploadStub).to.have.been.calledOnce;
       const [, , mimetype] = uploadStub.firstCall.args;
       expect(mimetype).to.equal('application/octet-stream');
+    });
+  });
+
+  // =========================================================================
+  // extractAndUploadCodesets
+  // =========================================================================
+  describe('extractAndUploadCodesets', () => {
+    let uploadStub: sinon.SinonStub;
+    let mockService: ObjectStorageService;
+
+    beforeEach(() => {
+      uploadStub = sinon.stub().resolves();
+      mockService = { uploadStream: uploadStub } as unknown as ObjectStorageService;
+    });
+
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('uploads files under codes/ and skips other entries', async () => {
+      const tarBuf = await createTestTar([
+        { name: '.dataset-id', content: 'dataset-uuid' },
+        { name: 'codes/agency.json', content: '{"agency": {"codes": {}}}' },
+        { name: 'observation.json', content: JSON.stringify([sampleObservation]) },
+        { name: 'files/photo.jpg', content: 'jpeg-bytes' }
+      ]);
+
+      const result = await extractAndUploadCodesets(bufferToStream(tarBuf), mockService, 'prefix/123/codes');
+
+      expect(uploadStub).to.have.been.calledOnce;
+      const [bucketType, , mimetype, s3Key] = uploadStub.firstCall.args;
+      expect(bucketType).to.equal(BucketType.MAIN);
+      expect(mimetype).to.equal('application/json');
+      expect(s3Key).to.equal('prefix/123/codes/agency.json');
+
+      expect(result.has('agency.json')).to.be.true;
     });
   });
 });

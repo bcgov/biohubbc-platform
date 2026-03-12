@@ -11,7 +11,6 @@ import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { CodeService } from './code-service';
 import { DBService } from './db-service';
 import {
-  CodesetFeature,
   FeatureTypePropertyMetadataRow,
   InsertDatetimeSearchableRecord,
   InsertNumberSearchableRecord,
@@ -35,6 +34,18 @@ type PendingTaxonRecord = {
   feature_type_property_id: number;
   propertyName: string;
   tsn: number;
+};
+
+type ParsedCodeToken = {
+  token: string;
+  categoryKey: string;
+  categoryCodeKey: string;
+};
+
+type PendingCodeRecord = {
+  submission_feature_id: number;
+  feature_type_property_id: number;
+  codeToken: ParsedCodeToken;
 };
 
 /**
@@ -220,19 +231,15 @@ export class SearchFeatureService extends DBService {
     const metadataRows = await submissionFeaturePropertyIndexRepository.getFeatureTypePropertyMetadata(featureTypeIds);
     const metadataByFeatureType = this.groupFeatureTypePropertyMetadata(metadataRows);
 
-    const hasCodeProperties = metadataRows.some((item) => item.feature_property_type_name === 'code');
-    const codesetCodeIds = hasCodeProperties ? this.extractCodesetCodeIds(allFeatures) : new Set<string>();
-
     const stringRecords: InsertSubmissionFeaturePropertyString[] = [];
     const numberRecords: InsertSubmissionFeaturePropertyNumber[] = [];
     const booleanRecords: InsertSubmissionFeaturePropertyBoolean[] = [];
     const timestampRecords: InsertSubmissionFeaturePropertyTimestamp[] = [];
     const codeRecords: InsertSubmissionFeaturePropertyCode[] = [];
+    const pendingCodeRecords: PendingCodeRecord[] = [];
     const geometryRecords: InsertSubmissionFeaturePropertyGeometry[] = [];
     const taxonRecords: InsertSubmissionFeaturePropertyTaxon[] = [];
     const pendingTaxonRecords: PendingTaxonRecord[] = [];
-
-    const referencedCodeIds = new Set<number>();
 
     for (const currentFeature of allFeatures) {
       const featureTypeMetadata = metadataByFeatureType.get(currentFeature.feature_type_id);
@@ -365,44 +372,19 @@ export class SearchFeatureService extends DBService {
           }
 
           if (propertyType === 'code') {
-            // Desired state: payload tokens are `code::<id>`, but canonical storage is numeric `code_id`.
-            const codeTokenId = this.parseCodeToken(
+            // Desired state: payload tokens are `code::<category>::<category-code>`.
+            // Tokens are resolved in bulk to contributor_codeset_code_id later.
+            const codeToken = this.parseCodeToken(
               currentValue,
               submissionId,
               currentFeature.submission_feature_id,
               currentFeaturePropertyName
             );
 
-            if (!codesetCodeIds.has(codeTokenId)) {
-              throw new ApiExecuteSQLError('Referenced code id not found in codeset feature payload', [
-                'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
-                {
-                  submissionId,
-                  submission_feature_id: currentFeature.submission_feature_id,
-                  propertyName: currentFeaturePropertyName,
-                  code_id: codeTokenId
-                }
-              ]);
-            }
-
-            const codeId = Number(codeTokenId);
-            if (!Number.isInteger(codeId)) {
-              throw new ApiExecuteSQLError('Referenced code id is not a numeric code_id', [
-                'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
-                {
-                  submissionId,
-                  submission_feature_id: currentFeature.submission_feature_id,
-                  propertyName: currentFeaturePropertyName,
-                  code_id: codeTokenId
-                }
-              ]);
-            }
-
-            referencedCodeIds.add(codeId);
-            codeRecords.push({
+            pendingCodeRecords.push({
               submission_feature_id: currentFeature.submission_feature_id,
               feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
-              code_id: codeId
+              codeToken
             });
             continue;
           }
@@ -478,23 +460,37 @@ export class SearchFeatureService extends DBService {
       }
     }
 
-    if (referencedCodeIds.size > 0 && codesetCodeIds.size === 0) {
-      throw new ApiExecuteSQLError('Code values were provided but no codeset feature was found', [
-        'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
-        { submissionId }
-      ]);
-    }
+    if (pendingCodeRecords.length) {
+      const contributorCodesetCodeIdByToken =
+        await submissionFeaturePropertyIndexRepository.resolveContributorCodesetCodeIdsByTokens(
+          submissionId,
+          pendingCodeRecords.map((record) => ({
+            categoryKey: record.codeToken.categoryKey,
+            categoryCodeKey: record.codeToken.categoryCodeKey
+          }))
+        );
 
-    if (referencedCodeIds.size) {
-      const existingCodeIds = await submissionFeaturePropertyIndexRepository.getExistingCodeIds([...referencedCodeIds]);
-      const existingCodeIdSet = new Set(existingCodeIds);
-      const missingCodeIds = [...referencedCodeIds].filter((codeId) => !existingCodeIdSet.has(codeId));
+      for (const pendingCodeRecord of pendingCodeRecords) {
+        const contributorCodesetCodeId = contributorCodesetCodeIdByToken.get(pendingCodeRecord.codeToken.token);
 
-      if (missingCodeIds.length) {
-        throw new ApiExecuteSQLError('Referenced code id does not exist in code table', [
-          'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
-          { submissionId, missingCodeIds }
-        ]);
+        if (contributorCodesetCodeId === undefined) {
+          throw new ApiExecuteSQLError('Failed to resolve code token to contributor_codeset_code_id', [
+            'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
+            {
+              submissionId,
+              submission_feature_id: pendingCodeRecord.submission_feature_id,
+              token: pendingCodeRecord.codeToken.token,
+              advice:
+                'Ensure the token exists in a codes/*.json file and a unique contributor_codeset_code row can be resolved.'
+            }
+          ]);
+        }
+
+        codeRecords.push({
+          submission_feature_id: pendingCodeRecord.submission_feature_id,
+          feature_type_property_id: pendingCodeRecord.feature_type_property_id,
+          contributor_codeset_code_id: contributorCodesetCodeId
+        });
       }
     }
 
@@ -586,89 +582,66 @@ export class SearchFeatureService extends DBService {
   }
 
   /**
-   * Extract code ids from codeset feature payloads.
-   *
-   * @private
-   * @param {CodesetFeature[]} features
-   * @return {Set<string>}
-   */
-  private extractCodesetCodeIds(features: CodesetFeature[]): Set<string> {
-    const codesetCodeIds = new Set<string>();
-
-    for (const feature of features) {
-      if (feature.feature_type_name !== 'codeset') {
-        continue;
-      }
-
-      // Current inbound shape: codes are nested under categories.<category>.codes.
-      const categories = feature.data['categories'];
-      if (typeof categories === 'object' && categories !== null) {
-        for (const category of Object.values(categories)) {
-          if (typeof category !== 'object' || category === null) {
-            continue;
-          }
-
-          const codes = (category as Record<string, unknown>)['codes'];
-          if (typeof codes !== 'object' || codes === null) {
-            continue;
-          }
-
-          for (const codeIdText of Object.keys(codes)) {
-            codesetCodeIds.add(codeIdText);
-          }
-        }
-      }
-
-      // Transitional compatibility for older payloads until codeset structure migration is complete.
-      const legacyCodes = feature.data['codes'];
-      if (typeof legacyCodes === 'object' && legacyCodes !== null) {
-        for (const codeIdText of Object.keys(legacyCodes)) {
-          codesetCodeIds.add(codeIdText);
-        }
-      }
-    }
-
-    return codesetCodeIds;
-  }
-
-  /**
-   * Parse a code token string (`code::<id>`) into a numeric id.
+   * Parse a code token string (`code::<category>::<category-code>`).
    *
    * @private
    * @param {unknown} value
    * @param {number} submissionId
    * @param {number} submissionFeatureId
    * @param {string} propertyName
-   * @return {string}
+   * @return {ParsedCodeToken}
    */
   private parseCodeToken(
     value: unknown,
     submissionId: number,
     submissionFeatureId: number,
     propertyName: string
-  ): string {
+  ): ParsedCodeToken {
     if (typeof value !== 'string') {
-      this.throwTypeMismatch(submissionId, submissionFeatureId, propertyName, 'code token (code::<id>)', value);
+      this.throwTypeMismatch(
+        submissionId,
+        submissionFeatureId,
+        propertyName,
+        'code token (code::<category>::<category-code>)',
+        value
+      );
     }
 
     const trimmedValue = value.trim();
     const splitToken = trimmedValue.split('::');
-    if (splitToken.length < 2 || splitToken[0] !== 'code') {
+    if (splitToken.length !== 3 || splitToken[0] !== 'code') {
       throw new ApiExecuteSQLError('Invalid code token format', [
         'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
-        { submissionId, submission_feature_id: submissionFeatureId, propertyName, value: trimmedValue }
+        {
+          submissionId,
+          submission_feature_id: submissionFeatureId,
+          propertyName,
+          value: trimmedValue,
+          expected: 'code::<category>::<category-code>'
+        }
       ]);
     }
 
-    const codeIdToken = splitToken.slice(1).join('::');
-    if (!codeIdToken) {
+    const categoryKey = splitToken[1].trim();
+    const categoryCodeKey = splitToken[2].trim();
+    if (!categoryKey || !categoryCodeKey) {
       throw new ApiExecuteSQLError('Invalid code token format', [
         'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
-        { submissionId, submission_feature_id: submissionFeatureId, propertyName, value: trimmedValue }
+        {
+          submissionId,
+          submission_feature_id: submissionFeatureId,
+          propertyName,
+          value: trimmedValue,
+          expected: 'code::<category>::<category-code>'
+        }
       ]);
     }
 
-    return codeIdToken;
+    return {
+      token: `code::${categoryKey}::${categoryCodeKey}`,
+      categoryKey,
+      categoryCodeKey
+    };
   }
 
   /**
