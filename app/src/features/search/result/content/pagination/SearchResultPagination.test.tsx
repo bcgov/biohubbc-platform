@@ -45,9 +45,7 @@ describe('SearchResultPagination', () => {
 
   it('calls onPageChange when a page button is clicked', () => {
     const onPageChange = vi.fn();
-    const { getByRole } = render(
-      <SearchResultPagination {...defaultProps} lastPage={5} onPageChange={onPageChange} />
-    );
+    const { getByRole } = render(<SearchResultPagination {...defaultProps} lastPage={5} onPageChange={onPageChange} />);
 
     fireEvent.click(getByRole('button', { name: /page 2/i }));
 
@@ -56,9 +54,7 @@ describe('SearchResultPagination', () => {
 
   it('calls onPageSizeChange when the page size select changes', () => {
     const onPageSizeChange = vi.fn();
-    const { getByRole } = render(
-      <SearchResultPagination {...defaultProps} onPageSizeChange={onPageSizeChange} />
-    );
+    const { getByRole } = render(<SearchResultPagination {...defaultProps} onPageSizeChange={onPageSizeChange} />);
 
     fireEvent.mouseDown(getByRole('combobox', { name: /rows per page/i }));
     fireEvent.click(getByRole('option', { name: /25 \/ page/i }));
