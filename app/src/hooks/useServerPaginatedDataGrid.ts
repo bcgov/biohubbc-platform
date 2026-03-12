@@ -1,9 +1,9 @@
 import { GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiPaginationRequestOptions } from 'types/pagination';
+import { toApiPagination } from 'utils/pagination';
 import useDataLoader from './useDataLoader';
 import useDebounce from './useDebounce';
-import { toApiPagination } from 'utils/pagination';
 
 /**
  * Configuration options for the useServerPaginatedDataGrid hook.
@@ -26,9 +26,11 @@ export interface IUseServerPaginatedDataGridOptions<TData, TResponse> {
 /**
  * Return type for the useServerPaginatedDataGrid hook.
  */
-export interface IUseServerPaginatedDataGridReturn<TData> {
-  /** The data array */
-  data: TData[];
+export interface IUseServerPaginatedDataGridReturn<TData, TResponse> {
+  /** Raw server response */
+  response: TResponse | undefined;
+  /** Extracted rows from server response data */
+  rows: TData[];
   /** Total row count for server-side pagination */
   rowCount: number;
   /** Whether data is currently loading */
@@ -47,6 +49,8 @@ export interface IUseServerPaginatedDataGridReturn<TData> {
   handleSearch: (term: string) => void;
   /** Refresh data with current params */
   refresh: () => void;
+  /** Directly replace the raw server response */
+  setData: (data: TResponse) => void;
 }
 
 /**
@@ -78,7 +82,7 @@ export interface IUseServerPaginatedDataGridReturn<TData> {
  */
 export const useServerPaginatedDataGrid = <TData, TResponse>(
   options: IUseServerPaginatedDataGridOptions<TData, TResponse>
-): IUseServerPaginatedDataGridReturn<TData> => {
+): IUseServerPaginatedDataGridReturn<TData, TResponse> => {
   const { fetcher, extractData, extractTotal, defaultSort, defaultPageSize = 10, debounceMs = 300 } = options;
 
   // Pagination state
@@ -151,12 +155,12 @@ export const useServerPaginatedDataGrid = <TData, TResponse>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearchTerm, paginationModel, sortModel]);
 
-  // Extract data from response
-  const data = dataLoader.data ? extractData(dataLoader.data) : [];
+  const rows = dataLoader.data ? extractData(dataLoader.data) : [];
   const rowCount = dataLoader.data ? extractTotal(dataLoader.data) : 0;
 
   return {
-    data,
+    response: dataLoader.data,
+    rows,
     rowCount,
     isLoading: dataLoader.isLoading,
     paginationModel,
@@ -165,6 +169,7 @@ export const useServerPaginatedDataGrid = <TData, TResponse>(
     handleSortChange,
     searchTerm,
     handleSearch,
-    refresh
+    refresh,
+    setData: dataLoader.setData
   };
 };

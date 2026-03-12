@@ -54,12 +54,12 @@ describe('paths/tickets', () => {
     const countStub = sinon.stub(TicketService.prototype, 'getTicketsCount').resolves(21);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.query = { team_id: mockTicket.team_id, status: 'open', page: '2', limit: '10' };
+    mockReq.query = { team_id: mockTicket.team_id, status: 'open', search: 'ticket', page: '2', limit: '10' };
 
     await getTickets()(mockReq, mockRes, mockNext);
 
     expect(listStub).to.have.been.calledWith(
-      { team_id: mockTicket.team_id, status: 'open' },
+      { team_id: mockTicket.team_id, status: 'open', search: 'ticket' },
       {
         page: 2,
         limit: 10,
@@ -67,7 +67,7 @@ describe('paths/tickets', () => {
         order: undefined
       }
     );
-    expect(countStub).to.have.been.calledWith({ team_id: mockTicket.team_id, status: 'open' });
+    expect(countStub).to.have.been.calledWith({ team_id: mockTicket.team_id, status: 'open', search: 'ticket' });
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql({
       tickets: [mockTicket],
@@ -94,7 +94,7 @@ describe('paths/tickets', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { page: '1', limit: '10' };
-    const noFilters = { team_id: undefined, status: undefined };
+    const noFilters = { team_id: undefined, status: undefined, search: undefined };
 
     await getTickets()(mockReq, mockRes, mockNext);
 
