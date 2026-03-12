@@ -79,13 +79,17 @@ export class SubmissionFeaturePropertyCodeService extends DBService {
   }
 
   /**
-   * Get submission_feature_property_code rows by code id.
+   * Get submission_feature_property_code rows by contributor_codeset_code id.
    *
-   * @param {number} codeId
+   * @param {number} contributorCodesetCodeId
    * @return {Promise<SubmissionFeaturePropertyCode[]>}
    * @memberof SubmissionFeaturePropertyCodeService
    */
-  getSubmissionFeaturePropertyCodesByCodeId(codeId: number): Promise<SubmissionFeaturePropertyCode[]> {
-    return this.submissionFeaturePropertyCodeRepository.getSubmissionFeaturePropertyCodesByCodeId(codeId);
+  getSubmissionFeaturePropertyCodesByContributorCodesetCodeId(
+    contributorCodesetCodeId: number
+  ): Promise<SubmissionFeaturePropertyCode[]> {
+    return this.submissionFeaturePropertyCodeRepository.getSubmissionFeaturePropertyCodesByContributorCodesetCodeId(
+      contributorCodesetCodeId
+    );
   }
 }

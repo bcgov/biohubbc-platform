@@ -25,7 +25,7 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
         'submission_feature_property_code_id',
         'submission_feature_id',
         'feature_type_property_id',
-        'code_id'
+        'contributor_codeset_code_id'
       ]);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
@@ -52,7 +52,12 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
   ): Promise<SubmissionFeaturePropertyCode> {
     const knex = getKnex();
     const query = knex('submission_feature_property_code')
-      .select(['submission_feature_property_code_id', 'submission_feature_id', 'feature_type_property_id', 'code_id'])
+      .select([
+        'submission_feature_property_code_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'contributor_codeset_code_id'
+      ])
       .where('submission_feature_property_code_id', submissionFeaturePropertyCodeId);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
@@ -86,7 +91,12 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
   ): Promise<SubmissionFeaturePropertyCode[]> {
     const knex = getKnex();
     const query = knex('submission_feature_property_code')
-      .select(['submission_feature_property_code_id', 'submission_feature_id', 'feature_type_property_id', 'code_id'])
+      .select([
+        'submission_feature_property_code_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'contributor_codeset_code_id'
+      ])
       .where('submission_feature_id', submissionFeatureId);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
@@ -106,7 +116,12 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
   ): Promise<SubmissionFeaturePropertyCode[]> {
     const knex = getKnex();
     const query = knex('submission_feature_property_code')
-      .select(['submission_feature_property_code_id', 'submission_feature_id', 'feature_type_property_id', 'code_id'])
+      .select([
+        'submission_feature_property_code_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'contributor_codeset_code_id'
+      ])
       .where('feature_type_property_id', featureTypePropertyId);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
@@ -115,17 +130,24 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
   }
 
   /**
-   * Get submission_feature_property_code rows by code_id.
+   * Get submission_feature_property_code rows by contributor_codeset_code_id.
    *
-   * @param {number} codeId
+   * @param {number} contributorCodesetCodeId
    * @return {Promise<SubmissionFeaturePropertyCode[]>}
    * @memberof SubmissionFeaturePropertyCodeRepository
    */
-  async getSubmissionFeaturePropertyCodesByCodeId(codeId: number): Promise<SubmissionFeaturePropertyCode[]> {
+  async getSubmissionFeaturePropertyCodesByContributorCodesetCodeId(
+    contributorCodesetCodeId: number
+  ): Promise<SubmissionFeaturePropertyCode[]> {
     const knex = getKnex();
     const query = knex('submission_feature_property_code')
-      .select(['submission_feature_property_code_id', 'submission_feature_id', 'feature_type_property_id', 'code_id'])
-      .where('code_id', codeId);
+      .select([
+        'submission_feature_property_code_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'contributor_codeset_code_id'
+      ])
+      .where('contributor_codeset_code_id', contributorCodesetCodeId);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
 

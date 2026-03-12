@@ -7,13 +7,13 @@ export async function up(knex: Knex): Promise<void> {
     --------------------------------------------------------------------------------
     -- TABLES
     --------------------------------------------------------------------------------
-    CREATE TABLE code_category (
-      code_category_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    CREATE TABLE contributor_codeset (
+      contributor_codeset_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       contributor_id INTEGER NOT NULL,
-      value VARCHAR(128) NOT NULL,
+      key VARCHAR(128) NOT NULL,
       label VARCHAR(250) NOT NULL,
       description VARCHAR(1000),
-      version VARCHAR(50),
+      version VARCHAR(50) NOT NULL,
       record_end_date TIMESTAMPTZ(6),
       create_date TIMESTAMPTZ(6) NOT NULL DEFAULT now(),
       create_user INTEGER NOT NULL,
@@ -21,16 +21,16 @@ export async function up(knex: Knex): Promise<void> {
       update_user INTEGER,
       revision_count INTEGER NOT NULL DEFAULT 0,
 
-      CONSTRAINT code_category_fk1 FOREIGN KEY (contributor_id) REFERENCES contributor(contributor_id)
+      CONSTRAINT contributor_codeset_fk1 FOREIGN KEY (contributor_id) REFERENCES contributor(contributor_id)
     );
 
-    CREATE TABLE code (
-      code_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-      code_category_id INTEGER NOT NULL,
-      value VARCHAR(128) NOT NULL,
+    CREATE TABLE contributor_codeset_code (
+      contributor_codeset_code_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      contributor_codeset_id INTEGER NOT NULL,
+      key VARCHAR(128) NOT NULL,
       label VARCHAR(250) NOT NULL,
       description VARCHAR(1000),
-      version VARCHAR(50),
+      version VARCHAR(50) NOT NULL,
       record_end_date TIMESTAMPTZ(6),
       create_date TIMESTAMPTZ(6) NOT NULL DEFAULT now(),
       create_user INTEGER NOT NULL,
@@ -38,14 +38,14 @@ export async function up(knex: Knex): Promise<void> {
       update_user INTEGER,
       revision_count INTEGER NOT NULL DEFAULT 0,
 
-      CONSTRAINT code_fk1 FOREIGN KEY (code_category_id) REFERENCES code_category(code_category_id)
+      CONSTRAINT contributor_codeset_code_fk1 FOREIGN KEY (contributor_codeset_id) REFERENCES contributor_codeset(contributor_codeset_id)
     );
 
     CREATE TABLE submission_feature_property_code (
       submission_feature_property_code_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       submission_feature_id INTEGER NOT NULL,
       feature_type_property_id INTEGER NOT NULL,
-      code_id INTEGER NOT NULL,
+      contributor_codeset_code_id INTEGER NOT NULL,
       record_end_date TIMESTAMPTZ(6),
       create_date TIMESTAMPTZ(6) NOT NULL DEFAULT now(),
       create_user INTEGER NOT NULL,
@@ -55,71 +55,67 @@ export async function up(knex: Knex): Promise<void> {
 
       CONSTRAINT submission_feature_property_code_fk1 FOREIGN KEY (submission_feature_id) REFERENCES submission_feature(submission_feature_id),
       CONSTRAINT submission_feature_property_code_fk2 FOREIGN KEY (feature_type_property_id) REFERENCES feature_type_property(feature_type_property_id),
-      CONSTRAINT submission_feature_property_code_fk3 FOREIGN KEY (code_id) REFERENCES code(code_id)
+      CONSTRAINT submission_feature_property_code_fk3 FOREIGN KEY (contributor_codeset_code_id) REFERENCES contributor_codeset_code(contributor_codeset_code_id)
     );
 
     --------------------------------------------------------------------------------
     -- INDEXES
     --------------------------------------------------------------------------------
 
-    CREATE INDEX code_category_idx1 ON code_category(contributor_id);
-    CREATE UNIQUE INDEX code_category_nuk1
-      ON code_category(contributor_id, value, version)
-      WHERE record_end_date IS NULL;
-    CREATE INDEX code_category_idx2
-      ON code_category(value, version)
+    CREATE INDEX contributor_codeset_idx1 ON contributor_codeset(contributor_id);
+    CREATE UNIQUE INDEX contributor_codeset_nuk1 ON contributor_codeset(contributor_id, key, version);
+    CREATE INDEX contributor_codeset_idx2
+      ON contributor_codeset(key, version)
       WHERE record_end_date IS NULL;
 
-    CREATE INDEX code_idx1 ON code(code_category_id);
-    CREATE UNIQUE INDEX code_nuk1
-      ON code(code_category_id, value, version)
-      WHERE record_end_date IS NULL;
-    CREATE INDEX code_idx2
-      ON code(value, version)
+    CREATE INDEX contributor_codeset_code_idx1 ON contributor_codeset_code(contributor_codeset_id);
+    CREATE UNIQUE INDEX contributor_codeset_code_nuk1 ON contributor_codeset_code(contributor_codeset_id, key, version);
+    CREATE INDEX contributor_codeset_code_idx2
+      ON contributor_codeset_code(key, version)
       WHERE record_end_date IS NULL;
 
     CREATE INDEX submission_feature_property_code_idx1 ON submission_feature_property_code(submission_feature_id);
     CREATE INDEX submission_feature_property_code_idx2 ON submission_feature_property_code(feature_type_property_id);
-    CREATE INDEX submission_feature_property_code_idx3 ON submission_feature_property_code(code_id);
-    CREATE INDEX submission_feature_property_code_idx4 ON submission_feature_property_code(code_id, submission_feature_id);
+    CREATE INDEX submission_feature_property_code_idx3 ON submission_feature_property_code(contributor_codeset_code_id);
+    CREATE INDEX submission_feature_property_code_idx4 ON submission_feature_property_code(contributor_codeset_code_id, submission_feature_id);
 
     --------------------------------------------------------------------------------
     -- COMMENTS
     --------------------------------------------------------------------------------
 
-    COMMENT ON TABLE code_category IS 'Controlled vocabulary category (code set) with versioned definitions.';
-    COMMENT ON COLUMN code_category.code_category_id IS 'Primary key.';
-    COMMENT ON COLUMN code_category.contributor_id IS 'Foreign key to contributor that defines this code category.';
-    COMMENT ON COLUMN code_category.value IS 'Machine-readable identifier for the category.';
-    COMMENT ON COLUMN code_category.label IS 'Human-readable category label.';
-    COMMENT ON COLUMN code_category.description IS 'Optional category description.';
-    COMMENT ON COLUMN code_category.version IS 'Optional category definition version.';
-    COMMENT ON COLUMN code_category.record_end_date IS 'Timestamp for soft delete; null when active.';
-    COMMENT ON COLUMN code_category.create_date IS 'The datetime the record was created.';
-    COMMENT ON COLUMN code_category.create_user IS 'The id of the user who created the record.';
-    COMMENT ON COLUMN code_category.update_date IS 'The datetime the record was last updated.';
-    COMMENT ON COLUMN code_category.update_user IS 'The id of the user who last updated the record.';
-    COMMENT ON COLUMN code_category.revision_count IS 'Revision count used for concurrency control.';
+    COMMENT ON TABLE contributor_codeset IS 'Controlled vocabulary code set with versioned definitions per contributor.';
+    COMMENT ON COLUMN contributor_codeset.contributor_codeset_id IS 'Primary key.';
+    COMMENT ON COLUMN contributor_codeset.contributor_id IS 'Foreign key to contributor that defines this code set.';
+    COMMENT ON COLUMN contributor_codeset.key IS 'Machine-readable identifier for the code set.';
+    COMMENT ON COLUMN contributor_codeset.label IS 'Human-readable code set label.';
+    COMMENT ON COLUMN contributor_codeset.description IS 'Optional code set description.';
+    COMMENT ON COLUMN contributor_codeset.version IS 'Code set definition version.';
+    COMMENT ON COLUMN contributor_codeset.record_end_date IS 'Timestamp for soft delete; null when active.';
+    COMMENT ON COLUMN contributor_codeset.create_date IS 'The datetime the record was created.';
+    COMMENT ON COLUMN contributor_codeset.create_user IS 'The id of the user who created the record.';
+    COMMENT ON COLUMN contributor_codeset.update_date IS 'The datetime the record was last updated.';
+    COMMENT ON COLUMN contributor_codeset.update_user IS 'The id of the user who last updated the record.';
+    COMMENT ON COLUMN contributor_codeset.revision_count IS 'Revision count used for concurrency control.';
 
-    COMMENT ON TABLE code IS 'Versioned controlled vocabulary code belonging to a code category.';
-    COMMENT ON COLUMN code.code_id IS 'Primary key.';
-    COMMENT ON COLUMN code.code_category_id IS 'Foreign key to code_category.';
-    COMMENT ON COLUMN code.value IS 'Machine-readable code value, stored as text (varchar(128)).';
-    COMMENT ON COLUMN code.label IS 'Human-readable code label.';
-    COMMENT ON COLUMN code.description IS 'Optional code description.';
-    COMMENT ON COLUMN code.version IS 'Optional code definition version.';
-    COMMENT ON COLUMN code.record_end_date IS 'Timestamp for soft delete; null when active.';
-    COMMENT ON COLUMN code.create_date IS 'The datetime the record was created.';
-    COMMENT ON COLUMN code.create_user IS 'The id of the user who created the record.';
-    COMMENT ON COLUMN code.update_date IS 'The datetime the record was last updated.';
-    COMMENT ON COLUMN code.update_user IS 'The id of the user who last updated the record.';
-    COMMENT ON COLUMN code.revision_count IS 'Revision count used for concurrency control.';
+    COMMENT ON TABLE contributor_codeset_code IS 'Versioned controlled vocabulary code belonging to a contributor code set.';
+    COMMENT ON COLUMN contributor_codeset_code.contributor_codeset_code_id IS 'Primary key.';
+    COMMENT ON COLUMN contributor_codeset_code.contributor_codeset_id IS 'Foreign key to contributor_codeset.';
+    COMMENT ON COLUMN contributor_codeset_code.key IS 'Machine-readable code key, stored as text (varchar(128)).';
+    COMMENT ON COLUMN contributor_codeset_code.label IS 'Human-readable code label.';
+    COMMENT ON COLUMN contributor_codeset_code.description IS 'Optional code description.';
+    COMMENT ON COLUMN contributor_codeset_code.version IS 'Code definition version.';
+    COMMENT ON COLUMN contributor_codeset_code.record_end_date IS 'Timestamp for soft delete; null when active.';
+    COMMENT ON COLUMN contributor_codeset_code.create_date IS 'The datetime the record was created.';
+    COMMENT ON COLUMN contributor_codeset_code.create_user IS 'The id of the user who created the record.';
+    COMMENT ON COLUMN contributor_codeset_code.update_date IS 'The datetime the record was last updated.';
+    COMMENT ON COLUMN contributor_codeset_code.update_user IS 'The id of the user who last updated the record.';
+    COMMENT ON COLUMN contributor_codeset_code.revision_count IS 'Revision count used for concurrency control.';
 
     COMMENT ON TABLE submission_feature_property_code IS 'Canonical typed coded property values linked to a feature and feature_type_property definition.';
     COMMENT ON COLUMN submission_feature_property_code.submission_feature_property_code_id IS 'Primary key.';
     COMMENT ON COLUMN submission_feature_property_code.submission_feature_id IS 'Foreign key to submission_feature.';
     COMMENT ON COLUMN submission_feature_property_code.feature_type_property_id IS 'Foreign key to feature_type_property.';
-    COMMENT ON COLUMN submission_feature_property_code.code_id IS 'Foreign key to code.';
+    COMMENT ON COLUMN submission_feature_property_code.contributor_codeset_code_id IS 'Foreign key to contributor_codeset_code.';
     COMMENT ON COLUMN submission_feature_property_code.record_end_date IS 'Timestamp for soft delete; null when active.';
     COMMENT ON COLUMN submission_feature_property_code.create_date IS 'The datetime the record was created.';
     COMMENT ON COLUMN submission_feature_property_code.create_user IS 'The id of the user who created the record.';
@@ -131,20 +127,20 @@ export async function up(knex: Knex): Promise<void> {
     -- TRIGGERS
     --------------------------------------------------------------------------------
 
-    CREATE TRIGGER audit_code_category
-      BEFORE INSERT OR UPDATE OR DELETE ON code_category
+    CREATE TRIGGER audit_contributor_codeset
+      BEFORE INSERT OR UPDATE OR DELETE ON contributor_codeset
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
 
-    CREATE TRIGGER journal_code_category
-      AFTER INSERT OR UPDATE OR DELETE ON code_category
+    CREATE TRIGGER journal_contributor_codeset
+      AFTER INSERT OR UPDATE OR DELETE ON contributor_codeset
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
 
-    CREATE TRIGGER audit_code
-      BEFORE INSERT OR UPDATE OR DELETE ON code
+    CREATE TRIGGER audit_contributor_codeset_code
+      BEFORE INSERT OR UPDATE OR DELETE ON contributor_codeset_code
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
 
-    CREATE TRIGGER journal_code
-      AFTER INSERT OR UPDATE OR DELETE ON code
+    CREATE TRIGGER journal_contributor_codeset_code
+      AFTER INSERT OR UPDATE OR DELETE ON contributor_codeset_code
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
 
     CREATE TRIGGER audit_submission_feature_property_code
@@ -162,7 +158,7 @@ export async function down(knex: Knex): Promise<void> {
     SET SEARCH_PATH = biohub, public;
 
     DROP TABLE IF EXISTS submission_feature_property_code CASCADE;
-    DROP TABLE IF EXISTS code CASCADE;
-    DROP TABLE IF EXISTS code_category CASCADE;
+    DROP TABLE IF EXISTS contributor_codeset_code CASCADE;
+    DROP TABLE IF EXISTS contributor_codeset CASCADE;
   `);
 }
