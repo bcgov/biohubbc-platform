@@ -1,6 +1,7 @@
 import { IDBConnection } from '../../database/db';
 import { parseFeatureUrn } from '../../database/urn-utils';
-import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
+import { HTTP400 } from '../../errors/http-error';
+import { CreatePolicy, Policy, PolicyStatus, UpdatePolicy } from '../../models/policy';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
@@ -22,6 +23,12 @@ export class PolicyService extends DBService {
   securityScopeService: SecurityScopeService;
   teamPolicyRepository: TeamPolicyRepository;
 
+  /**
+   * Creates an instance of PolicyService.
+   *
+   * @param {IDBConnection} connection - Database connection object.
+   * @memberof PolicyService
+   */
   constructor(connection: IDBConnection) {
     super(connection);
     this.policyRepository = new PolicyRepository(connection);
@@ -32,21 +39,21 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Create a new policy record.
+   * Create a new policy.
    *
-   * @param {CreatePolicy} policyData - Data required to create a new policy.
-   * @return {Promise<Policy>} - The created policy record.
+   * @param {CreatePolicy} policyData - Policy payload.
+   * @return {Promise<Policy>} Newly created policy.
    * @memberof PolicyService
    */
-  createPolicy(policyData: CreatePolicy): Promise<Policy> {
+  async createPolicy(policyData: CreatePolicy): Promise<Policy> {
     return this.policyRepository.insertPolicy(policyData);
   }
 
   /**
-   * Retrieve a policy record
+   * Get a policy by identifier.
    *
-   * @param {string} policyId - The ID of the policy to fetch.
-   * @return {Promise<Policy>}
+   * @param {string} policyId - Policy UUID.
+   * @return {Promise<Policy>} Matching policy.
    * @memberof PolicyService
    */
   getPolicy(policyId: string): Promise<Policy> {
@@ -54,11 +61,11 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Retrieve policies with optional filters and pagination.
+   * List policies with optional filters and pagination.
    *
-   * @param {PolicyFilters} [filters] - Optional filter set.
+   * @param {PolicyFilters} [filters] - Optional policy filters.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options.
-   * @return {Promise<Policy[]>}
+   * @return {Promise<Policy[]>} Matching policies.
    * @memberof PolicyService
    */
   getPolicies(filters?: PolicyFilters, pagination?: ApiPaginationOptions): Promise<Policy[]> {
@@ -66,10 +73,10 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Retrieve count of policies matching optional filters.
+   * Count policies that match optional filters.
    *
-   * @param {PolicyFilters} [filters] - Optional filter set.
-   * @return {Promise<number>}
+   * @param {PolicyFilters} [filters] - Optional policy filters.
+   * @return {Promise<number>} Count of matching policies.
    * @memberof PolicyService
    */
   getPoliciesCount(filters?: PolicyFilters): Promise<number> {
@@ -77,11 +84,11 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Retrieve a policy record
+   * Find policies that authorize feature access for a URN and system user.
    *
-   * @param {string} urn
-   * @param {number} systemUserId
-   * @return {Promise<Policy[]>}
+   * @param {string} urn - Feature URN.
+   * @param {number} systemUserId - System user identifier.
+   * @return {Promise<Policy[]>} Matching policies.
    * @memberof PolicyService
    */
   getPoliciesThatAuthorizeFeatureAccessByUrn(urn: string, systemUserId: number): Promise<Policy[]> {
@@ -90,45 +97,112 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Update an existing policy record.
+   * Update policy fields and validate lifecycle transitions when status changes.
    *
-   * @param {string} policyId - The ID of the policy to update.
-   * @param {UpdatePolicy} policyData - Partial data to update the policy record.
-   * @return {Promise<Policy>} - The updated policy record.
+   * @param {string} policyId - Policy UUID.
+   * @param {UpdatePolicy} policyData - Partial policy update payload.
+   * @return {Promise<Policy>} Updated policy.
    * @memberof PolicyService
    */
-  updatePolicy(policyId: string, policyData: UpdatePolicy): Promise<Policy> {
+  async updatePolicy(policyId: string, policyData: UpdatePolicy): Promise<Policy> {
+    if (policyData.status === undefined) {
+      return this.policyRepository.updatePolicy(policyId, policyData);
+    }
+
+    const currentPolicy = await this.policyRepository.getPolicy(policyId);
+    if (currentPolicy.status === policyData.status) {
+      return this.policyRepository.updatePolicy(policyId, policyData);
+    }
+
+    if (policyData.status === 'approved') {
+      this.assertCanApproveRequest(currentPolicy.status);
+    }
+
+    this.assertValidStatusTransition(currentPolicy.status, policyData.status);
     return this.policyRepository.updatePolicy(policyId, policyData);
   }
 
   /**
-   * Delete a policy and clean up its security scope mappings.
+   * Update policy lifecycle status with transition validation.
    *
-   * Must fetch affected team IDs and statement IDs BEFORE soft-deleting the policy,
-   * because after soft-delete the team_policy JOIN won't find the policy and
-   * getPolicyStatements filters on record_end_date IS NULL.
+   * @param {string} policyId - Policy UUID.
+   * @param {PolicyStatus} status - Target policy status.
+   * @return {Promise<Policy>} Updated policy.
+   * @memberof PolicyService
+   */
+  async updatePolicyStatus(policyId: string, status: PolicyStatus): Promise<Policy> {
+    const currentPolicy = await this.policyRepository.getPolicy(policyId);
+
+    if (currentPolicy.status === status) {
+      return currentPolicy;
+    }
+
+    if (status === 'approved') {
+      this.assertCanApproveRequest(currentPolicy.status);
+    }
+
+    this.assertValidStatusTransition(currentPolicy.status, status);
+    return this.policyRepository.updatePolicy(policyId, { status });
+  }
+
+  /**
+   * Assert that a request can be approved based on policy readiness.
    *
-   * @param {string} policyId - The id of the policy to delete
+   * @private
+   * @param {(PolicyStatus | 'requested')} current - Current policy status.
+   * @return {void}
+   * @memberof PolicyService
+   */
+  private assertCanApproveRequest(current: PolicyStatus | 'requested'): void {
+    const blockedStatuses = new Set(['requested']);
+
+    if (blockedStatuses.has(current)) {
+      throw new HTTP400(`Cannot approve request while policy is '${current}'`);
+    }
+  }
+
+  /**
+   * Validate lifecycle transition between two policy status values.
+   *
+   * @private
+   * @param {PolicyStatus} current - Current policy status.
+   * @param {PolicyStatus} next - Target policy status.
+   * @return {void}
+   * @memberof PolicyService
+   */
+  private assertValidStatusTransition(current: PolicyStatus, next: PolicyStatus): void {
+    const validTransitions: Record<PolicyStatus, PolicyStatus[]> = {
+      requested: ['reviewed', 'denied'],
+      reviewed: ['approved', 'denied'],
+      approved: ['reviewed', 'denied'],
+      denied: ['reviewed']
+    };
+
+    if (!validTransitions[current].includes(next)) {
+      throw new HTTP400(`Invalid policy status transition: ${current} -> ${next}`);
+    }
+  }
+
+  /**
+   * Delete a policy and run associated cleanup.
+   *
+   * @param {string} policyId - Policy UUID.
    * @return {Promise<void>}
    * @memberof PolicyService
    */
   async deletePolicy(policyId: string): Promise<void> {
-    // Gather affected teams and statements before soft-delete makes them unreachable
-    const [teamPolicies, statements] = await Promise.all([
-      this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] }),
-      this.policyStatementService.getPolicyStatements(policyId)
-    ]);
+    await this.performPolicyDelete(policyId);
+  }
 
-    const affectedTeamIds = teamPolicies.map((tp) => tp.team_id);
-    const statementIds = statements.map((s) => s.policy_statement_id);
-
-    // Soft-delete the policy
-    await this.policyRepository.deletePolicy(policyId);
-
-    // Clean up derived scope mappings and rebuild affected teams' scope grants
-    if (statementIds.length > 0) {
-      await this.securityScopeService.cleanupScopesForDeletedStatements(statementIds, affectedTeamIds);
-    }
+  /**
+   * Internal lifecycle-only delete for request-linked policies.
+   *
+   * @param {string} policyId
+   * @return {Promise<void>}
+   * @memberof PolicyService
+   */
+  deletePolicyFromRequestLifecycle(policyId: string): Promise<void> {
+    return this.deletePolicy(policyId, { bypassLinkedPolicyDeleteGuard: true });
   }
 
   /**
@@ -156,10 +230,10 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Get a single policy with its statements and conditions.
+   * Get a policy by identifier and include its statements with conditions.
    *
-   * @param {string} policyId - The ID of the policy to fetch.
-   * @return {Promise<PolicyWithStatements>}
+   * @param {string} policyId - Policy UUID.
+   * @return {Promise<PolicyWithStatements>} Policy enriched with statements and conditions.
    * @memberof PolicyService
    */
   async getPolicyWithStatements(policyId: string): Promise<PolicyWithStatements> {
@@ -169,10 +243,10 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Get statements for a policy, including conditions.
+   * Get policy statements and hydrate each with its conditions.
    *
-   * @param {string} policyId - The ID of the policy.
-   * @return {Promise<PolicyStatementWithConditions[]>}
+   * @param {string} policyId - Policy UUID.
+   * @return {Promise<PolicyStatementWithConditions[]>} Statements with conditions.
    * @memberof PolicyService
    */
   async getStatementsWithConditions(policyId: string): Promise<PolicyStatementWithConditions[]> {
@@ -187,11 +261,11 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Create a policy with statements and conditions.
+   * Create a policy and its associated statements/conditions/scopes.
    *
-   * @param {CreatePolicy} policyData - Data required to create a new policy.
-   * @param {CreatePolicyStatementInput[]} statements - Statements to create for the policy.
-   * @return {Promise<PolicyWithStatements>}
+   * @param {CreatePolicy} policyData - Policy payload.
+   * @param {CreatePolicyStatementInput[]} statements - Statement payloads.
+   * @return {Promise<PolicyWithStatements>} Created policy with statements.
    * @memberof PolicyService
    */
   async createPolicyWithStatements(
@@ -204,18 +278,12 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Update a policy with statements and conditions.
-   * Strategy: Delete existing statements and recreate (simpler than diffing).
+   * Update a policy and fully replace its statements/conditions/scopes.
    *
-   * Note: When a statement's URN changes, the old security_scope row may become
-   * orphaned (no policy_statement_scope references it). We intentionally skip
-   * cleanup because the same scope may still be referenced by other statements
-   * via the shared scope_hash. Orphaned scopes are low-cost (~500 rows at scale).
-   *
-   * @param {string} policyId - The ID of the policy to update.
-   * @param {UpdatePolicy} policyData - Partial data to update the policy record.
-   * @param {CreatePolicyStatementInput[]} statements - New statements for the policy.
-   * @return {Promise<PolicyWithStatements>}
+   * @param {string} policyId - Policy UUID.
+   * @param {UpdatePolicy} policyData - Partial policy update payload.
+   * @param {CreatePolicyStatementInput[]} statements - Replacement statement payloads.
+   * @return {Promise<PolicyWithStatements>} Updated policy with rebuilt statements.
    * @memberof PolicyService
    */
   async updatePolicyWithStatements(
@@ -223,26 +291,28 @@ export class PolicyService extends DBService {
     policyData: UpdatePolicy,
     statements: CreatePolicyStatementInput[]
   ): Promise<PolicyWithStatements> {
+    const linkedDataRequest = await this.policyRepository.findActiveDataRequestByPolicyId(policyId);
+
+    if (linkedDataRequest) {
+      throw new HTTP400(
+        'Policy is linked to a data request and cannot be updated directly'
+      );
+    }
+
     const policy = await this.updatePolicy(policyId, policyData);
 
-    // Collect old statement IDs and affected teams before soft-deleting statements.
-    // After soft-delete, the policy_statement_scope mappings must be cleaned up
-    // and affected teams' scope grants rebuilt from the remaining active chain.
     const existingStatements = await this.policyStatementService.getPolicyStatements(policyId);
     const oldStatementIds = existingStatements.map((s) => s.policy_statement_id);
 
     const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] });
     const affectedTeamIds = teamPolicies.map((tp) => tp.team_id);
 
-    // Soft-delete old statements
     await Promise.all(
       existingStatements.map((stmt) => this.policyStatementService.deletePolicyStatement(stmt.policy_statement_id))
     );
 
-    // Create new statements
     const createdStatements = await this.createStatementsWithScopes(policyId, statements);
 
-    // Clean up old scope mappings and rebuild affected teams' scope grants
     if (oldStatementIds.length > 0) {
       await this.securityScopeService.cleanupScopesForDeletedStatements(oldStatementIds, affectedTeamIds);
     }
@@ -251,8 +321,13 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Create statements with conditions and register security scopes for each.
-   * Shared by createPolicyWithStatements and updatePolicyWithStatements.
+   * Create policy statements, create nested conditions, and materialize security scopes.
+   *
+   * @private
+   * @param {string} policyId - Policy UUID.
+   * @param {CreatePolicyStatementInput[]} statements - Statement payloads.
+   * @return {Promise<PolicyStatementWithConditions[]>} Created statements with conditions.
+   * @memberof PolicyService
    */
   private async createStatementsWithScopes(
     policyId: string,
@@ -289,5 +364,29 @@ export class PolicyService extends DBService {
     }
 
     return createdStatements;
+  }
+
+  /**
+   * Delete policy and clean up security scopes tied to deleted statements.
+   *
+   * @private
+   * @param {string} policyId - Policy UUID.
+   * @return {Promise<void>}
+   * @memberof PolicyService
+   */
+  private async performPolicyDelete(policyId: string): Promise<void> {
+    const [teamPolicies, statements] = await Promise.all([
+      this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] }),
+      this.policyStatementService.getPolicyStatements(policyId)
+    ]);
+
+    const affectedTeamIds = teamPolicies.map((tp) => tp.team_id);
+    const statementIds = statements.map((s) => s.policy_statement_id);
+
+    await this.policyRepository.deletePolicy(policyId);
+
+    if (statementIds.length > 0) {
+      await this.securityScopeService.cleanupScopesForDeletedStatements(statementIds, affectedTeamIds);
+    }
   }
 }

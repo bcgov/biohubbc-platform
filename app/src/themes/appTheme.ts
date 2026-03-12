@@ -157,17 +157,26 @@ const appTheme = createTheme({
             fontSize: '1.2rem'
           }
         }),
-        contained: ({ theme }) => ({
-          color: theme.palette.primary.contrastText,
-          backgroundColor: theme.palette.primary.main,
-          '&:hover': {
-            backgroundColor: theme.palette.primary.dark
-          },
-          '&.Mui-disabled': {
-            color: theme.palette.action.disabled,
-            backgroundColor: theme.palette.action.disabledBackground
-          }
-        }),
+        contained: ({ theme, ownerState }) => {
+          const { main, dark, contrastText } = {
+            ...theme.palette.primary,
+            ...(theme.palette[ownerState.color as keyof typeof theme.palette] as
+              | { main: string; dark?: string; contrastText?: string }
+              | undefined)
+          };
+
+          return {
+            color: contrastText,
+            backgroundColor: main,
+            '&:hover': {
+              backgroundColor: dark
+            },
+            '&.Mui-disabled': {
+              color: theme.palette.action.disabled,
+              backgroundColor: theme.palette.action.disabledBackground
+            }
+          };
+        },
         outlined: ({ theme }) => ({
           borderWidth: 1,
           borderColor: 'currentColor',
@@ -417,6 +426,12 @@ const appTheme = createTheme({
           },
           '&:hover .MuiOutlinedInput-notchedOutline': {
             borderColor: theme.palette.text.secondary
+          },
+          '&.Mui-disabled .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'rgba(0, 0, 0, 0.23)'
+          },
+          '&.Mui-disabled:hover .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'rgba(0, 0, 0, 0.23)'
           },
           '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
             borderColor: theme.palette.primary.main,

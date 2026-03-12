@@ -6,10 +6,11 @@ import { AlertBanner } from 'components/notifications/AlertBanner';
 import { SkeletonList } from 'components/loading/SkeletonLoaders';
 import { ComponentSwitch } from 'components/switch/ComponentSwitch';
 import { APIError } from 'hooks/api/useAxios';
+import { useSearchQueryParams } from 'hooks/useSearchQuery';
 import { useCartContext, useDialogContext } from 'hooks/useContext';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useCallback, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { SearchResultCardLayout } from '../../layout/list/SearchResultCardLayout';
 import { SearchResultTableLayout } from '../../layout/table/SearchResultTableLayout';
 import { SEARCH_RESULT_OPTION_VIEW } from '../../SearchResultPage';
@@ -26,7 +27,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload, onClick
   const { features, addToCart, removeFromCart } = useCartContext();
   const dialogContext = useDialogContext();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { searchParams } = useSearchQueryParams();
 
   const hasResults = rows.length > 0;
   const hasSecuredResults = rows.some((r) => r.is_secured);

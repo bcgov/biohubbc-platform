@@ -4,7 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiNotFoundError } from '../errors/api-error';
-import { CreateDataRequestPayload, DataRequest, UpdateDataRequest } from '../models/data-request';
+import { CreateDataRequest, DataRequest, UpdateDataRequest } from '../models/data-request';
 import { getMockDBConnection } from '../__mocks__/db';
 import { DataRequestRepository } from './data-request-repository';
 
@@ -20,9 +20,10 @@ describe('DataRequestRepository', () => {
     reason: 'Research purposes',
     team_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
     requested_by: 1,
-    ticket_id: 'd4e5f6a7-b8c9-0123-def0-234567890123'
+    ticket_id: 'd4e5f6a7-b8c9-0123-def0-234567890123',
+    policy_id: 'f5f6a7b8-c9d0-1234-efab-345678901234',
+    status: 'requested'
   };
-
   describe('findDataRequests', () => {
     it('should return data requests when found', async () => {
       const mockQueryResponse = {
@@ -70,7 +71,7 @@ describe('DataRequestRepository', () => {
 
       const repo = new DataRequestRepository(mockDBConnection);
 
-      const result = await repo.findDataRequests({ status: 'REQUESTED' });
+      const result = await repo.findDataRequests({ status: 'requested' });
 
       expect(result).to.eql([mockDataRequest]);
     });
@@ -144,7 +145,7 @@ describe('DataRequestRepository', () => {
       const repo = new DataRequestRepository(mockDBConnection);
 
       const result = await repo.findDataRequestsByTeamMembership(mockDataRequest.requested_by, {
-        status: 'REQUESTED'
+        status: 'requested'
       });
 
       expect(result).to.eql([mockDataRequest]);
@@ -240,14 +241,15 @@ describe('DataRequestRepository', () => {
 
       const repo = new DataRequestRepository(mockDBConnection);
 
-      const payload: CreateDataRequestPayload = {
+      const payload: Omit<CreateDataRequest, 'system_user_ids'> & { team_id: string; policy_id: string } = {
         requested_by: mockDataRequest.requested_by,
         reason: 'New research project',
         team_id: mockDataRequest.team_id,
-        ticket_id: mockDataRequest.ticket_id
+        ticket_id: mockDataRequest.ticket_id,
+        policy_id: mockDataRequest.policy_id
       };
 
-      const result = await repo.createDataRequest(mockDataRequest.requested_by, payload);
+      const result = await repo.createDataRequest(payload);
 
       expect(result).to.eql(mockDataRequest);
     });
@@ -264,15 +266,16 @@ describe('DataRequestRepository', () => {
 
       const repo = new DataRequestRepository(mockDBConnection);
 
-      const payload: CreateDataRequestPayload = {
+      const payload: Omit<CreateDataRequest, 'system_user_ids'> & { team_id: string; policy_id: string } = {
         requested_by: mockDataRequest.requested_by,
         reason: 'Test',
         team_id: mockDataRequest.team_id,
-        ticket_id: mockDataRequest.ticket_id
+        ticket_id: mockDataRequest.ticket_id,
+        policy_id: mockDataRequest.policy_id
       };
 
       try {
-        await repo.createDataRequest(mockDataRequest.requested_by, payload);
+        await repo.createDataRequest(payload);
         throw new Error('Expected to throw');
       } catch (err) {
         expect((err as Error).message).to.equal('Failed to create data request');

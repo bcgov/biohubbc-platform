@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react';
+import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { ITicketContext } from 'contexts/ticketContext';
 import { useTicketContext } from 'hooks/useContext';
 import { DataLoader } from 'hooks/useDataLoader';
@@ -35,11 +36,20 @@ vi.mock('./detail/comment/TicketComment', () => ({
 }));
 
 vi.mock('./detail/sidebar/TicketSidebar', () => ({
-  TicketSidebar: ({ teamId, references }: { teamId?: string; references?: unknown[] }) => (
+  TicketSidebar: ({
+    teamId,
+    references,
+    dataRequests
+  }: {
+    teamId?: string;
+    references?: unknown[];
+    dataRequests?: unknown[];
+  }) => (
     <div
       data-testid="ticket-sidebar"
       data-team-id={teamId ?? ''}
       data-reference-count={String(references?.length ?? 0)}
+      data-data-request-count={String(dataRequests?.length ?? 0)}
     />
   )
 }));
@@ -108,6 +118,18 @@ const baseTicket: ITicketWithHistory = {
       user_identifier: 'Sarah',
       create_date: '2026-02-25T00:00:00.000Z'
     }
+  ],
+  data_requests: [
+    {
+      data_request_id: 'dr-1',
+      reason: 'Request secured records',
+      team_id: '33333333-3333-3333-3333-333333333333',
+      requested_by: 1,
+      ticket_id: '11111111-1111-1111-1111-111111111111',
+      policy_id: '44444444-4444-4444-4444-444444444444',
+      status: PolicyStatus.REQUESTED,
+      create_date: '2026-02-24T10:00:00.000Z'
+    }
   ]
 };
 
@@ -156,6 +178,7 @@ describe('TicketDetailPageContent', () => {
     expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-comment', 'Draft comment');
     expect(screen.getByTestId('ticket-sidebar')).toHaveAttribute('data-team-id', baseTicket.team_id);
     expect(screen.getByTestId('ticket-sidebar')).toHaveAttribute('data-reference-count', '1');
+    expect(screen.getByTestId('ticket-sidebar')).toHaveAttribute('data-data-request-count', '1');
   });
 
   it('passes chronologically sorted history to timeline', () => {
@@ -165,7 +188,12 @@ describe('TicketDetailPageContent', () => {
     const history = JSON.parse(timeline.getAttribute('data-history') ?? '[]') as Array<{ create_date: string }>;
     const createDates = history.map((entry) => entry.create_date);
 
-    expect(createDates).toEqual(['2026-02-24T00:00:00.000Z', '2026-02-24T12:00:00.000Z', '2026-02-25T00:00:00.000Z']);
+    expect(createDates).toEqual([
+      '2026-02-24T00:00:00.000Z',
+      '2026-02-24T10:00:00.000Z',
+      '2026-02-24T12:00:00.000Z',
+      '2026-02-25T00:00:00.000Z'
+    ]);
     expect(timeline).toHaveAttribute('data-loading', 'false');
   });
 

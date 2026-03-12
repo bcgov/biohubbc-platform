@@ -5,7 +5,7 @@ import sinonChai from 'sinon-chai';
 import { deleteDataRequest, getDataRequestById, updateDataRequest } from '.';
 import * as db from '../../../database/db';
 import { ApiError } from '../../../errors/api-error';
-import { DataRequest, DataRequestWithStatus } from '../../../models/data-request';
+import { DataRequest } from '../../../models/data-request';
 import { DataRequestService } from '../../../services/data-request-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 
@@ -16,26 +16,14 @@ describe('data-request/{dataRequestId}', () => {
     sinon.restore();
   });
 
-  const mockDataRequestWithStatus: DataRequestWithStatus = {
-    data_request_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-    reason: 'Research purposes',
-    team_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
-    requested_by: 1,
-    ticket_id: 'd4e5f6a7-b8c9-0123-def0-234567890123',
-    data_request_status: {
-      data_request_status_id: 'c3d4e5f6-a7b8-9012-cdef-123456789012',
-      data_request_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      comment_id: null,
-      request_status: 'REQUESTED'
-    }
-  };
-
   const mockDataRequest: DataRequest = {
     data_request_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
     reason: 'Research purposes',
     team_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
     requested_by: 1,
-    ticket_id: 'd4e5f6a7-b8c9-0123-def0-234567890123'
+    ticket_id: 'd4e5f6a7-b8c9-0123-def0-234567890123',
+    policy_id: 'f5f6a7b8-c9d0-1234-efab-345678901234',
+    status: 'requested'
   };
 
   describe('getDataRequestById', () => {
@@ -50,7 +38,7 @@ describe('data-request/{dataRequestId}', () => {
 
       const requestHandler = getDataRequestById();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.params.dataRequestId = mockDataRequestWithStatus.data_request_id;
+      mockReq.params.dataRequestId = mockDataRequest.data_request_id;
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
@@ -70,19 +58,19 @@ describe('data-request/{dataRequestId}', () => {
       });
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-      const stub = sinon.stub(DataRequestService.prototype, 'getDataRequestById').resolves(mockDataRequestWithStatus);
+      const stub = sinon.stub(DataRequestService.prototype, 'getDataRequestById').resolves(mockDataRequest);
 
       const requestHandler = getDataRequestById();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.params.dataRequestId = mockDataRequestWithStatus.data_request_id;
+      mockReq.params.dataRequestId = mockDataRequest.data_request_id;
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(stub).to.have.been.calledOnceWith(mockDataRequestWithStatus.data_request_id);
+      expect(stub).to.have.been.calledOnceWith(mockDataRequest.data_request_id);
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql(mockDataRequestWithStatus);
+      expect(mockRes.jsonValue).to.eql(mockDataRequest);
     });
 
     it('rolls back and rethrows if service throws', async () => {
@@ -97,7 +85,7 @@ describe('data-request/{dataRequestId}', () => {
 
       const requestHandler = getDataRequestById();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.params.dataRequestId = mockDataRequestWithStatus.data_request_id;
+      mockReq.params.dataRequestId = mockDataRequest.data_request_id;
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);

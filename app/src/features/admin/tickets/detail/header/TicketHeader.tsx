@@ -75,14 +75,15 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
         buttons={
           <Stack direction="row" spacing={1}>
             <Button
+              size="small"
               color={statusActionButtonColor}
-              variant="outlined"
+              variant="contained"
               onClick={handleStatusActionClick}
               disabled={isSavingStatus || isSavingTicket}
               data-testid={statusActionButtonTestId}>
               {statusActionButtonLabel}
             </Button>
-            <Button variant="outlined" onClick={openEditDialog} data-testid="edit-ticket-button">
+            <Button size="small" variant="outlined" onClick={openEditDialog} data-testid="edit-ticket-button">
               Edit
             </Button>
           </Stack>

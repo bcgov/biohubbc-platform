@@ -1,10 +1,10 @@
-import { getKnex } from '../database/db';
+import { getKnex, IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { Comment, UpdateComment } from '../models/comment';
 import { BaseRepository } from './base-repository';
 
 /**
- * Comment repository class.
+ * Repository for `comment` table operations.
  *
  * @export
  * @class CommentRepository
@@ -12,25 +12,17 @@ import { BaseRepository } from './base-repository';
  */
 export class CommentRepository extends BaseRepository {
   /**
-   * Find all comments associated with a data request status.
+   * Creates an instance of CommentRepository.
    *
-   * @param {string} dataRequestStatusId
-   * @return {Promise<Comment[]>}
+   * @param {IDBConnection} connection
    * @memberof CommentRepository
    */
-  async findCommentsByDataRequestStatusId(dataRequestStatusId: string): Promise<Comment[]> {
-    const knex = getKnex();
-    const query = knex('comment as c')
-      .select('c.comment_id', 'c.comment')
-      .join('data_request_status as drs', 'c.comment_id', 'drs.comment_id')
-      .where('drs.data_request_status_id', dataRequestStatusId);
-
-    const response = await this.connection.knex(query, Comment);
-    return response.rows;
+  constructor(connection: IDBConnection) {
+    super(connection);
   }
 
   /**
-   * Create a new comment.
+   * Create a new comment row.
    *
    * @param {string} comment
    * @return {Promise<Comment>}
@@ -49,7 +41,7 @@ export class CommentRepository extends BaseRepository {
   }
 
   /**
-   * Update an existing comment body.
+   * Update an existing comment row.
    *
    * @param {string} commentId
    * @param {UpdateComment} payload

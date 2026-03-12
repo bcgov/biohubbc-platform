@@ -1,4 +1,5 @@
 import { fireEvent, waitFor } from '@testing-library/react';
+import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { Formik } from 'formik';
 import { cleanup, render } from 'test-helpers/test-utils';
 import { AddPolicyForm, AddPolicyFormInitialValues, IAddPolicyFormValues } from './AddPolicyForm';
@@ -62,6 +63,7 @@ describe('AddPolicyForm', () => {
     const { getByDisplayValue } = renderContainer({
       name: 'Test Policy',
       description: 'Test description',
+      status: PolicyStatus.REVIEWED,
       policy_json: JSON.stringify({ Version: '2024-01-01', Statement: [] }, null, 2)
     });
 

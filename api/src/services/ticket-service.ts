@@ -1,12 +1,14 @@
 import { v4 } from 'uuid';
 import { IDBConnection } from '../database/db';
 import { HTTP400 } from '../errors/http-error';
+import { PolicyStatus } from '../models/policy';
 import { Team } from '../models/team';
 import { CreateTicketRequest, Ticket, TicketFilters, TicketWithHistory, UpdateTicketRequest } from '../models/ticket';
 import { CreateTicketReferenceRequest, TicketReference } from '../models/ticket-reference';
 import { TicketRepository } from '../repositories/ticket-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
+import { DataRequestService } from './data-request-service';
 import { DBService } from './db-service';
 import { TicketCommentService } from './ticket-comment-service';
 import { TicketReferenceService } from './ticket-reference-service';
@@ -18,6 +20,7 @@ export class TicketService extends DBService {
   ticketCommentService: TicketCommentService;
   ticketStatusService: TicketStatusService;
   ticketReferenceService: TicketReferenceService;
+  dataRequestService: DataRequestService;
 
   /**
    * Creates an instance of TicketService.
@@ -32,6 +35,7 @@ export class TicketService extends DBService {
     this.ticketCommentService = new TicketCommentService(connection);
     this.ticketStatusService = new TicketStatusService(connection);
     this.ticketReferenceService = new TicketReferenceService(connection);
+    this.dataRequestService = new DataRequestService(connection);
   }
 
   /**
@@ -85,14 +89,15 @@ export class TicketService extends DBService {
    * @memberof TicketService
    */
   async getTicket(ticketId: string): Promise<TicketWithHistory> {
-    const [ticket, statuses, comments, references] = await Promise.all([
+    const [ticket, statuses, comments, references, dataRequests] = await Promise.all([
       this.ticketRepository.getTicketById(ticketId),
       this.ticketStatusService.getTicketStatus(ticketId),
       this.ticketCommentService.getTicketComments(ticketId),
-      this.ticketReferenceService.getTicketReferencesForTicket(ticketId)
+      this.ticketReferenceService.getTicketReferencesForTicket(ticketId),
+      this.dataRequestService.findDataRequestsByTicketId(ticketId)
     ]);
 
-    return { ...ticket, statuses, comments, references };
+    return { ...ticket, statuses, comments, references, data_requests: dataRequests };
   }
 
   /**
@@ -159,6 +164,11 @@ export class TicketService extends DBService {
    * @memberof TicketService
    */
   async updateTicket(ticketId: string, ticket: UpdateTicketRequest): Promise<Ticket> {
+    if (ticket.status === 'closed') {
+      const dataRequests = await this.dataRequestService.findDataRequestsByTicketId(ticketId);
+      this.assertCanCloseTicket(dataRequests.map((dataRequest) => dataRequest.status));
+    }
+
     const updates = Object.fromEntries(
       Object.entries({
         subject: ticket.subject,
@@ -179,6 +189,23 @@ export class TicketService extends DBService {
     }
 
     return updatedTicket;
+  }
+
+  /**
+   * Assert that a ticket can be closed based on linked data-request statuses.
+   *
+   * @private
+   * @param {PolicyStatus[]} dataRequestStatuses - Linked statuses.
+   * @return {void}
+   * @memberof TicketService
+   */
+  private assertCanCloseTicket(dataRequestStatuses: PolicyStatus[]): void {
+    const blockedStatuses = new Set(['requested', 'reviewed']);
+    const hasBlockedStatuses = dataRequestStatuses.some((status) => blockedStatuses.has(status));
+
+    if (hasBlockedStatuses) {
+      throw new HTTP400('Cannot close tickets that have unaddressed data requests');
+    }
   }
 
   /**

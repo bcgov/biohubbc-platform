@@ -157,9 +157,22 @@ export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersP
    */
   const requestStatusChange = useCallback(
     (nextStatus: TicketStatus) => {
+      const currentTicket = getCurrentTicket();
+      const hasUnaddressedDataRequests = currentTicket.data_requests.some(
+        (dataRequest) => dataRequest.status === 'requested' || dataRequest.status === 'reviewed'
+      );
+
+      if (nextStatus === 'closed' && hasUnaddressedDataRequests) {
+        dialogContext.setSnackbar({
+          open: true,
+          snackbarMessage: 'Cannot close tickets that have unaddressed data requests'
+        });
+        return;
+      }
+
       dialogContext.setYesNoDialog(buildStatusChangeDialogConfig(nextStatus, closeConfirmationDialog, updateStatus));
     },
-    [closeConfirmationDialog, dialogContext, updateStatus]
+    [closeConfirmationDialog, dialogContext, getCurrentTicket, updateStatus]
   );
 
   return {

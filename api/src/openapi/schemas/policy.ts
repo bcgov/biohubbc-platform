@@ -97,7 +97,7 @@ export const PolicyStatementWithConditionsSchema: OpenAPIV3.SchemaObject = {
 export const PolicySchema: OpenAPIV3.SchemaObject = {
   title: 'Policy',
   type: 'object',
-  required: ['policy_id', 'name'],
+  required: ['policy_id', 'name', 'status'],
   properties: {
     policy_id: {
       type: 'string',
@@ -114,6 +114,11 @@ export const PolicySchema: OpenAPIV3.SchemaObject = {
       maxLength: 1000,
       nullable: true,
       description: 'Description of the policy'
+    },
+    status: {
+      type: 'string',
+      enum: ['requested', 'reviewed', 'approved', 'denied'],
+      description: 'Lifecycle state of the policy'
     }
   }
 };
@@ -124,7 +129,7 @@ export const PolicySchema: OpenAPIV3.SchemaObject = {
 export const PolicyWithStatementsSchema: OpenAPIV3.SchemaObject = {
   title: 'PolicyWithStatements',
   type: 'object',
-  required: ['policy_id', 'name', 'statements'],
+  required: ['policy_id', 'name', 'status', 'statements'],
   properties: {
     policy_id: {
       type: 'string',
@@ -141,6 +146,11 @@ export const PolicyWithStatementsSchema: OpenAPIV3.SchemaObject = {
       maxLength: 1000,
       nullable: true,
       description: 'Description of the policy'
+    },
+    status: {
+      type: 'string',
+      enum: ['requested', 'reviewed', 'approved', 'denied'],
+      description: 'Lifecycle state of the policy'
     },
     statements: {
       type: 'array',
@@ -269,10 +279,31 @@ export const UpdatePolicyRequestSchema: OpenAPIV3.SchemaObject = {
       maxLength: 1000,
       description: 'Description of the policy'
     },
+    status: {
+      type: 'string',
+      enum: ['requested', 'reviewed', 'approved', 'denied'],
+      description: 'Optional lifecycle state for the policy'
+    },
     statements: {
       type: 'array',
       items: CreatePolicyStatementInputSchema,
       description: 'Policy statements (replaces existing)'
+    }
+  }
+};
+
+/**
+ * Schema for policy status transition request body.
+ */
+export const UpdatePolicyStatusRequestSchema: OpenAPIV3.SchemaObject = {
+  title: 'UpdatePolicyStatusRequest',
+  type: 'object',
+  required: ['status'],
+  properties: {
+    status: {
+      type: 'string',
+      enum: ['requested', 'reviewed', 'approved', 'denied'],
+      description: 'Target policy workflow status'
     }
   }
 };

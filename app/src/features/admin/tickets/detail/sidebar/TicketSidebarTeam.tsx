@@ -37,7 +37,11 @@ export const TicketSidebarTeam = (props: ITicketSidebarTeamProps) => {
           </Stack>
         }
         hasNoData={!members.length}
-        hasNoDataFallback={<Typography variant="body2">No assignees</Typography>}>
+        hasNoDataFallback={
+          <Typography variant="body2" color="textSecondary">
+            No assignees
+          </Typography>
+        }>
         <Stack spacing={0.75}>
           {visibleMembers.map((member) => (
             <TicketSidebarItem
