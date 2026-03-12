@@ -131,7 +131,7 @@ describe('biohub-tar-parser', () => {
       expect(ids).to.include('srv-1');
     });
 
-    it('parses codes/*.json files into codesetByCategory and excludes them from allBlocks', async () => {
+    it('parses codes/*.json files into codesets and excludes them from allBlocks', async () => {
       const tarBuf = await createTestTar([
         { name: '.dataset-id', content: 'dataset-uuid' },
         { name: 'observation.json', content: JSON.stringify([sampleObservation]) },
@@ -150,8 +150,8 @@ describe('biohub-tar-parser', () => {
       const result = await extractBlocksFromArchive(bufferToStream(tarBuf));
 
       expect(result.allBlocks).to.have.length(1);
-      expect(result.codesetByCategory).to.have.property('agency');
-      expect(result.codesetByCategory['agency']).to.deep.equal({
+      expect(result.codesets).to.have.property('agency');
+      expect(result.codesets['agency']).to.deep.equal({
         codes: {
           aarde: { label: 'Aarde Environmental Ltd.' }
         }

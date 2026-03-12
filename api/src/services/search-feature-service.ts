@@ -5,10 +5,12 @@ import { SearchFeatureRepository } from '../repositories/search-feature-reposito
 import { SubmissionFeaturePropertyIndexRepository } from '../repositories/submission-feature-property-index-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { TaxonomyRepository } from '../repositories/taxonomy-repository';
+import { CodeReference, parseCodeReference } from '../utils/code-reference';
 import { getLogger } from '../utils/logger';
 import { splitTimestampValue } from '../utils/timestamp-utils';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { CodeService } from './code-service';
+import { ContributorService } from './contributor-service';
 import { DBService } from './db-service';
 import {
   FeatureTypePropertyMetadataRow,
@@ -36,16 +38,10 @@ type PendingTaxonRecord = {
   tsn: number;
 };
 
-type ParsedCodeToken = {
-  token: string;
-  categoryKey: string;
-  categoryCodeKey: string;
-};
-
 type PendingCodeRecord = {
   submission_feature_id: number;
   feature_type_property_id: number;
-  codeToken: ParsedCodeToken;
+  codeReference: CodeReference;
 };
 
 /**
@@ -210,7 +206,11 @@ export class SearchFeatureService extends DBService {
    * @return {Promise<void>}
    */
   async indexSubmissionPropertiesBySubmissionId(submissionId: number): Promise<void> {
-    defaultLog.debug({ label: 'indexSubmissionPropertiesBySubmissionId', message: 'start', submissionId });
+    defaultLog.debug({
+      label: 'indexSubmissionPropertiesBySubmissionId',
+      message: 'start',
+      submissionId
+    });
 
     const submissionFeaturePropertyIndexRepository = new SubmissionFeaturePropertyIndexRepository(this.connection);
     // Idempotency: canonical typed property tables are fully rebuilt per submission.
@@ -372,9 +372,7 @@ export class SearchFeatureService extends DBService {
           }
 
           if (propertyType === 'code') {
-            // Desired state: payload tokens are `code::<category>::<category-code>`.
-            // Tokens are resolved in bulk to contributor_codeset_code_id later.
-            const codeToken = this.parseCodeToken(
+            const codeReference = this.parseCodeReferenceValue(
               currentValue,
               submissionId,
               currentFeature.submission_feature_id,
@@ -384,7 +382,7 @@ export class SearchFeatureService extends DBService {
             pendingCodeRecords.push({
               submission_feature_id: currentFeature.submission_feature_id,
               feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
-              codeToken
+              codeReference
             });
             continue;
           }
@@ -460,28 +458,34 @@ export class SearchFeatureService extends DBService {
       }
     }
 
+    // Resolve each `code::<contributor-codeset-key>::<contributor-codeset-code-key>` slug
+    // to a stable contributor_codeset_code_id.
+    // This only requires the database. Codes are already persisted during ingestion, so property indexing only
+    // does a set-based lookup and then maps slug -> FK in memory for fast assignment.
     if (pendingCodeRecords.length) {
-      const contributorCodesetCodeIdByToken =
-        await submissionFeaturePropertyIndexRepository.resolveContributorCodesetCodeIdsByTokens(
-          submissionId,
-          pendingCodeRecords.map((record) => ({
-            categoryKey: record.codeToken.categoryKey,
-            categoryCodeKey: record.codeToken.categoryCodeKey
-          }))
+      const contributorService = new ContributorService(this.connection);
+      const contributor = await contributorService.getContributorBySubmissionId(submissionId);
+      const uniqueCodeReferences = [
+        ...new Map(pendingCodeRecords.map((record) => [record.codeReference.slug, record.codeReference])).values()
+      ];
+      const codesetSlugMap =
+        await submissionFeaturePropertyIndexRepository.resolveContributorCodesetCodeIdsByCodeReferences(
+          contributor.contributor_id,
+          uniqueCodeReferences
         );
 
       for (const pendingCodeRecord of pendingCodeRecords) {
-        const contributorCodesetCodeId = contributorCodesetCodeIdByToken.get(pendingCodeRecord.codeToken.token);
+        const contributorCodesetCodeId = codesetSlugMap.get(pendingCodeRecord.codeReference.slug);
 
         if (contributorCodesetCodeId === undefined) {
-          throw new ApiExecuteSQLError('Failed to resolve code token to contributor_codeset_code_id', [
+          throw new ApiExecuteSQLError('Failed to resolve code slug to contributor_codeset_code_id', [
             'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
             {
               submissionId,
               submission_feature_id: pendingCodeRecord.submission_feature_id,
-              token: pendingCodeRecord.codeToken.token,
+              slug: pendingCodeRecord.codeReference.slug,
               advice:
-                'Ensure the token exists in a codes/*.json file and a unique contributor_codeset_code row can be resolved.'
+                'Ensure the slug exists and resolves to a unique contributor_codeset_code row for this contributor.'
             }
           ]);
         }
@@ -582,66 +586,46 @@ export class SearchFeatureService extends DBService {
   }
 
   /**
-   * Parse a code token string (`code::<category>::<category-code>`).
+   * Parse and validate a code reference payload value.
    *
    * @private
    * @param {unknown} value
    * @param {number} submissionId
    * @param {number} submissionFeatureId
    * @param {string} propertyName
-   * @return {ParsedCodeToken}
+   * @return {CodeReference}
    */
-  private parseCodeToken(
+  private parseCodeReferenceValue(
     value: unknown,
     submissionId: number,
     submissionFeatureId: number,
     propertyName: string
-  ): ParsedCodeToken {
+  ): CodeReference {
     if (typeof value !== 'string') {
       this.throwTypeMismatch(
         submissionId,
         submissionFeatureId,
         propertyName,
-        'code token (code::<category>::<category-code>)',
+        'code slug (code::<contributor-codeset-key>::<contributor-codeset-code-key>)',
         value
       );
     }
 
-    const trimmedValue = value.trim();
-    const splitToken = trimmedValue.split('::');
-    if (splitToken.length !== 3 || splitToken[0] !== 'code') {
-      throw new ApiExecuteSQLError('Invalid code token format', [
+    const parsed = parseCodeReference(value);
+    if (!parsed) {
+      throw new ApiExecuteSQLError('Invalid code slug format', [
         'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
         {
           submissionId,
           submission_feature_id: submissionFeatureId,
           propertyName,
-          value: trimmedValue,
-          expected: 'code::<category>::<category-code>'
+          value,
+          expected: 'code::<contributor-codeset-key>::<contributor-codeset-code-key>'
         }
       ]);
     }
 
-    const categoryKey = splitToken[1].trim();
-    const categoryCodeKey = splitToken[2].trim();
-    if (!categoryKey || !categoryCodeKey) {
-      throw new ApiExecuteSQLError('Invalid code token format', [
-        'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
-        {
-          submissionId,
-          submission_feature_id: submissionFeatureId,
-          propertyName,
-          value: trimmedValue,
-          expected: 'code::<category>::<category-code>'
-        }
-      ]);
-    }
-
-    return {
-      token: `code::${categoryKey}::${categoryCodeKey}`,
-      categoryKey,
-      categoryCodeKey
-    };
+    return parsed;
   }
 
   /**

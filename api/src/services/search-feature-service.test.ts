@@ -9,6 +9,7 @@ import { SubmissionRepository } from '../repositories/submission-repository';
 import { TaxonomyRepository } from '../repositories/taxonomy-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CodeService } from './code-service';
+import { ContributorService } from './contributor-service';
 import { SearchFeatureService } from './search-feature-service';
 import { SearchFeatureResultWithRelevancy } from './search-feature-service.interface';
 
@@ -500,7 +501,9 @@ describe('SearchFeatureService', () => {
         }
       ]);
 
-      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
+      sinon
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId')
+        .resolves();
       sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'getFeatureTypePropertyMetadata').resolves([
         {
           feature_type_id: 1,
@@ -511,8 +514,12 @@ describe('SearchFeatureService', () => {
         }
       ]);
       sinon
-        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'resolveContributorCodesetCodeIdsByTokens')
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'resolveContributorCodesetCodeIdsByCodeReferences')
         .resolves(new Map([['code::agency::aarde', 32]]));
+      sinon.stub(ContributorService.prototype, 'getContributorBySubmissionId').resolves({
+        contributor_id: 999,
+        client_id: 'test-client'
+      });
 
       const insertCodeRecordsStub = sinon
         .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'insertCodeRecords')
@@ -558,7 +565,9 @@ describe('SearchFeatureService', () => {
         }
       ]);
 
-      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
+      sinon
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId')
+        .resolves();
       sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'getFeatureTypePropertyMetadata').resolves([
         {
           feature_type_id: 1,
@@ -653,7 +662,9 @@ describe('SearchFeatureService', () => {
         }
       ]);
 
-      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
+      sinon
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId')
+        .resolves();
       sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'getFeatureTypePropertyMetadata').resolves([
         {
           feature_type_id: 1,

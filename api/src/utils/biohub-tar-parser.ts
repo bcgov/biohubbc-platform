@@ -15,8 +15,8 @@ export interface IExtractedBlocks {
   allBlocks: IFlattenedBlock[];
   /** Filenames found in files/ directory (for media reference validation) */
   mediaFileNames: Set<string>;
-  /** Codeset categories loaded from codeset*.json files. */
-  codesetByCategory: Record<string, unknown>;
+  /** Contributor codesets loaded from codes/*.json files. */
+  codesets: Record<string, unknown>;
 }
 
 export interface IUploadedMediaFile {
@@ -93,7 +93,7 @@ export async function extractBlocksFromArchive(inputStream: Readable): Promise<I
   let datasetId: string | undefined;
   const blocksByType = new Map<string, IFlattenedBlock[]>();
   const mediaFileNames = new Set<string>();
-  const codesetByCategory: Record<string, unknown> = {};
+  const codesets: Record<string, unknown> = {};
 
   let rejectEntryPromise: (err: unknown) => void;
 
@@ -115,7 +115,7 @@ export async function extractBlocksFromArchive(inputStream: Readable): Promise<I
           const buf = await streamToBuffer(stream);
           datasetId = buf.toString('utf-8').trim();
         } else if (entryName.startsWith('codes/') && header.type === 'file') {
-          // codes/<file> entries define codesets used by code-token validation.
+          // codes/<file> entries define codesets used by code-slug validation.
           const buf = await streamToBuffer(stream);
           const parsed = JSON.parse(buf.toString('utf-8')) as Record<string, unknown>;
           const categories =
@@ -124,7 +124,7 @@ export async function extractBlocksFromArchive(inputStream: Readable): Promise<I
               : parsed;
 
           for (const [categoryKey, categoryValue] of Object.entries(categories)) {
-            codesetByCategory[categoryKey] = categoryValue;
+            codesets[categoryKey] = categoryValue;
           }
         } else if (entryName.endsWith('.json') && !entryName.includes('/')) {
           // Root-level JSON file → parse as blocks
@@ -170,7 +170,7 @@ export async function extractBlocksFromArchive(inputStream: Readable): Promise<I
     allBlocks.push(...blocks);
   }
 
-  return { datasetId, blocksByType, allBlocks, mediaFileNames, codesetByCategory };
+  return { datasetId, blocksByType, allBlocks, mediaFileNames, codesets };
 }
 
 /**

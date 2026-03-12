@@ -43,6 +43,87 @@ export class ContributorRepository extends BaseRepository {
   }
 
   /**
+   * Get the contributor linked to a submission upload.
+   *
+   * @param {string} submissionUploadId
+   * @return {Promise<GetContributor>}
+   * @memberof ContributorRepository
+   */
+  async getContributorBySubmissionUploadId(submissionUploadId: string): Promise<GetContributor> {
+    const sql = SQL`
+      SELECT
+        c.contributor_id,
+        c.client_id
+      FROM submission_upload su
+      INNER JOIN submission s ON s.submission_id = su.submission_id
+      INNER JOIN contributor_system_user csu ON csu.system_user_id = s.system_user_id
+      INNER JOIN contributor c ON c.contributor_id = csu.contributor_id
+      WHERE su.submission_upload_id = ${submissionUploadId}
+        AND s.record_end_date IS NULL
+        AND csu.record_end_date IS NULL
+        AND c.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sql, GetContributor);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Contributor not found for submission upload', [
+        'ContributorRepository->getContributorBySubmissionUploadId',
+        { submissionUploadId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'ContributorRepository->getContributorBySubmissionUploadId',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get the contributor linked to a submission.
+   *
+   * @param {number} submissionId
+   * @return {Promise<GetContributor>}
+   * @memberof ContributorRepository
+   */
+  async getContributorBySubmissionId(submissionId: number): Promise<GetContributor> {
+    const sql = SQL`
+      SELECT
+        c.contributor_id,
+        c.client_id
+      FROM submission s
+      INNER JOIN contributor_system_user csu ON csu.system_user_id = s.system_user_id
+      INNER JOIN contributor c ON c.contributor_id = csu.contributor_id
+      WHERE s.submission_id = ${submissionId}
+        AND s.record_end_date IS NULL
+        AND csu.record_end_date IS NULL
+        AND c.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sql, GetContributor);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Contributor not found for submission', [
+        'ContributorRepository->getContributorBySubmissionId',
+        { submissionId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'ContributorRepository->getContributorBySubmissionId',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
    * Check if a contributor exists for a given clientId (active records only)
    *
    * @param {string} clientId

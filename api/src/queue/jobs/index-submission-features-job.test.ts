@@ -24,7 +24,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       id,
       name: 'index-submission-features',
       data: { submissionId }
-    } as PgBoss.Job<IIndexSubmissionFeaturesJobData>);
+    } as unknown as PgBoss.Job<IIndexSubmissionFeaturesJobData>);
 
   it('should index submission successfully', async () => {
     const mockDBConnection = getMockDBConnection();
@@ -41,6 +41,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
 
     await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
 
+    expect(indexStub).to.have.been.calledOnce;
     expect(indexStub).to.have.been.calledOnceWith(777);
     expect(commitStub).to.have.been.calledOnce;
     expect(releaseStub).to.have.been.calledOnce;
