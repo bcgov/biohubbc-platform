@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection } from '../../../database/db';
+import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import {
   featureSearchRequestBodySchema,
@@ -18,6 +18,11 @@ export const POST: Operation = [searchFeatures()];
 POST.apiDoc = {
   description: 'Search for features by keyword and optional filters.',
   tags: ['search'],
+  security: [
+    {
+      OptionalBearer: []
+    }
+  ],
   requestBody: featureSearchRequestBodySchema,
   responses: {
     200: {
@@ -33,14 +38,22 @@ POST.apiDoc = {
 /**
  * Search for features by keywords and/or property filters.
  *
+ * Supports optional authentication via OptionalBearer. When authenticated,
+ * secured features the user has access to (via team_feature cache) are
+ * included alongside unsecured features. Anonymous requests see only
+ * unsecured features.
+ *
  * @returns {RequestHandler}
  */
 export function searchFeatures(): RequestHandler {
   return async (req, res) => {
-    const connection = getAPIUserDBConnection();
+    const isAuthenticated = !!req.keycloak_token;
+    const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     try {
       await connection.open();
+
+      const systemUserId = isAuthenticated ? connection.systemUserId() : null;
 
       const filters = req.body.filters as ISearchFeaturesFilters;
 
@@ -49,8 +62,8 @@ export function searchFeatures(): RequestHandler {
       const pagination = makePaginationOptionsFromBody(req);
 
       const [features, count] = await Promise.all([
-        service.searchFeatures(filters, pagination),
-        service.getSearchFeaturesCount(filters)
+        service.searchFeatures(filters, pagination, systemUserId),
+        service.getSearchFeaturesCount(filters, systemUserId)
       ]);
       await connection.commit();
 

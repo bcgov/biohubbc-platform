@@ -39,16 +39,23 @@ export class SearchFeatureService extends DBService {
    * Accepts multiple filter types (keywords, property filters, ITIS TSNs, property types)
    * and returns results matching all criteria with aggregated relevancy scores.
    *
+   * When systemUserId is provided, secured features are filtered by team_feature access:
+   * - null (anonymous): only unsecured features returned
+   * - number (authenticated): unsecured + team-authorized secured features returned
+   * - undefined (not passed): no security filtering (backward-compatible for internal callers)
+   *
    * @param {ISearchFeaturesFilters} filters - Search filter criteria
    * @param {ApiPaginationOptions} [pagination] - Optional pagination settings
+   * @param {number | null} [systemUserId] - Authenticated user's ID, null for anonymous, undefined to skip filtering
    * @return {Promise<SearchFeatureResultWithRelevancy[]>} Array of features sorted by relevancy
    */
   async searchFeatures(
     filters: ISearchFeaturesFilters,
-    pagination?: ApiPaginationOptions
+    pagination?: ApiPaginationOptions,
+    systemUserId?: number | null
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     defaultLog.debug({ label: 'searchFeatures', filters, pagination });
-    return this.searchFeatureRepository.searchFeaturesByFilters(filters, pagination);
+    return this.searchFeatureRepository.searchFeaturesByFilters(filters, pagination, systemUserId);
   }
 
   /**
@@ -56,12 +63,16 @@ export class SearchFeatureService extends DBService {
    * Accepts multiple filter types (keywords, property filters, ITIS TSNs, property types)
    * and returns the count of results matching all criteria.
    *
+   * Security filtering follows the same rules as searchFeatures — count must match the
+   * filtered result set so pagination numbers are accurate.
+   *
    * @param {ISearchFeaturesFilters} filters - Search filter criteria
+   * @param {number | null} [systemUserId] - Authenticated user's ID, null for anonymous, undefined to skip filtering
    * @return {Promise<number>} Total count of matching features
    */
-  async getSearchFeaturesCount(filters: ISearchFeaturesFilters): Promise<number> {
+  async getSearchFeaturesCount(filters: ISearchFeaturesFilters, systemUserId?: number | null): Promise<number> {
     defaultLog.debug({ label: 'getSearchFeaturesCount', filters });
-    return this.searchFeatureRepository.searchFeaturesByFiltersCount(filters);
+    return this.searchFeatureRepository.searchFeaturesByFiltersCount(filters, systemUserId);
   }
 
   /**

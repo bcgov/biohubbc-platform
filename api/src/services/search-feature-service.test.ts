@@ -620,7 +620,29 @@ describe('SearchFeatureService', () => {
 
       await searchFeatureService.searchFeatures({ keyword: 'data' }, { page: 1, limit: 10 });
 
-      expect(searchStub).to.be.calledOnceWith({ keyword: 'data' }, { page: 1, limit: 10 });
+      expect(searchStub).to.be.calledOnceWith({ keyword: 'data' }, { page: 1, limit: 10 }, undefined);
+    });
+
+    it('should forward systemUserId to repository when provided', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+
+      const searchStub = sinon.stub(SearchFeatureRepository.prototype, 'searchFeaturesByFilters').resolves([]);
+
+      await searchFeatureService.searchFeatures({ keyword: 'moose' }, undefined, 42);
+
+      expect(searchStub).to.be.calledOnceWith({ keyword: 'moose' }, undefined, 42);
+    });
+
+    it('should forward null systemUserId to repository for anonymous searches', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+
+      const searchStub = sinon.stub(SearchFeatureRepository.prototype, 'searchFeaturesByFilters').resolves([]);
+
+      await searchFeatureService.searchFeatures({ keyword: 'moose' }, undefined, null);
+
+      expect(searchStub).to.be.calledOnceWith({ keyword: 'moose' }, undefined, null);
     });
 
     it('should return empty array for no matches', async () => {
@@ -700,6 +722,28 @@ describe('SearchFeatureService', () => {
       const result = await searchFeatureService.getSearchFeaturesCount({ keyword: 'nonexistent' });
 
       expect(result).to.equal(0);
+    });
+
+    it('should forward systemUserId to repository when provided', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+
+      const countStub = sinon.stub(SearchFeatureRepository.prototype, 'searchFeaturesByFiltersCount').resolves(5);
+
+      await searchFeatureService.getSearchFeaturesCount({ keyword: 'moose' }, 42);
+
+      expect(countStub).to.be.calledOnceWith({ keyword: 'moose' }, 42);
+    });
+
+    it('should forward null systemUserId to repository for anonymous searches', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+
+      const countStub = sinon.stub(SearchFeatureRepository.prototype, 'searchFeaturesByFiltersCount').resolves(3);
+
+      await searchFeatureService.getSearchFeaturesCount({ keyword: 'moose' }, null);
+
+      expect(countStub).to.be.calledOnceWith({ keyword: 'moose' }, null);
     });
   });
 });

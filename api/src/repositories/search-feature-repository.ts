@@ -155,7 +155,8 @@ export class SearchFeatureRepository extends BaseRepository {
    */
   async searchFeaturesByFilters(
     filters: ISearchFeaturesFilters,
-    pagination?: ApiPaginationOptions
+    pagination?: ApiPaginationOptions,
+    systemUserId?: number | null
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     defaultLog.debug({ label: 'searchFeaturesByFilters', filters, pagination });
 
@@ -165,7 +166,7 @@ export class SearchFeatureRepository extends BaseRepository {
     }
 
     const knex = getKnex();
-    let query = this.buildSearchQuery(knex, filters);
+    let query = this.buildSearchQuery(knex, filters, systemUserId);
 
     // Apply pagination and sorting using base repository method
     query = this.applyPagination(query, pagination);
@@ -180,10 +181,10 @@ export class SearchFeatureRepository extends BaseRepository {
    * @param {ISearchFeaturesFilters} filters - Search filters to count results for
    * @returns {Promise<number>} Promise resolving to the count of matching features
    */
-  async searchFeaturesByFiltersCount(filters: ISearchFeaturesFilters): Promise<number> {
+  async searchFeaturesByFiltersCount(filters: ISearchFeaturesFilters, systemUserId?: number | null): Promise<number> {
     defaultLog.debug({ label: 'searchFeaturesByFiltersCount', filters });
     const knex = getKnex();
-    const query = this.buildSearchQuery(knex, filters);
+    const query = this.buildSearchQuery(knex, filters, systemUserId);
     const countQuery = knex.from(query.as('sf_filtered')).select(knex.raw('count(*)::integer as count'));
     const response = await this.connection.knex(countQuery);
     return response.rows[0]?.count ?? 0;
@@ -219,12 +220,16 @@ export class SearchFeatureRepository extends BaseRepository {
    * @param {ISearchFeaturesFilters} filters - Search filters to apply
    * @returns {Knex.QueryBuilder} Knex query builder with all filters applied
    */
-  private buildSearchQuery(knex: Knex, filters: ISearchFeaturesFilters): Knex.QueryBuilder {
+  private buildSearchQuery(
+    knex: Knex,
+    filters: ISearchFeaturesFilters,
+    systemUserId?: number | null
+  ): Knex.QueryBuilder {
     const keyword = filters.keyword ?? '';
     const featureTypes = filters.feature_types ?? [];
     const speciesFilters = filters.species ?? [];
     const propertyGroups = filters.properties ?? [];
-    return this.buildQueryWithCTEs(knex, keyword, featureTypes, speciesFilters, propertyGroups);
+    return this.buildQueryWithCTEs(knex, keyword, featureTypes, speciesFilters, propertyGroups, systemUserId);
   }
 
   /**
@@ -241,7 +246,8 @@ export class SearchFeatureRepository extends BaseRepository {
     keyword: string,
     featureTypes: string[],
     speciesFilters: string[],
-    propertyGroups: ISearchFeaturePropertyGroup[]
+    propertyGroups: ISearchFeaturePropertyGroup[],
+    systemUserId?: number | null
   ): Knex.QueryBuilder {
     const activeCteCount = [keyword.trim(), featureTypes.length, speciesFilters.length, propertyGroups.length].filter(
       (v) => {
@@ -351,7 +357,7 @@ export class SearchFeatureRepository extends BaseRepository {
           );
       });
 
-    return query
+    const finalQuery = query
       .select(
         'submission_feature_id',
         'submission_id',
@@ -366,6 +372,24 @@ export class SearchFeatureRepository extends BaseRepository {
         'create_date'
       )
       .from('aggregated_results');
+
+    // Apply security filter when systemUserId is explicitly provided.
+    // undefined = no filtering (backward-compatible for internal callers like searchFeatureIdsByFilters).
+    // null = anonymous user, only unsecured features visible.
+    // number = authenticated user, unsecured + team_feature-authorized secured features visible.
+    if (systemUserId !== undefined) {
+      const accessFilter = this.buildUserAccessFilter(knex, systemUserId);
+
+      if (accessFilter) {
+        finalQuery.where((qb) => {
+          qb.where('is_secured', false).orWhereIn('submission_feature_id', accessFilter);
+        });
+      } else {
+        finalQuery.where('is_secured', false);
+      }
+    }
+
+    return finalQuery;
   }
 
   /**
@@ -649,6 +673,31 @@ export class SearchFeatureRepository extends BaseRepository {
         return query;
       }
     }
+  }
+
+  /**
+   * Builds a subquery returning submission_feature_ids the user can access via the
+   * team_feature cache (team membership → team_feature). Used to gate secured features
+   * in search results — only features cached for the user's teams are visible.
+   *
+   * Returns null when systemUserId is null (anonymous), meaning no secured features
+   * are accessible. The caller uses null to simplify the WHERE clause to
+   * `is_secured = false` (unsecured only).
+   *
+   * @param knex - Knex instance
+   * @param systemUserId - Authenticated user's ID, or null for anonymous
+   * @returns Knex subquery selecting accessible submission_feature_ids, or null for anonymous
+   */
+  private buildUserAccessFilter(knex: Knex, systemUserId: number | null): Knex.QueryBuilder | null {
+    if (!systemUserId) {
+      return null;
+    }
+
+    return knex('team_feature as tf')
+      .select('tf.submission_feature_id')
+      .join('team_member as tm', 'tm.team_id', 'tf.team_id')
+      .where('tm.system_user_id', systemUserId)
+      .whereNull('tm.record_end_date');
   }
 
   /**

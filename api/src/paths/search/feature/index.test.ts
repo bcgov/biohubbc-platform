@@ -230,6 +230,83 @@ describe('searchFeatures', () => {
     });
   });
 
+  it('should use getDBConnection when Bearer token is present and pass systemUserId', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves(),
+      open: sinon.stub().resolves(),
+      systemUserId: () => 42
+    });
+    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    mockReq.keycloak_token = { sub: 'user-uuid' };
+
+    const mockResults: SearchFeatureResultWithRelevancy[] = [
+      {
+        submission_feature_id: 1,
+        submission_id: 10,
+        uuid: '550e8400-e29b-41d4-a716-446655440001',
+        feature_type_id: 1,
+        feature_type_name: 'dataset',
+        feature_name: 'Moose Study',
+        feature_description: 'A study of moose',
+        submission_name: 'Wildlife Project',
+        is_secured: false,
+        relevancy_score: 0.75,
+        create_date: dayjs().toISOString()
+      }
+    ];
+
+    mockReq.body = {
+      filters: { keyword: 'moose' },
+      pagination: { page: '1', limit: '10' }
+    };
+
+    const searchStub = sinon.stub(SearchFeatureService.prototype, 'searchFeatures').resolves(mockResults);
+    const countStub = sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(1);
+
+    const requestHandler = search.searchFeatures();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(mockRes.statusValue).to.equal(200);
+    expect(searchStub).to.have.been.calledOnce;
+    expect(searchStub.firstCall.args[2]).to.equal(42);
+    expect(countStub).to.have.been.calledOnce;
+    expect(countStub.firstCall.args[1]).to.equal(42);
+  });
+
+  it('should pass null systemUserId for anonymous requests', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves(),
+      open: sinon.stub().resolves()
+    });
+    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    mockReq.body = {
+      filters: { keyword: 'moose' },
+      pagination: { page: '1', limit: '10' }
+    };
+
+    const searchStub = sinon.stub(SearchFeatureService.prototype, 'searchFeatures').resolves([]);
+    const countStub = sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(0);
+
+    const requestHandler = search.searchFeatures();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(mockRes.statusValue).to.equal(200);
+    expect(searchStub).to.have.been.calledOnce;
+    expect(searchStub.firstCall.args[2]).to.equal(null);
+    expect(countStub).to.have.been.calledOnce;
+    expect(countStub.firstCall.args[1]).to.equal(null);
+  });
+
   it('should handle errors and rollback', async () => {
     const dbConnectionObj = getMockDBConnection({
       commit: sinon.stub().resolves(),
