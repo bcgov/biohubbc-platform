@@ -18,6 +18,7 @@ import { getMockDBConnection } from '../../__mocks__/db';
 import { CodeService } from '../code-service';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { DownloadPipelineService } from './download-pipeline-service';
+import { DownloadService } from './download-service';
 
 chai.use(sinonChai);
 
@@ -315,7 +316,7 @@ describe('DownloadPipelineService', () => {
   });
 
   describe('estimateDownloadSize', () => {
-    it('sums per-feature sizes for totalEstimatedBytes', async () => {
+    it('sums per-feature sizes via verified DownloadService path', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
@@ -323,7 +324,7 @@ describe('DownloadPipelineService', () => {
         { submission_feature_id: 1, feature_type_name: 'observation', estimated_byte_size: '120', submission_id: 1 },
         { submission_feature_id: 2, feature_type_name: 'sample', estimated_byte_size: '80', submission_id: 1 }
       ];
-      sinon.stub(DownloadRepository.prototype, 'getDownloadFeatureSummaries').resolves(features);
+      sinon.stub(DownloadService.prototype, 'getAuthorizedDownloadFeatures').resolves(features);
 
       const result = await service.estimateDownloadSize('aaaa0000-0000-0000-0000-000000000001');
 
@@ -335,7 +336,7 @@ describe('DownloadPipelineService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      sinon.stub(DownloadRepository.prototype, 'getDownloadFeatureSummaries').resolves([]);
+      sinon.stub(DownloadService.prototype, 'getAuthorizedDownloadFeatures').resolves([]);
 
       const result = await service.estimateDownloadSize('aaaa0000-0000-0000-0000-000000000001');
 
@@ -487,4 +488,3 @@ describe('DownloadPipelineService', () => {
     });
   });
 });
-

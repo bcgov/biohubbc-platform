@@ -448,4 +448,61 @@ describe('DownloadService', () => {
       }
     });
   });
+
+  describe('getAuthorizedDownloadFeatures', () => {
+    it('combines unsecured and secured features when verification passes', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const unsecured = [
+        { submission_feature_id: 1, submission_id: 100, feature_type_name: 'dataset', estimated_byte_size: '500' }
+      ];
+      const secured = [
+        { submission_feature_id: 2, submission_id: 100, feature_type_name: 'observation', estimated_byte_size: '300' }
+      ];
+
+      sinon.stub(DownloadRepository.prototype, 'getUnsecuredDownloadFeatures').resolves(unsecured);
+      sinon.stub(DownloadRepository.prototype, 'getSecuredAuthorizedFeatures').resolves(secured);
+      sinon.stub(DownloadRepository.prototype, 'getSecuredFeatureIds').resolves(new Set());
+
+      const result = await service.getAuthorizedDownloadFeatures('dl-1');
+
+      expect(result).to.have.length(2);
+      expect(result[0].submission_feature_id).to.equal(1);
+      expect(result[1].submission_feature_id).to.equal(2);
+    });
+
+    it('excludes misclassified features and logs security alert', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const unsecured = [
+        { submission_feature_id: 1, submission_id: 100, feature_type_name: 'dataset', estimated_byte_size: '500' },
+        { submission_feature_id: 2, submission_id: 100, feature_type_name: 'observation', estimated_byte_size: '300' }
+      ];
+
+      sinon.stub(DownloadRepository.prototype, 'getUnsecuredDownloadFeatures').resolves(unsecured);
+      sinon.stub(DownloadRepository.prototype, 'getSecuredAuthorizedFeatures').resolves([]);
+      // Feature 2 is actually secured — verification catches it
+      sinon.stub(DownloadRepository.prototype, 'getSecuredFeatureIds').resolves(new Set([2]));
+
+      const result = await service.getAuthorizedDownloadFeatures('dl-1');
+
+      expect(result).to.have.length(1);
+      expect(result[0].submission_feature_id).to.equal(1);
+    });
+
+    it('returns empty when all features are secured and none authorized', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      sinon.stub(DownloadRepository.prototype, 'getUnsecuredDownloadFeatures').resolves([]);
+      sinon.stub(DownloadRepository.prototype, 'getSecuredAuthorizedFeatures').resolves([]);
+      sinon.stub(DownloadRepository.prototype, 'getSecuredFeatureIds').resolves(new Set());
+
+      const result = await service.getAuthorizedDownloadFeatures('dl-1');
+
+      expect(result).to.deep.equal([]);
+    });
+  });
 });

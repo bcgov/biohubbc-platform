@@ -1,4 +1,5 @@
 import SQL from 'sql-template-strings';
+import { z } from 'zod';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
@@ -15,7 +16,6 @@ import {
 import { DownloadStatusEnum } from '../../models/download-status';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
-
 
 /**
  * A repository class for accessing download data.
@@ -263,62 +263,112 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Get authorized feature summaries for a download.
+   * Returns features in a download that have NO active security rule.
    *
-   * Returns features linked via download_feature that the download is authorized to include.
-   * A feature is included if it is unsecured (no active security rule) OR if a user on
-   * the download's ownership team belongs to a policy team with a matching ALLOW statement.
-   *
-   * Policy chain: download_team → team_member → (same user's policy teams) →
-   * team_policy → policy_statement. Anonymous downloads (no download_team rows)
-   * only get unsecured features.
+   * A feature is unsecured if no row exists in submission_feature_security with
+   * record_end_date IS NULL — including future-dated rules (no effective_date
+   * filter). This is intentionally strict: a feature is secured as soon as a
+   * rule is created, not when it takes effect.
    *
    * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadFeatureSummary[]>}
+   * @return {Promise<DownloadFeatureSummary[]>} Unsecured features.
    * @memberof DownloadRepository
    */
-  async getDownloadFeatureSummaries(downloadId: string): Promise<DownloadFeatureSummary[]> {
+  async getUnsecuredDownloadFeatures(downloadId: string): Promise<DownloadFeatureSummary[]> {
     const sql = SQL`
       SELECT
         sf.submission_feature_id,
         sf.submission_id,
-        ft.name as feature_type_name,
-        sf.data_byte_size as estimated_byte_size
+        ft.name AS feature_type_name,
+        sf.data_byte_size AS estimated_byte_size
       FROM download_feature df
       INNER JOIN submission_feature sf ON df.submission_feature_id = sf.submission_feature_id
       INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
       WHERE df.download_id = ${downloadId}
-        AND (
-          -- Unsecured features: no active security rule
-          NOT EXISTS (
-            SELECT 1
-            FROM submission_feature_security sfs
-            WHERE sfs.submission_feature_id = sf.submission_feature_id
-              AND sfs.record_end_date IS NULL
-              AND sfs.record_effective_date <= NOW()
-          )
-          OR
-          -- Secured features: a user on this download's ownership team has a policy team with a matching ALLOW
-          EXISTS (
-            SELECT 1
-            FROM download_team dt
-            INNER JOIN team_member tm_dl ON tm_dl.team_id = dt.team_id AND tm_dl.record_end_date IS NULL
-            INNER JOIN team_member tm_pol ON tm_pol.system_user_id = tm_dl.system_user_id AND tm_pol.record_end_date IS NULL
-            INNER JOIN team_policy tp ON tp.team_id = tm_pol.team_id AND tp.record_end_date IS NULL
-            INNER JOIN policy_statement ps ON ps.policy_id = tp.policy_id AND ps.record_end_date IS NULL
-            WHERE dt.download_id = ${downloadId}
-              AND dt.record_end_date IS NULL
-              AND ps.effect = 'allow'
-              AND (ps.urn_submission_id = sf.submission_id::text OR ps.urn_submission_id = '*')
-              AND (ps.urn_feature_type = ft.name OR ps.urn_feature_type = '*')
-              AND (ps.urn_feature_id = sf.submission_feature_id::text OR ps.urn_feature_id = '*')
-          )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM submission_feature_security sfs
+          WHERE sfs.submission_feature_id = sf.submission_feature_id
+            AND sfs.record_end_date IS NULL
         );
     `;
 
     const response = await this.connection.sql(sql, DownloadFeatureSummary);
-
     return response.rows;
+  }
+
+  /**
+   * Returns features in a download that have active security rules AND the
+   * download's team members have policy access to view them.
+   *
+   * Policy chain: download_team → team_member (download team) → team_member
+   * (same user, policy teams) → team_policy → policy_statement (ALLOW).
+   *
+   * @param {string} downloadId - The download ID.
+   * @return {Promise<DownloadFeatureSummary[]>} Secured, authorized features.
+   * @memberof DownloadRepository
+   */
+  async getSecuredAuthorizedFeatures(downloadId: string): Promise<DownloadFeatureSummary[]> {
+    const sql = SQL`
+      SELECT
+        sf.submission_feature_id,
+        sf.submission_id,
+        ft.name AS feature_type_name,
+        sf.data_byte_size AS estimated_byte_size
+      FROM download_feature df
+      INNER JOIN submission_feature sf ON df.submission_feature_id = sf.submission_feature_id
+      INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
+      WHERE df.download_id = ${downloadId}
+        AND EXISTS (
+          SELECT 1
+          FROM submission_feature_security sfs
+          WHERE sfs.submission_feature_id = sf.submission_feature_id
+            AND sfs.record_end_date IS NULL
+        )
+        AND EXISTS (
+          SELECT 1
+          FROM download_team dt
+          INNER JOIN team_member tm_dl ON tm_dl.team_id = dt.team_id AND tm_dl.record_end_date IS NULL
+          INNER JOIN team_member tm_pol ON tm_pol.system_user_id = tm_dl.system_user_id AND tm_pol.record_end_date IS NULL
+          INNER JOIN team_policy tp ON tp.team_id = tm_pol.team_id AND tp.record_end_date IS NULL
+          INNER JOIN policy_statement ps ON ps.policy_id = tp.policy_id AND ps.record_end_date IS NULL
+          WHERE dt.download_id = ${downloadId}
+            AND dt.record_end_date IS NULL
+            AND ps.effect = 'allow'
+            AND (ps.urn_submission_id = sf.submission_id::text OR ps.urn_submission_id = '*')
+            AND (ps.urn_feature_type = ft.name OR ps.urn_feature_type = '*')
+            AND (ps.urn_feature_id = sf.submission_feature_id::text OR ps.urn_feature_id = '*')
+        );
+    `;
+
+    const response = await this.connection.sql(sql, DownloadFeatureSummary);
+    return response.rows;
+  }
+
+  /**
+   * Returns which of the given feature IDs have active security rules.
+   *
+   * This query is intentionally trivial — it must be obviously correct so it
+   * can serve as a reliable cross-check against the more complex query logic.
+   *
+   * @param {number[]} submissionFeatureIds - Feature IDs to check.
+   * @return {Promise<Set<number>>} Set of feature IDs that are secured.
+   * @memberof DownloadRepository
+   */
+  async getSecuredFeatureIds(submissionFeatureIds: number[]): Promise<Set<number>> {
+    if (submissionFeatureIds.length === 0) {
+      return new Set();
+    }
+
+    const sql = SQL`
+      SELECT DISTINCT submission_feature_id
+      FROM submission_feature_security
+      WHERE submission_feature_id = ANY(${submissionFeatureIds}::int[])
+        AND record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sql, z.object({ submission_feature_id: z.number() }));
+    return new Set(response.rows.map((r) => r.submission_feature_id));
   }
 
   /**

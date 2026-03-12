@@ -13,10 +13,13 @@ import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { getLogger } from '../../utils/logger';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+
+const defaultLog = getLogger('services/download-service');
 
 /**
  * Request-time service for downloads.
@@ -133,18 +136,44 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * Get authorized feature summaries for a download.
+   * Returns authorized feature summaries for a download with defense-in-depth.
    *
-   * Security filtering is handled in the repository SQL query — unsecured features
-   * are always included, secured features require a matching ALLOW policy via the
-   * download's ownership team → user → policy team chain.
+   * **Layer 1 — Two independent queries:**
+   * Unsecured and secured+authorized features are fetched separately. A bug in
+   * one query cannot affect the other — they share no SQL context.
+   *
+   * **Layer 2 — Cross-check verification:**
+   * Features returned as "unsecured" are verified against a trivially simple
+   * independent query. Any disagreement → feature excluded + security alert.
    *
    * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadFeatureSummary[]>}
+   * @return {Promise<DownloadFeatureSummary[]>} Verified, authorized features.
    * @memberof DownloadService
    */
-  async getDownloadFeatureSummaries(downloadId: string): Promise<DownloadFeatureSummary[]> {
-    return this.downloadRepository.getDownloadFeatureSummaries(downloadId);
+  async getAuthorizedDownloadFeatures(downloadId: string): Promise<DownloadFeatureSummary[]> {
+    // Layer 1: Two independent queries
+    const [unsecuredFeatures, securedFeatures] = await Promise.all([
+      this.downloadRepository.getUnsecuredDownloadFeatures(downloadId),
+      this.downloadRepository.getSecuredAuthorizedFeatures(downloadId)
+    ]);
+
+    // Layer 2: Verify unsecured classification
+    const unsecuredIds = unsecuredFeatures.map((f) => f.submission_feature_id);
+    const actuallySecuredIds = await this.downloadRepository.getSecuredFeatureIds(unsecuredIds);
+
+    if (actuallySecuredIds.size > 0) {
+      defaultLog.error({
+        label: 'getAuthorizedDownloadFeatures',
+        message: 'SECURITY ALERT: features classified as unsecured have active security rules — excluding',
+        downloadId,
+        misclassifiedFeatureIds: [...actuallySecuredIds]
+      });
+    }
+
+    // Fail-closed: exclude any misclassified features
+    const verifiedUnsecured = unsecuredFeatures.filter((f) => !actuallySecuredIds.has(f.submission_feature_id));
+
+    return [...verifiedUnsecured, ...securedFeatures];
   }
 
   /**
@@ -233,7 +262,12 @@ export class DownloadService extends DBService {
    * @return {Promise<void>}
    * @memberof DownloadService
    */
-  async linkDownloadToNewTeam(downloadId: string, systemUserId: number, name: string, description: string): Promise<void> {
+  async linkDownloadToNewTeam(
+    downloadId: string,
+    systemUserId: number,
+    name: string,
+    description: string
+  ): Promise<void> {
     const team = await this.teamService.createTeam({
       name,
       description,
@@ -268,7 +302,12 @@ export class DownloadService extends DBService {
       throw new HTTP409('Download already claimed');
     }
 
-    await this.linkDownloadToNewTeam(downloadId, systemUserId, `Team for cart ${downloadId}`, 'Team created when claiming anonymous download');
+    await this.linkDownloadToNewTeam(
+      downloadId,
+      systemUserId,
+      `Team for cart ${downloadId}`,
+      'Team created when claiming anonymous download'
+    );
   }
 
   /**

@@ -18,6 +18,7 @@ import { getLogger } from '../../utils/logger';
 import { CodeService } from '../code-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { DownloadService } from './download-service';
 
 const defaultLog = getLogger('services/download-pipeline-service');
 
@@ -49,11 +50,13 @@ interface FileFeatureRef {
 export class DownloadPipelineService extends DBService {
   downloadRepository: DownloadRepository;
   fragmentRepository: DownloadFragmentRepository;
+  downloadService: DownloadService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
     this.fragmentRepository = new DownloadFragmentRepository(connection);
+    this.downloadService = new DownloadService(connection);
   }
 
   /**
@@ -87,14 +90,15 @@ export class DownloadPipelineService extends DBService {
    * Estimate the total download size and plan fragmentation.
    *
    * Uses pre-computed data_byte_size which includes JSONB size + CSV overhead + artifact file size.
-   * Security filtering is handled in the repository query (SQL-level NOT EXISTS / EXISTS).
+   * Routes through DownloadService.getAuthorizedDownloadFeatures() which applies
+   * defense-in-depth security (two independent queries + cross-check verification).
    *
    * @param {string} downloadId - The download ID.
    * @return {Promise<DownloadSizeEstimate>}
    * @memberof DownloadPipelineService
    */
   async estimateDownloadSize(downloadId: string): Promise<DownloadSizeEstimate> {
-    const features = await this.downloadRepository.getDownloadFeatureSummaries(downloadId);
+    const features = await this.downloadService.getAuthorizedDownloadFeatures(downloadId);
     const totalEstimatedBytes = features.reduce((sum, f) => sum + Number(f.estimated_byte_size), 0);
 
     return { totalEstimatedBytes, features };
