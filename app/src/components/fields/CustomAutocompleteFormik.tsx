@@ -22,7 +22,7 @@ export interface ICustomAutocompleteFormikProps<T extends string | number> exten
  */
 const CustomAutocompleteFormik = <T extends string | number>(props: ICustomAutocompleteFormikProps<T>) => {
   const { touched, errors, setFieldValue, values, submitCount } = useFormikContext<any>();
-  const { id, name, options, onChange, ...rest } = props;
+  const { id, name, options, onChange, label, ...rest } = props;
 
   const currentValue = get(values, name) as T | undefined;
   const selectedOption = options.find((option) => option.value === currentValue) ?? null;
@@ -34,6 +34,7 @@ const CustomAutocompleteFormik = <T extends string | number>(props: ICustomAutoc
       {...rest}
       id={id}
       data-testid={id}
+      label={label}
       options={options}
       value={selectedOption}
       isOptionEqualToValue={(option, value) => option.value === value.value}
@@ -41,7 +42,7 @@ const CustomAutocompleteFormik = <T extends string | number>(props: ICustomAutoc
         onChange?.(event, option);
         setFieldValue(name, option?.value);
       }}
-      renderInput={(params) => <CustomTextField {...params} error={showError} helperText={helperText} />}
+      renderInput={(params) => <CustomTextField {...params} label={label} error={showError} helperText={helperText} />}
     />
   );
 };

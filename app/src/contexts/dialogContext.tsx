@@ -2,6 +2,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import IconButton from '@mui/material/IconButton';
 import Snackbar from '@mui/material/Snackbar';
 import { ErrorDialog, IErrorDialogProps } from 'components/dialog/ErrorDialog';
+import { IOkDialogProps, OkDialog } from 'components/dialog/OkDialog';
 import YesNoDialog, { IYesNoDialogProps } from 'components/dialog/YesNoDialog';
 import { createContext, ReactNode, useState } from 'react';
 
@@ -36,6 +37,21 @@ export interface IDialogContext {
    * @memberof IDialogContext
    */
   errorDialogProps: IErrorDialogProps;
+  /**
+   * Set the ok dialog props.
+   *
+   * Note: Any props that are not provided, will default to whatever value was previously set (or the default value)
+   *
+   * @memberof IDialogContext
+   */
+  setOkDialog: (props: Partial<IOkDialogProps>) => void;
+  /**
+   * The current ok dialog props.
+   *
+   * @type {IOkDialogProps}
+   * @memberof IDialogContext
+   */
+  okDialogProps: IOkDialogProps;
   /**
    * Set the snackbar props.
    *
@@ -85,6 +101,15 @@ export const defaultErrorDialogProps: IErrorDialogProps = {
   }
 };
 
+export const defaultOkDialogProps: IOkDialogProps = {
+  dialogTitle: '',
+  dialogText: '',
+  open: false,
+  onClose: () => {
+    // default do nothing
+  }
+};
+
 export const defaultSnackbarProps: ISnackbarProps = {
   snackbarMessage: '',
   open: false
@@ -99,6 +124,10 @@ export const DialogContext = createContext<IDialogContext>({
     // default do nothing
   },
   errorDialogProps: defaultErrorDialogProps,
+  setOkDialog: () => {
+    // default do nothing
+  },
+  okDialogProps: defaultOkDialogProps,
   setSnackbar: () => {
     // default do nothing
   },
@@ -115,6 +144,7 @@ export const DialogContextProvider: React.FC<React.PropsWithChildren> = (props) 
   const [yesNoDialogProps, setYesNoDialogProps] = useState<IYesNoDialogProps>(defaultYesNoDialogProps);
 
   const [errorDialogProps, setErrorDialogProps] = useState<IErrorDialogProps>(defaultErrorDialogProps);
+  const [okDialogProps, setOkDialogProps] = useState<IOkDialogProps>(defaultOkDialogProps);
 
   const [snackbarProps, setSnackbarProps] = useState<ISnackbarProps>(defaultSnackbarProps);
 
@@ -130,6 +160,10 @@ export const DialogContextProvider: React.FC<React.PropsWithChildren> = (props) 
     setErrorDialogProps({ ...errorDialogProps, ...partialProps });
   };
 
+  const setOkDialog = function (partialProps: Partial<IOkDialogProps>) {
+    setOkDialogProps({ ...okDialogProps, ...partialProps });
+  };
+
   return (
     <DialogContext.Provider
       value={{
@@ -137,12 +171,15 @@ export const DialogContextProvider: React.FC<React.PropsWithChildren> = (props) 
         yesNoDialogProps,
         setErrorDialog,
         errorDialogProps,
+        setOkDialog,
+        okDialogProps,
         setSnackbar,
         snackbarProps
       }}>
       {props.children}
       <YesNoDialog {...yesNoDialogProps} />
       <ErrorDialog {...errorDialogProps} />
+      <OkDialog {...okDialogProps} />
       <Snackbar
         anchorOrigin={{
           vertical: 'bottom',

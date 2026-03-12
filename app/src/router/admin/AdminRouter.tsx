@@ -7,6 +7,7 @@ import BaseLayout from 'layouts/BaseLayout';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
 import { SubmissionsRouter } from './submission/SubmissionRouter';
+import { TicketsRouter } from './ticket/TicketsRouter';
 
 /**
  * Returns routes for system administrators
@@ -64,6 +65,23 @@ export const AdminRouter = () => {
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
                 fallback={<Navigate to="/forbidden" replace />}>
                 <ManagePoliciesPage />
+              </SystemRoleGuard>
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
+        }
+      />
+
+      {/* Tickets route */}
+      <Route
+        path="tickets/*"
+        element={
+          <BaseLayout>
+            <PageTitle title="Tickets" description="Manage administrative tickets" />
+            <AuthenticatedRouteGuard>
+              <SystemRoleGuard
+                validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                fallback={<Navigate to="/forbidden" replace />}>
+                <TicketsRouter />
               </SystemRoleGuard>
             </AuthenticatedRouteGuard>
           </BaseLayout>
