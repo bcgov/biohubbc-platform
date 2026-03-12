@@ -121,6 +121,27 @@ export const useCartApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Get features in a cart, with optional filters and pagination.
+   *
+   * @param {string} cartId - The cart ID to fetch features for.
+   * @param {object} [params] - Optional query parameters.
+   * @param {number} [params.submissionFeatureId] - Filter to a specific submission feature ID.
+   * @param {ApiPaginationRequestOptions} [params.pagination] - Optional pagination parameters.
+   * @return {Promise<CartFeatureListResponse>} Cart features with pagination.
+   */
+  const getCartFeatures = async (
+    cartId: string,
+    params?: { submissionFeatureId?: number; pagination?: ApiPaginationRequestOptions }
+  ): Promise<CartFeatureListResponse> => {
+    const { data } = await axios.get<CartFeatureListResponse>(`/api/cart/${cartId}/feature`, {
+      params: { submissionFeatureId: params?.submissionFeatureId, ...params?.pagination },
+      paramsSerializer: (p) => qs.stringify(p)
+    });
+
+    return data;
+  };
+
+  /**
    * Check if a submission feature is in the cart.
    *
    * @param {string} cartId - The cart ID to check.
@@ -149,6 +170,7 @@ export const useCartApi = (axios: AxiosInstance) => {
     createCart,
     assignCartToCurrentUser,
     getCartById,
+    getCartFeatures,
     addCartFeatures,
     removeCartFeatureById,
     clearCart,
