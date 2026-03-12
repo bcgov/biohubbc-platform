@@ -21,46 +21,47 @@ WITH deployments AS (
     WHERE ft_dep.name = 'telemetry_deployment'
       AND dep.record_end_date IS NULL
 ),
-related_targets AS (
+
+related_features AS (
     SELECT
-      sff.source_feature_id AS deployment_id,
-      sff.target_feature_id AS related_feature_id
-    FROM submission_feature_feature sff
-    JOIN deployments d ON sff.source_feature_id = d.submission_feature_id
-),
-related_sources AS (
-    SELECT
-      sff.target_feature_id AS deployment_id,
-      sff.source_feature_id AS related_feature_id
-    FROM submission_feature_feature sff
-    JOIN deployments d ON sff.target_feature_id = d.submission_feature_id
-),
-related_feature_ids AS (
-    SELECT DISTINCT related_feature_id
-    FROM related_targets
+        sff.source_feature_id AS deployment_id,
+        sff.target_feature_id AS related_feature_id
+    FROM biohub.submission_feature_feature sff
+    JOIN deployments d
+      ON sff.source_feature_id = d.submission_feature_id
+
     UNION
-    SELECT DISTINCT related_feature_id
-    FROM related_sources
+
+    SELECT
+        sff.target_feature_id AS deployment_id,
+        sff.source_feature_id AS related_feature_id
+    FROM biohub.submission_feature_feature sff
+    JOIN deployments d
+      ON sff.target_feature_id = d.submission_feature_id
 ),
+
 related_animals AS (
     SELECT
-      sf.submission_feature_id,
-      sf.data->>'taxon_id' AS taxon_id,
-      sf.data->>'sex' AS sex,
-      sf.data->>'animal_identifier' AS related_animal_identifier
-    FROM biohub.submission_feature sf
+        rf.deployment_id,
+        sf.submission_feature_id AS animal_feature_id,
+        sf.data->>'taxon_id' AS taxon_id,
+        sf.data->>'sex' AS sex,
+        sf.data->>'animal_identifier' AS related_animal_identifier
+    FROM related_features rf
+    JOIN biohub.submission_feature sf
+      ON sf.submission_feature_id = rf.related_feature_id
     JOIN biohub.feature_type ft_animal
       ON sf.feature_type_id = ft_animal.feature_type_id
     WHERE ft_animal.name = 'animal'
       AND sf.record_end_date IS NULL
-      AND sf.submission_feature_id IN (SELECT related_feature_id FROM related_feature_ids)
 )
+
 SELECT
     sf.submission_feature_id AS Feature_ID,
     d.animal_id,
     d.device_key,
     (sf.data->>'timestamp')::timestamptz AS DATETIME,
-    (EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz))::int AS YEAR,
+    EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz)::int AS YEAR,
     (sf.data->>'latitude')::numeric AS Latitude,
     (sf.data->>'longitude')::numeric AS Longitude,
     (sf.data->>'dop')::numeric AS dop,
@@ -68,19 +69,24 @@ SELECT
     ra.sex AS animal_sex,
     ra.related_animal_identifier AS related_animal_identifier,
     CASE
-      WHEN sf.submission_feature_id IN (
-        SELECT submission_feature_id
-        FROM biohub.submission_feature_security
+      WHEN EXISTS (
+        SELECT 1
+        FROM biohub.submission_feature_security sfs
+        WHERE sfs.submission_feature_id = sf.submission_feature_id
       ) THEN 'Secured'
       ELSE 'Open'
     END AS SECURITY
+
 FROM biohub.submission_feature sf
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
+
 LEFT JOIN deployments d
   ON d.submission_feature_id = sf.parent_submission_feature_id
+
 LEFT JOIN related_animals ra
-  ON ra.submission_feature_id = d.submission_feature_id
+  ON ra.deployment_id = d.submission_feature_id
+
 WHERE ft.name = 'telemetry'
   AND sf.record_end_date IS NULL
   AND (sf.data->>'timestamp')::timestamptz <= (NOW() - INTERVAL '3 months');
@@ -118,14 +124,14 @@ related_targets AS (
     SELECT
       sff.source_feature_id AS deployment_id,
       sff.target_feature_id AS related_feature_id
-    FROM submission_feature_feature sff
+    FROM biohub.submission_feature_feature sff
     JOIN deployments d ON sff.source_feature_id = d.submission_feature_id
 ),
 related_sources AS (
     SELECT
       sff.target_feature_id AS deployment_id,
       sff.source_feature_id AS related_feature_id
-    FROM submission_feature_feature sff
+    FROM biohub.submission_feature_feature sff
     JOIN deployments d ON sff.target_feature_id = d.submission_feature_id
 ),
 related_feature_ids AS (
