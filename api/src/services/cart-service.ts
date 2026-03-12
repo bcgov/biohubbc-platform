@@ -152,7 +152,7 @@ export class CartService extends DBService {
 
     // Create team and link to download for authenticated users.
     // Anonymous checkouts have no download_team rows — UUID is the credential.
-    if (systemUserId) {
+    if (systemUserId !== null) {
       const team = await this.teamService.createTeam({
         name: `Team for cart ${cartId}`,
         description: 'Team automatically created for cart checkout',

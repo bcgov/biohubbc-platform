@@ -733,9 +733,6 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     expect(errorContent).to.include('non-existent/missing-image.png');
 
     const multimediaCsv = zipEntryText(zip, `${rootFolder}multimedia.csv`);
-    console.log('\n--- multimedia.csv (error placeholder) ---');
-    console.log(multimediaCsv);
-    console.log('--- end ---\n');
     const multimediaLines = parseCsvLines(multimediaCsv);
     const multimediaHeaders = multimediaLines[0].split(',');
     expect(multimediaHeaders).to.include('filePath');

@@ -23,9 +23,6 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
 
       const mockDownload = {
         download_id: 'aaaa0000-0000-0000-0000-000000000001',
-        system_user_id: null,
-        team_id: 'bbbb0000-0000-0000-0000-000000000001',
-        data_request_id: null,
         download_status: 'ready'
       };
 
@@ -48,9 +45,6 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
     it('should return 200 for anonymous download without authentication', async () => {
       const mockDownload = {
         download_id: 'aaaa0000-0000-0000-0000-000000000001',
-        system_user_id: null,
-        team_id: null,
-        data_request_id: null,
         download_status: 'ready'
       };
 
@@ -78,9 +72,6 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
 
       const mockDownload = {
         download_id: 'aaaa0000-0000-0000-0000-000000000001',
-        system_user_id: 1,
-        team_id: null,
-        data_request_id: null,
         download_status: 'ready'
       };
 
@@ -193,9 +184,6 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
 
       const mockDownload = {
         download_id: 'aaaa0000-0000-0000-0000-000000000001',
-        system_user_id: null,
-        team_id: 'bbbb0000-0000-0000-0000-000000000001',
-        data_request_id: null,
         download_status: 'processing'
       };
 

@@ -57,9 +57,6 @@ describe('DownloadService', () => {
       const mockRecords = [
         {
           download_id: 'aaaa0000-0000-0000-0000-000000000001',
-          system_user_id: 42,
-          team_id: null,
-          data_request_id: null,
           download_status: 'ready' as const,
           metadata: null,
           started_at: '2025-01-01T00:00:00Z',

@@ -66,8 +66,8 @@ GET.apiDoc = {
 /**
  * Get a signed URL for downloading a specific fragment of a completed download.
  *
- * Unauthenticated downloads (system_user_id is null) are accessible to anyone.
- * Authenticated downloads are restricted to the requesting user.
+ * Anonymous downloads (no download_team rows) are accessible to anyone with the UUID.
+ * Team-based downloads are restricted to members of linked teams.
  *
  * @returns {RequestHandler}
  */
