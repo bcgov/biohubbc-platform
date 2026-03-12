@@ -56,9 +56,9 @@ export const SubmissionFeaturePage = () => {
 
     let isCurrent = true;
 
-    biohubApi.cart.isFeatureInCart(cartId, Number(submissionFeatureId)).then((response) => {
+    biohubApi.cart.getCartFeatures(cartId, { submissionFeatureId: Number(submissionFeatureId) }).then((response) => {
       if (isCurrent) {
-        setIsInCart(response.isInCart);
+        setIsInCart(response.features.length > 0);
       }
     });
 
