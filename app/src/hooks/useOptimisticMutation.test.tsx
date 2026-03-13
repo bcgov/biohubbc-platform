@@ -96,4 +96,34 @@ describe('useOptimisticMutation', () => {
       optimisticState: { value: 2 }
     });
   });
+
+  it('uses latest getData and setData after rerender', async () => {
+    const setDataA = vi.fn();
+    const setDataB = vi.fn();
+
+    const { result, rerender } = renderHook(({ currentValue, setData }) =>
+      useOptimisticMutation<{ value: number }>({
+        getData: () => ({ value: currentValue }),
+        setData
+      }),
+    {
+      initialProps: {
+        currentValue: 1,
+        setData: setDataA
+      }
+    });
+
+    rerender({ currentValue: 10, setData: setDataB });
+
+    await act(async () => {
+      await result.current.handleMutation((currentState) => ({
+        optimisticState: { value: currentState.value + 1 },
+        mutation: async () => ({ ok: true })
+      }));
+    });
+
+    expect(setDataA).not.toHaveBeenCalled();
+    expect(setDataB).toHaveBeenCalledTimes(1);
+    expect(setDataB).toHaveBeenCalledWith({ value: 11 });
+  });
 });

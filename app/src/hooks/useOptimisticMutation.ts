@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 export interface IOptimisticMutationContext<TState> {
   currentState: TState;
@@ -24,6 +24,12 @@ export interface IOptimisticMutationConfig<TState, TApiResult> {
  * rolls back to `currentState` on failure unless a custom rollback is provided.
  */
 export const useOptimisticMutation = <TState>(setup: IOptimisticMutationSetup<TState>) => {
+  const getDataRef = useRef(setup.getData);
+  const setDataRef = useRef(setup.setData);
+
+  getDataRef.current = setup.getData;
+  setDataRef.current = setup.setData;
+
   /**
    * Executes one optimistic mutation transaction.
    *
@@ -34,26 +40,26 @@ export const useOptimisticMutation = <TState>(setup: IOptimisticMutationSetup<TS
     async <TApiResult>(
       buildConfig: (currentState: TState) => IOptimisticMutationConfig<TState, TApiResult>
     ): Promise<TApiResult> => {
-      const currentState = setup.getData();
+      const currentState = getDataRef.current();
       const config = buildConfig(currentState);
       const context: IOptimisticMutationContext<TState> = {
         currentState,
         optimisticState: config.optimisticState
       };
 
-      setup.setData(config.optimisticState);
+      setDataRef.current(config.optimisticState);
 
       try {
         const result = await config.mutation(context);
         config.onSuccess?.(result, context);
         return result;
       } catch (error) {
-        setup.setData(currentState);
+        setDataRef.current(currentState);
         config.onRollback?.(context);
         throw error;
       }
     },
-    [setup]
+    []
   );
 
   return { handleMutation };
