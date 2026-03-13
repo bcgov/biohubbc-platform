@@ -194,19 +194,26 @@ export function createDownload(): RequestHandler {
       const filters: ISearchFeaturesFilters = req.body.filters;
 
       const searchFeatureService = new SearchFeatureService(connection);
+      const downloadService = new DownloadService(connection);
 
-      // Quick count check before fetching all IDs
-      const featureCount = await searchFeatureService.getSearchFeaturesCount(filters);
+      // Resolve filters to all matching feature IDs
+      const allFeatureIds = await searchFeatureService.getSearchFeatureIds(filters);
 
-      if (featureCount === 0) {
+      if (allFeatureIds.length === 0) {
         throw new HTTP400('No features match the filter criteria');
       }
 
-      // Resolve filters to feature IDs via CTE intersection
-      const submissionFeatureIds = await searchFeatureService.getSearchFeatureIds(filters);
+      // Filter to only features the user is authorized to download.
+      // Unsecured features pass through. Secured features require an ALLOW policy
+      // via the user's team memberships. Anonymous users get unsecured only.
+      const systemUserId = isAuthenticated ? connection.systemUserId() : null;
+      const submissionFeatureIds = await downloadService.filterAuthorizedFeatureIds(allFeatureIds, systemUserId);
+
+      if (submissionFeatureIds.length === 0) {
+        throw new HTTP400('No authorized features match the filter criteria');
+      }
 
       // Create download with search filters stored for traceability
-      const downloadService = new DownloadService(connection);
       const downloadId = await downloadService.createDownloadRequest({
         submissionFeatureIds,
         filters

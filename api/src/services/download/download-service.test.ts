@@ -502,4 +502,66 @@ describe('DownloadService', () => {
       expect(result).to.deep.equal([]);
     });
   });
+
+  describe('filterAuthorizedFeatureIds', () => {
+    it('returns empty array when given empty input', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const result = await service.filterAuthorizedFeatureIds([], null);
+
+      expect(result).to.deep.equal([]);
+    });
+
+    it('returns all IDs when no features are secured', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      sinon.stub(DownloadRepository.prototype, 'getSecuredFeatureIds').resolves(new Set());
+
+      const result = await service.filterAuthorizedFeatureIds([1, 2, 3], null);
+
+      expect(result).to.deep.equal([1, 2, 3]);
+    });
+
+    it('returns only unsecured IDs for anonymous users', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      // Feature 2 is secured
+      sinon.stub(DownloadRepository.prototype, 'getSecuredFeatureIds').resolves(new Set([2]));
+
+      const result = await service.filterAuthorizedFeatureIds([1, 2, 3], null);
+
+      expect(result).to.deep.equal([1, 3]);
+    });
+
+    it('returns unsecured + policy-authorized secured IDs for authenticated users', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      // Features 2 and 3 are secured
+      sinon.stub(DownloadRepository.prototype, 'getSecuredFeatureIds').resolves(new Set([2, 3]));
+      // User has policy access to feature 2 but not 3
+      sinon.stub(DownloadRepository.prototype, 'getUserAuthorizedSecuredFeatureIds').resolves(new Set([2]));
+
+      const result = await service.filterAuthorizedFeatureIds([1, 2, 3], 5);
+
+      expect(result).to.include(1);
+      expect(result).to.include(2);
+      expect(result).to.not.include(3);
+    });
+
+    it('returns empty when all features are secured and user has no policies', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      sinon.stub(DownloadRepository.prototype, 'getSecuredFeatureIds').resolves(new Set([1, 2]));
+      sinon.stub(DownloadRepository.prototype, 'getUserAuthorizedSecuredFeatureIds').resolves(new Set());
+
+      const result = await service.filterAuthorizedFeatureIds([1, 2], 5);
+
+      expect(result).to.deep.equal([]);
+    });
+  });
 });

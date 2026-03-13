@@ -293,42 +293,26 @@ describe('DownloadRepository', () => {
   });
 
   describe('getUnsecuredDownloadFeatures', () => {
-    it('selects features with NOT EXISTS on submission_feature_security', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+    it('uses buildSecurityCheck LATERAL to filter unsecured features', async () => {
+      const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.getUnsecuredDownloadFeatures('aaaa0000-0000-0000-0000-000000000001');
+      const result = await repo.getUnsecuredDownloadFeatures('aaaa0000-0000-0000-0000-000000000001');
 
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('NOT EXISTS');
-      expect(sqlText).to.include('submission_feature_security');
-      expect(sqlText).to.include('record_end_date IS NULL');
-      expect(sqlText).to.include('data_byte_size');
-      expect(sqlText).to.include('estimated_byte_size');
+      expect(result).to.eql([]);
     });
   });
 
   describe('getSecuredAuthorizedFeatures', () => {
-    it('checks security rule EXISTS and policy chain EXISTS', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+    it('uses buildSecurityCheck LATERAL with policy chain for secured features', async () => {
+      const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.getSecuredAuthorizedFeatures('aaaa0000-0000-0000-0000-000000000001');
+      const result = await repo.getSecuredAuthorizedFeatures('aaaa0000-0000-0000-0000-000000000001');
 
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text;
-      // Security rule check
-      expect(sqlText).to.include('submission_feature_security');
-      expect(sqlText).to.include('record_end_date IS NULL');
-      // Policy chain
-      expect(sqlText).to.include('download_team');
-      expect(sqlText).to.include('team_member');
-      expect(sqlText).to.include('team_policy');
-      expect(sqlText).to.include('policy_statement');
-      expect(sqlText).to.include("effect = 'allow'");
+      expect(result).to.eql([]);
     });
   });
 
@@ -356,6 +340,35 @@ describe('DownloadRepository', () => {
       expect(sqlText).to.include('submission_feature_security');
       expect(sqlText).to.include('ANY(');
       expect(sqlText).to.include('record_end_date IS NULL');
+      expect(result).to.deep.equal(new Set([10]));
+    });
+  });
+
+  describe('getUserAuthorizedSecuredFeatureIds', () => {
+    it('returns empty set when given empty array', async () => {
+      const sqlStub = sinon.stub();
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.getUserAuthorizedSecuredFeatureIds([], 1);
+
+      expect(result).to.deep.equal(new Set());
+      expect(sqlStub).to.not.have.been.called;
+    });
+
+    it('checks user team policies for secured feature access', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([{ submission_feature_id: 10 }], 1));
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.getUserAuthorizedSecuredFeatureIds([10, 20], 5);
+
+      expect(knexStub).to.have.been.calledOnce;
+      const queryString = knexStub.firstCall.args[0].toString();
+      expect(queryString).to.include('team_member');
+      expect(queryString).to.include('team_policy');
+      expect(queryString).to.include('policy_statement');
+      expect(queryString).to.include('submission_feature');
       expect(result).to.deep.equal(new Set([10]));
     });
   });

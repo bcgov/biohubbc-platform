@@ -339,6 +339,33 @@ describe('Download services (integration)', function () {
       expect(result).to.have.length(0);
     });
 
+    it('should treat child as secured when only the parent has a security rule (inherited security)', async () => {
+      // The buildSecurityCheck recursive CTE walks parent_submission_feature_id upward.
+      // If a parent is secured but its child has no direct security rule, the child
+      // inherits the parent's secured status and must be excluded from anonymous downloads.
+      const submissionId = await createTestSubmission(connection);
+      const parentFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Parent' });
+      const childFeatureId = await createTestFeature(
+        connection,
+        submissionId,
+        'species_observation',
+        { name: 'Child Observation' },
+        parentFeatureId
+      );
+
+      // Secure the parent only — child has NO direct submission_feature_security row
+      await secureFeature(parentFeatureId);
+
+      const { download_id } = await crudService.createDownloadRequest({
+        submissionFeatureIds: [childFeatureId]
+      });
+
+      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
+
+      // Child should be excluded: it inherits its parent's secured status
+      expect(result).to.have.length(0);
+    });
+
     it('should include secured features when team has a matching ALLOW policy', async () => {
       const submissionId = await createTestSubmission(connection);
       const openFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
@@ -1003,6 +1030,43 @@ describe('Download services (integration)', function () {
       const { downloads } = await crudService.getDownloadsByTeamMembership(otherUserId);
       const ids = downloads.map((d) => d.download_id);
       expect(ids).to.not.include(download_id);
+    });
+  });
+
+  // ── filterAuthorizedFeatureIds (creation-time auth) ────────────────
+
+  describe('filterAuthorizedFeatureIds', () => {
+    it('should include secured features when user has matching ALLOW policy via team membership', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const openFeat = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
+      const securedFeat = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
+      await secureFeature(securedFeat);
+
+      const userId = connection.systemUserId();
+      const policyTeamId = await createTeam('CreationAuth Policy');
+      await addTeamMember(policyTeamId, userId);
+      await grantTeamAccess(policyTeamId, submissionId, 'dataset', securedFeat);
+
+      const result = await crudService.filterAuthorizedFeatureIds([openFeat, securedFeat], userId);
+
+      expect(result).to.have.length(2);
+      expect(result).to.include(openFeat);
+      expect(result).to.include(securedFeat);
+    });
+
+    it('should exclude secured features when user has no matching policy', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const openFeat = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
+      const securedFeat = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
+      await secureFeature(securedFeat);
+
+      const userId = connection.systemUserId();
+
+      const result = await crudService.filterAuthorizedFeatureIds([openFeat, securedFeat], userId);
+
+      expect(result).to.have.length(1);
+      expect(result).to.include(openFeat);
+      expect(result).to.not.include(securedFeat);
     });
   });
 });
