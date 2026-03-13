@@ -10,9 +10,7 @@ const defaultLog = getLogger('paths/dataset/search-index');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({
-    or: [
-      { discriminator: 'Contributor' }
-    ]
+    or: [{ discriminator: 'Contributor' }]
   })),
   indexSubmission()
 ];

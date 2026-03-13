@@ -55,7 +55,7 @@ describe('paths/download/{downloadId}/index', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.keycloak_token = { preferred_username: 'test-user' };
+      mockReq.keycloak_token = 'token';
       mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
 
       const requestHandler = findDownloadById();
@@ -147,7 +147,7 @@ describe('paths/download/{downloadId}/index', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.keycloak_token = { preferred_username: 'test-user' };
+      mockReq.keycloak_token = 'token';
       mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
 
       const requestHandler = findDownloadById();
@@ -187,7 +187,7 @@ describe('paths/download/{downloadId}/index', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.keycloak_token = { preferred_username: 'test-user' };
+      mockReq.keycloak_token = 'token';
       mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
 
       const requestHandler = findDownloadById();
@@ -253,7 +253,7 @@ describe('paths/download/{downloadId}/index', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.keycloak_token = { preferred_username: 'test-user' };
+      mockReq.keycloak_token = 'token';
       mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
 
       const requestHandler = findDownloadById();
@@ -277,7 +277,7 @@ describe('paths/download/{downloadId}/index', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.keycloak_token = { preferred_username: 'test-user' };
+      mockReq.keycloak_token = 'token';
       mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
 
       const requestHandler = claimDownloadForCurrentUser();
@@ -297,7 +297,7 @@ describe('paths/download/{downloadId}/index', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.keycloak_token = { preferred_username: 'test-user' };
+      mockReq.keycloak_token = 'token';
       mockReq.params = { downloadId: 'aaaa0000-0000-0000-0000-000000000001' };
 
       const requestHandler = claimDownloadForCurrentUser();

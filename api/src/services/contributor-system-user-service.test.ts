@@ -17,8 +17,12 @@ describe('ContributorSystemUserService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new ContributorSystemUserService(mockDBConnection);
 
-      const findStub = sinon.stub(ContributorSystemUserRepository.prototype, 'findContributorSystemUser').resolves(null);
-      const createStub = sinon.stub(ContributorSystemUserRepository.prototype, 'createContributorSystemUser').resolves();
+      const findStub = sinon
+        .stub(ContributorSystemUserRepository.prototype, 'findContributorSystemUser')
+        .resolves(null);
+      const createStub = sinon
+        .stub(ContributorSystemUserRepository.prototype, 'createContributorSystemUser')
+        .resolves();
 
       await service.ensureContributorSystemUser(123, 456);
 
@@ -35,7 +39,9 @@ describe('ContributorSystemUserService', () => {
         contributor_id: 123,
         system_user_id: 456
       });
-      const createStub = sinon.stub(ContributorSystemUserRepository.prototype, 'createContributorSystemUser').resolves();
+      const createStub = sinon
+        .stub(ContributorSystemUserRepository.prototype, 'createContributorSystemUser')
+        .resolves();
 
       await service.ensureContributorSystemUser(123, 456);
 

@@ -11,9 +11,7 @@ const defaultLog = getLogger('paths/artifact/intake');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({
-    or: [
-      { discriminator: 'Contributor' }
-    ]
+    or: [{ discriminator: 'Contributor' }]
   })),
   intakeArtifact()
 ];

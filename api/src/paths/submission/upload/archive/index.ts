@@ -16,9 +16,7 @@ const defaultLog = getLogger('paths/submission/upload/archive');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({
-    or: [
-      { discriminator: 'Contributor' }
-    ]
+    or: [{ discriminator: 'Contributor' }]
   })),
   startUpload()
 ];

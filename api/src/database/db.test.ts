@@ -8,7 +8,6 @@ import { ApiExecuteSQLError } from '../errors/api-error';
 import { HTTPError } from '../errors/http-error';
 import { SystemUser } from '../repositories/user-repository';
 import { getMockDBConnection } from '../__mocks__/db';
-import { KeycloakUserInformation } from '../utils/keycloak-utils';
 import * as db from './db';
 import {
   DB_CLIENT,
@@ -42,7 +41,7 @@ describe('db', () => {
   describe('getDBConnection', () => {
     it('throws an error if keycloak token is undefined', () => {
       try {
-        getDBConnection(null as unknown as KeycloakUserInformation);
+        getDBConnection(null as unknown as object);
 
         expect.fail();
       } catch (actualError) {

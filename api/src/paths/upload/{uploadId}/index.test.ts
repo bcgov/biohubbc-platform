@@ -40,7 +40,7 @@ describe('completeUpload handler', () => {
         { PartNumber: 2, ETag: 'etag2' }
       ]
     };
-    mockReq.keycloak_token = { preferred_username: 'test-user' };
+    mockReq.keycloak_token = 'mock-token';
 
     await requestHandler(mockReq, mockRes, mockNext);
 
@@ -85,7 +85,7 @@ describe('completeUpload handler', () => {
       key: 'mock-key',
       parts: [{ PartNumber: 1, ETag: 'etag1' }]
     };
-    mockReq.keycloak_token = { preferred_username: 'test-user' };
+    mockReq.keycloak_token = 'mock-token';
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
@@ -115,7 +115,7 @@ describe('completeUpload handler', () => {
       key: 'mock-key',
       parts: [{ PartNumber: 1, ETag: 'etag1' }]
     };
-    mockReq.keycloak_token = { preferred_username: 'test-user' };
+    mockReq.keycloak_token = 'mock-token';
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
@@ -150,7 +150,7 @@ describe('completeUpload handler', () => {
       key: 'mock-key',
       parts: [] // empty array
     };
-    mockReq.keycloak_token = { preferred_username: 'test-user' };
+    mockReq.keycloak_token = 'mock-token';
 
     await requestHandler(mockReq, mockRes, mockNext);
 

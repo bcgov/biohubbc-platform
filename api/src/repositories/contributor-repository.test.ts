@@ -106,5 +106,4 @@ describe('ContributorRepository', () => {
       expect(result).to.equal(null);
     });
   });
-
 });

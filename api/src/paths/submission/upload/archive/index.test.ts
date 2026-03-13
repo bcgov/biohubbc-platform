@@ -154,5 +154,4 @@ describe('archive upload handler', () => {
       contributor_id: 11
     });
   });
-
 });

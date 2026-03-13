@@ -18,9 +18,7 @@ const defaultLog = getLogger('paths/submission/intake');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({
-    or: [
-      { discriminator: 'Contributor' }
-    ]
+    or: [{ discriminator: 'Contributor' }]
   })),
   submissionIntake()
 ];
