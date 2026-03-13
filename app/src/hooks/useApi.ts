@@ -3,6 +3,7 @@ import useAdminApi from './api/useAdminApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
 import { useCartApi } from './api/useCartApi';
+import { useDownloadApi } from './api/useDownloadApi';
 import useCodesApi from './api/useCodesApi';
 import { useDataRequestApi } from './api/useDataRequestApi';
 import { useFeaturesApi } from './api/useFeaturesApi';
@@ -14,6 +15,7 @@ import { useSubmissionsStatusApi } from './api/useSubmissionStatusApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
 import { useTeamPoliciesApi } from './api/useTeamPoliciesApi';
 import { useTeamsApi } from './api/useTeamsApi';
+import { useTicketsApi } from './api/useTicketsApi';
 import useUserApi from './api/useUserApi';
 
 /**
@@ -52,7 +54,11 @@ export const useApi = () => {
 
   const cart = useCartApi(apiAxios);
 
+  const download = useDownloadApi(apiAxios);
+
   const teamPolicies = useTeamPoliciesApi(apiAxios);
+
+  const tickets = useTicketsApi(apiAxios);
 
   const dataRequest = useDataRequestApi(apiAxios);
 
@@ -70,7 +76,9 @@ export const useApi = () => {
     search,
     teams,
     cart,
+    download,
     teamPolicies,
+    tickets,
     dataRequest
   };
 };

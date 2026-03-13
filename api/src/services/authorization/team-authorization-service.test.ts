@@ -71,6 +71,8 @@ describe('TeamAuthorizationService', () => {
         source_id: null,
         data: {},
         feature_type_name: 'Feature',
+        feature_type_display_name: 'Feature',
+        submission_name: 'Test Submission',
         secured: true
       };
 
