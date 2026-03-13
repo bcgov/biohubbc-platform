@@ -6,7 +6,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import { IRelatedSubmissionFeature } from 'interfaces/useFeaturesApi.interface';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useLocation } from 'react-router-dom';
 
 interface SubmissionFeatureRelatedProps {
   submissionId: string | undefined;
@@ -14,6 +14,8 @@ interface SubmissionFeatureRelatedProps {
 }
 
 export const SubmissionFeatureRelated = ({ submissionId, relatedFeatures }: SubmissionFeatureRelatedProps) => {
+  const location = useLocation();
+
   return (
     <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider' }}>
       <Box p={3}>
@@ -26,7 +28,7 @@ export const SubmissionFeatureRelated = ({ submissionId, relatedFeatures }: Subm
               <ListItem key={related.submission_feature_id} disablePadding divider>
                 <ListItemButton
                   component={RouterLink}
-                  to={`/submission/${submissionId}/feature/${related.submission_feature_id}`}>
+                  to={`/submission/${submissionId}/feature/${related.submission_feature_id}${location.search}`}>
                   <ListItemText
                     primary={related.data?.name || related.feature_type_display_name}
                     secondary={related.feature_type_display_name}

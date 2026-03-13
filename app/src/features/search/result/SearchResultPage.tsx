@@ -19,7 +19,7 @@ import {
   RecommendedFiltersInput,
   useRecommendedFilters
 } from './sidebar/search/hooks/useRecommendedFilters';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 
 export enum SEARCH_RESULT_OPTION_VIEW {
   LIST = 'list',
@@ -28,6 +28,7 @@ export enum SEARCH_RESULT_OPTION_VIEW {
 
 export const SearchResultPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination, filters } = useSearchResults();
   const api = useApi();
   const { codesDataLoader } = useCodesContext();
@@ -284,7 +285,7 @@ export const SearchResultPage = () => {
               rows={rows}
               isLoading={isLoading}
               view={view}
-              onClick={(result) => navigate(`/submission/${result.submission_id}`)}
+              onClick={(result) => navigate(`/submission/${result.submission_id}${location.search}`)}
             />
           </Box>
         </Paper>

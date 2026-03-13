@@ -21,7 +21,7 @@ import {
   SubmissionRecordWithSecurity
 } from 'interfaces/useSubmissionsApi.interface';
 import { useEffect, useMemo, useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 import { toApiPagination } from 'utils/pagination';
 
@@ -42,6 +42,7 @@ const columns: GridColDef[] = [
  */
 export const SubmissionDetailPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { submissionId } = useParams<{ submissionId: string }>();
   const api = useApi();
 
@@ -94,7 +95,7 @@ export const SubmissionDetailPage = () => {
 
   const handleRowClick = (params: GridRowParams<SubmissionRow>, _event: MuiEvent<React.MouseEvent>) => {
     const featureId = params.row.submission_feature_id;
-    navigate(`/submission/${submissionId}/feature/${featureId}`);
+    navigate(`/submission/${submissionId}/feature/${featureId}${location.search}`);
     return;
   };
 
@@ -112,7 +113,7 @@ export const SubmissionDetailPage = () => {
         <PageHeader
           breadcrumbs={
             <Breadcrumbs aria-label="breadcrumb">
-              <Link component={RouterLink} to="/search" underline="hover" color="inherit">
+              <Link component={RouterLink} to={`/search/list${location.search}`} underline="hover" color="inherit">
                 Search
               </Link>
               <Typography color="text.primary">{submission?.name}</Typography>

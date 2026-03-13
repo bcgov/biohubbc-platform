@@ -14,7 +14,7 @@ import { useApi } from 'hooks/useApi';
 import { useCartContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { useEffect, useMemo, useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonTable } from 'components/loading/SkeletonLoaders';
 import { SubmissionFeatureProperties } from './components/SubmissionFeatureProperties';
@@ -22,6 +22,7 @@ import { SubmissionFeatureRelated } from './components/SubmissionFeatureRelated'
 
 export const SubmissionFeaturePage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const biohubApi = useApi();
   const { cartId, addToCart, removeFromCart } = useCartContext();
   const [isInCart, setIsInCart] = useState(false);
@@ -117,7 +118,7 @@ export const SubmissionFeaturePage = () => {
           }
           breadcrumbs={
             <Breadcrumbs aria-label="breadcrumb">
-              <Link component={RouterLink} to="/search" underline="hover" color="inherit">
+              <Link component={RouterLink} to={`/search/list${location.search}`} underline="hover" color="inherit">
                 Search
               </Link>
               <Link
