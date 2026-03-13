@@ -69,9 +69,7 @@ describe('Pagination', () => {
   });
 
   it('disables previous/next navigation when on the only page', () => {
-    const { getByRole } = render(
-      <Pagination {...defaultProps} currentPage={1} lastPage={1} totalCount={5} />
-    );
+    const { getByRole } = render(<Pagination {...defaultProps} currentPage={1} lastPage={1} totalCount={5} />);
 
     expect(getByRole('button', { name: /go to previous page/i })).toBeDisabled();
     expect(getByRole('button', { name: /go to next page/i })).toBeDisabled();
