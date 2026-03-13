@@ -36,8 +36,19 @@ export const CreateTicketReference = z.object({
 export type CreateTicketReference = z.infer<typeof CreateTicketReference>;
 
 export const CreateTicketReferenceRequest = z.object({
+  references: z.array(
+    z.object({
+      target_ticket_id: z.string().uuid(),
+      relationship: TicketRelationshipType
+    })
+  )
+});
+
+export type CreateTicketReferenceRequest = z.infer<typeof CreateTicketReferenceRequest>;
+
+export const CreateTicketReferenceRequestItem = z.object({
   target_ticket_id: z.string().uuid(),
   relationship: TicketRelationshipType
 });
 
-export type CreateTicketReferenceRequest = z.infer<typeof CreateTicketReferenceRequest>;
+export type CreateTicketReferenceRequestItem = z.infer<typeof CreateTicketReferenceRequestItem>;

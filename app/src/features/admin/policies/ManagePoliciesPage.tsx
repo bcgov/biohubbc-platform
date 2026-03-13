@@ -101,7 +101,7 @@ export const ManagePoliciesPage = () => {
       <PageHeader label="Manage Policies" />
       <Box py={4}>
         <PoliciesContainer
-          policies={policies.data}
+          policies={policies.rows}
           rowCount={policies.rowCount}
           paginationModel={policies.paginationModel}
           setPaginationModel={policies.handlePaginationChange}
@@ -114,7 +114,7 @@ export const ManagePoliciesPage = () => {
 
         <Container maxWidth="xl" sx={{ mt: 4 }}>
           <TeamsContainer
-            teams={teams.data}
+            teams={teams.rows}
             rowCount={teams.rowCount}
             paginationModel={teams.paginationModel}
             setPaginationModel={teams.handlePaginationChange}

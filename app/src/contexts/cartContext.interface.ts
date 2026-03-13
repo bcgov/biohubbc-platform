@@ -43,6 +43,11 @@ export type CartAction =
  */
 export interface ICartContext {
   /**
+   * The current cart ID, or null if no cart has been created yet.
+   */
+  cartId: string | null;
+
+  /**
    * The current list of features in the cart.
    *
    * This is intentionally a union of:

@@ -90,19 +90,23 @@ export class TicketService extends DBService {
   }
 
   /**
-   * Add a reference linking this ticket to another ticket.
+   * Add references linking this ticket to one or more target tickets.
    *
    * @param {string} ticketId - Source ticket UUID.
    * @param {CreateTicketReferenceRequest} payload - Ticket reference payload.
-   * @return {Promise<TicketReference>} Created ticket reference.
+   * @return {Promise<TicketReference[]>} Created ticket references.
    * @memberof TicketService
    */
-  async createTicketReference(ticketId: string, payload: CreateTicketReferenceRequest): Promise<TicketReference> {
-    return this.ticketReferenceService.createTicketReference({
-      source_ticket_id: ticketId,
-      target_ticket_id: payload.target_ticket_id,
-      relationship: payload.relationship
-    });
+  async createTicketReference(ticketId: string, payload: CreateTicketReferenceRequest): Promise<TicketReference[]> {
+    return Promise.all(
+      payload.references.map((reference) =>
+        this.ticketReferenceService.createTicketReference({
+          source_ticket_id: ticketId,
+          target_ticket_id: reference.target_ticket_id,
+          relationship: reference.relationship
+        })
+      )
+    );
   }
 
   /**
