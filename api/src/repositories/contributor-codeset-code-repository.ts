@@ -20,7 +20,14 @@ export class ContributorCodesetCodeRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex('contributor_codeset_code')
       .insert(payload)
-      .returning(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'external_id']);
+      .returning([
+        'contributor_codeset_code_id',
+        'contributor_codeset_id',
+        'key',
+        'label',
+        'description',
+        'external_id'
+      ]);
 
     const response = await this.connection.knex(query, ContributorCodesetCodeSchema);
 
@@ -49,7 +56,14 @@ export class ContributorCodesetCodeRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex('contributor_codeset_code')
       .insert(payloads)
-      .returning(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'external_id']);
+      .returning([
+        'contributor_codeset_code_id',
+        'contributor_codeset_id',
+        'key',
+        'label',
+        'description',
+        'external_id'
+      ]);
 
     const response = await this.connection.knex(query, ContributorCodesetCodeSchema);
 

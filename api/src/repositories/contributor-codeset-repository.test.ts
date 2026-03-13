@@ -195,9 +195,7 @@ describe('ContributorCodesetRepository', () => {
         getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow])) })
       );
 
-      const result = await repository.getContributorCodesetsByIdentities([
-        { contributor_id: 10, key: 'life_stage' }
-      ]);
+      const result = await repository.getContributorCodesetsByIdentities([{ contributor_id: 10, key: 'life_stage' }]);
       expect(result).to.eql([mockRow]);
     });
 

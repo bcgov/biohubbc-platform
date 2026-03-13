@@ -5,6 +5,9 @@ export interface ContributorCodesetCodeIdentity {
   key: string;
 }
 
-export type ContributorCodesetCodeMetadata = Pick<CreateContributorCodesetCode, 'external_id' | 'label' | 'description'>;
+export type ContributorCodesetCodeMetadata = Pick<
+  CreateContributorCodesetCode,
+  'external_id' | 'label' | 'description'
+>;
 
 export type ContributorCodesetCodeDefinition = ContributorCodesetCodeIdentity & ContributorCodesetCodeMetadata;

@@ -117,9 +117,7 @@ export class ContributorCodesetService extends DBService {
    * Keeping this in one place avoids duplicated identity mapping logic and
    * ensures repository lookups always use the same identity fields.
    */
-  private toIdentity(
-    payload: Pick<CreateContributorCodeset, 'contributor_id' | 'key'>
-  ): ContributorCodesetIdentity {
+  private toIdentity(payload: Pick<CreateContributorCodeset, 'contributor_id' | 'key'>): ContributorCodesetIdentity {
     return {
       contributor_id: payload.contributor_id,
       key: payload.key
@@ -229,9 +227,7 @@ export class ContributorCodesetService extends DBService {
    * Identity-key generation stays in this service so identity semantics remain
    * local while delegating string composition to a shared util.
    */
-  private toContributorCodesetIdentityKey(
-    payload: Pick<CreateContributorCodeset, 'contributor_id' | 'key'>
-  ): string {
+  private toContributorCodesetIdentityKey(payload: Pick<CreateContributorCodeset, 'contributor_id' | 'key'>): string {
     return makeIdentityKey(payload.contributor_id, payload.key);
   }
 }

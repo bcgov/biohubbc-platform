@@ -59,7 +59,9 @@ describe('ContributorCodesetCodeRepository', () => {
       const repository = new ContributorCodesetCodeRepository(
         getMockDBConnection({
           knex: () =>
-            Promise.resolve(mockQueryResult([mockRow, { ...mockRow, contributor_codeset_code_id: 2, external_id: 'v2' }]))
+            Promise.resolve(
+              mockQueryResult([mockRow, { ...mockRow, contributor_codeset_code_id: 2, external_id: 'v2' }])
+            )
         })
       );
 
