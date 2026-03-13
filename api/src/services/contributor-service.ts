@@ -1,27 +1,16 @@
 import { IDBConnection } from '../database/db';
-import { ContributorRecord } from '../models/contributor';
 import { ContributorRepository } from '../repositories/contributor-repository';
-import { ContributorMemberService } from './contributor-member-service';
+import { ContributorSystemUserService } from './contributor-system-user-service';
 import { DBService } from './db-service';
 
 export class ContributorService extends DBService {
   contributorRepository: ContributorRepository;
-  contributorMemberService: ContributorMemberService;
+  contributorSystemUserService: ContributorSystemUserService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.contributorRepository = new ContributorRepository(connection);
-    this.contributorMemberService = new ContributorMemberService(connection);
-  }
-
-  /**
-   * Get the contributor record for a clientId
-   *
-   * @param {string} clientId
-   * @returns {Promise<ContributorRecord>}
-   */
-  async getContributorByClientId(clientId: string): Promise<ContributorRecord> {
-    return this.contributorRepository.getContributorByClientId(clientId);
+    this.contributorSystemUserService = new ContributorSystemUserService(connection);
   }
 
   /**
@@ -49,7 +38,7 @@ export class ContributorService extends DBService {
    */
   async ensureContributorForSystemUser(clientId: string, systemUserId: number): Promise<number> {
     const contributorId = await this.ensureContributor(clientId);
-    await this.contributorMemberService.ensureContributorMember(contributorId, systemUserId);
+    await this.contributorSystemUserService.ensureContributorSystemUser(contributorId, systemUserId);
 
     return contributorId;
   }

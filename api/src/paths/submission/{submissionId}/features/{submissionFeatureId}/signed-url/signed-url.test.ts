@@ -31,7 +31,7 @@ describe('getSubmissionFeatureSignedUrl', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    mockReq.keycloak_token = 'TOKEN';
+    mockReq.keycloak_token = { preferred_username: 'test-user' };
 
     mockReq.params = {
       submissionId: '1',
@@ -48,7 +48,7 @@ describe('getSubmissionFeatureSignedUrl', () => {
 
       expect.fail();
     } catch (error) {
-      expect(getDBConnectionStub).to.have.been.calledWith('TOKEN');
+      expect(getDBConnectionStub).to.have.been.calledWith({ preferred_username: 'test-user' });
       expect(isSystemUserAdminStub).to.have.been.calledOnce;
       expect(getSubmissionFeatureSignedUrlStub).to.have.been.calledOnce;
       expect((error as HTTPError).status).to.equal(400);

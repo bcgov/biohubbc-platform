@@ -146,14 +146,14 @@ describe('paths/download/index', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.keycloak_token = 'valid-token';
+      mockReq.keycloak_token = { preferred_username: 'test-user' };
       mockReq.body = { filters: { keyword: 'moose' } };
 
       const requestHandler = createDownload();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(getDBConnectionStub).to.have.been.calledWith('valid-token');
+      expect(getDBConnectionStub).to.have.been.calledWith({ preferred_username: 'test-user' });
     });
 
     it('should use getAPIUserDBConnection when anonymous', async () => {

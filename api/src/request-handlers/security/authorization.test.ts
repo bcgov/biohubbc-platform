@@ -120,6 +120,18 @@ describe('authorizeRequest', function () {
     expect(isAuthorized).to.equal(true);
   });
 
+  it('returns true for a direct single-rule authorization scheme', async function () {
+    registerMockDBConnection();
+
+    sinon.stub(AuthorizationService.prototype, 'authorizeSystemAdministrator').resolves(false);
+    sinon.stub(AuthorizationService.prototype, 'executeAuthorizationScheme').resolves(true);
+
+    const mockReq = { authorization_scheme: { discriminator: 'Contributor' } } as unknown as Request;
+    const isAuthorized = await authorization.authorizeRequest(mockReq);
+
+    expect(isAuthorized).to.equal(true);
+  });
+
   it('returns false if the user is not authorized against the authorization_scheme', async function () {
     registerMockDBConnection();
 
@@ -147,5 +159,17 @@ describe('authorizeRequest', function () {
     const isAuthorized = await authorization.authorizeRequest(mockReq);
 
     expect(isAuthorized).to.equal(false);
+  });
+
+  it('allows system admin bypass for contributor authorization', async function () {
+    registerMockDBConnection();
+
+    sinon.stub(AuthorizationService.prototype, 'authorizeSystemAdministrator').resolves(true);
+    sinon.stub(AuthorizationService.prototype, 'executeAuthorizationScheme').resolves(false);
+
+    const mockReq = { authorization_scheme: { discriminator: 'Contributor' } } as unknown as Request;
+    const isAuthorized = await authorization.authorizeRequest(mockReq);
+
+    expect(isAuthorized).to.equal(true);
   });
 });

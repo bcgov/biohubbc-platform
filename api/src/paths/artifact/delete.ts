@@ -18,7 +18,7 @@ export const POST: Operation = [
           discriminator: 'SystemRole'
         },
         {
-          discriminator: 'ServiceClient'
+          discriminator: 'Contributor'
         }
       ]
     };

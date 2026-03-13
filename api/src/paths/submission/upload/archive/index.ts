@@ -1,9 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { v4 } from 'uuid';
-import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
-import { HTTP400 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import {
   CreateSubmissionUploadRequestSchema,
@@ -11,9 +9,7 @@ import {
 } from '../../../../openapi/schemas/upload';
 import { ICreateSubmission } from '../../../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { ContributorService } from '../../../../services/contributor-service';
 import { UploadIngestionService } from '../../../../services/upload/upload-ingestion-service';
-import { getServiceClientSystemUser } from '../../../../utils/keycloak-utils';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/submission/upload/archive');
@@ -21,8 +17,7 @@ const defaultLog = getLogger('paths/submission/upload/archive');
 export const POST: Operation = [
   authorizeRequestHandler(() => ({
     or: [
-      { discriminator: 'ServiceClient' },
-      { validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }
+      { discriminator: 'Contributor' }
     ]
   })),
   startUpload()
@@ -67,28 +62,8 @@ export function startUpload(): RequestHandler {
     try {
       await connection.open();
 
-      const { system_user_id } = req.system_user;
-      const contributorService = new ContributorService(connection);
-
-      const serviceClientSystemUser = getServiceClientSystemUser(token);
-      const contributorClientId = token.clientId;
-
-      if (!contributorClientId) {
-        throw new HTTP400('Failed to identify known submission source system', [
-          'token did not contain a service client id'
-        ]);
-      }
-
-      let contributorId: number;
-
-      if (serviceClientSystemUser) {
-        contributorId = await contributorService.ensureContributorForSystemUser(
-          contributorClientId,
-          serviceClientSystemUser.system_user_id
-        );
-      } else {
-        contributorId = await contributorService.ensureContributor(contributorClientId);
-      }
+      const system_user_id = req.system_user!.system_user_id;
+      const contributorId = req.contributor_id!;
 
       const { bytes, ...rest } = req.body;
       const submission = { ...rest, uuid: v4(), system_user_id, contributor_id: contributorId } as ICreateSubmission;
@@ -98,7 +73,7 @@ export function startUpload(): RequestHandler {
 
       await connection.commit();
 
-      res.status(201).json(result);
+      return res.status(201).json(result);
     } catch (error) {
       defaultLog.error({ label: 'startUpload', message: 'error initializing archive upload', error });
       await connection.rollback();

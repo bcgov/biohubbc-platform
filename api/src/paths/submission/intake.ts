@@ -6,28 +6,22 @@ import { UploadStatusEnum } from '../../models/upload';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { ISubmissionFeature } from '../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
-import { ContributorService } from '../../services/contributor-service';
 import { RegionService } from '../../services/region-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
 import { SubmissionService } from '../../services/submission-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { UploadService } from '../../services/upload/upload-service';
 import { ValidationService } from '../../services/validation-service';
-import { getServiceClientSystemUser } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/submission/intake');
 
 export const POST: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          discriminator: 'ServiceClient'
-        }
-      ]
-    };
-  }),
+  authorizeRequestHandler(() => ({
+    or: [
+      { discriminator: 'Contributor' }
+    ]
+  })),
   submissionIntake()
 ];
 
@@ -130,19 +124,11 @@ POST.apiDoc = {
 
 export function submissionIntake(): RequestHandler {
   return async (req, res) => {
-    // TODO Allow system admins
-    const serviceClientSystemUser = getServiceClientSystemUser(req.keycloak_token);
-
-    if (!serviceClientSystemUser) {
-      throw new HTTP400('Failed to identify known submission source system', [
-        'token did not contain a sub or sub value is unknown'
-      ]);
-    }
-
     const submissionUuid = req.body.id;
     const submissionName = req.body.name;
     const submissionDescription = req.body.description;
     const submissionComment = req.body.comment;
+    const contributorId = req.contributor_id!;
 
     const submissionFeature: ISubmissionFeature = req.body.content;
 
@@ -150,9 +136,9 @@ export function submissionIntake(): RequestHandler {
 
     try {
       await connection.open();
+      const system_user_id = req.system_user!.system_user_id;
 
       const submissionService = new SubmissionService(connection);
-      const contributorService = new ContributorService(connection);
       const validationService = new ValidationService(connection);
       const searchFeatureService = new SearchFeatureService(connection);
       const regionService = new RegionService(connection);
@@ -162,26 +148,13 @@ export function submissionIntake(): RequestHandler {
         throw new HTTP400('Invalid submission'); // TODO return details on why the submission is invalid
       }
 
-      const serviceClientId = req.keycloak_token!.clientId;
-
-      if (!serviceClientId) {
-        throw new HTTP400('Failed to identify known submission source system', [
-          'token did not contain a service client id'
-        ]);
-      }
-
-      const contributorId = await contributorService.ensureContributorForSystemUser(
-        serviceClientId,
-        serviceClientSystemUser.system_user_id
-      );
-
       // insert the submission record
       const submissionRecord = await submissionService.insertSubmissionRecordWithPotentialConflict(
         submissionUuid,
         submissionName,
         submissionDescription,
         submissionComment,
-        serviceClientSystemUser.system_user_id,
+        system_user_id,
         contributorId
       );
 

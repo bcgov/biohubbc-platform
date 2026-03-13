@@ -1,25 +1,20 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getServiceAccountDBConnection } from '../../database/db';
+import { getDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { ArtifactService } from '../../services/old-artifact-service';
-import { getServiceClientSystemUser } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/artifact/intake');
 
 export const POST: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          discriminator: 'ServiceClient'
-        }
-      ]
-    };
-  }),
+  authorizeRequestHandler(() => ({
+    or: [
+      { discriminator: 'Contributor' }
+    ]
+  })),
   intakeArtifact()
 ];
 
@@ -111,15 +106,7 @@ export function intakeArtifact(): RequestHandler {
 
     const artifactUploadKey = req.body.artifact_upload_key;
 
-    const serviceClientSystemUser = getServiceClientSystemUser(req.keycloak_token);
-
-    if (!serviceClientSystemUser) {
-      throw new HTTP400('Failed to identify known submission source system', [
-        'token sub did not match any known system user guid for a service client user'
-      ]);
-    }
-
-    const connection = getServiceAccountDBConnection(serviceClientSystemUser);
+    const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();
