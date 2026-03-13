@@ -12,13 +12,14 @@ import {
   extractBlocksFromArchive,
   IUploadedMediaFile
 } from '../../utils/biohub-tar-parser';
+import { CodeReference, parseCodeReference } from '../../utils/code-reference';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { getLogger } from '../../utils/logger';
+import { ContributorService } from '../contributor-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
-import { ContributorService } from '../contributor-service';
 import { FeatureValidationService } from './feature-validation-service';
 import { IValidationError, IValidationResult, ValidationErrorType } from './feature-validation-service.interface';
 
@@ -83,10 +84,7 @@ export class SubmissionIngestionService extends DBService {
     const { allBlocks, mediaFileNames, codesets } = await extractBlocksFromArchive(tarStream1);
 
     // Validate feature structure: types exist in feature_type, required properties present, types correct
-    const featureValidation = await this.featureValidationService.validateFlatSubmissionFeatures(
-      allBlocks,
-      codesets
-    );
+    const featureValidation = await this.featureValidationService.validateFlatSubmissionFeatures(allBlocks, codesets);
     if (!featureValidation.valid) {
       return featureValidation;
     }
@@ -99,10 +97,12 @@ export class SubmissionIngestionService extends DBService {
 
     // Persist contributor codeset/category + code definitions before downstream indexing.
     // This ensures index jobs can resolve code slugs entirely from database state.
+    const referencedCodeReferences = this.extractReferencedCodeReferences(allBlocks);
     const contributor = await this.contributorService.getContributorBySubmissionUploadId(submissionUploadId);
     await this.submissionFeaturePropertyIndexRepository.persistContributorCodesByContributorId(
       contributor.contributor_id,
-      codesets
+      codesets,
+      referencedCodeReferences
     );
 
     // ================================================================
@@ -301,6 +301,39 @@ export class SubmissionIngestionService extends DBService {
     }
 
     return map;
+  }
+
+  /**
+   * Extract unique code references from feature property values.
+   *
+   * @private
+   * @param {IFlattenedBlock[]} blocks
+   * @return {CodeReference[]}
+   * @memberof SubmissionIngestionService
+   */
+  private extractReferencedCodeReferences(blocks: IFlattenedBlock[]): CodeReference[] {
+    const bySlug = new Map<string, CodeReference>();
+
+    for (const block of blocks) {
+      for (const value of Object.values(block.properties ?? {})) {
+        const values = Array.isArray(value) ? value : [value];
+
+        for (const current of values) {
+          if (typeof current !== 'string') {
+            continue;
+          }
+
+          const parsed = parseCodeReference(current);
+          if (!parsed) {
+            continue;
+          }
+
+          bySlug.set(parsed.slug, parsed);
+        }
+      }
+    }
+
+    return [...bySlug.values()];
   }
 }
 

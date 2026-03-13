@@ -56,7 +56,7 @@ export type ContributorCodeResolution = z.infer<typeof ContributorCodeResolution
 export interface CreateContributorCodeset {
   contributor_id: number;
   key: string;
-  external_id: string;
+  external_id: string | null;
   label: string;
   description: string | null;
 }
@@ -70,7 +70,7 @@ export interface CreateContributorCodesetCode {
   contributor_codeset_id: number;
   contributor_codeset_key: string;
   key: string;
-  external_id: string;
+  external_id: string | null;
   label: string;
   description: string | null;
 }
