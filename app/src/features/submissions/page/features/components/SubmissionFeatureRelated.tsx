@@ -26,7 +26,7 @@ export const SubmissionFeatureRelated = ({ submissionId, relatedFeatures }: Subm
               <ListItem key={related.submission_feature_id} disablePadding divider>
                 <ListItemButton
                   component={RouterLink}
-                  to={`/search/${submissionId}/feature/${related.submission_feature_id}`}>
+                  to={`/submission/${submissionId}/feature/${related.submission_feature_id}`}>
                   <ListItemText
                     primary={related.data?.name || related.feature_type_display_name}
                     secondary={related.feature_type_display_name}

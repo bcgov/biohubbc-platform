@@ -1,11 +1,13 @@
+import { CartContextProvider } from 'contexts/cartContext';
 import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import BaseLayout from 'layouts/BaseLayout';
+import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
 import { AdminRouter } from './admin/AdminRouter';
-import { SearchRouter } from './search/SearchRouter';
-import BaseLayout from 'layouts/BaseLayout';
 import { DataRequestRouter } from './data-request/DataRequestRouter';
+import { SearchRouter } from './search/SearchRouter';
+import { SubmissionRouter } from './submission/SubmissionRouter';
 
 export const AppRouter = () => {
   return (
@@ -13,16 +15,37 @@ export const AppRouter = () => {
       {/* Redirect base to search router */}
       <Route path="/" element={<Navigate to="/search" replace />} />
 
-      {/* Search Routes  */}
+      {/* Search and Submission routes share CartContextProvider */}
       <Route
-        path="/search/*"
         element={
           <>
-            <PageTitle title="Search Data" description="Search and download data" />
-            <SearchRouter />
+            <CartContextProvider>
+              <Outlet />
+            </CartContextProvider>
           </>
-        }
-      />
+        }>
+        {/* Search Routes */}
+        <Route
+          path="/search/*"
+          element={
+            <>
+              <PageTitle title="Search Data" description="Search and download data" />
+              <SearchRouter />
+            </>
+          }
+        />
+
+        {/* Submission Routes */}
+        <Route
+          path="/submission/*"
+          element={
+            <BaseLayout>
+              <PageTitle title="Submission Details" description="Details of a specific submission" />
+              <SubmissionRouter />
+            </BaseLayout>
+          }
+        />
+      </Route>
 
       {/* Admin Routes */}
       <Route

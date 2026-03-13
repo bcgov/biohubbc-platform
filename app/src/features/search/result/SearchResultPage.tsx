@@ -284,7 +284,7 @@ export const SearchResultPage = () => {
               rows={rows}
               isLoading={isLoading}
               view={view}
-              onClick={(result) => navigate(`/search/${result.submission_id}`)}
+              onClick={(result) => navigate(`/submission/${result.submission_id}`)}
             />
           </Box>
         </Paper>

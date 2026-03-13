@@ -94,7 +94,7 @@ export const SubmissionDetailPage = () => {
 
   const handleRowClick = (params: GridRowParams<SubmissionRow>, _event: MuiEvent<React.MouseEvent>) => {
     const featureId = params.row.submission_feature_id;
-    navigate(`/search/${submissionId}/feature/${featureId}`);
+    navigate(`/submission/${submissionId}/feature/${featureId}`);
     return;
   };
 

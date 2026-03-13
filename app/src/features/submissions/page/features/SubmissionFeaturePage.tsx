@@ -120,7 +120,11 @@ export const SubmissionFeaturePage = () => {
               <Link component={RouterLink} to="/search" underline="hover" color="inherit">
                 Search
               </Link>
-              <Link component={RouterLink} to={`/search/${feature?.submission_id}`} underline="hover" color="inherit">
+              <Link
+                component={RouterLink}
+                to={`/submission/${feature?.submission_id}`}
+                underline="hover"
+                color="inherit">
                 {feature?.submission_name}
               </Link>
               <Typography color="text.primary">{feature?.feature_type_display_name}</Typography>
