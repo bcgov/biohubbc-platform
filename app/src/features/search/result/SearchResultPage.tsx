@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { normalizeQueryParam } from 'utils/query-param';
 import { SearchResultOptions } from './content/option/SearchResultOptions';
-import { SearchResultPagination } from './content/pagination/SearchResultPagination';
+import { Pagination } from 'components/pagination/Pagination';
 import { SearchResultToolbar } from './content/toolbar/SearchResultToolbar';
 import { SearchResultHeader } from './header/SearchResultHeader';
 import { useSearchResults } from './hooks/useSearchResults';
@@ -296,7 +296,7 @@ export const SearchResultPage = () => {
           <Divider />
 
           <Box sx={{ px: 2, py: 1 }}>
-            <SearchResultPagination
+            <Pagination
               currentPage={pagination?.current_page ?? 1}
               pageSize={pagination?.per_page ?? 10}
               totalCount={pagination?.total ?? 0}

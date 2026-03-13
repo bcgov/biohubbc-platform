@@ -1,8 +1,8 @@
-import { MenuItem, Pagination, Select, SelectChangeEvent, Stack, Typography } from '@mui/material';
+import { MenuItem, Pagination as MuiPagination, Select, SelectChangeEvent, Stack, Typography } from '@mui/material';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
-interface SearchResultPaginationProps {
+interface PaginationProps {
   currentPage: number;
   pageSize: number;
   totalCount: number;
@@ -11,14 +11,14 @@ interface SearchResultPaginationProps {
   onPageSizeChange: (pageSize: number) => void;
 }
 
-export const SearchResultPagination = ({
+export const Pagination = ({
   currentPage,
   pageSize,
   totalCount,
   lastPage,
   onPageChange,
   onPageSizeChange
-}: SearchResultPaginationProps) => {
+}: PaginationProps) => {
   const firstItem = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const lastItem = Math.min(currentPage * pageSize, totalCount);
 
@@ -46,7 +46,7 @@ export const SearchResultPagination = ({
         </Select>
       </Stack>
 
-      <Pagination
+      <MuiPagination
         count={lastPage}
         page={currentPage}
         onChange={(_event, page) => onPageChange(page)}
