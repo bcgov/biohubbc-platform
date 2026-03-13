@@ -52,10 +52,13 @@ POST.apiDoc = {
   },
   responses: {
     201: {
-      description: 'Ticket reference created successfully',
+      description: 'Ticket references created successfully',
       content: {
         'application/json': {
-          schema: TicketReferenceSchema
+          schema: {
+            type: 'array',
+            items: TicketReferenceSchema
+          }
         }
       }
     },
@@ -72,11 +75,11 @@ export function createTicketReference(): RequestHandler {
 
       const ticketService = new TicketService(connection);
       const payload = req.body as CreateTicketReferenceRequest;
-      const createdReference = await ticketService.createTicketReference(req.params.ticketId, payload);
+      const createdReferences = await ticketService.createTicketReference(req.params.ticketId, payload);
 
       await connection.commit();
 
-      return res.status(201).json(createdReference);
+      return res.status(201).json(createdReferences);
     } catch (error) {
       defaultLog.error({ label: 'createTicketReference', message: 'error', error });
       await connection.rollback();

@@ -73,10 +73,21 @@ export const SubmissionFeature = z.object({
   source_id: z.string().nullable(),
   data: z.record(z.any()),
   feature_type_name: z.string(),
+  feature_type_display_name: z.string(),
+  submission_name: z.string(),
   secured: z.boolean()
 });
 
 export type SubmissionFeature = z.infer<typeof SubmissionFeature>;
+
+export const RelatedSubmissionFeature = z.object({
+  submission_feature_id: z.number(),
+  feature_type_name: z.string(),
+  feature_type_display_name: z.string(),
+  data: z.record(z.any())
+});
+
+export type RelatedSubmissionFeature = z.infer<typeof RelatedSubmissionFeature>;
 
 export const SubmissionFeatureRecordWithTypeAndSecurity = SubmissionFeatureRecord.extend({
   feature_type_name: z.string(),
@@ -571,6 +582,35 @@ export class SubmissionRepository extends BaseRepository {
       sourceIds: parentResult.rows.map((r) => r.source_feature_id),
       targetIds: childResult.rows.map((r) => r.target_feature_id)
     };
+  }
+
+  /**
+   * Get all related submission features with their type names.
+   *
+   * @param {number} submissionFeatureId The submission feature ID.
+   * @return {Promise<RelatedSubmissionFeature[]>}
+   * @memberof SubmissionRepository
+   */
+  async getRelatedSubmissionFeatures(submissionFeatureId: number): Promise<RelatedSubmissionFeature[]> {
+    const sqlStatement = SQL`
+      SELECT DISTINCT
+        sf.submission_feature_id,
+        ft.name as feature_type_name,
+        ft.display_name as feature_type_display_name,
+        sf.data
+      FROM submission_feature sf
+      JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+      WHERE sf.submission_feature_id IN (
+        SELECT source_feature_id FROM submission_feature_feature
+        WHERE target_feature_id = ${submissionFeatureId}
+        UNION
+        SELECT target_feature_id FROM submission_feature_feature
+        WHERE source_feature_id = ${submissionFeatureId}
+      );
+    `;
+
+    const response = await this.connection.sql(sqlStatement, RelatedSubmissionFeature);
+    return response.rows;
   }
 
   /**
@@ -1247,6 +1287,8 @@ export class SubmissionRepository extends BaseRepository {
         sf.source_id,
         sf.data,
         ft.name as feature_type_name,
+        ft.display_name as feature_type_display_name,
+        s.name as submission_name,
         EXISTS (
           SELECT 1
           FROM submission_feature_security sfs
@@ -1257,6 +1299,8 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature sf
       JOIN
         feature_type ft ON ft.feature_type_id = sf.feature_type_id
+      JOIN
+        submission s ON s.submission_id = sf.submission_id
       WHERE
         sf.submission_feature_id = ${submissionFeatureId};
     `;

@@ -1,12 +1,9 @@
 import { Divider, Typography } from '@mui/material';
 import { Stack } from '@mui/system';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
 import { ISubmissionUploadStatus } from 'interfaces/useSubmissionStatusApi.interface';
+import { getRelativeTimeLabel } from 'utils/date';
 import { SubmissionUploadStatusRow } from './components/SubmissionUploadStatusRow';
 import { SubmissionUploadStatusSection } from './components/SubmissionUploadStatusSection';
-
-dayjs.extend(relativeTime);
 
 interface SubmissionUploadStatusCardProps {
   status: ISubmissionUploadStatus;
@@ -64,7 +61,7 @@ export const SubmissionUploadStatusCard = (props: SubmissionUploadStatusCardProp
         {/* Scans */}
         <SubmissionUploadStatusSection title="Scans">
           {scans.map((scan) => {
-            const scannedAt = scan.scanned_at ? dayjs(scan.scanned_at).fromNow() : scan.artifact_security_scan_id;
+            const scannedAt = getRelativeTimeLabel(scan.scanned_at) ?? scan.artifact_security_scan_id;
 
             return (
               <SubmissionUploadStatusSection

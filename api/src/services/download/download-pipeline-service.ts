@@ -210,7 +210,10 @@ export class DownloadPipelineService extends DBService {
    * @memberof DownloadPipelineService
    */
   async planFragments(downloadId: string, sizeEstimate: DownloadSizeEstimate): Promise<void> {
-    const features = sizeEstimate.features;
+    // Sort by feature type so same types stay together during bin packing.
+    // This minimizes duplicate CSVs across fragments (e.g. one species_observation.csv
+    // instead of the same CSV appearing in multiple parts).
+    const features = [...sizeEstimate.features].sort((a, b) => a.feature_type_name.localeCompare(b.feature_type_name));
 
     // Read configurable fragment size from the download record
     const download = await this.downloadRepository.findDownloadById(downloadId);
@@ -332,6 +335,13 @@ export class DownloadPipelineService extends DBService {
     await this.updateDownloadStatus(downloadId, DownloadStatusEnum.READY);
   }
 
+  /**
+   * Mark a fragment as processing (sets started_at timestamp).
+   *
+   * @param {number} fragmentId - The fragment ID.
+   * @return {Promise<void>}
+   * @memberof DownloadPipelineService
+   */
   async markFragmentProcessing(fragmentId: number): Promise<void> {
     const now = new Date().toISOString();
     await this.fragmentRepository.updateFragmentStatus(fragmentId, DownloadStatusEnum.PROCESSING, {
@@ -363,8 +373,8 @@ export class DownloadPipelineService extends DBService {
       }
       const isSingleFragment = download.total_fragments === 1;
       const zipFileName = isSingleFragment
-        ? `download-${downloadId}.zip`
-        : `download-${downloadId}-part-${fragment.fragment_index + 1}.zip`;
+        ? `biohub-${downloadId}.zip`
+        : `biohub-${downloadId}-part-${fragment.fragment_index + 1}.zip`;
       const s3Key = `downloads/${downloadId}/${zipFileName}`;
 
       // Create streaming pipeline: archiver → passThrough → S3 upload
@@ -385,14 +395,23 @@ export class DownloadPipelineService extends DBService {
 
       const uploadPromise = objectStorageService.uploadStream(BucketType.MAIN, passThrough, 'application/zip', s3Key);
 
+      // Root folder inside the zip so extraction creates a containing directory
+      // e.g. "biohub-abc123/" or "biohub-abc123-part-1/"
+      const rootFolder = zipFileName.replace('.zip', '') + '/';
+
       // Index files folder for multi-fragment downloads so extracted parts combine cleanly
       const filesFolderName = isSingleFragment ? 'files' : `files${fragment.fragment_index + 1}`;
 
       // Stream features via cursor, append each type's CSV as it completes
-      const fileRefs = await this.streamFeaturesIntoArchive(fragmentId, archive, filesFolderName);
+      const fileRefs = await this.streamFeaturesIntoArchive(
+        fragmentId,
+        archive,
+        `${rootFolder}${filesFolderName}`,
+        rootFolder
+      );
 
       // Stream binary files into archive
-      await this.streamFilesToArchive(archive, fileRefs, objectStorageService, filesFolderName);
+      await this.streamFilesToArchive(archive, fileRefs, objectStorageService, `${rootFolder}${filesFolderName}`);
 
       await archive.finalize();
       await uploadPromise;
@@ -460,7 +479,13 @@ export class DownloadPipelineService extends DBService {
     }
 
     const objectStorageService = new ObjectStorageService();
-    return objectStorageService.getSignedUrl(BucketType.MAIN, fragment.s3_key, SIGNED_URL_EXPIRY_FRAGMENT);
+    const fileName = fragment.file_name ?? `download-${downloadId}-part-${fragmentIndex + 1}.zip`;
+    return objectStorageService.getSignedUrl(
+      BucketType.MAIN,
+      fragment.s3_key,
+      SIGNED_URL_EXPIRY_FRAGMENT,
+      `attachment; filename="${fileName}"`
+    );
   }
 
   /**
@@ -476,7 +501,8 @@ export class DownloadPipelineService extends DBService {
   private async streamFeaturesIntoArchive(
     fragmentId: number,
     archive: archiver.Archiver,
-    filesFolderName: string
+    filesFolderName: string,
+    rootFolder: string
   ): Promise<FileFeatureRef[]> {
     const featureTypes = await this.fragmentRepository.getFragmentFeatureTypes(fragmentId);
 
@@ -499,7 +525,8 @@ export class DownloadPipelineService extends DBService {
         archive,
         schemaLookup,
         rootDatasetCache,
-        filesFolderName
+        filesFolderName,
+        rootFolder
       );
       fileRefs.push(...refs);
     }
@@ -545,14 +572,15 @@ export class DownloadPipelineService extends DBService {
     archive: archiver.Archiver,
     schemaLookup: Map<string, CsvPropertyDefinition[]>,
     rootDatasetCache: Map<number, { dataset_uuid: string; dataset_name: string | null }>,
-    filesFolderName: string
+    filesFolderName: string,
+    rootFolder: string
   ): Promise<FileFeatureRef[]> {
     const isCore = featureType === 'dataset';
     const systemHeaders = isCore ? ['uuid'] : ['uuid', 'dataset_name', 'dataset_uuid'];
     const childProperties = schemaLookup.get(featureType) ?? [];
 
     const csvStream = new PassThrough();
-    archive.append(csvStream, { name: getOutputFilename(featureType) });
+    archive.append(csvStream, { name: `${rootFolder}${getOutputFilename(featureType)}` });
 
     let headersWritten = false;
     let parentProperties: CsvPropertyDefinition[] | null = null;
