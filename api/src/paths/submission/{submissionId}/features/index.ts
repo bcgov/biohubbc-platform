@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getDBConnection } from '../../../../database/db';
+import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../../../openapi/schemas/pagination';
 import { SubmissionService } from '../../../../services/submission-service';
@@ -12,7 +12,7 @@ const defaultLog = getLogger('paths/submission/{submissionId}');
 export const GET: Operation = [getSubmissionFeatures()];
 
 GET.apiDoc = {
-  description: 'Retrieves submission features for a logged-in system user.',
+  description: 'Retrieves submission features. Supports both authenticated and anonymous users.',
   tags: ['submission'],
   security: [
     {
@@ -74,7 +74,7 @@ GET.apiDoc = {
 };
 
 /**
- * Retrieves paginated submission feature records for an authenticated system user.
+ * Retrieves paginated submission feature records. Uses the request token when present, otherwise the API user connection for anonymous requests.
  *
  * Returns all features (secured and unsecured).
  *
@@ -82,7 +82,7 @@ GET.apiDoc = {
  */
 export function getSubmissionFeatures(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req.keycloak_token);
+    const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     const submissionId = Number(req.params.submissionId);
     const paginationOptions = makePaginationOptionsFromRequest(req);
