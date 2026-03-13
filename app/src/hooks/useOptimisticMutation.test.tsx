@@ -101,17 +101,19 @@ describe('useOptimisticMutation', () => {
     const setDataA = vi.fn();
     const setDataB = vi.fn();
 
-    const { result, rerender } = renderHook(({ currentValue, setData }) =>
-      useOptimisticMutation<{ value: number }>({
-        getData: () => ({ value: currentValue }),
-        setData
-      }),
-    {
-      initialProps: {
-        currentValue: 1,
-        setData: setDataA
+    const { result, rerender } = renderHook(
+      ({ currentValue, setData }) =>
+        useOptimisticMutation<{ value: number }>({
+          getData: () => ({ value: currentValue }),
+          setData
+        }),
+      {
+        initialProps: {
+          currentValue: 1,
+          setData: setDataA
+        }
       }
-    });
+    );
 
     rerender({ currentValue: 10, setData: setDataB });
 

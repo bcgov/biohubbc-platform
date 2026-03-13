@@ -1,8 +1,7 @@
-import { useCallback, useMemo } from 'react';
 import { useOptimisticDataLoader } from 'hooks/useOptimisticDataLoader';
 import { CartFeatureListResponse } from 'interfaces/useCartApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
-import { CartSnapshot } from './cartContext.interface';
+import { useCallback, useMemo } from 'react';
 import {
   buildOptimisticAddSnapshot,
   buildOptimisticRemoveSnapshot,
@@ -11,6 +10,7 @@ import {
   getPaginationParams,
   makeSnapshot
 } from './cartContext.helpers';
+import { CartSnapshot } from './cartContext.interface';
 import { IUseCartOptimisticActionsParams, IUseCartOptimisticActionsResult } from './useCartOptimisticActions.interface';
 
 /**
@@ -35,26 +35,102 @@ export const useCartOptimisticActions = (params: IUseCartOptimisticActionsParams
   });
 
   /**
+   * Maps optimistic feature items to the API add payload format.
+   */
+  const getFeaturePayload = useCallback((optimisticAdds: SearchFeatureResultWithRelevancy[]) => {
+    return { features: optimisticAdds.map((feature) => feature.submission_feature_id) };
+  }, []);
+
+  /**
+   * Builds optimistic config for adding features to an existing cart.
+   *
+   * Usage: pass the returned config directly into `refresh(...)`.
+   */
+  const buildAddConfig = useCallback(
+    (currentState: CartSnapshot, cartId: string, optimisticAdds: SearchFeatureResultWithRelevancy[]) => {
+      const optimisticState = buildOptimisticAddSnapshot(currentState, optimisticAdds);
+
+      return {
+        optimisticState,
+        mutation: () =>
+          cartApi.addCartFeatures(
+            cartId,
+            getFeaturePayload(optimisticAdds),
+            getPaginationParams(optimisticState.features.length)
+          ),
+        onSuccess: applyLoadSuccess
+      };
+    },
+    [applyLoadSuccess, cartApi, getFeaturePayload]
+  );
+
+  /**
+   * Removes persisted cart features and returns the last API response.
+   *
+   * Usage: called by remove mutation config to fan out one delete per
+   * `cart_submission_feature_id`, then reconcile from the final payload.
+   */
+  const removePersistedFeatures = useCallback(
+    async (
+      currentState: CartSnapshot,
+      optimisticState: CartSnapshot,
+      cartId: string,
+      featureIds: number[]
+    ): Promise<CartFeatureListResponse | undefined> => {
+      const cartSubmissionFeatureIds = getCartSubmissionFeatureIds(currentState.features, featureIds);
+
+      if (!cartSubmissionFeatureIds.length) {
+        return undefined;
+      }
+
+      const pagination = getPaginationParams(Math.max(optimisticState.features.length, 1));
+      const removePromises = cartSubmissionFeatureIds.map((cartSubmissionFeatureId) =>
+        cartApi.removeCartFeatureById(cartId, cartSubmissionFeatureId, pagination)
+      );
+      const responses = await Promise.all(removePromises);
+      return responses.at(-1);
+    },
+    [cartApi]
+  );
+
+  /**
+   * Commits authoritative remove state when a remove response is available.
+   */
+  const onRemoveSuccess = useCallback(
+    (lastResponse: CartFeatureListResponse | undefined) => {
+      if (lastResponse) {
+        applyLoadSuccess(lastResponse);
+      }
+    },
+    [applyLoadSuccess]
+  );
+
+  /**
+   * Builds optimistic config for removing features from an existing cart.
+   *
+   * Usage: pass the returned config directly into `refresh(...)`.
+   */
+  const buildRemoveConfig = useCallback(
+    (currentState: CartSnapshot, cartId: string, featureIds: number[]) => {
+      const optimisticState = buildOptimisticRemoveSnapshot(currentState, featureIds);
+
+      return {
+        optimisticState,
+        mutation: () => removePersistedFeatures(currentState, optimisticState, cartId, featureIds),
+        onSuccess: onRemoveSuccess
+      };
+    },
+    [onRemoveSuccess, removePersistedFeatures]
+  );
+
+  /**
    * Optimistically appends new features, then reconciles with server response.
    */
   const addToExistingCart = useCallback(
     async (cartId: string, optimisticAdds: SearchFeatureResultWithRelevancy[]) => {
-      await refresh<CartFeatureListResponse>((currentState) => {
-        const optimisticState = buildOptimisticAddSnapshot(currentState, optimisticAdds);
-
-        return {
-          optimisticState,
-          mutation: () =>
-            cartApi.addCartFeatures(
-              cartId,
-              { features: optimisticAdds.map((feature) => feature.submission_feature_id) },
-              getPaginationParams(optimisticState.features.length)
-            ),
-          onSuccess: applyLoadSuccess
-        };
-      });
+      await refresh<CartFeatureListResponse>((currentState) => buildAddConfig(currentState, cartId, optimisticAdds));
     },
-    [applyLoadSuccess, cartApi, refresh]
+    [buildAddConfig, refresh]
   );
 
   /**
@@ -63,38 +139,11 @@ export const useCartOptimisticActions = (params: IUseCartOptimisticActionsParams
    */
   const removeFromExistingCart = useCallback(
     async (cartId: string, featureIds: number[]) => {
-      await refresh<CartFeatureListResponse | undefined>((currentState) => {
-        const optimisticState = buildOptimisticRemoveSnapshot(currentState, featureIds);
-
-        return {
-          optimisticState,
-          mutation: async () => {
-            const cartSubmissionFeatureIds = getCartSubmissionFeatureIds(currentState.features, featureIds);
-
-            if (!cartSubmissionFeatureIds.length) {
-              return undefined;
-            }
-
-            const removePromises = cartSubmissionFeatureIds.map((cartSubmissionFeatureId) =>
-              cartApi.removeCartFeatureById(
-                cartId,
-                cartSubmissionFeatureId,
-                getPaginationParams(Math.max(optimisticState.features.length, 1))
-              )
-            );
-
-            const responses = await Promise.all(removePromises);
-            return responses[responses.length - 1];
-          },
-          onSuccess: (lastResponse) => {
-            if (lastResponse) {
-              applyLoadSuccess(lastResponse);
-            }
-          }
-        };
-      });
+      await refresh<CartFeatureListResponse | undefined>((currentState) =>
+        buildRemoveConfig(currentState, cartId, featureIds)
+      );
     },
-    [applyLoadSuccess, cartApi, refresh]
+    [buildRemoveConfig, refresh]
   );
 
   /**
