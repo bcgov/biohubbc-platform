@@ -18,7 +18,7 @@ import { IUseCartOptimisticActionsParams, IUseCartOptimisticActionsResult } from
  * add features, remove features, and clear cart.
  */
 export const useCartOptimisticActions = (params: IUseCartOptimisticActionsParams): IUseCartOptimisticActionsResult => {
-  const { state, cartApi, applyLoadSuccess, applyRollback, applyOptimisticSnapshot } = params;
+  const { state, cartApi, applyLoadSuccess, applyOptimisticSnapshot } = params;
 
   /**
    * CartSnapshot is a lightweight reducer snapshot (features + pagination)
@@ -50,14 +50,11 @@ export const useCartOptimisticActions = (params: IUseCartOptimisticActionsParams
               { features: optimisticAdds.map((feature) => feature.submission_feature_id) },
               getPaginationParams(optimisticState.features.length)
             ),
-          onSuccess: applyLoadSuccess,
-          onRollback: ({ currentState: previousState }) => {
-            applyRollback(previousState);
-          }
+          onSuccess: applyLoadSuccess
         };
       });
     },
-    [applyLoadSuccess, applyRollback, cartApi, refresh]
+    [applyLoadSuccess, cartApi, refresh]
   );
 
   /**
@@ -93,14 +90,11 @@ export const useCartOptimisticActions = (params: IUseCartOptimisticActionsParams
             if (lastResponse) {
               applyLoadSuccess(lastResponse);
             }
-          },
-          onRollback: ({ currentState: previousState }) => {
-            applyRollback(previousState);
           }
         };
       });
     },
-    [applyLoadSuccess, applyRollback, cartApi, refresh]
+    [applyLoadSuccess, cartApi, refresh]
   );
 
   /**
@@ -108,16 +102,13 @@ export const useCartOptimisticActions = (params: IUseCartOptimisticActionsParams
    */
   const clearExistingCart = useCallback(
     async (cartId: string) => {
-      await refresh<CartFeatureListResponse>((currentState) => ({
+      await refresh<CartFeatureListResponse>(() => ({
         optimisticState: EMPTY_SNAPSHOT,
         mutation: () => cartApi.clearCart(cartId, getPaginationParams(1)),
-        onSuccess: applyLoadSuccess,
-        onRollback: () => {
-          applyRollback(currentState);
-        }
+        onSuccess: applyLoadSuccess
       }));
     },
-    [applyLoadSuccess, applyRollback, cartApi, refresh]
+    [applyLoadSuccess, cartApi, refresh]
   );
 
   return {

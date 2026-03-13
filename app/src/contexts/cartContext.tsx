@@ -46,13 +46,6 @@ export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
   }, []);
 
   /**
-   * Restores the previous cart snapshot after an optimistic failure.
-   */
-  const applyRollback = useCallback((snapshot: CartSnapshot) => {
-    dispatch({ type: 'ROLLBACK', payload: snapshot });
-  }, []);
-
-  /**
    * Applies a transient optimistic cart snapshot for immediate UI feedback.
    */
   const applyOptimisticSnapshot = useCallback((snapshot: CartSnapshot) => {
@@ -73,7 +66,6 @@ export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
     state,
     cartApi: api.cart,
     applyLoadSuccess,
-    applyRollback,
     applyOptimisticSnapshot
   });
 

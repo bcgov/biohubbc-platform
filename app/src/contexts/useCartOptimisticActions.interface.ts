@@ -20,7 +20,6 @@ export interface IUseCartOptimisticActionsParams {
   state: CartState;
   cartApi: CartOptimisticActionsApi;
   applyLoadSuccess: (response: CartFeatureListResponse) => void;
-  applyRollback: (snapshot: CartSnapshot) => void;
   applyOptimisticSnapshot: (snapshot: CartSnapshot) => void;
 }
 
