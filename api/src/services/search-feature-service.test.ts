@@ -501,9 +501,7 @@ describe('SearchFeatureService', () => {
         }
       ]);
 
-      sinon
-        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId')
-        .resolves();
+      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
       sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'getFeatureTypePropertyMetadata').resolves([
         {
           feature_type_id: 1,
@@ -565,9 +563,7 @@ describe('SearchFeatureService', () => {
         }
       ]);
 
-      sinon
-        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId')
-        .resolves();
+      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
       sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'getFeatureTypePropertyMetadata').resolves([
         {
           feature_type_id: 1,
@@ -662,9 +658,7 @@ describe('SearchFeatureService', () => {
         }
       ]);
 
-      sinon
-        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId')
-        .resolves();
+      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
       sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'getFeatureTypePropertyMetadata').resolves([
         {
           feature_type_id: 1,

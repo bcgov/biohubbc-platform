@@ -28,12 +28,12 @@ export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmiss
   for (const job of jobs) {
     const { submissionId } = job.data;
 
-      defaultLog.info({
-        label: 'indexSubmissionFeaturesJobHandler',
-        message: 'Processing index submission features job',
-        jobId: job.id,
-        submissionId
-      });
+    defaultLog.info({
+      label: 'indexSubmissionFeaturesJobHandler',
+      message: 'Processing index submission features job',
+      jobId: job.id,
+      submissionId
+    });
 
     const connection = getAPIUserDBConnection();
     try {

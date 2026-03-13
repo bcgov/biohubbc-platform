@@ -40,10 +40,7 @@ export const parseCodeReference = (value: string): CodeReference | null => {
  * @param {CodeReference} codeReference
  * @return {unknown}
  */
-export const resolveCodeReference = (
-  codesets: Record<string, unknown>,
-  codeReference: CodeReference
-): unknown => {
+export const resolveCodeReference = (codesets: Record<string, unknown>, codeReference: CodeReference): unknown => {
   const contributorCodeset = codesets[codeReference.contributorCodesetKey];
   const codes =
     typeof contributorCodeset === 'object' && contributorCodeset !== null

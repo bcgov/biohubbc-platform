@@ -90,11 +90,7 @@ export class FeatureValidationService extends DBService {
       if (typeErrors.length === 0) {
         const featureTypeWithProps = await this.findFeatureTypeWithPropertiesCached(feature.type);
         if (featureTypeWithProps) {
-          const propertyErrors = this.validateFeaturePropertyFlat(
-            feature,
-            featureTypeWithProps.properties,
-            codesets
-          );
+          const propertyErrors = this.validateFeaturePropertyFlat(feature, featureTypeWithProps.properties, codesets);
           errors.push(...propertyErrors);
         }
       }
