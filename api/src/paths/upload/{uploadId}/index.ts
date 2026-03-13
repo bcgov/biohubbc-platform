@@ -11,7 +11,9 @@ const defaultLog = getLogger('paths/upload/{uploadId}/archive/{uploadArchiveId}/
 
 export const PUT: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ discriminator: 'ServiceClient' }]
+    or: [
+      { discriminator: 'Contributor' }
+    ]
   })),
   completeUpload()
 ];

@@ -7,7 +7,12 @@ import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import * as UserQueries from '../queries/database/user-context-queries';
 import { SystemUser } from '../repositories/user-repository';
-import { getServiceClientSystemUser, getUserGuid, getUserIdentitySource } from '../utils/keycloak-utils';
+import {
+  getServiceClientSystemUser,
+  getUserGuid,
+  getUserIdentitySource,
+  KeycloakUserInformation
+} from '../utils/keycloak-utils';
 import { getLogger } from '../utils/logger';
 import { asyncErrorWrapper, syncErrorWrapper } from './db-utils';
 
@@ -194,10 +199,12 @@ export interface IDBConnection {
  *   connection.release();
  * }
  *
- * @param {object} keycloakToken
+ * @param {(KeycloakUserInformation | null | undefined)} keycloakToken
  * @return {*} {IDBConnection}
  */
-export const getDBConnection = function (keycloakToken: object): IDBConnection {
+export const getDBConnection = function (
+  keycloakToken: KeycloakUserInformation | null | undefined
+): IDBConnection {
   if (!keycloakToken) {
     throw Error('Keycloak token is undefined');
   }

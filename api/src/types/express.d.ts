@@ -13,7 +13,7 @@ declare module 'express-serve-static-core' {
     /**
      * Keycloak user JWT token object.
      */
-    keycloak_token?: KeycloakUserInformation;
+    keycloak_token?: KeycloakUserInformation | null;
 
     /**
      * SIMS system user details object.
@@ -24,6 +24,11 @@ declare module 'express-serve-static-core' {
      * Authorization Scheme object.
      */
     authorization_scheme?: AuthorizationScheme;
+
+    /**
+     * Contributor id resolved during contributor authorization.
+     */
+    contributor_id?: number;
 
     /**
      * OpenAPI operation object injected by express-openapi.

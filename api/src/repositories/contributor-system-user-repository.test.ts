@@ -3,18 +3,18 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiExecuteSQLError } from '../../src/errors/api-error';
-import { ContributorMemberRepository } from '../../src/repositories/contributor-member-repository';
+import { ContributorSystemUserRepository } from '../../src/repositories/contributor-system-user-repository';
 import { getMockDBConnection } from '../../src/__mocks__/db';
 
 chai.use(sinonChai);
 
-describe('ContributorMemberRepository', () => {
+describe('ContributorSystemUserRepository', () => {
   afterEach(() => {
     sinon.restore();
   });
 
-  describe('findContributorMember', () => {
-    it('returns contributor-member relationship when found', async () => {
+  describe('findContributorSystemUser', () => {
+    it('returns contributor-system-user relationship when found', async () => {
       const mockQueryResponse = {
         rowCount: 1,
         rows: [{ contributor_system_user_id: 1, contributor_id: 123, system_user_id: 456 }]
@@ -24,9 +24,9 @@ describe('ContributorMemberRepository', () => {
         sql: async () => mockQueryResponse
       });
 
-      const repository = new ContributorMemberRepository(mockDBConnection);
+      const repository = new ContributorSystemUserRepository(mockDBConnection);
 
-      const result = await repository.findContributorMember(123, 456);
+      const result = await repository.findContributorSystemUser(456);
 
       expect(result).to.eql({ contributor_system_user_id: 1, contributor_id: 123, system_user_id: 456 });
     });
@@ -41,9 +41,9 @@ describe('ContributorMemberRepository', () => {
         sql: async () => mockQueryResponse
       });
 
-      const repository = new ContributorMemberRepository(mockDBConnection);
+      const repository = new ContributorSystemUserRepository(mockDBConnection);
 
-      const result = await repository.findContributorMember(123, 456);
+      const result = await repository.findContributorSystemUser(456);
 
       expect(result).to.equal(null);
     });
@@ -61,10 +61,10 @@ describe('ContributorMemberRepository', () => {
         sql: async () => mockQueryResponse
       });
 
-      const repository = new ContributorMemberRepository(mockDBConnection);
+      const repository = new ContributorSystemUserRepository(mockDBConnection);
 
       try {
-        await repository.findContributorMember(123, 456);
+        await repository.findContributorSystemUser(456);
         expect.fail('Expected error to be thrown');
       } catch (err) {
         expect(err).to.be.instanceOf(ApiExecuteSQLError);
@@ -73,7 +73,7 @@ describe('ContributorMemberRepository', () => {
     });
   });
 
-  describe('createContributorMember', () => {
+  describe('createContributorSystemUser', () => {
     it('calls SQL insert with correct table and columns', async () => {
       const sqlSpy = sinon.stub().resolves({ rowCount: 1 });
 
@@ -81,9 +81,9 @@ describe('ContributorMemberRepository', () => {
         sql: sqlSpy
       });
 
-      const repository = new ContributorMemberRepository(mockDBConnection);
+      const repository = new ContributorSystemUserRepository(mockDBConnection);
 
-      await repository.createContributorMember(123, 456);
+      await repository.createContributorSystemUser(123, 456);
 
       expect(sqlSpy).to.have.been.calledOnce;
       const insertQueryText = sqlSpy.getCall(0).args[0].text;
@@ -98,10 +98,10 @@ describe('ContributorMemberRepository', () => {
         }
       });
 
-      const repository = new ContributorMemberRepository(mockDBConnection);
+      const repository = new ContributorSystemUserRepository(mockDBConnection);
 
       try {
-        await repository.createContributorMember(999, 999);
+        await repository.createContributorSystemUser(999, 999);
         expect.fail('Expected error to be thrown');
       } catch (err) {
         expect(err).to.be.instanceOf(Error);
