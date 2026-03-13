@@ -18,7 +18,7 @@ chai.use(sinonChai);
 describe('keycloakUtils', () => {
   describe('getUserGuid', () => {
     it('returns null response when null keycloakToken provided', () => {
-      const response = getUserGuid(null);
+      const response = getUserGuid(null as unknown as object);
 
       expect(response).to.be.null;
     });
@@ -38,7 +38,7 @@ describe('keycloakUtils', () => {
 
   describe('getUserIdentifier', () => {
     it('returns null response when null keycloakToken provided', () => {
-      const response = getUserIdentifier(null);
+      const response = getUserIdentifier(null as unknown as object);
 
       expect(response).to.be.null;
     });
@@ -64,7 +64,7 @@ describe('keycloakUtils', () => {
 
   describe('getUserIdentitySource', () => {
     it('returns non null response when null keycloakToken provided', () => {
-      const response = getUserIdentitySource(null);
+      const response = getUserIdentitySource(null as unknown as object);
 
       expect(response).to.equal(SYSTEM_IDENTITY_SOURCE.DATABASE);
     });

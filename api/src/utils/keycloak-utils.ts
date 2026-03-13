@@ -2,30 +2,16 @@ import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { getDBConstants } from '../database/db-constants';
 import { SystemUser } from '../repositories/user-repository';
 
-export interface KeycloakUserInformation {
-  preferred_username?: string | null;
-  identity_provider?: string | null;
-  idir_username?: string | null;
-  bceid_username?: string | null;
-  sub?: string | null;
-  display_name?: string | null;
-  email?: string | null;
-  given_name?: string | null;
-  family_name?: string | null;
-  bceid_business_name?: string | null;
-  [key: string]: unknown;
-}
-
 /**
  * Parses out the user's GUID from a keycloak token, which is extracted from the
  * `preferred_username` property.
  *
  * @example getUserGuid({ preferred_username: '123-456-789@idir' }) // => '123-456-789'
  *
- * @param {KeycloakUserInformation} keycloakToken
+ * @param {Record<string, any>} keycloakToken
  * @return {*} {(string | null)}
  */
-export const getUserGuid = (keycloakToken: KeycloakUserInformation | null | undefined): string | null => {
+export const getUserGuid = (keycloakToken: Record<string, any>): string | null => {
   const userIdentifier = keycloakToken?.['preferred_username']?.split('@')?.[0];
 
   if (!userIdentifier) {
@@ -43,14 +29,14 @@ export const getUserGuid = (keycloakToken: KeycloakUserInformation | null | unde
  * @example getUserIdentitySource({ ...token, identity_provider: 'bceidbasic' }) => SYSTEM_IDENTITY_SOURCE.BCEID_BASIC
  * @example getUserIdentitySource({ preferred_username: '123-456-789@idir' }) => SYSTEM_IDENTITY_SOURCE.IDIR
  *
- * @param {KeycloakUserInformation} keycloakToken
+ * @param {Record<string, any>} keycloakToken
  * @return {*} {SYSTEM_IDENTITY_SOURCE}
  */
-export const getUserIdentitySource = (keycloakToken: KeycloakUserInformation | null | undefined): SYSTEM_IDENTITY_SOURCE => {
-  const userIdentitySource: string | undefined =
+export const getUserIdentitySource = (keycloakToken: Record<string, any>): SYSTEM_IDENTITY_SOURCE => {
+  const userIdentitySource: string =
     keycloakToken?.['identity_provider'] || keycloakToken?.['preferred_username']?.split('@')?.[1];
 
-  return coerceUserIdentitySource(userIdentitySource ?? null);
+  return coerceUserIdentitySource(userIdentitySource);
 };
 
 /**
@@ -91,10 +77,10 @@ export const coerceUserIdentitySource = (userIdentitySource: string | null): SYS
  *
  * @example getUserIdentifier({ ....token, bceid_username: 'jsmith@idir' }) => 'jsmith'
  *
- * @param {KeycloakUserInformation} keycloakToken
+ * @param {Record<string, any>} keycloakToken
  * @return {*} {(string | null)}
  */
-export const getUserIdentifier = (keycloakToken: KeycloakUserInformation | null | undefined): string | null => {
+export const getUserIdentifier = (keycloakToken: Record<string, any>): string | null => {
   const userIdentifier = keycloakToken?.['idir_username'] || keycloakToken?.['bceid_username'];
 
   if (!userIdentifier) {
@@ -107,10 +93,10 @@ export const getUserIdentifier = (keycloakToken: KeycloakUserInformation | null 
 /**
  * Parses out the `sub` field from the token and maps them to a known service client system user.
  *
- * @param {KeycloakUserInformation} keycloakToken
+ * @param {Record<string, any>} keycloakToken
  * @return {*}  {(SystemUser | null)}
  */
-export const getServiceClientSystemUser = (keycloakToken: KeycloakUserInformation | null | undefined): SystemUser | null => {
+export const getServiceClientSystemUser = (keycloakToken: Record<string, any>): SystemUser | null => {
   const sub = keycloakToken?.['sub'];
 
   if (!sub) {
@@ -124,40 +110,40 @@ export const getServiceClientSystemUser = (keycloakToken: KeycloakUserInformatio
 /**
  * Parses out the user's display name from a keycloak token.
  *
- * @param {KeycloakUserInformation} keycloakToken
+ * @param {Record<string, any>} keycloakToken
  * @return {*}  {(string | null)}
  */
-export const getDisplayName = (keycloakToken: KeycloakUserInformation | null | undefined): string | null => {
+export const getDisplayName = (keycloakToken: Record<string, any>): string | null => {
   return keycloakToken?.['display_name'] ?? null;
 };
 
 /**
  * Parses out the user's email from a keycloak token.
  *
- * @param {KeycloakUserInformation} keycloakToken
+ * @param {Record<string, any>} keycloakToken
  * @return {*}  {(string | null)}
  */
-export const getEmail = (keycloakToken: KeycloakUserInformation | null | undefined): string | null => {
+export const getEmail = (keycloakToken: Record<string, any>): string | null => {
   return keycloakToken?.['email'] ?? null;
 };
 
 /**
  * Parses out the user's given name (first name) from a keycloak token.
  *
- * @param {KeycloakUserInformation} keycloakToken
+ * @param {Record<string, any>} keycloakToken
  * @return {*}  {(string | null)}
  */
-export const getGivenName = (keycloakToken: KeycloakUserInformation | null | undefined): string | null => {
+export const getGivenName = (keycloakToken: Record<string, any>): string | null => {
   return keycloakToken?.['given_name'] ?? null;
 };
 
 /**
  * Parses out the user's family name (last name) from a keycloak token.
  *
- * @param {KeycloakUserInformation} keycloakToken
+ * @param {Record<string, any>} keycloakToken
  * @return {*}  {(string | null)}
  */
-export const getFamilyName = (keycloakToken: KeycloakUserInformation | null | undefined): string | null => {
+export const getFamilyName = (keycloakToken: Record<string, any>): string | null => {
   return keycloakToken?.['family_name'] ?? null;
 };
 
@@ -165,9 +151,9 @@ export const getFamilyName = (keycloakToken: KeycloakUserInformation | null | un
  * Parses out the user's agency from a keycloak token.
  * This is only available for BCeID Business users via the `bceid_business_name` field.
  *
- * @param {KeycloakUserInformation} keycloakToken
+ * @param {Record<string, any>} keycloakToken
  * @return {*}  {(string | null)}
  */
-export const getAgency = (keycloakToken: KeycloakUserInformation | null | undefined): string | null => {
+export const getAgency = (keycloakToken: Record<string, any>): string | null => {
   return keycloakToken?.['bceid_business_name'] ?? null;
 };

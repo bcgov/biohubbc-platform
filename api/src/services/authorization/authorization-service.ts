@@ -2,7 +2,7 @@ import dayjs from 'dayjs';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { IDBConnection } from '../../database/db';
 import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
-import { getUserGuid, KeycloakUserInformation } from '../../utils/keycloak-utils';
+import { getUserGuid } from '../../utils/keycloak-utils';
 import { CartService } from '../cart-service';
 import { ContributorSystemUserService } from '../contributor-system-user-service';
 import { DBService } from '../db-service';
@@ -99,13 +99,10 @@ export class AuthorizationService extends DBService {
   _userService = new UserService(this.connection);
   _contributorSystemUserService = new ContributorSystemUserService(this.connection);
   _systemUser: SystemUserExtended | undefined = undefined;
-  _keycloakToken: KeycloakUserInformation | null | undefined = undefined;
+  _keycloakToken: object | undefined = undefined;
   _contributorId: number | undefined = undefined;
 
-  constructor(
-    connection: IDBConnection,
-    init?: { systemUser?: SystemUserExtended; keycloakToken?: KeycloakUserInformation | null }
-  ) {
+  constructor(connection: IDBConnection, init?: { systemUser?: SystemUserExtended; keycloakToken?: object }) {
     super(connection);
 
     this._systemUser = init?.systemUser;
