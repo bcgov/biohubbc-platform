@@ -19,6 +19,7 @@ import {
   RecommendedFiltersInput,
   useRecommendedFilters
 } from './sidebar/search/hooks/useRecommendedFilters';
+import { useNavigate } from 'react-router';
 
 export enum SEARCH_RESULT_OPTION_VIEW {
   LIST = 'list',
@@ -26,6 +27,7 @@ export enum SEARCH_RESULT_OPTION_VIEW {
 }
 
 export const SearchResultPage = () => {
+  const navigate = useNavigate();
   const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination, filters } = useSearchResults();
   const api = useApi();
   const { codesDataLoader } = useCodesContext();

@@ -5,7 +5,7 @@ import sinonChai from 'sinon-chai';
 import * as index from '.';
 import * as db from '../../../../../database/db';
 import { HTTP400, HTTPError } from '../../../../../errors/http-error';
-import { SubmissionFeature } from '../../../../../repositories/submission-repository';
+import { RelatedSubmissionFeature, SubmissionFeature } from '../../../../../repositories/submission-repository';
 import { SubmissionService } from '../../../../../services/submission-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 
@@ -24,6 +24,8 @@ describe('index', () => {
       const getSubmissionFeatureByIdStub = sinon
         .stub(SubmissionService.prototype, 'getSubmissionFeatureById')
         .throws(new HTTP400('Error', ['Error']));
+
+      sinon.stub(SubmissionService.prototype, 'getRelatedSubmissionFeatures').resolves([]);
 
       const requestHandler = index.getSubmissionFeatureById();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -54,13 +56,28 @@ describe('index', () => {
         feature_type_id: 1,
         source_id: null,
         data: { key: 'value' },
-        feature_type_name: 'Sample Site',
+        feature_type_name: 'sample_site',
+        feature_type_display_name: 'Sample Site',
+        submission_name: 'Test Submission',
         secured: true
       };
+
+      const mockRelatedFeatures: RelatedSubmissionFeature[] = [
+        {
+          submission_feature_id: 2,
+          feature_type_name: 'observation',
+          feature_type_display_name: 'Observation',
+          data: { name: 'Observation A' }
+        }
+      ];
 
       const getSubmissionFeatureByIdStub = sinon
         .stub(SubmissionService.prototype, 'getSubmissionFeatureById')
         .resolves(mockFeature);
+
+      const getRelatedSubmissionFeaturesStub = sinon
+        .stub(SubmissionService.prototype, 'getRelatedSubmissionFeatures')
+        .resolves(mockRelatedFeatures);
 
       const requestHandler = index.getSubmissionFeatureById();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -72,8 +89,9 @@ describe('index', () => {
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(getSubmissionFeatureByIdStub).to.have.been.calledOnceWith(1);
+      expect(getRelatedSubmissionFeaturesStub).to.have.been.calledOnceWith(1);
       expect(mockRes.statusValue).to.eql(200);
-      expect(mockRes.jsonValue).to.eql({ feature: mockFeature });
+      expect(mockRes.jsonValue).to.eql({ feature: mockFeature, relatedFeatures: mockRelatedFeatures });
     });
   });
 });

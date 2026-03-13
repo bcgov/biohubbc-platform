@@ -13,53 +13,53 @@ import { PageTitle } from 'utils/RouteWithMeta';
  */
 export const SearchRouter = () => {
   return (
-    <Routes>
-      {/* Default redirect */}
-      <Route
-        path="/"
-        element={
-          <BaseLayout>
-            <PageTitle title="Search Data" description="Search and download data" />
-            <SearchPage />
-          </BaseLayout>
-        }
-      />
+    <CartContextProvider>
+      <Routes>
+        {/* Default redirect */}
+        <Route
+          path="/"
+          element={
+            <BaseLayout>
+              <PageTitle title="Search Data" description="Search and download data" />
+              <SearchPage />
+            </BaseLayout>
+          }
+        />
 
-      <Route
-        path="/list"
-        element={
-          <SearchLayout>
-            <CartContextProvider>
+        <Route
+          path="/list"
+          element={
+            <SearchLayout>
               <PageTitle title="Search Results" description="List of search results" />
               <SearchResultPage />
-            </CartContextProvider>
-          </SearchLayout>
-        }
-      />
+            </SearchLayout>
+          }
+        />
 
-      {/* Route for submission details with meta */}
-      <Route
-        path="/:submissionId/feature/:submissionFeatureId"
-        element={
-          <BaseLayout>
-            <PageTitle title="Submission Details" description="Details of a specific submission" />
-            <SubmissionFeaturePage />
-          </BaseLayout>
-        }
-      />
+        {/* Route for submission details with meta */}
+        <Route
+          path="/:submissionId/feature/:submissionFeatureId"
+          element={
+            <BaseLayout>
+              <PageTitle title="Submission Details" description="Details of a specific submission" />
+              <SubmissionFeaturePage />
+            </BaseLayout>
+          }
+        />
 
-      <Route
-        path="/:submissionId"
-        element={
-          <BaseLayout>
-            <PageTitle title="Submission Details" description="Details of a specific submission" />
-            <SubmissionDetailPage />
-          </BaseLayout>
-        }
-      />
+        <Route
+          path="/:submissionId"
+          element={
+            <BaseLayout>
+              <PageTitle title="Submission Details" description="Details of a specific submission" />
+              <SubmissionDetailPage />
+            </BaseLayout>
+          }
+        />
 
-      {/* Catch any unknown routes, and re-direct to the not found page */}
-      <Route path="*" element={<Navigate to="/page-not-found" replace />} />
-    </Routes>
+        {/* Catch any unknown routes, and re-direct to the not found page */}
+        <Route path="*" element={<Navigate to="/page-not-found" replace />} />
+      </Routes>
+    </CartContextProvider>
   );
 };
