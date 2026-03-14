@@ -2,7 +2,7 @@ import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { SubmissionFeatureForReview } from '../models/submission';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
@@ -674,11 +674,12 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Fetch a submission_id from uuid.
    *
-   * @param {number} uuid
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @param {string} uuid - The submission UUID.
+   * @return {Promise<{ submission_id: number }>} The submission_id for the given UUID.
+   * @throws {ApiNotFoundError} If no submission exists for the given UUID.
    * @memberof SubmissionRepository
    */
-  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number } | null> {
+  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       SELECT
         submission_id
@@ -689,11 +690,10 @@ export class SubmissionRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
-    if (response.rowCount !== 0) {
-      return response.rows[0];
-    } else {
-      return null;
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Submission not found', ['SubmissionRepository->getSubmissionIdByUUID', { uuid }]);
     }
+    return response.rows[0];
   }
 
   /**
