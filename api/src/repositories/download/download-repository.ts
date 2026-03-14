@@ -343,10 +343,16 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Returns which of the given feature IDs have active security rules.
+   * Returns which of the given feature IDs are secured — directly or by
+   * inheriting security from an ancestor.
    *
-   * This query is intentionally trivial — it must be obviously correct so it
-   * can serve as a reliable cross-check against the more complex query logic.
+   * Walks DOWN from secured roots to all descendants, the opposite direction
+   * of buildSecurityCheck() (which walks UP from a feature to its ancestors).
+   * Using a different traversal direction makes this a genuine cross-check:
+   * if the two methods disagree, there's a bug.
+   *
+   * Scoped to submissions containing the candidate features to avoid walking
+   * every secured tree in the system.
    *
    * @param {number[]} submissionFeatureIds - Feature IDs to check.
    * @return {Promise<Set<number>>} Set of feature IDs that are secured.
@@ -358,10 +364,27 @@ export class DownloadRepository extends BaseRepository {
     }
 
     const sql = SQL`
+      WITH RECURSIVE secured_descendants AS (
+        -- Base: directly secured features, scoped to relevant submissions
+        SELECT sfs.submission_feature_id
+        FROM submission_feature_security sfs
+        INNER JOIN submission_feature sf ON sf.submission_feature_id = sfs.submission_feature_id
+        WHERE sfs.record_end_date IS NULL
+          AND sf.submission_id IN (
+            SELECT submission_id FROM submission_feature
+            WHERE submission_feature_id = ANY(${submissionFeatureIds}::int[])
+          )
+
+        UNION ALL
+
+        -- Walk down to children
+        SELECT child.submission_feature_id
+        FROM submission_feature child
+        INNER JOIN secured_descendants sd ON child.parent_submission_feature_id = sd.submission_feature_id
+      )
       SELECT DISTINCT submission_feature_id
-      FROM submission_feature_security
-      WHERE submission_feature_id = ANY(${submissionFeatureIds}::int[])
-        AND record_end_date IS NULL;
+      FROM secured_descendants
+      WHERE submission_feature_id = ANY(${submissionFeatureIds}::int[]);
     `;
 
     const response = await this.connection.sql(sql, z.object({ submission_feature_id: z.number() }));
