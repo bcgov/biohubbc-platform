@@ -239,13 +239,15 @@ describe('useSessionStorage', () => {
     });
 
     it('should round-trip object values through storage and retrieval', () => {
-      const { result } = renderHook(() => useSessionStorage('round-trip-obj', { a: 1 }));
+      const { result } = renderHook(() => useSessionStorage<{ a: number; b?: number }>('round-trip-obj', { a: 1 }));
 
       act(() => {
         result.current[1]({ a: 2, b: 3 });
       });
 
-      const { result: result2 } = renderHook(() => useSessionStorage('round-trip-obj', { a: 1 }));
+      const { result: result2 } = renderHook(() =>
+        useSessionStorage<{ a: number; b?: number }>('round-trip-obj', { a: 1 })
+      );
 
       expect(result2.current[0]).toEqual({ a: 2, b: 3 });
     });
