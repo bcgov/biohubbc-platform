@@ -415,36 +415,36 @@ describe('Team feature cache + search (integration)', function () {
     });
   });
 
+  /**
+   * Shared setup: creates a submission with one unsecured and one secured feature,
+   * a team with a user, and a policy granting the team access to the secured feature.
+   * Returns all IDs needed for assertions.
+   */
+  async function setupSearchScenario() {
+    const submissionId = await createTestSubmission(connection);
+    const unsecuredFeatureId = await createTestFeature(connection, submissionId, 'dataset', {
+      name: 'Open Dataset'
+    });
+    const securedFeatureId = await createTestFeature(connection, submissionId, 'dataset', {
+      name: 'Secured Dataset'
+    });
+    await secureFeature(securedFeatureId);
+
+    const teamId = await createTeam('Search Test Team');
+    const userId = await createUser();
+    await addTeamMember(teamId, userId);
+
+    // Grant team access to the secured feature and populate cache
+    await grantTeamAccess(teamId, `urn:${submissionId}:dataset:${securedFeatureId}`);
+    const teamFeatureService = new TeamFeatureService(connection);
+    await teamFeatureService.refreshCacheForTeam(teamId);
+
+    return { submissionId, unsecuredFeatureId, securedFeatureId, teamId, userId };
+  }
+
   // ── Search filtering tests ─────────────────────────────────────────────
 
   describe('Search with team_feature filtering', () => {
-    /**
-     * Shared setup: creates a submission with one unsecured and one secured feature,
-     * a team with a user, and a policy granting the team access to the secured feature.
-     * Returns all IDs needed for assertions.
-     */
-    async function setupSearchScenario() {
-      const submissionId = await createTestSubmission(connection);
-      const unsecuredFeatureId = await createTestFeature(connection, submissionId, 'dataset', {
-        name: 'Open Dataset'
-      });
-      const securedFeatureId = await createTestFeature(connection, submissionId, 'dataset', {
-        name: 'Secured Dataset'
-      });
-      await secureFeature(securedFeatureId);
-
-      const teamId = await createTeam('Search Test Team');
-      const userId = await createUser();
-      await addTeamMember(teamId, userId);
-
-      // Grant team access to the secured feature and populate cache
-      await grantTeamAccess(teamId, `urn:${submissionId}:dataset:${securedFeatureId}`);
-      const teamFeatureService = new TeamFeatureService(connection);
-      await teamFeatureService.refreshCacheForTeam(teamId);
-
-      return { submissionId, unsecuredFeatureId, securedFeatureId, teamId, userId };
-    }
-
     it('should return only unsecured features for anonymous search (systemUserId=null)', async () => {
       const { unsecuredFeatureId, securedFeatureId } = await setupSearchScenario();
 
