@@ -141,15 +141,23 @@ describe('Team feature cache + search (integration)', function () {
     return result.rows.map((r: { submission_feature_id: number }) => r.submission_feature_id);
   }
 
+  /**
+   * Composite helper: create a submission with one secured feature and a team.
+   * Covers the common setup pattern used by mutation and cache tests.
+   */
+  async function setupSecuredFeatureWithTeam(teamName: string) {
+    const submissionId = await createTestSubmission(connection);
+    const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: teamName });
+    await secureFeature(featureId);
+    const teamId = await createTeam(teamName);
+    return { submissionId, featureId, teamId };
+  }
+
   // ── Cache population tests ─────────────────────────────────────────────
 
   describe('TeamFeatureService cache refresh', () => {
     it('should populate team_feature for exact URN match', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
-      await secureFeature(featureId);
-
-      const teamId = await createTeam('Exact URN Team');
+      const { submissionId, featureId, teamId } = await setupSecuredFeatureWithTeam('Exact URN Team');
       await grantTeamAccess(teamId, `urn:${submissionId}:dataset:${featureId}`);
 
       const service = new TeamFeatureService(connection);
@@ -230,11 +238,7 @@ describe('Team feature cache + search (integration)', function () {
 
   describe('Cache refresh via service-layer mutations', () => {
     it('should populate cache when creating a policy with statements via PolicyService', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Policy Create Test' });
-      await secureFeature(featureId);
-
-      const teamId = await createTeam('Policy Create Team');
+      const { submissionId, featureId, teamId } = await setupSecuredFeatureWithTeam('Policy Create Test');
 
       // Create policy via service — triggers refreshCacheForPolicy
       const policyService = new PolicyService(connection);
@@ -280,11 +284,7 @@ describe('Team feature cache + search (integration)', function () {
     });
 
     it('should clear cache when policy is deleted via PolicyService', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Policy Delete Test' });
-      await secureFeature(featureId);
-
-      const teamId = await createTeam('Policy Delete Team');
+      const { submissionId, featureId, teamId } = await setupSecuredFeatureWithTeam('Policy Delete Test');
 
       const policyService = new PolicyService(connection);
       const policy = await policyService.createPolicyWithStatements({ name: `test-policy-delete-${Date.now()}` }, [
@@ -303,11 +303,7 @@ describe('Team feature cache + search (integration)', function () {
     });
 
     it('should clear cache when team-policy is deleted via TeamPolicyService', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'TP Delete Test' });
-      await secureFeature(featureId);
-
-      const teamId = await createTeam('TP Delete Team');
+      const { submissionId, featureId, teamId } = await setupSecuredFeatureWithTeam('TP Delete Test');
 
       const policyService = new PolicyService(connection);
       const policy = await policyService.createPolicyWithStatements({ name: `test-tp-delete-${Date.now()}` }, [
