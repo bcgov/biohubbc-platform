@@ -96,31 +96,6 @@ describe('Download services (integration)', function () {
     `);
   }
 
-  /**
-   * Helper: grant a team access via a raw URN string (supports wildcards).
-   * Default effect is 'allow'; pass 'deny' for deny-effect tests.
-   */
-  async function grantTeamAccessWithUrn(teamId: string, urn: string, effect: string = 'allow'): Promise<void> {
-    const userId = connection.systemUserId();
-
-    const policy = await connection.sql(SQL`
-      INSERT INTO policy (name, create_user)
-      VALUES (${`test-urn-policy-${crypto.randomUUID()}`}, ${userId})
-      RETURNING policy_id;
-    `);
-    const policyId = policy.rows[0].policy_id;
-
-    await connection.sql(SQL`
-      INSERT INTO policy_statement (policy_id, effect, submission_feature_urn, create_user)
-      VALUES (${policyId}, ${effect}, ${urn}, ${userId});
-    `);
-
-    await connection.sql(SQL`
-      INSERT INTO team_policy (team_id, policy_id, create_user)
-      VALUES (${teamId}, ${policyId}, ${userId});
-    `);
-  }
-
   describe('createDownloadRequest', () => {
     it('should create a download record and link submission features', async () => {
       const submissionId = await createTestSubmission(connection);
@@ -249,7 +224,7 @@ describe('Download services (integration)', function () {
     });
   });
 
-  describe('getAuthorizedDownloadFeatures', () => {
+  describe('getDownloadFeatures', () => {
     it('should return per-feature estimated_byte_size from pre-computed column', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Size Test' });
@@ -258,7 +233,7 @@ describe('Download services (integration)', function () {
         submissionFeatureIds: [featureId]
       });
 
-      const sizeData = await crudService.getAuthorizedDownloadFeatures(download_id);
+      const sizeData = await crudService.getDownloadFeatures(download_id);
 
       expect(sizeData).to.have.length(1);
       expect(sizeData[0].submission_feature_id).to.equal(featureId);
@@ -268,7 +243,9 @@ describe('Download services (integration)', function () {
       expect(sizeData[0]).to.not.have.property('data');
     });
 
-    it('should exclude secured features for anonymous downloads (no team)', async () => {
+    it('should return all linked features regardless of security status', async () => {
+      // Authorization is enforced at creation time via filterAuthorizedFeatureIds.
+      // At retrieval time, getDownloadFeatures returns everything that was linked.
       const submissionId = await createTestSubmission(connection);
       const openFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
       const securedFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
@@ -278,392 +255,13 @@ describe('Download services (integration)', function () {
         submissionFeatureIds: [openFeatureId, securedFeatureId]
       });
 
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
+      const result = await crudService.getDownloadFeatures(download_id);
 
-      expect(result).to.have.length(1);
-      expect(result[0].submission_feature_id).to.equal(openFeatureId);
-    });
-
-    it('should exclude secured features when team has no matching policy', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const openFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
-      const securedFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
-      await secureFeature(securedFeatureId);
-
-      await createTeam('No Policy Team');
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [openFeatureId, securedFeatureId]
-      });
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-
-      expect(result).to.have.length(1);
-      expect(result[0].submission_feature_id).to.equal(openFeatureId);
-    });
-
-    it('should return empty when ALL features are secured and no policy exists (fail-closed)', async () => {
-      // Critical safety test: if every feature in the download is secured and there is
-      // no authorization, the result must be empty — not the full list.
-      const submissionId = await createTestSubmission(connection);
-      const feat1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured A' });
-      const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured B' });
-      await secureFeature(feat1);
-      await secureFeature(feat2);
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [feat1, feat2]
-      });
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-
-      // Fail-closed: no features should be returned
-      expect(result).to.have.length(0);
-    });
-
-    it('should block feature with future-dated security rule (fail-closed)', async () => {
-      // Defense-in-depth: the secured CTE uses record_end_date IS NULL with NO
-      // effective_date filter. A feature with a future-dated security rule is treated
-      // as secured immediately — blocked until authorized. This errs on the side of safety.
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Future Secured' });
-      await secureFeature(featureId, '2099-01-01');
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-
-      // Feature is blocked — security rule exists (even though future-dated), no policy grant
-      expect(result).to.have.length(0);
-    });
-
-    it('should treat child as secured when only the parent has a security rule (inherited security)', async () => {
-      // The buildSecurityCheck recursive CTE walks parent_submission_feature_id upward.
-      // If a parent is secured but its child has no direct security rule, the child
-      // inherits the parent's secured status and must be excluded from anonymous downloads.
-      const submissionId = await createTestSubmission(connection);
-      const parentFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Parent' });
-      const childFeatureId = await createTestFeature(
-        connection,
-        submissionId,
-        'species_observation',
-        { name: 'Child Observation' },
-        parentFeatureId
-      );
-
-      // Secure the parent only — child has NO direct submission_feature_security row
-      await secureFeature(parentFeatureId);
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [childFeatureId]
-      });
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-
-      // Child should be excluded: it inherits its parent's secured status
-      expect(result).to.have.length(0);
-    });
-
-    it('should include secured features when team has a matching ALLOW policy', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const openFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
-      const securedFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
-      await secureFeature(securedFeatureId);
-
-      const userId = connection.systemUserId();
-
-      // Ownership team — linked to the download, no policies
-      const ownershipTeamId = await createTeam('Ownership Team');
-      await addTeamMember(ownershipTeamId, userId);
-
-      // Policy team — has ALLOW policy, not linked to the download
-      const policyTeamId = await createTeam('Policy Team');
-      await addTeamMember(policyTeamId, userId);
-      await grantTeamAccess(policyTeamId, submissionId, 'dataset', securedFeatureId);
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [openFeatureId, securedFeatureId]
-      });
-
-      // Link the ownership team to the download (not the policy team)
-      await crudService.createDownloadTeam(download_id, ownershipTeamId);
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-
-      // Both features should be returned: open (unsecured) + secured (user's policy team has ALLOW)
       expect(result).to.have.length(2);
-      const featureIds = result.map((f) => f.submission_feature_id);
+      const featureIds = result.map((f: { submission_feature_id: number }) => f.submission_feature_id);
       expect(featureIds).to.include(openFeatureId);
       expect(featureIds).to.include(securedFeatureId);
     });
-
-    // ── Wildcard URN policies ───────────────────────────────────────────
-
-    it('should grant access with wildcard feature_id (urn:subId:type:*)', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const feat1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'A' });
-      const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'B' });
-      await secureFeature(feat1);
-      await secureFeature(feat2);
-
-      const userId = connection.systemUserId();
-      const ownerTeamId = await createTeam('WC-FeatId Owner');
-      await addTeamMember(ownerTeamId, userId);
-      const policyTeamId = await createTeam('WC-FeatId Policy');
-      await addTeamMember(policyTeamId, userId);
-      await grantTeamAccessWithUrn(policyTeamId, `urn:${submissionId}:dataset:*`);
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [feat1, feat2]
-      });
-      await crudService.createDownloadTeam(download_id, ownerTeamId);
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-      expect(result).to.have.length(2);
-    });
-
-    it('should grant access with wildcard feature_type and feature_id (urn:subId:*:*)', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const feat1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'DS' });
-      const feat2 = await createTestFeature(connection, submissionId, 'species_observation', { taxon_id: 1 });
-      await secureFeature(feat1);
-      await secureFeature(feat2);
-
-      const userId = connection.systemUserId();
-      const ownerTeamId = await createTeam('WC-TypeId Owner');
-      await addTeamMember(ownerTeamId, userId);
-      const policyTeamId = await createTeam('WC-TypeId Policy');
-      await addTeamMember(policyTeamId, userId);
-      await grantTeamAccessWithUrn(policyTeamId, `urn:${submissionId}:*:*`);
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [feat1, feat2]
-      });
-      await crudService.createDownloadTeam(download_id, ownerTeamId);
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-      expect(result).to.have.length(2);
-    });
-
-    it('should grant access with full wildcard (urn:*:*:*)', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const feat = await createTestFeature(connection, submissionId, 'dataset', { name: 'X' });
-      await secureFeature(feat);
-
-      const userId = connection.systemUserId();
-      const ownerTeamId = await createTeam('WC-Full Owner');
-      await addTeamMember(ownerTeamId, userId);
-      const policyTeamId = await createTeam('WC-Full Policy');
-      await addTeamMember(policyTeamId, userId);
-      await grantTeamAccessWithUrn(policyTeamId, 'urn:*:*:*');
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [feat]
-      });
-      await crudService.createDownloadTeam(download_id, ownerTeamId);
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-      expect(result).to.have.length(1);
-    });
-
-    // ── Soft-deleted auth chain (fail-closed) ──────────────────────────
-    //
-    // Each test sets up a complete working auth chain (secured feature + ALLOW policy),
-    // then soft-deletes ONE link. The secured feature must be excluded — proving
-    // every record_end_date IS NULL check is load-bearing.
-
-    /**
-     * Helper: set up a complete authorized download chain.
-     * Returns all IDs needed to soft-delete any single link.
-     */
-    async function setupAuthorizedSecuredDownload() {
-      const submissionId = await createTestSubmission(connection);
-      const openFeat = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
-      const securedFeat = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
-      await secureFeature(securedFeat);
-
-      const userId = connection.systemUserId();
-      const ownerTeamId = await createTeam(`SD-Owner-${Date.now()}`);
-      await addTeamMember(ownerTeamId, userId);
-      const policyTeamId = await createTeam(`SD-Policy-${Date.now()}`);
-      await addTeamMember(policyTeamId, userId);
-      await grantTeamAccess(policyTeamId, submissionId, 'dataset', securedFeat);
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [openFeat, securedFeat]
-      });
-      await crudService.createDownloadTeam(download_id, ownerTeamId);
-
-      return { submissionId, openFeat, securedFeat, userId, ownerTeamId, policyTeamId, download_id };
-    }
-
-    it('should exclude secured feature when download_team is soft-deleted', async () => {
-      const { download_id, ownerTeamId, openFeat } = await setupAuthorizedSecuredDownload();
-
-      await connection.sql(SQL`
-        UPDATE download_team SET record_end_date = now()
-        WHERE download_id = ${download_id} AND team_id = ${ownerTeamId};
-      `);
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-      expect(result).to.have.length(1);
-      expect(result[0].submission_feature_id).to.equal(openFeat);
-    });
-
-    it('should exclude secured feature when team_member on download team is soft-deleted', async () => {
-      const { download_id, ownerTeamId, userId, openFeat } = await setupAuthorizedSecuredDownload();
-
-      await connection.sql(SQL`
-        UPDATE team_member SET record_end_date = now()
-        WHERE team_id = ${ownerTeamId} AND system_user_id = ${userId};
-      `);
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-      expect(result).to.have.length(1);
-      expect(result[0].submission_feature_id).to.equal(openFeat);
-    });
-
-    it('should exclude secured feature when team_member on policy team is soft-deleted', async () => {
-      const { download_id, policyTeamId, userId, openFeat } = await setupAuthorizedSecuredDownload();
-
-      await connection.sql(SQL`
-        UPDATE team_member SET record_end_date = now()
-        WHERE team_id = ${policyTeamId} AND system_user_id = ${userId};
-      `);
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-      expect(result).to.have.length(1);
-      expect(result[0].submission_feature_id).to.equal(openFeat);
-    });
-
-    it('should exclude secured feature when team_policy is soft-deleted', async () => {
-      const { download_id, policyTeamId, openFeat } = await setupAuthorizedSecuredDownload();
-
-      await connection.sql(SQL`
-        UPDATE team_policy SET record_end_date = now()
-        WHERE team_id = ${policyTeamId};
-      `);
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-      expect(result).to.have.length(1);
-      expect(result[0].submission_feature_id).to.equal(openFeat);
-    });
-
-    it('should exclude secured feature when policy_statement is soft-deleted', async () => {
-      const { download_id, openFeat } = await setupAuthorizedSecuredDownload();
-
-      // Soft-delete ALL policy statements in this transaction (test isolation guarantees
-      // only our test's statements exist)
-      await connection.sql(SQL`
-        UPDATE policy_statement SET record_end_date = now()
-        WHERE record_end_date IS NULL AND effect = 'allow';
-      `);
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-      expect(result).to.have.length(1);
-      expect(result[0].submission_feature_id).to.equal(openFeat);
-    });
-
-    // ── Security rule lifecycle ─────────────────────────────────────────
-
-    it('should treat feature as unsecured when security rule is soft-deleted', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const feat = await createTestFeature(connection, submissionId, 'dataset', { name: 'Was Secured' });
-      await secureFeature(feat);
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [feat]
-      });
-
-      // Blocked while security rule is active
-      const blocked = await crudService.getAuthorizedDownloadFeatures(download_id);
-      expect(blocked).to.have.length(0);
-
-      // Soft-delete the security rule
-      await connection.sql(SQL`
-        UPDATE submission_feature_security SET record_end_date = now()
-        WHERE submission_feature_id = ${feat};
-      `);
-
-      // Feature is now unsecured — returned via PATH 1 without any policy
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-      expect(result).to.have.length(1);
-      expect(result[0].submission_feature_id).to.equal(feat);
-    });
-
-    // ── Wrong-target policies (no cross-leak) ──────────────────────────
-
-    it('should not grant access when policy targets wrong submission_id', async () => {
-      const subA = await createTestSubmission(connection);
-      const subB = await createTestSubmission(connection);
-      const feat = await createTestFeature(connection, subA, 'dataset', { name: 'In Sub A' });
-      await secureFeature(feat);
-
-      const userId = connection.systemUserId();
-      const ownerTeamId = await createTeam('WrongSub Owner');
-      await addTeamMember(ownerTeamId, userId);
-      const policyTeamId = await createTeam('WrongSub Policy');
-      await addTeamMember(policyTeamId, userId);
-      // Policy targets subB — should NOT grant access to subA's feature
-      await grantTeamAccessWithUrn(policyTeamId, `urn:${subB}:dataset:*`);
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [feat]
-      });
-      await crudService.createDownloadTeam(download_id, ownerTeamId);
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-      expect(result).to.have.length(0);
-    });
-
-    it('should not grant access when policy targets wrong feature_type', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const feat = await createTestFeature(connection, submissionId, 'dataset', { name: 'DS' });
-      await secureFeature(feat);
-
-      const userId = connection.systemUserId();
-      const ownerTeamId = await createTeam('WrongType Owner');
-      await addTeamMember(ownerTeamId, userId);
-      const policyTeamId = await createTeam('WrongType Policy');
-      await addTeamMember(policyTeamId, userId);
-      // Policy targets species_observation — should NOT grant access to dataset feature
-      await grantTeamAccessWithUrn(policyTeamId, `urn:${submissionId}:species_observation:*`);
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [feat]
-      });
-      await crudService.createDownloadTeam(download_id, ownerTeamId);
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-      expect(result).to.have.length(0);
-    });
-
-    it('should not grant access when policy targets wrong feature_id', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const targetFeat = await createTestFeature(connection, submissionId, 'dataset', { name: 'Target' });
-      const decoyFeat = await createTestFeature(connection, submissionId, 'dataset', { name: 'Decoy' });
-      await secureFeature(targetFeat);
-
-      const userId = connection.systemUserId();
-      const ownerTeamId = await createTeam('WrongId Owner');
-      await addTeamMember(ownerTeamId, userId);
-      const policyTeamId = await createTeam('WrongId Policy');
-      await addTeamMember(policyTeamId, userId);
-      // Policy targets decoyFeat — should NOT grant access to targetFeat
-      await grantTeamAccess(policyTeamId, submissionId, 'dataset', decoyFeat);
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [targetFeat]
-      });
-      await crudService.createDownloadTeam(download_id, ownerTeamId);
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-      expect(result).to.have.length(0);
-    });
-
-    // ── Cross-isolation ─────────────────────────────────────────────────
 
     it('should not leak features across different downloads', async () => {
       const submissionId = await createTestSubmission(connection);
@@ -673,67 +271,22 @@ describe('Download services (integration)', function () {
       const dlA = await crudService.createDownloadRequest({ submissionFeatureIds: [featA] });
       const dlB = await crudService.createDownloadRequest({ submissionFeatureIds: [featB] });
 
-      const resultA = await crudService.getAuthorizedDownloadFeatures(dlA.download_id);
+      const resultA = await crudService.getDownloadFeatures(dlA.download_id);
       expect(resultA).to.have.length(1);
       expect(resultA[0].submission_feature_id).to.equal(featA);
 
-      const resultB = await crudService.getAuthorizedDownloadFeatures(dlB.download_id);
+      const resultB = await crudService.getDownloadFeatures(dlB.download_id);
       expect(resultB).to.have.length(1);
       expect(resultB[0].submission_feature_id).to.equal(featB);
     });
 
-    it('should not grant access via another user who has policy but is not on the download team', async () => {
-      // User A is on the download team but has NO policy.
-      // User B has the ALLOW policy but is NOT on the download team.
-      // The SQL chain requires the SAME user to be on both teams — User B's policy
-      // should not leak through.
-      const submissionId = await createTestSubmission(connection);
-      const securedFeat = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
-      await secureFeature(securedFeat);
-
-      const userA = connection.systemUserId();
-      const userB = await createOtherUser();
-
-      // User A's team — linked to the download, no policies
-      const ownerTeamId = await createTeam('CrossUser Owner');
-      await addTeamMember(ownerTeamId, userA);
-
-      // User B's policy team — has ALLOW, NOT linked to the download
-      const policyTeamId = await createTeam('CrossUser Policy');
-      await addTeamMember(policyTeamId, userB);
-      await grantTeamAccess(policyTeamId, submissionId, 'dataset', securedFeat);
-
+    it('should return empty for a download with no linked features', async () => {
       const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [securedFeat]
+        submissionFeatureIds: []
       });
-      await crudService.createDownloadTeam(download_id, ownerTeamId);
 
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
-      // User B has policy but isn't on the download team — secured feature must be excluded
-      expect(result).to.have.length(0);
-    });
+      const result = await crudService.getDownloadFeatures(download_id);
 
-    // ── Deny effect ────────────────────────────────────────────────────
-
-    it('should not grant access with deny-only policy (only ALLOW authorizes)', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const securedFeat = await createTestFeature(connection, submissionId, 'dataset', { name: 'Denied' });
-      await secureFeature(securedFeat);
-
-      const userId = connection.systemUserId();
-      const ownerTeamId = await createTeam('Deny Owner');
-      await addTeamMember(ownerTeamId, userId);
-      const policyTeamId = await createTeam('Deny Policy');
-      await addTeamMember(policyTeamId, userId);
-      // Deny effect — should NOT satisfy the ps.effect = 'allow' condition
-      await grantTeamAccessWithUrn(policyTeamId, `urn:${submissionId}:dataset:${securedFeat}`, 'deny');
-
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [securedFeat]
-      });
-      await crudService.createDownloadTeam(download_id, ownerTeamId);
-
-      const result = await crudService.getAuthorizedDownloadFeatures(download_id);
       expect(result).to.have.length(0);
     });
   });

@@ -292,25 +292,13 @@ describe('DownloadRepository', () => {
     });
   });
 
-  describe('getUnsecuredDownloadFeatures', () => {
-    it('uses buildSecurityCheck LATERAL to filter unsecured features', async () => {
+  describe('getDownloadFeatures', () => {
+    it('returns all features linked to a download without security filtering', async () => {
       const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
 
       const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.getUnsecuredDownloadFeatures('aaaa0000-0000-0000-0000-000000000001');
-
-      expect(result).to.eql([]);
-    });
-  });
-
-  describe('getSecuredAuthorizedFeatures', () => {
-    it('uses buildSecurityCheck LATERAL with policy chain for secured features', async () => {
-      const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.getSecuredAuthorizedFeatures('aaaa0000-0000-0000-0000-000000000001');
+      const result = await repo.getDownloadFeatures('aaaa0000-0000-0000-0000-000000000001');
 
       expect(result).to.eql([]);
     });

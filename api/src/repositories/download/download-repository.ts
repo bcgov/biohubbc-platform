@@ -1,4 +1,3 @@
-import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
@@ -264,17 +263,18 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Returns features in a download that have NO active security rule
-   * (on the feature itself or any ancestor in the feature hierarchy).
+   * Returns all features linked to a download.
    *
-   * Uses buildSecurityCheck() — a recursive CTE that walks
-   * parent_submission_feature_id upward — to determine secured status.
+   * Authorization is enforced at creation time via filterAuthorizedFeatureIds —
+   * only authorized features are ever linked. At retrieval time we return
+   * everything that was linked, avoiding the download_team → policy_team hop
+   * that would let later team membership changes alter which features are visible.
    *
    * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadFeatureSummary[]>} Unsecured features.
+   * @return {Promise<DownloadFeatureSummary[]>} All linked features.
    * @memberof DownloadRepository
    */
-  async getUnsecuredDownloadFeatures(downloadId: string): Promise<DownloadFeatureSummary[]> {
+  async getDownloadFeatures(downloadId: string): Promise<DownloadFeatureSummary[]> {
     const knex = getKnex();
 
     const query = knex
@@ -287,56 +287,7 @@ export class DownloadRepository extends BaseRepository {
       .from('download_feature as df')
       .innerJoin('submission_feature as sf', 'df.submission_feature_id', 'sf.submission_feature_id')
       .innerJoin('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
-      .crossJoin(knex.raw('LATERAL (?) as security_check', [this.buildSecurityCheck(knex)]))
-      .where('df.download_id', downloadId)
-      .andWhere('security_check.is_secured', false);
-
-    const response = await this.connection.knex(query, DownloadFeatureSummary);
-    return response.rows;
-  }
-
-  /**
-   * Returns features in a download that have active security rules AND the
-   * download's team members have policy access to view them.
-   *
-   * Uses buildSecurityCheck() to determine secured status (recursive ancestor walk).
-   * Policy chain: download_team → team_member (download team) → team_member
-   * (same user, policy teams) → team_policy → policy_statement (ALLOW).
-   *
-   * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadFeatureSummary[]>} Secured, authorized features.
-   * @memberof DownloadRepository
-   */
-  async getSecuredAuthorizedFeatures(downloadId: string): Promise<DownloadFeatureSummary[]> {
-    const knex = getKnex();
-
-    const query = knex
-      .select([
-        'sf.submission_feature_id',
-        'sf.submission_id',
-        knex.raw('ft.name AS feature_type_name'),
-        knex.raw('sf.data_byte_size AS estimated_byte_size')
-      ])
-      .from('download_feature as df')
-      .innerJoin('submission_feature as sf', 'df.submission_feature_id', 'sf.submission_feature_id')
-      .innerJoin('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
-      .crossJoin(knex.raw('LATERAL (?) as security_check', [this.buildSecurityCheck(knex)]))
-      .where('df.download_id', downloadId)
-      .andWhere('security_check.is_secured', true)
-      .andWhereRaw(
-        `EXISTS (
-          SELECT 1
-          FROM download_team dt
-          INNER JOIN team_member tm_dl ON tm_dl.team_id = dt.team_id AND tm_dl.record_end_date IS NULL
-          INNER JOIN team_member tm_pol ON tm_pol.system_user_id = tm_dl.system_user_id AND tm_pol.record_end_date IS NULL
-          INNER JOIN team_policy tp ON tp.team_id = tm_pol.team_id AND tp.record_end_date IS NULL
-          INNER JOIN policy_statement ps ON ps.policy_id = tp.policy_id AND ps.record_end_date IS NULL
-          WHERE dt.download_id = ?
-            AND dt.record_end_date IS NULL
-            AND ${this.buildPolicyMatchConditions()}
-        )`,
-        [downloadId]
-      );
+      .where('df.download_id', downloadId);
 
     const response = await this.connection.knex(query, DownloadFeatureSummary);
     return response.rows;
@@ -542,8 +493,7 @@ export class DownloadRepository extends BaseRepository {
 
   /**
    * SQL conditions for policy statement feature-level authorization.
-   * Single source of truth — prevents security gate drift between
-   * pre-creation (user-direct) and post-creation (download_team) paths.
+   * Single source of truth for policy matching at download creation time.
    *
    * Requires outer query aliases: ps (policy_statement),
    * sf (submission_feature), ft (feature_type).
@@ -556,36 +506,5 @@ export class DownloadRepository extends BaseRepository {
             AND (ps.urn_submission_id = sf.submission_id::text OR ps.urn_submission_id = '*')
             AND (ps.urn_feature_type = ft.name OR ps.urn_feature_type = '*')
             AND (ps.urn_feature_id = sf.submission_feature_id::text OR ps.urn_feature_id = '*')`;
-  }
-
-  /**
-   * Builds a LATERAL subquery that determines if a feature or any of its
-   * ancestors are secured (have active submission_feature_security rows).
-   *
-   * Uses a recursive CTE to walk up the parent_submission_feature_id chain.
-   * Matches the pattern in SearchFeatureRepository.buildSecurityCheck().
-   *
-   * @param {Knex} knex - Knex instance.
-   * @return {Knex.Raw} Raw subquery returning { is_secured: boolean }.
-   * @memberof DownloadRepository
-   */
-  private buildSecurityCheck(knex: Knex): Knex.Raw {
-    return knex.raw(`
-      WITH RECURSIVE ancestors AS (
-        -- Base case: references outer query's sf via LATERAL (no FROM clause)
-        SELECT sf.submission_feature_id as ancestor_id, sf.parent_submission_feature_id
-        UNION ALL
-        -- Recursive case: walk up the parent chain
-        SELECT sf2.submission_feature_id, sf2.parent_submission_feature_id
-        FROM submission_feature sf2
-        INNER JOIN ancestors a ON sf2.submission_feature_id = a.parent_submission_feature_id
-      )
-      SELECT EXISTS (
-        SELECT 1
-        FROM ancestors a
-        INNER JOIN submission_feature_security sfs ON a.ancestor_id = sfs.submission_feature_id
-        WHERE sfs.record_end_date IS NULL
-      ) as is_secured
-    `);
   }
 }

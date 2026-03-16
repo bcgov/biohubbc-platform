@@ -13,13 +13,10 @@ import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
-import { getLogger } from '../../utils/logger';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
-
-const defaultLog = getLogger('services/download-service');
 
 /**
  * Request-time service for downloads.
@@ -136,44 +133,19 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * Returns authorized feature summaries for a download with defense-in-depth.
+   * Returns all features linked to a download.
    *
-   * **Layer 1 — Two independent queries:**
-   * Unsecured and secured+authorized features are fetched separately. A bug in
-   * one query cannot affect the other — they share no SQL context.
-   *
-   * **Layer 2 — Cross-check verification:**
-   * Features returned as "unsecured" are verified against a trivially simple
-   * independent query. Any disagreement → feature excluded + security alert.
+   * Authorization is enforced once at creation time via filterAuthorizedFeatureIds —
+   * only authorized features are ever linked to the download. Re-checking at
+   * retrieval time caused a bug: the download_team → policy_team hop meant
+   * adding a user to the download team could change which features were visible.
    *
    * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadFeatureSummary[]>} Verified, authorized features.
+   * @return {Promise<DownloadFeatureSummary[]>} All linked features.
    * @memberof DownloadService
    */
-  async getAuthorizedDownloadFeatures(downloadId: string): Promise<DownloadFeatureSummary[]> {
-    // Layer 1: Two independent queries
-    const [unsecuredFeatures, securedFeatures] = await Promise.all([
-      this.downloadRepository.getUnsecuredDownloadFeatures(downloadId),
-      this.downloadRepository.getSecuredAuthorizedFeatures(downloadId)
-    ]);
-
-    // Layer 2: Verify unsecured classification
-    const unsecuredIds = unsecuredFeatures.map((f) => f.submission_feature_id);
-    const actuallySecuredIds = await this.downloadRepository.getSecuredFeatureIds(unsecuredIds);
-
-    if (actuallySecuredIds.size > 0) {
-      defaultLog.error({
-        label: 'getAuthorizedDownloadFeatures',
-        message: 'SECURITY ALERT: features classified as unsecured have active security rules — excluding',
-        downloadId,
-        misclassifiedFeatureIds: [...actuallySecuredIds]
-      });
-    }
-
-    // Fail-closed: exclude any misclassified features
-    const verifiedUnsecured = unsecuredFeatures.filter((f) => !actuallySecuredIds.has(f.submission_feature_id));
-
-    return [...verifiedUnsecured, ...securedFeatures];
+  async getDownloadFeatures(downloadId: string): Promise<DownloadFeatureSummary[]> {
+    return this.downloadRepository.getDownloadFeatures(downloadId);
   }
 
   /**
@@ -184,8 +156,8 @@ export class DownloadService extends DBService {
    * memberships. Anonymous users (null systemUserId) get unsecured only.
    *
    * Used at download creation time to prevent unauthorized features from
-   * being linked to the download. getAuthorizedDownloadFeatures() remains
-   * as defense-in-depth at retrieval time.
+   * being linked to the download. This is the sole authorization gate —
+   * at retrieval time, all linked features are returned without re-checking.
    *
    * @param {number[]} featureIds - All candidate feature IDs from search.
    * @param {number | null} systemUserId - Authenticated user ID, or null for anonymous.
@@ -219,7 +191,7 @@ export class DownloadService extends DBService {
       systemUserId
     );
 
-    return [...unsecuredIds, ...featureIds.filter((id) => authorizedSecuredIds.has(id))];
+    return [...unsecuredIds, ...authorizedSecuredIds];
   }
 
   /**

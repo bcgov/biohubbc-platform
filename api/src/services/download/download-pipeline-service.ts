@@ -90,15 +90,13 @@ export class DownloadPipelineService extends DBService {
    * Estimate the total download size and plan fragmentation.
    *
    * Uses pre-computed data_byte_size which includes JSONB size + CSV overhead + artifact file size.
-   * Routes through DownloadService.getAuthorizedDownloadFeatures() which applies
-   * defense-in-depth security (two independent queries + cross-check verification).
    *
    * @param {string} downloadId - The download ID.
    * @return {Promise<DownloadSizeEstimate>}
    * @memberof DownloadPipelineService
    */
   async estimateDownloadSize(downloadId: string): Promise<DownloadSizeEstimate> {
-    const features = await this.downloadService.getAuthorizedDownloadFeatures(downloadId);
+    const features = await this.downloadService.getDownloadFeatures(downloadId);
     const totalEstimatedBytes = features.reduce((sum, f) => sum + Number(f.estimated_byte_size), 0);
 
     return { totalEstimatedBytes, features };
