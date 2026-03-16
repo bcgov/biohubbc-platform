@@ -250,4 +250,52 @@ describe('useSessionStorage', () => {
       expect(result2.current[0]).toEqual({ a: 2, b: 3 });
     });
   });
+
+  describe('Edge Cases: undefined and NaN', () => {
+    it('should store undefined as "undefined" which does not round-trip', () => {
+      const { result } = renderHook(() => useSessionStorage<string | undefined>('test-undef', 'fallback'));
+
+      act(() => {
+        result.current[1](undefined);
+      });
+
+      // JSON.stringify(undefined) returns undefined (not a string),
+      // so sessionStorage.setItem coerces it to the string "undefined"
+      expect(mockSessionStorage.setItem).toHaveBeenCalledWith('USE_SESSION_STORAGE_test-undef', undefined);
+    });
+
+    it('should fall back to initialValue when retrieving a stored undefined', () => {
+      // Simulate a previously stored undefined value
+      mockSessionStorage.setItem('USE_SESSION_STORAGE_test-undef', 'undefined' as unknown as string);
+
+      const { result } = renderHook(() => useSessionStorage<string | undefined>('test-undef', 'fallback'));
+
+      // "undefined" is not valid JSON, so the hook falls back to initialValue
+      expect(result.current[0]).toBe('fallback');
+    });
+
+    it('should store NaN as "null" via JSON.stringify', () => {
+      const { result } = renderHook(() => useSessionStorage<number>('test-nan', 0));
+
+      act(() => {
+        result.current[1](NaN);
+      });
+
+      // JSON.stringify(NaN) produces "null"
+      expect(mockSessionStorage.setItem).toHaveBeenCalledWith('USE_SESSION_STORAGE_test-nan', 'null');
+    });
+
+    it('should retrieve null instead of NaN on re-mount', () => {
+      const { result } = renderHook(() => useSessionStorage<number | null>('test-nan', 0));
+
+      act(() => {
+        result.current[1](NaN as unknown as number | null);
+      });
+
+      // Re-mount: JSON.parse("null") returns null, not NaN
+      const { result: result2 } = renderHook(() => useSessionStorage<number | null>('test-nan', 0));
+
+      expect(result2.current[0]).toBeNull();
+    });
+  });
 });
