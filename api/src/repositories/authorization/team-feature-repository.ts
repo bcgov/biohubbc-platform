@@ -46,6 +46,23 @@ export class TeamFeatureRepository extends BaseRepository {
    */
   async populateTeamFeatureCache(teamId: string): Promise<void> {
     const sql = SQL`
+      WITH RECURSIVE secured_features AS (
+        -- Base: features with a direct security row
+        SELECT sf.submission_feature_id
+        FROM submission_feature sf
+        JOIN submission_feature_security sfs
+          ON sfs.submission_feature_id = sf.submission_feature_id
+          AND sfs.record_end_date IS NULL
+        WHERE sf.record_end_date IS NULL
+
+        UNION
+
+        -- Recursive: children inherit security from their parent
+        SELECT child.submission_feature_id
+        FROM submission_feature child
+        INNER JOIN secured_features sec ON child.parent_submission_feature_id = sec.submission_feature_id
+        WHERE child.record_end_date IS NULL
+      )
       INSERT INTO team_feature (team_id, submission_feature_id)
       SELECT DISTINCT ${teamId}::uuid, sf.submission_feature_id
       FROM team_policy tp
@@ -53,9 +70,7 @@ export class TeamFeatureRepository extends BaseRepository {
         JOIN policy_statement ps ON ps.policy_id = p.policy_id AND ps.record_end_date IS NULL
         JOIN submission_feature sf ON sf.record_end_date IS NULL
         JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-        JOIN submission_feature_security sfs
-          ON sfs.submission_feature_id = sf.submission_feature_id
-          AND sfs.record_end_date IS NULL
+        JOIN secured_features sec ON sec.submission_feature_id = sf.submission_feature_id
       WHERE tp.team_id = ${teamId}
         AND tp.record_end_date IS NULL
         AND ps.effect = 'allow'
