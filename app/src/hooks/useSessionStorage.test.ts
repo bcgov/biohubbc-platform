@@ -46,10 +46,7 @@ describe('useSessionStorage', () => {
       });
 
       // String should be stored as JSON ie. '"hello"' not 'hello'
-      expect(mockSessionStorage.setItem).toHaveBeenCalledWith(
-        'USE_SESSION_STORAGE_test-str',
-        JSON.stringify('hello')
-      );
+      expect(mockSessionStorage.setItem).toHaveBeenCalledWith('USE_SESSION_STORAGE_test-str', JSON.stringify('hello'));
     });
 
     it('should store number values as JSON strings', () => {
