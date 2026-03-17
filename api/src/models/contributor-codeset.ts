@@ -16,5 +16,5 @@ export interface CreateContributorCodeset {
   key: string;
   label: string;
   description?: string | null;
-  external_id: string | null;
+  external_id?: string | null;
 }

@@ -63,13 +63,13 @@ export async function up(knex: Knex): Promise<void> {
     --------------------------------------------------------------------------------
 
     CREATE INDEX contributor_codeset_idx1 ON contributor_codeset(contributor_id);
-    CREATE UNIQUE INDEX contributor_codeset_nuk1 ON contributor_codeset(contributor_id, key);
+    CREATE UNIQUE INDEX contributor_codeset_nuk1 ON contributor_codeset(contributor_id, key, external_id) WHERE record_end_date IS NULL;
     CREATE INDEX contributor_codeset_idx2
       ON contributor_codeset(key)
       WHERE record_end_date IS NULL;
 
     CREATE INDEX contributor_codeset_code_idx1 ON contributor_codeset_code(contributor_codeset_id);
-    CREATE UNIQUE INDEX contributor_codeset_code_nuk1 ON contributor_codeset_code(contributor_codeset_id, key);
+    CREATE UNIQUE INDEX contributor_codeset_code_nuk1 ON contributor_codeset_code(contributor_codeset_id, key, external_id) WHERE record_end_date IS NULL;
     CREATE INDEX contributor_codeset_code_idx2
       ON contributor_codeset_code(key)
       WHERE record_end_date IS NULL;

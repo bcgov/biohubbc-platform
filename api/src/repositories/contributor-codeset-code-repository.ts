@@ -88,7 +88,8 @@ export class ContributorCodesetCodeRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex('contributor_codeset_code')
       .select(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'external_id'])
-      .where('contributor_codeset_code_id', contributorCodesetCodeId);
+      .where('contributor_codeset_code_id', contributorCodesetCodeId)
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, ContributorCodesetCodeSchema);
 
@@ -122,7 +123,8 @@ export class ContributorCodesetCodeRepository extends BaseRepository {
     const knex = getKnex();
     const query = knex('contributor_codeset_code')
       .select(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'external_id'])
-      .where('contributor_codeset_id', contributorCodesetId);
+      .where('contributor_codeset_id', contributorCodesetId)
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, ContributorCodesetCodeSchema);
 
@@ -145,7 +147,8 @@ export class ContributorCodesetCodeRepository extends BaseRepository {
       .where({
         contributor_codeset_id: identity.contributor_codeset_id,
         key: identity.key
-      });
+      })
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, ContributorCodesetCodeSchema);
 
@@ -181,7 +184,8 @@ export class ContributorCodesetCodeRepository extends BaseRepository {
     const tuples = identities.map((identity) => [identity.contributor_codeset_id, identity.key]);
     const query = knex('contributor_codeset_code')
       .select(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'external_id'])
-      .whereIn(['contributor_codeset_id', 'key'], tuples);
+      .whereIn(['contributor_codeset_id', 'key'], tuples)
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, ContributorCodesetCodeSchema);
 

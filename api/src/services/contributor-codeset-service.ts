@@ -64,6 +64,7 @@ export class ContributorCodesetService extends DBService {
     const insertedRows = payloadsToInsert.length
       ? await this.contributorCodesetRepository.insertContributorCodesets(payloadsToInsert)
       : [];
+
     for (const inserted of insertedRows) {
       resolvedByIdentity.set(this.toContributorCodesetIdentityKey(inserted), inserted);
     }
