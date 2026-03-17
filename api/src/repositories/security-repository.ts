@@ -2,7 +2,9 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import { CountResult } from '../models/count';
 import { getLogger } from '../utils/logger';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 
 const defaultLog = getLogger('repositories/security-repository');
@@ -83,6 +85,26 @@ export const SubmissionFeatureSecurityRulesSummary = z.object({
 });
 
 export type SubmissionFeatureSecurityRulesSummary = z.infer<typeof SubmissionFeatureSecurityRulesSummary>;
+
+export const SecurityCategoryWithRuleCount = z.object({
+  security_category_id: z.number(),
+  name: z.string(),
+  description: z.string(),
+  rule_count: z.number()
+});
+export type SecurityCategoryWithRuleCount = z.infer<typeof SecurityCategoryWithRuleCount>;
+
+export const SecurityRuleWithFeatureCount = z.object({
+  security_rule_id: z.number(),
+  name: z.string(),
+  description: z.string(),
+  feature_count: z.number()
+});
+export type SecurityRuleWithFeatureCount = z.infer<typeof SecurityRuleWithFeatureCount>;
+
+export interface SecuritySearchFilters {
+  search?: string;
+}
 
 export const SecurityReason = z.object({
   id: z.number(),
@@ -571,5 +593,129 @@ export class SecurityRepository extends BaseRepository {
     const response = await this.connection.knex(finalQuery, SubmissionFeatureSecurityRulesSummary);
 
     return response.rows[0];
+  }
+
+  /**
+   * Get paginated security categories with a count of associated active rules.
+   *
+   * @param {SecuritySearchFilters} [filters]
+   * @param {ApiPaginationOptions} [pagination]
+   * @return {*}  {Promise<SecurityCategoryWithRuleCount[]>}
+   * @memberof SecurityRepository
+   */
+  async getSecurityCategoriesWithRuleCount(
+    filters?: SecuritySearchFilters,
+    pagination?: ApiPaginationOptions
+  ): Promise<SecurityCategoryWithRuleCount[]> {
+    const knex = getKnex();
+
+    const query = knex
+      .select(
+        'sc.security_category_id',
+        'sc.name',
+        'sc.description',
+        knex.raw('COALESCE(COUNT(sr.security_rule_id), 0)::integer AS rule_count')
+      )
+      .from('security_category as sc')
+      .leftJoin('security_rule as sr', function () {
+        this.on('sr.security_category_id', '=', 'sc.security_category_id').andOnNull('sr.record_end_date');
+      })
+      .whereNull('sc.record_end_date')
+      .groupBy('sc.security_category_id', 'sc.name', 'sc.description');
+
+    if (filters?.search) {
+      query.whereILike('sc.name', `%${filters.search}%`);
+    }
+
+    if (pagination) {
+      this.applyPagination(query, pagination);
+    }
+
+    const response = await this.connection.knex(query, SecurityCategoryWithRuleCount);
+    return response.rows;
+  }
+
+  /**
+   * Get total count of active security categories matching optional filters.
+   *
+   * @param {SecuritySearchFilters} [filters]
+   * @return {*}  {Promise<number>}
+   * @memberof SecurityRepository
+   */
+  async getSecurityCategoriesCount(filters?: SecuritySearchFilters): Promise<number> {
+    const knex = getKnex();
+
+    const query = knex
+      .select(knex.raw('coalesce(count(*), 0)::integer as count'))
+      .from('security_category')
+      .whereNull('record_end_date');
+
+    if (filters?.search) {
+      query.whereILike('name', `%${filters.search}%`);
+    }
+
+    const response = await this.connection.knex(query.first(), CountResult);
+    return response.rows[0].count;
+  }
+
+  /**
+   * Get paginated security rules with a count of associated submission features.
+   *
+   * @param {SecuritySearchFilters} [filters]
+   * @param {ApiPaginationOptions} [pagination]
+   * @return {*}  {Promise<SecurityRuleWithFeatureCount[]>}
+   * @memberof SecurityRepository
+   */
+  async getSecurityRulesWithFeatureCount(
+    filters?: SecuritySearchFilters,
+    pagination?: ApiPaginationOptions
+  ): Promise<SecurityRuleWithFeatureCount[]> {
+    const knex = getKnex();
+
+    const query = knex
+      .select(
+        'sr.security_rule_id',
+        'sr.name',
+        'sr.description',
+        knex.raw('COALESCE(COUNT(sfs.submission_feature_security_id), 0)::integer AS feature_count')
+      )
+      .from('security_rule as sr')
+      .leftJoin('submission_feature_security as sfs', 'sfs.security_rule_id', 'sr.security_rule_id')
+      .whereNull('sr.record_end_date')
+      .groupBy('sr.security_rule_id', 'sr.name', 'sr.description');
+
+    if (filters?.search) {
+      query.whereILike('sr.name', `%${filters.search}%`);
+    }
+
+    if (pagination) {
+      this.applyPagination(query, pagination);
+    }
+
+    const response = await this.connection.knex(query, SecurityRuleWithFeatureCount);
+    return response.rows;
+  }
+
+  /**
+   * Get total count of active security rules matching optional filters.
+   *
+   * @param {SecuritySearchFilters} [filters]
+   * @return {*}  {Promise<number>}
+   * @memberof SecurityRepository
+   */
+  async getSecurityRulesCount(filters?: SecuritySearchFilters): Promise<number> {
+    const knex = getKnex();
+
+    const query = knex
+      .select(knex.raw('coalesce(count(*), 0)::integer as count'))
+      .from('security_rule')
+      .whereNull('record_end_date');
+
+    if (filters?.search) {
+      query.whereILike('name', `%${filters.search}%`);
+    }
+
+    const response = await this.connection.knex(query.first(), CountResult);
+    return response.rows[0].count;
   }
 }
