@@ -73,20 +73,19 @@ const insertRecord = async (knex: Knex) => {
   // Dataset
   const parent_submission_feature_id1 = await insertDatasetRecord(knex, { submission_id, submission_upload_id });
 
-  // Codeset: create a single codeset feature linked to this submission
-  await insertCodesetRecord(knex, { submission_id });
-
   // Telemetry Deployments
   const deployments: { id: number; devices: { submission_feature_id: number; device_id: string }[] }[] = [];
   for (let i = 0; i < 5; i++) {
     const deploymentId = await insertTelemetryDeployment(knex, {
       submission_id,
+      submission_upload_id,
       parent_submission_feature_id: parent_submission_feature_id1
     });
     const devices: { submission_feature_id: number; device_id: string }[] = [];
     for (let j = 0; j < 2; j++) {
       const deviceInfo = await insertTelemetryDevice(knex, {
         submission_id,
+        submission_upload_id,
         parent_submission_feature_id: deploymentId
       });
       devices.push(deviceInfo);
@@ -104,15 +103,6 @@ const insertRecord = async (knex: Knex) => {
     });
 
     // Animals
-<<<<<<< HEAD
-    const animalPromises = Array.from({ length: 5 }).map(async () => {
-      const animalId = await insertAnimalRecord(knex, {
-        submission_id,
-        parent_submission_feature_id: parent_submission_feature_id2
-      });
-      animalIds.push(animalId);
-    });
-=======
     const animalPromises = Array.from({ length: 2 }).map(() =>
       insertAnimalRecord(knex, {
         submission_id,
@@ -120,7 +110,6 @@ const insertRecord = async (knex: Knex) => {
         parent_submission_feature_id: parent_submission_feature_id2
       })
     );
->>>>>>> aa6a5fcbd22d49feb5c73d769de5b227f207747d
 
     // Observations
     const observationPromises = Array.from({ length: 20 }).map(() =>
@@ -136,21 +125,6 @@ const insertRecord = async (knex: Knex) => {
   });
 
   // Telemetry
-<<<<<<< HEAD
-  const possibleParents = deployments.flatMap((d) => [d.id, ...d.devices.map((dev) => dev.submission_feature_id)]);
-  const telemetryPromises = Array.from({ length: 100 }).map(() => {
-    const randomParent = possibleParents[Math.floor(Math.random() * possibleParents.length)];
-    const deployment = deployments.find(
-      (d) => d.id === randomParent || d.devices.some((dev) => dev.submission_feature_id === randomParent)
-    );
-    const deviceInfo = deployment?.devices.find((dev) => dev.submission_feature_id === randomParent);
-    return insertTelemetryRecord(knex, {
-      submission_id,
-      parent_submission_feature_id: randomParent,
-      device_id: deviceInfo?.device_id
-    });
-  });
-=======
   const telemetryPromises = Array.from({ length: 100 }).map(() =>
     insertTelemetryRecord(knex, {
       submission_id,
@@ -158,7 +132,6 @@ const insertRecord = async (knex: Knex) => {
       parent_submission_feature_id: parent_submission_feature_id1
     })
   );
->>>>>>> aa6a5fcbd22d49feb5c73d769de5b227f207747d
 
   // Wait for all sample sites and telemetry to complete concurrently
   await Promise.all([...sampleSitePromises, ...telemetryPromises]);
@@ -342,82 +315,6 @@ export const insertObservationRecord = async (
   //   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
 
   await knex.raw(`${insertSpatialPoint({ submission_feature_id })}`);
-
-  // attach a measurement child record (sex & life stage) to the observation
-  await insertMeasurementRecord(knex, {
-    submission_id: options.submission_id,
-    parent_submission_feature_id: submission_feature_id
-  });
-
-  return submission_feature_id;
-};
-
-export const insertMeasurementRecord = async (
-  knex: Knex,
-  options: { submission_id: number; parent_submission_feature_id: number }
-): Promise<number> => {
-  const response = await knex.raw(
-    `${insertSubmissionFeature({
-      submission_id: options.submission_id,
-      parent_submission_feature_id: options.parent_submission_feature_id,
-      feature_type: 'measurement',
-      data: {
-        sex: faker.helpers.arrayElement(['male', 'female', 'unknown']),
-        life_stage: faker.helpers.arrayElement(['adult', 'juvenile', 'unknown'])
-      }
-    })}`
-  );
-  const submission_feature_id = response.rows[0].submission_feature_id;
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
-
-  return submission_feature_id;
-};
-
-const insertCodesetRecord = async (knex: Knex, options: { submission_id: number }): Promise<number> => {
-  // build a nested categories object with life_stage and sex
-  const categories: any = {
-    life_stage: {
-      label: 'life_stage',
-      description: 'Stages of life for organisms',
-      codes: {
-        1: { label: 'unknown', description: 'Unknown life stage' },
-        2: { label: 'adult', description: 'Adult' },
-        3: { label: 'subadult', description: 'Subadult' },
-        4: { label: 'juvenile', description: 'Juvenile' },
-        5: { label: 'calf', description: 'Calf' },
-        6: { label: 'pup', description: 'Pup' },
-        7: { label: 'egg', description: 'Egg' }
-      }
-    },
-    sex: {
-      label: 'sex',
-      description: 'Biological sex',
-      codes: {
-        1: { label: 'male', description: 'Male' },
-        2: { label: 'female', description: 'Female' },
-        3: { label: 'hermaphroditic', description: 'Hermaphroditic' },
-        4: { label: 'undefined', description: 'Undefined' }
-      }
-    }
-  };
-
-  const response = await knex.raw(
-    `${insertSubmissionFeature({
-      submission_id: options.submission_id,
-      parent_submission_feature_id: null,
-      feature_type: 'codeset',
-      data: {
-        categories
-      }
-    })}`
-  );
-  const submission_feature_id = response.rows[0].submission_feature_id;
-
-  // optionally add search indices for categories? we'll at least add a search_string for name
-  await knex.raw(`${insertSearchString({ submission_feature_id })}`);
 
   return submission_feature_id;
 };
@@ -739,6 +636,7 @@ export const insertTelemetryDeployment = async (
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
+      submission_upload_id: options.submission_upload_id,
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'telemetry_deployment',
       data: deploymentData
@@ -757,7 +655,12 @@ export const insertTelemetryDeployment = async (
 
 export const insertTelemetryDevice = async (
   knex: Knex,
-  options: { submission_id: number; parent_submission_feature_id: number; device_id?: string }
+  options: {
+    submission_id: number;
+    submission_upload_id: string;
+    parent_submission_feature_id: number;
+    device_id?: string;
+  }
 ): Promise<{ submission_feature_id: number; device_id: string }> => {
   const device_id = options.device_id || faker.string.alphanumeric({ length: 8 });
   const deviceData = {
@@ -771,6 +674,7 @@ export const insertTelemetryDevice = async (
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
+      submission_upload_id: options.submission_upload_id,
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'telemetry_device',
       data: deviceData
@@ -786,7 +690,12 @@ export const insertTelemetryDevice = async (
 
 export const insertTelemetryRecord = async (
   knex: Knex,
-  options: { submission_id: number; parent_submission_feature_id: number; device_id?: string }
+  options: {
+    submission_id: number;
+    submission_upload_id: string;
+    parent_submission_feature_id: number;
+    device_id?: string;
+  }
 ): Promise<number> => {
   const device_id = options.device_id || faker.string.alphanumeric({ length: 8 });
   const telemetryData = {

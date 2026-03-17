@@ -82,6 +82,7 @@ const createSubmissionWithUploads = async (
   });
   await insertTelemetryRecord(knex, {
     submission_id,
+    submission_upload_id,
     parent_submission_feature_id: parent_feature_id
   });
 
