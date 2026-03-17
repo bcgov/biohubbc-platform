@@ -163,12 +163,23 @@ export const UpdateTicketCommentRequestSchema: OpenAPIV3.SchemaObject = {
 export const CreateTicketReferenceRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
-  required: ['target_ticket_id', 'relationship'],
+  required: ['references'],
   properties: {
-    target_ticket_id: { type: 'string', format: 'uuid' },
-    relationship: {
-      type: 'string',
-      enum: ['blocks', 'blocked_by', 'duplicates', 'duplicate_of', 'relates_to', 'resolves', 'resolved_by']
+    references: {
+      type: 'array',
+      minItems: 1,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['target_ticket_id', 'relationship'],
+        properties: {
+          target_ticket_id: { type: 'string', format: 'uuid' },
+          relationship: {
+            type: 'string',
+            enum: ['blocks', 'blocked_by', 'duplicates', 'duplicate_of', 'relates_to', 'resolves', 'resolved_by']
+          }
+        }
+      }
     }
   }
 };

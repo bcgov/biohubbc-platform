@@ -210,34 +210,58 @@ describe('TicketService', () => {
   });
 
   describe('createTicketReference', () => {
-    it('creates a ticket reference for the source ticket', async () => {
-      const createdReference: TicketReference = {
-        ticket_reference_id: '77777777-7777-7777-7777-777777777777',
-        source_ticket_id: mockTicket.ticket_id,
-        source_ticket_slug: mockTicket.ticket_slug,
-        source_ticket_subject: mockTicket.subject,
-        target_ticket_id: '88888888-8888-8888-8888-888888888888',
-        target_ticket_slug: '04900003',
-        target_ticket_subject: 'Another ticket',
-        relationship: 'relates_to',
-        user_identifier: 'Sarah',
-        create_date: '2026-02-25T00:00:00.000Z'
-      };
+    it('creates ticket references for the source ticket', async () => {
+      const createdReferences: TicketReference[] = [
+        {
+          ticket_reference_id: '77777777-7777-7777-7777-777777777777',
+          source_ticket_id: mockTicket.ticket_id,
+          source_ticket_slug: mockTicket.ticket_slug,
+          source_ticket_subject: mockTicket.subject,
+          target_ticket_id: '88888888-8888-8888-8888-888888888888',
+          target_ticket_slug: '04900003',
+          target_ticket_subject: 'Another ticket',
+          relationship: 'relates_to',
+          user_identifier: 'Sarah',
+          create_date: '2026-02-25T00:00:00.000Z'
+        },
+        {
+          ticket_reference_id: '99999999-9999-9999-9999-999999999999',
+          source_ticket_id: mockTicket.ticket_id,
+          source_ticket_slug: mockTicket.ticket_slug,
+          source_ticket_subject: mockTicket.subject,
+          target_ticket_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          target_ticket_slug: '04900004',
+          target_ticket_subject: 'Yet another ticket',
+          relationship: 'relates_to',
+          user_identifier: 'Sarah',
+          create_date: '2026-02-25T00:00:00.000Z'
+        }
+      ];
       const createReferenceStub = sinon
         .stub(TicketReferenceService.prototype, 'createTicketReference')
-        .resolves(createdReference);
+        .onFirstCall()
+        .resolves(createdReferences[0])
+        .onSecondCall()
+        .resolves(createdReferences[1]);
 
       const result = await service.createTicketReference(mockTicket.ticket_id, {
-        target_ticket_id: createdReference.target_ticket_id,
-        relationship: createdReference.relationship
+        references: createdReferences.map((reference) => ({
+          target_ticket_id: reference.target_ticket_id,
+          relationship: reference.relationship
+        }))
       });
 
-      expect(createReferenceStub).to.have.been.calledWith({
+      expect(createReferenceStub).to.have.been.calledWithMatch({
         source_ticket_id: mockTicket.ticket_id,
-        target_ticket_id: createdReference.target_ticket_id,
-        relationship: createdReference.relationship
+        target_ticket_id: createdReferences[0].target_ticket_id,
+        relationship: createdReferences[0].relationship
       });
-      expect(result).to.eql(createdReference);
+      expect(createReferenceStub).to.have.been.calledWithMatch({
+        source_ticket_id: mockTicket.ticket_id,
+        target_ticket_id: createdReferences[1].target_ticket_id,
+        relationship: createdReferences[1].relationship
+      });
+      expect(result).to.eql(createdReferences);
     });
   });
 

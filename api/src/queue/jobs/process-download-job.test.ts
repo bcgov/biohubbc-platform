@@ -37,6 +37,7 @@ describe('process-download-job', () => {
 
       const planStub = sinon.stub(DownloadPipelineService.prototype, 'planDownloadIfNeeded').resolves();
       sinon.stub(DownloadPipelineService.prototype, 'getFragmentsToProcess').resolves([]);
+      sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
       const finalizeStub = sinon.stub(DownloadPipelineService.prototype, 'finalizeDownload').resolves();
 
       const mockJobs = [createMockJob('aaaa0000-0000-0000-0000-000000000123', 'job-abc')];
@@ -46,6 +47,29 @@ describe('process-download-job', () => {
       expect(planStub.firstCall.args[0]).to.equal('aaaa0000-0000-0000-0000-000000000123');
       expect(finalizeStub.calledOnce).to.be.true;
       expect(finalizeStub.firstCall.args[0]).to.equal('aaaa0000-0000-0000-0000-000000000123');
+    });
+
+    it('sets download status to PROCESSING before processing fragments', async () => {
+      // Verifies: started_at is populated by setting PROCESSING status before fragment loop
+
+      const mockDBConnection = getMockDBConnection();
+      mockDBConnection.open = sinon.stub().resolves();
+      mockDBConnection.commit = sinon.stub().resolves();
+      mockDBConnection.release = sinon.stub();
+
+      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+
+      sinon.stub(DownloadPipelineService.prototype, 'planDownloadIfNeeded').resolves();
+      sinon.stub(DownloadPipelineService.prototype, 'getFragmentsToProcess').resolves([]);
+      const updateStatusStub = sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
+      sinon.stub(DownloadPipelineService.prototype, 'finalizeDownload').resolves();
+
+      const mockJobs = [createMockJob('aaaa0000-0000-0000-0000-000000000123')];
+      await processDownloadJobHandler(mockJobs);
+
+      expect(updateStatusStub.calledOnce).to.be.true;
+      expect(updateStatusStub.firstCall.args[0]).to.equal('aaaa0000-0000-0000-0000-000000000123');
+      expect(updateStatusStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
     });
 
     it('rolls back and throws error on failure without updating status to failed', async () => {
