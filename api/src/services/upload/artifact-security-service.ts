@@ -3,6 +3,8 @@ import { ArtifactStatusEnum } from '../../models/artifact';
 import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
+import { UploadArchive } from '../../models/upload-archive';
+import { publishProcessSubmissionFeaturesJob } from '../../queue/publisher';
 import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
 import { getObjectStoreBucketName, getSecurityObjectStoreBucketName, _getClamAvScanner } from '../../utils/file-utils';
 import { DBService } from '../db-service';
@@ -10,6 +12,7 @@ import { BucketType, ObjectStorageService } from '../object-storage/object-stora
 import { ArtifactSecurityScanService } from './artifact-security-scan-service';
 import { ScanExecutionResult, ScanOutcome } from './artifact-security-service.interface';
 import { ArtifactService } from './artifact-service';
+import { SubmissionUploadService } from './submission-upload-service';
 import { UploadArchiveService } from './upload-archive-service';
 
 export class ArtifactSecurityService extends DBService {
@@ -83,20 +86,36 @@ export class ArtifactSecurityService extends DBService {
    * @param {string} objectKey The S3 object key
    * @memberof ArtifactSecurityService
    */
-  async handleCleanScanResult(artifactId: string, objectKey: string): Promise<void> {
+  async handleCleanScanResult(artifactId: string, objectKey: string): Promise<UploadArchive> {
+    const uploadArchiveService = new UploadArchiveService(this.connection);
+    const uploadArchive = await uploadArchiveService.getUploadArchiveByArtifactId(artifactId);
+
     // 1. Copy file from security bucket to main bucket
     const storageService = new ObjectStorageService();
     await storageService.promoteFromSecurity(objectKey);
 
     // 2. Unblock the upload_archive for extraction
-    const uploadArchiveService = new UploadArchiveService(this.connection);
-    const uploadArchive = await uploadArchiveService.getUploadArchiveByArtifactId(artifactId);
+    await uploadArchiveService.updateUploadArchive(uploadArchive.upload_archive_id, {
+      archive_status: ProcessStatusStatusEnum.PENDING
+    });
 
-    if (uploadArchive) {
-      await uploadArchiveService.updateUploadArchive(uploadArchive.upload_archive_id, {
-        archive_status: ProcessStatusStatusEnum.PENDING
-      });
-    }
+    return uploadArchive;
+  }
+
+  /**
+   * Publishes the downstream processing job after a clean scan.
+   *
+   * submission_upload is created atomically in completeArchiveUpload before the scan
+   * job is published — a missing record means data corruption, not a valid state.
+   *
+   * @param {UploadArchive} uploadArchive The upload archive record from handleCleanScanResult
+   * @memberof ArtifactSecurityService
+   */
+  async publishNextPipelineStep(uploadArchive: UploadArchive): Promise<void> {
+    const submissionUploadService = new SubmissionUploadService(this.connection);
+    const submissionUpload = await submissionUploadService.getSubmissionUploadByUploadId(uploadArchive.upload_id);
+
+    await publishProcessSubmissionFeaturesJob(this.connection, submissionUpload);
   }
 
   /**
@@ -165,7 +184,8 @@ export class ArtifactSecurityService extends DBService {
 
       // 6. Handle post-scan actions for clean files
       if (scanOutcome.securityStatus === SecurityStatusEnum.CLEAN) {
-        await this.handleCleanScanResult(artifact.artifact_id, artifact.object_key);
+        const uploadArchive = await this.handleCleanScanResult(artifact.artifact_id, artifact.object_key);
+        await this.publishNextPipelineStep(uploadArchive);
       }
 
       return {

@@ -1,7 +1,7 @@
 import { IDBConnection } from '../database/db';
 import { CartFeatureListResponse, CartSubmissionFeature } from '../models/cart';
 import { CartSubmissionFeatureRepository } from '../repositories/cart-submission-feature-repository';
-import { ensureCompletePaginationOptions, makePaginationResponse } from '../utils/pagination';
+import { makePaginationResponse } from '../utils/pagination';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { PolicyService } from './access-policy/policy-service';
 import { DBService } from './db-service';
@@ -71,15 +71,32 @@ export class CartSubmissionFeatureService extends DBService {
   }
 
   /**
-   * Get submission features in a cart
+   * Get all submission feature IDs in a cart (unpaginated).
+   * Used by checkout to identify which features to link to the download record.
    *
    * @param {string} cartId - The ID of the cart
-   * @param {ApiPaginationOptions} pagination
+   * @return {Promise<number[]>}
+   * @memberof CartSubmissionFeatureService
+   */
+  async getCartSubmissionFeatureIds(cartId: string): Promise<number[]> {
+    return this.cartSubmissionFeatureRepository.getCartSubmissionFeatureIds(cartId);
+  }
+
+  /**
+   * Get submission features in a cart, optionally filtered by submission feature ID and paginated.
+   *
+   * @param {string} cartId - The ID of the cart
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options
+   * @param {number} [submissionFeatureId] - Optional submission feature ID to filter by
    * @return {Promise<CartSubmissionFeature[]>}
    * @memberof CartSubmissionFeatureService
    */
-  async getCartSubmissionFeatures(cartId: string, pagination?: ApiPaginationOptions): Promise<CartSubmissionFeature[]> {
-    return this.cartSubmissionFeatureRepository.getCartSubmissionFeatures(cartId, pagination);
+  async getCartSubmissionFeatures(
+    cartId: string,
+    pagination?: ApiPaginationOptions,
+    submissionFeatureId?: number
+  ): Promise<CartSubmissionFeature[]> {
+    return this.cartSubmissionFeatureRepository.getCartSubmissionFeatures(cartId, pagination, submissionFeatureId);
   }
 
   /**
@@ -94,19 +111,33 @@ export class CartSubmissionFeatureService extends DBService {
   }
 
   /**
+   * Returns true if the given submission feature exists in an active cart.
+   *
+   * @param {string} cartId - The ID of the cart
+   * @param {number} submissionFeatureId - The submission feature ID to check
+   * @return {Promise<boolean>}
+   * @memberof CartSubmissionFeatureService
+   */
+  async isSubmissionFeatureInCart(cartId: string, submissionFeatureId: number): Promise<boolean> {
+    const ids = await this.cartSubmissionFeatureRepository.getCartSubmissionFeatureIds(cartId);
+    return ids.includes(submissionFeatureId);
+  }
+
+  /**
    * Returns cart features and pagination payload in the same shape used by cart feature endpoints.
    *
    * @param {string} cartId - The ID of the cart
-   * @param {Partial<ApiPaginationOptions>} pagination - Requested pagination parameters
+   * @param {ApiPaginationOptions} pagination - Requested pagination parameters
    * @return {Promise<CartFeatureListResponse>}
    * @memberof CartSubmissionFeatureService
    */
   async getPaginatedCartFeaturesResponse(
     cartId: string,
-    pagination: Partial<ApiPaginationOptions>
+    pagination: ApiPaginationOptions,
+    submissionFeatureId?: number
   ): Promise<CartFeatureListResponse> {
     const [features, count] = await Promise.all([
-      this.getCartSubmissionFeatures(cartId, ensureCompletePaginationOptions(pagination)),
+      this.getCartSubmissionFeatures(cartId, pagination, submissionFeatureId),
       this.getCartSubmissionFeatureCount(cartId)
     ]);
 

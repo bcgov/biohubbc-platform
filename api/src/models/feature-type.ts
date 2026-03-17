@@ -9,7 +9,8 @@ export const FeatureProperty = z.object({
   display_name: z.string(),
   description: z.string(),
   type_name: z.string(),
-  required_value: z.boolean()
+  required_value: z.boolean(),
+  calculated_value: z.boolean()
 });
 
 export type FeatureProperty = z.infer<typeof FeatureProperty>;
@@ -27,25 +28,20 @@ export const FeatureTypeSummary = z.object({
 export type FeatureTypeSummary = z.infer<typeof FeatureTypeSummary>;
 
 /**
- * Schema for raw DB row when querying feature type with properties.
- * Used for Zod validation of the JOIN query result.
+ * Schema for aggregated DB row when querying feature type with properties.
+ * SQL uses JSON_AGG to return properties as a JSON array in a single row.
  */
 export const FeatureTypeWithPropertiesRow = z.object({
   feature_type_id: z.number(),
   name: z.string(),
   display_name: z.string(),
-  property_name: z.string().nullable(),
-  property_display_name: z.string().nullable(),
-  property_description: z.string().nullable(),
-  property_type_name: z.string().nullable(),
-  required_value: z.boolean().nullable()
+  properties: z.array(FeatureProperty)
 });
 
 export type FeatureTypeWithPropertiesRow = z.infer<typeof FeatureTypeWithPropertiesRow>;
 
 /**
  * Feature type with its associated properties.
- * Transformed result after processing raw DB rows.
  */
 export const FeatureTypeWithProperties = z.object({
   featureType: FeatureTypeSummary,

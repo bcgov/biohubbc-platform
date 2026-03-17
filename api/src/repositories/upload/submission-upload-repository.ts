@@ -1,6 +1,6 @@
 import { SQL } from 'sql-template-strings';
 import { getKnex } from '../../database/db';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   CreateSubmissionUpload,
   SubmissionUpload,
@@ -12,11 +12,12 @@ import { BaseRepository } from '../base-repository';
 
 export class SubmissionUploadRepository extends BaseRepository {
   /**
-   * Get a single submission_upload record by ID.
+   * Get a single active submission_upload record by ID.
    *
    * @param {string} submissionUploadId - The ID of the submission_upload record.
    * @returns {Promise<SubmissionUpload>} - The requested submission_upload record.
-   * @throws {ApiExecuteSQLError} - If the record is not found or an error occurs.
+   * @throws {ApiNotFoundError} - If the record is not found.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
    */
   async getSubmissionUpload(submissionUploadId: string): Promise<SubmissionUpload> {
     const sqlStatement = SQL`
@@ -27,15 +28,70 @@ export class SubmissionUploadRepository extends BaseRepository {
       FROM
         submission_upload
       WHERE
-        submission_upload_id = ${submissionUploadId};
+        submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionUpload);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get submission_upload record', [
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Submission upload not found', [
         'SubmissionUploadRepository->getSubmissionUpload',
-        `rowCount was ${response.rowCount}, expected 1`
+        { submissionUploadId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'SubmissionUploadRepository->getSubmissionUpload',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get a single active submission_upload record by submission UUID and submission_upload_id.
+   * Use to validate that an upload belongs to the given submission (e.g. path parameter validation).
+   *
+   * @param {string} submissionUuid - The submission UUID (submission.uuid).
+   * @param {string} submissionUploadId - The submission_upload_id.
+   * @returns {Promise<SubmissionUpload>} - The requested submission_upload record.
+   * @throws {ApiNotFoundError} - If the record is not found or does not belong to the submission.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
+   */
+  async getSubmissionUploadBySubmissionUuid(
+    submissionUuid: string,
+    submissionUploadId: string
+  ): Promise<SubmissionUpload> {
+    const sqlStatement = SQL`
+      SELECT
+        su.submission_upload_id,
+        su.submission_id,
+        su.upload_id,
+        su.record_end_date
+      FROM
+        submission_upload su
+      INNER JOIN submission s ON s.submission_id = su.submission_id
+      WHERE
+        s.uuid = ${submissionUuid}
+        AND su.submission_upload_id = ${submissionUploadId}
+        AND su.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionUpload);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Submission upload not found', [
+        'SubmissionUploadRepository->getSubmissionUploadBySubmissionUuid',
+        { submissionUuid, submissionUploadId }
+      ]);
+    }
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'SubmissionUploadRepository->getSubmissionUploadBySubmissionUuid',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 
@@ -58,10 +114,15 @@ export class SubmissionUploadRepository extends BaseRepository {
     const knex = getKnex();
 
     let query = knex
-      .select('submission_upload_id', 'submission_id', 'upload_id')
+      .select(
+        'submission_upload.submission_upload_id',
+        'submission_upload.submission_id',
+        'submission_upload.upload_id'
+      )
       .from('submission_upload')
-      .join('upload_artifact ua', 'ua.upload_id', 'submission_upload.upload_id')
-      .where('submission_id', submissionId);
+      .join('upload_artifact as ua', 'ua.upload_id', 'submission_upload.upload_id')
+      .where('submission_upload.submission_id', submissionId)
+      .whereNull('submission_upload.record_end_date');
 
     if (filters?.role) {
       query = query.andWhere('role', filters.role);
@@ -180,7 +241,90 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
-   * Delete a submission_upload record by ID.
+   * Get an active submission_upload record by upload_id (reverse lookup).
+   *
+   * @param {string} uploadId - The upload_id to look up.
+   * @returns {Promise<SubmissionUpload>} - The submission_upload record.
+   * @throws {ApiNotFoundError} - If the record is not found.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
+   */
+  async getSubmissionUploadByUploadId(uploadId: string): Promise<SubmissionUpload> {
+    const sqlStatement = SQL`
+      SELECT
+        submission_upload_id,
+        submission_id,
+        upload_id
+      FROM
+        submission_upload
+      WHERE
+        upload_id = ${uploadId}
+        AND record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionUpload);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Submission upload not found', [
+        'SubmissionUploadRepository->getSubmissionUploadByUploadId',
+        { uploadId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'SubmissionUploadRepository->getSubmissionUploadByUploadId',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Soft-delete a single active submission_upload record by setting record_end_date to now.
+   *
+   * @param {string} submissionUploadId - The ID of the submission_upload record to soft-delete.
+   * @throws {ApiExecuteSQLError} - If no active record is found.
+   */
+  async softDeleteSubmissionUpload(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission_upload
+      SET record_end_date = NOW()
+      WHERE submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to soft-delete submission_upload record', [
+        'SubmissionUploadRepository->softDeleteSubmissionUpload',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
+    }
+  }
+
+  /**
+   * Soft-delete all active submission_upload records for a given submission.
+   *
+   * @param {number} submissionId - The submission ID whose uploads should be soft-deleted.
+   * @returns {Promise<number>} - The number of records soft-deleted.
+   */
+  async softDeleteSubmissionUploadsBySubmissionId(submissionId: number): Promise<number> {
+    const sqlStatement = SQL`
+      UPDATE submission_upload
+      SET record_end_date = NOW()
+      WHERE submission_id = ${submissionId}
+        AND record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    return response.rowCount ?? 0;
+  }
+
+  /**
+   * Hard-delete a submission_upload record by ID.
    *
    * @param {string} submissionUploadId - The ID of the submission_upload record to delete.
    * @throws {ApiExecuteSQLError} - If the deletion fails.

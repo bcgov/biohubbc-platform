@@ -1,12 +1,12 @@
+import dayjs from 'dayjs';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { IDBConnection } from '../../database/db';
 import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
 import { getServiceClientSystemUser, getUserGuid } from '../../utils/keycloak-utils';
-import { PolicyService } from '../access-policy/policy-service';
 import { CartService } from '../cart-service';
 import { DBService } from '../db-service';
-import { SubmissionService } from '../submission-service';
 import { UserService } from '../user-service';
+import { TeamAuthorizationService } from './team-authorization-service';
 
 export enum AuthorizeOperator {
   AND = 'and',
@@ -35,16 +35,24 @@ export interface AuthorizeBySystemUser {
 }
 
 /**
- * Authorization rule that checks if the user can access the resource through an access policy
+ * Team-scoped entity reference used by Team authorization checks.
  *
  * @export
- * @interface AuthorizeByAccessPolicy
  */
-export interface AuthorizeByAccessPolicy {
-  submissionId: number;
-  submissionFeatureId: number;
-  discriminator: 'AccessPolicy';
-}
+export type TeamAuthorizationEntity =
+  | {
+      entity: 'data_request';
+      dataRequestId: string;
+    }
+  | {
+      entity: 'submission_feature';
+      submissionFeatureId: number;
+      submissionId: number;
+    };
+
+export type AuthorizeByTeam = TeamAuthorizationEntity & {
+  discriminator: 'Team';
+};
 
 /**
  * Authorization rule that checks if a jwt token's client id matches at least one of the required client ids.
@@ -73,7 +81,7 @@ export type AuthorizeRule =
   | AuthorizeBySystemRoles
   | AuthorizeBySystemUser
   | AuthorizeByServiceClient
-  | AuthorizeByAccessPolicy
+  | AuthorizeByTeam
   | AuthorizeByCart;
 
 export type AuthorizeConfigOr = {
@@ -138,8 +146,8 @@ export class AuthorizationService extends DBService {
         case 'ServiceClient':
           authorizeResults.push(await this.authorizeByServiceClient());
           break;
-        case 'AccessPolicy':
-          authorizeResults.push(await this.authorizeByAccessPolicy(authorizeRule));
+        case 'Team':
+          authorizeResults.push(await this.authorizeByTeam(authorizeRule));
           break;
         case 'Cart':
           authorizeResults.push(await this.authorizeByCart(authorizeRule));
@@ -216,42 +224,23 @@ export class AuthorizationService extends DBService {
   }
 
   /**
-   * Check whether the user is authorized to access the requested resource through an access policy
+   * Check whether the user is authorized to access a team-scoped entity.
    *
-   * @param {AuthorizeByAccessPolicy} authorizeRule - The access rule containing submissionFeatureId and submissionId
-   * @returns {Promise<boolean>} Resolves with `true` if the user is authorized, otherwise `false`.
+   * @param {AuthorizeByTeam} authorizeRule
+   * @returns {Promise<boolean>}
    */
-  async authorizeByAccessPolicy(authorizeRule: AuthorizeByAccessPolicy): Promise<boolean> {
-    const submissionService = new SubmissionService(this.connection);
-
-    // Step 1: Fetch the feature by ID to get URN and security status
-    const feature = await submissionService.getSubmissionFeatureById(authorizeRule.submissionFeatureId);
-
-    // Step 2: If the feature is not secured (open-access), grant access immediately
-    if (!feature.secured) {
-      return true;
+  async authorizeByTeam(authorizeRule: AuthorizeByTeam): Promise<boolean> {
+    if (!authorizeRule) {
+      return false;
     }
 
-    // Step 3: Ensure the feature belongs to the requested submission
-    if (feature.submission_id !== authorizeRule.submissionId) {
-      return false; // Deny access if submission IDs do not match
-    }
-
-    // Step 4: Fetch and cache the system user
     const user = await this.getCachedSystemUser();
     if (!user) {
-      return false; // Deny access if we cannot verify the user's identity
+      return false;
     }
 
-    // Step 5: Use the PolicyService to check if any policies grant access to this feature
-    const policyService = new PolicyService(this.connection);
-    const policiesThatGrantAccess = await policyService.getPoliciesThatAuthorizeFeatureAccessByUrn(
-      feature.urn,
-      user.system_user_id
-    );
-
-    // Step 6: Grant access if at least one policy authorizes it
-    return policiesThatGrantAccess.length > 0;
+    const teamAuthorizationService = new TeamAuthorizationService(this.connection);
+    return teamAuthorizationService.isUserAuthorizedForTeamEntity(user.system_user_id, authorizeRule);
   }
 
   /**
@@ -269,6 +258,18 @@ export class AuthorizationService extends DBService {
 
     // Cart does not exist
     if (!cart) {
+      return false;
+    }
+
+    // Only active carts are accessible
+    if (cart.cart_status !== 'active') {
+      return false;
+    }
+
+    // Deny access to carts whose validity window has ended
+    const recordEndDate = cart.record_end_date ? dayjs(cart.record_end_date) : null;
+    const cartValidityEnded = recordEndDate !== null && (!recordEndDate.isValid() || !recordEndDate.isAfter(dayjs()));
+    if (cartValidityEnded) {
       return false;
     }
 

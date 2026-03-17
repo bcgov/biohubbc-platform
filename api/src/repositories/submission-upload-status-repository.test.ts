@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiGeneralError } from '../errors/api-error';
+import { ApiNotFoundError } from '../errors/api-error';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionUploadStatusRepository } from './submission-upload-status-repository';
 
@@ -74,7 +74,7 @@ describe('SubmissionUploadStatusRepository', () => {
         await repo.getSubmissionUploadStatusById(submissionId);
         expect.fail('Expected error to be thrown');
       } catch (error) {
-        expect((error as ApiGeneralError).message).to.equal(`Failed to get submission upload status`);
+        expect((error as ApiNotFoundError).message).to.equal(`Submission upload status not found`);
       }
     });
 

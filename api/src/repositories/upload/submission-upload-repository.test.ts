@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CreateSubmissionUpload, SubmissionUpload, UpdateSubmissionUpload } from '../../models/submission-upload';
 import { UploadArtifactRoleEnum } from '../../models/upload-artifact';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -26,8 +26,8 @@ describe('SubmissionUploadRepository', () => {
         await repo.getSubmissionUpload('id-1');
         expect.fail();
       } catch (error) {
-        expect(error).to.be.instanceOf(ApiExecuteSQLError);
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get submission_upload record');
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as ApiNotFoundError).message).to.equal('Submission upload not found');
       }
     });
 
@@ -42,6 +42,36 @@ describe('SubmissionUploadRepository', () => {
       const repo = new SubmissionUploadRepository(mockDBConnection);
 
       const result = await repo.getSubmissionUpload('id-1');
+      expect(result).to.eql(mockRow);
+    });
+  });
+
+  describe('getSubmissionUploadBySubmissionUuid', () => {
+    it('throws ApiNotFoundError when no matching record found', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      try {
+        await repo.getSubmissionUploadBySubmissionUuid('submission-uuid', 'upload-id');
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as ApiNotFoundError).message).to.equal('Submission upload not found');
+      }
+    });
+
+    it('returns the submission upload when it belongs to the submission', async () => {
+      const mockRow = {
+        submission_upload_id: 'upload-id',
+        submission_id: 123,
+        upload_id: 'upload-uuid'
+      };
+      const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.getSubmissionUploadBySubmissionUuid('submission-uuid', 'upload-id');
       expect(result).to.eql(mockRow);
     });
   });

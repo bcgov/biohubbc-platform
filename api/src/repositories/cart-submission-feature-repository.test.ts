@@ -86,6 +86,38 @@ describe('CartSubmissionFeatureRepository', () => {
     });
   });
 
+  describe('getCartSubmissionFeatureIds', () => {
+    it('should return an array of submission feature IDs', async () => {
+      const mockQueryResponse = {
+        rowCount: 2,
+        rows: [{ submission_feature_id: 1 }, { submission_feature_id: 2 }]
+      } as unknown as QueryResult<any>;
+
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockQueryResponse });
+
+      const repo = new CartSubmissionFeatureRepository(mockDBConnection);
+
+      const result = await repo.getCartSubmissionFeatureIds('cart-1');
+
+      expect(result).to.eql([1, 2]);
+    });
+
+    it('should return an empty array when cart has no features', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as QueryResult<any>;
+
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockQueryResponse });
+
+      const repo = new CartSubmissionFeatureRepository(mockDBConnection);
+
+      const result = await repo.getCartSubmissionFeatureIds('cart-1');
+
+      expect(result).to.eql([]);
+    });
+  });
+
   describe('getCartSubmissionFeatures', () => {
     it('should return submission features from the cart', async () => {
       const mockRows: CartSubmissionFeature[] = [
@@ -119,6 +151,30 @@ describe('CartSubmissionFeatureRepository', () => {
       const result = await repo.getCartSubmissionFeatures('cart-1', { page: 1, limit: 25 });
 
       expect(result).to.eql(mockRows);
+    });
+
+    it('should return only the matching feature when submissionFeatureId is provided', async () => {
+      const matchingFeature: CartSubmissionFeature = {
+        submission_feature_id: 5,
+        cart_submission_feature_id: 'uuid5',
+        feature_type_name: 'Type1',
+        feature_type_id: 2,
+        secured: false,
+        submission_id: 1
+      };
+
+      const knexStub = sinon.stub().resolves({
+        rowCount: 1,
+        rows: [matchingFeature]
+      } as unknown as QueryResult<any>);
+
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repo = new CartSubmissionFeatureRepository(mockDBConnection);
+
+      const result = await repo.getCartSubmissionFeatures('cart-1', { page: 1, limit: 25 }, 5);
+
+      expect(result).to.eql([matchingFeature]);
     });
   });
 

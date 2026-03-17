@@ -203,7 +203,7 @@ describe('searchProperties', () => {
       properties: mockResultsWithData,
       pagination: {
         total: 2,
-        per_page: 2,
+        per_page: 25,
         current_page: 1,
         last_page: 1,
         sort: undefined,

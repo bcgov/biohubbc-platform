@@ -18,7 +18,7 @@ export const Artifact = z.object({
   artifact_status: ArtifactStatusZod,
   bucket: z.string().max(200),
   object_key: z.string(),
-  byte_size: z.number().int().nullable(),
+  byte_size: z.string().nullable(),
   checksum_sha256: z.string().length(64).nullable(),
   uploaded_at: z.string().nullable()
 });

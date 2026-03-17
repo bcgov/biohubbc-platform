@@ -1,6 +1,7 @@
 import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { DATE_FORMAT, TIME_FORMAT } from 'constants/dateTimeFormats';
 import { Dayjs, default as dayjs } from 'dayjs';
+import { getRelativeTimeLabel } from './date';
 
 /**
  * Checks if a url string starts with an `http[s]://` protocol, and adds `https://` if it does not. If the url
@@ -39,16 +40,18 @@ export const ensureProtocol = (url: string, protocol: 'http://' | 'https://' = '
  */
 export const getDaysSinceDate = (oldDate: Dayjs, futureDate = dayjs()) => {
   const days = futureDate.diff(oldDate, 'days');
-  let label = '';
   if (days < 1) {
     // today
-    label = `Today (${oldDate.format(DATE_FORMAT.ShortDateFormat)})`;
-  } else if (days < 2) {
-    label = `Yesterday (${oldDate.format(DATE_FORMAT.ShortDateFormat)})`;
-  } else {
-    label = `${days} days ago (${oldDate.format(DATE_FORMAT.ShortDateFormat)})`;
+    return `Today (${oldDate.format(DATE_FORMAT.ShortDateFormat)})`;
   }
-  return label;
+
+  if (days < 2) {
+    return `Yesterday (${oldDate.format(DATE_FORMAT.ShortDateFormat)})`;
+  }
+
+  const relativeLabel = getRelativeTimeLabel(oldDate, { now: futureDate }) ?? `${days} days ago`;
+
+  return `${relativeLabel} (${oldDate.format(DATE_FORMAT.ShortDateFormat)})`;
 };
 
 /**

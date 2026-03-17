@@ -10,6 +10,7 @@ interface ResultPageContainerProps {
   rightSidebar?: React.ReactNode;
   leftSidebarWidth?: number;
   rightSidebarWidth?: number;
+  rightSidebarTitle?: string;
   children: React.ReactNode;
 }
 
@@ -18,6 +19,7 @@ export const ResultPageContainer = ({
   rightSidebar,
   leftSidebarWidth = 350,
   rightSidebarWidth = 350,
+  rightSidebarTitle = 'Downloads',
   children
 }: ResultPageContainerProps) => {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -86,7 +88,7 @@ export const ResultPageContainer = ({
             ) : (
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Typography variant="subtitle1" fontWeight="bold">
-                  Downloads
+                  {rightSidebarTitle}
                 </Typography>
                 <IconButton size="small" onClick={() => setRightCollapsed(true)}>
                   <ChevronRightIcon />

@@ -1,6 +1,10 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
-import { CartFeatureListResponse, CartWithFeaturesResponse } from 'interfaces/useCartApi.interface';
+import {
+  CartFeatureListResponse,
+  CartWithFeaturesResponse,
+  CheckoutCartResponse
+} from 'interfaces/useCartApi.interface';
 import { useCartApi } from './useCartApi';
 
 describe('useCartApi', () => {
@@ -20,7 +24,8 @@ describe('useCartApi', () => {
         cart: {
           cart_id: '123',
           system_user_id: null,
-          cart_status: 'active'
+          cart_status: 'active',
+          record_end_date: null
         },
         features: [],
         pagination: {
@@ -43,7 +48,8 @@ describe('useCartApi', () => {
         cart: {
           cart_id: '123',
           system_user_id: null,
-          cart_status: 'active'
+          cart_status: 'active',
+          record_end_date: null
         },
         features: [],
         pagination: {
@@ -145,7 +151,8 @@ describe('useCartApi', () => {
         cart: {
           cart_id: '123',
           system_user_id: 1,
-          cart_status: 'active'
+          cart_status: 'active',
+          record_end_date: null
         },
         features: [],
         pagination: {
@@ -170,6 +177,24 @@ describe('useCartApi', () => {
       mock.onPut(`/api/cart/${cartId}`).reply(200);
 
       await expect(useCartApi(axios).assignCartToCurrentUser(cartId)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('checkoutCart', () => {
+    it('posts to the correct URL and returns download_id', async () => {
+      const mockResponse: CheckoutCartResponse = { download_id: 'dl-001' };
+
+      mock.onPost('/api/cart/cart-456/checkout').reply(200, mockResponse);
+
+      const result = await useCartApi(axios).checkoutCart('cart-456');
+
+      expect(result).toEqual({ download_id: 'dl-001' });
+    });
+
+    it('propagates rejection on error', async () => {
+      mock.onPost('/api/cart/cart-456/checkout').reply(500);
+
+      await expect(useCartApi(axios).checkoutCart('cart-456')).rejects.toThrow();
     });
   });
 });

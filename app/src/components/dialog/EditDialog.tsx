@@ -3,6 +3,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
+import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { Formik, FormikValues } from 'formik';
 
 export interface IEditDialogComponentProps<T> {
@@ -64,7 +65,7 @@ export interface IEditDialogProps<T> {
   /**
    * Prop to track if the dialog should be in a 'loading' state
    */
-  isLoading: boolean;
+  isLoading?: boolean;
 }
 
 /**
@@ -92,9 +93,7 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
       }}>
       {(formikProps) => (
         <Dialog
-          fullWidth
-          maxWidth="md"
-          open={props.open}
+          open={props.open ?? false}
           aria-labelledby="edit-dialog-title"
           aria-describedby="edit-dialog-description">
           <DialogTitle id="edit-dialog-title">{props.dialogTitle}</DialogTitle>
@@ -102,13 +101,12 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
           <DialogActions>
             <Button
               loading={props.isLoading}
-              disabled={!formikProps.isValid}
               onClick={formikProps.submitForm}
               color="primary"
               variant="contained"
               autoFocus
               data-testid="edit-dialog-save-button">
-              {props.dialogSaveButtonLabel || 'Save Changes'}
+              <LoadingGuard isLoading={props.isLoading}>{props.dialogSaveButtonLabel || 'Save Changes'}</LoadingGuard>
             </Button>
             <Button onClick={props.onCancel} color="primary" variant="outlined" data-testid="edit-dialog-cancel-button">
               Cancel
@@ -120,5 +118,3 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
     </Formik>
   );
 };
-
-export default EditDialog;

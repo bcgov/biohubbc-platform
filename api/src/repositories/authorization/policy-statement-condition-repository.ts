@@ -1,5 +1,5 @@
 import { getKnex } from '../../database/db';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CreatePolicyStatementCondition, PolicyStatementCondition } from '../../models/policy-statement-condition';
 import { BaseRepository } from '../base-repository';
 
@@ -60,10 +60,17 @@ export class PolicyStatementConditionRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, PolicyStatementCondition);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get policy statement condition', [
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Policy statement condition not found', [
         'PolicyStatementConditionRepository->getPolicyStatementCondition',
-        'rowCount was null or undefined, expected rowCount = 1'
+        { policyStatementConditionId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'PolicyStatementConditionRepository->getPolicyStatementCondition',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 

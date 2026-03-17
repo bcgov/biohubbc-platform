@@ -24,6 +24,10 @@ export interface CreateTeamPolicy {
   policy_id: string;
 }
 
+export interface CreateTeamPoliciesRequest {
+  policies: string[];
+}
+
 export interface UpdateTeamPolicy {
   record_end_date?: string;
 }

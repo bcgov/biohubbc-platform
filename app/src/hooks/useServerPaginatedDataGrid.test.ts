@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
-import { useServerPaginatedDataGrid, toApiPagination } from './useServerPaginatedDataGrid';
+import { toApiPagination } from 'utils/pagination';
+import { useServerPaginatedDataGrid } from './useServerPaginatedDataGrid';
 
 // Mock useDataLoader
 const mockLoad = vi.fn();
@@ -30,7 +31,7 @@ interface ITestResponse {
 
 // Default hook options for tests
 const createDefaultOptions = (overrides = {}) => ({
-  fetcher: vi.fn<(search: string | undefined, pagination: any) => Promise<ITestResponse>>().mockResolvedValue({
+  fetcher: vi.fn<(search: string, pagination: any) => Promise<ITestResponse>>().mockResolvedValue({
     items: [{ id: '1', name: 'Test' }],
     pagination: { total: 1 }
   }),
@@ -117,10 +118,10 @@ describe('useServerPaginatedDataGrid', () => {
       expect(result.current.searchTerm).toBe('');
     });
 
-    it('starts with empty data array when no response', () => {
+    it('starts with empty rows array when no response', () => {
       const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
-      expect(result.current.data).toEqual([]);
+      expect(result.current.rows).toEqual([]);
       expect(result.current.rowCount).toBe(0);
     });
   });
@@ -131,7 +132,7 @@ describe('useServerPaginatedDataGrid', () => {
       renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
       expect(mockLoad).toHaveBeenCalledWith(
-        undefined, // no search term
+        '', // no search term
         expect.objectContaining({
           page: 1,
           limit: 10,
@@ -144,7 +145,7 @@ describe('useServerPaginatedDataGrid', () => {
     it('uses custom defaultPageSize in initial load', () => {
       renderHook(() => useServerPaginatedDataGrid(createDefaultOptions({ defaultPageSize: 50 })));
 
-      expect(mockLoad).toHaveBeenCalledWith(undefined, expect.objectContaining({ limit: 50 }));
+      expect(mockLoad).toHaveBeenCalledWith('', expect.objectContaining({ limit: 50 }));
     });
   });
 
@@ -169,7 +170,7 @@ describe('useServerPaginatedDataGrid', () => {
 
       const { result } = renderHook(() => useServerPaginatedDataGrid(createDefaultOptions()));
 
-      expect(result.current.data).toEqual(mockItems);
+      expect(result.current.rows).toEqual(mockItems);
     });
 
     it('extracts total count from response using extractTotal', async () => {
@@ -298,7 +299,7 @@ describe('useServerPaginatedDataGrid', () => {
 
       // Should be called immediately, not debounced
       expect(mockRefresh).toHaveBeenCalledWith(
-        undefined,
+        '',
         expect.objectContaining({
           page: 3, // 0-indexed page 2 = API page 3
           limit: 10
@@ -354,7 +355,7 @@ describe('useServerPaginatedDataGrid', () => {
       });
 
       expect(mockRefresh).toHaveBeenCalledWith(
-        undefined,
+        '',
         expect.objectContaining({
           sort: 'updated_at',
           order: 'asc'
@@ -380,7 +381,7 @@ describe('useServerPaginatedDataGrid', () => {
 
       // Page should be preserved
       expect(mockRefresh).toHaveBeenCalledWith(
-        undefined,
+        '',
         expect.objectContaining({
           page: 3 // page 2 (0-indexed) = API page 3
         })

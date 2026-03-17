@@ -1,6 +1,6 @@
 import { fireEvent, waitFor } from '@testing-library/react';
-import EditDialog from 'components/dialog/EditDialog';
-import CustomTextField from 'components/fields/CustomTextField';
+import { EditDialog } from 'components/dialog/EditDialog';
+import CustomTextFieldFormik from 'components/fields/CustomTextFieldFormik';
 import { useFormikContext } from 'formik';
 import { render } from 'test-helpers/test-utils';
 import yup from 'utils/YupSchema';
@@ -20,7 +20,7 @@ const SampleFormikForm = () => {
 
   return (
     <form onSubmit={handleSubmit}>
-      <CustomTextField name="testField" label="Test Field" other={{ multiline: true, required: true, rows: 4 }} />
+      <CustomTextFieldFormik name="testField" label="Test Field" multiline required rows={4} />
     </form>
   );
 };
@@ -31,19 +31,21 @@ const handleOnCancel = vi.fn();
 const renderContainer = ({
   testFieldValue,
   dialogError,
-  open = true
+  open,
+  isLoading
 }: {
   testFieldValue: string;
   dialogError?: string;
   open?: boolean;
+  isLoading?: boolean;
 }) => {
   return render(
     <div id="root">
       <EditDialog
-        isLoading={false}
+        isLoading={isLoading}
         dialogTitle="This is dialog title"
         dialogError={dialogError || undefined}
-        open={open}
+        open={open ?? false}
         component={{
           element: <SampleFormikForm />,
           initialValues: { testField: testFieldValue },
@@ -58,7 +60,7 @@ const renderContainer = ({
 
 describe('EditDialog', () => {
   it('renders component and data values', () => {
-    const { getByTestId, getByText } = renderContainer({ testFieldValue: 'this is a test' });
+    const { getByTestId, getByText } = renderContainer({ testFieldValue: 'this is a test', open: true });
 
     expect(getByTestId('testField')).toBeVisible();
     expect(getByText('this is a test')).toBeVisible();
@@ -67,7 +69,8 @@ describe('EditDialog', () => {
   it('matches snapshot when open, with error message', () => {
     const { getByTestId, getByText } = renderContainer({
       testFieldValue: 'this is a test',
-      dialogError: 'This is an error'
+      dialogError: 'This is an error',
+      open: true
     });
 
     expect(getByTestId('testField')).toBeVisible();
@@ -75,13 +78,13 @@ describe('EditDialog', () => {
   });
 
   it('calls the onSave prop when `Save Changes` button is clicked', async () => {
-    const { findByText, getByLabelText } = renderContainer({ testFieldValue: 'initial value' });
+    const { getByTestId, getByLabelText } = renderContainer({ testFieldValue: 'initial value', open: true });
 
     const textField = await getByLabelText('Test Field', { exact: false });
 
     fireEvent.change(textField, { target: { value: 'updated value' } });
 
-    const saveChangesButton = await findByText('Save Changes', { exact: false });
+    const saveChangesButton = getByTestId('edit-dialog-save-button');
 
     fireEvent.click(saveChangesButton);
 
@@ -93,8 +96,19 @@ describe('EditDialog', () => {
     });
   });
 
+  it('hides save label text while loading', () => {
+    const { getByTestId, queryByText } = renderContainer({
+      testFieldValue: 'this is a test',
+      open: true,
+      isLoading: true
+    });
+
+    expect(getByTestId('edit-dialog-save-button')).toBeVisible();
+    expect(queryByText('Save Changes', { exact: false })).toBeNull();
+  });
+
   it('calls the onCancel prop when `Cancel` button is clicked', async () => {
-    const { findByText } = renderContainer({ testFieldValue: 'this is a test' });
+    const { findByText } = renderContainer({ testFieldValue: 'this is a test', open: true });
 
     const cancelButton = await findByText('Cancel', { exact: false });
 

@@ -2,8 +2,9 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
+import { UpdateTeamRequest } from '../../../../models/team';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { TeamWithMembersSchema, UpdateTeamRequestSchema } from '../../../../openapi/schemas/team';
+import { TeamSchema, UpdateTeamRequestSchema } from '../../../../openapi/schemas/team';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { TeamService } from '../../../../services/access-policy/team-service';
 import { getLogger } from '../../../../utils/logger';
@@ -14,7 +15,7 @@ export const GET: Operation = [
   authorizeRequestHandler(() => ({
     and: [
       {
-        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR],
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
         discriminator: 'SystemRole'
       }
     ]
@@ -23,7 +24,7 @@ export const GET: Operation = [
 ];
 
 GET.apiDoc = {
-  description: 'Get a team by ID with its members.',
+  description: 'Get a team by ID.',
   tags: ['admin'],
   security: [{ Bearer: [] }],
   parameters: [
@@ -37,15 +38,19 @@ GET.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'Team with members',
-      content: { 'application/json': { schema: TeamWithMembersSchema } }
+      description: 'Team',
+      content: {
+        'application/json': {
+          schema: TeamSchema
+        }
+      }
     },
     ...defaultErrorResponses
   }
 };
 
 /**
- * Get a team by ID with its members.
+ * Get a team by ID.
  *
  * @returns {RequestHandler}
  */
@@ -57,7 +62,7 @@ export function getTeam(): RequestHandler {
     try {
       await connection.open();
       const teamService = new TeamService(connection);
-      const result = await teamService.getTeamWithMembers(teamId);
+      const result = await teamService.getTeam(teamId);
       await connection.commit();
       return res.status(200).json(result);
     } catch (error) {
@@ -72,7 +77,12 @@ export function getTeam(): RequestHandler {
 
 export const PUT: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR], discriminator: 'SystemRole' }]
+    and: [
+      {
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        discriminator: 'SystemRole'
+      }
+    ]
   })),
   updateTeam()
 ];
@@ -92,12 +102,20 @@ PUT.apiDoc = {
   ],
   requestBody: {
     required: true,
-    content: { 'application/json': { schema: UpdateTeamRequestSchema } }
+    content: {
+      'application/json': {
+        schema: UpdateTeamRequestSchema
+      }
+    }
   },
   responses: {
     200: {
       description: 'Team updated',
-      content: { 'application/json': { schema: TeamWithMembersSchema } }
+      content: {
+        'application/json': {
+          schema: TeamSchema
+        }
+      }
     },
     ...defaultErrorResponses
   }
@@ -112,14 +130,16 @@ export function updateTeam(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
     const teamId = req.params.teamId;
-    const { name, description, member_user_ids } = req.body;
+    const payload = req.body as UpdateTeamRequest;
 
     try {
       await connection.open();
       const teamService = new TeamService(connection);
-      const result = await teamService.updateTeamWithMembers(teamId, { name, description }, member_user_ids || []);
+
+      const team = await teamService.updateTeam(teamId, payload);
+
       await connection.commit();
-      return res.status(200).json(result);
+      return res.status(200).json(team);
     } catch (error) {
       defaultLog.error({ label: 'updateTeam', message: 'error', error });
       await connection.rollback();
@@ -132,7 +152,12 @@ export function updateTeam(): RequestHandler {
 
 export const DELETE: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR], discriminator: 'SystemRole' }]
+    and: [
+      {
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        discriminator: 'SystemRole'
+      }
+    ]
   })),
   deleteTeam()
 ];

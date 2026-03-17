@@ -7,7 +7,7 @@ import { searchAllResponseSchema } from '../../openapi/schemas/search/search-all
 import { SearchService } from '../../services/search-service';
 import { SearchParams } from '../../services/search-service.interface';
 import { getLogger } from '../../utils/logger';
-import { ensureCompletePaginationOptions, makePaginationOptionsFromRequest } from '../../utils/pagination';
+import { makePaginationOptionsFromRequest } from '../../utils/pagination';
 
 const defaultLog = getLogger('paths/search/index');
 
@@ -63,13 +63,13 @@ export function searchAll(): RequestHandler {
       const filters = parseQueryParams(req);
       const paginationOptions = makePaginationOptionsFromRequest(req);
 
-      const result = await searchService.search(filters, ensureCompletePaginationOptions(paginationOptions));
+      const result = await searchService.search(filters, paginationOptions);
 
       await connection.commit();
 
       res.setHeader('Cache-Control', 'public, max-age=90');
 
-      res.status(200).json(result);
+      return res.status(200).json(result);
     } catch (error) {
       defaultLog.error({ label: 'searchAll', message: 'error', error });
       await connection.rollback();

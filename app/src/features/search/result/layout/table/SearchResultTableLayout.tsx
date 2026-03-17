@@ -1,5 +1,6 @@
 import { Button, Stack } from '@mui/material';
-import { DataGrid, GridCellParams, GridRowSelectionModel } from '@mui/x-data-grid';
+import { GridCellParams, GridRowSelectionModel } from '@mui/x-data-grid';
+import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useMemo } from 'react';
 
@@ -7,6 +8,7 @@ interface SearchResultTableLayoutProps {
   results: SearchFeatureResultWithRelevancy[];
   cartFeatureIds: Set<number>;
   onRowSelectionModelChange: (rowSelectionModel: GridRowSelectionModel) => void;
+  onClick?: (result: SearchFeatureResultWithRelevancy) => void;
   onDownload?: (result: SearchFeatureResultWithRelevancy) => void;
   onAddToCart?: (result: SearchFeatureResultWithRelevancy) => void;
   onRemoveFromCart?: (featureId: number) => void;
@@ -16,7 +18,7 @@ export const SearchResultTableLayout = ({
   results,
   cartFeatureIds,
   onRowSelectionModelChange,
-  onDownload,
+  onClick,
   onAddToCart,
   onRemoveFromCart
 }: SearchResultTableLayoutProps) => {
@@ -65,7 +67,7 @@ export const SearchResultTableLayout = ({
                 size="small"
                 variant="outlined"
                 onClick={() => {
-                  onDownload?.(result);
+                  onClick?.(result);
                 }}>
                 View
               </Button>
@@ -94,10 +96,10 @@ export const SearchResultTableLayout = ({
         }
       }
     ];
-  }, [results, cartFeatureIds, onDownload, onAddToCart, onRemoveFromCart]);
+  }, [results, cartFeatureIds, onClick, onAddToCart, onRemoveFromCart]);
 
   return (
-    <DataGrid
+    <CustomDataGrid
       rows={results}
       columns={columns}
       getRowId={(row) => row.uuid}

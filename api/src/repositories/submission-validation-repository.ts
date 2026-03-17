@@ -15,17 +15,23 @@ import { BaseRepository } from './base-repository';
  */
 export class SubmissionValidationRepository extends BaseRepository {
   /**
-   * Create a new submission validation record.
+   * Create a new submission validation record keyed by submission_upload_id.
+   * Each upload event gets its own validation record to track ingestion status independently.
    *
+   * @param {string} submissionUploadId - The submission_upload_id (UUID).
    * @param {number} submissionId - The submission ID.
    * @param {string} jobId - The pg-boss job UUID.
    * @return {Promise<{ submission_validation_id: number }>} The created record ID.
    * @memberof SubmissionValidationRepository
    */
-  async createSubmissionValidation(submissionId: number, jobId: string): Promise<{ submission_validation_id: number }> {
+  async createSubmissionValidation(
+    submissionUploadId: string,
+    submissionId: number,
+    jobId: string
+  ): Promise<{ submission_validation_id: number }> {
     const sql = SQL`
-      INSERT INTO submission_validation (submission_id, job_id, status)
-      VALUES (${submissionId}, ${jobId}::uuid, 'pending')
+      INSERT INTO submission_validation (submission_upload_id, submission_id, job_id, status)
+      VALUES (${submissionUploadId}::uuid, ${submissionId}, ${jobId}::uuid, 'pending')
       RETURNING submission_validation_id;
     `;
 
@@ -65,17 +71,19 @@ export class SubmissionValidationRepository extends BaseRepository {
   }
 
   /**
-   * Get the most recent submission validation record for a submission.
+   * Get the most recent submission validation record for a submission upload.
    *
-   * @param {number} submissionId - The submission ID.
+   * @param {string} submissionUploadId - The submission_upload_id (UUID).
    * @return {Promise<SubmissionValidationRecord | null>}
    * @memberof SubmissionValidationRepository
    */
-  async getSubmissionValidationBySubmissionId(submissionId: number): Promise<SubmissionValidationRecord | null> {
+  async getSubmissionValidationBySubmissionUploadId(
+    submissionUploadId: string
+  ): Promise<SubmissionValidationRecord | null> {
     const sql = SQL`
       SELECT submission_validation_id, job_id, status
       FROM submission_validation
-      WHERE submission_id = ${submissionId}
+      WHERE submission_upload_id = ${submissionUploadId}::uuid
       ORDER BY create_date DESC
       LIMIT 1;
     `;
@@ -86,18 +94,19 @@ export class SubmissionValidationRepository extends BaseRepository {
   }
 
   /**
-   * Update submission validation status by submission ID.
+   * Update the most recent submission validation status by submission_upload_id.
    *
    * Used by Dead Letter Queue handler where the original job ID is not available.
+   * Scoped to the latest record so manual retries don't corrupt historical records.
    *
-   * @param {number} submissionId - The submission ID.
+   * @param {string} submissionUploadId - The submission_upload_id (UUID).
    * @param {SubmissionValidationStatus} status - The new status.
    * @param {Record<string, unknown>} [metadata] - Optional metadata (e.g., error details).
    * @return {Promise<void>}
    * @memberof SubmissionValidationRepository
    */
-  async updateSubmissionValidationStatusBySubmissionId(
-    submissionId: number,
+  async updateSubmissionValidationStatusBySubmissionUploadId(
+    submissionUploadId: string,
     status: SubmissionValidationStatus,
     metadata?: Record<string, unknown>
   ): Promise<void> {
@@ -107,7 +116,13 @@ export class SubmissionValidationRepository extends BaseRepository {
         status = ${status},
         metadata = ${JSON.stringify(metadata ?? null)}::jsonb,
         ended_at = CASE WHEN ${status} IN ('completed', 'invalid', 'failed') THEN now() ELSE ended_at END
-      WHERE submission_id = ${submissionId};
+      WHERE submission_validation_id = (
+        SELECT submission_validation_id
+        FROM submission_validation
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+        ORDER BY create_date DESC
+        LIMIT 1
+      );
     `;
 
     await this.connection.sql(sql);

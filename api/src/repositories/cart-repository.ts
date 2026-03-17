@@ -1,5 +1,5 @@
 import { getKnex } from '../database/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { Cart, CartStatus, UpdateCart } from '../models/cart';
 import { BaseRepository } from './base-repository';
 
@@ -20,7 +20,9 @@ export class CartRepository extends BaseRepository {
    */
   async findCartById(cartId: string): Promise<Cart | null> {
     const knex = getKnex();
-    const query = knex('cart').where('cart_id', cartId).select('cart_id', 'cart_status', 'system_user_id');
+    const query = knex('cart')
+      .where('cart_id', cartId)
+      .select('cart_id', 'cart_status', 'system_user_id', 'record_end_date');
 
     const response = await this.connection.knex(query, Cart);
 
@@ -36,14 +38,20 @@ export class CartRepository extends BaseRepository {
    */
   async getCartById(cartId: string): Promise<Cart> {
     const knex = getKnex();
-    const query = knex('cart').where('cart_id', cartId).select('cart_id', 'cart_status', 'system_user_id');
+    const query = knex('cart')
+      .where('cart_id', cartId)
+      .select('cart_id', 'cart_status', 'system_user_id', 'record_end_date');
 
     const response = await this.connection.knex(query, Cart);
 
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Cart not found', ['CartRepository->getCartById', { cartId }]);
+    }
+
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get cart', [
+      throw new ApiExecuteSQLError('Unexpected row count', [
         'CartRepository->getCartById',
-        'rowCount !== 1, expected rowCount === 1'
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 
@@ -64,14 +72,14 @@ export class CartRepository extends BaseRepository {
         system_user_id: systemUserId,
         cart_status: CartStatus.ACTIVE
       })
-      .returning(['cart_id', 'cart_status', 'system_user_id']);
+      .returning(['cart_id', 'cart_status', 'system_user_id', 'record_end_date']);
 
     const response = await this.connection.knex(query, Cart);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to create cart', [
         'CartRepository->createCart',
-        'rowCount !== 1, expected rowCount === 1'
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
     return response.rows[0];
@@ -81,21 +89,21 @@ export class CartRepository extends BaseRepository {
    * Update a cart.
    *
    * @param {string} cartId
-   * @param {UpdateCart} payload
+   * @param {UpdateCart} cart
    * @return {Promise<void>}
    * @memberof CartRepository
    */
-  async updateCart(cartId: string, payload: UpdateCart): Promise<void> {
+  async updateCart(cartId: string, cart: UpdateCart): Promise<void> {
     const knex = getKnex();
 
-    const query = knex('cart').where('cart_id', cartId).update(payload);
+    const query = knex('cart').where('cart_id', cartId).update(cart);
 
     const response = await this.connection.knex(query, Cart);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update cart status', [
-        'CartRepository->updateCartStatus',
-        'rowCount !== 1, expected rowCount === 1'
+      throw new ApiExecuteSQLError('Failed to update cart', [
+        'CartRepository->updateCart',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
   }

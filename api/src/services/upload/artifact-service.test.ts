@@ -29,7 +29,7 @@ describe('ArtifactService', () => {
         bucket: 'test-bucket',
         artifact_status: ArtifactStatusEnum.PENDING,
         object_key: 'test-object-key',
-        byte_size: 1234,
+        byte_size: '1234',
         checksum_sha256: 'abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
         uploaded_at: '2025-01-01T00:00:00Z'
       };
@@ -62,7 +62,7 @@ describe('ArtifactService', () => {
           artifact_status: ArtifactStatusEnum.UPLOADED,
           bucket: 'test-bucket-1',
           object_key: 'test-object-key-1',
-          byte_size: 1234,
+          byte_size: '1234',
           checksum_sha256: 'abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
           uploaded_at: '2025-01-01T00:00:00Z'
         },
@@ -71,7 +71,7 @@ describe('ArtifactService', () => {
           artifact_status: ArtifactStatusEnum.PENDING,
           bucket: 'test-bucket-2',
           object_key: 'test-object-key-2',
-          byte_size: 5678,
+          byte_size: '5678',
           checksum_sha256: '1234567890abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
           uploaded_at: '2025-02-01T00:00:00Z'
         }

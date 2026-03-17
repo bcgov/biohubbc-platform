@@ -35,3 +35,26 @@ export interface ITeamPolicy {
   team_id: string;
   policy_id: string;
 }
+
+/**
+ * Request payload for bulk policy assignment to a team.
+ */
+export interface ICreateTeamPoliciesRequest {
+  policies: string[];
+}
+
+/**
+ * Team-policy record returned by bulk assignment endpoint.
+ */
+export interface ITeamPolicyAssignment {
+  team_policy_id: string;
+  team_id: string;
+  policy_id: string;
+}
+
+/**
+ * Response payload for bulk team-policy assignment.
+ */
+export interface ICreateTeamPoliciesResponse {
+  team_policies: ITeamPolicyAssignment[];
+}

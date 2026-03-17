@@ -98,7 +98,7 @@ export const createMockCartFeaturesResponse = (
   features: CartSubmissionFeature[],
   pagination: ApiPaginationResponseParams
 ): CartWithFeaturesResponse => ({
-  cart: { cart_id, system_user_id: null, cart_status: 'active' },
+  cart: { cart_id, system_user_id: null, cart_status: 'active', record_end_date: null },
   features,
   pagination
 });

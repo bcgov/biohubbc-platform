@@ -1,6 +1,6 @@
 import { Typography } from '@mui/material';
 import { GridRowSelectionModel } from '@mui/x-data-grid';
-import EditDialog from 'components/dialog/EditDialog';
+import { EditDialog } from 'components/dialog/EditDialog';
 import { ApplySecurityRulesI18N } from 'constants/i18n';
 import { ISecurityRuleAndCategory } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';

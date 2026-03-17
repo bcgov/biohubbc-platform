@@ -13,7 +13,7 @@ import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import EditDialog from 'components/dialog/EditDialog';
+import { EditDialog } from 'components/dialog/EditDialog';
 import { CustomMenuButton, CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { AddSystemUserI18N, DeleteSystemUserI18N, UpdateSystemUserI18N } from 'constants/i18n';
 import { ISnackbarProps } from 'contexts/dialogContext';
@@ -23,7 +23,7 @@ import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { IGetRoles } from 'interfaces/useAdminApi.interface';
 import { ISystemUser } from 'interfaces/useUserApi.interface';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { handleChangePage, handleChangeRowsPerPage } from 'utils/tablePaginationUtils';
 import AddSystemUsersForm, {
   AddSystemUsersFormInitialValues,
@@ -74,9 +74,16 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
 
   const [openAddUserDialog, setOpenAddUserDialog] = useState(false);
 
-  const showSnackBar = (textDialogProps?: Partial<ISnackbarProps>) => {
-    dialogContext.setSnackbar({ ...textDialogProps, open: true });
-  };
+  const showSnackBar = useCallback(
+    (textDialogProps?: Partial<ISnackbarProps>) => {
+      dialogContext.setSnackbar({ ...textDialogProps, open: true });
+    },
+    [dialogContext]
+  );
+
+  const closeYesNoDialog = useCallback(() => {
+    dialogContext.setYesNoDialog({ open: false });
+  }, [dialogContext]);
 
   const handleRemoveUserClick = (row: ISystemUser) => {
     dialogContext.setYesNoDialog({
@@ -90,57 +97,53 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
       yesButtonLabel: 'Remove User',
       noButtonLabel: 'Cancel',
       yesButtonProps: { color: 'error' },
-      onClose: () => {
-        dialogContext.setYesNoDialog({ open: false });
-      },
-      onNo: () => {
-        dialogContext.setYesNoDialog({ open: false });
-      },
+      onClose: closeYesNoDialog,
+      onNo: closeYesNoDialog,
       open: true,
-      onYes: async () => {
-        await deActivateSystemUser(row);
-        dialogContext.setYesNoDialog({ open: false });
-      }
+      onYes: buildConfirmRemoveUserHandler(row)
     });
   };
 
-  const deActivateSystemUser = async (user: ISystemUser) => {
-    if (!user?.system_user_id) {
-      return;
-    }
-    try {
-      await biohubApi.user.deleteSystemUser(user.system_user_id);
+  const deActivateSystemUser = useCallback(
+    async (user: ISystemUser) => {
+      if (!user?.system_user_id) {
+        return;
+      }
+      try {
+        await biohubApi.user.deleteSystemUser(user.system_user_id);
 
-      showSnackBar({
-        snackbarMessage: (
-          <>
-            <Typography variant="body2" component="div">
-              User <strong>{user.user_identifier}</strong> removed from application.
-            </Typography>
-          </>
-        ),
-        open: true
-      });
+        showSnackBar({
+          snackbarMessage: (
+            <>
+              <Typography variant="body2" component="div">
+                User <strong>{user.user_identifier}</strong> removed from application.
+              </Typography>
+            </>
+          ),
+          open: true
+        });
 
-      props.refresh();
-    } catch (error) {
-      const apiError = error as APIError;
+        props.refresh();
+      } catch (error) {
+        const apiError = error as APIError;
 
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: DeleteSystemUserI18N.deleteUserErrorTitle,
-        dialogText: DeleteSystemUserI18N.deleteUserErrorText,
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
-        onClose: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        onOk: () => {
-          dialogContext.setErrorDialog({ open: false });
-        }
-      });
-    }
-  };
+        dialogContext.setErrorDialog({
+          open: true,
+          dialogTitle: DeleteSystemUserI18N.deleteUserErrorTitle,
+          dialogText: DeleteSystemUserI18N.deleteUserErrorText,
+          dialogError: apiError.message,
+          dialogErrorDetails: apiError.errors,
+          onClose: () => {
+            dialogContext.setErrorDialog({ open: false });
+          },
+          onOk: () => {
+            dialogContext.setErrorDialog({ open: false });
+          }
+        });
+      }
+    },
+    [biohubApi.user, dialogContext, props, showSnackBar]
+  );
 
   const handleChangeUserPermissionsClick = (row: ISystemUser, newRoleName: any, newRoleId: number) => {
     dialogContext.setYesNoDialog({
@@ -153,58 +156,84 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
       yesButtonLabel: 'Change Role',
       noButtonLabel: 'Cancel',
       yesButtonProps: { color: 'primary' },
-      onClose: () => {
-        dialogContext.setYesNoDialog({ open: false });
-      },
-      onNo: () => {
-        dialogContext.setYesNoDialog({ open: false });
-      },
+      onClose: closeYesNoDialog,
+      onNo: closeYesNoDialog,
       open: true,
-      onYes: async () => {
-        await changeSystemUserRole(row, newRoleId, newRoleName);
-        dialogContext.setYesNoDialog({ open: false });
-      }
+      onYes: buildConfirmRoleChangeHandler(row, newRoleId, newRoleName)
     });
   };
 
-  const changeSystemUserRole = async (user: ISystemUser, roleId: number, roleName: string) => {
-    if (!user?.system_user_id) {
-      return;
-    }
-    const roleIds = [roleId];
+  const changeSystemUserRole = useCallback(
+    async (user: ISystemUser, roleId: number, roleName: string) => {
+      if (!user?.system_user_id) {
+        return;
+      }
+      const roleIds = [roleId];
 
-    try {
-      await biohubApi.user.updateSystemUserRoles(user.system_user_id, roleIds);
+      try {
+        await biohubApi.user.updateSystemUserRoles(user.system_user_id, roleIds);
 
-      showSnackBar({
-        snackbarMessage: (
-          <>
-            <Typography variant="body2" component="div">
-              User <strong>{user.user_identifier}</strong>'s role has changed to <strong>{roleName}</strong>.
-            </Typography>
-          </>
-        ),
-        open: true
-      });
+        showSnackBar({
+          snackbarMessage: (
+            <>
+              <Typography variant="body2" component="div">
+                User <strong>{user.user_identifier}</strong>'s role has changed to <strong>{roleName}</strong>.
+              </Typography>
+            </>
+          ),
+          open: true
+        });
 
-      props.refresh();
-    } catch (error) {
-      const apiError = error as APIError;
-      dialogContext.setErrorDialog({
-        open: true,
-        dialogTitle: UpdateSystemUserI18N.updateUserErrorTitle,
-        dialogText: UpdateSystemUserI18N.updateUserErrorText,
-        dialogError: apiError.message,
-        dialogErrorDetails: apiError.errors,
-        onClose: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        onOk: () => {
-          dialogContext.setErrorDialog({ open: false });
+        props.refresh();
+      } catch (error) {
+        const apiError = error as APIError;
+        dialogContext.setErrorDialog({
+          open: true,
+          dialogTitle: UpdateSystemUserI18N.updateUserErrorTitle,
+          dialogText: UpdateSystemUserI18N.updateUserErrorText,
+          dialogError: apiError.message,
+          dialogErrorDetails: apiError.errors,
+          onClose: () => {
+            dialogContext.setErrorDialog({ open: false });
+          },
+          onOk: () => {
+            dialogContext.setErrorDialog({ open: false });
+          }
+        });
+      }
+    },
+    [biohubApi.user, dialogContext, props, showSnackBar]
+  );
+
+  const buildConfirmRemoveUserHandler = useCallback(
+    (user: ISystemUser) => () => {
+      const confirmRemoveUser = async () => {
+        try {
+          await deActivateSystemUser(user);
+        } finally {
+          closeYesNoDialog();
         }
-      });
-    }
-  };
+      };
+
+      confirmRemoveUser();
+    },
+    [closeYesNoDialog, deActivateSystemUser]
+  );
+
+  const buildConfirmRoleChangeHandler = useCallback(
+    (user: ISystemUser, roleId: number, roleName: string) => () => {
+      const confirmRoleChange = async () => {
+        try {
+          await changeSystemUserRole(user, roleId, roleName);
+        } finally {
+          closeYesNoDialog();
+        }
+      };
+
+      confirmRoleChange();
+    },
+    [changeSystemUserRole, closeYesNoDialog]
+  );
 
   const handleAddSystemUsersSave = async (values: IAddSystemUsersForm) => {
     setOpenAddUserDialog(false);
@@ -250,34 +279,14 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
   return (
     <>
       <Container maxWidth="xl">
-        <Box mb={6} display="flex" justifyContent="space-between" alignItems="center">
-          <Typography
-            variant="h1"
-            sx={{
-              mt: -2
-            }}>
-            Manage Users
-          </Typography>
-          <Button
-            size="large"
-            color="primary"
-            variant="contained"
-            data-testid="invite-system-users-button"
-            aria-label={'Add Users'}
-            startIcon={<Icon path={mdiPlus} size={1} />}
-            onClick={() => setOpenAddUserDialog(true)}
-            sx={{
-              mt: -2,
-              fontWeight: 700
-            }}>
-            Add Users
-          </Button>
-        </Box>
         <Paper>
           <Toolbar
             sx={{
               pl: { sm: 2 },
-              pr: { xs: 1, sm: 1 }
+              pr: { xs: 1, sm: 1 },
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
             }}>
             <Typography variant="h4" component="h2">
               Active Users{' '}
@@ -285,6 +294,17 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
                 ({activeUsers?.length || 0})
               </Typography>
             </Typography>
+            <Button
+              size="medium"
+              color="primary"
+              variant="contained"
+              data-testid="invite-system-users-button"
+              aria-label={'Add Users'}
+              startIcon={<Icon path={mdiPlus} size={1} />}
+              onClick={() => setOpenAddUserDialog(true)}
+              sx={{ fontWeight: 700 }}>
+              Add Users
+            </Button>
           </Toolbar>
           <TableContainer>
             <Table sx={classes.table}>

@@ -1,9 +1,13 @@
 import { IDBConnection } from '../database/db';
+import { DownloadStatusEnum } from '../models/download-status';
+import { SubmissionUpload } from '../models/submission-upload';
+import { DownloadService } from '../services/download/download-service';
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
+import { IIndexSubmissionFeaturesJobData } from './jobs/index-submission-features-job';
 import { IMalwareScanJobData } from './jobs/malware-scan-job';
-import { IProcessSubmissionFeaturesJobData } from './jobs/process-submission-features-job';
+import { IProcessDownloadJobData } from './jobs/process-download-job';
 import { getPgBoss } from './pg-boss-service';
 
 const defaultLog = getLogger('queue/publisher');
@@ -40,10 +44,12 @@ export type PublishJobResult =
 
 /**
  * Options for process submission features jobs.
- * Shorter timeout since indexing/regions should complete in minutes.
+ *
+ * Singleton key is per-submission
+ * pg-boss won't dequeue a new job for the same singleton key while the current one is active.
  */
 const PROCESS_SUBMISSION_FEATURES_OPTIONS: IPublishOptions = {
-  retryLimit: 3,
+  retryLimit: 2,
   retryDelay: 60,
   retryBackoff: true,
   expireInSeconds: 60 * 10 // 10 minutes
@@ -61,6 +67,18 @@ const MALWARE_SCAN_OPTIONS: IPublishOptions = {
 };
 
 /**
+ * Options for process download jobs.
+ * Generous timeout — large downloads stream millions of rows via cursor and may take significant time.
+ * Includes S3 upload which may have transient failures.
+ */
+const PROCESS_DOWNLOAD_OPTIONS: IPublishOptions = {
+  retryLimit: 3,
+  retryDelay: 60,
+  retryBackoff: true,
+  expireInSeconds: 60 * 60 * 4 // 4 hours
+};
+
+/**
  * Publish a process submission features job to the queue.
  *
  * Queues slow operations (indexing, regions) for submission feature processing.
@@ -69,31 +87,38 @@ const MALWARE_SCAN_OPTIONS: IPublishOptions = {
  * Blocks if an existing validation record exists unless status is 'failed',
  * which allows retrying failed jobs.
  *
+ * Caller provides the pre-resolved submission_upload bridge record — avoids
+ * redundant lookups since the caller (ArtifactSecurityService) already has it.
+ * Singleton key is per-submission (not per-upload) to prevent concurrent jobs for the
+ * same submission — two uploads must serialize to avoid conflicting feature writes.
+ *
  * @param {IDBConnection} connection Database connection for submission validation tracking
- * @param {IProcessSubmissionFeaturesJobData} data Job data containing submissionId
+ * @param {SubmissionUpload} submissionUpload Pre-resolved bridge record
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success, blocked, duplicate, or error
  */
 export const publishProcessSubmissionFeaturesJob = async (
   connection: IDBConnection,
-  data: IProcessSubmissionFeaturesJobData,
+  submissionUpload: SubmissionUpload,
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
+  const { submission_upload_id: submissionUploadId, submission_id: submissionId } = submissionUpload;
+
   try {
     const submissionValidationService = new SubmissionValidationService(connection);
 
-    // Check for existing validation record
-    const existingValidation = await submissionValidationService.getSubmissionValidationBySubmissionId(
-      data.submissionId
+    // Check for existing validation record by submission_upload_id
+    const existingValidation = await submissionValidationService.getSubmissionValidationBySubmissionUploadId(
+      submissionUploadId
     );
 
     if (existingValidation) {
-      // Only allow retry if status is 'failed'
-      if (existingValidation.status !== 'failed') {
+      // Only allow retry if status is 'failed' or 'invalid'
+      if (existingValidation.status !== 'failed' && existingValidation.status !== 'invalid') {
         defaultLog.warn({
           label: 'publishProcessSubmissionFeaturesJob',
           message: 'Blocked: validation record already exists',
-          submissionId: data.submissionId,
+          submissionUploadId,
           existingStatus: existingValidation.status,
           existingJobId: existingValidation.job_id
         });
@@ -108,7 +133,7 @@ export const publishProcessSubmissionFeaturesJob = async (
       defaultLog.info({
         label: 'publishProcessSubmissionFeaturesJob',
         message: 'Retrying failed validation',
-        submissionId: data.submissionId,
+        submissionUploadId,
         previousJobId: existingValidation.job_id
       });
     }
@@ -119,22 +144,33 @@ export const publishProcessSubmissionFeaturesJob = async (
     // Ensure queue exists before sending jobs
     await boss.createQueue(JobQueues.PROCESS_SUBMISSION_FEATURES);
 
+    const db = {
+      executeSql: async (text: string, values: any[]) => {
+        const result = await connection.query(text, values);
+        return { rows: result.rows, rowCount: result.rowCount };
+      }
+    };
+
+    // Full bridge record travels through the queue — handler uses it directly
+    const jobData: SubmissionUpload = submissionUpload;
+
     // Use singletonKey to prevent duplicate concurrent jobs for the same submission
-    const jobId = await boss.send(JobQueues.PROCESS_SUBMISSION_FEATURES, data, {
+    const jobId = await boss.send(JobQueues.PROCESS_SUBMISSION_FEATURES, jobData, {
       ...mergedOptions,
-      singletonKey: `submission-${data.submissionId}`
+      singletonKey: `submission-${submissionId}`,
+      db
     });
 
     // jobId is null when pg-boss rejects the job (e.g., duplicate singletonKey still active)
     if (jobId) {
       // Create submission validation record for tracking
-      await submissionValidationService.createSubmissionValidation(data.submissionId, jobId);
+      await submissionValidationService.createSubmissionValidation(submissionUploadId, submissionId, jobId);
 
       defaultLog.info({
         label: 'publishProcessSubmissionFeaturesJob',
         message: 'Process submission features job published',
         jobId,
-        submissionId: data.submissionId
+        submissionUploadId
       });
 
       return { status: 'published', jobId };
@@ -142,7 +178,7 @@ export const publishProcessSubmissionFeaturesJob = async (
       defaultLog.warn({
         label: 'publishProcessSubmissionFeaturesJob',
         message: 'Job not published (duplicate or throttled)',
-        submissionId: data.submissionId
+        submissionUploadId
       });
 
       return { status: 'duplicate', message: 'Job already exists for this submission' };
@@ -153,7 +189,7 @@ export const publishProcessSubmissionFeaturesJob = async (
     defaultLog.error({
       label: 'publishProcessSubmissionFeaturesJob',
       message: 'Failed to publish job',
-      submissionId: data.submissionId,
+      submissionUploadId,
       error
     });
 
@@ -166,11 +202,13 @@ export const publishProcessSubmissionFeaturesJob = async (
  *
  * Queues ClamAV scanning for an uploaded artifact.
  *
+ * @param {IDBConnection} connection Database connection for submission validation tracking
  * @param {IMalwareScanJobData} data Job data containing artifactSecurityId
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
  */
 export const publishMalwareScanJob = async (
+  connection: IDBConnection,
   data: IMalwareScanJobData,
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
@@ -180,10 +218,18 @@ export const publishMalwareScanJob = async (
 
     await boss.createQueue(JobQueues.MALWARE_SCAN);
 
+    const db = {
+      executeSql: async (text: string, values: any[]) => {
+        const result = await connection.query(text, values);
+        return { rows: result.rows, rowCount: result.rowCount };
+      }
+    };
+
     // Use singletonKey to prevent duplicate concurrent jobs for the same artifact security record
     const jobId = await boss.send(JobQueues.MALWARE_SCAN, data, {
       ...mergedOptions,
-      singletonKey: `artifact-security-${data.artifactSecurityId}`
+      singletonKey: `artifact-security-${data.artifactSecurityId}`,
+      db
     });
 
     if (jobId) {
@@ -211,6 +257,171 @@ export const publishMalwareScanJob = async (
       label: 'publishMalwareScanJob',
       message: 'Failed to publish job',
       artifactSecurityId: data.artifactSecurityId,
+      error
+    });
+
+    return { status: 'error', message: errorMessage };
+  }
+};
+
+/**
+ * Publish a process download job to the queue.
+ *
+ * Queues async packaging of selected features into a downloadable zip file.
+ * Updates the download record with the job_id for tracking.
+ *
+ * @param {IDBConnection} connection Database connection for download record updates
+ * @param {IProcessDownloadJobData} data Job data containing downloadId
+ * @param {IPublishOptions} [options={}] Job options
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
+ */
+export const publishProcessDownloadJob = async (
+  connection: IDBConnection,
+  data: IProcessDownloadJobData,
+  options: IPublishOptions = {}
+): Promise<PublishJobResult> => {
+  try {
+    const downloadService = new DownloadService(connection);
+
+    // Check if download exists
+    const download = await downloadService.findDownloadById(data.downloadId);
+
+    if (!download) {
+      return { status: 'error', message: 'Download not found' };
+    }
+
+    // Check if download is already being processed or completed
+    if (download.download_status !== DownloadStatusEnum.PENDING) {
+      defaultLog.warn({
+        label: 'publishProcessDownloadJob',
+        message: 'Download is not in pending status',
+        downloadId: data.downloadId,
+        currentStatus: download.download_status
+      });
+
+      return { status: 'duplicate', message: 'Job already exists for this download' };
+    }
+
+    const boss = getPgBoss();
+    const mergedOptions = { ...PROCESS_DOWNLOAD_OPTIONS, ...options };
+
+    await boss.createQueue(JobQueues.PROCESS_DOWNLOAD);
+
+    // Insert the job in the same transaction as the business data via the `db` option.
+    // This prevents ghost jobs (job exists but data rolled back) and lost jobs (data committed but job never sent).
+    const db = {
+      executeSql: async (text: string, values: any[]) => {
+        const result = await connection.query(text, values);
+        return { rows: result.rows, rowCount: result.rowCount };
+      }
+    };
+
+    // Use singletonKey to prevent duplicate concurrent jobs for the same download
+    const jobId = await boss.send(JobQueues.PROCESS_DOWNLOAD, data, {
+      ...mergedOptions,
+      singletonKey: `download-${data.downloadId}`,
+      db
+    });
+
+    if (jobId) {
+      defaultLog.info({
+        label: 'publishProcessDownloadJob',
+        message: 'Process download job published',
+        jobId,
+        downloadId: data.downloadId
+      });
+
+      return { status: 'published', jobId };
+    }
+
+    defaultLog.warn({
+      label: 'publishProcessDownloadJob',
+      message: 'Job not published (duplicate or throttled)',
+      downloadId: data.downloadId
+    });
+
+    return { status: 'duplicate', message: 'Job already exists for this download' };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    defaultLog.error({
+      label: 'publishProcessDownloadJob',
+      message: 'Failed to publish job',
+      downloadId: data.downloadId,
+      error
+    });
+
+    return { status: 'error', message: errorMessage };
+  }
+};
+
+/**
+ * Options for index submission features jobs.
+ * Same timeout as validation — indexing should complete within minutes.
+ */
+const INDEX_SUBMISSION_FEATURES_OPTIONS: IPublishOptions = {
+  retryLimit: 3,
+  retryDelay: 60,
+  retryBackoff: true,
+  expireInSeconds: 60 * 10 // 10 minutes
+};
+
+/**
+ * Publish an index submission features job to the queue.
+ *
+ * Queues async search indexing for a submission's features. Uses the caller's
+ * DB connection via pg-boss's `db` option so the job insert participates in
+ * the same transaction — if the caller rolls back, the job is never visible.
+ *
+ * @param {IDBConnection} connection Database connection for transactional job insert
+ * @param {IIndexSubmissionFeaturesJobData} data Job data containing submissionId
+ * @param {IPublishOptions} [options={}] Job options
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
+ */
+export const publishIndexSubmissionFeaturesJob = async (
+  connection: IDBConnection,
+  data: IIndexSubmissionFeaturesJobData,
+  options: IPublishOptions = {}
+): Promise<PublishJobResult> => {
+  try {
+    const boss = getPgBoss();
+    const mergedOptions = { ...INDEX_SUBMISSION_FEATURES_OPTIONS, ...options };
+
+    await boss.createQueue(JobQueues.INDEX_SUBMISSION_FEATURES);
+
+    // Use singletonKey to prevent duplicate concurrent indexing jobs for the same submission
+    // Pass caller's connection via db option so job insert is part of the same transaction
+    const jobId = await boss.send(JobQueues.INDEX_SUBMISSION_FEATURES, data, {
+      ...mergedOptions,
+      singletonKey: `submission-idx-${data.submissionId}`,
+      db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
+    });
+
+    if (jobId) {
+      defaultLog.info({
+        label: 'publishIndexSubmissionFeaturesJob',
+        message: 'Index submission features job published',
+        jobId,
+        submissionId: data.submissionId
+      });
+
+      return { status: 'published', jobId };
+    }
+
+    defaultLog.warn({
+      label: 'publishIndexSubmissionFeaturesJob',
+      message: 'Job not published (duplicate or throttled)',
+      submissionId: data.submissionId
+    });
+
+    return { status: 'duplicate', message: 'Job already exists for this submission' };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    defaultLog.error({
+      label: 'publishIndexSubmissionFeaturesJob',
+      message: 'Failed to publish job',
+      submissionId: data.submissionId,
       error
     });
 

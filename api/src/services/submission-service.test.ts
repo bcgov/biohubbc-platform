@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../errors/api-error';
+import { IngestionRepository } from '../repositories/ingestion/ingestion-repository';
 import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
   ISubmissionFeature,
@@ -102,7 +103,7 @@ describe('SubmissionService', () => {
       const parentSubmissionFeatureId = 2;
 
       const insertSubmissionFeatureRecordStub = sinon
-        .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord')
+        .stub(IngestionRepository.prototype, 'insertSubmissionFeatureRecord')
         .resolves({ submission_feature_id: parentSubmissionFeatureId });
 
       const submissionFeatures: ISubmissionFeature[] = [
@@ -197,16 +198,28 @@ describe('SubmissionService', () => {
 
       const submissionService = new SubmissionService(mockDBConnection);
 
-      const response = await submissionService.insertSubmissionFeatureRecords(submissionId, submissionFeatures);
+      const response = await submissionService.insertSubmissionFeatureRecords(
+        submissionId,
+        'some-uuid',
+        submissionFeatures
+      );
 
       expect(response).to.be.undefined;
 
       expect(insertSubmissionFeatureRecordStub.callCount).to.equal(9);
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, null, '1-1', 'dataset', {
-        name: 'Dataset1'
-      });
       expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
         submissionId,
+        'some-uuid',
+        null,
+        '1-1',
+        'dataset',
+        {
+          name: 'Dataset1'
+        }
+      );
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        submissionId,
+        'some-uuid',
         parentSubmissionFeatureId,
         '2-1',
         'sample_site',
@@ -216,6 +229,7 @@ describe('SubmissionService', () => {
       );
       expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
         submissionId,
+        'some-uuid',
         parentSubmissionFeatureId,
         '3-1',
         'observation',
@@ -233,6 +247,7 @@ describe('SubmissionService', () => {
       );
       expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
         submissionId,
+        'some-uuid',
         parentSubmissionFeatureId,
         '3-2',
         'observation',
@@ -242,6 +257,7 @@ describe('SubmissionService', () => {
       );
       expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
         submissionId,
+        'some-uuid',
         parentSubmissionFeatureId,
         '2-2',
         'sample_site',
@@ -255,6 +271,7 @@ describe('SubmissionService', () => {
       );
       expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
         submissionId,
+        'some-uuid',
         parentSubmissionFeatureId,
         '3-3',
         'observation',
@@ -264,6 +281,7 @@ describe('SubmissionService', () => {
       );
       expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
         submissionId,
+        'some-uuid',
         parentSubmissionFeatureId,
         '3-4',
         'observation',
@@ -273,6 +291,7 @@ describe('SubmissionService', () => {
       );
       expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
         submissionId,
+        'some-uuid',
         parentSubmissionFeatureId,
         '2-3',
         'artifact',
@@ -282,6 +301,7 @@ describe('SubmissionService', () => {
       );
       expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
         submissionId,
+        'some-uuid',
         parentSubmissionFeatureId,
         '2-4',
         'artifact',

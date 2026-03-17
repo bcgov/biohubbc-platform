@@ -1,6 +1,6 @@
 import { SQL } from 'sql-template-strings';
 import z from 'zod';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { Artifact, CreateArtifact, UpdateArtifact } from '../../models/artifact';
 import { BaseRepository } from '../base-repository';
 
@@ -10,7 +10,8 @@ export class ArtifactRepository extends BaseRepository {
    *
    * @param {string} artifactId - The ID of the artifact to retrieve.
    * @returns {Promise<Artifact>} - The artifact record.
-   * @throws {ApiExecuteSQLError} - If the artifact is not found or query fails.
+   * @throws {ApiNotFoundError} - If the artifact is not found.
+   * @throws {ApiExecuteSQLError} - If an unexpected row count is returned.
    */
   async getArtifact(artifactId: string): Promise<Artifact> {
     const sqlStatement = SQL`
@@ -30,10 +31,14 @@ export class ArtifactRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, Artifact);
 
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Artifact not found', ['ArtifactRepository->getArtifact', { artifactId }]);
+    }
+
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get artifact record', [
+      throw new ApiExecuteSQLError('Unexpected row count', [
         'ArtifactRepository->getArtifact',
-        `rowCount was ${response.rowCount}, expected 1`
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
 
@@ -89,19 +94,22 @@ export class ArtifactRepository extends BaseRepository {
         ${artifact.checksum_sha256 ?? null},
         ${artifact.uploaded_at ?? null}
       )
+      ON CONFLICT (bucket, object_key) DO NOTHING
       RETURNING artifact_id;
     `;
 
-    const response = await this.connection.sql(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, z.object({ artifact_id: z.string().uuid() }));
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert artifact record', [
-        'ArtifactRepository->insertArtifact',
-        `rowCount was ${response.rowCount}, expected 1`
-      ]);
+    if (response.rowCount === 1) {
+      return response.rows[0];
     }
 
-    return response.rows[0];
+    // Conflict: return existing artifact_id
+    const existing = await this.connection.sql(SQL`
+      SELECT artifact_id FROM artifact WHERE bucket = ${artifact.bucket} AND object_key = ${artifact.object_key};
+    `);
+
+    return existing.rows[0];
   }
 
   /**

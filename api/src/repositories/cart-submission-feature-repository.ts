@@ -97,15 +97,42 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
   }
 
   /**
-   * Get all submission features in an active cart with pagination.
+   * Get all submission feature IDs in a cart (unpaginated).
+   * Used by checkout to copy cart contents to download_feature
+   * without fetching full feature metadata.
+   *
+   * @param {string} cartId - The ID of the cart
+   * @return {Promise<number[]>} - Array of submission feature IDs
+   * @memberof CartSubmissionFeatureRepository
+   */
+  async getCartSubmissionFeatureIds(cartId: string): Promise<number[]> {
+    const knex = getKnex();
+    const query = knex('cart_submission_feature as csf')
+      .join('cart as c', 'c.cart_id', 'csf.cart_id')
+      .where('csf.cart_id', cartId)
+      .andWhere('c.cart_status', CartStatus.ACTIVE)
+      .select('csf.submission_feature_id');
+
+    const response = await this.connection.knex(query);
+
+    return response.rows.map((row: { submission_feature_id: number }) => row.submission_feature_id);
+  }
+
+  /**
+   * Get all submission features in an active cart with pagination, optionally filtered by submission feature ID.
    * Excludes secured features where the submission_feature_id is present in submission_feature_security.
    *
    * @param {string} cartId - The ID of the cart
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options
+   * @param {number} [submissionFeatureId] - Optional submission feature ID to filter by
    * @return {Promise<CartSubmissionFeature[]>} - Paginated list of submission features
    * @memberof CartSubmissionFeatureRepository
    */
-  async getCartSubmissionFeatures(cartId: string, pagination?: ApiPaginationOptions): Promise<CartSubmissionFeature[]> {
+  async getCartSubmissionFeatures(
+    cartId: string,
+    pagination?: ApiPaginationOptions,
+    submissionFeatureId?: number
+  ): Promise<CartSubmissionFeature[]> {
     const knex = getKnex();
 
     const baseQuery = knex
@@ -133,6 +160,10 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
       .andWhere('c.cart_status', CartStatus.ACTIVE)
       // Filter out secured features
       .whereNull('sf_sec.submission_feature_id');
+
+    if (submissionFeatureId) {
+      baseQuery.andWhere('sf.submission_feature_id', submissionFeatureId);
+    }
 
     const paginatedQuery = this.applyPagination(baseQuery, pagination);
 

@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   CreateUploadArtifact,
   UpdateUploadArtifact,
@@ -30,8 +30,8 @@ describe('UploadArtifactRepository', () => {
         await repo.getUploadArtifact('upload-artifact-id-1');
         expect.fail();
       } catch (error) {
-        expect(error).to.be.instanceOf(ApiExecuteSQLError);
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to get upload artifact record');
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as ApiNotFoundError).message).to.equal('Upload artifact not found');
       }
     });
 

@@ -36,10 +36,11 @@ describe('team-policies', () => {
 
       const mockResponse = {
         team_policies: mockTeamPolicies,
-        pagination: { total: 1, per_page: 10, current_page: 1, last_page: 1 }
+        pagination: { total: 1, per_page: 10, current_page: 1, last_page: 1, sort: undefined, order: undefined }
       };
 
-      sinon.stub(TeamPolicyService.prototype, 'getAllTeamPoliciesWithPagination').resolves(mockResponse);
+      sinon.stub(TeamPolicyService.prototype, 'getAllTeamPolicies').resolves(mockTeamPolicies);
+      sinon.stub(TeamPolicyService.prototype, 'getAllTeamPoliciesCount').resolves(1);
 
       const requestHandler = teamPolicies.getTeamPolicies();
 
@@ -57,23 +58,25 @@ describe('team-policies', () => {
 
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-      const mockResponse = {
-        team_policies: [],
-        pagination: { total: 0, per_page: 10, current_page: 1, last_page: 1, sort: 'team_name', order: 'desc' as const }
-      };
-
-      const stub = sinon.stub(TeamPolicyService.prototype, 'getAllTeamPoliciesWithPagination').resolves(mockResponse);
+      const getAllTeamPoliciesStub = sinon.stub(TeamPolicyService.prototype, 'getAllTeamPolicies').resolves([]);
+      const getAllTeamPoliciesCountStub = sinon
+        .stub(TeamPolicyService.prototype, 'getAllTeamPoliciesCount')
+        .resolves(0);
 
       const requestHandler = teamPolicies.getTeamPolicies();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(stub).to.have.been.calledWith({
-        page: 1,
-        limit: 10,
-        sort: 'team_name',
-        order: 'desc'
-      });
+      expect(getAllTeamPoliciesStub).to.have.been.calledWith(
+        { search: undefined },
+        {
+          page: 1,
+          limit: 10,
+          sort: 'team_name',
+          order: 'desc'
+        }
+      );
+      expect(getAllTeamPoliciesCountStub).to.have.been.calledWith({ search: undefined });
     });
   });
 

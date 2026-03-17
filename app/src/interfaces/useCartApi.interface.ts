@@ -19,6 +19,7 @@ export interface Cart {
   cart_id: string;
   system_user_id: number | null;
   cart_status: 'active' | 'checked_out' | 'expired' | 'abandoned';
+  record_end_date: string | null;
 }
 
 /**
@@ -37,6 +38,21 @@ export interface CartFeatureListResponse {
  */
 export interface CartWithFeaturesResponse extends CartFeatureListResponse {
   cart: Cart;
+}
+
+/**
+ * Response from the cart checkout endpoint (`POST /api/cart/{cartId}/checkout`).
+ */
+export interface CheckoutCartResponse {
+  download_id: string;
+}
+
+/**
+ * Response from the cart feature membership check endpoint
+ * (`GET /api/cart/{cartId}/feature/exists/{submissionFeatureId}`)
+ */
+export interface IsFeatureInCartResponse {
+  isInCart: boolean;
 }
 
 /**

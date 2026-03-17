@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../../database/db';
+import { Team } from '../../../../models/team';
 import { TeamService } from '../../../../services/access-policy/team-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import { deleteTeam, getTeam, updateTeam } from './index';
@@ -36,17 +37,17 @@ describe('getTeam', () => {
     }
   });
 
-  it('should return 200 with team and members', async () => {
-    const mockTeam = {
-      team_id: 'team-1',
+  it('should return 200 with team details', async () => {
+    const mockTeam: Team = {
+      team_id: '5d92f13c-fefa-49f3-9fb9-4e4611c67a34',
       name: 'Test Team',
       description: 'A test team',
-      members: [{ team_member_id: 'tm-1', system_user_id: 1, user_identifier: 'alice' }]
+      member_count: 1
     };
 
     const mockDBConnection = getMockDBConnection();
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-    sinon.stub(TeamService.prototype, 'getTeamWithMembers').resolves(mockTeam);
+    sinon.stub(TeamService.prototype, 'getTeam').resolves(mockTeam);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { teamId: 'team-1' };
@@ -58,7 +59,6 @@ describe('getTeam', () => {
     expect(mockRes.jsonValue).to.eql(mockTeam);
   });
 });
-
 describe('updateTeam', () => {
   afterEach(() => {
     sinon.restore();
@@ -81,60 +81,38 @@ describe('updateTeam', () => {
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
-      expect.fail();
+      expect.fail('Expected error to be thrown');
     } catch (actualError) {
       expect((actualError as Error).message).to.equal('test error');
     }
   });
 
   it('should return 200 with updated team', async () => {
-    const mockTeam = {
-      team_id: 'team-1',
+    const mockTeam: Team = {
+      team_id: '5d92f13c-fefa-49f3-9fb9-4e4611c67a34',
       name: 'Updated Team',
       description: 'Updated description',
-      members: []
+      member_count: 0
     };
 
     const mockDBConnection = getMockDBConnection();
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-    const updateStub = sinon.stub(TeamService.prototype, 'updateTeamWithMembers').resolves(mockTeam);
+    const updateStub = sinon.stub(TeamService.prototype, 'updateTeam').resolves(mockTeam);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { teamId: 'team-1' };
-    mockReq.body = { name: 'Updated Team', description: 'Updated description', member_user_ids: [] };
+    mockReq.body = { name: 'Updated Team', description: 'Updated description', system_user_ids: [1, 2] };
 
     const requestHandler = updateTeam();
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(updateStub).to.have.been.calledWith(
-      'team-1',
-      { name: 'Updated Team', description: 'Updated description' },
-      []
-    );
+    expect(updateStub).to.have.been.calledWith('team-1', {
+      name: 'Updated Team',
+      description: 'Updated description',
+      system_user_ids: [1, 2]
+    });
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql(mockTeam);
-  });
-
-  it('should default member_user_ids to empty array when not provided', async () => {
-    const mockTeam = {
-      team_id: 'team-1',
-      name: 'Updated Team',
-      description: null,
-      members: []
-    };
-
-    const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-    const updateStub = sinon.stub(TeamService.prototype, 'updateTeamWithMembers').resolves(mockTeam);
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.params = { teamId: 'team-1' };
-    mockReq.body = { name: 'Updated Team' };
-
-    const requestHandler = updateTeam();
-    await requestHandler(mockReq, mockRes, mockNext);
-
-    expect(updateStub).to.have.been.calledWith('team-1', { name: 'Updated Team', description: undefined }, []);
   });
 });
 

@@ -26,12 +26,9 @@ export const useSessionStorage = <T>(sessionStorageId: string, initialValue: T):
     }
 
     try {
-      // attempt to parse storage value
       return JSON.parse(storageValue);
-    } catch (error) {
-      console.error(`Failed to parse session storage value for key: ${prefixedKey}`, error);
-      // unable to parse, return the raw stored value
-      return storageValue;
+    } catch {
+      return initialValue;
     }
   });
 
@@ -41,7 +38,7 @@ export const useSessionStorage = <T>(sessionStorageId: string, initialValue: T):
    * @param {T} newValue - Updated value.
    */
   const setSessionStorageValue = (newValue: T) => {
-    const parsedValue = typeof newValue === 'string' ? newValue : JSON.stringify(newValue);
+    const parsedValue = JSON.stringify(newValue);
     // set session storage value
     sessionStorage.setItem(prefixedKey, parsedValue);
     // set state value

@@ -22,7 +22,8 @@ export type CartSubmissionFeature = z.infer<typeof CartSubmissionFeature>;
 export const Cart = z.object({
   cart_id: z.string(),
   system_user_id: z.number().nullable(),
-  cart_status: z.nativeEnum(CartStatus)
+  cart_status: z.nativeEnum(CartStatus),
+  record_end_date: z.string().nullable()
 });
 
 export type Cart = z.infer<typeof Cart>;
@@ -33,7 +34,9 @@ export type CartWithFeatures = z.infer<typeof CartWithFeatures>;
 export const UpdateCart = z.object({
   system_user_id: z.number().nullable().optional(),
   cart_status: z.nativeEnum(CartStatus).optional(),
-  record_end_date: z.string().nullable().optional()
+  record_end_date: z.string().nullable().optional(),
+  checkout_date: z.string().nullable().optional(),
+  checkout_user: z.number().nullable().optional()
 });
 
 export type UpdateCart = z.infer<typeof UpdateCart>;

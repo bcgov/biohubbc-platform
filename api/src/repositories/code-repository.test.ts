@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { ApiNotFoundError } from '../errors/api-error';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CodeRepository, FeaturePropertyCode, FeatureTypeCode } from './code-repository';
 
@@ -96,7 +97,8 @@ describe('CodeRepository', () => {
 
         expect.fail();
       } catch (error) {
-        expect((error as Error).message).to.equal('Failed to get feature property record');
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as ApiNotFoundError).message).to.equal('Feature property not found');
       }
     });
 

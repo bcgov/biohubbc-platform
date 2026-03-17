@@ -2,11 +2,13 @@ import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
 import { SubmissionFeatureForReview } from '../models/submission';
+import { IngestionRepository } from '../repositories/ingestion/ingestion-repository';
 import {
   ICreateSubmission,
   ISubmissionFeature,
   ISubmissionModel,
   PatchSubmissionRecord,
+  RelatedSubmissionFeature,
   SubmissionFeature,
   SubmissionFeatureDownloadRecord,
   SubmissionFeatureRecord,
@@ -30,11 +32,13 @@ const defaultLog = getLogger('submission-service');
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
+  ingestionRepository: IngestionRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.submissionRepository = new SubmissionRepository(connection);
+    this.ingestionRepository = new IngestionRepository(connection);
   }
 
   /**
@@ -84,11 +88,16 @@ export class SubmissionService extends DBService {
    * Insert submission features.
    *
    * @param {number} submissionId
+   * @param {string} submissionUploadId - The submission_upload_id that produced these features.
    * @param {ISubmissionFeature[]} submissionFeatures
    * @return {*}  {Promise<void>}
    * @memberof SubmissionService
    */
-  async insertSubmissionFeatureRecords(submissionId: number, submissionFeatures: ISubmissionFeature[]): Promise<void> {
+  async insertSubmissionFeatureRecords(
+    submissionId: number,
+    submissionUploadId: string,
+    submissionFeatures: ISubmissionFeature[]
+  ): Promise<void> {
     try {
       // Generate paths to all non-null nodes which contain a 'child_features' property
       const submissionFeatureJsonPaths: string[] = JSONPath({
@@ -122,12 +131,14 @@ export class SubmissionService extends DBService {
         const parentSubmissionFeatureId = parentSubmissionFeatureIdMap.get(parentJsonPath) || null;
 
         // Validate the submissionFeature object
-        const response = await this.submissionRepository.insertSubmissionFeatureRecord(
+        const response = await this.ingestionRepository.insertSubmissionFeatureRecord(
           submissionId,
+          submissionUploadId,
           parentSubmissionFeatureId,
           featureNode.id,
           featureNode.type,
-          featureNode.properties
+          featureNode.properties,
+          0 // Legacy tree path — byte size not computed
         );
 
         // Cache the submission_feature_id for the current jsonPath
@@ -159,7 +170,7 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number } | null> {
+  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
     return this.submissionRepository.getSubmissionIdByUUID(uuid);
   }
 
@@ -433,6 +444,17 @@ export class SubmissionService extends DBService {
    */
   async getSubmissionFeatureById(submissionFeatureId: number): Promise<SubmissionFeature> {
     return this.submissionRepository.getSubmissionFeatureById(submissionFeatureId);
+  }
+
+  /**
+   * Get all related submission features with their type names.
+   *
+   * @param {number} submissionFeatureId
+   * @return {Promise<RelatedSubmissionFeature[]>}
+   * @memberof SubmissionService
+   */
+  async getRelatedSubmissionFeatures(submissionFeatureId: number): Promise<RelatedSubmissionFeature[]> {
+    return this.submissionRepository.getRelatedSubmissionFeatures(submissionFeatureId);
   }
 
   /**

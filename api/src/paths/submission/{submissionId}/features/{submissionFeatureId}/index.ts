@@ -14,9 +14,10 @@ export const GET: Operation = [
     return {
       and: [
         {
-          submissionId: Number(req.params.submissionId),
+          discriminator: 'Team',
+          entity: 'submission_feature',
           submissionFeatureId: Number(req.params.submissionFeatureId),
-          discriminator: 'AccessPolicy'
+          submissionId: Number(req.params.submissionId)
         }
       ]
     };
@@ -83,11 +84,14 @@ export function getSubmissionFeatureById(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
 
-      const feature = await submissionService.getSubmissionFeatureById(submissionFeatureId);
+      const [feature, relatedFeatures] = await Promise.all([
+        submissionService.getSubmissionFeatureById(submissionFeatureId),
+        submissionService.getRelatedSubmissionFeatures(submissionFeatureId)
+      ]);
 
       await connection.commit();
 
-      res.status(200).json({ feature });
+      return res.status(200).json({ feature, relatedFeatures });
     } catch (error) {
       defaultLog.error({ label: 'getSubmissionFeatureById', message: 'error', error });
       await connection.rollback();
