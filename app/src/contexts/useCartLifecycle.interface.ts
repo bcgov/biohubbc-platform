@@ -1,6 +1,6 @@
-import { Dispatch } from 'react';
 import { CartWithFeaturesResponse } from 'interfaces/useCartApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
+import { Dispatch } from 'react';
 import { CartAction, CartState } from './cartContext.interface';
 
 export type CartLifecycleApi = {

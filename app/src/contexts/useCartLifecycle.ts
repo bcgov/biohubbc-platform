@@ -1,21 +1,29 @@
+import useDataLoader from 'hooks/useDataLoader';
+import { CartFeatureListResponse } from 'interfaces/useCartApi.interface';
 import { useCallback, useEffect, useRef } from 'react';
 import { isInvalidCachedCartError } from './cartContext.helpers';
 import { IUseCartLifecycleParams, IUseCartLifecycleResult } from './useCartLifecycle.interface';
 
-/**
- * Owns cart identity/lifecycle orchestration:
- * loading by cart id, stale-id recovery, anonymous cart claiming, and cart creation.
- */
 export const useCartLifecycle = (params: IUseCartLifecycleParams): IUseCartLifecycleResult => {
   const { cartApi, isAuthenticated, storedCartId, setStoredCartId, state, dispatch, applyLoadSuccess } = params;
 
   const cartApiRef = useRef(cartApi);
-  const hasClaimedCurrentCart = useRef(false);
-  const skipNextLoadForCartId = useRef<string | null>(null);
+  const isAuthenticatedRef = useRef(isAuthenticated);
+  const applyLoadSuccessRef = useRef(applyLoadSuccess);
 
   useEffect(() => {
     cartApiRef.current = cartApi;
   }, [cartApi]);
+
+  useEffect(() => {
+    isAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    applyLoadSuccessRef.current = applyLoadSuccess;
+  }, [applyLoadSuccess]);
+
+  const hasClaimedCurrentCart = useRef(false);
 
   useEffect(() => {
     dispatch({ type: 'SET_CART_ID', payload: storedCartId });
@@ -25,9 +33,6 @@ export const useCartLifecycle = (params: IUseCartLifecycleParams): IUseCartLifec
     hasClaimedCurrentCart.current = false;
   }, [state.cartId]);
 
-  /**
-   * Updates both persisted cart id (session storage) and reducer state.
-   */
   const setCartId = useCallback(
     (nextCartId: string | null) => {
       setStoredCartId(nextCartId);
@@ -36,19 +41,16 @@ export const useCartLifecycle = (params: IUseCartLifecycleParams): IUseCartLifec
     [dispatch, setStoredCartId]
   );
 
-  const clearCachedCartId = useCallback(() => {
-    setCartId(null);
+  const setCartIdRef = useRef(setCartId);
+
+  useEffect(() => {
+    setCartIdRef.current = setCartId;
   }, [setCartId]);
 
-  /**
-   * Claims anonymous carts for authenticated users once per cart id.
-   */
-  const claimCartIfNeeded = useCallback(
-    async (cartId: string, systemUserId: number | null): Promise<void> => {
-      if (!isAuthenticated || systemUserId !== null || hasClaimedCurrentCart.current) {
-        return;
-      }
+  const cartDataLoader = useDataLoader(async (cartId: string): Promise<CartFeatureListResponse> => {
+    const response = await cartApiRef.current.getCartById(cartId);
 
+    if (isAuthenticatedRef.current && response.cart.system_user_id === null && !hasClaimedCurrentCart.current) {
       try {
         hasClaimedCurrentCart.current = true;
         await cartApiRef.current.assignCartToCurrentUser(cartId);
@@ -56,84 +58,48 @@ export const useCartLifecycle = (params: IUseCartLifecycleParams): IUseCartLifec
         hasClaimedCurrentCart.current = false;
         console.error('Failed to claim cart for authenticated user:', error);
       }
-    },
-    [isAuthenticated]
-  );
+    }
 
-  /**
-   * Loads cart contents when cart id changes, with stale cart id recovery.
-   */
+    applyLoadSuccessRef.current(response);
+    return response;
+  });
+
+  const cartDataLoaderRef = useRef(cartDataLoader);
+
   useEffect(() => {
-    const cartId = state.cartId;
+    cartDataLoaderRef.current = cartDataLoader;
+  }, [cartDataLoader]);
 
-    if (!cartId) {
+  useEffect(() => {
+    if (!state.cartId) {
       dispatch({ type: 'RESET' });
       return;
     }
 
-    if (skipNextLoadForCartId.current === cartId) {
-      skipNextLoadForCartId.current = null;
-      return;
-    }
-
-    let isMounted = true;
-
-    const loadCart = async () => {
-      dispatch({ type: 'LOAD_START' });
-
+    const refresh = async () => {
       try {
-        const response = await cartApiRef.current.getCartById(cartId);
-
-        if (!isMounted) {
-          return;
-        }
-
-        applyLoadSuccess(response);
-        await claimCartIfNeeded(cartId, response.cart.system_user_id);
+        await cartDataLoaderRef.current.refresh(state.cartId!);
       } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
         if (isInvalidCachedCartError(error)) {
-          clearCachedCartId();
-          return;
+          setCartIdRef.current(null);
         }
-
-        dispatch({ type: 'LOAD_ERROR', payload: error });
       }
     };
 
-    loadCart();
+    refresh();
+  }, [dispatch, state.cartId]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [applyLoadSuccess, claimCartIfNeeded, clearCachedCartId, dispatch, state.cartId]);
+  const createCart: IUseCartLifecycleResult['createCart'] = useCallback(async (options) => {
+    const { features = [] } = options;
 
-  /**
-   * Creates a new cart, updates local cart id, and applies server payload immediately.
-   */
-  const createCart: IUseCartLifecycleResult['createCart'] = useCallback(
-    async (options) => {
-      const { features = [] } = options;
+    const response = await cartApiRef.current.createCart({
+      features: features.map((f) => f.submission_feature_id)
+    });
 
-      const response = await cartApiRef.current.createCart({
-        features: features.map((feature) => feature.submission_feature_id)
-      });
+    hasClaimedCurrentCart.current = false;
+    setCartIdRef.current(response.cart.cart_id);
+    cartDataLoaderRef.current.refresh(response.cart.cart_id);
+  }, []);
 
-      skipNextLoadForCartId.current = response.cart.cart_id;
-      setCartId(response.cart.cart_id);
-      hasClaimedCurrentCart.current = false;
-
-      applyLoadSuccess(response);
-      await claimCartIfNeeded(response.cart.cart_id, response.cart.system_user_id);
-    },
-    [applyLoadSuccess, claimCartIfNeeded, setCartId]
-  );
-
-  return {
-    setCartId,
-    createCart
-  };
+  return { setCartId, createCart };
 };
