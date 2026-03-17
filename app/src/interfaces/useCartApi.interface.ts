@@ -48,6 +48,14 @@ export interface CheckoutCartResponse {
 }
 
 /**
+ * Response from the cart feature membership check endpoint
+ * (`GET /api/cart/{cartId}/feature/exists/{submissionFeatureId}`)
+ */
+export interface IsFeatureInCartResponse {
+  isInCart: boolean;
+}
+
+/**
  * Payload for updating a cart
  */
 export interface UpdateCartPayload {

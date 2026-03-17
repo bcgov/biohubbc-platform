@@ -5,6 +5,7 @@ import { SearchResultCard } from './card/SearchResultCard';
 interface SearchResultCardLayoutProps {
   results: SearchFeatureResultWithRelevancy[];
   cartFeatureIds: Set<number>;
+  onClick: (result: SearchFeatureResultWithRelevancy) => void;
   onDownload?: (result: SearchFeatureResultWithRelevancy) => void;
   onAddToCart?: (result: SearchFeatureResultWithRelevancy) => void;
   onRemoveFromCart?: (featureId: number) => void;
@@ -13,6 +14,7 @@ interface SearchResultCardLayoutProps {
 export const SearchResultCardLayout = ({
   results,
   cartFeatureIds,
+  onClick,
   onDownload,
   onAddToCart,
   onRemoveFromCart
@@ -24,6 +26,7 @@ export const SearchResultCardLayout = ({
           key={result.submission_feature_id}
           result={result}
           isInCart={cartFeatureIds.has(result.submission_feature_id)}
+          onClick={onClick}
           onDownload={onDownload}
           onAddToCart={onAddToCart}
           onRemoveFromCart={onRemoveFromCart}

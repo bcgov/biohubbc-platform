@@ -83,15 +83,20 @@ export class CartSubmissionFeatureService extends DBService {
   }
 
   /**
-   * Get submission features in a cart
+   * Get submission features in a cart, optionally filtered by submission feature ID and paginated.
    *
    * @param {string} cartId - The ID of the cart
-   * @param {ApiPaginationOptions} pagination
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination options
+   * @param {number} [submissionFeatureId] - Optional submission feature ID to filter by
    * @return {Promise<CartSubmissionFeature[]>}
    * @memberof CartSubmissionFeatureService
    */
-  async getCartSubmissionFeatures(cartId: string, pagination?: ApiPaginationOptions): Promise<CartSubmissionFeature[]> {
-    return this.cartSubmissionFeatureRepository.getCartSubmissionFeatures(cartId, pagination);
+  async getCartSubmissionFeatures(
+    cartId: string,
+    pagination?: ApiPaginationOptions,
+    submissionFeatureId?: number
+  ): Promise<CartSubmissionFeature[]> {
+    return this.cartSubmissionFeatureRepository.getCartSubmissionFeatures(cartId, pagination, submissionFeatureId);
   }
 
   /**
@@ -106,6 +111,19 @@ export class CartSubmissionFeatureService extends DBService {
   }
 
   /**
+   * Returns true if the given submission feature exists in an active cart.
+   *
+   * @param {string} cartId - The ID of the cart
+   * @param {number} submissionFeatureId - The submission feature ID to check
+   * @return {Promise<boolean>}
+   * @memberof CartSubmissionFeatureService
+   */
+  async isSubmissionFeatureInCart(cartId: string, submissionFeatureId: number): Promise<boolean> {
+    const ids = await this.cartSubmissionFeatureRepository.getCartSubmissionFeatureIds(cartId);
+    return ids.includes(submissionFeatureId);
+  }
+
+  /**
    * Returns cart features and pagination payload in the same shape used by cart feature endpoints.
    *
    * @param {string} cartId - The ID of the cart
@@ -115,10 +133,11 @@ export class CartSubmissionFeatureService extends DBService {
    */
   async getPaginatedCartFeaturesResponse(
     cartId: string,
-    pagination: ApiPaginationOptions
+    pagination: ApiPaginationOptions,
+    submissionFeatureId?: number
   ): Promise<CartFeatureListResponse> {
     const [features, count] = await Promise.all([
-      this.getCartSubmissionFeatures(cartId, pagination),
+      this.getCartSubmissionFeatures(cartId, pagination, submissionFeatureId),
       this.getCartSubmissionFeatureCount(cartId)
     ]);
 

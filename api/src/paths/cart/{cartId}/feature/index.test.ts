@@ -112,6 +112,39 @@ describe('cart/{cartId}', () => {
       expect(mockDBConnection.release).to.have.been.calledOnce;
     });
 
+    it('returns 200 with only the matching feature when submissionFeatureId is provided', async () => {
+      const mockDBConnection = getMockDBConnection({
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+
+      const matchingFeature: CartSubmissionFeature = {
+        cart_submission_feature_id: 'uuid-1',
+        submission_feature_id: 5,
+        submission_id: 1,
+        feature_type_id: 1,
+        feature_type_name: 'feature-1',
+        secured: false
+      };
+
+      sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves([matchingFeature]);
+      sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureCount').resolves(1);
+
+      const requestHandler = getCartSubmissionFeatures();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params.cartId = 'fake-cart-id';
+      mockReq.query = { submissionFeatureId: '5' };
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.jsonValue.features).to.deep.equal([matchingFeature]);
+      expect(mockDBConnection.commit).to.have.been.calledOnce;
+      expect(mockDBConnection.release).to.have.been.calledOnce;
+    });
+
     it('rolls back and rethrows if CartSubmissionFeatureService.getCartSubmissionFeatures throws an error', async () => {
       const mockDBConnection = getMockDBConnection({
         commit: sinon.stub(),
