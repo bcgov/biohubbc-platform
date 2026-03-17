@@ -25,7 +25,7 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
         'submission_feature_property_code_id',
         'submission_feature_id',
         'feature_type_property_id',
-        'code_id'
+        'contributor_codeset_code_id'
       ]);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
@@ -52,8 +52,14 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
   ): Promise<SubmissionFeaturePropertyCode> {
     const knex = getKnex();
     const query = knex('submission_feature_property_code')
-      .select(['submission_feature_property_code_id', 'submission_feature_id', 'feature_type_property_id', 'code_id'])
-      .where('submission_feature_property_code_id', submissionFeaturePropertyCodeId);
+      .select([
+        'submission_feature_property_code_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'contributor_codeset_code_id'
+      ])
+      .where('submission_feature_property_code_id', submissionFeaturePropertyCodeId)
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
 
@@ -75,19 +81,25 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
   }
 
   /**
-   * Get submission_feature_property_code rows by submission feature id.
+   * Get submission_feature_property_code rows by submission_feature_id.
    *
    * @param {number} submissionFeatureId
    * @return {Promise<SubmissionFeaturePropertyCode[]>}
    * @memberof SubmissionFeaturePropertyCodeRepository
    */
-  async getSubmissionFeaturePropertyCodeBySubmissionFeatureId(
+  async getSubmissionFeaturePropertyCodesBySubmissionFeatureId(
     submissionFeatureId: number
   ): Promise<SubmissionFeaturePropertyCode[]> {
     const knex = getKnex();
     const query = knex('submission_feature_property_code')
-      .select(['submission_feature_property_code_id', 'submission_feature_id', 'feature_type_property_id', 'code_id'])
-      .where('submission_feature_id', submissionFeatureId);
+      .select([
+        'submission_feature_property_code_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'contributor_codeset_code_id'
+      ])
+      .where('submission_feature_id', submissionFeatureId)
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
 
@@ -95,19 +107,51 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
   }
 
   /**
-   * Get submission_feature_property_code rows by feature type property id.
+   * Get submission_feature_property_code rows by feature_type_property_id.
    *
    * @param {number} featureTypePropertyId
    * @return {Promise<SubmissionFeaturePropertyCode[]>}
    * @memberof SubmissionFeaturePropertyCodeRepository
    */
-  async getSubmissionFeaturePropertyCodeByFeatureTypePropertyId(
+  async getSubmissionFeaturePropertyCodesByFeatureTypePropertyId(
     featureTypePropertyId: number
   ): Promise<SubmissionFeaturePropertyCode[]> {
     const knex = getKnex();
     const query = knex('submission_feature_property_code')
-      .select(['submission_feature_property_code_id', 'submission_feature_id', 'feature_type_property_id', 'code_id'])
-      .where('feature_type_property_id', featureTypePropertyId);
+      .select([
+        'submission_feature_property_code_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'contributor_codeset_code_id'
+      ])
+      .where('feature_type_property_id', featureTypePropertyId)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
+
+    return response.rows;
+  }
+
+  /**
+   * Get submission_feature_property_code rows by contributor_codeset_code_id.
+   *
+   * @param {number} contributorCodesetCodeId
+   * @return {Promise<SubmissionFeaturePropertyCode[]>}
+   * @memberof SubmissionFeaturePropertyCodeRepository
+   */
+  async getSubmissionFeaturePropertyCodesByContributorCodesetCodeId(
+    contributorCodesetCodeId: number
+  ): Promise<SubmissionFeaturePropertyCode[]> {
+    const knex = getKnex();
+    const query = knex('submission_feature_property_code')
+      .select([
+        'submission_feature_property_code_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'contributor_codeset_code_id'
+      ])
+      .where('contributor_codeset_code_id', contributorCodesetCodeId)
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
 

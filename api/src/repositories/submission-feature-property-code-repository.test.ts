@@ -15,32 +15,34 @@ describe('SubmissionFeaturePropertyCodeRepository', () => {
     submission_feature_property_code_id: 1,
     submission_feature_id: 10,
     feature_type_property_id: 20,
-    code_id: 9001
+    contributor_codeset_code_id: 30
   };
 
   describe('insert', () => {
     it('returns inserted row', async () => {
-      const mockDBConnection = getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow])) });
-      const repository = new SubmissionFeaturePropertyCodeRepository(mockDBConnection);
+      const repository = new SubmissionFeaturePropertyCodeRepository(
+        getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow])) })
+      );
 
       const result = await repository.insertSubmissionFeaturePropertyCode({
         submission_feature_id: 10,
         feature_type_property_id: 20,
-        code_id: 9001
+        contributor_codeset_code_id: 30
       });
 
       expect(result).to.eql(mockRow);
     });
 
     it('throws on failed insert', async () => {
-      const mockDBConnection = getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([])) });
-      const repository = new SubmissionFeaturePropertyCodeRepository(mockDBConnection);
+      const repository = new SubmissionFeaturePropertyCodeRepository(
+        getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([])) })
+      );
 
       try {
         await repository.insertSubmissionFeaturePropertyCode({
           submission_feature_id: 10,
           feature_type_property_id: 20,
-          code_id: 9001
+          contributor_codeset_code_id: 30
         });
         expect.fail();
       } catch (error) {
@@ -51,15 +53,18 @@ describe('SubmissionFeaturePropertyCodeRepository', () => {
 
   describe('getById', () => {
     it('returns row', async () => {
-      const mockDBConnection = getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow])) });
-      const repository = new SubmissionFeaturePropertyCodeRepository(mockDBConnection);
+      const repository = new SubmissionFeaturePropertyCodeRepository(
+        getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow])) })
+      );
+
       const result = await repository.getSubmissionFeaturePropertyCodeById(1);
       expect(result).to.eql(mockRow);
     });
 
     it('throws not found', async () => {
-      const mockDBConnection = getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([])) });
-      const repository = new SubmissionFeaturePropertyCodeRepository(mockDBConnection);
+      const repository = new SubmissionFeaturePropertyCodeRepository(
+        getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([])) })
+      );
 
       try {
         await repository.getSubmissionFeaturePropertyCodeById(1);
@@ -70,8 +75,9 @@ describe('SubmissionFeaturePropertyCodeRepository', () => {
     });
 
     it('throws on unexpected row count', async () => {
-      const mockDBConnection = getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow], 2)) });
-      const repository = new SubmissionFeaturePropertyCodeRepository(mockDBConnection);
+      const repository = new SubmissionFeaturePropertyCodeRepository(
+        getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow], 2)) })
+      );
 
       try {
         await repository.getSubmissionFeaturePropertyCodeById(1);
@@ -84,16 +90,29 @@ describe('SubmissionFeaturePropertyCodeRepository', () => {
 
   describe('lookups', () => {
     it('lists by submission_feature_id', async () => {
-      const mockDBConnection = getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow])) });
-      const repository = new SubmissionFeaturePropertyCodeRepository(mockDBConnection);
-      const result = await repository.getSubmissionFeaturePropertyCodeBySubmissionFeatureId(10);
+      const repository = new SubmissionFeaturePropertyCodeRepository(
+        getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow])) })
+      );
+
+      const result = await repository.getSubmissionFeaturePropertyCodesBySubmissionFeatureId(10);
       expect(result).to.eql([mockRow]);
     });
 
     it('lists by feature_type_property_id', async () => {
-      const mockDBConnection = getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow])) });
-      const repository = new SubmissionFeaturePropertyCodeRepository(mockDBConnection);
-      const result = await repository.getSubmissionFeaturePropertyCodeByFeatureTypePropertyId(20);
+      const repository = new SubmissionFeaturePropertyCodeRepository(
+        getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow])) })
+      );
+
+      const result = await repository.getSubmissionFeaturePropertyCodesByFeatureTypePropertyId(20);
+      expect(result).to.eql([mockRow]);
+    });
+
+    it('lists by contributor_codeset_code_id', async () => {
+      const repository = new SubmissionFeaturePropertyCodeRepository(
+        getMockDBConnection({ knex: () => Promise.resolve(mockQueryResult([mockRow])) })
+      );
+
+      const result = await repository.getSubmissionFeaturePropertyCodesByContributorCodesetCodeId(30);
       expect(result).to.eql([mockRow]);
     });
   });
