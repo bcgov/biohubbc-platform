@@ -10,20 +10,23 @@ export const useCartLifecycle = (params: IUseCartLifecycleParams): IUseCartLifec
   const cartApiRef = useRef(cartApi);
   const isAuthenticatedRef = useRef(isAuthenticated);
   const applyLoadSuccessRef = useRef(applyLoadSuccess);
+  const setStoredCartIdRef = useRef(setStoredCartId);
 
   useEffect(() => {
     cartApiRef.current = cartApi;
   }, [cartApi]);
-
   useEffect(() => {
     isAuthenticatedRef.current = isAuthenticated;
   }, [isAuthenticated]);
-
   useEffect(() => {
     applyLoadSuccessRef.current = applyLoadSuccess;
   }, [applyLoadSuccess]);
+  useEffect(() => {
+    setStoredCartIdRef.current = setStoredCartId;
+  }, [setStoredCartId]);
 
   const hasClaimedCurrentCart = useRef(false);
+  const skipNextLoadForCartId = useRef<string | null>(null);
 
   useEffect(() => {
     dispatch({ type: 'SET_CART_ID', payload: storedCartId });
@@ -41,65 +44,62 @@ export const useCartLifecycle = (params: IUseCartLifecycleParams): IUseCartLifec
     [dispatch, setStoredCartId]
   );
 
-  const setCartIdRef = useRef(setCartId);
+  const cartDataLoader = useDataLoader(
+    async (cartId: string): Promise<CartFeatureListResponse> => {
+      const response = await cartApiRef.current.getCartById(cartId);
 
-  useEffect(() => {
-    setCartIdRef.current = setCartId;
-  }, [setCartId]);
+      if (isAuthenticatedRef.current && response.cart.system_user_id === null && !hasClaimedCurrentCart.current) {
+        try {
+          hasClaimedCurrentCart.current = true;
+          await cartApiRef.current.assignCartToCurrentUser(cartId);
+        } catch (error) {
+          hasClaimedCurrentCart.current = false;
+          console.error('Failed to claim cart for authenticated user:', error);
+        }
+      }
 
-  const cartDataLoader = useDataLoader(async (cartId: string): Promise<CartFeatureListResponse> => {
-    const response = await cartApiRef.current.getCartById(cartId);
-
-    if (isAuthenticatedRef.current && response.cart.system_user_id === null && !hasClaimedCurrentCart.current) {
-      try {
-        hasClaimedCurrentCart.current = true;
-        await cartApiRef.current.assignCartToCurrentUser(cartId);
-      } catch (error) {
-        hasClaimedCurrentCart.current = false;
-        console.error('Failed to claim cart for authenticated user:', error);
+      applyLoadSuccessRef.current(response);
+      return response;
+    },
+    (error) => {
+      if (isInvalidCachedCartError(error)) {
+        setStoredCartIdRef.current(null);
+        dispatch({ type: 'RESET' });
+      } else {
+        dispatch({ type: 'LOAD_ERROR', payload: error });
       }
     }
-
-    applyLoadSuccessRef.current(response);
-    return response;
-  });
-
-  const cartDataLoaderRef = useRef(cartDataLoader);
-
-  useEffect(() => {
-    cartDataLoaderRef.current = cartDataLoader;
-  }, [cartDataLoader]);
+  );
 
   useEffect(() => {
     if (!state.cartId) {
-      dispatch({ type: 'RESET' });
       return;
     }
 
-    const refresh = async () => {
-      try {
-        await cartDataLoaderRef.current.refresh(state.cartId!);
-      } catch (error) {
-        if (isInvalidCachedCartError(error)) {
-          setCartIdRef.current(null);
-        }
-      }
-    };
+    if (skipNextLoadForCartId.current === state.cartId) {
+      skipNextLoadForCartId.current = null;
+      return;
+    }
 
-    refresh();
+    cartDataLoader.refresh(state.cartId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, state.cartId]);
 
-  const createCart: IUseCartLifecycleResult['createCart'] = useCallback(async (options) => {
-    const { features = [] } = options;
+  const createCart: IUseCartLifecycleResult['createCart'] = useCallback(
+    async (options) => {
+      const { features = [] } = options;
+      const response = await cartApiRef.current.createCart({
+        features: features.map((f) => f.submission_feature_id)
+      });
 
-    const response = await cartApiRef.current.createCart({
-      features: features.map((f) => f.submission_feature_id)
-    });
-
-    hasClaimedCurrentCart.current = false;
-    setCartIdRef.current(response.cart.cart_id);
-    cartDataLoaderRef.current.refresh(response.cart.cart_id);
-  }, []);
+      hasClaimedCurrentCart.current = false;
+      skipNextLoadForCartId.current = response.cart.cart_id;
+      applyLoadSuccessRef.current(response);
+      setStoredCartIdRef.current(response.cart.cart_id);
+      dispatch({ type: 'SET_CART_ID', payload: response.cart.cart_id });
+    },
+    [dispatch]
+  );
 
   return { setCartId, createCart };
 };

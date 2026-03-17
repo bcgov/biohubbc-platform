@@ -112,6 +112,7 @@ export const cartReducer = (state: CartState, action: CartAction): CartState => 
     case 'RESET':
       return {
         ...state,
+        cartId: null,
         features: [],
         pagination: DEFAULT_PAGINATION,
         isLoading: false,

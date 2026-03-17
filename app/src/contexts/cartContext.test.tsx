@@ -113,7 +113,7 @@ describe('CartContextProvider', () => {
 
     await waitFor(() => {
       expect(getContext().features).toEqual([]);
-      expect(getContext().pagination).toEqual({ total: 0, current_page: 1, last_page: 1, per_page: 10 });
+      expect(getContext().pagination).toEqual({ total: 0, current_page: 1, last_page: 1 });
       expect(getContext().error).toBeUndefined();
     });
 
@@ -157,7 +157,7 @@ describe('CartContextProvider', () => {
     await waitFor(() => {
       expect(mockSetStoredCartId).toHaveBeenCalledWith(null);
       expect(getContext().features).toEqual([]);
-      expect(getContext().pagination).toEqual({ total: 0, current_page: 1, last_page: 1, per_page: 10 });
+      expect(getContext().pagination).toEqual({ total: 0, current_page: 1, last_page: 1 });
       expect(getContext().error).toBeUndefined();
       expect(getContext().isLoading).toBe(false);
     });
