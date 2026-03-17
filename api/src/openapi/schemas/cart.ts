@@ -82,6 +82,18 @@ export const CartFeaturesResponseSchema: OpenAPIV3.SchemaObject = {
   }
 };
 
+export const IsFeatureInCartResponseSchema: OpenAPIV3.SchemaObject = {
+  type: 'object',
+  required: ['isInCart'],
+  additionalProperties: false,
+  properties: {
+    isInCart: {
+      type: 'boolean',
+      description: 'Whether the submission feature is in the cart'
+    }
+  }
+};
+
 export const CartWithFeaturesResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   required: ['cart', 'features', 'pagination'],

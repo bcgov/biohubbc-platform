@@ -55,7 +55,9 @@ export class CodeRepository extends BaseRepository {
         name as feature_type_name,
         display_name as feature_type_display_name
       FROM 
-        feature_type;
+        feature_type
+      WHERE
+        feature_type.record_end_date IS NULL;
     `;
 
     const response = await this.connection.sql(sql, FeatureTypeCode);
@@ -83,13 +85,18 @@ export class CodeRepository extends BaseRepository {
       FROM
         feature_type ft
       INNER JOIN
-        feature_type_property ftp on ft.feature_type_id = ftp.feature_type_id 
+        feature_type_property ftp on ft.feature_type_id = ftp.feature_type_id
+        AND ftp.record_end_date IS NULL
       INNER JOIN
         feature_property fp ON fp.feature_property_id = ftp.feature_property_id
+        AND fp.record_end_date IS NULL
       INNER JOIN
         feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
+        AND fpt.record_end_date IS NULL
+      WHERE
+        ft.record_end_date IS NULL
       ORDER BY
-        ft.sort, 
+        ft.sort,
         ftp.sort
       ASC;
     `;
@@ -118,8 +125,10 @@ export class CodeRepository extends BaseRepository {
       feature_property fp
     INNER JOIN
       feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
+      AND fpt.record_end_date IS NULL
     WHERE
-      fp.name = ${featurePropertyName};
+      fp.name = ${featurePropertyName}
+      AND fp.record_end_date IS NULL;
   `;
 
     const response = await this.connection.sql(sqlStatement, FeaturePropertyCode);

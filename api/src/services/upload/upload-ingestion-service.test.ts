@@ -1,3 +1,4 @@
+import { S3Client } from '@aws-sdk/client-s3';
 import chai, { expect } from 'chai';
 import dayjs from 'dayjs';
 import sinon from 'sinon';
@@ -8,16 +9,18 @@ import { HTTP401 } from '../../errors/http-error';
 import { ArtifactSecurity } from '../../models/artifact-security';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
+import { SubmissionUploadReviewStatus } from '../../models/submission-upload-review-status';
 import { Upload, UploadStatusEnum } from '../../models/upload';
 import { UploadArchive } from '../../models/upload-archive';
 import * as publisher from '../../queue/publisher';
-import { ICreateSubmission } from '../../repositories/submission-repository';
+import { ICreateSubmission, ISubmissionModel } from '../../repositories/submission-repository';
 import * as fileUtils from '../../utils/file-utils';
 import * as submissionUploadUtils from '../../utils/submission-upload-utils';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { SubmissionService } from '../submission-service';
 import { ArtifactSecurityService } from './artifact-security-service';
 import { ArtifactService } from './artifact-service';
+import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 import { SubmissionUploadService } from './submission-upload-service';
 import { UploadArchiveService } from './upload-archive-service';
 import { UploadIngestionService } from './upload-ingestion-service';
@@ -57,10 +60,18 @@ describe('UploadIngestionService', () => {
       const mockBytes = 5_000_000;
 
       sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({ submission_id: mockSubmissionId });
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+        uuid: mockSubmission.uuid
+      } as ISubmissionModel);
       sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: mockUploadId });
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
+      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus').resolves({
+        submission_upload_status_id: 1,
+        submission_upload_id: 'submission-upload-id-1',
+        status: 'submitted'
+      } as SubmissionUploadReviewStatus);
       sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: mockArtifactId });
       sinon
         .stub(UploadArchiveService.prototype, 'insertUploadArchive')
@@ -81,7 +92,7 @@ describe('UploadIngestionService', () => {
 
       const result = await service.startArchiveUpload(mockBytes, mockSubmission);
 
-      expect(result.submissionId).to.equal(mockSubmissionId);
+      expect(result.submissionId).to.equal(mockSubmission.uuid);
       expect(result.uploadId).to.equal(mockUploadId);
       expect(result.uploadArchiveId).to.equal(mockUploadArchiveId);
       expect(result.s3UploadId).to.equal(mockS3UploadId);
@@ -105,6 +116,9 @@ describe('UploadIngestionService', () => {
 
     it('should throw if upload creation fails', async () => {
       sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({ submission_id: 123 });
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+        uuid: mockSubmission.uuid
+      } as ISubmissionModel);
       sinon.stub(UploadService.prototype, 'insertUpload').rejects(new Error('Database error: upload insert failed'));
 
       try {
@@ -117,10 +131,18 @@ describe('UploadIngestionService', () => {
 
     it('should throw if artifact creation fails', async () => {
       sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({ submission_id: 123 });
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+        uuid: mockSubmission.uuid
+      } as ISubmissionModel);
       sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: 'upload-456' });
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
+      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus').resolves({
+        submission_upload_status_id: 1,
+        submission_upload_id: 'submission-upload-id-1',
+        status: 'submitted'
+      } as SubmissionUploadReviewStatus);
       sinon
         .stub(ArtifactService.prototype, 'insertArtifact')
         .rejects(new Error('Database error: artifact insert failed'));
@@ -135,10 +157,18 @@ describe('UploadIngestionService', () => {
 
     it('should throw if presigned URL generation fails', async () => {
       sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({ submission_id: 123 });
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+        uuid: mockSubmission.uuid
+      } as ISubmissionModel);
       sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: 'upload-456' });
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
+      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus').resolves({
+        submission_upload_status_id: 1,
+        submission_upload_id: 'submission-upload-id-1',
+        status: 'submitted'
+      } as SubmissionUploadReviewStatus);
       sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: 'artifact-789' });
       sinon
         .stub(UploadArchiveService.prototype, 'insertUploadArchive')
@@ -204,7 +234,7 @@ describe('UploadIngestionService', () => {
     ];
 
     beforeEach(() => {
-      sinon.stub(publisher, 'publishMalwareScanJob').resolves({ status: 'published', jobId: 'job-1' } as any);
+      sinon.stub(publisher, 'publishMalwareScanJob').resolves({ status: 'published', jobId: 'job-1' });
     });
 
     it('should complete upload successfully and enqueue security artifacts', async () => {
@@ -219,7 +249,7 @@ describe('UploadIngestionService', () => {
       sinon.stub(UploadArchiveService.prototype, 'updateUploadArchivesByUploadId').resolves(mockUploadArchiveRecords);
 
       const s3ClientStub = { send: sinon.stub().resolves({ ETag: 'etag' }) };
-      sinon.stub(fileUtils, 'getSecurityS3Client').returns(s3ClientStub as any);
+      sinon.stub(fileUtils, 'getSecurityS3Client').returns(s3ClientStub as unknown as S3Client);
       sinon.stub(fileUtils, 'getSecurityObjectStoreBucketName').returns('security-bucket');
 
       await service.completeArchiveUpload(mockParams);
@@ -376,11 +406,11 @@ describe('UploadIngestionService', () => {
 
       sinon.stub(UploadArchiveService.prototype, 'updateUploadArchivesByUploadId').resolves(mockUploadArchiveRecords);
 
-      const fakeS3Client = {
+      const fakeS3Client: Pick<S3Client, 'send'> = {
         send: sinon.stub().rejects(new Error('S3 API error: Access Denied'))
       };
 
-      sinon.stub(fileUtils, 'getSecurityS3Client').returns(fakeS3Client as any);
+      sinon.stub(fileUtils, 'getSecurityS3Client').returns(fakeS3Client as S3Client);
       sinon.stub(fileUtils, 'getSecurityObjectStoreBucketName').returns('security-bucket');
 
       try {

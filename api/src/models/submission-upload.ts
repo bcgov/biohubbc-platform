@@ -7,7 +7,8 @@ import { UploadArtifactRoleEnum } from './upload-artifact';
 export const SubmissionUpload = z.object({
   submission_upload_id: z.string().uuid(),
   submission_id: z.number(),
-  upload_id: z.string().uuid()
+  upload_id: z.string().uuid(),
+  record_end_date: z.coerce.date().nullable().optional()
 });
 export type SubmissionUpload = z.infer<typeof SubmissionUpload>;
 
