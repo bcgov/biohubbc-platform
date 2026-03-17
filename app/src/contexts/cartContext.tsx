@@ -1,5 +1,7 @@
+import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
+import { useDialogContext } from 'hooks/useContext';
 import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { useSessionStorage } from 'hooks/useSessionStorage';
 import { CartFeatureListResponse, CheckoutCartResponse } from 'interfaces/useCartApi.interface';
@@ -27,6 +29,7 @@ export const CartContext = React.createContext<ICartContext | undefined>(undefin
  */
 export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
   const api = useApi();
+  const dialogContext = useDialogContext();
   const authStateContext = useAuthStateContext();
   const [storedCartId, setStoredCartId] = useSessionStorage<string | null>('cart_id', null);
 
@@ -52,6 +55,10 @@ export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
     dispatch({ type: 'OPTIMISTIC_SET', payload: snapshot });
   }, []);
 
+  const handleClaimError = (error: APIError) => {
+    dialogContext.setSnackbar({ open: true, snackbarMessage: error.message });
+  };
+
   const { createCart } = useCartLifecycle({
     cartApi: api.cart,
     isAuthenticated: authStateContext.auth.isAuthenticated,
@@ -59,7 +66,8 @@ export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
     setStoredCartId,
     state,
     dispatch,
-    applyLoadSuccess
+    applyLoadSuccess,
+    handleClaimError
   });
 
   const { addToExistingCart, removeFromExistingCart, clearExistingCart } = useCartOptimisticActions({

@@ -1,3 +1,4 @@
+import { APIError } from 'hooks/api/useAxios';
 import { CartWithFeaturesResponse } from 'interfaces/useCartApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { Dispatch } from 'react';
@@ -17,6 +18,7 @@ export interface IUseCartLifecycleParams {
   state: CartState;
   dispatch: Dispatch<CartAction>;
   applyLoadSuccess: (response: CartWithFeaturesResponse) => void;
+  handleClaimError: (error: APIError) => void;
 }
 
 export interface IUseCartLifecycleResult {

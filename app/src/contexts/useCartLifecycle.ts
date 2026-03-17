@@ -1,3 +1,4 @@
+import { APIError } from 'hooks/api/useAxios';
 import useDataLoader from 'hooks/useDataLoader';
 import { CartFeatureListResponse } from 'interfaces/useCartApi.interface';
 import { useCallback, useEffect, useRef } from 'react';
@@ -15,7 +16,16 @@ import { IUseCartLifecycleParams, IUseCartLifecycleResult } from './useCartLifec
  * - Recovers from stale/invalid cached cart ids
  */
 export const useCartLifecycle = (params: IUseCartLifecycleParams): IUseCartLifecycleResult => {
-  const { cartApi, isAuthenticated, storedCartId, setStoredCartId, state, dispatch, applyLoadSuccess } = params;
+  const {
+    cartApi,
+    isAuthenticated,
+    storedCartId,
+    setStoredCartId,
+    state,
+    dispatch,
+    applyLoadSuccess,
+    handleClaimError
+  } = params;
 
   // Tracks whether we've already claimed the current cart for the authenticated user.
   // Reset whenever the active cart id changes.
@@ -49,7 +59,7 @@ export const useCartLifecycle = (params: IUseCartLifecycleParams): IUseCartLifec
           await cartApi.assignCartToCurrentUser(cartId);
         } catch (error) {
           hasClaimedCurrentCart.current = false;
-          console.error('Failed to claim cart for authenticated user:', error);
+          handleClaimError(error as APIError);
         }
       }
 
