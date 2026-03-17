@@ -20,6 +20,5 @@ export interface IUseCartLifecycleParams {
 }
 
 export interface IUseCartLifecycleResult {
-  setCartId: (cartId: string | null) => void;
   createCart: (options: { features?: SearchFeatureResultWithRelevancy[] }) => Promise<void>;
 }

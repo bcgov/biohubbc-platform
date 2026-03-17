@@ -565,7 +565,6 @@ describe('CartContextProvider', () => {
 
     expect(mockCartApi.checkoutCart).toHaveBeenCalledTimes(1);
     expect(mockCartApi.checkoutCart).toHaveBeenCalledWith('cart-1');
-    expect(mockSetStoredCartId).toHaveBeenCalledWith(null);
 
     await waitFor(() => {
       expect(getContext().features).toEqual([]);
