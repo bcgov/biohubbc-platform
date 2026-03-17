@@ -6,7 +6,6 @@ import type { Knex } from 'knex';
  * - submission_feature_property_number
  * - submission_feature_property_boolean
  * - submission_feature_property_timestamp
- * - submission_feature_property_code
  * - submission_feature_property_taxon
  * - submission_feature_property_geometry
  *
@@ -17,7 +16,6 @@ import type { Knex } from 'knex';
 export async function up(knex: Knex): Promise<void> {
   await knex.raw(`--sql
     SET SEARCH_PATH = biohub, public;
-
 
     ----------------------------------------------------------------------------------------
     -- Allow multiple values for a property
@@ -83,19 +81,6 @@ export async function up(knex: Knex): Promise<void> {
       update_user                integer,
       revision_count             integer           DEFAULT 0 NOT NULL,
       CONSTRAINT submission_feature_property_timestamp_pk PRIMARY KEY (submission_feature_property_timestamp_id)
-    );
-
-    CREATE TABLE submission_feature_property_code (
-      submission_feature_property_code_id           integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-      submission_feature_id      integer           NOT NULL,
-      feature_type_property_id   integer           NOT NULL,
-      code_id                    integer           NOT NULL,
-      create_date                timestamptz(6)    DEFAULT now() NOT NULL,
-      create_user                integer           NOT NULL,
-      update_date                timestamptz(6),
-      update_user                integer,
-      revision_count             integer           DEFAULT 0 NOT NULL,
-      CONSTRAINT submission_feature_property_code_pk PRIMARY KEY (submission_feature_property_code_id)
     );
 
     CREATE TABLE submission_feature_property_taxon (
@@ -180,19 +165,6 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX submission_feature_property_timestamp_idx2 ON submission_feature_property_timestamp(feature_type_property_id);
     CREATE INDEX submission_feature_property_timestamp_idx3 ON submission_feature_property_timestamp(value);
 
-    -- submission_feature_property_code
-    ALTER TABLE submission_feature_property_code ADD CONSTRAINT submission_feature_property_code_fk1
-      FOREIGN KEY (submission_feature_id)
-      REFERENCES submission_feature(submission_feature_id);
-
-    ALTER TABLE submission_feature_property_code ADD CONSTRAINT submission_feature_property_code_fk2
-      FOREIGN KEY (feature_type_property_id)
-      REFERENCES feature_type_property(feature_type_property_id);
-
-    CREATE INDEX submission_feature_property_code_idx1 ON submission_feature_property_code(submission_feature_id);
-    CREATE INDEX submission_feature_property_code_idx2 ON submission_feature_property_code(feature_type_property_id);
-    CREATE INDEX submission_feature_property_code_idx3 ON submission_feature_property_code(code_id);
-
     -- submission_feature_property_taxon
     ALTER TABLE submission_feature_property_taxon ADD CONSTRAINT submission_feature_property_taxon_fk1
       FOREIGN KEY (submission_feature_id)
@@ -271,17 +243,6 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN submission_feature_property_timestamp.update_user IS 'The id of the user who updated the record as identified in the system user table.';
     COMMENT ON COLUMN submission_feature_property_timestamp.revision_count IS 'Revision count used for concurrency control.';
 
-    COMMENT ON TABLE submission_feature_property_code IS 'Canonical typed coded property values.';
-    COMMENT ON COLUMN submission_feature_property_code.submission_feature_property_code_id IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN submission_feature_property_code.submission_feature_id IS 'Foreign key to the submission_feature table.';
-    COMMENT ON COLUMN submission_feature_property_code.feature_type_property_id IS 'Foreign key to the feature_type_property table.';
-    COMMENT ON COLUMN submission_feature_property_code.code_id IS 'Resolved code identifier value; FK intentionally deferred to a later codes schema migration.';
-    COMMENT ON COLUMN submission_feature_property_code.create_date IS 'The datetime the record was created.';
-    COMMENT ON COLUMN submission_feature_property_code.create_user IS 'The id of the user who created the record as identified in the system user table.';
-    COMMENT ON COLUMN submission_feature_property_code.update_date IS 'The datetime the record was updated.';
-    COMMENT ON COLUMN submission_feature_property_code.update_user IS 'The id of the user who updated the record as identified in the system user table.';
-    COMMENT ON COLUMN submission_feature_property_code.revision_count IS 'Revision count used for concurrency control.';
-
     COMMENT ON TABLE submission_feature_property_taxon IS 'Canonical typed taxon property values.';
     COMMENT ON COLUMN submission_feature_property_taxon.submission_feature_property_taxon_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN submission_feature_property_taxon.submission_feature_id IS 'Foreign key to the submission_feature table.';
@@ -336,13 +297,6 @@ export async function up(knex: Knex): Promise<void> {
       AFTER INSERT OR UPDATE OR DELETE ON submission_feature_property_timestamp
       FOR EACH ROW EXECUTE PROCEDURE tr_journal_trigger();
 
-    CREATE TRIGGER audit_submission_feature_property_code
-      BEFORE INSERT OR UPDATE OR DELETE ON submission_feature_property_code
-      FOR EACH ROW EXECUTE PROCEDURE tr_audit_trigger();
-    CREATE TRIGGER journal_submission_feature_property_code
-      AFTER INSERT OR UPDATE OR DELETE ON submission_feature_property_code
-      FOR EACH ROW EXECUTE PROCEDURE tr_journal_trigger();
-
     CREATE TRIGGER audit_submission_feature_property_taxon
       BEFORE INSERT OR UPDATE OR DELETE ON submission_feature_property_taxon
       FOR EACH ROW EXECUTE PROCEDURE tr_audit_trigger();
@@ -373,9 +327,6 @@ export async function down(knex: Knex): Promise<void> {
     DROP TRIGGER IF EXISTS journal_submission_feature_property_taxon ON submission_feature_property_taxon;
     DROP TRIGGER IF EXISTS audit_submission_feature_property_taxon ON submission_feature_property_taxon;
 
-    DROP TRIGGER IF EXISTS journal_submission_feature_property_code ON submission_feature_property_code;
-    DROP TRIGGER IF EXISTS audit_submission_feature_property_code ON submission_feature_property_code;
-
     DROP TRIGGER IF EXISTS journal_submission_feature_property_timestamp ON submission_feature_property_timestamp;
     DROP TRIGGER IF EXISTS audit_submission_feature_property_timestamp ON submission_feature_property_timestamp;
 
@@ -394,7 +345,6 @@ export async function down(knex: Knex): Promise<void> {
 
     DROP TABLE IF EXISTS submission_feature_property_geometry;
     DROP TABLE IF EXISTS submission_feature_property_taxon;
-    DROP TABLE IF EXISTS submission_feature_property_code;
     DROP TABLE IF EXISTS submission_feature_property_timestamp;
     DROP TABLE IF EXISTS submission_feature_property_boolean;
     DROP TABLE IF EXISTS submission_feature_property_number;
