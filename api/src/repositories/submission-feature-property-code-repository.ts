@@ -58,7 +58,8 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
         'feature_type_property_id',
         'contributor_codeset_code_id'
       ])
-      .where('submission_feature_property_code_id', submissionFeaturePropertyCodeId);
+      .where('submission_feature_property_code_id', submissionFeaturePropertyCodeId)
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
 
@@ -97,7 +98,8 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
         'feature_type_property_id',
         'contributor_codeset_code_id'
       ])
-      .where('submission_feature_id', submissionFeatureId);
+      .where('submission_feature_id', submissionFeatureId)
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
 
@@ -122,7 +124,8 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
         'feature_type_property_id',
         'contributor_codeset_code_id'
       ])
-      .where('feature_type_property_id', featureTypePropertyId);
+      .where('feature_type_property_id', featureTypePropertyId)
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
 
@@ -147,7 +150,8 @@ export class SubmissionFeaturePropertyCodeRepository extends BaseRepository {
         'feature_type_property_id',
         'contributor_codeset_code_id'
       ])
-      .where('contributor_codeset_code_id', contributorCodesetCodeId);
+      .where('contributor_codeset_code_id', contributorCodesetCodeId)
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
 
