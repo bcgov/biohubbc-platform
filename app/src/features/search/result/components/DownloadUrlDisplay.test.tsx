@@ -10,6 +10,7 @@ describe('DownloadUrlDisplay', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     originalClipboard = navigator.clipboard;
     Object.defineProperty(navigator, 'clipboard', {
       value: { writeText: vi.fn().mockResolvedValue(undefined) },
@@ -19,6 +20,8 @@ describe('DownloadUrlDisplay', () => {
   });
 
   afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
     Object.defineProperty(navigator, 'clipboard', {
       value: originalClipboard,
       writable: true,
@@ -54,8 +57,6 @@ describe('DownloadUrlDisplay', () => {
   });
 
   it('resets copied state after 2 seconds', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-
     const { getByTestId } = render(<DownloadUrlDisplay url={TEST_URL} />);
 
     fireEvent.click(getByTestId('copy-url-button'));
@@ -71,8 +72,6 @@ describe('DownloadUrlDisplay', () => {
     await waitFor(() => {
       expect(getByTestId('copy-url-button')).toHaveAttribute('aria-label', 'Copy download URL');
     });
-
-    vi.useRealTimers();
   });
 
   it('does not show copied feedback when clipboard write fails', async () => {
@@ -82,7 +81,6 @@ describe('DownloadUrlDisplay', () => {
 
     fireEvent.click(getByTestId('copy-url-button'));
 
-    // Wait for the promise rejection to be handled, then verify label stayed unchanged
     await waitFor(() => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(TEST_URL);
     });
