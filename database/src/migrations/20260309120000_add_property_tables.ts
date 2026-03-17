@@ -1,4 +1,4 @@
-import { Knex } from 'knex';
+import type { Knex } from 'knex';
 
 /**
  * Add canonical typed property tables:
@@ -363,20 +363,34 @@ export async function down(knex: Knex): Promise<void> {
   await knex.raw(`--sql
     SET SEARCH_PATH = biohub, public;
 
+    ----------------------------------------------------------------------------------------
+    -- Drop triggers
+    ----------------------------------------------------------------------------------------
+
     DROP TRIGGER IF EXISTS journal_submission_feature_property_geometry ON submission_feature_property_geometry;
     DROP TRIGGER IF EXISTS audit_submission_feature_property_geometry ON submission_feature_property_geometry;
+
     DROP TRIGGER IF EXISTS journal_submission_feature_property_taxon ON submission_feature_property_taxon;
     DROP TRIGGER IF EXISTS audit_submission_feature_property_taxon ON submission_feature_property_taxon;
+
     DROP TRIGGER IF EXISTS journal_submission_feature_property_code ON submission_feature_property_code;
     DROP TRIGGER IF EXISTS audit_submission_feature_property_code ON submission_feature_property_code;
+
     DROP TRIGGER IF EXISTS journal_submission_feature_property_timestamp ON submission_feature_property_timestamp;
     DROP TRIGGER IF EXISTS audit_submission_feature_property_timestamp ON submission_feature_property_timestamp;
+
     DROP TRIGGER IF EXISTS journal_submission_feature_property_boolean ON submission_feature_property_boolean;
     DROP TRIGGER IF EXISTS audit_submission_feature_property_boolean ON submission_feature_property_boolean;
+
     DROP TRIGGER IF EXISTS journal_submission_feature_property_number ON submission_feature_property_number;
     DROP TRIGGER IF EXISTS audit_submission_feature_property_number ON submission_feature_property_number;
+
     DROP TRIGGER IF EXISTS journal_submission_feature_property_string ON submission_feature_property_string;
     DROP TRIGGER IF EXISTS audit_submission_feature_property_string ON submission_feature_property_string;
+
+    ----------------------------------------------------------------------------------------
+    -- Drop tables
+    ----------------------------------------------------------------------------------------
 
     DROP TABLE IF EXISTS submission_feature_property_geometry;
     DROP TABLE IF EXISTS submission_feature_property_taxon;
@@ -385,5 +399,12 @@ export async function down(knex: Knex): Promise<void> {
     DROP TABLE IF EXISTS submission_feature_property_boolean;
     DROP TABLE IF EXISTS submission_feature_property_number;
     DROP TABLE IF EXISTS submission_feature_property_string;
+
+    ----------------------------------------------------------------------------------------
+    -- Revert schema changes
+    ----------------------------------------------------------------------------------------
+
+    ALTER TABLE feature_type_property
+    DROP COLUMN IF EXISTS allow_multiple;
   `);
 }
