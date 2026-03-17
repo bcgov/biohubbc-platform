@@ -3,9 +3,11 @@ import { PageHeader } from 'components/header/PageHeader';
 import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
+import { useCartContext, useCodesContext, useConfigContext, useDialogContext } from 'hooks/useContext';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { normalizeQueryParam } from 'utils/query-param';
+import { DownloadUrlDisplay } from './components/DownloadUrlDisplay';
 import { SearchResultOptions } from './content/option/SearchResultOptions';
 import { SearchResultToolbar } from './content/toolbar/SearchResultToolbar';
 import { SearchResultHeader } from './header/SearchResultHeader';
@@ -30,6 +32,8 @@ export const SearchResultPage = () => {
   const navigate = useNavigate();
   const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination, filters } = useSearchResults();
   const api = useApi();
+  const { auth } = useAuthStateContext();
+  const config = useConfigContext();
   const { codesDataLoader } = useCodesContext();
   const { features, pagination: cartPagination, addToCart, checkout } = useCartContext();
   const dialogContext = useDialogContext();
@@ -206,21 +210,38 @@ export const SearchResultPage = () => {
    * Download all features matching the current search filters in one click.
    * Bypasses the shopping cart — sends filters to POST /api/download which resolves
    * them to feature IDs server-side and creates a download record.
+   *
+   * Anonymous users have no "My Downloads" page, so the download UUID is their only
+   * credential. Instead of an ephemeral snackbar, they get a persistent dialog with
+   * the API status URL they can use with curl to check progress and get download links.
    */
   const handleDownloadAll = useCallback(async () => {
     try {
       setIsDownloading(true);
-      await api.search.createDownload(filters);
-      dialogContext.setSnackbar({
-        snackbarMessage: 'Download started. You can track its progress in your downloads.',
-        open: true
-      });
+      const { download_id: downloadId } = await api.search.createDownload(filters);
+
+      if (auth.isAuthenticated) {
+        dialogContext.setSnackbar({
+          snackbarMessage: 'Download started. You can track its progress in your downloads.',
+          open: true
+        });
+      } else {
+        const downloadUrl = `${config.API_HOST}/api/download/${downloadId}`;
+        dialogContext.setOkDialog({
+          dialogTitle: 'Download Started',
+          dialogText:
+            'Your download is being prepared. Use this URL to check its status and get download links when ready.',
+          dialogContent: <DownloadUrlDisplay url={downloadUrl} />,
+          open: true,
+          onClose: () => dialogContext.setOkDialog({ open: false })
+        });
+      }
     } catch (error) {
       dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
     } finally {
       setIsDownloading(false);
     }
-  }, [filters, api.search, dialogContext]);
+  }, [filters, api.search, dialogContext, auth.isAuthenticated, config.API_HOST]);
 
   const handleCheckout = useCallback(async () => {
     try {
