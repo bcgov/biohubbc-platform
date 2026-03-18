@@ -19,9 +19,10 @@ interface SearchResultOptionsProps {
   isLoading: boolean;
   view: SEARCH_RESULT_OPTION_VIEW;
   onDownload?: (result: SearchFeatureResultWithRelevancy) => void;
+  onClick: (result: SearchFeatureResultWithRelevancy) => void;
 }
 
-export const SearchResultOptions = ({ rows, isLoading, view, onDownload }: SearchResultOptionsProps) => {
+export const SearchResultOptions = ({ rows, isLoading, view, onDownload, onClick }: SearchResultOptionsProps) => {
   const { features, addToCart, removeFromCart } = useCartContext();
   const dialogContext = useDialogContext();
   const navigate = useNavigate();
@@ -92,6 +93,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload }: Searc
               <SearchResultTableLayout
                 results={rows}
                 cartFeatureIds={cartFeatureIds}
+                onClick={onClick}
                 onDownload={onDownload}
                 onAddToCart={handleAddToCart}
                 onRemoveFromCart={handleRemoveFromCart}
@@ -102,6 +104,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload }: Searc
               <SearchResultCardLayout
                 results={rows}
                 cartFeatureIds={cartFeatureIds}
+                onClick={onClick}
                 onDownload={onDownload}
                 onAddToCart={handleAddToCart}
                 onRemoveFromCart={handleRemoveFromCart}

@@ -311,7 +311,7 @@ describe('Download Worker', function () {
     // File info now lives on the fragment, not the download record
     const [fragment] = await db('biohub.download_fragment').where('download_id', downloadId).select('*');
     expect(fragment.s3_key).to.be.a('string');
-    expect(fragment.file_name).to.include(`download-${downloadId}`);
+    expect(fragment.file_name).to.include(`biohub-${downloadId}`);
     expect(Number(fragment.file_size_bytes)).to.be.greaterThan(0);
 
     // Track S3 key for cleanup
@@ -326,13 +326,16 @@ describe('Download Worker', function () {
     const zip = await downloadZipFromS3(storageService, fragment.s3_key);
     const entries = zip.getEntries().map((e) => e.entryName);
 
+    // Zip entries are nested under a root folder: biohub-{downloadId}/
+    const rootFolder = `biohub-${downloadId}/`;
+
     // Should contain one CSV per feature type (file features become multimedia.csv)
-    expect(entries).to.include('dataset.csv');
-    expect(entries).to.include('sample_site.csv');
-    expect(entries).to.include('multimedia.csv');
+    expect(entries).to.include(`${rootFolder}dataset.csv`);
+    expect(entries).to.include(`${rootFolder}sample_site.csv`);
+    expect(entries).to.include(`${rootFolder}multimedia.csv`);
 
     // Verify binary file exists in the zip (CSV content verified by service tests)
-    const expectedFilePath = `files/${fileFeatureId}_test-image.png`;
+    const expectedFilePath = `${rootFolder}files/${fileFeatureId}_test-image.png`;
     expect(entries).to.include(expectedFilePath);
     const binaryContent = zip.readFile(expectedFilePath);
     expect(binaryContent).to.not.be.null;
@@ -422,8 +425,8 @@ describe('Download Worker', function () {
     for (const frag of fragments) {
       expect(frag.fragment_status).to.equal('ready');
       expect(frag.s3_key).to.be.a('string');
-      // Each fragment S3 key uses part naming: download-{id}-part-{n}.zip
-      expect(frag.s3_key).to.match(new RegExp(String.raw`download-${downloadId}-part-\d+\.zip`));
+      // Each fragment S3 key uses part naming: biohub-{id}-part-{n}.zip
+      expect(frag.s3_key).to.match(new RegExp(String.raw`biohub-${downloadId}-part-\d+\.zip`));
       s3Keys.add(frag.s3_key);
       createdS3Keys.push(frag.s3_key);
     }
@@ -443,16 +446,18 @@ describe('Download Worker', function () {
       expect(entries.length).to.be.greaterThanOrEqual(1);
 
       for (const entry of entries) {
-        allCsvEntries.push(entry);
+        // Strip root folder prefix for cross-fragment accumulation (e.g. biohub-123-part-1/dataset.csv → dataset.csv)
+        const baseName = entry.replace(/^biohub-[^/]+\//, '');
+        allCsvEntries.push(baseName);
         const content = zipEntryText(zip, entry);
         const parsed = content.trim();
         // Accumulate CSV content (append rows, skip duplicate headers)
-        if (allCsvContent[entry]) {
+        if (allCsvContent[baseName]) {
           const lines = parsed.split('\n');
           // Skip header row (already captured), append data rows
-          allCsvContent[entry] += '\n' + lines.slice(1).join('\n');
+          allCsvContent[baseName] += '\n' + lines.slice(1).join('\n');
         } else {
-          allCsvContent[entry] = parsed;
+          allCsvContent[baseName] = parsed;
         }
       }
     }
@@ -483,7 +488,9 @@ describe('Download Worker', function () {
     for (const frag of fragments) {
       const zip = await downloadZipFromS3(storageService, frag.s3_key);
       const entries = zip.getEntries().map((e) => e.entryName);
-      allFileEntries.push(...entries.filter((e) => e.match(/^files\d+\//)));
+      allFileEntries.push(
+        ...entries.map((e) => e.replace(/^biohub-[^/]+\//, '')).filter((e) => e.match(/^files\d+\//))
+      );
     }
 
     // Multi-fragment: files should be in numbered folders (files1/, files2/, etc.), not bare files/
@@ -552,9 +559,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
    * Helper: run the full download pipeline and return the resulting zip.
    */
   async function executeAndGetZip(featureIds: number[]): Promise<{ zip: AdmZip; downloadId: string }> {
-    const { download_id } = await service.createDownloadRequest({
-      systemUserId: null,
-      teamId: null,
+    const { download_id } = await crudService.createDownloadRequest({
       submissionFeatureIds: featureIds
     });
 
@@ -571,7 +576,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     expect(download!.download_status).to.equal(DownloadStatusEnum.READY);
 
     // s3_key lives on the fragment, not the download record
-    const allFragments = await service.getFragmentsByDownloadId(download_id);
+    const allFragments = await crudService.getFragmentsByDownloadId(download_id);
     expect(allFragments.length).to.be.greaterThanOrEqual(1);
     const zip = await downloadAndTrackZip(allFragments[0].s3_key as string);
     return { zip, downloadId: download_id };
@@ -587,13 +592,14 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     });
     const emptyId = await createTestFeature(connection, submissionId, 'dataset', {});
 
-    const { zip } = await executeAndGetZip([populatedId, emptyId]);
+    const { zip, downloadId } = await executeAndGetZip([populatedId, emptyId]);
+    const rootFolder = `biohub-${downloadId}/`;
 
     const entries = zip.getEntries().map((e) => e.entryName);
-    expect(entries).to.include('dataset.csv');
+    expect(entries).to.include(`${rootFolder}dataset.csv`);
     expect(entries).to.have.lengthOf(1);
 
-    const csv = zipEntryText(zip, 'dataset.csv');
+    const csv = zipEntryText(zip, `${rootFolder}dataset.csv`);
     const lines = parseCsvLines(csv);
     expect(lines).to.have.lengthOf(3); // header + 2 data rows
 
@@ -650,12 +656,13 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     );
 
     const { zip, downloadId } = await executeAndGetZip([featureId1, featureId2]);
+    const rootFolder = `biohub-${downloadId}/`;
 
     const entries = zip.getEntries().map((e) => e.entryName);
-    expect(entries).to.include('telemetry.csv');
+    expect(entries).to.include(`${rootFolder}telemetry.csv`);
     expect(entries).to.have.lengthOf(1);
 
-    const csv = zipEntryText(zip, 'telemetry.csv');
+    const csv = zipEntryText(zip, `${rootFolder}telemetry.csv`);
     const lines = parseCsvLines(csv);
     expect(lines).to.have.lengthOf(3);
 
@@ -689,17 +696,17 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     expect(row2Values[elevationIndex]).to.equal('1203');
 
     // Verify fragment metadata
-    const fragments = await service.getFragmentsByDownloadId(downloadId);
+    const fragments = await crudService.getFragmentsByDownloadId(downloadId);
     expect(fragments).to.have.lengthOf(1);
     expect(fragments[0].fragment_status).to.equal(DownloadStatusEnum.READY);
     expect(fragments[0].fragment_index).to.equal(0);
     expect(fragments[0].s3_key).to.be.a('string');
-    expect(fragments[0].file_name).to.include(`download-${downloadId}`);
+    expect(fragments[0].file_name).to.include(`biohub-${downloadId}`);
     expect(Number(fragments[0].file_size_bytes)).to.be.greaterThan(0);
     expect(fragments[0].feature_count).to.equal(2);
 
     // Verify signed URL
-    const signedUrl = await service.getFragmentSignedUrl(downloadId, 0);
+    const signedUrl = await crudService.getFragmentSignedUrl(downloadId, 0);
     expect(signedUrl).to.be.a('string');
     expect(signedUrl).to.include('download');
   });
@@ -710,11 +717,12 @@ describe('DownloadPipelineService download pipeline (system)', function () {
       file: 'non-existent/missing-image.png'
     });
 
-    const { zip } = await executeAndGetZip([featureId]);
+    const { zip, downloadId } = await executeAndGetZip([featureId]);
+    const rootFolder = `biohub-${downloadId}/`;
 
     const entries = zip.getEntries().map((e) => e.entryName);
 
-    expect(entries).to.include('multimedia.csv');
+    expect(entries).to.include(`${rootFolder}multimedia.csv`);
 
     const errorEntry = entries.find((e) => e.endsWith('.error.txt')) as string;
     expect(errorEntry).to.not.be.undefined;
@@ -724,10 +732,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     expect(errorContent).to.include('Error');
     expect(errorContent).to.include('non-existent/missing-image.png');
 
-    const multimediaCsv = zipEntryText(zip, 'multimedia.csv');
-    console.log('\n--- multimedia.csv (error placeholder) ---');
-    console.log(multimediaCsv);
-    console.log('--- end ---\n');
+    const multimediaCsv = zipEntryText(zip, `${rootFolder}multimedia.csv`);
     const multimediaLines = parseCsvLines(multimediaCsv);
     const multimediaHeaders = multimediaLines[0].split(',');
     expect(multimediaHeaders).to.include('filePath');
@@ -763,13 +768,14 @@ describe('DownloadPipelineService download pipeline (system)', function () {
       featureIds.push(featureId);
     }
 
-    const { zip } = await executeAndGetZip(featureIds);
+    const { zip, downloadId } = await executeAndGetZip(featureIds);
+    const rootFolder = `biohub-${downloadId}/`;
 
     const entries = zip.getEntries().map((e) => e.entryName);
 
     // multimedia.csv should list all 3 files
-    expect(entries).to.include('multimedia.csv');
-    const multimediaCsv = zipEntryText(zip, 'multimedia.csv');
+    expect(entries).to.include(`${rootFolder}multimedia.csv`);
+    const multimediaCsv = zipEntryText(zip, `${rootFolder}multimedia.csv`);
     const lines = parseCsvLines(multimediaCsv);
     expect(lines).to.have.lengthOf(4); // header + 3 data rows
     const multiFileHeaders = lines[0].split(',');
@@ -778,7 +784,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     // Verify each binary file is present and has the correct content
     for (let i = 0; i < testFiles.length; i++) {
       const fileName = testFiles[i].key.split('/').pop()!;
-      const expectedPath = `files/${featureIds[i]}_${fileName}`;
+      const expectedPath = `${rootFolder}files/${featureIds[i]}_${fileName}`;
 
       expect(entries).to.include(expectedPath);
 
@@ -826,9 +832,10 @@ describe('DownloadPipelineService download pipeline (system)', function () {
       deploymentId
     );
 
-    const { zip } = await executeAndGetZip([telemetryId]);
+    const { zip, downloadId } = await executeAndGetZip([telemetryId]);
+    const rootFolder = `biohub-${downloadId}/`;
 
-    const csv = zipEntryText(zip, 'telemetry.csv');
+    const csv = zipEntryText(zip, `${rootFolder}telemetry.csv`);
     const lines = parseCsvLines(csv);
     const headers = lines[0].split(',');
 

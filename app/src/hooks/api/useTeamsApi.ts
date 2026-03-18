@@ -5,7 +5,8 @@ import {
   ICreateTeamRequest,
   IUpdateTeamRequest,
   IAvailableUsersResponse,
-  ITeamMembersResponse
+  ITeamMembersResponse,
+  ITeamMember
 } from 'interfaces/useTeamsApi.interface';
 import { ApiPaginationRequestOptions, ApiSearchParams } from 'types/pagination';
 
@@ -102,10 +103,36 @@ export const useTeamsApi = (axios: AxiosInstance) => {
    */
   const getTeamMembers = async (teamId: string): Promise<ITeamMembersResponse> => {
     const { data } = await axios.get(`/api/administrative/teams/${teamId}/member`, {
-      params: { page: 1, limit: 1000 }
+      params: { page: 1, limit: 100 }
     });
 
     return data;
+  };
+
+  /**
+   * Add a user to a team.
+   *
+   * @param {string} teamId
+   * @param {number} systemUserId
+   * @return {*} {Promise<ITeamMember>}
+   */
+  const createTeamMember = async (teamId: string, systemUserId: number): Promise<ITeamMember> => {
+    const { data } = await axios.post(`/api/administrative/teams/${teamId}/member`, {
+      system_user_id: systemUserId
+    });
+
+    return data;
+  };
+
+  /**
+   * Remove a team member association by team_member_id.
+   *
+   * @param {string} teamId
+   * @param {string} teamMemberId
+   * @return {*} {Promise<void>}
+   */
+  const deleteTeamMember = async (teamId: string, teamMemberId: string): Promise<void> => {
+    await axios.delete(`/api/administrative/teams/${teamId}/member/${teamMemberId}`);
   };
 
   return {
@@ -115,6 +142,8 @@ export const useTeamsApi = (axios: AxiosInstance) => {
     updateTeam,
     deleteTeam,
     getAvailableUsers,
-    getTeamMembers
+    getTeamMembers,
+    createTeamMember,
+    deleteTeamMember
   };
 };

@@ -2,7 +2,7 @@ import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { SubmissionFeatureForReview } from '../models/submission';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
@@ -73,10 +73,21 @@ export const SubmissionFeature = z.object({
   source_id: z.string().nullable(),
   data: z.record(z.any()),
   feature_type_name: z.string(),
+  feature_type_display_name: z.string(),
+  submission_name: z.string(),
   secured: z.boolean()
 });
 
 export type SubmissionFeature = z.infer<typeof SubmissionFeature>;
+
+export const RelatedSubmissionFeature = z.object({
+  submission_feature_id: z.number(),
+  feature_type_name: z.string(),
+  feature_type_display_name: z.string(),
+  data: z.record(z.any())
+});
+
+export type RelatedSubmissionFeature = z.infer<typeof RelatedSubmissionFeature>;
 
 export const SubmissionFeatureRecordWithTypeAndSecurity = SubmissionFeatureRecord.extend({
   feature_type_name: z.string(),
@@ -574,6 +585,35 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Get all related submission features with their type names.
+   *
+   * @param {number} submissionFeatureId The submission feature ID.
+   * @return {Promise<RelatedSubmissionFeature[]>}
+   * @memberof SubmissionRepository
+   */
+  async getRelatedSubmissionFeatures(submissionFeatureId: number): Promise<RelatedSubmissionFeature[]> {
+    const sqlStatement = SQL`
+      SELECT DISTINCT
+        sf.submission_feature_id,
+        ft.name as feature_type_name,
+        ft.display_name as feature_type_display_name,
+        sf.data
+      FROM submission_feature sf
+      JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+      WHERE sf.submission_feature_id IN (
+        SELECT source_feature_id FROM submission_feature_feature
+        WHERE target_feature_id = ${submissionFeatureId}
+        UNION
+        SELECT target_feature_id FROM submission_feature_feature
+        WHERE source_feature_id = ${submissionFeatureId}
+      );
+    `;
+
+    const response = await this.connection.sql(sqlStatement, RelatedSubmissionFeature);
+    return response.rows;
+  }
+
+  /**
    * Get feature type id by name.
    *
    * @param {string} name
@@ -634,11 +674,12 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Fetch a submission_id from uuid.
    *
-   * @param {number} uuid
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @param {string} uuid - The submission UUID.
+   * @return {Promise<{ submission_id: number }>} The submission_id for the given UUID.
+   * @throws {ApiNotFoundError} If no submission exists for the given UUID.
    * @memberof SubmissionRepository
    */
-  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number } | null> {
+  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       SELECT
         submission_id
@@ -649,11 +690,10 @@ export class SubmissionRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
-    if (response.rowCount !== 0) {
-      return response.rows[0];
-    } else {
-      return null;
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Submission not found', ['SubmissionRepository->getSubmissionIdByUUID', { uuid }]);
     }
+    return response.rows[0];
   }
 
   /**
@@ -1247,6 +1287,8 @@ export class SubmissionRepository extends BaseRepository {
         sf.source_id,
         sf.data,
         ft.name as feature_type_name,
+        ft.display_name as feature_type_display_name,
+        s.name as submission_name,
         EXISTS (
           SELECT 1
           FROM submission_feature_security sfs
@@ -1257,6 +1299,8 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature sf
       JOIN
         feature_type ft ON ft.feature_type_id = sf.feature_type_id
+      JOIN
+        submission s ON s.submission_id = sf.submission_id
       WHERE
         sf.submission_feature_id = ${submissionFeatureId};
     `;

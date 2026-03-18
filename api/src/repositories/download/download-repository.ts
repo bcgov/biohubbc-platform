@@ -1,13 +1,21 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
+import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { CreateDownload, DownloadFeatureSummary, DownloadId, DownloadRecord } from '../../models/download';
+import {
+  CreateDownload,
+  DownloadFeatureSummary,
+  DownloadId,
+  DownloadListRecord,
+  DownloadListRow,
+  DownloadRecord,
+  HasTeams,
+  IsAuthorized
+} from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
-
-const IsAuthorized = z.object({ authorized: z.boolean() });
-type IsAuthorized = z.infer<typeof IsAuthorized>;
 
 /**
  * A repository class for accessing download data.
@@ -20,19 +28,20 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Create a new download record.
    *
+   * Team linking is handled separately via download_team — callers insert
+   * into the join table after creating the download record.
+   *
    * @param {CreateDownload} payload
    * @return {Promise<DownloadId>} The created record ID.
    * @memberof DownloadRepository
    */
   async createDownload(payload: CreateDownload): Promise<DownloadId> {
-    const { teamId, dataRequestId, fragmentSizeBytes, systemUserId, filters } = payload;
+    const { fragmentSizeBytes, filters } = payload;
     const sizeBytes = fragmentSizeBytes ?? FRAGMENT_SIZE_THRESHOLD;
 
     const sql = SQL`
-      INSERT INTO download (team_id, data_request_id, download_status, fragment_size_bytes, system_user_id, filters)
-      VALUES (${teamId}, ${dataRequestId}, 'pending', ${sizeBytes}, ${systemUserId ?? null}, ${
-      filters ? JSON.stringify(filters) : null
-    }::jsonb)
+      INSERT INTO download (download_status, fragment_size_bytes, filters)
+      VALUES ('pending', ${sizeBytes}, ${filters ? JSON.stringify(filters) : null}::jsonb)
       RETURNING download_id;
     `;
 
@@ -70,6 +79,33 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
+   * Link a download to a team via the download_team join table.
+   *
+   * This is the single source of truth for download-to-team relationships.
+   * Authenticated downloads get a team row at creation; anonymous downloads have none.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {string} teamId - The team ID.
+   * @return {Promise<void>}
+   * @memberof DownloadRepository
+   */
+  async createDownloadTeam(downloadId: string, teamId: string): Promise<void> {
+    const sql = SQL`
+      INSERT INTO download_team (download_id, team_id)
+      VALUES (${downloadId}, ${teamId});
+    `;
+
+    const response = await this.connection.sql(sql);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to link download to team', [
+        'DownloadRepository->createDownloadTeam',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+  }
+
+  /**
    * Get a download record by ID.
    *
    * @param {string} downloadId - The download ID.
@@ -80,9 +116,6 @@ export class DownloadRepository extends BaseRepository {
     const sql = SQL`
       SELECT
         download_id,
-        system_user_id,
-        team_id,
-        data_request_id,
         download_status,
         metadata,
         started_at,
@@ -91,7 +124,8 @@ export class DownloadRepository extends BaseRepository {
         total_fragments,
         completed_fragments,
         estimated_total_size_bytes,
-        fragment_size_bytes
+        fragment_size_bytes,
+        create_date
       FROM download
       WHERE download_id = ${downloadId};
     `;
@@ -102,59 +136,66 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Get all download records accessible to a user.
+   * Get paginated download records accessible to a user, with total count.
    *
-   * Three authorization paths:
-   * - Owner: user created or claimed the download (system_user_id matches).
-   * - Shared: user has a direct entry in download_share.
-   * - Data request: user is a member of the data request's approved team.
+   * Uses COUNT(*) OVER() window function to get the total count in the same query,
+   * avoiding a second round-trip.
+   *
+   * Single authorization path: download_team → team → team_member.
+   * Returns downloads where the user is a member of any linked team.
    *
    * @param {number} systemUserId - The user ID.
-   * @return {Promise<DownloadRecord[]>}
+   * @param {ApiPaginationOptions} [pagination] - Optional pagination/sort options.
+   * @return {Promise<{ downloads: DownloadListRecord[]; count: number }>}
    * @memberof DownloadRepository
    */
-  async getDownloadsByTeamMembership(systemUserId: number): Promise<DownloadRecord[]> {
-    const sql = SQL`
-      SELECT
-        d.download_id,
-        d.system_user_id,
-        d.team_id,
-        d.data_request_id,
-        d.download_status,
-        d.metadata,
-        d.started_at,
-        d.completed_at,
-        d.downloaded_at,
-        d.total_fragments,
-        d.completed_fragments,
-        d.estimated_total_size_bytes,
-        d.fragment_size_bytes
-      FROM download d
-      WHERE
-        -- Downloads I created or claimed
-        d.system_user_id = ${systemUserId}
-        OR
-        -- Downloads shared with me
-        d.download_id IN (
-          SELECT ds.download_id FROM download_share ds
-          WHERE ds.system_user_id = ${systemUserId}
-            AND ds.record_end_date IS NULL
-        )
-        OR
-        -- Downloads via approved data requests
-        d.download_id IN (
-          SELECT d2.download_id FROM download d2
-          JOIN data_request dr ON dr.data_request_id = d2.data_request_id
-          JOIN team_member tm ON tm.team_id = dr.team_id
-          WHERE tm.system_user_id = ${systemUserId}
-            AND tm.record_end_date IS NULL
-        )
-      ORDER BY d.create_date DESC;
-    `;
+  async getDownloadsByTeamMembership(
+    systemUserId: number,
+    pagination?: ApiPaginationOptions
+  ): Promise<{ downloads: DownloadListRecord[]; count: number }> {
+    const knex = getKnex();
 
-    const response = await this.connection.sql(sql, DownloadRecord);
+    const query = knex
+      .select([
+        'd.download_id',
+        'd.download_status',
+        'd.metadata',
+        'd.started_at',
+        'd.completed_at',
+        'd.downloaded_at',
+        'd.total_fragments',
+        'd.completed_fragments',
+        'd.estimated_total_size_bytes',
+        'd.fragment_size_bytes',
+        'd.create_date',
+        knex.raw(
+          '(SELECT COUNT(*)::int FROM download_feature df WHERE df.download_id = d.download_id) AS feature_count'
+        ),
+        knex.raw('COUNT(*) OVER()::int AS total_count')
+      ])
+      .from('download as d')
+      .innerJoin('download_team as dt', 'dt.download_id', 'd.download_id')
+      .innerJoin('team_member as tm', 'tm.team_id', 'dt.team_id')
+      .where('tm.system_user_id', systemUserId)
+      .whereNull('dt.record_end_date')
+      .whereNull('tm.record_end_date');
 
-    return response.rows;
+    if (pagination) {
+      this.applyPagination(query, pagination);
+    }
+
+    // Default sort when no pagination sort is specified
+    if (!pagination?.sort) {
+      query.orderBy('d.create_date', 'desc');
+    }
+
+    const response = await this.connection.knex(query, DownloadListRow);
+
+    const count = response.rows[0]?.total_count ?? 0;
+    // Strip the total_count column from each row before returning
+    const downloads: DownloadListRecord[] = response.rows.map(({ total_count: _total_count, ...rest }) => rest);
+
+    return { downloads, count };
   }
 
   /**
@@ -222,54 +263,125 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Get lightweight summaries for all authorized features in a download.
+   * Returns all features linked to a download.
    *
-   * Returns feature metadata and pre-computed data_byte_size (no JSONB data column).
-   * Used by estimateDownloadSize and planFragments for bin packing.
+   * Authorization is enforced at creation time via filterAuthorizedFeatureIds —
+   * only authorized features are ever linked. At retrieval time we return
+   * everything that was linked, avoiding the download_team → policy_team hop
+   * that would let later team membership changes alter which features are visible.
    *
    * @param {string} downloadId - The download ID.
-   * @param {string | null} teamId - The team that owns the download. Null for anonymous downloads (only unsecured features returned).
-   * @return {Promise<DownloadFeatureSummary[]>}
+   * @return {Promise<DownloadFeatureSummary[]>} All linked features.
    * @memberof DownloadRepository
    */
-  async getDownloadFeatureSummaries(downloadId: string, teamId: string | null): Promise<DownloadFeatureSummary[]> {
+  async getDownloadFeatures(downloadId: string): Promise<DownloadFeatureSummary[]> {
+    const knex = getKnex();
+
+    const query = knex
+      .select([
+        'sf.submission_feature_id',
+        'sf.submission_id',
+        knex.raw('ft.name AS feature_type_name'),
+        knex.raw('sf.data_byte_size AS estimated_byte_size')
+      ])
+      .from('download_feature as df')
+      .innerJoin('submission_feature as sf', 'df.submission_feature_id', 'sf.submission_feature_id')
+      .innerJoin('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
+      .where('df.download_id', downloadId);
+
+    const response = await this.connection.knex(query, DownloadFeatureSummary);
+    return response.rows;
+  }
+
+  /**
+   * Returns which of the given feature IDs are secured — directly or by
+   * inheriting security from an ancestor.
+   *
+   * Walks DOWN from secured roots to all descendants, the opposite direction
+   * of buildSecurityCheck() (which walks UP from a feature to its ancestors).
+   * Using a different traversal direction makes this a genuine cross-check:
+   * if the two methods disagree, there's a bug.
+   *
+   * Scoped to submissions containing the candidate features to avoid walking
+   * every secured tree in the system.
+   *
+   * @param {number[]} submissionFeatureIds - Feature IDs to check.
+   * @return {Promise<Set<number>>} Set of feature IDs that are secured.
+   * @memberof DownloadRepository
+   */
+  async getSecuredFeatureIds(submissionFeatureIds: number[]): Promise<Set<number>> {
+    if (submissionFeatureIds.length === 0) {
+      return new Set();
+    }
+
     const sql = SQL`
-      SELECT
-        sf.submission_feature_id,
-        sf.submission_id,
-        ft.name as feature_type_name,
-        sf.data_byte_size as estimated_byte_size
-      FROM download_feature df
-      INNER JOIN submission_feature sf ON df.submission_feature_id = sf.submission_feature_id
-      INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
-      WHERE df.download_id = ${downloadId}
-        AND (
-          -- Unsecured features: no active security rule
-          NOT EXISTS (
-            SELECT 1
-            FROM submission_feature_security sfs
-            WHERE sfs.submission_feature_id = sf.submission_feature_id
-              AND sfs.record_end_date IS NULL
+      WITH RECURSIVE secured_descendants AS (
+        -- Base: directly secured features, scoped to relevant submissions
+        SELECT sfs.submission_feature_id
+        FROM submission_feature_security sfs
+        INNER JOIN submission_feature sf ON sf.submission_feature_id = sfs.submission_feature_id
+        WHERE sfs.record_end_date IS NULL
+          AND sf.submission_id IN (
+            SELECT submission_id FROM submission_feature
+            WHERE submission_feature_id = ANY(${submissionFeatureIds}::int[])
           )
-          OR
-          -- Secured features: team has a matching ALLOW policy
-          EXISTS (
-            SELECT 1
-            FROM policy_statement ps
-            INNER JOIN team_policy tp ON tp.policy_id = ps.policy_id AND tp.record_end_date IS NULL
-            WHERE tp.team_id = ${teamId}
-              AND ps.record_end_date IS NULL
-              AND ps.effect = 'allow'
-              AND (ps.urn_submission_id = sf.submission_id::text OR ps.urn_submission_id = '*')
-              AND (ps.urn_feature_type = ft.name OR ps.urn_feature_type = '*')
-              AND (ps.urn_feature_id = sf.submission_feature_id::text OR ps.urn_feature_id = '*')
-          )
-        );
+
+        UNION ALL
+
+        -- Walk down to children
+        SELECT child.submission_feature_id
+        FROM submission_feature child
+        INNER JOIN secured_descendants sd ON child.parent_submission_feature_id = sd.submission_feature_id
+      )
+      SELECT DISTINCT submission_feature_id
+      FROM secured_descendants
+      WHERE submission_feature_id = ANY(${submissionFeatureIds}::int[]);
     `;
 
-    const response = await this.connection.sql(sql, DownloadFeatureSummary);
+    const response = await this.connection.sql(sql, z.object({ submission_feature_id: z.number() }));
+    return new Set(response.rows.map((r) => r.submission_feature_id));
+  }
 
-    return response.rows;
+  /**
+   * Returns which of the given secured feature IDs the user has policy access to.
+   *
+   * Checks the user's team memberships for ALLOW policy statements matching
+   * each feature's submission, feature type, and feature ID. Used at download
+   * creation time before the download_team link exists — unlike
+   * getSecuredAuthorizedFeatures which checks via the download's teams.
+   *
+   * @param {number[]} submissionFeatureIds - Secured feature IDs to check.
+   * @param {number} systemUserId - The user to check policies for.
+   * @return {Promise<Set<number>>} Feature IDs the user is authorized to access.
+   * @memberof DownloadRepository
+   */
+  async getUserAuthorizedSecuredFeatureIds(submissionFeatureIds: number[], systemUserId: number): Promise<Set<number>> {
+    if (submissionFeatureIds.length === 0) {
+      return new Set();
+    }
+
+    const knex = getKnex();
+
+    const query = knex
+      .distinct('sf.submission_feature_id')
+      .from('submission_feature as sf')
+      .innerJoin('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
+      .whereIn('sf.submission_feature_id', submissionFeatureIds)
+      .andWhereRaw(
+        `EXISTS (
+          SELECT 1
+          FROM team_member tm
+          INNER JOIN team_policy tp ON tp.team_id = tm.team_id AND tp.record_end_date IS NULL
+          INNER JOIN policy_statement ps ON ps.policy_id = tp.policy_id AND ps.record_end_date IS NULL
+          WHERE tm.system_user_id = ?
+            AND tm.record_end_date IS NULL
+            AND ${this.buildPolicyMatchConditions()}
+        )`,
+        [systemUserId]
+      );
+
+    const response = await this.connection.knex(query, z.object({ submission_feature_id: z.number() }));
+    return new Set(response.rows.map((r) => r.submission_feature_id));
   }
 
   /**
@@ -330,13 +442,9 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Check if a user is authorized to access a specific download.
    *
-   * Three authorization paths:
-   * - Owner: user created or claimed the download (system_user_id matches).
-   * - Shared: user has a direct entry in download_share.
-   * - Data request: user is a member of the data request's approved team.
-   *
-   * Anonymous downloads (system_user_id IS NULL AND team_id IS NULL) are not checked here —
-   * callers handle that separately.
+   * Single authorization path: download_team → team → team_member.
+   * Anonymous downloads (no download_team rows) are not checked here —
+   * callers handle that separately via isDownloadClaimedByTeam.
    *
    * @param {string} downloadId - The download ID.
    * @param {number} systemUserId - The user ID.
@@ -346,23 +454,12 @@ export class DownloadRepository extends BaseRepository {
   async isUserAuthorizedForDownload(downloadId: string, systemUserId: number): Promise<boolean> {
     const sql = SQL`
       SELECT EXISTS (
-        -- Owner: user created or claimed this download
-        SELECT 1 FROM download d
-        WHERE d.download_id = ${downloadId}
-          AND d.system_user_id = ${systemUserId}
-        UNION ALL
-        -- Shared: user has a direct entry in download_share
-        SELECT 1 FROM download_share ds
-        WHERE ds.download_id = ${downloadId}
-          AND ds.system_user_id = ${systemUserId}
-          AND ds.record_end_date IS NULL
-        UNION ALL
-        -- Data request: user is a member of the data request's approved team
-        SELECT 1 FROM download d
-        JOIN data_request dr ON dr.data_request_id = d.data_request_id
-        JOIN team_member tm ON tm.team_id = dr.team_id
-        WHERE d.download_id = ${downloadId}
+        SELECT 1
+        FROM download_team dt
+        JOIN team_member tm ON tm.team_id = dt.team_id
+        WHERE dt.download_id = ${downloadId}
           AND tm.system_user_id = ${systemUserId}
+          AND dt.record_end_date IS NULL
           AND tm.record_end_date IS NULL
       ) AS authorized;
     `;
@@ -373,26 +470,41 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Claim an anonymous download by setting the owner.
-   *
-   * Only succeeds if the download has no existing owner and no team association.
+   * Check if a download has any active team associations.
+   * No teams = anonymous download (UUID is the credential).
    *
    * @param {string} downloadId - The download ID.
-   * @param {number} systemUserId - The user ID to set as owner.
-   * @return {Promise<boolean>} True if claimed, false if already owned or not found.
+   * @return {Promise<boolean>}
    * @memberof DownloadRepository
    */
-  async claimDownload(downloadId: string, systemUserId: number): Promise<boolean> {
+  async isDownloadClaimedByTeam(downloadId: string): Promise<boolean> {
     const sql = SQL`
-      UPDATE download
-      SET system_user_id = ${systemUserId}
-      WHERE download_id = ${downloadId}
-        AND system_user_id IS NULL
-        AND team_id IS NULL;
+      SELECT EXISTS (
+        SELECT 1 FROM download_team dt
+        WHERE dt.download_id = ${downloadId}
+          AND dt.record_end_date IS NULL
+      ) AS has_teams;
     `;
 
-    const response = await this.connection.sql(sql);
+    const response = await this.connection.sql(sql, HasTeams);
 
-    return response.rowCount === 1;
+    return response.rows[0]?.has_teams ?? false;
+  }
+
+  /**
+   * SQL conditions for policy statement feature-level authorization.
+   * Single source of truth for policy matching at download creation time.
+   *
+   * Requires outer query aliases: ps (policy_statement),
+   * sf (submission_feature), ft (feature_type).
+   *
+   * @return {string} Raw SQL conditions fragment.
+   * @memberof DownloadRepository
+   */
+  private buildPolicyMatchConditions(): string {
+    return `ps.effect = 'allow'
+            AND (ps.urn_submission_id = sf.submission_id::text OR ps.urn_submission_id = '*')
+            AND (ps.urn_feature_type = ft.name OR ps.urn_feature_type = '*')
+            AND (ps.urn_feature_id = sf.submission_feature_id::text OR ps.urn_feature_id = '*')`;
   }
 }

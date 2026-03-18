@@ -2,7 +2,8 @@ import { AxiosInstance } from 'axios';
 import {
   CartFeatureListResponse,
   CartWithFeaturesResponse,
-  CheckoutCartResponse
+  CheckoutCartResponse,
+  IsFeatureInCartResponse
 } from 'interfaces/useCartApi.interface';
 import qs from 'qs';
 import { ApiPaginationRequestOptions } from 'types/pagination';
@@ -120,6 +121,40 @@ export const useCartApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Get features in a cart, with optional filters and pagination.
+   *
+   * @param {string} cartId - The cart ID to fetch features for.
+   * @param {object} [params] - Optional query parameters.
+   * @param {number} [params.submissionFeatureId] - Filter to a specific submission feature ID.
+   * @param {ApiPaginationRequestOptions} [params.pagination] - Optional pagination parameters.
+   * @return {Promise<CartFeatureListResponse>} Cart features with pagination.
+   */
+  const getCartFeatures = async (
+    cartId: string,
+    params?: { submissionFeatureId?: number; pagination?: ApiPaginationRequestOptions }
+  ): Promise<CartFeatureListResponse> => {
+    const { data } = await axios.get<CartFeatureListResponse>(`/api/cart/${cartId}/feature`, {
+      params: { submissionFeatureId: params?.submissionFeatureId, ...params?.pagination },
+      paramsSerializer: (p) => qs.stringify(p)
+    });
+
+    return data;
+  };
+
+  /**
+   * Check if a submission feature is in the cart.
+   *
+   * @param {string} cartId - The cart ID to check.
+   * @param {number} submissionFeatureId - The submission feature ID to check for.
+   * @return {Promise<IsFeatureInCartResponse>} Whether the feature is in the cart.
+   */
+  const isFeatureInCart = async (cartId: string, submissionFeatureId: number): Promise<IsFeatureInCartResponse> => {
+    const { data } = await axios.get<IsFeatureInCartResponse>(`/api/cart/${cartId}/feature/${submissionFeatureId}`);
+
+    return data;
+  };
+
+  /**
    * Check out a cart, creating a download from all cart features.
    *
    * @param {string} cartId - The cart to check out.
@@ -135,9 +170,11 @@ export const useCartApi = (axios: AxiosInstance) => {
     createCart,
     assignCartToCurrentUser,
     getCartById,
+    getCartFeatures,
     addCartFeatures,
     removeCartFeatureById,
     clearCart,
+    isFeatureInCart,
     checkoutCart
   };
 };

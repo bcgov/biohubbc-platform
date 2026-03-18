@@ -1,10 +1,8 @@
 import archiver from 'archiver';
 import { PassThrough } from 'node:stream';
-import { FRAGMENT_SIZE_THRESHOLD, SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
+import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
-import { ApiConflictError } from '../../errors/api-error';
-import { HTTP403, HTTP404, HTTP409, HTTP500 } from '../../errors/http-error';
-import { CreateDownloadRequest, DownloadId, DownloadRecord, DownloadSizeEstimate } from '../../models/download';
+import { DownloadSizeEstimate } from '../../models/download';
 import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
@@ -20,6 +18,7 @@ import { getLogger } from '../../utils/logger';
 import { CodeService } from '../code-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { DownloadService } from './download-service';
 
 const defaultLog = getLogger('services/download-pipeline-service');
 
@@ -35,12 +34,14 @@ interface FileFeatureRef {
 }
 
 /**
- * Orchestrator service for download pipeline operations.
+ * Background processing pipeline for downloads.
  *
- * Composes CRUD services and holds direct repository references for low-level
- * operations (streaming cursors, fragment management). All multi-step workflows
- * — creating downloads, authorization, fragment planning, streaming, and S3
- * upload — live here.
+ * Called exclusively by the pg-boss job handler (processDownloadJobHandler).
+ * Handles fragment planning, streaming CSV/zip generation, S3 upload, and
+ * status transitions during async processing.
+ *
+ * Request-time operations (CRUD, auth, team linking, fragment URL delivery)
+ * live in DownloadService.
  *
  * @export
  * @class DownloadPipelineService
@@ -49,94 +50,13 @@ interface FileFeatureRef {
 export class DownloadPipelineService extends DBService {
   downloadRepository: DownloadRepository;
   fragmentRepository: DownloadFragmentRepository;
+  downloadService: DownloadService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
     this.fragmentRepository = new DownloadFragmentRepository(connection);
-  }
-
-  /**
-   * Create a new download request.
-   *
-   * Creates a download record and links the specified submission features.
-   * Caller must validate that submissionFeatureIds is non-empty.
-   *
-   * For authenticated users, `system_user_id` is set on the download record directly.
-   * For anonymous users, `system_user_id` is null (UUID is the credential).
-   *
-   * @param {CreateDownloadRequest} payload
-   * @return {Promise<DownloadId>} The created download record ID.
-   * @memberof DownloadPipelineService
-   */
-  async createDownloadRequest(payload: CreateDownloadRequest): Promise<DownloadId> {
-    const { systemUserId, teamId, submissionFeatureIds, dataRequestId, fragmentSizeMb, filters } = payload;
-    const fragmentSizeBytes = fragmentSizeMb ? fragmentSizeMb * 1024 * 1024 : undefined;
-
-    const downloadId = await this.downloadRepository.createDownload({
-      teamId,
-      dataRequestId: dataRequestId ?? null,
-      fragmentSizeBytes,
-      systemUserId,
-      filters
-    });
-
-    await this.downloadRepository.createDownloadFeatures(downloadId.download_id, submissionFeatureIds);
-
-    return downloadId;
-  }
-
-  /**
-   * Authorize a user's access to a specific download.
-   *
-   * Downloads have three access paths, each serving a different use case:
-   *
-   * 1. **Anonymous** (`system_user_id` and `team_id` are both NULL):
-   *    Public access — the download UUID itself is the credential. Anyone with the link
-   *    can access it. This supports unauthenticated "download now" flows where users
-   *    don't have an account yet. The user can later claim the download (see `claimDownload`).
-   *
-   * 2. **User-owned** (`system_user_id` is set):
-   *    The user who created or claimed the download. Only this specific authenticated user
-   *    can access it. Downloads start anonymous and become user-owned when claimed, or are
-   *    created as user-owned when the request originates from an authenticated session.
-   *
-   * 3. **Team / data request** (`team_id` is set via a `data_request`):
-   *    Any authenticated member of the team that was granted access through an approved
-   *    data request. This supports the collaborative workflow where a team submits a data
-   *    request, it gets approved, and all team members can then access the resulting download.
-   *
-   * Throws HTTP403 if none of the above paths grant access.
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {number | null} systemUserId - The authenticated user's ID, or null if unauthenticated.
-   * @return {Promise<DownloadRecord>} The download record (avoids a second fetch by the caller).
-   * @memberof DownloadPipelineService
-   */
-  async getAuthorizedDownload(downloadId: string, systemUserId: number | null): Promise<DownloadRecord> {
-    const download = await this.downloadRepository.findDownloadById(downloadId);
-
-    if (!download) {
-      throw new HTTP404('Download not found');
-    }
-
-    // Anonymous downloads are public — the UUID is the credential
-    if (download.system_user_id === null && download.team_id === null) {
-      return download;
-    }
-
-    // Owned or team downloads require an authenticated user
-    if (systemUserId === null) {
-      throw new HTTP403('Access denied');
-    }
-
-    // Check all authenticated access paths: owner, shared, or team membership
-    const authorized = await this.downloadRepository.isUserAuthorizedForDownload(downloadId, systemUserId);
-    if (!authorized) {
-      throw new HTTP403('Access denied');
-    }
-
-    return download;
+    this.downloadService = new DownloadService(connection);
   }
 
   /**
@@ -167,31 +87,16 @@ export class DownloadPipelineService extends DBService {
   }
 
   /**
-   * Get all fragments for a download.
-   *
-   * Convenience method so route handlers that already use the pipeline service
-   * don't need to instantiate a separate DownloadFragmentService.
-   *
-   * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadFragmentRecord[]>}
-   * @memberof DownloadPipelineService
-   */
-  async getFragmentsByDownloadId(downloadId: string): Promise<DownloadFragmentRecord[]> {
-    return this.fragmentRepository.getFragmentsByDownloadId(downloadId);
-  }
-
-  /**
    * Estimate the total download size and plan fragmentation.
    *
    * Uses pre-computed data_byte_size which includes JSONB size + CSV overhead + artifact file size.
    *
    * @param {string} downloadId - The download ID.
-   * @param {string | null} teamId - The team that owns the download. Null for anonymous downloads.
    * @return {Promise<DownloadSizeEstimate>}
    * @memberof DownloadPipelineService
    */
-  async estimateDownloadSize(downloadId: string, teamId: string | null): Promise<DownloadSizeEstimate> {
-    const features = await this.downloadRepository.getDownloadFeatureSummaries(downloadId, teamId);
+  async estimateDownloadSize(downloadId: string): Promise<DownloadSizeEstimate> {
+    const features = await this.downloadService.getDownloadFeatures(downloadId);
     const totalEstimatedBytes = features.reduce((sum, f) => sum + Number(f.estimated_byte_size), 0);
 
     return { totalEstimatedBytes, features };
@@ -210,7 +115,10 @@ export class DownloadPipelineService extends DBService {
    * @memberof DownloadPipelineService
    */
   async planFragments(downloadId: string, sizeEstimate: DownloadSizeEstimate): Promise<void> {
-    const features = sizeEstimate.features;
+    // Sort by feature type so same types stay together during bin packing.
+    // This minimizes duplicate CSVs across fragments (e.g. one species_observation.csv
+    // instead of the same CSV appearing in multiple parts).
+    const features = [...sizeEstimate.features].sort((a, b) => a.feature_type_name.localeCompare(b.feature_type_name));
 
     // Read configurable fragment size from the download record
     const download = await this.downloadRepository.findDownloadById(downloadId);
@@ -298,7 +206,7 @@ export class DownloadPipelineService extends DBService {
       return;
     }
 
-    const sizeEstimate = await this.estimateDownloadSize(downloadId, download.team_id);
+    const sizeEstimate = await this.estimateDownloadSize(downloadId);
     await this.planFragments(downloadId, sizeEstimate);
   }
 
@@ -332,6 +240,13 @@ export class DownloadPipelineService extends DBService {
     await this.updateDownloadStatus(downloadId, DownloadStatusEnum.READY);
   }
 
+  /**
+   * Mark a fragment as processing (sets started_at timestamp).
+   *
+   * @param {number} fragmentId - The fragment ID.
+   * @return {Promise<void>}
+   * @memberof DownloadPipelineService
+   */
   async markFragmentProcessing(fragmentId: number): Promise<void> {
     const now = new Date().toISOString();
     await this.fragmentRepository.updateFragmentStatus(fragmentId, DownloadStatusEnum.PROCESSING, {
@@ -363,8 +278,8 @@ export class DownloadPipelineService extends DBService {
       }
       const isSingleFragment = download.total_fragments === 1;
       const zipFileName = isSingleFragment
-        ? `download-${downloadId}.zip`
-        : `download-${downloadId}-part-${fragment.fragment_index + 1}.zip`;
+        ? `biohub-${downloadId}.zip`
+        : `biohub-${downloadId}-part-${fragment.fragment_index + 1}.zip`;
       const s3Key = `downloads/${downloadId}/${zipFileName}`;
 
       // Create streaming pipeline: archiver → passThrough → S3 upload
@@ -385,14 +300,23 @@ export class DownloadPipelineService extends DBService {
 
       const uploadPromise = objectStorageService.uploadStream(BucketType.MAIN, passThrough, 'application/zip', s3Key);
 
+      // Root folder inside the zip so extraction creates a containing directory
+      // e.g. "biohub-abc123/" or "biohub-abc123-part-1/"
+      const rootFolder = zipFileName.replace('.zip', '') + '/';
+
       // Index files folder for multi-fragment downloads so extracted parts combine cleanly
       const filesFolderName = isSingleFragment ? 'files' : `files${fragment.fragment_index + 1}`;
 
       // Stream features via cursor, append each type's CSV as it completes
-      const fileRefs = await this.streamFeaturesIntoArchive(fragmentId, archive, filesFolderName);
+      const fileRefs = await this.streamFeaturesIntoArchive(
+        fragmentId,
+        archive,
+        `${rootFolder}${filesFolderName}`,
+        rootFolder
+      );
 
       // Stream binary files into archive
-      await this.streamFilesToArchive(archive, fileRefs, objectStorageService, filesFolderName);
+      await this.streamFilesToArchive(archive, fileRefs, objectStorageService, `${rootFolder}${filesFolderName}`);
 
       await archive.finalize();
       await uploadPromise;
@@ -415,55 +339,6 @@ export class DownloadPipelineService extends DBService {
   }
 
   /**
-   * Claim an anonymous download for the current user.
-   *
-   * @param {string} downloadId - The download ID to claim.
-   * @return {Promise<void>}
-   * @memberof DownloadPipelineService
-   */
-  async claimDownload(downloadId: string): Promise<void> {
-    const systemUserId = this.connection.systemUserId();
-    const claimed = await this.downloadRepository.claimDownload(downloadId, systemUserId);
-
-    if (!claimed) {
-      throw new ApiConflictError('Unable to claim download', [
-        'DownloadPipelineService->claimDownload',
-        'Download is not anonymous or does not exist'
-      ]);
-    }
-  }
-
-  /**
-   * Get a signed URL for downloading a specific fragment.
-   *
-   * Validates the fragment exists and is ready before generating the URL.
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {number} fragmentIndex - The zero-based fragment index.
-   * @return {Promise<string>} The signed download URL.
-   * @memberof DownloadPipelineService
-   */
-  async getFragmentSignedUrl(downloadId: string, fragmentIndex: number): Promise<string> {
-    const fragments = await this.fragmentRepository.getFragmentsByDownloadId(downloadId);
-    const fragment = fragments.find((f) => f.fragment_index === fragmentIndex);
-
-    if (!fragment) {
-      throw new HTTP404(`Fragment ${fragmentIndex} not found for download ${downloadId}`);
-    }
-
-    if (fragment.fragment_status !== DownloadStatusEnum.READY) {
-      throw new HTTP409('Fragment is not ready');
-    }
-
-    if (!fragment.s3_key) {
-      throw new HTTP500('Fragment record missing s3_key');
-    }
-
-    const objectStorageService = new ObjectStorageService();
-    return objectStorageService.getSignedUrl(BucketType.MAIN, fragment.s3_key, SIGNED_URL_EXPIRY_FRAGMENT);
-  }
-
-  /**
    * Stream features into the archive using a single-pass approach driven by schema.
    *
    * Headers come from `feature_type_property` (via CodeService), so no discovery pass is needed.
@@ -476,7 +351,8 @@ export class DownloadPipelineService extends DBService {
   private async streamFeaturesIntoArchive(
     fragmentId: number,
     archive: archiver.Archiver,
-    filesFolderName: string
+    filesFolderName: string,
+    rootFolder: string
   ): Promise<FileFeatureRef[]> {
     const featureTypes = await this.fragmentRepository.getFragmentFeatureTypes(fragmentId);
 
@@ -499,7 +375,8 @@ export class DownloadPipelineService extends DBService {
         archive,
         schemaLookup,
         rootDatasetCache,
-        filesFolderName
+        filesFolderName,
+        rootFolder
       );
       fileRefs.push(...refs);
     }
@@ -545,14 +422,15 @@ export class DownloadPipelineService extends DBService {
     archive: archiver.Archiver,
     schemaLookup: Map<string, CsvPropertyDefinition[]>,
     rootDatasetCache: Map<number, { dataset_uuid: string; dataset_name: string | null }>,
-    filesFolderName: string
+    filesFolderName: string,
+    rootFolder: string
   ): Promise<FileFeatureRef[]> {
     const isCore = featureType === 'dataset';
     const systemHeaders = isCore ? ['uuid'] : ['uuid', 'dataset_name', 'dataset_uuid'];
     const childProperties = schemaLookup.get(featureType) ?? [];
 
     const csvStream = new PassThrough();
-    archive.append(csvStream, { name: getOutputFilename(featureType) });
+    archive.append(csvStream, { name: `${rootFolder}${getOutputFilename(featureType)}` });
 
     let headersWritten = false;
     let parentProperties: CsvPropertyDefinition[] | null = null;

@@ -46,6 +46,36 @@ describe('SubmissionUploadRepository', () => {
     });
   });
 
+  describe('getSubmissionUploadBySubmissionUuid', () => {
+    it('throws ApiNotFoundError when no matching record found', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      try {
+        await repo.getSubmissionUploadBySubmissionUuid('submission-uuid', 'upload-id');
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as ApiNotFoundError).message).to.equal('Submission upload not found');
+      }
+    });
+
+    it('returns the submission upload when it belongs to the submission', async () => {
+      const mockRow = {
+        submission_upload_id: 'upload-id',
+        submission_id: 123,
+        upload_id: 'upload-uuid'
+      };
+      const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.getSubmissionUploadBySubmissionUuid('submission-uuid', 'upload-id');
+      expect(result).to.eql(mockRow);
+    });
+  });
+
   describe('getSubmissionUploadsBySubmissionId', () => {
     it('returns an array of records without filters', async () => {
       const mockQueryResponse = {

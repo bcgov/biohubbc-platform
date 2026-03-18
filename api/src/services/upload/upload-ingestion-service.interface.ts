@@ -9,7 +9,8 @@ interface PresignedUrl {
 }
 
 export interface PresignedUploadUrlResponse {
-  submissionId: number;
+  submissionId: string;
+  submissionUploadId: string;
   uploadId: string;
   s3UploadId: string;
   uploadArchiveId: string;

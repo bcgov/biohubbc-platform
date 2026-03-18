@@ -34,7 +34,6 @@ export type CartAction =
   | { type: 'LOAD_SUCCESS'; payload: CartFeatureListResponse }
   | { type: 'LOAD_ERROR'; payload: unknown }
   | { type: 'OPTIMISTIC_SET'; payload: CartSnapshot }
-  | { type: 'ROLLBACK'; payload: CartSnapshot }
   | { type: 'SET_CART_ID'; payload: string | null }
   | { type: 'RESET' };
 
@@ -43,6 +42,11 @@ export type CartAction =
  * Provides cart state and methods for managing cart features.
  */
 export interface ICartContext {
+  /**
+   * The current cart ID, or null if no cart has been created yet.
+   */
+  cartId: string | null;
+
   /**
    * The current list of features in the cart.
    *
