@@ -121,17 +121,22 @@ const insertRecord = async (knex: Knex) => {
     );
 
     // Wait for all animals and observations for this sample site
-    await Promise.all([...animalPromises, ...observationPromises]);
+    const animalResults = await Promise.all(animalPromises);
+    await Promise.all(observationPromises);
+    
+    // Collect animal IDs
+    animalIds.push(...animalResults);
   });
 
   // Telemetry
-  const telemetryPromises = Array.from({ length: 100 }).map(() =>
-    insertTelemetryRecord(knex, {
+  const telemetryPromises = Array.from({ length: 100 }).map(() => {
+    const randomDeployment = deployments[Math.floor(Math.random() * deployments.length)];
+    return insertTelemetryRecord(knex, {
       submission_id,
       submission_upload_id,
-      parent_submission_feature_id: parent_submission_feature_id1
-    })
-  );
+      parent_submission_feature_id: randomDeployment.id
+    });
+  });
 
   // Wait for all sample sites and telemetry to complete concurrently
   await Promise.all([...sampleSitePromises, ...telemetryPromises]);
@@ -146,8 +151,19 @@ const insertRecord = async (knex: Knex) => {
     }
   }
 
-  // Link animals to random deployments
-  for (const animalId of animalIds) {
+  // Ensure each deployment is linked to at least one animal
+  for (let i = 0; i < deployments.length; i++) {
+    const deployment = deployments[i];
+    const animalId = animalIds[i % animalIds.length]; // Distribute animals across deployments
+    await knex.raw(`
+      INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
+      VALUES (${animalId}, ${deployment.id})
+    `);
+  }
+
+  // Link additional animals to random deployments
+  for (let i = deployments.length; i < animalIds.length; i++) {
+    const animalId = animalIds[i];
     const randomDeployment = deployments[Math.floor(Math.random() * deployments.length)];
     await knex.raw(`
       INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
