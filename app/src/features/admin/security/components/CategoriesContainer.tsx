@@ -29,8 +29,7 @@ const columns: GridColDef<ISecurityCategoryWithRuleCount>[] = [
     field: 'description',
     headerName: 'Description',
     flex: 2,
-    minWidth: 200,
-    valueGetter: (value) => value || '-'
+    minWidth: 200
   },
   {
     field: 'rule_count',
