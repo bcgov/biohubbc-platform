@@ -17,7 +17,8 @@ import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
 import { SubmissionRecordWithSecurity } from 'interfaces/useSubmissionsApi.interface';
 import { useEffect, useMemo } from 'react';
 import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { SubmissionFeatureRow, SubmissionFeatureTable } from './components/SubmissionFeatureTable';
+import { SubmissionFeatureRow } from './components/SubmissionFeatureTable.interface';
+import { SubmissionFeatureTable } from './components/SubmissionFeatureTable';
 
 /**
  * Public-facing submission detail page.
@@ -37,7 +38,6 @@ export const SubmissionDetailPage = () => {
     fetcher: (_search, pagination) => api.submissions.getSubmissionFeatures(Number(submissionId), pagination),
     extractData: (response) =>
       response.features.map((f) => ({
-        submissionFeatureId: f.submission_feature_id,
         submission_feature_id: f.submission_feature_id,
         feature_type_name: f.feature_type_name
       })),
@@ -87,7 +87,7 @@ export const SubmissionDetailPage = () => {
         subheader={
           <Box display="flex" flexDirection="column" gap={1}>
             {submission?.description && (
-              <Typography variant="body1" color="text.secondary">
+              <Typography color="text.secondary">
                 {submission.description}
               </Typography>
             )}
