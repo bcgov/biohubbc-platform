@@ -86,11 +86,7 @@ export const SubmissionDetailPage = () => {
         label={submission?.name ?? ''}
         subheader={
           <Box display="flex" flexDirection="column" gap={1}>
-            {submission?.description && (
-              <Typography color="text.secondary">
-                {submission.description}
-              </Typography>
-            )}
+            {submission?.description && <Typography color="text.secondary">{submission.description}</Typography>}
             {hasSecuredFeatures && (
               <Box display="flex" gap={1}>
                 <Chip icon={<Icon path={mdiLock} size={0.625} />} label="Contains secured features" size="small" />
