@@ -18,6 +18,7 @@ import * as fileUtils from '../../utils/file-utils';
 import * as submissionUploadUtils from '../../utils/submission-upload-utils';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { SubmissionService } from '../submission-service';
+import { TicketService } from '../ticket-service';
 import { ArtifactSecurityService } from './artifact-security-service';
 import { ArtifactService } from './artifact-service';
 import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
@@ -64,6 +65,9 @@ describe('UploadIngestionService', () => {
         uuid: mockSubmission.uuid
       } as ISubmissionModel);
       sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: mockUploadId });
+      sinon.stub(TicketService.prototype, 'createTicket').resolves({
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      } as any);
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
@@ -135,6 +139,9 @@ describe('UploadIngestionService', () => {
         uuid: mockSubmission.uuid
       } as ISubmissionModel);
       sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: 'upload-456' });
+      sinon.stub(TicketService.prototype, 'createTicket').resolves({
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      } as any);
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });
@@ -161,6 +168,9 @@ describe('UploadIngestionService', () => {
         uuid: mockSubmission.uuid
       } as ISubmissionModel);
       sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: 'upload-456' });
+      sinon.stub(TicketService.prototype, 'createTicket').resolves({
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      } as any);
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
         .resolves({ submission_upload_id: 'submission-upload-id-1' });

@@ -23,7 +23,8 @@ describe('process-submission-features-job', () => {
   const defaultSubmissionUpload: SubmissionUpload = {
     submission_upload_id: 'test-sub-upload-id',
     submission_id: 123,
-    upload_id: 'test-upload-id'
+    upload_id: 'test-upload-id',
+    ticket_id: '11111111-1111-1111-1111-111111111111'
   };
 
   describe('processSubmissionFeaturesJobHandler', () => {
@@ -82,7 +83,8 @@ describe('process-submission-features-job', () => {
       const jobData: SubmissionUpload = {
         submission_upload_id: 'my-sub-upload-id',
         submission_id: 456,
-        upload_id: 'my-upload-id'
+        upload_id: 'my-upload-id',
+        ticket_id: '22222222-2222-2222-2222-222222222222'
       };
       const mockJobs = [createMockJob(jobData)];
 

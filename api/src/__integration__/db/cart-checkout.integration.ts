@@ -13,6 +13,7 @@ import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } 
 import { HTTP400 } from '../../errors/http-error';
 import { CartService } from '../../services/cart-service';
 import { DownloadService } from '../../services/download/download-service';
+import { getOrCreateIntegrationTicketId } from '../helpers/test-submission-helpers';
 
 describe('Cart checkout (integration)', function () {
   this.timeout(15000);
@@ -66,9 +67,11 @@ describe('Cart checkout (integration)', function () {
     `);
     const uploadId = uploadResult.rows[0].upload_id;
 
+    const ticket_id = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, systemUserId);
+
     const bridgeResult = await connection.sql(SQL`
-      INSERT INTO submission_upload (submission_id, upload_id, create_user)
-      VALUES (${submissionId}, ${uploadId}, ${systemUserId})
+      INSERT INTO submission_upload (submission_id, upload_id, ticket_id, create_user)
+      VALUES (${submissionId}, ${uploadId}, ${ticket_id}, ${systemUserId})
       RETURNING submission_upload_id;
     `);
     const submissionUploadId = bridgeResult.rows[0].submission_upload_id;

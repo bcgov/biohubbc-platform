@@ -250,7 +250,10 @@ describe('useSearchApi', () => {
 
   describe('createDownload', () => {
     it('should POST filters to /api/download and return download_id', async () => {
-      const mockResponse: CreateDownloadResponse = { download_id: '550e8400-e29b-41d4-a716-446655440099' };
+      const mockResponse: CreateDownloadResponse = {
+        download_id: '550e8400-e29b-41d4-a716-446655440099',
+        download_url: 'https://localhost/api/download/550e8400-e29b-41d4-a716-446655440099'
+      };
 
       mock.onPost('/api/download').reply(201, mockResponse);
 
@@ -261,7 +264,10 @@ describe('useSearchApi', () => {
     });
 
     it('should resolve with download_id from response', async () => {
-      const mockResponse: CreateDownloadResponse = { download_id: 'uuid-abc-123' };
+      const mockResponse: CreateDownloadResponse = {
+        download_id: 'uuid-abc-123',
+        download_url: 'https://localhost/api/download/uuid-abc-123'
+      };
 
       mock.onPost('/api/download').reply(201, mockResponse);
 
