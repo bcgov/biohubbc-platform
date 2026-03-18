@@ -24,7 +24,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       id,
       name: 'index-submission-features',
       data: { submissionId }
-    } as unknown as PgBoss.Job<IIndexSubmissionFeaturesJobData>);
+    } as PgBoss.Job<IIndexSubmissionFeaturesJobData>);
 
   it('should index submission successfully', async () => {
     const mockDBConnection = getMockDBConnection();

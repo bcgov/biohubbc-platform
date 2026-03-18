@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import { Feature } from 'geojson';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
@@ -11,9 +12,13 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
     sinon.restore();
   });
 
-  const mockGeometry = {
-    type: 'Point',
-    coordinates: [-123.1, 49.2]
+  const mockGeometry: Feature = {
+    type: 'Feature',
+    geometry: {
+      type: 'Point',
+      coordinates: [-123.1, 49.2]
+    },
+    properties: {}
   };
 
   const mockRow: SubmissionFeaturePropertyGeometry = {

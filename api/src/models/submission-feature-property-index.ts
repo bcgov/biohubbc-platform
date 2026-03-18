@@ -21,30 +21,3 @@ export const ContributorCodeResolution = z.object({
   contributor_codeset_code_key: z.string()
 });
 export type ContributorCodeResolution = z.infer<typeof ContributorCodeResolution>;
-
-/**
- * Payload to create/reuse a contributor_codeset definition.
- *
- * Not validated with Zod because this is an internal TypeScript payload.
- */
-export interface CreateContributorCodeset {
-  contributor_id: number;
-  key: string;
-  external_id: string | null;
-  label: string;
-  description: string | null;
-}
-
-/**
- * Payload to create/reuse a contributor_codeset_code definition.
- *
- * Not validated with Zod because this is an internal TypeScript payload.
- */
-export interface CreateContributorCodesetCode {
-  contributor_codeset_id: number;
-  contributor_codeset_key: string;
-  key: string;
-  external_id: string | null;
-  label: string;
-  description: string | null;
-}

@@ -2,28 +2,29 @@ import { Feature } from 'geojson';
 import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { ContributorCodeset } from '../models/contributor-codeset';
-import { ContributorCodesetCode, ContributorCodesetCodeSchema } from '../models/contributor-codeset-code';
+import { ContributorCodeset, CreateContributorCodeset } from '../models/contributor-codeset';
 import {
-  ContributorCodeResolution,
-  CreateContributorCodeset,
-  CreateContributorCodesetCode,
-  FeatureTypePropertyMetadata
-} from '../models/submission-feature-property-index';
+  ContributorCodesetCode,
+  ContributorCodesetCodeSchema,
+  CreateContributorCodesetCode
+} from '../models/contributor-codeset-code';
+import { CreateSubmissionFeaturePropertyBoolean } from '../models/submission-feature-property-boolean';
+import { CreateSubmissionFeaturePropertyCode } from '../models/submission-feature-property-code';
+import { CreateSubmissionFeaturePropertyGeometry } from '../models/submission-feature-property-geometry';
+import { ContributorCodeResolution, FeatureTypePropertyMetadata } from '../models/submission-feature-property-index';
+import { CreateSubmissionFeaturePropertyNumber } from '../models/submission-feature-property-number';
+import { CreateSubmissionFeaturePropertyString } from '../models/submission-feature-property-string';
+import { CreateSubmissionFeaturePropertyTaxon } from '../models/submission-feature-property-taxon';
+import { CreateSubmissionFeaturePropertyTimestamp } from '../models/submission-feature-property-timestamp';
 import { ContributorCodesetCodeService } from '../services/contributor-codeset-code-service';
 import { ContributorCodesetService } from '../services/contributor-codeset-service';
-import {
-  InsertSubmissionFeaturePropertyBoolean,
-  InsertSubmissionFeaturePropertyCode,
-  InsertSubmissionFeaturePropertyGeometry,
-  InsertSubmissionFeaturePropertyNumber,
-  InsertSubmissionFeaturePropertyString,
-  InsertSubmissionFeaturePropertyTaxon,
-  InsertSubmissionFeaturePropertyTimestamp
-} from '../services/search-feature-service.interface';
 import { CodeReference } from '../utils/code-reference';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
+
+type CreateContributorCodesetCodeDefinition = CreateContributorCodesetCode & {
+  contributor_codeset_key: string;
+};
 
 /**
  * Repository for canonical submission feature property indexing operations.
@@ -327,8 +328,8 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
     codesets: Record<string, unknown>,
     existingCodesets: ContributorCodeset[],
     referencedCodeKeys: Map<string, Set<string>>
-  ): CreateContributorCodesetCode[] {
-    const definitions: CreateContributorCodesetCode[] = [];
+  ): CreateContributorCodesetCodeDefinition[] {
+    const definitions: CreateContributorCodesetCodeDefinition[] = [];
     const contributorCodesetsByKey = new Map<string, ContributorCodeset>();
 
     for (const contributorCodeset of existingCodesets) {
@@ -498,7 +499,7 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
   private mapCodesToSlugMap(
-    definitions: CreateContributorCodesetCode[],
+    definitions: CreateContributorCodesetCodeDefinition[],
     resolvedRows: ContributorCodesetCode[]
   ): Map<string, number> {
     const byIdentity = new Map<string, ContributorCodesetCode>();
@@ -533,77 +534,77 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
   /**
    * Bulk insert string property records.
    *
-   * @param {InsertSubmissionFeaturePropertyString[]} records
+   * @param {CreateSubmissionFeaturePropertyString[]} records
    * @return {Promise<void>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async insertStringRecords(records: InsertSubmissionFeaturePropertyString[]): Promise<void> {
+  async insertStringRecords(records: CreateSubmissionFeaturePropertyString[]): Promise<void> {
     await this.insertRecords('submission_feature_property_string', records);
   }
 
   /**
    * Bulk insert number property records.
    *
-   * @param {InsertSubmissionFeaturePropertyNumber[]} records
+   * @param {CreateSubmissionFeaturePropertyNumber[]} records
    * @return {Promise<void>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async insertNumberRecords(records: InsertSubmissionFeaturePropertyNumber[]): Promise<void> {
+  async insertNumberRecords(records: CreateSubmissionFeaturePropertyNumber[]): Promise<void> {
     await this.insertRecords('submission_feature_property_number', records);
   }
 
   /**
    * Bulk insert boolean property records.
    *
-   * @param {InsertSubmissionFeaturePropertyBoolean[]} records
+   * @param {CreateSubmissionFeaturePropertyBoolean[]} records
    * @return {Promise<void>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async insertBooleanRecords(records: InsertSubmissionFeaturePropertyBoolean[]): Promise<void> {
+  async insertBooleanRecords(records: CreateSubmissionFeaturePropertyBoolean[]): Promise<void> {
     await this.insertRecords('submission_feature_property_boolean', records);
   }
 
   /**
    * Bulk insert timestamp property records.
    *
-   * @param {InsertSubmissionFeaturePropertyTimestamp[]} records
+   * @param {CreateSubmissionFeaturePropertyTimestamp[]} records
    * @return {Promise<void>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async insertTimestampRecords(records: InsertSubmissionFeaturePropertyTimestamp[]): Promise<void> {
+  async insertTimestampRecords(records: CreateSubmissionFeaturePropertyTimestamp[]): Promise<void> {
     await this.insertRecords('submission_feature_property_timestamp', records);
   }
 
   /**
    * Bulk insert code property records.
    *
-   * @param {InsertSubmissionFeaturePropertyCode[]} records
+   * @param {CreateSubmissionFeaturePropertyCode[]} records
    * @return {Promise<void>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async insertCodeRecords(records: InsertSubmissionFeaturePropertyCode[]): Promise<void> {
+  async insertCodeRecords(records: CreateSubmissionFeaturePropertyCode[]): Promise<void> {
     await this.insertRecords('submission_feature_property_code', records);
   }
 
   /**
    * Bulk insert taxon property records.
    *
-   * @param {InsertSubmissionFeaturePropertyTaxon[]} records
+   * @param {CreateSubmissionFeaturePropertyTaxon[]} records
    * @return {Promise<void>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async insertTaxonRecords(records: InsertSubmissionFeaturePropertyTaxon[]): Promise<void> {
+  async insertTaxonRecords(records: CreateSubmissionFeaturePropertyTaxon[]): Promise<void> {
     await this.insertRecords('submission_feature_property_taxon', records);
   }
 
   /**
    * Bulk insert geometry property records.
    *
-   * @param {InsertSubmissionFeaturePropertyGeometry[]} records
+   * @param {CreateSubmissionFeaturePropertyGeometry[]} records
    * @return {Promise<void>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async insertGeometryRecords(records: InsertSubmissionFeaturePropertyGeometry[]): Promise<void> {
+  async insertGeometryRecords(records: CreateSubmissionFeaturePropertyGeometry[]): Promise<void> {
     if (!records.length) {
       return;
     }
