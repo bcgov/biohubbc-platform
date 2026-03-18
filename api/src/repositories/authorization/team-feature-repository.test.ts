@@ -33,7 +33,7 @@ describe('TeamFeatureRepository', () => {
       const mockConnection = getMockDBConnection({ sql: sqlStub });
 
       const repository = new TeamFeatureRepository(mockConnection);
-      await repository.populateTeamFeatureCache('22222222-2222-2222-2222-222222222222');
+      await repository.populateTeamFeatureCacheBatch('22222222-2222-2222-2222-222222222222', [1, 2, 3]);
 
       expect(sqlStub).to.have.been.calledOnce;
     });

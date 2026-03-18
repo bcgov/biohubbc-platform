@@ -21,7 +21,7 @@ describe('TeamFeatureService', () => {
   });
 
   describe('refreshCacheForTeam', () => {
-    it('calls delete then populate in order', async () => {
+    it('calls delete, gets submission ids, then populates in batches', async () => {
       const callOrder: string[] = [];
 
       const deleteStub = sinon
@@ -29,8 +29,14 @@ describe('TeamFeatureService', () => {
         .callsFake(async () => {
           callOrder.push('delete');
         });
+      const getIdsStub = sinon
+        .stub(TeamFeatureRepository.prototype, 'getSecuredSubmissionIds')
+        .callsFake(async () => {
+          callOrder.push('getIds');
+          return [1, 2, 3];
+        });
       const populateStub = sinon
-        .stub(TeamFeatureRepository.prototype, 'populateTeamFeatureCache')
+        .stub(TeamFeatureRepository.prototype, 'populateTeamFeatureCacheBatch')
         .callsFake(async () => {
           callOrder.push('populate');
         });
@@ -38,8 +44,9 @@ describe('TeamFeatureService', () => {
       await service.refreshCacheForTeam('22222222-2222-2222-2222-222222222222');
 
       expect(deleteStub).to.have.been.calledOnceWith('22222222-2222-2222-2222-222222222222');
-      expect(populateStub).to.have.been.calledOnceWith('22222222-2222-2222-2222-222222222222');
-      expect(callOrder).to.eql(['delete', 'populate']);
+      expect(getIdsStub).to.have.been.calledOnceWith('22222222-2222-2222-2222-222222222222');
+      expect(populateStub).to.have.been.calledOnceWith('22222222-2222-2222-2222-222222222222', [1, 2, 3]);
+      expect(callOrder).to.eql(['delete', 'getIds', 'populate']);
     });
   });
 });

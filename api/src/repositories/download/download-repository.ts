@@ -297,11 +297,7 @@ export class DownloadRepository extends BaseRepository {
    * Returns which of the given feature IDs are secured — directly or by
    * inheriting security from an ancestor.
    *
-   * Walks DOWN from secured roots to all descendants, the opposite direction
-   * of buildSecurityCheck() (which walks UP from a feature to its ancestors).
-   * Using a different traversal direction makes this a genuine cross-check:
-   * if the two methods disagree, there's a bug.
-   *
+   * Walks DOWN from secured roots to all descendants via a recursive CTE.
    * Scoped to submissions containing the candidate features to avoid walking
    * every secured tree in the system.
    *

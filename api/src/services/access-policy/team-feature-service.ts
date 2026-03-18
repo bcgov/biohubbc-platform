@@ -2,6 +2,8 @@ import { IDBConnection } from '../../database/db';
 import { TeamFeatureRepository } from '../../repositories/authorization/team-feature-repository';
 import { DBService } from '../db-service';
 
+const SUBMISSION_BATCH_SIZE = 1000;
+
 /**
  * Service for managing the team_feature cache.
  *
@@ -30,9 +32,9 @@ export class TeamFeatureService extends DBService {
   /**
    * Refresh the team_feature cache for a specific team.
    *
-   * Deletes existing cache entries and repopulates from current policy
-   * statements. Cache resolves URN wildcards to concrete submission_feature_ids
-   * for fast search JOINs instead of per-row URN matching.
+   * Deletes existing cache entries, then repopulates in batches by submission.
+   * Each batch runs its own recursive walk scoped to a subset of submissions,
+   * bounding memory usage instead of materializing all secured features at once.
    *
    * @param {string} teamId - The team UUID to refresh cache for.
    * @return {Promise<void>}
@@ -40,6 +42,12 @@ export class TeamFeatureService extends DBService {
    */
   async refreshCacheForTeam(teamId: string): Promise<void> {
     await this.teamFeatureRepository.deleteTeamFeaturesByTeamId(teamId);
-    await this.teamFeatureRepository.populateTeamFeatureCache(teamId);
+
+    const submissionIds = await this.teamFeatureRepository.getSecuredSubmissionIds(teamId);
+
+    for (let i = 0; i < submissionIds.length; i += SUBMISSION_BATCH_SIZE) {
+      const batch = submissionIds.slice(i, i + SUBMISSION_BATCH_SIZE);
+      await this.teamFeatureRepository.populateTeamFeatureCacheBatch(teamId, batch);
+    }
   }
 }
