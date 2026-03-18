@@ -18,11 +18,9 @@ export const AppRouter = () => {
       {/* Search and Submission routes share CartContextProvider */}
       <Route
         element={
-          <>
-            <CartContextProvider>
-              <Outlet />
-            </CartContextProvider>
-          </>
+          <CartContextProvider>
+            <Outlet />
+          </CartContextProvider>
         }>
         {/* Search Routes */}
         <Route
