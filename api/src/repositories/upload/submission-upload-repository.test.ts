@@ -35,7 +35,8 @@ describe('SubmissionUploadRepository', () => {
       const mockRow: SubmissionUpload = {
         submission_upload_id: 'id-1',
         submission_id: 123,
-        upload_id: 'upload-id'
+        upload_id: 'upload-id',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
@@ -46,13 +47,54 @@ describe('SubmissionUploadRepository', () => {
     });
   });
 
+  describe('getSubmissionUploadBySubmissionUuid', () => {
+    it('throws ApiNotFoundError when no matching record found', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      try {
+        await repo.getSubmissionUploadBySubmissionUuid('submission-uuid', 'upload-id');
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+        expect((error as ApiNotFoundError).message).to.equal('Submission upload not found');
+      }
+    });
+
+    it('returns the submission upload when it belongs to the submission', async () => {
+      const mockRow = {
+        submission_upload_id: 'upload-id',
+        submission_id: 123,
+        upload_id: 'upload-uuid',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      };
+      const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const repo = new SubmissionUploadRepository(mockDBConnection);
+
+      const result = await repo.getSubmissionUploadBySubmissionUuid('submission-uuid', 'upload-id');
+      expect(result).to.eql(mockRow);
+    });
+  });
+
   describe('getSubmissionUploadsBySubmissionId', () => {
     it('returns an array of records without filters', async () => {
       const mockQueryResponse = {
         rowCount: 2,
         rows: [
-          { submission_upload_id: 'id-1', submission_id: 123, upload_id: 'a-1' },
-          { submission_upload_id: 'id-2', submission_id: 123, upload_id: 'a-2' }
+          {
+            submission_upload_id: 'id-1',
+            submission_id: 123,
+            upload_id: 'a-1',
+            ticket_id: '11111111-1111-1111-1111-111111111111'
+          },
+          {
+            submission_upload_id: 'id-2',
+            submission_id: 123,
+            upload_id: 'a-2',
+            ticket_id: '22222222-2222-2222-2222-222222222222'
+          }
         ]
       } as any as Promise<QueryResult<any>>;
 
@@ -64,15 +106,32 @@ describe('SubmissionUploadRepository', () => {
       const result = await repo.getSubmissionUploadsBySubmissionId(123);
 
       expect(result).to.eql([
-        { submission_upload_id: 'id-1', submission_id: 123, upload_id: 'a-1' },
-        { submission_upload_id: 'id-2', submission_id: 123, upload_id: 'a-2' }
+        {
+          submission_upload_id: 'id-1',
+          submission_id: 123,
+          upload_id: 'a-1',
+          ticket_id: '11111111-1111-1111-1111-111111111111'
+        },
+        {
+          submission_upload_id: 'id-2',
+          submission_id: 123,
+          upload_id: 'a-2',
+          ticket_id: '22222222-2222-2222-2222-222222222222'
+        }
       ]);
     });
 
     it('applies type filter and returns filtered records', async () => {
       const mockQueryResponse = {
         rowCount: 1,
-        rows: [{ submission_upload_id: 'id-1', submission_id: 123, upload_id: 'a-1' }]
+        rows: [
+          {
+            submission_upload_id: 'id-1',
+            submission_id: 123,
+            upload_id: 'a-1',
+            ticket_id: '11111111-1111-1111-1111-111111111111'
+          }
+        ]
       } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
@@ -82,13 +141,30 @@ describe('SubmissionUploadRepository', () => {
 
       const filters = { role: UploadArtifactRoleEnum.FEATURE };
       const result = await repo.getSubmissionUploadsBySubmissionId(123, filters);
-      expect(result).to.eql([{ submission_upload_id: 'id-1', submission_id: 123, upload_id: 'a-1' }]);
+      expect(result).to.eql([
+        {
+          submission_upload_id: 'id-1',
+          submission_id: 123,
+          upload_id: 'a-1',
+          ticket_id: '11111111-1111-1111-1111-111111111111'
+        }
+      ]);
     });
 
     it('applies pagination', async () => {
       const mockRows = [
-        { submission_upload_id: 'id-1', submission_id: 123, upload_id: 'a-1' },
-        { submission_upload_id: 'id-2', submission_id: 123, upload_id: 'a-2' }
+        {
+          submission_upload_id: 'id-1',
+          submission_id: 123,
+          upload_id: 'a-1',
+          ticket_id: '11111111-1111-1111-1111-111111111111'
+        },
+        {
+          submission_upload_id: 'id-2',
+          submission_id: 123,
+          upload_id: 'a-2',
+          ticket_id: '22222222-2222-2222-2222-222222222222'
+        }
       ];
       const mockQueryResponse = {
         rowCount: 2,
@@ -112,7 +188,11 @@ describe('SubmissionUploadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new SubmissionUploadRepository(mockDBConnection);
 
-      const payload: CreateSubmissionUpload = { submission_id: 123, upload_id: 'a-1' };
+      const payload: CreateSubmissionUpload = {
+        submission_id: 123,
+        upload_id: 'a-1',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      };
 
       try {
         await repo.insertSubmissionUpload(payload);
@@ -129,7 +209,11 @@ describe('SubmissionUploadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new SubmissionUploadRepository(mockDBConnection);
 
-      const payload: CreateSubmissionUpload = { submission_id: 123, upload_id: 'a-1' };
+      const payload: CreateSubmissionUpload = {
+        submission_id: 123,
+        upload_id: 'a-1',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      };
       const result = await repo.insertSubmissionUpload(payload);
 
       expect(result).to.eql(mockRow);

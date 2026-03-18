@@ -240,7 +240,7 @@ describe('CartService', () => {
   });
 
   describe('checkoutCart', () => {
-    it('should create a download, create a team, link features, check out the cart, and publish download job', async () => {
+    it('should create a download, create a team, link via download_team, and publish download job', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new CartService(mockDBConnection);
 
@@ -256,6 +256,7 @@ describe('CartService', () => {
         description: 'description',
         member_count: 0
       });
+      const createDownloadTeamStub = sinon.stub(DownloadService.prototype, 'createDownloadTeam').resolves();
       const createFeaturesStub = sinon.stub(DownloadService.prototype, 'createDownloadFeatures').resolves();
       const updateCartStub = sinon.stub(CartRepository.prototype, 'updateCart').resolves();
       const publishStub = sinon
@@ -267,26 +268,24 @@ describe('CartService', () => {
       expect(result).to.deep.equal({ download_id: 'dl-uuid' });
       expect(getIdsStub).to.have.been.calledOnceWith('cart-1');
       expect(createDownloadStub).to.have.been.calledOnceWith({
-        teamId: 'team-1',
-        dataRequestId: null,
-        fragmentSizeBytes: undefined,
-        systemUserId: 42
+        fragmentSizeBytes: undefined
       });
       expect(createFeaturesStub).to.have.been.calledOnceWith('dl-uuid', [1, 2, 3]);
+      expect(createTeamStub).to.have.been.calledOnceWith({
+        name: `Team for cart cart-1`,
+        description: 'Team automatically created for cart checkout',
+        system_user_ids: [42]
+      });
+      expect(createDownloadTeamStub).to.have.been.calledOnceWith('dl-uuid', 'team-1');
       expect(updateCartStub).to.have.been.calledOnceWith('cart-1', {
         cart_status: CartStatus.CHECKED_OUT,
         checkout_date: sinon.match.string,
         checkout_user: 42
       });
       expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, { downloadId: 'dl-uuid' });
-      expect(createTeamStub).to.have.been.calledOnceWith({
-        name: `Team for cart cart-1`,
-        description: 'Team automatically created for cart checkout',
-        system_user_ids: [42]
-      });
     });
 
-    it('should not create a team for anonymous carts', async () => {
+    it('should not create a team or download_team for anonymous carts', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new CartService(mockDBConnection);
 
@@ -294,12 +293,8 @@ describe('CartService', () => {
       const createDownloadStub = sinon
         .stub(DownloadService.prototype, 'createDownload')
         .resolves({ download_id: 'dl-uuid' });
-      const createTeamStub = sinon.stub(TeamService.prototype, 'createTeam').resolves({
-        team_id: 'team-1',
-        name: 'team',
-        description: 'description',
-        member_count: 0
-      });
+      const createTeamStub = sinon.stub(TeamService.prototype, 'createTeam');
+      const createDownloadTeamStub = sinon.stub(DownloadService.prototype, 'createDownloadTeam');
       sinon.stub(DownloadService.prototype, 'createDownloadFeatures').resolves();
       const updateCartStub = sinon.stub(CartRepository.prototype, 'updateCart').resolves();
       sinon.stub(publisher, 'publishProcessDownloadJob').resolves({ status: 'published', jobId: 'job-1' });
@@ -307,10 +302,7 @@ describe('CartService', () => {
       await service.checkoutCart('cart-1', null);
 
       expect(createDownloadStub).to.have.been.calledOnceWith({
-        teamId: null,
-        dataRequestId: null,
-        fragmentSizeBytes: undefined,
-        systemUserId: null
+        fragmentSizeBytes: undefined
       });
       expect(updateCartStub).to.have.been.calledOnceWith('cart-1', {
         cart_status: CartStatus.CHECKED_OUT,
@@ -318,6 +310,7 @@ describe('CartService', () => {
         checkout_user: null
       });
       expect(createTeamStub).to.not.have.been.called;
+      expect(createDownloadTeamStub).to.not.have.been.called;
     });
 
     it('should throw HTTP400 when cart is empty', async () => {
@@ -326,14 +319,9 @@ describe('CartService', () => {
 
       sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureIds').resolves([]);
 
-      const createTeamStub = sinon.stub(TeamService.prototype, 'createTeam').resolves({
-        team_id: 'team-1',
-        name: 'team',
-        description: 'description',
-        member_count: 0
-      });
       const createDownloadStub = sinon.stub(DownloadService.prototype, 'createDownload');
       const createFeaturesStub = sinon.stub(DownloadService.prototype, 'createDownloadFeatures');
+      const createTeamStub = sinon.stub(TeamService.prototype, 'createTeam');
       const updateCartStub = sinon.stub(CartRepository.prototype, 'updateCart');
       const publishStub = sinon.stub(publisher, 'publishProcessDownloadJob');
 
@@ -347,12 +335,12 @@ describe('CartService', () => {
 
       expect(createDownloadStub).to.not.have.been.called;
       expect(createFeaturesStub).to.not.have.been.called;
+      expect(createTeamStub).to.not.have.been.called;
       expect(updateCartStub).to.not.have.been.called;
       expect(publishStub).to.not.have.been.called;
-      expect(createTeamStub).to.not.have.been.called;
     });
 
-    it('should forward systemUserId for authenticated users', async () => {
+    it('should pass custom fragmentSizeBytes to createDownload', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new CartService(mockDBConnection);
 
@@ -361,57 +349,21 @@ describe('CartService', () => {
         .stub(DownloadService.prototype, 'createDownload')
         .resolves({ download_id: 'dl-uuid' });
       sinon.stub(DownloadService.prototype, 'createDownloadFeatures').resolves();
+      sinon.stub(DownloadService.prototype, 'createDownloadTeam').resolves();
       sinon.stub(TeamService.prototype, 'createTeam').resolves({
         team_id: 'team-1',
         name: 'team',
         description: 'description',
         member_count: 0
       });
-      const updateCartStub = sinon.stub(CartRepository.prototype, 'updateCart').resolves();
+      sinon.stub(CartRepository.prototype, 'updateCart').resolves();
       sinon.stub(publisher, 'publishProcessDownloadJob').resolves({ status: 'published', jobId: 'job-1' });
 
-      await service.checkoutCart('cart-1', 7);
+      await service.checkoutCart('cart-1', 7, 500 * 1024 * 1024);
 
       expect(createDownloadStub).to.have.been.calledOnceWith({
-        teamId: 'team-1',
-        dataRequestId: null,
-        fragmentSizeBytes: undefined,
-        systemUserId: 7
+        fragmentSizeBytes: 500 * 1024 * 1024
       });
-      expect(updateCartStub).to.have.been.calledOnceWith('cart-1', {
-        cart_status: CartStatus.CHECKED_OUT,
-        checkout_date: sinon.match.string,
-        checkout_user: 7
-      });
-    });
-
-    it('should forward null systemUserId for anonymous users', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new CartService(mockDBConnection);
-
-      sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureIds').resolves([1]);
-      const createDownloadStub = sinon
-        .stub(DownloadService.prototype, 'createDownload')
-        .resolves({ download_id: 'dl-uuid' });
-      sinon.stub(DownloadService.prototype, 'createDownloadFeatures').resolves();
-      const createTeamStub = sinon.stub(TeamService.prototype, 'createTeam');
-      const updateCartStub = sinon.stub(CartRepository.prototype, 'updateCart').resolves();
-      sinon.stub(publisher, 'publishProcessDownloadJob').resolves({ status: 'published', jobId: 'job-1' });
-
-      await service.checkoutCart('cart-1', null);
-
-      expect(createDownloadStub).to.have.been.calledOnceWith({
-        teamId: null,
-        dataRequestId: null,
-        fragmentSizeBytes: undefined,
-        systemUserId: null
-      });
-      expect(updateCartStub).to.have.been.calledOnceWith('cart-1', {
-        cart_status: CartStatus.CHECKED_OUT,
-        checkout_date: sinon.match.string,
-        checkout_user: null
-      });
-      expect(createTeamStub).to.not.have.been.called;
     });
 
     it('should propagate errors and not call subsequent steps', async () => {
@@ -420,13 +372,8 @@ describe('CartService', () => {
 
       sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureIds').resolves([1, 2]);
       sinon.stub(DownloadService.prototype, 'createDownload').rejects(new Error('DB error'));
-      sinon.stub(TeamService.prototype, 'createTeam').resolves({
-        team_id: 'team-1',
-        name: 'team',
-        description: 'description',
-        member_count: 0
-      });
       const createFeaturesStub = sinon.stub(DownloadService.prototype, 'createDownloadFeatures');
+      const createDownloadTeamStub = sinon.stub(DownloadService.prototype, 'createDownloadTeam');
       const updateCartStub = sinon.stub(CartRepository.prototype, 'updateCart');
       const publishStub = sinon.stub(publisher, 'publishProcessDownloadJob');
 
@@ -438,6 +385,7 @@ describe('CartService', () => {
       }
 
       expect(createFeaturesStub).to.not.have.been.called;
+      expect(createDownloadTeamStub).to.not.have.been.called;
       expect(updateCartStub).to.not.have.been.called;
       expect(publishStub).to.not.have.been.called;
     });
