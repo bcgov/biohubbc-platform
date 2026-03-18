@@ -2,7 +2,7 @@ import { MenuItem, Pagination as MuiPagination, Select, SelectChangeEvent, Stack
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
-interface PaginationProps {
+interface CustomPaginationProps {
   currentPage: number;
   pageSize: number;
   totalCount: number;
@@ -11,14 +11,14 @@ interface PaginationProps {
   onPageSizeChange: (pageSize: number) => void;
 }
 
-export const Pagination = ({
+export const CustomPagination = ({
   currentPage,
   pageSize,
   totalCount,
   lastPage,
   onPageChange,
   onPageSizeChange
-}: PaginationProps) => {
+}: CustomPaginationProps) => {
   const firstItem = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const lastItem = Math.min(currentPage * pageSize, totalCount);
 
@@ -27,10 +27,10 @@ export const Pagination = ({
   };
 
   return (
-    <Stack direction="row" alignItems="center" justifyContent="space-between">
+    <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="nowrap">
       <Stack direction="row" alignItems="center" spacing={1}>
         <Typography variant="body2" color="text.secondary">
-          {firstItem}–{lastItem} of {totalCount} results
+          {firstItem}–{lastItem} of {totalCount}
         </Typography>
         <Select<number>
           size="small"
@@ -40,7 +40,7 @@ export const Pagination = ({
           sx={{ fontSize: '0.875rem' }}>
           {PAGE_SIZE_OPTIONS.map((option) => (
             <MenuItem key={option} value={option}>
-              {option} / page
+              {option}
             </MenuItem>
           ))}
         </Select>
@@ -51,7 +51,8 @@ export const Pagination = ({
         page={currentPage}
         onChange={(_event, page) => onPageChange(page)}
         shape="rounded"
-        siblingCount={1}
+        siblingCount={0}
+        boundaryCount={0}
       />
     </Stack>
   );
