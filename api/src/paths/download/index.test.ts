@@ -61,7 +61,10 @@ describe('paths/download/index', () => {
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(mockRes.statusValue).to.equal(201);
-      expect(mockRes.jsonValue).to.eql({ download_id: 'uuid-1' });
+      expect(mockRes.jsonValue).to.eql({
+        download_id: 'uuid-1',
+        download_url: 'http://localhost:6100/api/download/uuid-1'
+      });
     });
 
     it('should pass search filters to createDownloadRequest', async () => {

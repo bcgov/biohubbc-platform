@@ -157,11 +157,15 @@ POST.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['download_id'],
+            required: ['download_id', 'download_url'],
             properties: {
               download_id: {
                 type: 'string',
                 format: 'uuid'
+              },
+              download_url: {
+                type: 'string',
+                description: 'Relative API path to check download status'
               }
             }
           }
@@ -226,7 +230,14 @@ export function createDownload(): RequestHandler {
 
       await connection.commit();
 
-      return res.status(201).json({ download_id: downloadId.download_id });
+      const apiHost = process.env.API_HOST || 'localhost';
+      const apiPort = process.env.API_PORT || '6100';
+      const baseUrl = apiHost === 'localhost' ? `http://${apiHost}:${apiPort}` : `https://${apiHost}`;
+
+      return res.status(201).json({
+        download_id: downloadId.download_id,
+        download_url: `${baseUrl}/api/download/${downloadId.download_id}`
+      });
     } catch (error) {
       defaultLog.error({ label: 'createDownload', message: 'error', error });
       await connection.rollback();

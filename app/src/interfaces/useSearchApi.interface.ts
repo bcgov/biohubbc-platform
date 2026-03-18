@@ -58,6 +58,7 @@ export interface ISearchFeaturePropertyGroup {
  */
 export interface CreateDownloadResponse {
   download_id: string;
+  download_url: string;
 }
 
 /** Request parameters for advanced feature search */

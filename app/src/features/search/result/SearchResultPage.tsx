@@ -4,7 +4,7 @@ import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
-import { useCartContext, useCodesContext, useConfigContext, useDialogContext } from 'hooks/useContext';
+import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { normalizeQueryParam } from 'utils/query-param';
 import { DownloadUrlDisplay } from './components/DownloadUrlDisplay';
@@ -33,7 +33,7 @@ export const SearchResultPage = () => {
   const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination, filters } = useSearchResults();
   const api = useApi();
   const { auth } = useAuthStateContext();
-  const config = useConfigContext();
+
   const { codesDataLoader } = useCodesContext();
   const { features, pagination: cartPagination, addToCart, checkout } = useCartContext();
   const dialogContext = useDialogContext();
@@ -218,7 +218,7 @@ export const SearchResultPage = () => {
   const handleDownloadAll = useCallback(async () => {
     try {
       setIsDownloading(true);
-      const { download_id: downloadId } = await api.search.createDownload(filters);
+      const { download_url: downloadUrl } = await api.search.createDownload(filters);
 
       if (auth.isAuthenticated) {
         dialogContext.setSnackbar({
@@ -226,7 +226,6 @@ export const SearchResultPage = () => {
           open: true
         });
       } else {
-        const downloadUrl = `${config.API_HOST}/api/download/${downloadId}`;
         dialogContext.setOkDialog({
           dialogTitle: 'Download Started',
           dialogText:
@@ -241,7 +240,7 @@ export const SearchResultPage = () => {
     } finally {
       setIsDownloading(false);
     }
-  }, [filters, api.search, dialogContext, auth.isAuthenticated, config.API_HOST]);
+  }, [filters, api.search, dialogContext, auth.isAuthenticated]);
 
   const handleCheckout = useCallback(async () => {
     try {
