@@ -6,7 +6,6 @@ import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../openapi/schemas/pagination';
 import * as publisher from '../../queue/publisher';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
-import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadService } from '../../services/download/download-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
 import { ISearchFeaturesFilters } from '../../services/search-feature-service.interface';
@@ -180,11 +179,9 @@ POST.apiDoc = {
  * Original filters are stored in `download.filters` for traceability (ticket requirement).
  * Uses a dedicated column instead of `metadata` which gets overwritten by the pipeline.
  *
- * OptionalBearer: anonymous users get a download with system_user_id = null
- * (UUID is the credential). Authenticated users get it linked to their account.
- *
- * teamId is null: downloads from search are user-owned, not team-based.
- * Team-based downloads originate from data requests only.
+ * OptionalBearer: anonymous users get a download with no team associations
+ * (UUID is the credential). Authenticated users get a team created and linked
+ * via download_team — all download access flows through team membership.
  */
 export function createDownload(): RequestHandler {
   return async (req, res) => {
@@ -197,29 +194,42 @@ export function createDownload(): RequestHandler {
       const filters: ISearchFeaturesFilters = req.body.filters;
 
       const searchFeatureService = new SearchFeatureService(connection);
+      const downloadService = new DownloadService(connection);
 
-      // Quick count check before fetching all IDs
-      const featureCount = await searchFeatureService.getSearchFeaturesCount(filters);
+      // Resolve filters to all matching feature IDs
+      const allFeatureIds = await searchFeatureService.getSearchFeatureIds(filters);
 
-      if (featureCount === 0) {
+      if (allFeatureIds.length === 0) {
         throw new HTTP400('No features match the filter criteria');
       }
 
-      // Resolve filters to feature IDs via CTE intersection
-      const submissionFeatureIds = await searchFeatureService.getSearchFeatureIds(filters);
-
-      // Anonymous downloads: system_user_id is null (UUID is the credential).
+      // Filter to only features the user is authorized to download.
+      // Unsecured features pass through. Secured features require an ALLOW policy
+      // via the user's team memberships. Anonymous users get unsecured only.
       const systemUserId = isAuthenticated ? connection.systemUserId() : null;
+      const submissionFeatureIds = await downloadService.filterAuthorizedFeatureIds(allFeatureIds, systemUserId);
 
-      // Create download with search filters stored for traceability.
-      // teamId is null: downloads from search are user-owned, not team-based.
-      const pipelineService = new DownloadPipelineService(connection);
-      const downloadId = await pipelineService.createDownloadRequest({
-        systemUserId,
-        teamId: null,
+      if (submissionFeatureIds.length === 0) {
+        throw new HTTP400('No authorized features match the filter criteria');
+      }
+
+      // Create download with search filters stored for traceability
+      const downloadId = await downloadService.createDownloadRequest({
         submissionFeatureIds,
         filters
       });
+
+      // Link download to a new team for authenticated users.
+      // Anonymous downloads have no download_team rows — UUID is the credential.
+      if (isAuthenticated) {
+        const systemUserId = connection.systemUserId();
+        await downloadService.linkDownloadToNewTeam(
+          downloadId.download_id,
+          systemUserId,
+          `Team for bulk ${downloadId.download_id}`,
+          'Team automatically created for download'
+        );
+      }
 
       // Publish async processing job within the transaction
       await publisher.publishProcessDownloadJob(connection, { downloadId: downloadId.download_id });

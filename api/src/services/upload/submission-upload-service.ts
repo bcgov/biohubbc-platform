@@ -35,6 +35,23 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
+   * Retrieves a submission_upload record only if it belongs to the submission identified by the given UUID.
+   * Use this to validate path parameters (submissionId + submissionUploadId) before acting on an upload.
+   *
+   * @param {string} submissionUuid Submission UUID from path (submission.uuid)
+   * @param {string} submissionUploadId Submission upload ID from path
+   * @return {Promise<SubmissionUpload>} The submission upload record
+   * @throws {ApiNotFoundError} If the submission or upload does not exist, or the upload does not belong to the submission (mapped to 404 by error handler)
+   * @memberof SubmissionUploadService
+   */
+  async getSubmissionUploadBySubmissionUuid(
+    submissionUuid: string,
+    submissionUploadId: string
+  ): Promise<SubmissionUpload> {
+    return this.submissionUploadRepository.getSubmissionUploadBySubmissionUuid(submissionUuid, submissionUploadId);
+  }
+
+  /**
    * Retrieves all submission_upload records for the given submission, with filters and pagination.
    *
    * @param {number} submissionId
@@ -89,7 +106,29 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
-   * Deletes a submission_upload record by ID.
+   * Soft-deletes a single active submission_upload record by ID.
+   *
+   * @param {string} submissionUploadId The ID of the record to soft-delete
+   * @return {Promise<void>}
+   * @memberof SubmissionUploadService
+   */
+  async softDeleteSubmissionUpload(submissionUploadId: string): Promise<void> {
+    return this.submissionUploadRepository.softDeleteSubmissionUpload(submissionUploadId);
+  }
+
+  /**
+   * Soft-deletes all active submission_upload records for a given submission.
+   *
+   * @param {number} submissionId The submission whose uploads should be soft-deleted
+   * @return {Promise<number>} The number of records soft-deleted
+   * @memberof SubmissionUploadService
+   */
+  async softDeleteSubmissionUploadsBySubmissionId(submissionId: number): Promise<number> {
+    return this.submissionUploadRepository.softDeleteSubmissionUploadsBySubmissionId(submissionId);
+  }
+
+  /**
+   * Hard-deletes a submission_upload record by ID.
    *
    * @param {string} submissionUploadId The ID of the artifact to delete
    * @return {Promise<void>}
