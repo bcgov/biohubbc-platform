@@ -188,15 +188,105 @@ export const insertSubmissionUploadRecord = async (
   submission_id: number,
   upload_id: string
 ): Promise<string> => {
+  const ticket_id = await ensureTicketForSubmissionUpload(knex, { submission_id, upload_id });
+
   const [{ submission_upload_id }] = await knex('submission_upload')
     .insert({
       submission_id,
       upload_id,
-      create_user: 1
+      create_user: 1,
+      ticket_id
     })
     .returning('submission_upload_id');
 
   return submission_upload_id;
+};
+
+const ensureTicketForSubmissionUpload = async (
+  knex: Knex,
+  input: { submission_id: number; upload_id: string }
+): Promise<string> => {
+  // Use an existing system_user for create_user to satisfy NOT NULL constraints.
+  const createUserRow = await knex('system_user').whereNull('record_end_date').select('system_user_id').first();
+  const create_user = createUserRow?.system_user_id ?? 1;
+
+  // Keep a stable team across seed runs so we only need one FK target.
+  const teamName = 'Seed Submission Upload Team';
+  const team = await knex('team').where({ name: teamName }).whereNull('record_end_date').first();
+  const team_id =
+    team?.team_id ??
+    (
+      await knex('team')
+        .insert({
+          name: teamName,
+          description: 'Auto-generated team for submission_upload seed tickets.',
+          create_user
+        })
+        .returning(['team_id'])
+    )[0].team_id;
+
+  // Make subject unique per upload UUID so rerunning seeds can reuse the same ticket.
+  const subject = `Submission Upload - ${input.upload_id}`;
+  const existing = await knex('ticket').where({ subject }).whereNull('record_end_date').first();
+  if (existing?.ticket_id) {
+    return existing.ticket_id;
+  }
+
+  const ticket_slug = await generateUniqueTicketSlug(knex);
+
+  const [created] = await knex('ticket')
+    .insert({
+      ticket_slug,
+      subject,
+      description: null,
+      team_id,
+      priority: 'medium',
+      status: 'open',
+      create_user
+    })
+    .returning(['ticket_id']);
+
+  const ticket_id = created.ticket_id as string;
+
+  await knex('ticket_status').insert({
+    ticket_id,
+    status: 'open',
+    create_user
+  });
+
+  return ticket_id;
+};
+
+/**
+ * Generate an unused DDDNNNNN ticket slug for the current UTC day.
+ * (DDD = day-of-year, NNNNN = per-day sequence)
+ */
+const generateUniqueTicketSlug = async (knex: Knex): Promise<string> => {
+  const now = new Date();
+  const utcYearStart = Date.UTC(now.getUTCFullYear(), 0, 0);
+  const utcToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const dayOfYear = Math.floor((utcToday - utcYearStart) / (1000 * 60 * 60 * 24));
+  const dayPrefix = dayOfYear.toString().padStart(3, '0');
+
+  const row = await knex('ticket')
+    .whereRaw('ticket_slug LIKE ?', [`${dayPrefix}%`])
+    .select(knex.raw('COALESCE(MAX(RIGHT(ticket_slug, 5)::integer), -1) as last_value'))
+    .first();
+
+  const lastValueRaw = row?.last_value;
+  const nextSequenceInit = lastValueRaw === undefined || lastValueRaw === null ? -1 : Number(lastValueRaw);
+  let nextSequence = Number.isNaN(nextSequenceInit) ? -1 : nextSequenceInit;
+  // Ensure uniqueness even if another process inserted the candidate.
+  while (nextSequence < 100000) {
+    nextSequence += 1;
+    const candidate = `${dayPrefix}${nextSequence.toString().padStart(5, '0')}`;
+    const exists = await knex('ticket').where({ ticket_slug: candidate }).whereNull('record_end_date').first();
+    if (!exists) {
+      return candidate;
+    }
+  }
+
+  throw new Error('Unable to generate a unique ticket_slug for seed data');
 };
 
 export const insertSampleSiteRecord = async (
