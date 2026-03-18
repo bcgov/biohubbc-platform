@@ -144,12 +144,13 @@ export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
 
     const response = await runSerialized(async () => {
       const download = await api.cart.checkoutCart(cartId);
+      setStoredCartId(null);
       dispatch({ type: 'RESET' });
       return download;
     });
 
     return response ?? null;
-  }, [api.cart, runSerialized, state.cartId]);
+  }, [api.cart, runSerialized, setStoredCartId, state.cartId]);
 
   const value: ICartContext = useMemo(
     () => ({
