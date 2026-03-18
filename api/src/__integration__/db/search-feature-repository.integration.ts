@@ -61,9 +61,11 @@ describe('SearchFeatureRepository (integration)', function () {
     `);
     const uploadId = uploadResult.rows[0].upload_id;
 
+    const ticket_id = await getOrCreateIntegrationTicketId(connection, uploadId, systemUserId);
+
     const bridgeResult = await connection.sql(SQL`
-      INSERT INTO submission_upload (submission_id, upload_id, create_user)
-      VALUES (${submissionId}, ${uploadId}, ${systemUserId})
+      INSERT INTO submission_upload (submission_id, upload_id, ticket_id, create_user)
+      VALUES (${submissionId}, ${uploadId}, ${ticket_id}, ${systemUserId})
       RETURNING submission_upload_id;
     `);
     const submissionUploadId = bridgeResult.rows[0].submission_upload_id;
@@ -193,3 +195,99 @@ describe('SearchFeatureRepository (integration)', function () {
     });
   });
 });
+
+/**
+ * Integration tests insert into `submission_upload` directly.
+ * Since `submission_upload.ticket_id` is now NOT NULL, ensure a ticket exists first.
+ */
+async function getOrCreateIntegrationTicketId(connection: IDBConnection, uploadId: string, systemUserId: number) {
+  const teamName = 'Integration Ticket Team';
+  const subject = `Submission Upload - ${uploadId}`;
+
+  const existingTicket = await connection.sql(SQL`
+    SELECT ticket_id
+    FROM ticket
+    WHERE subject = ${subject}
+      AND record_end_date IS NULL
+    LIMIT 1;
+  `);
+
+  const existingTicketId = existingTicket.rows[0]?.ticket_id as string | undefined;
+  if (existingTicketId) {
+    return existingTicketId;
+  }
+
+  const existingTeam = await connection.sql(SQL`
+    SELECT team_id
+    FROM team
+    WHERE name = ${teamName}
+      AND record_end_date IS NULL
+    LIMIT 1;
+  `);
+
+  const existingTeamId = existingTeam.rows[0]?.team_id as string | undefined;
+  const teamId =
+    existingTeamId ??
+    (
+      await connection.sql(SQL`
+        INSERT INTO team (name, description, create_user)
+        VALUES (${teamName}, 'Integration test team for ticket linking.', ${systemUserId})
+        RETURNING team_id;
+      `)
+    ).rows[0].team_id;
+
+  const nextSlug = await connection.sql(SQL`
+    WITH
+      day_context AS (
+        SELECT TO_CHAR((now() AT TIME ZONE 'UTC')::date, 'DDD') AS day_of_year
+      ),
+      latest AS (
+        SELECT
+          COALESCE(MAX(RIGHT(ticket_slug, 5)::integer), -1) AS last_value
+        FROM ticket, day_context
+        WHERE ticket_slug LIKE day_context.day_of_year || '%'
+      ),
+      next_value AS (
+        SELECT
+          day_context.day_of_year,
+          latest.last_value + 1 AS next_sequence
+        FROM day_context, latest
+      )
+    SELECT
+      day_of_year || LPAD(next_sequence::text, 5, '0') AS ticket_slug
+    FROM next_value;
+  `);
+
+  const ticketSlug = nextSlug.rows[0].ticket_slug as string;
+
+  const createdTicket = await connection.sql(SQL`
+    INSERT INTO ticket (
+      ticket_slug,
+      subject,
+      description,
+      team_id,
+      priority,
+      status,
+      create_user
+    )
+    VALUES (
+      ${ticketSlug},
+      ${subject},
+      NULL,
+      ${teamId},
+      'medium',
+      'open',
+      ${systemUserId}
+    )
+    RETURNING ticket_id;
+  `);
+
+  const ticketId = createdTicket.rows[0].ticket_id as string;
+
+  await connection.sql(SQL`
+    INSERT INTO ticket_status (ticket_id, status, create_user)
+    VALUES (${ticketId}, 'open', ${systemUserId});
+  `);
+
+  return ticketId;
+}

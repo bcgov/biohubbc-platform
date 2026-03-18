@@ -24,7 +24,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       SELECT
         submission_upload_id,
         submission_id,
-        upload_id
+        upload_id,
+        ticket_id
       FROM
         submission_upload
       WHERE
@@ -70,6 +71,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         su.submission_upload_id,
         su.submission_id,
         su.upload_id,
+        su.ticket_id,
         su.record_end_date
       FROM
         submission_upload su
@@ -117,7 +119,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       .select(
         'submission_upload.submission_upload_id',
         'submission_upload.submission_id',
-        'submission_upload.upload_id'
+        'submission_upload.upload_id',
+        'submission_upload.ticket_id'
       )
       .from('submission_upload')
       .join('upload_artifact as ua', 'ua.upload_id', 'submission_upload.upload_id')
@@ -147,10 +150,12 @@ export class SubmissionUploadRepository extends BaseRepository {
     const sqlStatement = SQL`
       INSERT INTO submission_upload (
         submission_id,
-        upload_id
+        upload_id,
+        ticket_id
       ) VALUES (
         ${submissionUpload.submission_id},
-        ${submissionUpload.upload_id}
+        ${submissionUpload.upload_id},
+        ${submissionUpload.ticket_id}
       )
       RETURNING submission_upload_id;
     `;
@@ -172,21 +177,25 @@ export class SubmissionUploadRepository extends BaseRepository {
    *
    * @param {number} submissionId - The ID of the submission.
    * @param {string} uploadId - The ID of the upload.
+   * @param {string} ticketId - The ID of the associated ticket.
    * @returns {Promise<{ submission_upload_id: string }[]>} - The list of newly created submission_upload records.
    * @throws {ApiExecuteSQLError} - If the insert fails.
    */
   async insertSubmissionUploadsForUploadId(
     submissionId: number,
-    uploadId: string
+    uploadId: string,
+    ticketId: string
   ): Promise<{ submission_upload_id: string }[]> {
     const sqlStatement = SQL`
       INSERT INTO submission_upload (
         submission_id,
-        upload_id
+        upload_id,
+        ticket_id
       )
       SELECT
         ${submissionId},
-        ua.upload_id
+        ua.upload_id,
+        ${ticketId}
       FROM upload_artifact ua
       WHERE ua.upload_id = ${uploadId}
       RETURNING submission_upload_id;
@@ -222,7 +231,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       UPDATE submission_upload
       SET
         submission_id = COALESCE(${submissionUpload.submission_id}, submission_id),
-        upload_id = COALESCE(${submissionUpload.upload_id}, upload_id)
+        upload_id = COALESCE(${submissionUpload.upload_id}, upload_id),
+        ticket_id = COALESCE(${submissionUpload.ticket_id}, ticket_id)
       WHERE
         submission_upload_id = ${submissionUploadId}
       RETURNING submission_upload_id;
@@ -253,7 +263,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       SELECT
         submission_upload_id,
         submission_id,
-        upload_id
+        upload_id,
+        ticket_id
       FROM
         submission_upload
       WHERE
