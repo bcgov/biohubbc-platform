@@ -2,30 +2,14 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { GridColDef, GridPaginationModel, GridRowParams, GridSortModel, MuiEvent } from '@mui/x-data-grid';
+import { GridColDef } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
-
-export type SubmissionFeatureRow = {
-  submissionFeatureId: number;
-  submission_feature_id: number;
-  feature_type_name: string;
-};
+import { SubmissionFeatureTableProps } from './SubmissionFeatureTable.interface';
 
 const columns: GridColDef[] = [
   { field: 'submission_feature_id', headerName: 'ID', width: 120, sortable: true },
   { field: 'feature_type_name', headerName: 'Feature Type', flex: 1, sortable: true }
 ];
-
-interface SubmissionFeatureTableProps {
-  rows: SubmissionFeatureRow[];
-  rowCount: number;
-  isLoading: boolean;
-  onRowClick: (params: GridRowParams<SubmissionFeatureRow>, event: MuiEvent<React.MouseEvent>) => void;
-  paginationModel: GridPaginationModel;
-  onPaginationModelChange: (model: GridPaginationModel) => void;
-  sortModel: GridSortModel;
-  onSortModelChange: (model: GridSortModel) => void;
-}
 
 export const SubmissionFeatureTable = (props: SubmissionFeatureTableProps) => {
   const {
