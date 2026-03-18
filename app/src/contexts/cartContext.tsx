@@ -38,7 +38,6 @@ export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
   const { runSerialized } = useSerializedAsync();
 
   const [state, dispatch] = useReducer(cartReducer, {
-    cartId: storedCartId,
     features: [],
     pagination: DEFAULT_PAGINATION,
     isLoading: false,
@@ -62,9 +61,8 @@ export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
   const { createCart } = useCartLifecycle({
     cartApi: api.cart,
     isAuthenticated: authStateContext.auth.isAuthenticated,
-    storedCartId,
+    cartId: storedCartId,
     setStoredCartId,
-    state,
     dispatch,
     applyLoadSuccess,
     handleClaimError
@@ -89,7 +87,7 @@ export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
         let optimisticAdds: SearchFeatureResultWithRelevancy[] = [];
 
         try {
-          if (!state.cartId) {
+          if (!storedCartId) {
             await createCart({ features: featuresToAdd });
             return;
           }
@@ -99,7 +97,7 @@ export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
             return;
           }
 
-          await addToExistingCart(state.cartId, optimisticAdds);
+          await addToExistingCart(storedCartId, optimisticAdds);
         } catch (error) {
           if (optimisticAdds.length > 0 && isInvalidCachedCartError(error)) {
             await createCart({ features: optimisticAdds });
@@ -110,37 +108,37 @@ export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
         }
       });
     },
-    [addToExistingCart, createCart, runSerialized, state.cartId, state.features]
+    [addToExistingCart, createCart, runSerialized, state.features, storedCartId]
   );
 
   const removeFromCart = useCallback(
     async (featureIds: number[]): Promise<void> => {
-      if (!state.cartId || !featureIds.length) {
+      if (!storedCartId || !featureIds.length) {
         return;
       }
 
-      const cartId = state.cartId;
+      const cartId = storedCartId;
       await runSerialized(() => removeFromExistingCart(cartId, featureIds));
     },
-    [removeFromExistingCart, runSerialized, state.cartId]
+    [removeFromExistingCart, runSerialized, storedCartId]
   );
 
   const clearCart = useCallback(async (): Promise<void> => {
-    if (!state.cartId) {
+    if (!storedCartId) {
       return;
     }
 
-    const cartId = state.cartId;
+    const cartId = storedCartId;
     await runSerialized(() => clearExistingCart(cartId));
-  }, [clearExistingCart, runSerialized, state.cartId]);
+  }, [clearExistingCart, runSerialized, storedCartId]);
 
   // Checks out the cart and resets all cart state on success.
   const checkout = useCallback(async (): Promise<CheckoutCartResponse | null> => {
-    if (!state.cartId) {
+    if (!storedCartId) {
       return null;
     }
 
-    const cartId = state.cartId;
+    const cartId = storedCartId;
 
     const response = await runSerialized(async () => {
       const download = await api.cart.checkoutCart(cartId);
@@ -150,11 +148,11 @@ export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
     });
 
     return response ?? null;
-  }, [api.cart, runSerialized, setStoredCartId, state.cartId]);
+  }, [api.cart, runSerialized, setStoredCartId, storedCartId]);
 
   const value: ICartContext = useMemo(
     () => ({
-      cartId: state.cartId,
+      cartId: storedCartId,
       features: state.features,
       pagination: state.pagination,
       isLoading: state.isLoading,
@@ -169,11 +167,11 @@ export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
       checkout,
       clearCart,
       removeFromCart,
-      state.cartId,
       state.features,
       state.pagination,
       state.isLoading,
-      state.error
+      state.error,
+      storedCartId
     ]
   );
 

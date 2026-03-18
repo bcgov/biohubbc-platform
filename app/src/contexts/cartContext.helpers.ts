@@ -104,15 +104,9 @@ export const cartReducer = (state: CartState, action: CartAction): CartState => 
         pagination: action.payload.pagination,
         error: undefined
       };
-    case 'SET_CART_ID':
-      return {
-        ...state,
-        cartId: action.payload
-      };
     case 'RESET':
       return {
         ...state,
-        cartId: null,
         features: [],
         pagination: DEFAULT_PAGINATION,
         isLoading: false,
