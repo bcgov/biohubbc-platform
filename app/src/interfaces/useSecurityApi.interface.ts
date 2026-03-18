@@ -75,7 +75,7 @@ export interface ISubmissionFeatureSecurityRulesSummaryResponse {
 export interface ISecurityCategoryWithRuleCount {
   security_category_id: number;
   name: string;
-  description: string;
+  description: string | null;
   rule_count: number;
 }
 
@@ -87,7 +87,7 @@ export interface ISecurityCategoriesResponse {
 export interface ISecurityReasonWithFeatureCount {
   security_rule_id: number;
   name: string;
-  description: string;
+  description: string | null;
   feature_count: number;
 }
 

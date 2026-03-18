@@ -1,15 +1,14 @@
 import { IDBConnection } from '../database/db';
 import { HTTP403 } from '../errors/http-error';
+import { SecurityCategoryWithRuleCount } from '../models/security-category';
+import { SecurityRuleWithFeatureCount, SecuritySearchFilters } from '../models/security-rule';
 import {
   ArtifactPersecution,
   PersecutionAndHarmSecurity,
   SecurityCategoryRecord,
-  SecurityCategoryWithRuleCount,
   SecurityRepository,
   SecurityRuleAndCategory,
   SecurityRuleRecord,
-  SecurityRuleWithFeatureCount,
-  SecuritySearchFilters,
   SECURITY_APPLIED_STATUS,
   SubmissionFeatureSecurityRecord,
   SubmissionFeatureSecurityRulesSummary
