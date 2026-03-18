@@ -452,9 +452,6 @@ describe('publisher', () => {
   describe('publishProcessDownloadJob', () => {
     const createMockDownload = (overrides: Partial<DownloadRecord> = {}): DownloadRecord => ({
       download_id: 'aaaa0000-0000-0000-0000-000000000001',
-      system_user_id: null,
-      team_id: null,
-      data_request_id: null,
       download_status: 'pending',
       metadata: null,
       started_at: null,
