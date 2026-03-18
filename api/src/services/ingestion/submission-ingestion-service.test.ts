@@ -98,7 +98,8 @@ describe('SubmissionIngestionService', () => {
     const mockSubmissionUpload = {
       submission_upload_id: 'sub-upload-uuid-1',
       submission_id: 123,
-      upload_id: 'upload-1'
+      upload_id: 'upload-1',
+      ticket_id: '11111111-1111-1111-1111-111111111111'
     };
     const mockObjectKey = 'submissions/123/uploads/upload-1.tar';
 

@@ -8,6 +8,7 @@ import { SystemUser } from '../../repositories/user-repository';
 import { RegionService } from '../../services/region-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
 import { SubmissionService } from '../../services/submission-service';
+import { TicketService } from '../../services/ticket-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { UploadService } from '../../services/upload/upload-service';
 import { ValidationService } from '../../services/validation-service';
@@ -147,6 +148,9 @@ describe('intake', () => {
         });
 
       sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: 'some-uuid' });
+      sinon.stub(TicketService.prototype, 'createTicket').resolves({
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      } as any);
 
       sinon
         .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')

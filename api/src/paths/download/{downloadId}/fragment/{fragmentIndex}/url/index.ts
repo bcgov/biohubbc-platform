@@ -4,7 +4,7 @@ import { getAPIUserDBConnection, getDBConnection } from '../../../../../../datab
 import { HTTP400, HTTP409 } from '../../../../../../errors/http-error';
 import { DownloadStatusEnum } from '../../../../../../models/download-status';
 import { defaultErrorResponses } from '../../../../../../openapi/schemas/http-responses';
-import { DownloadPipelineService } from '../../../../../../services/download/download-pipeline-service';
+import { DownloadService } from '../../../../../../services/download/download-service';
 import { getLogger } from '../../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/download/{downloadId}/fragment/{fragmentIndex}/url');
@@ -66,8 +66,8 @@ GET.apiDoc = {
 /**
  * Get a signed URL for downloading a specific fragment of a completed download.
  *
- * Unauthenticated downloads (system_user_id is null) are accessible to anyone.
- * Authenticated downloads are restricted to the requesting user.
+ * Anonymous downloads (no download_team rows) are accessible to anyone with the UUID.
+ * Team-based downloads are restricted to members of linked teams.
  *
  * @returns {RequestHandler}
  */
@@ -85,15 +85,15 @@ export function getFragmentUrl(): RequestHandler {
 
       await connection.open();
 
-      const pipelineService = new DownloadPipelineService(connection);
+      const downloadService = new DownloadService(connection);
       const systemUserId = isAuthenticated ? connection.systemUserId() : null;
-      const download = await pipelineService.getAuthorizedDownload(downloadId, systemUserId);
+      const download = await downloadService.getAuthorizedDownload(downloadId, systemUserId);
 
       if (download.download_status !== DownloadStatusEnum.READY) {
         throw new HTTP409('Download is not ready');
       }
 
-      const url = await pipelineService.getFragmentSignedUrl(downloadId, fragmentIndex);
+      const url = await downloadService.getFragmentSignedUrl(downloadId, fragmentIndex);
 
       await connection.commit();
 

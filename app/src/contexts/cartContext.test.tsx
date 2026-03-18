@@ -425,11 +425,15 @@ describe('CartContextProvider', () => {
       expect(getContext().features).toEqual([featureA, featureB]);
     });
 
-    await expect(
-      act(async () => {
+    let removeError: unknown;
+    await act(async () => {
+      try {
         await getContext().removeFromCart([featureA.submission_feature_id]);
-      })
-    ).rejects.toThrow('remove failed');
+      } catch (error) {
+        removeError = error;
+      }
+    });
+    expect(removeError).toEqual(expect.objectContaining({ message: 'remove failed' }));
 
     await waitFor(() => {
       expect(getContext().features).toEqual([featureA, featureB]);
@@ -476,11 +480,15 @@ describe('CartContextProvider', () => {
       expect(getContext().features).toEqual([featureA]);
     });
 
-    await expect(
-      act(async () => {
+    let clearError: unknown;
+    await act(async () => {
+      try {
         await getContext().clearCart();
-      })
-    ).rejects.toThrow('clear failed');
+      } catch (error) {
+        clearError = error;
+      }
+    });
+    expect(clearError).toEqual(expect.objectContaining({ message: 'clear failed' }));
 
     await waitFor(() => {
       expect(getContext().features).toEqual([featureA]);
@@ -565,7 +573,7 @@ describe('CartContextProvider', () => {
 
     expect(mockCartApi.checkoutCart).toHaveBeenCalledTimes(1);
     expect(mockCartApi.checkoutCart).toHaveBeenCalledWith('cart-1');
-    expect(mockSetStoredCartId).toHaveBeenCalledWith(null);
+    expect(mockSetStoredCartId).to.have.been.lastCalledWith(null);
 
     await waitFor(() => {
       expect(getContext().features).toEqual([]);
@@ -597,11 +605,15 @@ describe('CartContextProvider', () => {
       expect(getContext().features).toEqual([existingFeature]);
     });
 
-    await expect(
-      act(async () => {
+    let checkoutErrorCaught: unknown;
+    await act(async () => {
+      try {
         await getContext().checkout();
-      })
-    ).rejects.toThrow('checkout failed');
+      } catch (error) {
+        checkoutErrorCaught = error;
+      }
+    });
+    expect(checkoutErrorCaught).toEqual(expect.objectContaining({ message: 'checkout failed' }));
 
     await waitFor(() => {
       expect(getContext().features).toEqual([existingFeature]);
@@ -633,9 +645,13 @@ describe('CartContextProvider', () => {
 
     // Fire two checkouts concurrently
     let firstDone = false;
-    const first = act(async () => {
-      await getContext().checkout();
-      firstDone = true;
+    let first: Promise<void>;
+    act(() => {
+      first = getContext()
+        .checkout()
+        .then(() => {
+          firstDone = true;
+        });
     });
 
     // Second call should be a no-op (operationInProgress is true)
@@ -647,7 +663,9 @@ describe('CartContextProvider', () => {
 
     // Resolve the first call
     resolveCheckout!();
-    await first;
+    await act(async () => {
+      await first;
+    });
     expect(firstDone).toBe(true);
   });
 });

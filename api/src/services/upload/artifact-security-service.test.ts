@@ -370,7 +370,8 @@ describe('ArtifactSecurityService', () => {
       sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId').resolves({
         submission_upload_id: 'su-1',
         submission_id: 123,
-        upload_id: 'upload-1'
+        upload_id: 'upload-1',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
       });
       const publishStub = sinon
         .stub(publisher, 'publishProcessSubmissionFeaturesJob')
@@ -384,7 +385,8 @@ describe('ArtifactSecurityService', () => {
       expect(publishStub.firstCall.args[1]).to.deep.equal({
         submission_upload_id: 'su-1',
         submission_id: 123,
-        upload_id: 'upload-1'
+        upload_id: 'upload-1',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
       });
     });
 
@@ -474,7 +476,8 @@ describe('ArtifactSecurityService', () => {
       sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId').resolves({
         submission_upload_id: 'su-1',
         submission_id: 999,
-        upload_id: 'upload-1'
+        upload_id: 'upload-1',
+        ticket_id: '22222222-2222-2222-2222-222222222222'
       });
       const publishStub = sinon
         .stub(publisher, 'publishProcessSubmissionFeaturesJob')
@@ -487,7 +490,8 @@ describe('ArtifactSecurityService', () => {
       expect(publishStub.firstCall.args[1]).to.deep.equal({
         submission_upload_id: 'su-1',
         submission_id: 999,
-        upload_id: 'upload-1'
+        upload_id: 'upload-1',
+        ticket_id: '22222222-2222-2222-2222-222222222222'
       });
     });
 

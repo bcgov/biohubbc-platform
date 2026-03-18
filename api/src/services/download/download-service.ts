@@ -1,20 +1,32 @@
+import { SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
+import { HTTP403, HTTP404, HTTP409, HTTP500 } from '../../errors/http-error';
 import {
   CreateDownload,
+  CreateDownloadRequest,
   DownloadFeatureSummary,
   DownloadId,
   DownloadListRecord,
   DownloadRecord
 } from '../../models/download';
+import { DownloadFragmentRecord } from '../../models/download-fragment';
+import { DownloadStatusEnum } from '../../models/download-status';
+import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
+import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
+import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 
 /**
- * CRUD service for download records.
+ * Request-time service for downloads.
  *
- * Thin pass-through to DownloadRepository. Business logic and orchestration
- * live in DownloadPipelineService.
+ * Owns all operations called by path handlers during HTTP requests:
+ * CRUD, request creation, access control, team linking, fragment listing,
+ * and signed URL delivery. Composes TeamService + repositories.
+ *
+ * Background processing (fragment planning, streaming, S3 upload) lives
+ * in DownloadPipelineService.
  *
  * @export
  * @class DownloadService
@@ -22,10 +34,14 @@ import { DBService } from '../db-service';
  */
 export class DownloadService extends DBService {
   downloadRepository: DownloadRepository;
+  fragmentRepository: DownloadFragmentRepository;
+  teamService: TeamService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
+    this.fragmentRepository = new DownloadFragmentRepository(connection);
+    this.teamService = new TeamService(connection);
   }
 
   /**
@@ -49,6 +65,33 @@ export class DownloadService extends DBService {
    */
   async createDownloadFeatures(downloadId: string, submissionFeatureIds: number[]): Promise<void> {
     return this.downloadRepository.createDownloadFeatures(downloadId, submissionFeatureIds);
+  }
+
+  /**
+   * Create a new download request from search filters.
+   *
+   * Creates a download record and links the specified submission features.
+   * Caller must validate that submissionFeatureIds is non-empty.
+   *
+   * Team linking is handled separately by the caller via linkDownloadToNewTeam.
+   * Anonymous downloads have no team rows (UUID is the credential).
+   *
+   * @param {CreateDownloadRequest} payload
+   * @return {Promise<DownloadId>} The created download record ID.
+   * @memberof DownloadService
+   */
+  async createDownloadRequest(payload: CreateDownloadRequest): Promise<DownloadId> {
+    const { submissionFeatureIds, fragmentSizeMb, filters } = payload;
+    const fragmentSizeBytes = fragmentSizeMb ? fragmentSizeMb * 1024 * 1024 : undefined;
+
+    const downloadId = await this.downloadRepository.createDownload({
+      fragmentSizeBytes,
+      filters
+    });
+
+    await this.downloadRepository.createDownloadFeatures(downloadId.download_id, submissionFeatureIds);
+
+    return downloadId;
   }
 
   /**
@@ -78,15 +121,88 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * Get lightweight summaries for all authorized features in a download.
+   * Link a download to a team via the download_team join table.
    *
    * @param {string} downloadId - The download ID.
-   * @param {string | null} teamId - The team that owns the download. Null for anonymous downloads.
-   * @return {Promise<DownloadFeatureSummary[]>}
+   * @param {string} teamId - The team ID.
+   * @return {Promise<void>}
    * @memberof DownloadService
    */
-  async getDownloadFeatureSummaries(downloadId: string, teamId: string | null): Promise<DownloadFeatureSummary[]> {
-    return this.downloadRepository.getDownloadFeatureSummaries(downloadId, teamId);
+  async createDownloadTeam(downloadId: string, teamId: string): Promise<void> {
+    return this.downloadRepository.createDownloadTeam(downloadId, teamId);
+  }
+
+  /**
+   * Returns all features linked to a download.
+   *
+   * Authorization is enforced once at creation time via filterAuthorizedFeatureIds —
+   * only authorized features are ever linked to the download. Re-checking at
+   * retrieval time caused a bug: the download_team → policy_team hop meant
+   * adding a user to the download team could change which features were visible.
+   *
+   * @param {string} downloadId - The download ID.
+   * @return {Promise<DownloadFeatureSummary[]>} All linked features.
+   * @memberof DownloadService
+   */
+  async getDownloadFeatures(downloadId: string): Promise<DownloadFeatureSummary[]> {
+    return this.downloadRepository.getDownloadFeatures(downloadId);
+  }
+
+  /**
+   * Filter feature IDs to only those the user is authorized to download.
+   *
+   * Unsecured features are always included. Secured features are included
+   * only if the authenticated user has an ALLOW policy via their team
+   * memberships. Anonymous users (null systemUserId) get unsecured only.
+   *
+   * Used at download creation time to prevent unauthorized features from
+   * being linked to the download. This is the sole authorization gate —
+   * at retrieval time, all linked features are returned without re-checking.
+   *
+   * @param {number[]} featureIds - All candidate feature IDs from search.
+   * @param {number | null} systemUserId - Authenticated user ID, or null for anonymous.
+   * @return {Promise<number[]>} Authorized feature IDs only.
+   * @memberof DownloadService
+   */
+  async filterAuthorizedFeatureIds(featureIds: number[], systemUserId: number | null): Promise<number[]> {
+    if (featureIds.length === 0) {
+      return [];
+    }
+
+    // Identify which features are secured
+    const securedIds = await this.downloadRepository.getSecuredFeatureIds(featureIds);
+
+    // No secured features — all are authorized
+    if (securedIds.size === 0) {
+      return featureIds;
+    }
+
+    // Unsecured features are always authorized
+    const unsecuredIds = featureIds.filter((id) => !securedIds.has(id));
+
+    // Anonymous users: unsecured only (no policies possible)
+    if (systemUserId === null) {
+      return unsecuredIds;
+    }
+
+    // Authenticated users: unsecured + secured with policy access
+    const authorizedSecuredIds = await this.downloadRepository.getUserAuthorizedSecuredFeatureIds(
+      [...securedIds],
+      systemUserId
+    );
+
+    return [...unsecuredIds, ...authorizedSecuredIds];
+  }
+
+  /**
+   * Get all fragments for a download.
+   *
+   * @param {string} downloadId - The download ID.
+   * @return {Promise<DownloadFragmentRecord[]>}
+   * @memberof DownloadService
+   */
+  async getFragmentsByDownloadId(downloadId: string): Promise<DownloadFragmentRecord[]> {
+    return this.fragmentRepository.getFragmentsByDownloadId(downloadId);
   }
 
   /**
@@ -100,5 +216,147 @@ export class DownloadService extends DBService {
    */
   async markDownloadAsDownloaded(downloadId: string): Promise<void> {
     await this.downloadRepository.markDownloadAsDownloaded(downloadId);
+  }
+
+  /**
+   * Authorize a user's access to a specific download.
+   *
+   * Single authorization path through download_team → team → team_member:
+   *
+   * 1. **Anonymous** (no download_team rows):
+   *    Public access — the download UUID itself is the credential. Anyone with the link
+   *    can access it. This supports unauthenticated "download now" flows where users
+   *    don't have an account yet. The user can later claim the download via PUT.
+   *
+   * 2. **Team-based** (download_team rows exist):
+   *    Any authenticated member of a team linked via download_team can access the download.
+   *    Teams are created at download time for authenticated users, or when an anonymous
+   *    download is claimed.
+   *
+   * Throws HTTP403 if the user is not a member of any linked team.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {number | null} systemUserId - The authenticated user's ID, or null if unauthenticated.
+   * @return {Promise<DownloadRecord>} The download record (avoids a second fetch by the caller).
+   * @memberof DownloadService
+   */
+  async getAuthorizedDownload(downloadId: string, systemUserId: number | null): Promise<DownloadRecord> {
+    const download = await this.downloadRepository.findDownloadById(downloadId);
+
+    if (!download) {
+      throw new HTTP404('Download not found');
+    }
+
+    // Anonymous downloads have no team associations — UUID is the credential
+    const hasTeams = await this.downloadRepository.isDownloadClaimedByTeam(downloadId);
+    if (!hasTeams) {
+      return download;
+    }
+
+    // Team-based downloads require an authenticated user
+    if (systemUserId === null) {
+      throw new HTTP403('Access denied');
+    }
+
+    // Check team membership via download_team
+    const authorized = await this.downloadRepository.isUserAuthorizedForDownload(downloadId, systemUserId);
+    if (!authorized) {
+      throw new HTTP403('Access denied');
+    }
+
+    return download;
+  }
+
+  /**
+   * Link a download to a new team containing the given user.
+   *
+   * Creates a single-member team and inserts a download_team row so
+   * all subsequent access flows through download_team → team → team_member.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {number} systemUserId - The user to add as team member.
+   * @param {string} name - Display name for the team record.
+   * @param {string} description - Descriptive text for the team record.
+   * @return {Promise<void>}
+   * @memberof DownloadService
+   */
+  async linkDownloadToNewTeam(
+    downloadId: string,
+    systemUserId: number,
+    name: string,
+    description: string
+  ): Promise<void> {
+    const team = await this.teamService.createTeam({
+      name,
+      description,
+      system_user_ids: [systemUserId]
+    });
+    await this.downloadRepository.createDownloadTeam(downloadId, team.team_id);
+  }
+
+  /**
+   * Claim an anonymous download for an authenticated user.
+   *
+   * Converts a UUID-only credential into team-based access by creating a team
+   * and linking it via download_team. Fails if the download already has team
+   * associations (already claimed) or doesn't exist.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {number} systemUserId - The claiming user's ID.
+   * @return {Promise<void>}
+   * @throws {HTTP404} If the download doesn't exist.
+   * @throws {HTTP409} If the download already has team associations.
+   * @memberof DownloadService
+   */
+  async claimDownload(downloadId: string, systemUserId: number): Promise<void> {
+    const download = await this.downloadRepository.findDownloadById(downloadId);
+
+    if (!download) {
+      throw new HTTP404('Download not found');
+    }
+
+    const hasTeams = await this.downloadRepository.isDownloadClaimedByTeam(downloadId);
+    if (hasTeams) {
+      throw new HTTP409('Download already claimed');
+    }
+
+    await this.linkDownloadToNewTeam(
+      downloadId,
+      systemUserId,
+      `Team for cart ${downloadId}`,
+      'Team created when claiming anonymous download'
+    );
+  }
+
+  /**
+   * Get a signed URL for downloading a specific fragment.
+   *
+   * Validates the fragment exists and is ready before generating the URL.
+   * Fragment delivery is a download-record concern (access control + URL generation),
+   * not a pipeline concern (processing, streaming, S3 upload).
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {number} fragmentIndex - The zero-based fragment index.
+   * @return {Promise<string>} The signed download URL.
+   * @memberof DownloadService
+   */
+  async getFragmentSignedUrl(downloadId: string, fragmentIndex: number): Promise<string> {
+    const fragments = await this.fragmentRepository.getFragmentsByDownloadId(downloadId);
+    const fragment = fragments.find((f) => f.fragment_index === fragmentIndex);
+
+    if (!fragment) {
+      throw new HTTP404(`Fragment ${fragmentIndex} not found for download ${downloadId}`);
+    }
+
+    if (fragment.fragment_status !== DownloadStatusEnum.READY) {
+      throw new HTTP409('Fragment is not ready');
+    }
+
+    if (!fragment.s3_key) {
+      throw new HTTP500('Fragment record missing s3_key');
+    }
+
+    const objectStorageService = new ObjectStorageService();
+    return objectStorageService.getSignedUrl(BucketType.MAIN, fragment.s3_key, SIGNED_URL_EXPIRY_FRAGMENT);
   }
 }
