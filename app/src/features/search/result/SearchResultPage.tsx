@@ -29,6 +29,7 @@ export enum SEARCH_RESULT_OPTION_VIEW {
 export const SearchResultPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
   const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination, filters } = useSearchResults();
   const api = useApi();
   const { codesDataLoader } = useCodesContext();
@@ -285,7 +286,11 @@ export const SearchResultPage = () => {
               rows={rows}
               isLoading={isLoading}
               view={view}
-              onClick={(result) => navigate(`/submission/${result.submission_id}${location.search}`)}
+              onClick={(result) =>
+                navigate(
+                  `/submission/${result.submission_id}/feature/${result.submission_feature_id}${location.search}`
+                )
+              }
             />
           </Box>
         </Paper>
