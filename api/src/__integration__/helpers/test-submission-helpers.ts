@@ -39,7 +39,7 @@ export async function createTestFeature(
   `);
   const uploadId = uploadResult.rows[0].upload_id;
 
-  const ticket_id = await getOrCreateIntegrationTicketId(connection, uploadId, systemUserId);
+  const ticket_id = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, systemUserId);
 
   const bridgeResult = await connection.sql(SQL`
     INSERT INTO submission_upload (submission_id, upload_id, ticket_id, create_user)
@@ -71,17 +71,43 @@ export async function createTestFeature(
 }
 
 /**
- * Integration tests insert into `submission_upload` directly.
- * Since `submission_upload.ticket_id` is now NOT NULL, ensure a ticket exists first.
+ * Get an existing integration ticket for a submission or create one if missing.
+ *
+ * This helper supports integration tests that insert into `submission_upload` directly now that
+ * `submission_upload.ticket_id` is required. It is idempotent per submission by matching on a
+ * stable subject + description pair.
+ *
+ * @param {IDBConnection} connection Active database connection used by the test.
+ * @param {number} submissionId Submission primary key (`submission.submission_id`).
+ * @param {string} uploadId Upload UUID (`upload.upload_id`).
+ * @param {number} systemUserId System user id used for `create_user` fields.
+ * @returns {Promise<string>} The `ticket.ticket_id` to associate with `submission_upload`.
  */
-async function getOrCreateIntegrationTicketId(connection: IDBConnection, uploadId: string, systemUserId: number) {
+export async function getOrCreateIntegrationTicketId(
+  connection: IDBConnection,
+  submissionId: number,
+  uploadId: string,
+  systemUserId: number
+): Promise<string> {
   const teamName = 'Integration Ticket Team';
-  const subject = `Submission Upload - ${uploadId}`;
+  const subject = 'New Submission';
+
+  const submissionResult = await connection.sql(SQL`
+    SELECT uuid
+    FROM submission
+    WHERE submission_id = ${submissionId}
+    LIMIT 1;
+  `);
+
+  const submissionUuid = submissionResult.rows[0]?.uuid as string | undefined;
+  const description = `Submission ID: ${submissionId}. Submission UUID: ${
+    submissionUuid ?? 'unknown'
+  }. Upload UUID: ${uploadId}`;
 
   const existingTicket = await connection.sql(SQL`
     SELECT ticket_id
     FROM ticket
-    WHERE subject = ${subject}
+    WHERE subject = ${subject} AND description = ${description}
       AND record_end_date IS NULL
     LIMIT 1;
   `);
@@ -147,7 +173,7 @@ async function getOrCreateIntegrationTicketId(connection: IDBConnection, uploadI
     VALUES (
       ${ticketSlug},
       ${subject},
-      NULL,
+      ${description},
       ${teamId},
       'medium',
       'open',

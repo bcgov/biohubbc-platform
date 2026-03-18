@@ -99,8 +99,8 @@ export class UploadIngestionService extends DBService {
 
     // 2. Create ticket for admin visibility into this upload
     const ticket = await this.ticketService.createTicket({
-      subject: `Submission Upload - ${submissionUuid}`,
-      description: null,
+      subject: 'New Submission',
+      description: `Submission ID: ${submissionId}. Submission UUID: ${submissionUuid}. Upload UUID: ${upload_id}`,
       priority: 'medium'
     });
 

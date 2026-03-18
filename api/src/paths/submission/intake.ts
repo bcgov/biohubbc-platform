@@ -184,8 +184,8 @@ export function submissionIntake(): RequestHandler {
 
       const ticketService = new TicketService(connection);
       const ticket = await ticketService.createTicket({
-        subject: `Submission Upload - ${submissionName}`,
-        description: null,
+        subject: 'New Submission',
+        description: `Submission ID: ${submissionRecord.submission_id}. Submission UUID: ${submissionRecord.uuid}. Upload UUID: ${upload_id}`,
         priority: 'medium'
       });
 
