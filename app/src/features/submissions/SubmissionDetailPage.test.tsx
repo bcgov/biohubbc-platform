@@ -113,7 +113,7 @@ describe('SubmissionDetailPage', () => {
 
     const { findByText } = renderPage();
 
-    expect(await findByText('This submission contains secured features that are not displayed.')).toBeVisible();
+    expect(await findByText('This submission contains secured features.')).toBeVisible();
   });
 
   it('navigates to feature page when a row is clicked', async () => {
