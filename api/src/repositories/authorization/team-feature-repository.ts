@@ -40,6 +40,14 @@ export class TeamFeatureRepository extends BaseRepository {
    * need cache entries. Uses decomposed URN columns on policy_statement
    * (urn_submission_id, urn_feature_type, urn_feature_id) for indexed matching.
    *
+   * Uses EXISTS semi-join so each submission_feature drives the outer scan exactly
+   * once — PostgreSQL short-circuits on the first matching policy statement. This
+   * avoids the hash aggregate that SELECT DISTINCT would build over the full
+   * (multiplied) result set when JOINing through team_policy → policy →
+   * policy_statement. At 10M features × 5 policies, EXISTS prevents 50M
+   * intermediate rows from materializing. Rows are unique by construction, so no
+   * ON CONFLICT clause is needed.
+   *
    * @param {string} teamId - The team UUID to populate cache for.
    * @return {Promise<void>}
    * @memberof TeamFeatureRepository
@@ -64,20 +72,23 @@ export class TeamFeatureRepository extends BaseRepository {
         WHERE child.record_end_date IS NULL
       )
       INSERT INTO team_feature (team_id, submission_feature_id)
-      SELECT DISTINCT ${teamId}::uuid, sf.submission_feature_id
-      FROM team_policy tp
-        JOIN policy p ON p.policy_id = tp.policy_id AND p.record_end_date IS NULL
-        JOIN policy_statement ps ON ps.policy_id = p.policy_id AND ps.record_end_date IS NULL
-        JOIN submission_feature sf ON sf.record_end_date IS NULL
+      SELECT ${teamId}::uuid, sf.submission_feature_id
+      FROM submission_feature sf
         JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
         JOIN secured_features sec ON sec.submission_feature_id = sf.submission_feature_id
-      WHERE tp.team_id = ${teamId}
-        AND tp.record_end_date IS NULL
-        AND ps.effect = 'allow'
-        AND (ps.urn_submission_id = sf.submission_id::text OR ps.urn_submission_id = '*')
-        AND (ps.urn_feature_type = ft.name OR ps.urn_feature_type = '*')
-        AND (ps.urn_feature_id = sf.submission_feature_id::text OR ps.urn_feature_id = '*')
-      ON CONFLICT (team_id, submission_feature_id) DO NOTHING
+      WHERE sf.record_end_date IS NULL
+        AND EXISTS (
+          SELECT 1
+          FROM team_policy tp
+            JOIN policy p ON p.policy_id = tp.policy_id AND p.record_end_date IS NULL
+            JOIN policy_statement ps ON ps.policy_id = p.policy_id AND ps.record_end_date IS NULL
+          WHERE tp.team_id = ${teamId}
+            AND tp.record_end_date IS NULL
+            AND ps.effect = 'allow'
+            AND (ps.urn_submission_id = sf.submission_id::text OR ps.urn_submission_id = '*')
+            AND (ps.urn_feature_type = ft.name OR ps.urn_feature_type = '*')
+            AND (ps.urn_feature_id = sf.submission_feature_id::text OR ps.urn_feature_id = '*')
+        )
     `;
 
     await this.connection.sql(sql);
