@@ -1,7 +1,8 @@
-import { Dispatch } from 'react';
+import { APIError } from 'hooks/api/useAxios';
 import { CartWithFeaturesResponse } from 'interfaces/useCartApi.interface';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
-import { CartAction, CartState } from './cartContext.interface';
+import { Dispatch } from 'react';
+import { CartAction } from './cartContext.interface';
 
 export type CartLifecycleApi = {
   getCartById: (cartId: string) => Promise<CartWithFeaturesResponse>;
@@ -12,14 +13,13 @@ export type CartLifecycleApi = {
 export interface IUseCartLifecycleParams {
   cartApi: CartLifecycleApi;
   isAuthenticated: boolean;
-  storedCartId: string | null;
+  cartId: string | null;
   setStoredCartId: (value: string | null) => void;
-  state: CartState;
   dispatch: Dispatch<CartAction>;
   applyLoadSuccess: (response: CartWithFeaturesResponse) => void;
+  handleClaimError: (error: APIError) => void;
 }
 
 export interface IUseCartLifecycleResult {
-  setCartId: (cartId: string | null) => void;
   createCart: (options: { features?: SearchFeatureResultWithRelevancy[] }) => Promise<void>;
 }

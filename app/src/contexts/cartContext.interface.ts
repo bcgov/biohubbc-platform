@@ -19,7 +19,6 @@ export type CartSnapshot = {
  * Internal state shape for the cart reducer.
  */
 export type CartState = {
-  cartId: string | null;
   features: CartContextFeature[];
   pagination: ApiPaginationResponseParams;
   isLoading: boolean;
@@ -34,7 +33,6 @@ export type CartAction =
   | { type: 'LOAD_SUCCESS'; payload: CartFeatureListResponse }
   | { type: 'LOAD_ERROR'; payload: unknown }
   | { type: 'OPTIMISTIC_SET'; payload: CartSnapshot }
-  | { type: 'SET_CART_ID'; payload: string | null }
   | { type: 'RESET' };
 
 /**
