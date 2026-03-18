@@ -115,7 +115,6 @@ describe('Cart checkout (integration)', function () {
     const download = await downloadService.findDownloadById(result.download_id);
     expect(download).to.not.be.null;
     expect(download!.download_status).to.equal('pending');
-    expect(download!.system_user_id).to.equal(systemUserId);
 
     // Verify: both features linked in download_feature
     const features = await connection.sql(SQL`

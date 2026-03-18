@@ -1,5 +1,7 @@
+import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
+import { useDialogContext } from 'hooks/useContext';
 import { useSerializedAsync } from 'hooks/useSerializedAsync';
 import { useSessionStorage } from 'hooks/useSessionStorage';
 import { CartFeatureListResponse, CheckoutCartResponse } from 'interfaces/useCartApi.interface';
@@ -18,48 +20,52 @@ import { useCartOptimisticActions } from './useCartOptimisticActions';
 export const CartContext = React.createContext<ICartContext | undefined>(undefined);
 
 /**
- * Provides cart state and cart actions to descendants.
- * Coordinates lifecycle loading, optimistic mutations, and operation serialization.
+ * Provides cart state and actions to descendants.
+ *
+ * Coordinates three concerns:
+ * - Lifecycle: loading, identity, and stale-cart recovery (useCartLifecycle)
+ * - Mutations: optimistic add/remove/clear with rollback (useCartOptimisticActions)
+ * - Serialization: operation lock prevents concurrent mutations racing each other
  */
 export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
   const api = useApi();
+  const dialogContext = useDialogContext();
   const authStateContext = useAuthStateContext();
   const [storedCartId, setStoredCartId] = useSessionStorage<string | null>('cart_id', null);
-  // Shared cart-operation lock:
-  // while one mutation/checkout is in flight, overlapping calls are dropped.
-  // This prevents optimistic races across add/remove/clear/checkout.
+
+  // Operation lock: while one mutation or checkout is in flight, overlapping
+  // calls are dropped. Prevents optimistic races across add/remove/clear/checkout.
   const { runSerialized } = useSerializedAsync();
 
   const [state, dispatch] = useReducer(cartReducer, {
-    cartId: storedCartId,
     features: [],
     pagination: DEFAULT_PAGINATION,
     isLoading: false,
     error: undefined
   });
 
-  /**
-   * Reconciles local cart state with the latest server payload.
-   */
+  // Reconciles local state with the latest server payload.
   const applyLoadSuccess = useCallback((response: CartFeatureListResponse) => {
     dispatch({ type: 'LOAD_SUCCESS', payload: response });
   }, []);
 
-  /**
-   * Applies a transient optimistic cart snapshot for immediate UI feedback.
-   */
+  // Applies an optimistic snapshot for immediate UI feedback before the API responds.
   const applyOptimisticSnapshot = useCallback((snapshot: CartSnapshot) => {
     dispatch({ type: 'OPTIMISTIC_SET', payload: snapshot });
   }, []);
 
-  const { setCartId, createCart } = useCartLifecycle({
+  const handleClaimError = (error: APIError) => {
+    dialogContext.setSnackbar({ open: true, snackbarMessage: error.message });
+  };
+
+  const { createCart } = useCartLifecycle({
     cartApi: api.cart,
     isAuthenticated: authStateContext.auth.isAuthenticated,
-    storedCartId,
+    cartId: storedCartId,
     setStoredCartId,
-    state,
     dispatch,
-    applyLoadSuccess
+    applyLoadSuccess,
+    handleClaimError
   });
 
   const { addToExistingCart, removeFromExistingCart, clearExistingCart } = useCartOptimisticActions({
@@ -69,23 +75,19 @@ export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
     applyOptimisticSnapshot
   });
 
-  /**
-   * Adds features to cart with stale-cart recovery behavior.
-   *
-   * Creates a cart when missing; otherwise performs optimistic add to existing cart.
-   */
+  // Creates a cart if none exists, otherwise optimistically adds new features.
+  // Recovers from stale cart ids by creating a fresh cart on 4xx failures.
   const addToCart = useCallback(
     async (featuresToAdd: SearchFeatureResultWithRelevancy[]): Promise<void> => {
       if (!featuresToAdd.length) {
         return;
       }
 
-      // Serialize add flow so it cannot interleave with other cart writes.
       await runSerialized(async () => {
         let optimisticAdds: SearchFeatureResultWithRelevancy[] = [];
 
         try {
-          if (!state.cartId) {
+          if (!storedCartId) {
             await createCart({ features: featuresToAdd });
             return;
           }
@@ -95,7 +97,7 @@ export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
             return;
           }
 
-          await addToExistingCart(state.cartId, optimisticAdds);
+          await addToExistingCart(storedCartId, optimisticAdds);
         } catch (error) {
           if (optimisticAdds.length > 0 && isInvalidCachedCartError(error)) {
             await createCart({ features: optimisticAdds });
@@ -106,61 +108,51 @@ export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
         }
       });
     },
-    [addToExistingCart, createCart, runSerialized, state.cartId, state.features]
+    [addToExistingCart, createCart, runSerialized, state.features, storedCartId]
   );
 
-  /**
-   * Removes features from an existing cart using optimistic update and rollback.
-   */
   const removeFromCart = useCallback(
     async (featureIds: number[]): Promise<void> => {
-      if (!state.cartId || !featureIds.length) {
+      if (!storedCartId || !featureIds.length) {
         return;
       }
 
-      const cartId = state.cartId;
-      // Serialize remove flow so optimistic snapshots are applied in a single sequence.
+      const cartId = storedCartId;
       await runSerialized(() => removeFromExistingCart(cartId, featureIds));
     },
-    [removeFromExistingCart, runSerialized, state.cartId]
+    [removeFromExistingCart, runSerialized, storedCartId]
   );
 
-  /**
-   * Clears an existing cart using optimistic update and rollback.
-   */
   const clearCart = useCallback(async (): Promise<void> => {
-    if (!state.cartId) {
+    if (!storedCartId) {
       return;
     }
 
-    const cartId = state.cartId;
-    // Serialize clear flow so no concurrent write can race rollback/commit.
+    const cartId = storedCartId;
     await runSerialized(() => clearExistingCart(cartId));
-  }, [clearExistingCart, runSerialized, state.cartId]);
+  }, [clearExistingCart, runSerialized, storedCartId]);
 
-  /**
-   * Checks out the current cart under the same operation lock as mutations.
-   */
+  // Checks out the cart and resets all cart state on success.
   const checkout = useCallback(async (): Promise<CheckoutCartResponse | null> => {
-    if (!state.cartId) {
+    if (!storedCartId) {
       return null;
     }
 
-    const cartId = state.cartId;
+    const cartId = storedCartId;
 
-    // Serialize checkout with writes to avoid clearing cart during another mutation.
     const response = await runSerialized(async () => {
       const download = await api.cart.checkoutCart(cartId);
-      setCartId(null);
+      setStoredCartId(null);
+      dispatch({ type: 'RESET' });
       return download;
     });
 
     return response ?? null;
-  }, [api.cart, runSerialized, setCartId, state.cartId]);
+  }, [api.cart, runSerialized, setStoredCartId, storedCartId]);
 
   const value: ICartContext = useMemo(
     () => ({
-      cartId: state.cartId,
+      cartId: storedCartId,
       features: state.features,
       pagination: state.pagination,
       isLoading: state.isLoading,
@@ -175,11 +167,11 @@ export const CartContextProvider = ({ children }: React.PropsWithChildren) => {
       checkout,
       clearCart,
       removeFromCart,
-      state.cartId,
       state.features,
       state.pagination,
       state.isLoading,
-      state.error
+      state.error,
+      storedCartId
     ]
   );
 
