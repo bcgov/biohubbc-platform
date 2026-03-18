@@ -312,28 +312,74 @@ export class SubmissionIngestionService extends DBService {
    * @memberof SubmissionIngestionService
    */
   private extractReferencedCodeReferences(blocks: IFlattenedBlock[]): CodeReference[] {
-    const bySlug = new Map<string, CodeReference>();
+    const codeReferencesBySlug = new Map<string, CodeReference>();
 
     for (const block of blocks) {
-      for (const value of Object.values(block.properties ?? {})) {
-        const values = Array.isArray(value) ? value : [value];
-
-        for (const current of values) {
-          if (typeof current !== 'string') {
-            continue;
-          }
-
-          const parsed = parseCodeReference(current);
-          if (!parsed) {
-            continue;
-          }
-
-          bySlug.set(parsed.slug, parsed);
-        }
-      }
+      this.collectCodeReferencesFromProperties(block.properties, codeReferencesBySlug);
     }
 
-    return [...bySlug.values()];
+    return [...codeReferencesBySlug.values()];
+  }
+
+  /**
+   * Collect code references from a single properties object.
+   *
+   * @private
+   * @param {Record<string, unknown>} properties
+   * @param {Map<string, CodeReference>} codeReferencesBySlug
+   * @memberof SubmissionIngestionService
+   */
+  private collectCodeReferencesFromProperties(
+    properties: Record<string, unknown>,
+    codeReferencesBySlug: Map<string, CodeReference>
+  ): void {
+    for (const propertyValue of Object.values(properties)) {
+      this.collectCodeReferencesFromPropertyValue(propertyValue, codeReferencesBySlug);
+    }
+  }
+
+  /**
+   * Collect code references from a single property value.
+   *
+   * @private
+   * @param {unknown} propertyValue
+   * @param {Map<string, CodeReference>} codeReferencesBySlug
+   * @memberof SubmissionIngestionService
+   */
+  private collectCodeReferencesFromPropertyValue(
+    propertyValue: unknown,
+    codeReferencesBySlug: Map<string, CodeReference>
+  ): void {
+    if (Array.isArray(propertyValue)) {
+      for (const arrayValue of propertyValue) {
+        this.collectCodeReferenceFromSingleValue(arrayValue, codeReferencesBySlug);
+      }
+
+      return;
+    }
+
+    this.collectCodeReferenceFromSingleValue(propertyValue, codeReferencesBySlug);
+  }
+
+  /**
+   * Parse and store a single code reference string value.
+   *
+   * @private
+   * @param {unknown} value
+   * @param {Map<string, CodeReference>} codeReferencesBySlug
+   * @memberof SubmissionIngestionService
+   */
+  private collectCodeReferenceFromSingleValue(value: unknown, codeReferencesBySlug: Map<string, CodeReference>): void {
+    if (typeof value !== 'string') {
+      return;
+    }
+
+    const parsedCodeReference = parseCodeReference(value);
+    if (!parsedCodeReference) {
+      return;
+    }
+
+    codeReferencesBySlug.set(parsedCodeReference.slug, parsedCodeReference);
   }
 }
 

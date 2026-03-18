@@ -1,4 +1,3 @@
-import { Feature } from 'geojson';
 import { z } from 'zod';
 import { GeoJSONFeatureCollectionZodSchema } from '../zod-schema/geoJsonZodSchema';
 
@@ -67,62 +66,6 @@ export type InsertNumberSearchableRecord = z.infer<typeof InsertNumberSearchable
 export type InsertStringSearchableRecord = z.infer<typeof InsertStringSearchableRecord>;
 export type InsertSpatialSearchableRecord = z.infer<typeof InsertSpatialSearchableRecord>;
 export type SearchFeatureResultWithRelevancy = z.infer<typeof SearchFeatureResultWithRelevancy>;
-
-export interface CodesetFeature {
-  feature_type_name: string;
-  data: Record<string, unknown>;
-}
-
-export interface FeatureTypePropertyMetadataRow {
-  feature_type_id: number;
-  feature_type_property_id: number;
-  feature_property_name: string;
-  feature_property_type_name: string;
-  allow_multiple: boolean;
-}
-
-export interface InsertSubmissionFeaturePropertyString {
-  submission_feature_id: number;
-  feature_type_property_id: number;
-  value: string;
-}
-
-export interface InsertSubmissionFeaturePropertyNumber {
-  submission_feature_id: number;
-  feature_type_property_id: number;
-  value: number;
-}
-
-export interface InsertSubmissionFeaturePropertyBoolean {
-  submission_feature_id: number;
-  feature_type_property_id: number;
-  value: boolean;
-}
-
-export interface InsertSubmissionFeaturePropertyTimestamp {
-  submission_feature_id: number;
-  feature_type_property_id: number;
-  date_value: string | null;
-  time_value: string | null;
-}
-
-export interface InsertSubmissionFeaturePropertyCode {
-  submission_feature_id: number;
-  feature_type_property_id: number;
-  contributor_codeset_code_id: number;
-}
-
-export interface InsertSubmissionFeaturePropertyTaxon {
-  submission_feature_id: number;
-  feature_type_property_id: number;
-  taxon_id: number;
-}
-
-export interface InsertSubmissionFeaturePropertyGeometry {
-  submission_feature_id: number;
-  feature_type_property_id: number;
-  value: Feature;
-}
 
 /**
  * Zod schema for property filter

@@ -1,6 +1,14 @@
 import { Feature, FeatureCollection, Geometry } from 'geojson';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import { CreateSubmissionFeaturePropertyBoolean } from '../models/submission-feature-property-boolean';
+import { CreateSubmissionFeaturePropertyCode } from '../models/submission-feature-property-code';
+import { CreateSubmissionFeaturePropertyGeometry } from '../models/submission-feature-property-geometry';
+import { FeatureTypePropertyMetadata } from '../models/submission-feature-property-index';
+import { CreateSubmissionFeaturePropertyNumber } from '../models/submission-feature-property-number';
+import { CreateSubmissionFeaturePropertyString } from '../models/submission-feature-property-string';
+import { CreateSubmissionFeaturePropertyTaxon } from '../models/submission-feature-property-taxon';
+import { CreateSubmissionFeaturePropertyTimestamp } from '../models/submission-feature-property-timestamp';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SubmissionFeaturePropertyIndexRepository } from '../repositories/submission-feature-property-index-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
@@ -13,18 +21,10 @@ import { CodeService } from './code-service';
 import { ContributorService } from './contributor-service';
 import { DBService } from './db-service';
 import {
-  FeatureTypePropertyMetadataRow,
   InsertDatetimeSearchableRecord,
   InsertNumberSearchableRecord,
   InsertSpatialSearchableRecord,
   InsertStringSearchableRecord,
-  InsertSubmissionFeaturePropertyBoolean,
-  InsertSubmissionFeaturePropertyCode,
-  InsertSubmissionFeaturePropertyGeometry,
-  InsertSubmissionFeaturePropertyNumber,
-  InsertSubmissionFeaturePropertyString,
-  InsertSubmissionFeaturePropertyTaxon,
-  InsertSubmissionFeaturePropertyTimestamp,
   ISearchFeaturesFilters,
   SearchFeatureResultWithRelevancy
 } from './search-feature-service.interface';
@@ -42,6 +42,24 @@ type PendingCodeRecord = {
   submission_feature_id: number;
   feature_type_property_id: number;
   codeReference: CodeReference;
+};
+
+type SubmissionFeatureRecord = {
+  submission_feature_id: number;
+  feature_type_id: number;
+  data: Record<string, unknown>;
+};
+
+type PropertyRecordBuckets = {
+  stringRecords: CreateSubmissionFeaturePropertyString[];
+  numberRecords: CreateSubmissionFeaturePropertyNumber[];
+  booleanRecords: CreateSubmissionFeaturePropertyBoolean[];
+  timestampRecords: CreateSubmissionFeaturePropertyTimestamp[];
+  codeRecords: CreateSubmissionFeaturePropertyCode[];
+  pendingCodeRecords: PendingCodeRecord[];
+  geometryRecords: CreateSubmissionFeaturePropertyGeometry[];
+  taxonRecords: CreateSubmissionFeaturePropertyTaxon[];
+  pendingTaxonRecords: PendingTaxonRecord[];
 };
 
 /**
@@ -63,6 +81,8 @@ export class SearchFeatureService extends DBService {
 
   /**
    * Main search method for features.
+   * Accepts multiple filter types (keywords, property filters, ITIS TSNs, property types)
+   * and returns results matching all criteria with aggregated relevancy scores.
    *
    * @param {ISearchFeaturesFilters} filters - Search filter criteria
    * @param {ApiPaginationOptions} [pagination] - Optional pagination settings
@@ -78,6 +98,8 @@ export class SearchFeatureService extends DBService {
 
   /**
    * Gets the total count of features matching the search criteria.
+   * Accepts multiple filter types (keywords, property filters, ITIS TSNs, property types)
+   * and returns the count of results matching all criteria.
    *
    * @param {ISearchFeaturesFilters} filters - Search filter criteria
    * @return {Promise<number>} Total count of matching features
@@ -89,6 +111,7 @@ export class SearchFeatureService extends DBService {
 
   /**
    * Returns submission feature IDs matching the provided search filters.
+   * Delegates to repository for the CTE-based query.
    *
    * @param {ISearchFeaturesFilters} filters - Search filters (keyword, feature_types, species, properties)
    * @returns {Promise<number[]>} Array of matching submission_feature_id values
@@ -103,12 +126,19 @@ export class SearchFeatureService extends DBService {
    * Creates search indexes for datetime, number, spatial and string properties belonging to
    * all features found for the given submission.
    *
+   * Deletes existing search records first for idempotency - job retries and manual re-indexing
+   * can run this multiple times for the same submission. Without delete-before-insert, duplicate
+   * records accumulate because the search tables have no unique constraint on
+   * (submission_feature_id, feature_property_id). Upsert was rejected because it cannot clean up
+   * orphaned rows when properties are removed between runs.
+   *
    * @param {number} submissionId
    * @return {Promise<void>}
    */
   async indexFeaturesBySubmissionId(submissionId: number): Promise<void> {
     defaultLog.debug({ label: 'indexFeaturesBySubmissionId', message: 'start', submissionId });
 
+    // Delete existing search records for idempotency (safe for retries and manual re-indexing)
     await this.searchFeatureRepository.deleteSearchRecordsBySubmissionId(submissionId);
 
     const datetimeRecords: InsertDatetimeSearchableRecord[] = [];
@@ -217,346 +247,709 @@ export class SearchFeatureService extends DBService {
     await submissionFeaturePropertyIndexRepository.deletePropertyRecordsBySubmissionId(submissionId);
 
     const submissionRepository = new SubmissionRepository(this.connection);
-    const allFeatures = await submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
+    const allFeatures = (await submissionRepository.getSubmissionFeaturesBySubmissionId(
+      submissionId
+    )) as SubmissionFeatureRecord[];
     if (!allFeatures.length) {
       return;
     }
 
-    const featureTypeIdSet = new Set<number>();
-    for (const feature of allFeatures) {
-      featureTypeIdSet.add(feature.feature_type_id);
-    }
+    const metadataByFeatureType = await this.getFeatureTypeMetadataByFeatureType(
+      submissionFeaturePropertyIndexRepository,
+      allFeatures
+    );
+    const propertyRecordBuckets = this.createPropertyRecordBuckets();
 
-    const featureTypeIds = [...featureTypeIdSet];
+    this.collectPropertyRecordsForFeatures(submissionId, allFeatures, metadataByFeatureType, propertyRecordBuckets);
+
+    await this.resolvePendingCodeRecords(
+      submissionId,
+      submissionFeaturePropertyIndexRepository,
+      propertyRecordBuckets.pendingCodeRecords,
+      propertyRecordBuckets.codeRecords
+    );
+    await this.resolvePendingTaxonRecords(
+      submissionId,
+      propertyRecordBuckets.pendingTaxonRecords,
+      propertyRecordBuckets.taxonRecords
+    );
+    await this.persistPropertyRecords(submissionFeaturePropertyIndexRepository, propertyRecordBuckets);
+  }
+
+  /**
+   * Fetch and group active feature type property metadata by feature type and property name.
+   *
+   * @private
+   * @param {SubmissionFeaturePropertyIndexRepository} submissionFeaturePropertyIndexRepository
+   * @param {SubmissionFeatureRecord[]} allFeatures
+   * @return {Promise<Map<number, Map<string, FeatureTypePropertyMetadata>>>}
+   */
+  private async getFeatureTypeMetadataByFeatureType(
+    submissionFeaturePropertyIndexRepository: SubmissionFeaturePropertyIndexRepository,
+    allFeatures: SubmissionFeatureRecord[]
+  ): Promise<Map<number, Map<string, FeatureTypePropertyMetadata>>> {
+    const featureTypeIds = [...new Set(allFeatures.map((feature) => feature.feature_type_id))];
     const metadataRows = await submissionFeaturePropertyIndexRepository.getFeatureTypePropertyMetadata(featureTypeIds);
-    const metadataByFeatureType = this.groupFeatureTypePropertyMetadata(metadataRows);
 
-    const stringRecords: InsertSubmissionFeaturePropertyString[] = [];
-    const numberRecords: InsertSubmissionFeaturePropertyNumber[] = [];
-    const booleanRecords: InsertSubmissionFeaturePropertyBoolean[] = [];
-    const timestampRecords: InsertSubmissionFeaturePropertyTimestamp[] = [];
-    const codeRecords: InsertSubmissionFeaturePropertyCode[] = [];
-    const pendingCodeRecords: PendingCodeRecord[] = [];
-    const geometryRecords: InsertSubmissionFeaturePropertyGeometry[] = [];
-    const taxonRecords: InsertSubmissionFeaturePropertyTaxon[] = [];
-    const pendingTaxonRecords: PendingTaxonRecord[] = [];
+    return this.groupFeatureTypePropertyMetadata(metadataRows);
+  }
 
-    for (const currentFeature of allFeatures) {
-      const featureTypeMetadata = metadataByFeatureType.get(currentFeature.feature_type_id);
+  /**
+   * Create mutable buckets used while collecting canonical property records.
+   *
+   * @private
+   * @return {PropertyRecordBuckets}
+   */
+  private createPropertyRecordBuckets(): PropertyRecordBuckets {
+    return {
+      stringRecords: [],
+      numberRecords: [],
+      booleanRecords: [],
+      timestampRecords: [],
+      codeRecords: [],
+      pendingCodeRecords: [],
+      geometryRecords: [],
+      taxonRecords: [],
+      pendingTaxonRecords: []
+    };
+  }
+
+  /**
+   * Collect canonical property records for all features in the submission.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {SubmissionFeatureRecord[]} allFeatures
+   * @param {Map<number, Map<string, FeatureTypePropertyMetadata>>} metadataByFeatureType
+   * @param {PropertyRecordBuckets} propertyRecordBuckets
+   * @return {void}
+   */
+  private collectPropertyRecordsForFeatures(
+    submissionId: number,
+    allFeatures: SubmissionFeatureRecord[],
+    metadataByFeatureType: Map<number, Map<string, FeatureTypePropertyMetadata>>,
+    propertyRecordBuckets: PropertyRecordBuckets
+  ): void {
+    for (const feature of allFeatures) {
+      const featureTypeMetadata = metadataByFeatureType.get(feature.feature_type_id);
       if (!featureTypeMetadata) {
         continue;
       }
 
-      const currentFeatureData = currentFeature.data;
-      for (const currentFeaturePropertyName in currentFeatureData) {
-        const currentFeaturePropertyValue = currentFeatureData[currentFeaturePropertyName];
-
-        if (currentFeaturePropertyValue === null || currentFeaturePropertyValue === undefined) {
-          continue;
-        }
-
-        const matchingFeatureProperty = featureTypeMetadata.get(currentFeaturePropertyName);
-        if (!matchingFeatureProperty) {
-          continue;
-        }
-
-        const values = Array.isArray(currentFeaturePropertyValue)
-          ? currentFeaturePropertyValue
-          : [currentFeaturePropertyValue];
-        // Desired state: arrays are represented as multiple rows in typed property tables.
-
-        if (!matchingFeatureProperty.allow_multiple && values.length > 1) {
-          throw new ApiExecuteSQLError('Property does not allow multiple values', [
-            'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
-            {
-              submissionId,
-              submission_feature_id: currentFeature.submission_feature_id,
-              propertyName: currentFeaturePropertyName,
-              valuesLength: values.length
-            }
-          ]);
-        }
-
-        for (const currentValue of values) {
-          if (currentValue === null || currentValue === undefined) {
-            continue;
-          }
-
-          const propertyType = matchingFeatureProperty.feature_property_type_name;
-
-          if (propertyType === 'string') {
-            if (typeof currentValue !== 'string') {
-              this.throwTypeMismatch(
-                submissionId,
-                currentFeature.submission_feature_id,
-                currentFeaturePropertyName,
-                'string',
-                currentValue
-              );
-            }
-            stringRecords.push({
-              submission_feature_id: currentFeature.submission_feature_id,
-              feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
-              value: currentValue
-            });
-            continue;
-          }
-
-          if (propertyType === 'number') {
-            if (typeof currentValue !== 'number' || Number.isNaN(currentValue)) {
-              this.throwTypeMismatch(
-                submissionId,
-                currentFeature.submission_feature_id,
-                currentFeaturePropertyName,
-                'number',
-                currentValue
-              );
-            }
-            numberRecords.push({
-              submission_feature_id: currentFeature.submission_feature_id,
-              feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
-              value: currentValue
-            });
-            continue;
-          }
-
-          if (propertyType === 'boolean') {
-            if (typeof currentValue !== 'boolean') {
-              this.throwTypeMismatch(
-                submissionId,
-                currentFeature.submission_feature_id,
-                currentFeaturePropertyName,
-                'boolean',
-                currentValue
-              );
-            }
-            booleanRecords.push({
-              submission_feature_id: currentFeature.submission_feature_id,
-              feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
-              value: currentValue
-            });
-            continue;
-          }
-
-          if (propertyType === 'timestamp') {
-            if (typeof currentValue !== 'string') {
-              this.throwTypeMismatch(
-                submissionId,
-                currentFeature.submission_feature_id,
-                currentFeaturePropertyName,
-                'timestamp',
-                currentValue
-              );
-            }
-
-            const splitTimestamp = splitTimestampValue(currentValue);
-            if (!splitTimestamp.date && !splitTimestamp.time) {
-              throw new ApiExecuteSQLError('Invalid timestamp property value', [
-                'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
-                {
-                  submissionId,
-                  submission_feature_id: currentFeature.submission_feature_id,
-                  propertyName: currentFeaturePropertyName,
-                  value: currentValue
-                }
-              ]);
-            }
-
-            timestampRecords.push({
-              submission_feature_id: currentFeature.submission_feature_id,
-              feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
-              date_value: splitTimestamp.date,
-              time_value: splitTimestamp.time
-            });
-            continue;
-          }
-
-          if (propertyType === 'code') {
-            const codeReference = this.parseCodeReferenceValue(
-              currentValue,
-              submissionId,
-              currentFeature.submission_feature_id,
-              currentFeaturePropertyName
-            );
-
-            pendingCodeRecords.push({
-              submission_feature_id: currentFeature.submission_feature_id,
-              feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
-              codeReference
-            });
-            continue;
-          }
-
-          if (propertyType === 'taxon') {
-            if (typeof currentValue !== 'number' || !Number.isInteger(currentValue)) {
-              this.throwTypeMismatch(
-                submissionId,
-                currentFeature.submission_feature_id,
-                currentFeaturePropertyName,
-                'taxon TSN (integer)',
-                currentValue
-              );
-            }
-
-            pendingTaxonRecords.push({
-              submission_feature_id: currentFeature.submission_feature_id,
-              feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
-              propertyName: currentFeaturePropertyName,
-              tsn: currentValue
-            });
-            continue;
-          }
-
-          if (propertyType === 'spatial') {
-            if (typeof currentValue !== 'object' || currentValue === null) {
-              this.throwTypeMismatch(
-                submissionId,
-                currentFeature.submission_feature_id,
-                currentFeaturePropertyName,
-                'spatial',
-                currentValue
-              );
-            }
-
-            // Keep FeatureCollection compatibility by normalizing to a GeoJSON Feature.
-            const spatialValue =
-              'features' in currentValue && Array.isArray((currentValue as { features?: unknown }).features)
-                ? ({
-                    type: 'Feature',
-                    geometry: {
-                      type: 'GeometryCollection',
-                      geometries: (currentValue as { features: Array<{ geometry?: Geometry }> }).features
-                        .map((feature) => feature.geometry)
-                        .filter((geometry): geometry is Geometry => !!geometry)
-                    },
-                    properties: null
-                  } as Feature)
-                : (() => {
-                    const spatialFeature = currentValue as { type?: unknown; geometry?: unknown };
-
-                    if (spatialFeature.type !== 'Feature' || !spatialFeature.geometry) {
-                      throw new ApiExecuteSQLError('Invalid spatial value for geometry property', [
-                        'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
-                        {
-                          submissionId,
-                          submission_feature_id: currentFeature.submission_feature_id,
-                          propertyName: currentFeaturePropertyName
-                        }
-                      ]);
-                    }
-
-                    return currentValue as Feature;
-                  })();
-
-            geometryRecords.push({
-              submission_feature_id: currentFeature.submission_feature_id,
-              feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
-              value: spatialValue
-            });
-          }
-        }
-      }
+      this.collectPropertyRecordsForFeature(submissionId, feature, featureTypeMetadata, propertyRecordBuckets);
     }
+  }
 
-    // Resolve each `code::<contributor-codeset-key>::<contributor-codeset-code-key>` slug
-    // to a stable contributor_codeset_code_id.
-    // This only requires the database. Codes are already persisted during ingestion, so property indexing only
-    // does a set-based lookup and then maps slug -> FK in memory for fast assignment.
-    if (pendingCodeRecords.length) {
-      const contributorService = new ContributorService(this.connection);
-      const contributor = await contributorService.getContributorBySubmissionId(submissionId);
-      const uniqueCodeReferences = [
-        ...new Map(pendingCodeRecords.map((record) => [record.codeReference.slug, record.codeReference])).values()
-      ];
-      const codesetSlugMap =
-        await submissionFeaturePropertyIndexRepository.resolveContributorCodesetCodeIdsByCodeReferences(
-          contributor.contributor_id,
-          uniqueCodeReferences
+  /**
+   * Collect canonical property records for a single feature.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {SubmissionFeatureRecord} feature
+   * @param {Map<string, FeatureTypePropertyMetadata>} featureTypeMetadata
+   * @param {PropertyRecordBuckets} propertyRecordBuckets
+   * @return {void}
+   */
+  private collectPropertyRecordsForFeature(
+    submissionId: number,
+    feature: SubmissionFeatureRecord,
+    featureTypeMetadata: Map<string, FeatureTypePropertyMetadata>,
+    propertyRecordBuckets: PropertyRecordBuckets
+  ): void {
+    for (const [propertyName, propertyValue] of Object.entries(feature.data)) {
+      if (propertyValue === null || propertyValue === undefined) {
+        continue;
+      }
+
+      const matchingFeatureProperty = featureTypeMetadata.get(propertyName);
+      if (!matchingFeatureProperty) {
+        continue;
+      }
+
+      const values = Array.isArray(propertyValue) ? propertyValue : [propertyValue];
+      this.validateMultipleValuesAllowed(submissionId, feature.submission_feature_id, propertyName, values.length, {
+        allow_multiple: matchingFeatureProperty.allow_multiple
+      });
+
+      for (const currentValue of values) {
+        if (currentValue === null || currentValue === undefined) {
+          continue;
+        }
+
+        this.collectPropertyRecordByType(
+          submissionId,
+          feature,
+          matchingFeatureProperty,
+          propertyName,
+          currentValue,
+          propertyRecordBuckets
         );
-
-      for (const pendingCodeRecord of pendingCodeRecords) {
-        const contributorCodesetCodeId = codesetSlugMap.get(pendingCodeRecord.codeReference.slug);
-
-        if (contributorCodesetCodeId === undefined) {
-          throw new ApiExecuteSQLError('Failed to resolve code slug to contributor_codeset_code_id', [
-            'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
-            {
-              submissionId,
-              submission_feature_id: pendingCodeRecord.submission_feature_id,
-              slug: pendingCodeRecord.codeReference.slug,
-              advice:
-                'Ensure the slug exists and resolves to a unique contributor_codeset_code row for this contributor.'
-            }
-          ]);
-        }
-
-        codeRecords.push({
-          submission_feature_id: pendingCodeRecord.submission_feature_id,
-          feature_type_property_id: pendingCodeRecord.feature_type_property_id,
-          contributor_codeset_code_id: contributorCodesetCodeId
-        });
       }
     }
+  }
 
-    if (pendingTaxonRecords.length) {
-      const taxonomyRepository = new TaxonomyRepository(this.connection);
-      // Desired state: taxon properties persist internal `taxon_id`, resolved from external TSN payload values.
-      const taxonMatches = await taxonomyRepository.getTaxonByTsnIds([
-        ...new Set(pendingTaxonRecords.map((record) => record.tsn))
+  /**
+   * Validate that multiple values are only provided when property metadata allows it.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {number} submissionFeatureId
+   * @param {string} propertyName
+   * @param {number} valuesLength
+   * @param {Pick<FeatureTypePropertyMetadata, 'allow_multiple'>} matchingFeatureProperty
+   * @return {void}
+   */
+  private validateMultipleValuesAllowed(
+    submissionId: number,
+    submissionFeatureId: number,
+    propertyName: string,
+    valuesLength: number,
+    matchingFeatureProperty: Pick<FeatureTypePropertyMetadata, 'allow_multiple'>
+  ): void {
+    if (matchingFeatureProperty.allow_multiple || valuesLength <= 1) {
+      return;
+    }
+
+    throw new ApiExecuteSQLError('Property does not allow multiple values', [
+      'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
+      {
+        submissionId,
+        submission_feature_id: submissionFeatureId,
+        propertyName,
+        valuesLength
+      }
+    ]);
+  }
+
+  /**
+   * Route a single property value to the type-specific collector.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {SubmissionFeatureRecord} feature
+   * @param {FeatureTypePropertyMetadata} matchingFeatureProperty
+   * @param {string} propertyName
+   * @param {unknown} currentValue
+   * @param {PropertyRecordBuckets} propertyRecordBuckets
+   * @return {void}
+   */
+  private collectPropertyRecordByType(
+    submissionId: number,
+    feature: SubmissionFeatureRecord,
+    matchingFeatureProperty: FeatureTypePropertyMetadata,
+    propertyName: string,
+    currentValue: unknown,
+    propertyRecordBuckets: PropertyRecordBuckets
+  ): void {
+    switch (matchingFeatureProperty.feature_property_type_name) {
+      case 'string':
+        this.collectStringRecord(
+          submissionId,
+          feature,
+          matchingFeatureProperty,
+          propertyName,
+          currentValue,
+          propertyRecordBuckets
+        );
+        return;
+      case 'number':
+        this.collectNumberRecord(
+          submissionId,
+          feature,
+          matchingFeatureProperty,
+          propertyName,
+          currentValue,
+          propertyRecordBuckets
+        );
+        return;
+      case 'boolean':
+        this.collectBooleanRecord(
+          submissionId,
+          feature,
+          matchingFeatureProperty,
+          propertyName,
+          currentValue,
+          propertyRecordBuckets
+        );
+        return;
+      case 'timestamp':
+        this.collectTimestampRecord(
+          submissionId,
+          feature,
+          matchingFeatureProperty,
+          propertyName,
+          currentValue,
+          propertyRecordBuckets
+        );
+        return;
+      case 'code':
+        this.collectCodeRecord(
+          submissionId,
+          feature,
+          matchingFeatureProperty,
+          propertyName,
+          currentValue,
+          propertyRecordBuckets
+        );
+        return;
+      case 'taxon':
+        this.collectTaxonRecord(
+          submissionId,
+          feature,
+          matchingFeatureProperty,
+          propertyName,
+          currentValue,
+          propertyRecordBuckets
+        );
+        return;
+      case 'spatial':
+        this.collectSpatialRecord(
+          submissionId,
+          feature,
+          matchingFeatureProperty,
+          propertyName,
+          currentValue,
+          propertyRecordBuckets
+        );
+        return;
+      default:
+        return;
+    }
+  }
+
+  /**
+   * Validate and collect a string property record.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {SubmissionFeatureRecord} feature
+   * @param {FeatureTypePropertyMetadata} matchingFeatureProperty
+   * @param {string} propertyName
+   * @param {unknown} currentValue
+   * @param {PropertyRecordBuckets} propertyRecordBuckets
+   * @return {void}
+   */
+  private collectStringRecord(
+    submissionId: number,
+    feature: SubmissionFeatureRecord,
+    matchingFeatureProperty: FeatureTypePropertyMetadata,
+    propertyName: string,
+    currentValue: unknown,
+    propertyRecordBuckets: PropertyRecordBuckets
+  ): void {
+    if (typeof currentValue !== 'string') {
+      this.throwTypeMismatch(submissionId, feature.submission_feature_id, propertyName, 'string', currentValue);
+    }
+
+    propertyRecordBuckets.stringRecords.push({
+      submission_feature_id: feature.submission_feature_id,
+      feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
+      value: currentValue
+    });
+  }
+
+  /**
+   * Validate and collect a number property record.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {SubmissionFeatureRecord} feature
+   * @param {FeatureTypePropertyMetadata} matchingFeatureProperty
+   * @param {string} propertyName
+   * @param {unknown} currentValue
+   * @param {PropertyRecordBuckets} propertyRecordBuckets
+   * @return {void}
+   */
+  private collectNumberRecord(
+    submissionId: number,
+    feature: SubmissionFeatureRecord,
+    matchingFeatureProperty: FeatureTypePropertyMetadata,
+    propertyName: string,
+    currentValue: unknown,
+    propertyRecordBuckets: PropertyRecordBuckets
+  ): void {
+    if (typeof currentValue !== 'number' || Number.isNaN(currentValue)) {
+      this.throwTypeMismatch(submissionId, feature.submission_feature_id, propertyName, 'number', currentValue);
+    }
+
+    propertyRecordBuckets.numberRecords.push({
+      submission_feature_id: feature.submission_feature_id,
+      feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
+      value: currentValue
+    });
+  }
+
+  /**
+   * Validate and collect a boolean property record.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {SubmissionFeatureRecord} feature
+   * @param {FeatureTypePropertyMetadata} matchingFeatureProperty
+   * @param {string} propertyName
+   * @param {unknown} currentValue
+   * @param {PropertyRecordBuckets} propertyRecordBuckets
+   * @return {void}
+   */
+  private collectBooleanRecord(
+    submissionId: number,
+    feature: SubmissionFeatureRecord,
+    matchingFeatureProperty: FeatureTypePropertyMetadata,
+    propertyName: string,
+    currentValue: unknown,
+    propertyRecordBuckets: PropertyRecordBuckets
+  ): void {
+    if (typeof currentValue !== 'boolean') {
+      this.throwTypeMismatch(submissionId, feature.submission_feature_id, propertyName, 'boolean', currentValue);
+    }
+
+    propertyRecordBuckets.booleanRecords.push({
+      submission_feature_id: feature.submission_feature_id,
+      feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
+      value: currentValue
+    });
+  }
+
+  /**
+   * Validate, split, and collect a timestamp property record.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {SubmissionFeatureRecord} feature
+   * @param {FeatureTypePropertyMetadata} matchingFeatureProperty
+   * @param {string} propertyName
+   * @param {unknown} currentValue
+   * @param {PropertyRecordBuckets} propertyRecordBuckets
+   * @return {void}
+   */
+  private collectTimestampRecord(
+    submissionId: number,
+    feature: SubmissionFeatureRecord,
+    matchingFeatureProperty: FeatureTypePropertyMetadata,
+    propertyName: string,
+    currentValue: unknown,
+    propertyRecordBuckets: PropertyRecordBuckets
+  ): void {
+    if (typeof currentValue !== 'string') {
+      this.throwTypeMismatch(submissionId, feature.submission_feature_id, propertyName, 'timestamp', currentValue);
+    }
+
+    const splitTimestamp = splitTimestampValue(currentValue);
+    if (!splitTimestamp.date && !splitTimestamp.time) {
+      throw new ApiExecuteSQLError('Invalid timestamp property value', [
+        'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
+        {
+          submissionId,
+          submission_feature_id: feature.submission_feature_id,
+          propertyName,
+          value: currentValue
+        }
       ]);
-      const taxonByTsn = new Map(taxonMatches.map((match) => [match.itis_tsn, match.taxon_id]));
-
-      for (const pendingTaxonRecord of pendingTaxonRecords) {
-        const resolvedTaxonId = taxonByTsn.get(pendingTaxonRecord.tsn);
-
-        if (!resolvedTaxonId) {
-          throw new ApiExecuteSQLError('Failed to resolve taxon value', [
-            'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
-            {
-              submissionId,
-              submission_feature_id: pendingTaxonRecord.submission_feature_id,
-              propertyName: pendingTaxonRecord.propertyName,
-              value: pendingTaxonRecord.tsn
-            }
-          ]);
-        }
-
-        taxonRecords.push({
-          submission_feature_id: pendingTaxonRecord.submission_feature_id,
-          feature_type_property_id: pendingTaxonRecord.feature_type_property_id,
-          taxon_id: resolvedTaxonId
-        });
-      }
     }
 
+    propertyRecordBuckets.timestampRecords.push({
+      submission_feature_id: feature.submission_feature_id,
+      feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
+      date_value: splitTimestamp.date,
+      time_value: splitTimestamp.time
+    });
+  }
+
+  /**
+   * Parse and collect a code property record for deferred slug resolution.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {SubmissionFeatureRecord} feature
+   * @param {FeatureTypePropertyMetadata} matchingFeatureProperty
+   * @param {string} propertyName
+   * @param {unknown} currentValue
+   * @param {PropertyRecordBuckets} propertyRecordBuckets
+   * @return {void}
+   */
+  private collectCodeRecord(
+    submissionId: number,
+    feature: SubmissionFeatureRecord,
+    matchingFeatureProperty: FeatureTypePropertyMetadata,
+    propertyName: string,
+    currentValue: unknown,
+    propertyRecordBuckets: PropertyRecordBuckets
+  ): void {
+    const codeReference = this.parseCodeReferenceValue(
+      currentValue,
+      submissionId,
+      feature.submission_feature_id,
+      propertyName
+    );
+
+    propertyRecordBuckets.pendingCodeRecords.push({
+      submission_feature_id: feature.submission_feature_id,
+      feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
+      codeReference
+    });
+  }
+
+  /**
+   * Validate and collect a taxon property record for deferred TSN resolution.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {SubmissionFeatureRecord} feature
+   * @param {FeatureTypePropertyMetadata} matchingFeatureProperty
+   * @param {string} propertyName
+   * @param {unknown} currentValue
+   * @param {PropertyRecordBuckets} propertyRecordBuckets
+   * @return {void}
+   */
+  private collectTaxonRecord(
+    submissionId: number,
+    feature: SubmissionFeatureRecord,
+    matchingFeatureProperty: FeatureTypePropertyMetadata,
+    propertyName: string,
+    currentValue: unknown,
+    propertyRecordBuckets: PropertyRecordBuckets
+  ): void {
+    if (typeof currentValue !== 'number' || !Number.isInteger(currentValue)) {
+      this.throwTypeMismatch(
+        submissionId,
+        feature.submission_feature_id,
+        propertyName,
+        'taxon TSN (integer)',
+        currentValue
+      );
+    }
+
+    propertyRecordBuckets.pendingTaxonRecords.push({
+      submission_feature_id: feature.submission_feature_id,
+      feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
+      propertyName,
+      tsn: currentValue
+    });
+  }
+
+  /**
+   * Validate, normalize, and collect a spatial property record.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {SubmissionFeatureRecord} feature
+   * @param {FeatureTypePropertyMetadata} matchingFeatureProperty
+   * @param {string} propertyName
+   * @param {unknown} currentValue
+   * @param {PropertyRecordBuckets} propertyRecordBuckets
+   * @return {void}
+   */
+  private collectSpatialRecord(
+    submissionId: number,
+    feature: SubmissionFeatureRecord,
+    matchingFeatureProperty: FeatureTypePropertyMetadata,
+    propertyName: string,
+    currentValue: unknown,
+    propertyRecordBuckets: PropertyRecordBuckets
+  ): void {
+    if (typeof currentValue !== 'object' || currentValue === null) {
+      this.throwTypeMismatch(submissionId, feature.submission_feature_id, propertyName, 'spatial', currentValue);
+    }
+
+    propertyRecordBuckets.geometryRecords.push({
+      submission_feature_id: feature.submission_feature_id,
+      feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
+      value: this.normalizeSpatialValue(submissionId, feature.submission_feature_id, propertyName, currentValue)
+    });
+  }
+
+  /**
+   * Normalize accepted spatial payload shapes to a GeoJSON Feature.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {number} submissionFeatureId
+   * @param {string} propertyName
+   * @param {unknown} value
+   * @return {Feature}
+   */
+  private normalizeSpatialValue(
+    submissionId: number,
+    submissionFeatureId: number,
+    propertyName: string,
+    value: unknown
+  ): Feature {
+    if ('features' in (value as object) && Array.isArray((value as { features?: unknown }).features)) {
+      return {
+        type: 'Feature',
+        geometry: {
+          type: 'GeometryCollection',
+          geometries: (value as { features: Array<{ geometry?: Geometry }> }).features
+            .map((feature) => feature.geometry)
+            .filter((geometry): geometry is Geometry => !!geometry)
+        },
+        properties: null
+      };
+    }
+
+    const spatialFeature = value as { type?: unknown; geometry?: unknown };
+    if (spatialFeature.type !== 'Feature' || !spatialFeature.geometry) {
+      throw new ApiExecuteSQLError('Invalid spatial value for geometry property', [
+        'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
+        {
+          submissionId,
+          submission_feature_id: submissionFeatureId,
+          propertyName
+        }
+      ]);
+    }
+
+    return value as Feature;
+  }
+
+  /**
+   * Resolve pending code slug records to contributor_codeset_code IDs.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {SubmissionFeaturePropertyIndexRepository} submissionFeaturePropertyIndexRepository
+   * @param {PendingCodeRecord[]} pendingCodeRecords
+   * @param {CreateSubmissionFeaturePropertyCode[]} codeRecords
+   * @return {Promise<void>}
+   */
+  private async resolvePendingCodeRecords(
+    submissionId: number,
+    submissionFeaturePropertyIndexRepository: SubmissionFeaturePropertyIndexRepository,
+    pendingCodeRecords: PendingCodeRecord[],
+    codeRecords: CreateSubmissionFeaturePropertyCode[]
+  ): Promise<void> {
+    if (!pendingCodeRecords.length) {
+      return;
+    }
+
+    const contributorService = new ContributorService(this.connection);
+    const contributor = await contributorService.getContributorBySubmissionId(submissionId);
+    const uniqueCodeReferences = [
+      ...new Map(pendingCodeRecords.map((record) => [record.codeReference.slug, record.codeReference])).values()
+    ];
+    const codesetSlugMap =
+      await submissionFeaturePropertyIndexRepository.resolveContributorCodesetCodeIdsByCodeReferences(
+        contributor.contributor_id,
+        uniqueCodeReferences
+      );
+
+    for (const pendingCodeRecord of pendingCodeRecords) {
+      const contributorCodesetCodeId = codesetSlugMap.get(pendingCodeRecord.codeReference.slug);
+
+      if (contributorCodesetCodeId === undefined) {
+        throw new ApiExecuteSQLError('Failed to resolve code slug to contributor_codeset_code_id', [
+          'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
+          {
+            submissionId,
+            submission_feature_id: pendingCodeRecord.submission_feature_id,
+            slug: pendingCodeRecord.codeReference.slug,
+            advice: 'Ensure the slug exists and resolves to a unique contributor_codeset_code row for this contributor.'
+          }
+        ]);
+      }
+
+      codeRecords.push({
+        submission_feature_id: pendingCodeRecord.submission_feature_id,
+        feature_type_property_id: pendingCodeRecord.feature_type_property_id,
+        contributor_codeset_code_id: contributorCodesetCodeId
+      });
+    }
+  }
+
+  /**
+   * Resolve pending taxon TSN records to internal taxon IDs.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {PendingTaxonRecord[]} pendingTaxonRecords
+   * @param {CreateSubmissionFeaturePropertyTaxon[]} taxonRecords
+   * @return {Promise<void>}
+   */
+  private async resolvePendingTaxonRecords(
+    submissionId: number,
+    pendingTaxonRecords: PendingTaxonRecord[],
+    taxonRecords: CreateSubmissionFeaturePropertyTaxon[]
+  ): Promise<void> {
+    if (!pendingTaxonRecords.length) {
+      return;
+    }
+
+    const taxonomyRepository = new TaxonomyRepository(this.connection);
+    // Desired state: taxon properties persist internal `taxon_id`, resolved from external TSN payload values.
+    const taxonMatches = await taxonomyRepository.getTaxonByTsnIds([
+      ...new Set(pendingTaxonRecords.map((record) => record.tsn))
+    ]);
+    const taxonByTsn = new Map(taxonMatches.map((match) => [match.itis_tsn, match.taxon_id]));
+
+    for (const pendingTaxonRecord of pendingTaxonRecords) {
+      const resolvedTaxonId = taxonByTsn.get(pendingTaxonRecord.tsn);
+
+      if (resolvedTaxonId === undefined) {
+        throw new ApiExecuteSQLError('Failed to resolve taxon value', [
+          'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
+          {
+            submissionId,
+            submission_feature_id: pendingTaxonRecord.submission_feature_id,
+            propertyName: pendingTaxonRecord.propertyName,
+            value: pendingTaxonRecord.tsn
+          }
+        ]);
+      }
+
+      taxonRecords.push({
+        submission_feature_id: pendingTaxonRecord.submission_feature_id,
+        feature_type_property_id: pendingTaxonRecord.feature_type_property_id,
+        taxon_id: resolvedTaxonId
+      });
+    }
+  }
+
+  /**
+   * Persist collected canonical property records to typed property tables.
+   *
+   * @private
+   * @param {SubmissionFeaturePropertyIndexRepository} submissionFeaturePropertyIndexRepository
+   * @param {PropertyRecordBuckets} propertyRecordBuckets
+   * @return {Promise<void>}
+   */
+  private async persistPropertyRecords(
+    submissionFeaturePropertyIndexRepository: SubmissionFeaturePropertyIndexRepository,
+    propertyRecordBuckets: PropertyRecordBuckets
+  ): Promise<void> {
     const promises: Promise<void>[] = [];
 
-    if (stringRecords.length) {
-      promises.push(submissionFeaturePropertyIndexRepository.insertStringRecords(stringRecords));
+    if (propertyRecordBuckets.stringRecords.length) {
+      promises.push(submissionFeaturePropertyIndexRepository.insertStringRecords(propertyRecordBuckets.stringRecords));
     }
 
-    if (numberRecords.length) {
-      promises.push(submissionFeaturePropertyIndexRepository.insertNumberRecords(numberRecords));
+    if (propertyRecordBuckets.numberRecords.length) {
+      promises.push(submissionFeaturePropertyIndexRepository.insertNumberRecords(propertyRecordBuckets.numberRecords));
     }
 
-    if (booleanRecords.length) {
-      promises.push(submissionFeaturePropertyIndexRepository.insertBooleanRecords(booleanRecords));
+    if (propertyRecordBuckets.booleanRecords.length) {
+      promises.push(
+        submissionFeaturePropertyIndexRepository.insertBooleanRecords(propertyRecordBuckets.booleanRecords)
+      );
     }
 
-    if (timestampRecords.length) {
-      promises.push(submissionFeaturePropertyIndexRepository.insertTimestampRecords(timestampRecords));
+    if (propertyRecordBuckets.timestampRecords.length) {
+      promises.push(
+        submissionFeaturePropertyIndexRepository.insertTimestampRecords(propertyRecordBuckets.timestampRecords)
+      );
     }
 
-    if (codeRecords.length) {
-      promises.push(submissionFeaturePropertyIndexRepository.insertCodeRecords(codeRecords));
+    if (propertyRecordBuckets.codeRecords.length) {
+      promises.push(submissionFeaturePropertyIndexRepository.insertCodeRecords(propertyRecordBuckets.codeRecords));
     }
 
-    if (taxonRecords.length) {
-      promises.push(submissionFeaturePropertyIndexRepository.insertTaxonRecords(taxonRecords));
+    if (propertyRecordBuckets.taxonRecords.length) {
+      promises.push(submissionFeaturePropertyIndexRepository.insertTaxonRecords(propertyRecordBuckets.taxonRecords));
     }
 
-    if (geometryRecords.length) {
-      promises.push(submissionFeaturePropertyIndexRepository.insertGeometryRecords(geometryRecords));
+    if (propertyRecordBuckets.geometryRecords.length) {
+      promises.push(
+        submissionFeaturePropertyIndexRepository.insertGeometryRecords(propertyRecordBuckets.geometryRecords)
+      );
     }
 
     await Promise.all(promises);
@@ -566,17 +959,17 @@ export class SearchFeatureService extends DBService {
    * Group metadata rows by feature type and property name.
    *
    * @private
-   * @param {FeatureTypePropertyMetadataRow[]} metadataRows
-   * @return {Map<number, Map<string, FeatureTypePropertyMetadataRow>>}
+   * @param {FeatureTypePropertyMetadata[]} metadataRows
+   * @return {Map<number, Map<string, FeatureTypePropertyMetadata>>}
    */
   private groupFeatureTypePropertyMetadata(
-    metadataRows: FeatureTypePropertyMetadataRow[]
-  ): Map<number, Map<string, FeatureTypePropertyMetadataRow>> {
-    const metadataByFeatureType = new Map<number, Map<string, FeatureTypePropertyMetadataRow>>();
+    metadataRows: FeatureTypePropertyMetadata[]
+  ): Map<number, Map<string, FeatureTypePropertyMetadata>> {
+    const metadataByFeatureType = new Map<number, Map<string, FeatureTypePropertyMetadata>>();
 
     for (const metadataRow of metadataRows) {
       if (!metadataByFeatureType.has(metadataRow.feature_type_id)) {
-        metadataByFeatureType.set(metadataRow.feature_type_id, new Map<string, FeatureTypePropertyMetadataRow>());
+        metadataByFeatureType.set(metadataRow.feature_type_id, new Map<string, FeatureTypePropertyMetadata>());
       }
 
       metadataByFeatureType.get(metadataRow.feature_type_id)?.set(metadataRow.feature_property_name, metadataRow);

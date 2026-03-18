@@ -1,3 +1,4 @@
+import { Feature } from 'geojson';
 import { z } from 'zod';
 
 export const SubmissionFeaturePropertyGeometrySchema = z.object({
@@ -12,5 +13,5 @@ export type SubmissionFeaturePropertyGeometry = z.infer<typeof SubmissionFeature
 export interface CreateSubmissionFeaturePropertyGeometry {
   submission_feature_id: number;
   feature_type_property_id: number;
-  value: Record<string, unknown>;
+  value: Feature;
 }

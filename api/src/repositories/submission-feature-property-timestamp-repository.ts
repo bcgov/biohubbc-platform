@@ -25,7 +25,8 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
         'submission_feature_property_timestamp_id',
         'submission_feature_id',
         'feature_type_property_id',
-        'value'
+        'date_value',
+        'time_value'
       ]);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestampSchema);
@@ -56,7 +57,8 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
         'submission_feature_property_timestamp_id',
         'submission_feature_id',
         'feature_type_property_id',
-        'value'
+        'date_value',
+        'time_value'
       ])
       .where('submission_feature_property_timestamp_id', submissionFeaturePropertyTimestampId);
 
@@ -95,7 +97,8 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
         'submission_feature_property_timestamp_id',
         'submission_feature_id',
         'feature_type_property_id',
-        'value'
+        'date_value',
+        'time_value'
       ])
       .where('submission_feature_id', submissionFeatureId);
 
@@ -120,7 +123,8 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
         'submission_feature_property_timestamp_id',
         'submission_feature_id',
         'feature_type_property_id',
-        'value'
+        'date_value',
+        'time_value'
       ])
       .where('feature_type_property_id', featureTypePropertyId);
 

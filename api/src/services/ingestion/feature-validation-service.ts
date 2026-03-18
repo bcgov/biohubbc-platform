@@ -13,11 +13,11 @@ import { IValidationError, IValidationResult, ValidationErrorType } from './feat
  * Handles structure validation, type validation, property validation, and reference validation.
  *
  * Validation Rules:
- * - Calculated prop (calculated_value=true) — No validation, system sets value during ingestion
- * - Required prop missing (required_value=true, calculated_value=false) — MISSING_REQUIRED_PROPERTY error
- * - Known optional prop missing — No error
- * - Known prop with wrong type — INVALID_PROPERTY_TYPE error
- * - Unknown prop — Silently ignored, persisted to JSONB
+ * - Calculated property (calculated_value=true) — No validation, system sets value during ingestion
+ * - Required property missing (required_value=true, calculated_value=false) — MISSING_REQUIRED_PROPERTY error
+ * - Known optional property missing — No error
+ * - Known property with wrong type — INVALID_PROPERTY_TYPE error
+ * - Unknown property — Silently ignored, persisted to JSONB
  *
  * @export
  * @class FeatureValidationService
@@ -44,7 +44,7 @@ export class FeatureValidationService extends DBService {
    */
   async validateFlatSubmissionFeatures(
     features: IFlattenedBlock[],
-    codesets: Record<string, unknown> = {}
+    codesets: Record<string, unknown>
   ): Promise<IValidationResult> {
     const errors: IValidationError[] = [];
 
@@ -216,22 +216,22 @@ export class FeatureValidationService extends DBService {
     const errors: IValidationError[] = [];
 
     // Check required properties and types
-    for (const prop of allowedProperties) {
+    for (const property of allowedProperties) {
       // Calculated properties are system-owned — skip all validation
-      if (prop.calculated_value) {
+      if (property.calculated_value) {
         continue;
       }
 
-      const value = feature.properties[prop.name];
+      const value = feature.properties[property.name];
 
       // Check if required property is missing
-      if (prop.required_value && (value === undefined || value === null)) {
+      if (property.required_value && (value === undefined || value === null)) {
         errors.push({
           type: ValidationErrorType.MISSING_REQUIRED_PROPERTY,
           featureId: feature.id,
           featureType: feature.type,
-          field: prop.name,
-          message: `Missing required property '${prop.name}' for feature type '${feature.type}'`
+          field: property.name,
+          message: `Missing required property '${property.name}' for feature type '${feature.type}'`
         });
         continue;
       }
@@ -242,7 +242,7 @@ export class FeatureValidationService extends DBService {
       }
 
       // Check property type
-      const typeError = this.validatePropertyType(feature, prop, value, codeSlugIndex);
+      const typeError = this.validatePropertyType(feature, property, value, codeSlugIndex);
       if (typeError) {
         errors.push(typeError);
       }
@@ -255,14 +255,14 @@ export class FeatureValidationService extends DBService {
    * Validate a single property's type against its expected type.
    *
    * @param {IFlattenedBlock} feature - Feature being validated
-   * @param {FeatureProperty} prop - Property definition
+   * @param {FeatureProperty} property - Property definition
    * @param {unknown} value - Actual value to validate
    * @return {IValidationError | null} Validation error if type mismatch, null otherwise
    * @memberof FeatureValidationService
    */
   validatePropertyType(
     feature: IFlattenedBlock,
-    prop: FeatureProperty,
+    property: FeatureProperty,
     value: unknown,
     codeSlugIndex: Set<string> = new Set<string>()
   ): IValidationError | null {
@@ -270,12 +270,12 @@ export class FeatureValidationService extends DBService {
       type: ValidationErrorType.INVALID_PROPERTY_TYPE,
       featureId: feature.id,
       featureType: feature.type,
-      field: prop.name,
-      message: `Property '${prop.name}' expected type '${expected}', got '${typeof value}'`
+      field: property.name,
+      message: `Property '${property.name}' expected type '${expected}', got '${typeof value}'`
     });
 
-    if (prop.type_name === 'code') {
-      return this.validateCodeProperty(feature, prop, value, codeSlugIndex);
+    if (property.type_name === 'code') {
+      return this.validateCodeProperty(feature, property, value, codeSlugIndex);
     }
 
     // Type validators return error message if invalid, null if valid
@@ -290,7 +290,7 @@ export class FeatureValidationService extends DBService {
       datetime: () => this.validateDatetimeType(value)
     };
 
-    const validator = typeValidators[prop.type_name];
+    const validator = typeValidators[property.type_name];
     if (!validator) {
       return null;
     }
@@ -318,7 +318,7 @@ export class FeatureValidationService extends DBService {
    */
   private validateCodeProperty(
     feature: IFlattenedBlock,
-    prop: FeatureProperty,
+    property: FeatureProperty,
     value: unknown,
     codeSlugIndex: Set<string>
   ): IValidationError | null {
@@ -330,8 +330,8 @@ export class FeatureValidationService extends DBService {
           type: ValidationErrorType.INVALID_PROPERTY_TYPE,
           featureId: feature.id,
           featureType: feature.type,
-          field: prop.name,
-          message: `Property '${prop.name}' expected type 'code slug string', got '${typeof currentValue}'`
+          field: property.name,
+          message: `Property '${property.name}' expected type 'code slug string', got '${typeof currentValue}'`
         };
       }
 
@@ -342,7 +342,7 @@ export class FeatureValidationService extends DBService {
           type: ValidationErrorType.INVALID_CODE_SLUG,
           featureId: feature.id,
           featureType: feature.type,
-          field: prop.name,
+          field: property.name,
           value: currentValue,
           message:
             "Invalid code slug format. Expected 'code::<contributor-codeset-key>::<contributor-codeset-code-key>' and ensure a codeset file is provided."
@@ -354,7 +354,7 @@ export class FeatureValidationService extends DBService {
           type: ValidationErrorType.INVALID_CODE_REFERENCE,
           featureId: feature.id,
           featureType: feature.type,
-          field: prop.name,
+          field: property.name,
           value: currentValue,
           message: `Code slug '${currentValue}' not found in codeset. Ensure codeset[${parsed.contributorCodesetKey}].codes[${parsed.contributorCodesetCodeKey}] exists.`
         };

@@ -80,7 +80,7 @@ describe('FeatureValidationService', () => {
 
       const features: IFlattenedBlock[] = [createValidFeature()];
 
-      const result = await service.validateFlatSubmissionFeatures(features);
+      const result = await service.validateFlatSubmissionFeatures(features, {});
 
       expect(result.valid).to.be.true;
       expect(result.errors).to.have.length(0);
@@ -102,7 +102,7 @@ describe('FeatureValidationService', () => {
         createValidFeature({ id: childId, parent: parentId, content: [] })
       ];
 
-      const result = await service.validateFlatSubmissionFeatures(features);
+      const result = await service.validateFlatSubmissionFeatures(features, {});
 
       expect(result.valid).to.be.true;
       expect(result.errors).to.have.length(0);
@@ -122,7 +122,7 @@ describe('FeatureValidationService', () => {
         createValidFeature({ id: duplicateId })
       ];
 
-      const result = await service.validateFlatSubmissionFeatures(features);
+      const result = await service.validateFlatSubmissionFeatures(features, {});
 
       expect(result.valid).to.be.false;
       expect(result.errors).to.have.length.greaterThan(0);
@@ -140,7 +140,7 @@ describe('FeatureValidationService', () => {
 
       const features: IFlattenedBlock[] = [createValidFeature({ type: 'unknown_type' })];
 
-      const result = await service.validateFlatSubmissionFeatures(features);
+      const result = await service.validateFlatSubmissionFeatures(features, {});
 
       expect(result.valid).to.be.false;
       expect(result.errors).to.have.length(1);
@@ -159,7 +159,7 @@ describe('FeatureValidationService', () => {
       const nonexistentParent = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
       const features: IFlattenedBlock[] = [createValidFeature({ parent: nonexistentParent })];
 
-      const result = await service.validateFlatSubmissionFeatures(features);
+      const result = await service.validateFlatSubmissionFeatures(features, {});
 
       expect(result.valid).to.be.false;
       expect(result.errors.some((e: IValidationError) => e.type === ValidationErrorType.UNRESOLVED_REFERENCE)).to.be
@@ -180,7 +180,7 @@ describe('FeatureValidationService', () => {
       const nonexistentChild = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
       const features: IFlattenedBlock[] = [createValidFeature({ content: [nonexistentChild] })];
 
-      const result = await service.validateFlatSubmissionFeatures(features);
+      const result = await service.validateFlatSubmissionFeatures(features, {});
 
       expect(result.valid).to.be.false;
       expect(result.errors.some((e: IValidationError) => e.type === ValidationErrorType.UNRESOLVED_REFERENCE)).to.be
@@ -201,7 +201,7 @@ describe('FeatureValidationService', () => {
       const selfId = '14ebb420-4cfa-4be1-99db-8122253e3106';
       const features: IFlattenedBlock[] = [createValidFeature({ id: selfId, parent: selfId })];
 
-      const result = await service.validateFlatSubmissionFeatures(features);
+      const result = await service.validateFlatSubmissionFeatures(features, {});
 
       expect(result.valid).to.be.false;
       expect(result.errors.some((e: IValidationError) => e.type === ValidationErrorType.SELF_REFERENCE)).to.be.true;
@@ -221,7 +221,7 @@ describe('FeatureValidationService', () => {
       const selfId = '14ebb420-4cfa-4be1-99db-8122253e3106';
       const features: IFlattenedBlock[] = [createValidFeature({ id: selfId, content: [selfId] })];
 
-      const result = await service.validateFlatSubmissionFeatures(features);
+      const result = await service.validateFlatSubmissionFeatures(features, {});
 
       expect(result.valid).to.be.false;
       expect(result.errors.some((e: IValidationError) => e.type === ValidationErrorType.SELF_REFERENCE)).to.be.true;
@@ -247,7 +247,7 @@ describe('FeatureValidationService', () => {
         }) // nonexistent parent
       ];
 
-      const result = await service.validateFlatSubmissionFeatures(features);
+      const result = await service.validateFlatSubmissionFeatures(features, {});
 
       expect(result.valid).to.be.false;
       expect(result.errors.length).to.be.greaterThan(1);
@@ -268,7 +268,7 @@ describe('FeatureValidationService', () => {
         createValidFeature({ type: 'invalid_type', properties: { unknown_prop: 'value' } })
       ];
 
-      const result = await service.validateFlatSubmissionFeatures(features);
+      const result = await service.validateFlatSubmissionFeatures(features, {});
 
       expect(result.valid).to.be.false;
       // Should only have the INVALID_FEATURE_TYPE error, not INVALID_PROPERTY

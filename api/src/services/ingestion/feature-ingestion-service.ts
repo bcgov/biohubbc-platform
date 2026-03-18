@@ -41,7 +41,7 @@ export class FeatureIngestionService extends DBService {
     features: IFlattenedBlock[]
   ): Promise<IValidationResult> {
     // 1. Validate all features
-    const validationResult = await this.featureValidationService.validateFlatSubmissionFeatures(features);
+    const validationResult = await this.featureValidationService.validateFlatSubmissionFeatures(features, {});
 
     if (!validationResult.valid) {
       return validationResult;
