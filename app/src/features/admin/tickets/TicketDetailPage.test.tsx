@@ -48,6 +48,16 @@ vi.mock('./detail/skeleton/TicketSkeleton', () => ({
   TicketSkeleton: () => <div data-testid="ticket-skeleton" />
 }));
 
+beforeEach(() => {
+  // Prevent delayed setTimeout callbacks from firing after Vitest tears down the test environment.
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.clearAllTimers();
+  vi.useRealTimers();
+});
+
 const mockUseTicketContext = useTicketContext as Mock;
 const mockUseTicketComment = useTicketComment as Mock;
 

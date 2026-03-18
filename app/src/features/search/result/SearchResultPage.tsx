@@ -7,6 +7,7 @@ import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useCont
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { normalizeQueryParam } from 'utils/query-param';
 import { SearchResultOptions } from './content/option/SearchResultOptions';
+import { CustomPagination } from 'components/pagination/CustomPagination';
 import { SearchResultToolbar } from './content/toolbar/SearchResultToolbar';
 import { SearchResultHeader } from './header/SearchResultHeader';
 import { useSearchResults } from './hooks/useSearchResults';
@@ -222,6 +223,20 @@ export const SearchResultPage = () => {
     }
   }, [filters, api.search, dialogContext]);
 
+  const handlePageChange = useCallback(
+    (page: number) => {
+      setSearchParams({ [URL_PARAMS.PAGE]: String(page) });
+    },
+    [setSearchParams]
+  );
+
+  const handlePageSizeChange = useCallback(
+    (limit: number) => {
+      setSearchParams({ [URL_PARAMS.LIMIT]: String(limit), [URL_PARAMS.PAGE]: '1' });
+    },
+    [setSearchParams]
+  );
+
   const handleCheckout = useCallback(async () => {
     try {
       await checkout();
@@ -285,6 +300,19 @@ export const SearchResultPage = () => {
               isLoading={isLoading}
               view={view}
               onClick={(result) => navigate(`/search/${result.submission_id}/feature/${result.submission_feature_id}`)}
+            />
+          </Box>
+
+          <Divider />
+
+          <Box sx={{ px: 2, py: 1 }}>
+            <CustomPagination
+              currentPage={pagination?.current_page ?? 1}
+              pageSize={pagination?.per_page ?? 10}
+              totalCount={pagination?.total ?? 0}
+              lastPage={pagination?.last_page ?? 1}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
             />
           </Box>
         </Paper>
