@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { CountResult } from '../models/count';
+import { SecurityCategoryWithRuleCount } from '../models/security-category';
+import { SecurityRuleWithFeatureCount, SecuritySearchFilters } from '../models/security-rule';
 import { getLogger } from '../utils/logger';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
@@ -85,26 +87,6 @@ export const SubmissionFeatureSecurityRulesSummary = z.object({
 });
 
 export type SubmissionFeatureSecurityRulesSummary = z.infer<typeof SubmissionFeatureSecurityRulesSummary>;
-
-export const SecurityCategoryWithRuleCount = z.object({
-  security_category_id: z.number(),
-  name: z.string(),
-  description: z.string(),
-  rule_count: z.number()
-});
-export type SecurityCategoryWithRuleCount = z.infer<typeof SecurityCategoryWithRuleCount>;
-
-export const SecurityRuleWithFeatureCount = z.object({
-  security_rule_id: z.number(),
-  name: z.string(),
-  description: z.string(),
-  feature_count: z.number()
-});
-export type SecurityRuleWithFeatureCount = z.infer<typeof SecurityRuleWithFeatureCount>;
-
-export interface SecuritySearchFilters {
-  search?: string;
-}
 
 export const SecurityReason = z.object({
   id: z.number(),
@@ -614,7 +596,7 @@ export class SecurityRepository extends BaseRepository {
         'sc.security_category_id',
         'sc.name',
         'sc.description',
-        knex.raw('COALESCE(COUNT(sr.security_rule_id), 0)::integer AS rule_count')
+        knex.raw('COUNT(sr.security_rule_id)::integer AS rule_count')
       )
       .from('security_category as sc')
       .leftJoin('security_rule as sr', function () {
@@ -646,7 +628,7 @@ export class SecurityRepository extends BaseRepository {
     const knex = getKnex();
 
     const query = knex
-      .select(knex.raw('coalesce(count(*), 0)::integer as count'))
+      .select(knex.raw('count(*)::integer as count'))
       .from('security_category')
       .whereNull('record_end_date');
 
@@ -654,7 +636,10 @@ export class SecurityRepository extends BaseRepository {
       query.whereILike('name', `%${filters.search}%`);
     }
 
-    const response = await this.connection.knex(query.first(), CountResult);
+    const response = await this.connection.knex(query, CountResult);
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get security categories count');
+    }
     return response.rows[0].count;
   }
 
@@ -677,7 +662,7 @@ export class SecurityRepository extends BaseRepository {
         'sr.security_rule_id',
         'sr.name',
         'sr.description',
-        knex.raw('COALESCE(COUNT(sfs.submission_feature_security_id), 0)::integer AS feature_count')
+        knex.raw('COUNT(sfs.submission_feature_security_id)::integer AS feature_count')
       )
       .from('security_rule as sr')
       .leftJoin('submission_feature_security as sfs', 'sfs.security_rule_id', 'sr.security_rule_id')
@@ -707,7 +692,7 @@ export class SecurityRepository extends BaseRepository {
     const knex = getKnex();
 
     const query = knex
-      .select(knex.raw('coalesce(count(*), 0)::integer as count'))
+      .select(knex.raw('count(*)::integer as count'))
       .from('security_rule')
       .whereNull('record_end_date');
 
@@ -715,7 +700,10 @@ export class SecurityRepository extends BaseRepository {
       query.whereILike('name', `%${filters.search}%`);
     }
 
-    const response = await this.connection.knex(query.first(), CountResult);
+    const response = await this.connection.knex(query, CountResult);
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get security rules count');
+    }
     return response.rows[0].count;
   }
 }
