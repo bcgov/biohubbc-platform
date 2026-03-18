@@ -679,19 +679,9 @@ describe('FeatureValidationService', () => {
         }
       ];
 
-      const codesets = {
-        agency: {
-          external_id: 'v1',
-          codes: {
-            aarde: {
-              external_id: 'v1',
-              label: 'Aarde Environmental Ltd.'
-            }
-          }
-        }
-      };
+      const codeSlugIndex = new Set<string>(['code::agency::aarde']);
 
-      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codesets);
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codeSlugIndex);
 
       expect(errors).to.have.length(0);
     });
@@ -719,7 +709,7 @@ describe('FeatureValidationService', () => {
         }
       ];
 
-      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, {});
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, new Set<string>());
 
       expect(errors).to.have.length(1);
       expect(errors[0].type).to.equal(ValidationErrorType.INVALID_CODE_SLUG);
@@ -748,22 +738,42 @@ describe('FeatureValidationService', () => {
         }
       ];
 
-      const codesets = {
-        agency: {
-          external_id: 'v1',
-          codes: {
-            aarde: {
-              external_id: 'v1',
-              label: 'Aarde Environmental Ltd.'
-            }
-          }
-        }
-      };
+      const codeSlugIndex = new Set<string>(['code::agency::aarde']);
 
-      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codesets);
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codeSlugIndex);
 
       expect(errors).to.have.length(1);
       expect(errors[0].type).to.equal(ValidationErrorType.INVALID_CODE_REFERENCE);
+    });
+
+    it('validates arrays of code slugs using the in-memory slug index', () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new FeatureValidationService(mockDBConnection);
+
+      const feature: IFlattenedBlock = {
+        id: '14ebb420-4cfa-4be1-99db-8122253e3106',
+        type: 'dataset',
+        properties: { agency: ['code::agency::aarde', 'code::agency::aventrix'] },
+        content: [],
+        parent: null
+      };
+
+      const allowedProperties: FeatureProperty[] = [
+        {
+          name: 'agency',
+          display_name: 'Agency',
+          description: '',
+          type_name: 'code',
+          required_value: true,
+          calculated_value: false
+        }
+      ];
+
+      const codeSlugIndex = new Set<string>(['code::agency::aarde', 'code::agency::aventrix']);
+
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codeSlugIndex);
+
+      expect(errors).to.have.length(0);
     });
   });
 

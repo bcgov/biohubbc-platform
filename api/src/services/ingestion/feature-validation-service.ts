@@ -2,7 +2,7 @@ import { IDBConnection } from '../../database/db';
 import { FeatureProperty, FeatureTypeWithProperties } from '../../models/feature-type';
 import { IFlattenedBlock } from '../../models/submission-feature';
 import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
-import { parseCodeReference, resolveCodeReference } from '../../utils/code-reference';
+import { parseCodeReference } from '../../utils/code-reference';
 import { GeoJSONFeatureCollectionZodSchema } from '../../zod-schema/geoJsonZodSchema';
 import { DBService } from '../db-service';
 import { IValidationError, IValidationResult, ValidationErrorType } from './feature-validation-service.interface';
@@ -48,6 +48,9 @@ export class FeatureValidationService extends DBService {
   ): Promise<IValidationResult> {
     const errors: IValidationError[] = [];
 
+    // Build once per submission for O(1) code slug existence checks during property validation.
+    const codeSlugIndex = this.buildCodeSlugIndex(codesets);
+
     // First pass: collect all feature IDs and check for duplicates
     const allIds = new Set<string>();
     const duplicateIds = new Set<string>();
@@ -90,7 +93,11 @@ export class FeatureValidationService extends DBService {
       if (typeErrors.length === 0) {
         const featureTypeWithProps = await this.findFeatureTypeWithPropertiesCached(feature.type);
         if (featureTypeWithProps) {
-          const propertyErrors = this.validateFeaturePropertyFlat(feature, featureTypeWithProps.properties, codesets);
+          const propertyErrors = this.validateFeaturePropertyFlat(
+            feature,
+            featureTypeWithProps.properties,
+            codeSlugIndex
+          );
           errors.push(...propertyErrors);
         }
       }
@@ -204,7 +211,7 @@ export class FeatureValidationService extends DBService {
   validateFeaturePropertyFlat(
     feature: IFlattenedBlock,
     allowedProperties: FeatureProperty[],
-    codesets: Record<string, unknown> = {}
+    codeSlugIndex: Set<string> = new Set<string>()
   ): IValidationError[] {
     const errors: IValidationError[] = [];
 
@@ -235,7 +242,7 @@ export class FeatureValidationService extends DBService {
       }
 
       // Check property type
-      const typeError = this.validatePropertyType(feature, prop, value, codesets);
+      const typeError = this.validatePropertyType(feature, prop, value, codeSlugIndex);
       if (typeError) {
         errors.push(typeError);
       }
@@ -257,7 +264,7 @@ export class FeatureValidationService extends DBService {
     feature: IFlattenedBlock,
     prop: FeatureProperty,
     value: unknown,
-    codesets: Record<string, unknown> = {}
+    codeSlugIndex: Set<string> = new Set<string>()
   ): IValidationError | null {
     const createTypeError = (expected: string): IValidationError => ({
       type: ValidationErrorType.INVALID_PROPERTY_TYPE,
@@ -268,7 +275,7 @@ export class FeatureValidationService extends DBService {
     });
 
     if (prop.type_name === 'code') {
-      return this.validateCodeProperty(feature, prop, value, codesets);
+      return this.validateCodeProperty(feature, prop, value, codeSlugIndex);
     }
 
     // Type validators return error message if invalid, null if valid
@@ -297,17 +304,15 @@ export class FeatureValidationService extends DBService {
   }
 
   /**
-   * Validate code property slug(s) against loaded codeset definitions.
+   * Validate code property slug(s) against in-memory codeset definitions.
    *
    * Accepted slug format: `code::<contributor-codeset-key>::<contributor-codeset-code-key>`.
-   * Resolution path:
-   * `codesets[contributorCodesetKey].codes[contributorCodesetCodeKey]`.
+   * Resolution path: O(1) membership checks against a prebuilt slug index.
    *
    * @private
    * @param {IFlattenedBlock} feature
-   * @param {FeatureProperty} prop
    * @param {unknown} value
-   * @param {Record<string, unknown>} codesets
+   * @param {Set<string>} codeSlugIndex
    * @return {IValidationError | null}
    * @memberof FeatureValidationService
    */
@@ -315,7 +320,7 @@ export class FeatureValidationService extends DBService {
     feature: IFlattenedBlock,
     prop: FeatureProperty,
     value: unknown,
-    codesets: Record<string, unknown>
+    codeSlugIndex: Set<string>
   ): IValidationError | null {
     const values = Array.isArray(value) ? value : [value];
 
@@ -344,9 +349,7 @@ export class FeatureValidationService extends DBService {
         };
       }
 
-      const resolved = resolveCodeReference(codesets, parsed);
-
-      if (resolved === undefined) {
+      if (!codeSlugIndex.has(parsed.slug)) {
         return {
           type: ValidationErrorType.INVALID_CODE_REFERENCE,
           featureId: feature.id,
@@ -375,6 +378,38 @@ export class FeatureValidationService extends DBService {
     }
     const date = new Date(value);
     return date.toString() === 'Invalid Date' ? 'datetime (ISO string)' : null;
+  }
+
+  /**
+   * Build an in-memory index of valid `code::<codeset>::<code>` slugs.
+   *
+   * This is intentionally precomputed once and then reused for O(1) membership checks
+   * while validating code-typed properties across all features.
+   *
+   * @private
+   * @param {Record<string, unknown>} codesets
+   * @return {Set<string>}
+   * @memberof FeatureValidationService
+   */
+  private buildCodeSlugIndex(codesets: Record<string, unknown>): Set<string> {
+    const codeSlugIndex = new Set<string>();
+
+    for (const [contributorCodesetKey, contributorCodesetValue] of Object.entries(codesets)) {
+      if (typeof contributorCodesetValue !== 'object' || contributorCodesetValue === null) {
+        continue;
+      }
+
+      const codes = (contributorCodesetValue as Record<string, unknown>).codes;
+      if (typeof codes !== 'object' || codes === null) {
+        continue;
+      }
+
+      for (const contributorCodesetCodeKey of Object.keys(codes as Record<string, unknown>)) {
+        codeSlugIndex.add(`code::${contributorCodesetKey}::${contributorCodesetCodeKey}`);
+      }
+    }
+
+    return codeSlugIndex;
   }
 
   /**

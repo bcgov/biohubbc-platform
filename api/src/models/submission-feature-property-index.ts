@@ -13,32 +13,6 @@ export const FeatureTypePropertyMetadata = z.object({
 export type FeatureTypePropertyMetadata = z.infer<typeof FeatureTypePropertyMetadata>;
 
 /**
- * Query row schema for contributor_codeset rows.
- */
-export const ContributorCodeset = z.object({
-  contributor_codeset_id: z.number(),
-  contributor_id: z.number(),
-  key: z.string(),
-  label: z.string(),
-  description: z.string().nullable(),
-  external_id: z.string()
-});
-export type ContributorCodeset = z.infer<typeof ContributorCodeset>;
-
-/**
- * Query row schema for contributor_codeset_code rows.
- */
-export const ContributorCodesetCode = z.object({
-  contributor_codeset_code_id: z.number(),
-  contributor_codeset_id: z.number(),
-  key: z.string(),
-  label: z.string(),
-  description: z.string().nullable(),
-  external_id: z.string()
-});
-export type ContributorCodesetCode = z.infer<typeof ContributorCodesetCode>;
-
-/**
  * Query row schema for code slug resolution rows.
  */
 export const ContributorCodeResolution = z.object({

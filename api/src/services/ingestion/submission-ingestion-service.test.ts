@@ -6,6 +6,7 @@ import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
 import { IFlattenedBlock } from '../../models/submission-feature';
 import { UploadArchive } from '../../models/upload-archive';
 import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
+import { SubmissionFeaturePropertyIndexRepository } from '../../repositories/submission-feature-property-index-repository';
 import * as biohubTarParser from '../../utils/biohub-tar-parser';
 import { IUploadedCodesetFile, IUploadedMediaFile } from '../../utils/biohub-tar-parser';
 import * as fileUtils from '../../utils/file-utils';
@@ -168,6 +169,9 @@ describe('SubmissionIngestionService', () => {
         contributor_id: 999,
         client_id: 'test-client'
       });
+      const persistContributorCodesStub = sinon
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'persistContributorCodesByContributorId')
+        .resolves(new Map<string, number>());
 
       const deleteSubmissionFeaturesBySubmissionUploadIdStub = sinon
         .stub(IngestionRepository.prototype, 'deleteSubmissionFeaturesBySubmissionUploadId')
@@ -196,6 +200,7 @@ describe('SubmissionIngestionService', () => {
         extractAndUploadCodesetsStub,
         validateStub,
         contributorStub,
+        persistContributorCodesStub,
         deleteSubmissionFeaturesBySubmissionUploadIdStub,
         insertSubmissionFeatureRecordStub,
         updateSubmissionFeatureParentStub,
@@ -229,6 +234,12 @@ describe('SubmissionIngestionService', () => {
       // validateFlatSubmissionFeatures called with the blocks
       expect(stubs.validateStub.calledOnce).to.be.true;
       expect(stubs.validateStub.getCall(0).args[0]).to.eql(mockBlocks);
+      expect(stubs.persistContributorCodesStub.calledOnce).to.be.true;
+      sinon.assert.callOrder(
+        stubs.validateStub,
+        stubs.persistContributorCodesStub,
+        stubs.deleteSubmissionFeaturesBySubmissionUploadIdStub
+      );
 
       // insertArtifact called once (one media file)
       expect(stubs.insertArtifactStub.calledOnce).to.be.true;
