@@ -16,6 +16,11 @@ import {
   processSubmissionFeaturesFailedHandler,
   processSubmissionFeaturesJobHandler
 } from './jobs/process-submission-features-job';
+import {
+  IRefreshTeamFeatureCacheJobData,
+  refreshTeamFeatureCacheFailedHandler,
+  refreshTeamFeatureCacheJobHandler
+} from './jobs/refresh-team-feature-cache-job';
 import { getPgBoss } from './pg-boss-service';
 
 const defaultLog = getLogger('queue/worker');
@@ -107,6 +112,31 @@ export const registerWorkers = async (): Promise<void> => {
   await boss.work<IIndexSubmissionFeaturesJobData>(
     JobQueues.INDEX_SUBMISSION_FEATURES_FAILED,
     indexSubmissionFeaturesFailedHandler
+  );
+
+  // Create dead letter queue first (must exist before main queue references it)
+  await boss.createQueue(JobQueues.REFRESH_TEAM_FEATURE_CACHE_FAILED);
+
+  // Create main queue with dead letter queue and retry configuration.
+  // policy: 'short' — enforces singleton_key uniqueness for queued (created) jobs.
+  await boss.createQueue(JobQueues.REFRESH_TEAM_FEATURE_CACHE, {
+    deadLetter: JobQueues.REFRESH_TEAM_FEATURE_CACHE_FAILED,
+    retryLimit: 3,
+    retryDelay: 60,
+    retryBackoff: true,
+    policy: 'short'
+  });
+
+  // Register refresh team feature cache job handler
+  await boss.work<IRefreshTeamFeatureCacheJobData>(
+    JobQueues.REFRESH_TEAM_FEATURE_CACHE,
+    refreshTeamFeatureCacheJobHandler
+  );
+
+  // Register dead letter queue handler for failed refresh team feature cache jobs
+  await boss.work<IRefreshTeamFeatureCacheJobData>(
+    JobQueues.REFRESH_TEAM_FEATURE_CACHE_FAILED,
+    refreshTeamFeatureCacheFailedHandler
   );
 
   defaultLog.info({

@@ -8,6 +8,7 @@ import { JobQueues } from './jobs';
 import { IIndexSubmissionFeaturesJobData } from './jobs/index-submission-features-job';
 import { IMalwareScanJobData } from './jobs/malware-scan-job';
 import { IProcessDownloadJobData } from './jobs/process-download-job';
+import { IRefreshTeamFeatureCacheJobData } from './jobs/refresh-team-feature-cache-job';
 import { getPgBoss } from './pg-boss-service';
 
 const defaultLog = getLogger('queue/publisher');
@@ -422,6 +423,87 @@ export const publishIndexSubmissionFeaturesJob = async (
       label: 'publishIndexSubmissionFeaturesJob',
       message: 'Failed to publish job',
       submissionId: data.submissionId,
+      error
+    });
+
+    return { status: 'error', message: errorMessage };
+  }
+};
+
+/**
+ * Options for refresh team feature cache jobs.
+ * Generous timeout — large teams may have millions of cached features to rebuild.
+ */
+const REFRESH_TEAM_FEATURE_CACHE_OPTIONS: IPublishOptions = {
+  retryLimit: 3,
+  retryDelay: 60,
+  retryBackoff: true,
+  expireInSeconds: 60 * 30 // 30 minutes
+};
+
+/**
+ * Publish a refresh-team-feature-cache job to the queue.
+ *
+ * Queues async cache rebuild for a single team's team_feature rows.
+ * Cache refresh is eventually consistent — policy mutations publish a job
+ * rather than refreshing synchronously, because refresh can process millions
+ * of rows and would block the HTTP response.
+ *
+ * Uses global singletonKey ('team-feature-refresh') so only one refresh
+ * runs at a time across all workers, preventing concurrent bulk delete+insert
+ * operations from swamping the DB regardless of worker replica count.
+ *
+ * Uses the caller's DB connection via pg-boss's `db` option so the job insert
+ * participates in the same transaction — if the caller rolls back, the job
+ * is never visible (no ghost jobs).
+ *
+ * @param {IDBConnection} connection Database connection for transactional job insert
+ * @param {IRefreshTeamFeatureCacheJobData} data Job data containing teamId
+ * @param {IPublishOptions} [options={}] Job options
+ * @return {*}  {Promise<PublishJobResult>}
+ */
+export const publishRefreshTeamFeatureCacheJob = async (
+  connection: IDBConnection,
+  data: IRefreshTeamFeatureCacheJobData,
+  options: IPublishOptions = {}
+): Promise<PublishJobResult> => {
+  try {
+    const boss = getPgBoss();
+    const mergedOptions = { ...REFRESH_TEAM_FEATURE_CACHE_OPTIONS, ...options };
+
+    await boss.createQueue(JobQueues.REFRESH_TEAM_FEATURE_CACHE);
+
+    const jobId = await boss.send(JobQueues.REFRESH_TEAM_FEATURE_CACHE, data, {
+      ...mergedOptions,
+      singletonKey: 'team-feature-refresh',
+      db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
+    });
+
+    if (jobId) {
+      defaultLog.info({
+        label: 'publishRefreshTeamFeatureCacheJob',
+        message: 'Refresh team feature cache job published',
+        jobId,
+        teamId: data.teamId
+      });
+
+      return { status: 'published', jobId };
+    }
+
+    defaultLog.warn({
+      label: 'publishRefreshTeamFeatureCacheJob',
+      message: 'Job not published (duplicate or throttled)',
+      teamId: data.teamId
+    });
+
+    return { status: 'duplicate', message: 'Job already exists for team feature cache refresh' };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    defaultLog.error({
+      label: 'publishRefreshTeamFeatureCacheJob',
+      message: 'Failed to publish job',
+      teamId: data.teamId,
       error
     });
 

@@ -1,7 +1,9 @@
 import { IDBConnection } from '../../database/db';
 import { parseFeatureUrn } from '../../database/urn-utils';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
+import { publishRefreshTeamFeatureCacheJob } from '../../queue/publisher';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
+import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
 import {
@@ -12,18 +14,19 @@ import {
 } from './policy-service.interface';
 import { PolicyStatementConditionService } from './policy-statement-condition-service';
 import { PolicyStatementService } from './policy-statement-service';
-import { TeamFeatureService } from './team-feature-service';
 
 export class PolicyService extends DBService {
   policyRepository: PolicyRepository;
   policyStatementService: PolicyStatementService;
   policyStatementConditionService: PolicyStatementConditionService;
+  teamPolicyRepository: TeamPolicyRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.policyRepository = new PolicyRepository(connection);
     this.policyStatementService = new PolicyStatementService(connection);
     this.policyStatementConditionService = new PolicyStatementConditionService(connection);
+    this.teamPolicyRepository = new TeamPolicyRepository(connection);
   }
 
   /**
@@ -108,16 +111,14 @@ export class PolicyService extends DBService {
    * @memberof PolicyService
    */
   async deletePolicy(policyId: string): Promise<void> {
-    const teamFeatureService = new TeamFeatureService(this.connection);
-
     // Must fetch affected teams BEFORE the soft-delete removes the team_policy association
-    const teamIds = await teamFeatureService.getTeamIdsForPolicy(policyId);
+    const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] });
 
     await this.policyRepository.deletePolicy(policyId);
 
-    // Refresh cache for each affected team after the policy is gone
-    for (const teamId of teamIds) {
-      await teamFeatureService.refreshCacheForTeam(teamId);
+    // Queue async cache refresh for each affected team
+    for (const tp of teamPolicies) {
+      await publishRefreshTeamFeatureCacheJob(this.connection, { teamId: tp.team_id });
     }
   }
 
@@ -213,9 +214,11 @@ export class PolicyService extends DBService {
       })
     );
 
-    // Refresh team_feature cache so secured search results reflect the new policy statements
-    const teamFeatureService = new TeamFeatureService(this.connection);
-    await teamFeatureService.refreshCacheForPolicy(policy.policy_id);
+    // Queue async cache refresh for teams affected by the new policy
+    const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policy.policy_id] });
+    for (const tp of teamPolicies) {
+      await publishRefreshTeamFeatureCacheJob(this.connection, { teamId: tp.team_id });
+    }
 
     return { ...policy, statements: createdStatements };
   }
@@ -267,9 +270,11 @@ export class PolicyService extends DBService {
       })
     );
 
-    // Refresh team_feature cache so secured search results reflect the updated policy statements
-    const teamFeatureService = new TeamFeatureService(this.connection);
-    await teamFeatureService.refreshCacheForPolicy(policyId);
+    // Queue async cache refresh for teams affected by the updated policy
+    const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] });
+    for (const tp of teamPolicies) {
+      await publishRefreshTeamFeatureCacheJob(this.connection, { teamId: tp.team_id });
+    }
 
     return { ...policy, statements: createdStatements };
   }

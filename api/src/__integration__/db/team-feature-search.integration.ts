@@ -231,30 +231,34 @@ describe('Team feature cache + search (integration)', function () {
     });
   });
 
-  // ── Mutation hook tests ──────────────────────────────────────────────────
+  // ── Mutation + cache refresh tests ───────────────────────────────────────
   //
-  // Verifies that creating/deleting policies and team-policy associations
-  // through the service layer automatically refreshes the team_feature cache.
+  // Verifies that after policy/team-policy mutations, refreshing the cache
+  // produces the correct team_feature rows. In production the refresh is
+  // async (pg-boss job), but integration tests call refreshCacheForTeam
+  // directly so assertions see deterministic state.
 
-  describe('Cache refresh via service-layer mutations', () => {
-    it('should populate cache when creating a policy with statements via PolicyService', async () => {
+  describe('Cache refresh after service-layer mutations', () => {
+    it('should populate cache after creating a policy and assigning it to a team', async () => {
       const { submissionId, featureId, teamId } = await setupSecuredFeatureWithTeam('Policy Create Test');
 
-      // Create policy via service — triggers refreshCacheForPolicy
       const policyService = new PolicyService(connection);
       const policy = await policyService.createPolicyWithStatements({ name: `test-policy-create-${Date.now()}` }, [
         { effect: PolicyEffect.ALLOW, submission_feature_urn: `urn:${submissionId}:dataset:${featureId}` }
       ]);
 
-      // Assign policy to team via service — triggers refreshCacheForTeam
       const teamPolicyService = new TeamPolicyService(connection);
       await teamPolicyService.createTeamPolicy({ team_id: teamId, policy_id: policy.policy_id });
+
+      // Manually refresh — in production the queue job does this asynchronously
+      const teamFeatureService = new TeamFeatureService(connection);
+      await teamFeatureService.refreshCacheForTeam(teamId);
 
       const cached = await getTeamFeatureIds(teamId);
       expect(cached).to.deep.equal([featureId]);
     });
 
-    it('should update cache when policy statements are updated via PolicyService', async () => {
+    it('should update cache after policy statements are changed', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Feature A' });
       const featureId2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Feature B' });
@@ -263,7 +267,6 @@ describe('Team feature cache + search (integration)', function () {
 
       const teamId = await createTeam('Policy Update Team');
 
-      // Create policy granting access to feature 1 only
       const policyService = new PolicyService(connection);
       const policy = await policyService.createPolicyWithStatements({ name: `test-policy-update-${Date.now()}` }, [
         { effect: PolicyEffect.ALLOW, submission_feature_urn: `urn:${submissionId}:dataset:${featureId1}` }
@@ -272,18 +275,23 @@ describe('Team feature cache + search (integration)', function () {
       const teamPolicyService = new TeamPolicyService(connection);
       await teamPolicyService.createTeamPolicy({ team_id: teamId, policy_id: policy.policy_id });
 
+      const teamFeatureService = new TeamFeatureService(connection);
+      await teamFeatureService.refreshCacheForTeam(teamId);
+
       expect(await getTeamFeatureIds(teamId)).to.deep.equal([featureId1]);
 
-      // Update policy to grant access to feature 2 instead — triggers cache refresh
+      // Update policy to grant access to feature 2 instead
       await policyService.updatePolicyWithStatements(policy.policy_id, { name: policy.name }, [
         { effect: PolicyEffect.ALLOW, submission_feature_urn: `urn:${submissionId}:dataset:${featureId2}` }
       ]);
+
+      await teamFeatureService.refreshCacheForTeam(teamId);
 
       const cached = await getTeamFeatureIds(teamId);
       expect(cached).to.deep.equal([featureId2]);
     });
 
-    it('should clear cache when policy is deleted via PolicyService', async () => {
+    it('should clear cache after policy is deleted', async () => {
       const { submissionId, featureId, teamId } = await setupSecuredFeatureWithTeam('Policy Delete Test');
 
       const policyService = new PolicyService(connection);
@@ -294,15 +302,19 @@ describe('Team feature cache + search (integration)', function () {
       const teamPolicyService = new TeamPolicyService(connection);
       await teamPolicyService.createTeamPolicy({ team_id: teamId, policy_id: policy.policy_id });
 
+      const teamFeatureService = new TeamFeatureService(connection);
+      await teamFeatureService.refreshCacheForTeam(teamId);
+
       expect(await getTeamFeatureIds(teamId)).to.deep.equal([featureId]);
 
-      // Delete policy — triggers cache refresh for affected teams
+      // Delete policy, then refresh cache
       await policyService.deletePolicy(policy.policy_id);
+      await teamFeatureService.refreshCacheForTeam(teamId);
 
       expect(await getTeamFeatureIds(teamId)).to.deep.equal([]);
     });
 
-    it('should clear cache when team-policy is deleted via TeamPolicyService', async () => {
+    it('should clear cache after team-policy is deleted', async () => {
       const { submissionId, featureId, teamId } = await setupSecuredFeatureWithTeam('TP Delete Test');
 
       const policyService = new PolicyService(connection);
@@ -316,10 +328,14 @@ describe('Team feature cache + search (integration)', function () {
         policy_id: policy.policy_id
       });
 
+      const teamFeatureService = new TeamFeatureService(connection);
+      await teamFeatureService.refreshCacheForTeam(teamId);
+
       expect(await getTeamFeatureIds(teamId)).to.deep.equal([featureId]);
 
-      // Delete team-policy — triggers cache refresh for the team
+      // Delete team-policy, then refresh cache
       await teamPolicyService.deleteTeamPolicy(teamPolicy.team_policy_id);
+      await teamFeatureService.refreshCacheForTeam(teamId);
 
       expect(await getTeamFeatureIds(teamId)).to.deep.equal([]);
     });

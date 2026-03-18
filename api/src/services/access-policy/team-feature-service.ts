@@ -1,6 +1,5 @@
 import { IDBConnection } from '../../database/db';
 import { TeamFeatureRepository } from '../../repositories/authorization/team-feature-repository';
-import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { DBService } from '../db-service';
 
 /**
@@ -11,18 +10,21 @@ import { DBService } from '../db-service';
  * team_policy → policy_statement → submission_feature URN matching.
  * The delete-and-reinsert pattern ensures consistency.
  *
+ * Callers should not invoke this service directly from HTTP request handlers.
+ * Policy/team-policy mutations publish a queue job instead, so the potentially
+ * large cache rebuild runs outside the request path. The job handler calls
+ * refreshCacheForTeam via this service.
+ *
  * @export
  * @class TeamFeatureService
  * @extends {DBService}
  */
 export class TeamFeatureService extends DBService {
   teamFeatureRepository: TeamFeatureRepository;
-  teamPolicyRepository: TeamPolicyRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.teamFeatureRepository = new TeamFeatureRepository(connection);
-    this.teamPolicyRepository = new TeamPolicyRepository(connection);
   }
 
   /**
@@ -39,36 +41,5 @@ export class TeamFeatureService extends DBService {
   async refreshCacheForTeam(teamId: string): Promise<void> {
     await this.teamFeatureRepository.deleteTeamFeaturesByTeamId(teamId);
     await this.teamFeatureRepository.populateTeamFeatureCache(teamId);
-  }
-
-  /**
-   * Refresh the team_feature cache for all teams that have a specific policy.
-   * Called after policy create/update/delete to keep cache in sync with
-   * policy changes.
-   *
-   * @param {string} policyId - The policy UUID whose teams need cache refresh.
-   * @return {Promise<void>}
-   * @memberof TeamFeatureService
-   */
-  async refreshCacheForPolicy(policyId: string): Promise<void> {
-    const teamIds = await this.getTeamIdsForPolicy(policyId);
-
-    for (const teamId of teamIds) {
-      await this.refreshCacheForTeam(teamId);
-    }
-  }
-
-  /**
-   * Get all team_ids that have a specific policy assigned (via team_policy).
-   * Used to determine which teams need cache refresh after a policy mutation.
-   *
-   * @param {string} policyId - The policy UUID to look up.
-   * @return {Promise<string[]>} - Array of team UUIDs.
-   * @memberof TeamFeatureService
-   */
-  async getTeamIdsForPolicy(policyId: string): Promise<string[]> {
-    const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] });
-
-    return teamPolicies.map((tp) => tp.team_id);
   }
 }

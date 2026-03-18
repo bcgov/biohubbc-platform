@@ -40,14 +40,6 @@ export class TeamFeatureRepository extends BaseRepository {
    * need cache entries. Uses decomposed URN columns on policy_statement
    * (urn_submission_id, urn_feature_type, urn_feature_id) for indexed matching.
    *
-   * Uses EXISTS semi-join so each submission_feature drives the outer scan exactly
-   * once — PostgreSQL short-circuits on the first matching policy statement. This
-   * avoids the hash aggregate that SELECT DISTINCT would build over the full
-   * (multiplied) result set when JOINing through team_policy → policy →
-   * policy_statement. At 10M features × 5 policies, EXISTS prevents 50M
-   * intermediate rows from materializing. Rows are unique by construction, so no
-   * ON CONFLICT clause is needed.
-   *
    * @param {string} teamId - The team UUID to populate cache for.
    * @return {Promise<void>}
    * @memberof TeamFeatureRepository

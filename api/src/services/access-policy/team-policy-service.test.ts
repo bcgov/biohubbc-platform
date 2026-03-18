@@ -3,9 +3,9 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { CreateTeamPolicy, TeamPolicy, TeamPolicyDetails, UpdateTeamPolicy } from '../../models/team-policy';
+import * as publisher from '../../queue/publisher';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { TeamFeatureService } from './team-feature-service';
 import { TeamPolicyService } from './team-policy-service';
 
 chai.use(sinonChai);
@@ -33,7 +33,7 @@ describe('TeamPolicyService', () => {
 
       const getExistingStub = sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([]);
       const stub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy').resolves(mockTeamPolicy);
-      sinon.stub(TeamFeatureService.prototype, 'refreshCacheForTeam').resolves();
+      sinon.stub(publisher, 'publishRefreshTeamFeatureCacheJob').resolves({ status: 'published', jobId: 'j1' });
 
       const input: CreateTeamPolicy = {
         team_id: '22222222-2222-2222-2222-222222222222',
@@ -62,7 +62,7 @@ describe('TeamPolicyService', () => {
         .stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId')
         .resolves([existingTeamPolicy]);
       const insertStub = sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy');
-      sinon.stub(TeamFeatureService.prototype, 'refreshCacheForTeam').resolves();
+      sinon.stub(publisher, 'publishRefreshTeamFeatureCacheJob').resolves({ status: 'published', jobId: 'j1' });
 
       const input: CreateTeamPolicy = {
         team_id: '22222222-2222-2222-2222-222222222222',
@@ -82,7 +82,7 @@ describe('TeamPolicyService', () => {
       });
     });
 
-    it('refreshes team_feature cache after new insert', async () => {
+    it('publishes cache refresh after new insert', async () => {
       const mockTeamPolicy: TeamPolicy = {
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
@@ -91,17 +91,20 @@ describe('TeamPolicyService', () => {
 
       sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([]);
       sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy').resolves(mockTeamPolicy);
-      const refreshStub = sinon.stub(TeamFeatureService.prototype, 'refreshCacheForTeam').resolves();
+      const publishStub = sinon
+        .stub(publisher, 'publishRefreshTeamFeatureCacheJob')
+        .resolves({ status: 'published', jobId: 'j1' });
 
       await service.createTeamPolicy({
         team_id: '22222222-2222-2222-2222-222222222222',
         policy_id: '33333333-3333-3333-3333-333333333333'
       });
 
-      expect(refreshStub).to.have.been.calledOnceWith('22222222-2222-2222-2222-222222222222');
+      expect(publishStub).to.have.been.calledOnce;
+      expect(publishStub.firstCall.args[1]).to.eql({ teamId: '22222222-2222-2222-2222-222222222222' });
     });
 
-    it('refreshes team_feature cache even on idempotent return', async () => {
+    it('publishes cache refresh even on idempotent return', async () => {
       const existingTeamPolicy: TeamPolicyDetails = {
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
@@ -111,14 +114,17 @@ describe('TeamPolicyService', () => {
       };
 
       sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([existingTeamPolicy]);
-      const refreshStub = sinon.stub(TeamFeatureService.prototype, 'refreshCacheForTeam').resolves();
+      const publishStub = sinon
+        .stub(publisher, 'publishRefreshTeamFeatureCacheJob')
+        .resolves({ status: 'published', jobId: 'j1' });
 
       await service.createTeamPolicy({
         team_id: '22222222-2222-2222-2222-222222222222',
         policy_id: '33333333-3333-3333-3333-333333333333'
       });
 
-      expect(refreshStub).to.have.been.calledOnceWith('22222222-2222-2222-2222-222222222222');
+      expect(publishStub).to.have.been.calledOnce;
+      expect(publishStub.firstCall.args[1]).to.eql({ teamId: '22222222-2222-2222-2222-222222222222' });
     });
   });
 
@@ -154,7 +160,7 @@ describe('TeamPolicyService', () => {
         team_id: '22222222-2222-2222-2222-222222222222',
         policy_id: '55555555-5555-5555-5555-555555555555'
       });
-      sinon.stub(TeamFeatureService.prototype, 'refreshCacheForTeam').resolves();
+      sinon.stub(publisher, 'publishRefreshTeamFeatureCacheJob').resolves({ status: 'published', jobId: 'j1' });
 
       const result = await service.createTeamPolicies('22222222-2222-2222-2222-222222222222', [
         '33333333-3333-3333-3333-333333333333',
@@ -204,7 +210,7 @@ describe('TeamPolicyService', () => {
         team_id: '22222222-2222-2222-2222-222222222222',
         policy_id: '55555555-5555-5555-5555-555555555555'
       });
-      sinon.stub(TeamFeatureService.prototype, 'refreshCacheForTeam').resolves();
+      sinon.stub(publisher, 'publishRefreshTeamFeatureCacheJob').resolves({ status: 'published', jobId: 'j1' });
 
       const result = await service.createTeamPolicies('22222222-2222-2222-2222-222222222222', [
         '33333333-3333-3333-3333-333333333333',
@@ -228,28 +234,33 @@ describe('TeamPolicyService', () => {
       ]);
     });
 
-    it('refreshes team_feature cache with the correct team ID', async () => {
+    it('publishes cache refresh with the correct team ID', async () => {
       sinon.stub(TeamPolicyRepository.prototype, 'getPoliciesByTeamId').resolves([]);
       sinon.stub(TeamPolicyRepository.prototype, 'insertTeamPolicy').resolves({
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
         policy_id: '33333333-3333-3333-3333-333333333333'
       });
-      const refreshStub = sinon.stub(TeamFeatureService.prototype, 'refreshCacheForTeam').resolves();
+      const publishStub = sinon
+        .stub(publisher, 'publishRefreshTeamFeatureCacheJob')
+        .resolves({ status: 'published', jobId: 'j1' });
 
       await service.createTeamPolicies('22222222-2222-2222-2222-222222222222', [
         '33333333-3333-3333-3333-333333333333'
       ]);
 
-      expect(refreshStub).to.have.been.calledOnceWith('22222222-2222-2222-2222-222222222222');
+      expect(publishStub).to.have.been.calledOnce;
+      expect(publishStub.firstCall.args[1]).to.eql({ teamId: '22222222-2222-2222-2222-222222222222' });
     });
 
     it('skips cache refresh when policyIds array is empty', async () => {
-      const refreshStub = sinon.stub(TeamFeatureService.prototype, 'refreshCacheForTeam').resolves();
+      const publishStub = sinon
+        .stub(publisher, 'publishRefreshTeamFeatureCacheJob')
+        .resolves({ status: 'published', jobId: 'j1' });
 
       const result = await service.createTeamPolicies('22222222-2222-2222-2222-222222222222', []);
 
-      expect(refreshStub).to.not.have.been.called;
+      expect(publishStub).to.not.have.been.called;
       expect(result).to.eql([]);
     });
   });
@@ -345,14 +356,14 @@ describe('TeamPolicyService', () => {
         policy_id: '33333333-3333-3333-3333-333333333333'
       });
       const stub = sinon.stub(TeamPolicyRepository.prototype, 'deleteTeamPolicy').resolves();
-      sinon.stub(TeamFeatureService.prototype, 'refreshCacheForTeam').resolves();
+      sinon.stub(publisher, 'publishRefreshTeamFeatureCacheJob').resolves({ status: 'published', jobId: 'j1' });
 
       await service.deleteTeamPolicy('11111111-1111-1111-1111-111111111111');
 
       expect(stub).to.have.been.calledWith('11111111-1111-1111-1111-111111111111');
     });
 
-    it('fetches team_id before delete, then refreshes cache for that team', async () => {
+    it('fetches team_id before delete, then publishes cache refresh', async () => {
       const callOrder: string[] = [];
 
       sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicy').callsFake(async () => {
@@ -366,28 +377,32 @@ describe('TeamPolicyService', () => {
       sinon.stub(TeamPolicyRepository.prototype, 'deleteTeamPolicy').callsFake(async () => {
         callOrder.push('delete');
       });
-      sinon.stub(TeamFeatureService.prototype, 'refreshCacheForTeam').callsFake(async () => {
-        callOrder.push('refresh');
+      sinon.stub(publisher, 'publishRefreshTeamFeatureCacheJob').callsFake(async () => {
+        callOrder.push('publish');
+        return { status: 'published', jobId: 'j1' };
       });
 
       await service.deleteTeamPolicy('11111111-1111-1111-1111-111111111111');
 
-      // Verify ordering: fetch team_id → delete → refresh cache
-      expect(callOrder).to.eql(['getTeamPolicy', 'delete', 'refresh']);
+      // Verify ordering: fetch team_id → delete → publish cache refresh
+      expect(callOrder).to.eql(['getTeamPolicy', 'delete', 'publish']);
     });
 
-    it('refreshes cache for the correct team', async () => {
+    it('publishes cache refresh for the correct team', async () => {
       sinon.stub(TeamPolicyRepository.prototype, 'getTeamPolicy').resolves({
         team_policy_id: '11111111-1111-1111-1111-111111111111',
         team_id: '22222222-2222-2222-2222-222222222222',
         policy_id: '33333333-3333-3333-3333-333333333333'
       });
       sinon.stub(TeamPolicyRepository.prototype, 'deleteTeamPolicy').resolves();
-      const refreshStub = sinon.stub(TeamFeatureService.prototype, 'refreshCacheForTeam').resolves();
+      const publishStub = sinon
+        .stub(publisher, 'publishRefreshTeamFeatureCacheJob')
+        .resolves({ status: 'published', jobId: 'j1' });
 
       await service.deleteTeamPolicy('11111111-1111-1111-1111-111111111111');
 
-      expect(refreshStub).to.have.been.calledOnceWith('22222222-2222-2222-2222-222222222222');
+      expect(publishStub).to.have.been.calledOnce;
+      expect(publishStub.firstCall.args[1]).to.eql({ teamId: '22222222-2222-2222-2222-222222222222' });
     });
   });
 });

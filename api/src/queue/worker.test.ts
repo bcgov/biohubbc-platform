@@ -5,6 +5,7 @@ import { JobQueues } from './jobs';
 import * as indexSubmissionFeaturesJob from './jobs/index-submission-features-job';
 import * as malwareScanJob from './jobs/malware-scan-job';
 import * as processSubmissionFeaturesJob from './jobs/process-submission-features-job';
+import * as refreshTeamFeatureCacheJob from './jobs/refresh-team-feature-cache-job';
 import * as pgBossService from './pg-boss-service';
 import { registerWorkers } from './worker';
 
@@ -52,8 +53,8 @@ describe('worker', () => {
       await registerWorkers();
 
       // createQueue is called for all queues (including dead letter queues)
-      // 8 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, INDEX_SUBMISSION_FEATURES + FAILED
-      expect(createQueueStub.callCount).to.equal(8);
+      // 10 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, REFRESH_TEAM_FEATURE_CACHE + FAILED
+      expect(createQueueStub.callCount).to.equal(10);
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
       expect(createQueueStub.thirdCall.args[0]).to.equal(JobQueues.MALWARE_SCAN_FAILED);
@@ -62,6 +63,8 @@ describe('worker', () => {
       expect(createQueueStub.getCall(5).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD);
       expect(createQueueStub.getCall(6).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.getCall(7).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
+      expect(createQueueStub.getCall(8).args[0]).to.equal(JobQueues.REFRESH_TEAM_FEATURE_CACHE_FAILED);
+      expect(createQueueStub.getCall(9).args[0]).to.equal(JobQueues.REFRESH_TEAM_FEATURE_CACHE);
     });
 
     it('configures dead letter queue for process-submission-features', async () => {
@@ -127,6 +130,40 @@ describe('worker', () => {
       expect(queueConfig.deadLetter).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
       expect(queueConfig.retryLimit).to.equal(3);
       expect(queueConfig.retryBackoff).to.equal(true);
+    });
+
+    it('registers the refresh team feature cache job handler with pg-boss', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      // Refresh team feature cache handlers are registered after index submission features
+      expect(workStub.getCall(8).args[0]).to.equal(JobQueues.REFRESH_TEAM_FEATURE_CACHE);
+      expect(workStub.getCall(8).args[1]).to.equal(refreshTeamFeatureCacheJob.refreshTeamFeatureCacheJobHandler);
+
+      expect(workStub.getCall(9).args[0]).to.equal(JobQueues.REFRESH_TEAM_FEATURE_CACHE_FAILED);
+      expect(workStub.getCall(9).args[1]).to.equal(refreshTeamFeatureCacheJob.refreshTeamFeatureCacheFailedHandler);
+    });
+
+    it('configures dead letter queue for refresh-team-feature-cache', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      // 10th createQueue call (REFRESH_TEAM_FEATURE_CACHE) should have DLQ config with short policy
+      const queueConfig = createQueueStub.getCall(9).args[1];
+      expect(queueConfig.deadLetter).to.equal(JobQueues.REFRESH_TEAM_FEATURE_CACHE_FAILED);
+      expect(queueConfig.retryLimit).to.equal(3);
+      expect(queueConfig.retryBackoff).to.equal(true);
+      expect(queueConfig.policy).to.equal('short');
     });
   });
 });

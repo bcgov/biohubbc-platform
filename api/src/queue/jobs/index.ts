@@ -39,7 +39,16 @@ export const JobQueues = {
    * Dead letter queue for failed index-submission-features jobs.
    * Jobs are moved here after all retries are exhausted.
    */
-  INDEX_SUBMISSION_FEATURES_FAILED: 'index-submission-features-failed'
+  INDEX_SUBMISSION_FEATURES_FAILED: 'index-submission-features-failed',
+  /**
+   * Refresh team_feature cache job queue for async cache rebuild after policy mutations.
+   */
+  REFRESH_TEAM_FEATURE_CACHE: 'refresh-team-feature-cache',
+  /**
+   * Dead letter queue for failed refresh-team-feature-cache jobs.
+   * Jobs are moved here after all retries are exhausted.
+   */
+  REFRESH_TEAM_FEATURE_CACHE_FAILED: 'refresh-team-feature-cache-failed'
 } as const;
 
 export type JobQueueName = (typeof JobQueues)[keyof typeof JobQueues];

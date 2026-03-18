@@ -1,9 +1,9 @@
 import { IDBConnection } from '../../database/db';
 import { CreateTeamPolicy, TeamPolicy, TeamPolicyDetails, UpdateTeamPolicy } from '../../models/team-policy';
+import { publishRefreshTeamFeatureCacheJob } from '../../queue/publisher';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
-import { TeamFeatureService } from './team-feature-service';
 import { TeamPolicyFilters } from './team-policy-service.interface';
 
 export class TeamPolicyService extends DBService {
@@ -29,9 +29,8 @@ export class TeamPolicyService extends DBService {
     if (existingPolicies.length > 0) {
       const existingPolicy = existingPolicies[0];
 
-      // Refresh cache even on idempotent return — the cache may be stale
-      const teamFeatureService = new TeamFeatureService(this.connection);
-      await teamFeatureService.refreshCacheForTeam(teamPolicyData.team_id);
+      // Queue cache refresh even on idempotent return — the cache may be stale
+      await publishRefreshTeamFeatureCacheJob(this.connection, { teamId: teamPolicyData.team_id });
 
       return {
         team_policy_id: existingPolicy.team_policy_id,
@@ -42,9 +41,8 @@ export class TeamPolicyService extends DBService {
 
     const result = await this.teamPolicyRepository.insertTeamPolicy(teamPolicyData);
 
-    // Refresh team_feature cache so secured search results reflect the new team-policy association
-    const teamFeatureService = new TeamFeatureService(this.connection);
-    await teamFeatureService.refreshCacheForTeam(teamPolicyData.team_id);
+    // Queue async cache refresh so secured search results reflect the new team-policy association
+    await publishRefreshTeamFeatureCacheJob(this.connection, { teamId: teamPolicyData.team_id });
 
     return result;
   }
@@ -77,9 +75,8 @@ export class TeamPolicyService extends DBService {
       )
     );
 
-    // Refresh team_feature cache so secured search results reflect the new team-policy associations
-    const teamFeatureService = new TeamFeatureService(this.connection);
-    await teamFeatureService.refreshCacheForTeam(teamId);
+    // Queue async cache refresh so secured search results reflect the new team-policy associations
+    await publishRefreshTeamFeatureCacheJob(this.connection, { teamId });
 
     return result;
   }
@@ -162,7 +159,7 @@ export class TeamPolicyService extends DBService {
 
     await this.teamPolicyRepository.deleteTeamPolicy(teamPolicyId);
 
-    const teamFeatureService = new TeamFeatureService(this.connection);
-    await teamFeatureService.refreshCacheForTeam(teamPolicy.team_id);
+    // Queue async cache refresh so secured search results reflect the removed team-policy association
+    await publishRefreshTeamFeatureCacheJob(this.connection, { teamId: teamPolicy.team_id });
   }
 }
