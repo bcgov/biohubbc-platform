@@ -39,9 +39,16 @@ export async function createTestFeature(
   `);
   const uploadId = uploadResult.rows[0].upload_id;
 
+  const ticket_id = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, systemUserId);
+
   const bridgeResult = await connection.sql(SQL`
-    INSERT INTO submission_upload (submission_id, upload_id, create_user)
-    VALUES (${submissionId}, ${uploadId}, ${systemUserId})
+    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, create_user)
+    VALUES (
+      ${submissionId},
+      ${uploadId},
+      ${ticket_id},
+      ${systemUserId}
+    )
     RETURNING submission_upload_id;
   `);
   const submissionUploadId = bridgeResult.rows[0].submission_upload_id;
@@ -61,4 +68,126 @@ export async function createTestFeature(
   `);
 
   return result.rows[0].submission_feature_id;
+}
+
+/**
+ * Get an existing integration ticket for a submission or create one if missing.
+ *
+ * This helper supports integration tests that insert into `submission_upload` directly now that
+ * `submission_upload.ticket_id` is required. It is idempotent per submission by matching on a
+ * stable subject + description pair.
+ *
+ * @param {IDBConnection} connection Active database connection used by the test.
+ * @param {number} submissionId Submission primary key (`submission.submission_id`).
+ * @param {string} uploadId Upload UUID (`upload.upload_id`).
+ * @param {number} systemUserId System user id used for `create_user` fields.
+ * @returns {Promise<string>} The `ticket.ticket_id` to associate with `submission_upload`.
+ */
+export async function getOrCreateIntegrationTicketId(
+  connection: IDBConnection,
+  submissionId: number,
+  uploadId: string,
+  systemUserId: number
+): Promise<string> {
+  const teamName = 'Integration Ticket Team';
+  const subject = 'New Submission';
+
+  const submissionResult = await connection.sql(SQL`
+    SELECT uuid
+    FROM submission
+    WHERE submission_id = ${submissionId}
+    LIMIT 1;
+  `);
+
+  const submissionUuid = submissionResult.rows[0]?.uuid as string | undefined;
+  const description = `Submission ID: ${submissionId}. Submission UUID: ${
+    submissionUuid ?? 'unknown'
+  }. Upload UUID: ${uploadId}`;
+
+  const existingTicket = await connection.sql(SQL`
+    SELECT ticket_id
+    FROM ticket
+    WHERE subject = ${subject} AND description = ${description}
+      AND record_end_date IS NULL
+    LIMIT 1;
+  `);
+
+  const existingTicketId = existingTicket.rows[0]?.ticket_id as string | undefined;
+  if (existingTicketId) {
+    return existingTicketId;
+  }
+
+  const existingTeam = await connection.sql(SQL`
+    SELECT team_id
+    FROM team
+    WHERE name = ${teamName}
+      AND record_end_date IS NULL
+    LIMIT 1;
+  `);
+
+  const existingTeamId = existingTeam.rows[0]?.team_id as string | undefined;
+  const teamId =
+    existingTeamId ??
+    (
+      await connection.sql(SQL`
+        INSERT INTO team (name, description, create_user)
+        VALUES (${teamName}, 'Integration test team for ticket linking.', ${systemUserId})
+        RETURNING team_id;
+      `)
+    ).rows[0].team_id;
+
+  const nextSlug = await connection.sql(SQL`
+    WITH
+      day_context AS (
+        SELECT TO_CHAR((now() AT TIME ZONE 'UTC')::date, 'DDD') AS day_of_year
+      ),
+      latest AS (
+        SELECT
+          COALESCE(MAX(RIGHT(ticket_slug, 5)::integer), -1) AS last_value
+        FROM ticket, day_context
+        WHERE ticket_slug LIKE day_context.day_of_year || '%'
+      ),
+      next_value AS (
+        SELECT
+          day_context.day_of_year,
+          latest.last_value + 1 AS next_sequence
+        FROM day_context, latest
+      )
+    SELECT
+      day_of_year || LPAD(next_sequence::text, 5, '0') AS ticket_slug
+    FROM next_value;
+  `);
+
+  const ticketSlug = nextSlug.rows[0].ticket_slug as string;
+
+  const createdTicket = await connection.sql(SQL`
+    INSERT INTO ticket (
+      ticket_slug,
+      subject,
+      description,
+      team_id,
+      priority,
+      status,
+      create_user
+    )
+    VALUES (
+      ${ticketSlug},
+      ${subject},
+      ${description},
+      ${teamId},
+      'medium',
+      'open',
+      ${systemUserId}
+    )
+    RETURNING ticket_id;
+  `);
+
+  const ticketId = createdTicket.rows[0].ticket_id as string;
+
+  await connection.sql(SQL`
+    INSERT INTO ticket_status (ticket_id, status, create_user)
+    VALUES (${ticketId}, 'open', ${systemUserId});
+  `);
+
+  return ticketId;
 }

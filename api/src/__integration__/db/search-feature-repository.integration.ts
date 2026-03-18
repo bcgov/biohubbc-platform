@@ -11,6 +11,7 @@ import { expect } from 'chai';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
+import { getOrCreateIntegrationTicketId } from '../helpers/test-submission-helpers';
 
 describe('SearchFeatureRepository (integration)', function () {
   this.timeout(15000);
@@ -61,9 +62,11 @@ describe('SearchFeatureRepository (integration)', function () {
     `);
     const uploadId = uploadResult.rows[0].upload_id;
 
+    const ticket_id = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, systemUserId);
+
     const bridgeResult = await connection.sql(SQL`
-      INSERT INTO submission_upload (submission_id, upload_id, create_user)
-      VALUES (${submissionId}, ${uploadId}, ${systemUserId})
+      INSERT INTO submission_upload (submission_id, upload_id, ticket_id, create_user)
+      VALUES (${submissionId}, ${uploadId}, ${ticket_id}, ${systemUserId})
       RETURNING submission_upload_id;
     `);
     const submissionUploadId = bridgeResult.rows[0].submission_upload_id;

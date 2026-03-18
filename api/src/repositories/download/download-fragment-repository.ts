@@ -156,7 +156,8 @@ export class DownloadFragmentRepository extends BaseRepository {
         LEFT JOIN submission_feature parent_sf ON sf.parent_submission_feature_id = parent_sf.submission_feature_id
         LEFT JOIN feature_type parent_ft ON parent_sf.feature_type_id = parent_ft.feature_type_id
         WHERE dff.download_fragment_id = $1
-          AND ft.name = $2`,
+          AND ft.name = $2
+        ORDER BY sf.submission_feature_id`,
       [downloadFragmentId, featureTypeName]
     );
 

@@ -170,7 +170,7 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number } | null> {
+  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
     return this.submissionRepository.getSubmissionIdByUUID(uuid);
   }
 

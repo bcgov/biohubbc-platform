@@ -6,7 +6,6 @@ import { vi } from 'vitest';
 
 // Default empty cart state
 export const EmptyCartState: CartState = {
-  cartId: null,
   features: [],
   pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 },
   isLoading: false,
@@ -15,7 +14,6 @@ export const EmptyCartState: CartState = {
 
 // Default cart state with features
 export const CartWithFeaturesState: CartState = {
-  cartId: '123',
   features: [
     {
       cart_submission_feature_id: '1',
@@ -41,11 +39,10 @@ export const CartWithFeaturesState: CartState = {
 
 // Helper to create CartState from base state
 export const createMockCartState = (base: CartState): CartState => ({
-  cartId: base.cartId || null,
-  features: base.features || [],
-  pagination: base.pagination || { total: 0, current_page: 1, last_page: 1, per_page: 10 },
-  isLoading: base.isLoading || false,
-  error: base.error || undefined
+  features: base.features ?? [],
+  pagination: base.pagination ?? { total: 0, current_page: 1, last_page: 1, per_page: 10 },
+  isLoading: base.isLoading ?? false,
+  error: base.error ?? undefined
 });
 
 // Helper to create a mock CartSubmissionFeature

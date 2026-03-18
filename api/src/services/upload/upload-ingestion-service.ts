@@ -11,8 +11,10 @@ import { getSecurityObjectStoreBucketName, getSecurityS3Client } from '../../uti
 import { generateMultipartUploadPresignedUrls } from '../../utils/submission-upload-utils';
 import { DBService } from '../db-service';
 import { SubmissionService } from '../submission-service';
+import { TicketService } from '../ticket-service';
 import { ArtifactSecurityService } from './artifact-security-service';
 import { ArtifactService } from './artifact-service';
+import { SubmissionUploadReviewStatusService } from './submission-upload-review-status-service';
 import { SubmissionUploadService } from './submission-upload-service';
 import { UploadArchiveService } from './upload-archive-service';
 import { UploadArtifactService } from './upload-artifact-service';
@@ -34,10 +36,12 @@ export class UploadIngestionService extends DBService {
   artifactService = new ArtifactService(this.connection);
   uploadArchiveService = new UploadArchiveService(this.connection);
   submissionUploadService = new SubmissionUploadService(this.connection);
+  submissionUploadReviewStatusService = new SubmissionUploadReviewStatusService(this.connection);
   artifactSecurityService = new ArtifactSecurityService(this.connection);
+  ticketService = new TicketService(this.connection);
 
   /**
-   * Create a new archive upload
+   * Create a new archive upload along with a new submission record.
    *
    * @param {number} bytes
    * @param {ICreateSubmission} submission
@@ -47,21 +51,74 @@ export class UploadIngestionService extends DBService {
     // 1. Create submission (intent)
     const { submission_id } = await this.submissionService.insertSubmissionRecord(submission);
 
-    // 2. Create upload session
+    // 2. Use UUID from submission table only (not submission_upload or submission_upload_status)
+    const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submission_id);
+    const submissionUuidFromTable = submissionRecord.uuid;
+
+    return this._startArchiveUploadForSubmission(bytes, submission_id, submissionUuidFromTable);
+  }
+
+  /**
+   * Create a new archive upload for an existing submission (append mode).
+   * Does not create a new submission record. Identifies submission by UUID.
+   *
+   * @param {number} bytes
+   * @param {string} submissionUuid - Submission UUID (submission.uuid).
+   * @returns {Promise<PresignedUploadUrlResponse>}
+   * @throws {ApiNotFoundError} If no submission exists for the given UUID (mapped to 404 by error handler).
+   */
+  async startArchiveUploadForExistingSubmissionByUuid(
+    bytes: number,
+    submissionUuid: string
+  ): Promise<PresignedUploadUrlResponse> {
+    const byUuid = await this.submissionService.getSubmissionIdByUUID(submissionUuid);
+    const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(byUuid.submission_id);
+    return this._startArchiveUploadForSubmission(bytes, byUuid.submission_id, submissionRecord.uuid);
+  }
+
+  /**
+   * Internal helper: creates a new upload session, submission_upload record, review status,
+   * artifact, upload_archive, and presigned URLs for the given submissionId.
+   *
+   * @param {number} bytes
+   * @param {number} submissionId - Integer PK for DB operations
+   * @param {string} submissionUuid - Submission UUID; used when building response (API returns this as submissionId for client use).
+   * @returns {Promise<PresignedUploadUrlResponse>}
+   */
+  async _startArchiveUploadForSubmission(
+    bytes: number,
+    submissionId: number,
+    submissionUuid: string
+  ): Promise<PresignedUploadUrlResponse> {
+    // 1. Create upload session
     const { upload_id } = await this.uploadService.insertUpload({
       upload_status: UploadStatusEnum.PENDING,
       record_end_date: dayjs().add(30, 'minute').toISOString(),
       s3_upload_id: null
     });
 
-    // 3. Bind submission → upload
-    await this.submissionUploadService.insertSubmissionUpload({
-      submission_id,
-      upload_id
+    // 2. Create ticket for admin visibility into this upload
+    const ticket = await this.ticketService.createTicket({
+      subject: 'New Submission',
+      description: `Submission ID: ${submissionId}. Submission UUID: ${submissionUuid}. Upload UUID: ${upload_id}`,
+      priority: 'medium'
     });
 
-    // 4. Create placeholder artifact for archive
-    const key = `submissions/${submission_id}/uploads/${upload_id}.tar`;
+    // 3. Bind submission → upload
+    const { submission_upload_id } = await this.submissionUploadService.insertSubmissionUpload({
+      submission_id: submissionId,
+      upload_id,
+      ticket_id: ticket.ticket_id
+    });
+
+    // 4. Create initial review status (submitted = unreviewed)
+    await this.submissionUploadReviewStatusService.insertSubmissionUploadReviewStatus({
+      submission_upload_id,
+      status: 'submitted'
+    });
+
+    // 5. Create placeholder artifact for archive
+    const key = `submissions/${submissionId}/uploads/${upload_id}.tar`;
     const artifact = await this.artifactService.insertArtifact({
       bucket: getSecurityObjectStoreBucketName(),
       artifact_status: ArtifactStatusEnum.PENDING,
@@ -71,14 +128,14 @@ export class UploadIngestionService extends DBService {
       uploaded_at: null
     });
 
-    // 5. Create upload_archive metadata
+    // 6. Create upload_archive metadata
     const { upload_archive_id } = await this.uploadArchiveService.insertUploadArchive({
       upload_id,
       artifact_id: artifact.artifact_id,
-      archive_status: ProcessStatusStatusEnum.DRAFT // Draft indicates that the archive record is not ready for processing
+      archive_status: ProcessStatusStatusEnum.DRAFT
     });
 
-    // 6. Initialize multipart upload
+    // 7. Initialize multipart upload
     const {
       uploadId: s3UploadId,
       presignedUrls,
@@ -90,11 +147,13 @@ export class UploadIngestionService extends DBService {
       bytes
     });
 
-    // 7. Persist S3 upload ID
+    // 8. Persist S3 upload ID
     await this.uploadService.updateUpload(upload_id, { s3_upload_id: s3UploadId });
 
+    // 9. Response submissionId is the submission UUID (callers pass it for clarity; API returns it for client use).
     return {
-      submissionId: submission_id,
+      submissionId: submissionUuid,
+      submissionUploadId: submission_upload_id,
       uploadId: upload_id,
       uploadArchiveId: upload_archive_id,
       s3UploadId,
