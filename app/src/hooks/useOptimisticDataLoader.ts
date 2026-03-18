@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import type { DataLoader } from './useDataLoader';
 import type { IOptimisticMutationConfig } from './useOptimisticMutation';
 import { useOptimisticMutation } from './useOptimisticMutation';
@@ -12,27 +12,27 @@ type DataLoaderLike<TData> = Pick<DataLoader<any[], TData, unknown>, 'data' | 's
  * optimistic lifecycle to `useOptimisticMutation`.
  */
 export const useOptimisticDataLoader = <TData>(dataLoader: DataLoaderLike<TData>) => {
+  const dataRef = useRef(dataLoader.data);
+  dataRef.current = dataLoader.data;
+
+  const setDataRef = useRef(dataLoader.setData);
+  setDataRef.current = dataLoader.setData;
+
   const { handleMutation } = useOptimisticMutation<TData>({
-    getData: () => dataLoader.data as TData,
-    setData: dataLoader.setData
+    getData: () => dataRef.current as TData,
+    setData: (nextState) => setDataRef.current(nextState)
   });
 
-  /**
-   * Runs an optimistic refresh when current data is available.
-   *
-   * Returns `undefined` when `dataLoader.data` has not been loaded yet.
-   */
   const refresh = useCallback(
     async <TApiResult>(
       buildConfig: (currentData: TData) => IOptimisticMutationConfig<TData, TApiResult>
     ): Promise<TApiResult | undefined> => {
-      if (dataLoader.data === undefined) {
+      if (dataRef.current === undefined) {
         return undefined;
       }
-
       return handleMutation(buildConfig);
     },
-    [dataLoader.data, handleMutation]
+    [handleMutation]
   );
 
   return { refresh };
