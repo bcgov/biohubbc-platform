@@ -164,6 +164,31 @@ describe('CartSubmissionFeatureService', () => {
       expect(stub).to.have.been.calledOnceWith('cart-1', undefined);
     });
 
+    it('should pass submissionFeatureId filter to repository', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new CartSubmissionFeatureService(mockDB);
+
+      const features: CartSubmissionFeature[] = [
+        {
+          cart_submission_feature_id: 'uuid-1',
+          submission_feature_id: 5,
+          submission_id: 1,
+          feature_type_id: 1,
+          feature_type_name: 'name',
+          secured: false
+        }
+      ];
+      const stub = sinon
+        .stub(CartSubmissionFeatureRepository.prototype, 'getCartSubmissionFeatures')
+        .resolves(features);
+
+      const pagination: ApiPaginationOptions = { page: 1, limit: 10 };
+      const result = await service.getCartSubmissionFeatures('cart-1', pagination, 5);
+
+      expect(stub).to.have.been.calledOnceWith('cart-1', pagination, 5);
+      expect(result).to.deep.equal(features);
+    });
+
     it('should propagate repository errors', async () => {
       const mockDB = getMockDBConnection();
       const service = new CartSubmissionFeatureService(mockDB);
@@ -239,6 +264,33 @@ describe('CartSubmissionFeatureService', () => {
       expect(result.pagination.total).to.equal(1);
       expect(result.pagination.current_page).to.equal(1);
       expect(result.pagination.per_page).to.equal(10);
+    });
+
+    it('should pass submissionFeatureId to getCartSubmissionFeatures and return filtered response', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new CartSubmissionFeatureService(mockDB);
+
+      const features: CartSubmissionFeature[] = [
+        {
+          cart_submission_feature_id: 'uuid-1',
+          submission_feature_id: 5,
+          submission_id: 1,
+          feature_type_id: 1,
+          feature_type_name: 'name',
+          secured: false
+        }
+      ];
+
+      const featuresStub = sinon
+        .stub(CartSubmissionFeatureRepository.prototype, 'getCartSubmissionFeatures')
+        .resolves(features);
+      sinon.stub(CartSubmissionFeatureRepository.prototype, 'getCartSubmissionFeatureCount').resolves(10);
+
+      const pagination: ApiPaginationOptions = { page: 1, limit: 10 };
+      const result: CartFeatureListResponse = await service.getPaginatedCartFeaturesResponse('cart-1', pagination, 5);
+
+      expect(featuresStub).to.have.been.calledOnceWith('cart-1', pagination, 5);
+      expect(result.features).to.deep.equal(features);
     });
   });
 });

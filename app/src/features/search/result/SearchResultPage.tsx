@@ -19,6 +19,7 @@ import {
   RecommendedFiltersInput,
   useRecommendedFilters
 } from './sidebar/search/hooks/useRecommendedFilters';
+import { useNavigate } from 'react-router';
 
 export enum SEARCH_RESULT_OPTION_VIEW {
   LIST = 'list',
@@ -26,6 +27,7 @@ export enum SEARCH_RESULT_OPTION_VIEW {
 }
 
 export const SearchResultPage = () => {
+  const navigate = useNavigate();
   const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination, filters } = useSearchResults();
   const api = useApi();
   const { codesDataLoader } = useCodesContext();
@@ -278,7 +280,12 @@ export const SearchResultPage = () => {
           <Divider />
 
           <Box sx={{ flex: 1, overflow: 'auto' }}>
-            <SearchResultOptions rows={rows} isLoading={isLoading} view={view} />
+            <SearchResultOptions
+              rows={rows}
+              isLoading={isLoading}
+              view={view}
+              onClick={(result) => navigate(`/search/${result.submission_id}/feature/${result.submission_feature_id}`)}
+            />
           </Box>
         </Paper>
       </Box>

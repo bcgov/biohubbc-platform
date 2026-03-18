@@ -58,7 +58,8 @@ export class SubmissionUploadStatusRepository extends BaseRepository {
         qb.select('submission_upload.submission_id', 'upload.upload_id', 'upload.upload_status')
           .from('submission_upload')
           .join('upload', 'submission_upload.upload_id', 'upload.upload_id')
-          .where('submission_upload.submission_id', submissionId);
+          .where('submission_upload.submission_id', submissionId)
+          .whereNull('submission_upload.record_end_date');
       })
       .with('upload_artifacts', (qb) => {
         qb.select('upload_artifact.upload_id', 'upload_artifact.artifact_id', 'upload_artifact.role')
