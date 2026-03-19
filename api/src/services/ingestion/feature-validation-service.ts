@@ -44,12 +44,12 @@ export class FeatureValidationService extends DBService {
    */
   async validateFlatSubmissionFeatures(
     features: IFlattenedBlock[],
-    codesets: Record<string, unknown>
+    codesets?: Record<string, unknown>
   ): Promise<IValidationResult> {
     const errors: IValidationError[] = [];
 
     // Build once per submission for O(1) code slug existence checks during property validation.
-    const codeSlugIndex = this.buildCodeSlugIndex(codesets);
+    const codeSlugIndex = codesets ? this.buildCodeSlugIndex(codesets) : new Set<string>();
 
     // First pass: collect all feature IDs and check for duplicates
     const allIds = new Set<string>();
@@ -211,7 +211,7 @@ export class FeatureValidationService extends DBService {
   validateFeaturePropertyFlat(
     feature: IFlattenedBlock,
     allowedProperties: FeatureProperty[],
-    codeSlugIndex: Set<string> = new Set<string>()
+    codeSlugIndex: Set<string>
   ): IValidationError[] {
     const errors: IValidationError[] = [];
 
@@ -264,7 +264,7 @@ export class FeatureValidationService extends DBService {
     feature: IFlattenedBlock,
     property: FeatureProperty,
     value: unknown,
-    codeSlugIndex: Set<string> = new Set<string>()
+    codeSlugIndex: Set<string>
   ): IValidationError | null {
     const createTypeError = (expected: string): IValidationError => ({
       type: ValidationErrorType.INVALID_PROPERTY_TYPE,

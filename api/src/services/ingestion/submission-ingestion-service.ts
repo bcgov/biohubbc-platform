@@ -5,23 +5,23 @@ import { IFlattenedBlock } from '../../models/submission-feature';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { UploadArtifactRoleEnum } from '../../models/upload-artifact';
 import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
-import { SubmissionFeaturePropertyIndexRepository } from '../../repositories/submission-feature-property-index-repository';
 import {
   extractAndUploadCodesets,
   extractAndUploadMedia,
   extractBlocksFromArchive,
   IUploadedMediaFile
 } from '../../utils/biohub-tar-parser';
-import { CodeReference, parseCodeReference } from '../../utils/code-reference';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { getLogger } from '../../utils/logger';
 import { ContributorService } from '../contributor-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { SubmissionFeaturePropertyIndexService } from '../submission-feature-property-index-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
 import { FeatureValidationService } from './feature-validation-service';
 import { IValidationError, IValidationResult, ValidationErrorType } from './feature-validation-service.interface';
+import { SubmissionIngestionCodesService } from './submission-ingestion-codes-service';
 
 const defaultLog = getLogger('services/ingestion/submission-ingestion-service');
 
@@ -42,9 +42,10 @@ export class SubmissionIngestionService extends DBService {
   ingestionRepository = new IngestionRepository(this.connection);
   uploadArchiveService = new UploadArchiveService(this.connection);
   artifactService = new ArtifactService(this.connection);
-  submissionFeaturePropertyIndexRepository = new SubmissionFeaturePropertyIndexRepository(this.connection);
+  submissionFeaturePropertyIndexService = new SubmissionFeaturePropertyIndexService(this.connection);
   contributorService = new ContributorService(this.connection);
   objectStorageService = new ObjectStorageService();
+  submissionIngestionCodesService = new SubmissionIngestionCodesService();
 
   /**
    * Process a submission archive using two-pass architecture.
@@ -97,9 +98,9 @@ export class SubmissionIngestionService extends DBService {
 
     // Persist contributor codeset/category + code definitions before downstream indexing.
     // This ensures index jobs can resolve code slugs entirely from database state.
-    const referencedCodeReferences = this.extractReferencedCodeReferences(allBlocks);
+    const referencedCodeReferences = this.submissionIngestionCodesService.getUniqueCodeReferencesFromBlocks(allBlocks);
     const contributor = await this.contributorService.getContributorBySubmissionUploadId(submissionUploadId);
-    await this.submissionFeaturePropertyIndexRepository.persistContributorCodesByContributorId(
+    await this.submissionFeaturePropertyIndexService.persistContributorCodesByContributorId(
       contributor.contributor_id,
       codesets,
       referencedCodeReferences
@@ -301,85 +302,6 @@ export class SubmissionIngestionService extends DBService {
     }
 
     return map;
-  }
-
-  /**
-   * Extract unique code references from feature property values.
-   *
-   * @private
-   * @param {IFlattenedBlock[]} blocks
-   * @return {CodeReference[]}
-   * @memberof SubmissionIngestionService
-   */
-  private extractReferencedCodeReferences(blocks: IFlattenedBlock[]): CodeReference[] {
-    const codeReferencesBySlug = new Map<string, CodeReference>();
-
-    for (const block of blocks) {
-      this.collectCodeReferencesFromProperties(block.properties, codeReferencesBySlug);
-    }
-
-    return [...codeReferencesBySlug.values()];
-  }
-
-  /**
-   * Collect code references from a single properties object.
-   *
-   * @private
-   * @param {Record<string, unknown>} properties
-   * @param {Map<string, CodeReference>} codeReferencesBySlug
-   * @memberof SubmissionIngestionService
-   */
-  private collectCodeReferencesFromProperties(
-    properties: Record<string, unknown>,
-    codeReferencesBySlug: Map<string, CodeReference>
-  ): void {
-    for (const propertyValue of Object.values(properties)) {
-      this.collectCodeReferencesFromPropertyValue(propertyValue, codeReferencesBySlug);
-    }
-  }
-
-  /**
-   * Collect code references from a single property value.
-   *
-   * @private
-   * @param {unknown} propertyValue
-   * @param {Map<string, CodeReference>} codeReferencesBySlug
-   * @memberof SubmissionIngestionService
-   */
-  private collectCodeReferencesFromPropertyValue(
-    propertyValue: unknown,
-    codeReferencesBySlug: Map<string, CodeReference>
-  ): void {
-    if (Array.isArray(propertyValue)) {
-      for (const arrayValue of propertyValue) {
-        this.collectCodeReferenceFromSingleValue(arrayValue, codeReferencesBySlug);
-      }
-
-      return;
-    }
-
-    this.collectCodeReferenceFromSingleValue(propertyValue, codeReferencesBySlug);
-  }
-
-  /**
-   * Parse and store a single code reference string value.
-   *
-   * @private
-   * @param {unknown} value
-   * @param {Map<string, CodeReference>} codeReferencesBySlug
-   * @memberof SubmissionIngestionService
-   */
-  private collectCodeReferenceFromSingleValue(value: unknown, codeReferencesBySlug: Map<string, CodeReference>): void {
-    if (typeof value !== 'string') {
-      return;
-    }
-
-    const parsedCodeReference = parseCodeReference(value);
-    if (!parsedCodeReference) {
-      return;
-    }
-
-    codeReferencesBySlug.set(parsedCodeReference.slug, parsedCodeReference);
   }
 }
 

@@ -1,38 +1,7 @@
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
+import { FeaturePropertyCode, FeatureTypeCode, FeatureTypePropertyCodeRow } from '../models/feature-property';
 import { BaseRepository } from './base-repository';
-
-const FeatureTypeCode = z.object({
-  feature_type_id: z.number(),
-  feature_type_name: z.string(),
-  feature_type_display_name: z.string()
-});
-
-export type FeatureTypeCode = z.infer<typeof FeatureTypeCode>;
-
-const FeaturePropertyCode = z.object({
-  feature_property_id: z.number(),
-  feature_property_name: z.string(),
-  feature_property_display_name: z.string(),
-  feature_property_type_id: z.number(),
-  feature_property_type_name: z.string()
-});
-
-export type FeaturePropertyCode = z.infer<typeof FeaturePropertyCode>;
-
-const FeatureTypeWithFeaturePropertiesCode = z.object({
-  feature_type: FeatureTypeCode,
-  feature_type_properties: z.array(FeaturePropertyCode)
-});
-
-export type FeatureTypeWithFeaturePropertiesCode = z.infer<typeof FeatureTypeWithFeaturePropertiesCode>;
-
-export const IAllCodeSets = z.object({
-  feature_type_with_properties: z.array(FeatureTypeWithFeaturePropertiesCode)
-});
-
-export type IAllCodeSets = z.infer<typeof IAllCodeSets>;
 
 /**
  * Code repository class.
@@ -68,10 +37,10 @@ export class CodeRepository extends BaseRepository {
   /**
    * Get all feature type property codes for all feature types.
    *
-   * @return {*}  {(Promise<(FeatureTypeCode & FeaturePropertyCode)[]>)}
+   * @return {*}  {(Promise<FeatureTypePropertyCodeRow[]>)}
    * @memberof CodeRepository
    */
-  async getFeatureTypePropertyCodes(): Promise<(FeatureTypeCode & FeaturePropertyCode)[]> {
+  async getFeatureTypePropertyCodes(): Promise<FeatureTypePropertyCodeRow[]> {
     const sql = SQL`
       SELECT
         ft.feature_type_id,
@@ -101,7 +70,7 @@ export class CodeRepository extends BaseRepository {
       ASC;
     `;
 
-    const response = await this.connection.sql(sql, FeatureTypeCode.merge(FeaturePropertyCode));
+    const response = await this.connection.sql(sql, FeatureTypePropertyCodeRow);
 
     return response.rows;
   }

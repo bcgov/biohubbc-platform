@@ -10,7 +10,6 @@ import { CreateSubmissionFeaturePropertyString } from '../models/submission-feat
 import { CreateSubmissionFeaturePropertyTaxon } from '../models/submission-feature-property-taxon';
 import { CreateSubmissionFeaturePropertyTimestamp } from '../models/submission-feature-property-timestamp';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
-import { SubmissionFeaturePropertyIndexRepository } from '../repositories/submission-feature-property-index-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { TaxonomyRepository } from '../repositories/taxonomy-repository';
 import { CodeReference, parseCodeReference } from '../utils/code-reference';
@@ -28,6 +27,7 @@ import {
   ISearchFeaturesFilters,
   SearchFeatureResultWithRelevancy
 } from './search-feature-service.interface';
+import { SubmissionFeaturePropertyIndexService } from './submission-feature-property-index-service';
 
 const defaultLog = getLogger('services/search-feature-service');
 
@@ -242,29 +242,29 @@ export class SearchFeatureService extends DBService {
       submissionId
     });
 
-    const submissionFeaturePropertyIndexRepository = new SubmissionFeaturePropertyIndexRepository(this.connection);
+    const submissionFeaturePropertyIndexService = new SubmissionFeaturePropertyIndexService(this.connection);
     // Idempotency: canonical typed property tables are fully rebuilt per submission.
-    await submissionFeaturePropertyIndexRepository.deletePropertyRecordsBySubmissionId(submissionId);
+    await submissionFeaturePropertyIndexService.deletePropertyRecordsBySubmissionId(submissionId);
 
     const submissionRepository = new SubmissionRepository(this.connection);
     const allFeatures = (await submissionRepository.getSubmissionFeaturesBySubmissionId(
       submissionId
     )) as SubmissionFeatureRecord[];
+
     if (!allFeatures.length) {
       return;
     }
 
-    const metadataByFeatureType = await this.getFeatureTypeMetadataByFeatureType(
-      submissionFeaturePropertyIndexRepository,
-      allFeatures
-    );
+    const featureTypeIds = [...new Set(allFeatures.map((feature) => feature.feature_type_id))];
+    const metadataRows = await submissionFeaturePropertyIndexService.getFeatureTypePropertyMetadata(featureTypeIds);
+    const metadataByFeatureType = this.groupFeatureTypePropertyMetadata(metadataRows);
     const propertyRecordBuckets = this.createPropertyRecordBuckets();
 
     this.collectPropertyRecordsForFeatures(submissionId, allFeatures, metadataByFeatureType, propertyRecordBuckets);
 
     await this.resolvePendingCodeRecords(
       submissionId,
-      submissionFeaturePropertyIndexRepository,
+      submissionFeaturePropertyIndexService,
       propertyRecordBuckets.pendingCodeRecords,
       propertyRecordBuckets.codeRecords
     );
@@ -273,25 +273,7 @@ export class SearchFeatureService extends DBService {
       propertyRecordBuckets.pendingTaxonRecords,
       propertyRecordBuckets.taxonRecords
     );
-    await this.persistPropertyRecords(submissionFeaturePropertyIndexRepository, propertyRecordBuckets);
-  }
-
-  /**
-   * Fetch and group active feature type property metadata by feature type and property name.
-   *
-   * @private
-   * @param {SubmissionFeaturePropertyIndexRepository} submissionFeaturePropertyIndexRepository
-   * @param {SubmissionFeatureRecord[]} allFeatures
-   * @return {Promise<Map<number, Map<string, FeatureTypePropertyMetadata>>>}
-   */
-  private async getFeatureTypeMetadataByFeatureType(
-    submissionFeaturePropertyIndexRepository: SubmissionFeaturePropertyIndexRepository,
-    allFeatures: SubmissionFeatureRecord[]
-  ): Promise<Map<number, Map<string, FeatureTypePropertyMetadata>>> {
-    const featureTypeIds = [...new Set(allFeatures.map((feature) => feature.feature_type_id))];
-    const metadataRows = await submissionFeaturePropertyIndexRepository.getFeatureTypePropertyMetadata(featureTypeIds);
-
-    return this.groupFeatureTypePropertyMetadata(metadataRows);
+    await this.persistPropertyRecords(submissionFeaturePropertyIndexService, propertyRecordBuckets);
   }
 
   /**
@@ -807,14 +789,14 @@ export class SearchFeatureService extends DBService {
    *
    * @private
    * @param {number} submissionId
-   * @param {SubmissionFeaturePropertyIndexRepository} submissionFeaturePropertyIndexRepository
+   * @param {SubmissionFeaturePropertyIndexService} submissionFeaturePropertyIndexService
    * @param {PendingCodeRecord[]} pendingCodeRecords
    * @param {CreateSubmissionFeaturePropertyCode[]} codeRecords
    * @return {Promise<void>}
    */
   private async resolvePendingCodeRecords(
     submissionId: number,
-    submissionFeaturePropertyIndexRepository: SubmissionFeaturePropertyIndexRepository,
+    submissionFeaturePropertyIndexService: SubmissionFeaturePropertyIndexService,
     pendingCodeRecords: PendingCodeRecord[],
     codeRecords: CreateSubmissionFeaturePropertyCode[]
   ): Promise<void> {
@@ -827,11 +809,10 @@ export class SearchFeatureService extends DBService {
     const uniqueCodeReferences = [
       ...new Map(pendingCodeRecords.map((record) => [record.codeReference.slug, record.codeReference])).values()
     ];
-    const codesetSlugMap =
-      await submissionFeaturePropertyIndexRepository.resolveContributorCodesetCodeIdsByCodeReferences(
-        contributor.contributor_id,
-        uniqueCodeReferences
-      );
+    const codesetSlugMap = await submissionFeaturePropertyIndexService.resolveContributorCodesetCodeIdsByCodeReferences(
+      contributor.contributor_id,
+      uniqueCodeReferences
+    );
 
     for (const pendingCodeRecord of pendingCodeRecords) {
       const contributorCodesetCodeId = codesetSlugMap.get(pendingCodeRecord.codeReference.slug);
@@ -908,48 +889,44 @@ export class SearchFeatureService extends DBService {
    * Persist collected canonical property records to typed property tables.
    *
    * @private
-   * @param {SubmissionFeaturePropertyIndexRepository} submissionFeaturePropertyIndexRepository
+   * @param {SubmissionFeaturePropertyIndexService} submissionFeaturePropertyIndexService
    * @param {PropertyRecordBuckets} propertyRecordBuckets
    * @return {Promise<void>}
    */
   private async persistPropertyRecords(
-    submissionFeaturePropertyIndexRepository: SubmissionFeaturePropertyIndexRepository,
+    submissionFeaturePropertyIndexService: SubmissionFeaturePropertyIndexService,
     propertyRecordBuckets: PropertyRecordBuckets
   ): Promise<void> {
     const promises: Promise<void>[] = [];
 
     if (propertyRecordBuckets.stringRecords.length) {
-      promises.push(submissionFeaturePropertyIndexRepository.insertStringRecords(propertyRecordBuckets.stringRecords));
+      promises.push(submissionFeaturePropertyIndexService.insertStringRecords(propertyRecordBuckets.stringRecords));
     }
 
     if (propertyRecordBuckets.numberRecords.length) {
-      promises.push(submissionFeaturePropertyIndexRepository.insertNumberRecords(propertyRecordBuckets.numberRecords));
+      promises.push(submissionFeaturePropertyIndexService.insertNumberRecords(propertyRecordBuckets.numberRecords));
     }
 
     if (propertyRecordBuckets.booleanRecords.length) {
-      promises.push(
-        submissionFeaturePropertyIndexRepository.insertBooleanRecords(propertyRecordBuckets.booleanRecords)
-      );
+      promises.push(submissionFeaturePropertyIndexService.insertBooleanRecords(propertyRecordBuckets.booleanRecords));
     }
 
     if (propertyRecordBuckets.timestampRecords.length) {
       promises.push(
-        submissionFeaturePropertyIndexRepository.insertTimestampRecords(propertyRecordBuckets.timestampRecords)
+        submissionFeaturePropertyIndexService.insertTimestampRecords(propertyRecordBuckets.timestampRecords)
       );
     }
 
     if (propertyRecordBuckets.codeRecords.length) {
-      promises.push(submissionFeaturePropertyIndexRepository.insertCodeRecords(propertyRecordBuckets.codeRecords));
+      promises.push(submissionFeaturePropertyIndexService.insertCodeRecords(propertyRecordBuckets.codeRecords));
     }
 
     if (propertyRecordBuckets.taxonRecords.length) {
-      promises.push(submissionFeaturePropertyIndexRepository.insertTaxonRecords(propertyRecordBuckets.taxonRecords));
+      promises.push(submissionFeaturePropertyIndexService.insertTaxonRecords(propertyRecordBuckets.taxonRecords));
     }
 
     if (propertyRecordBuckets.geometryRecords.length) {
-      promises.push(
-        submissionFeaturePropertyIndexRepository.insertGeometryRecords(propertyRecordBuckets.geometryRecords)
-      );
+      promises.push(submissionFeaturePropertyIndexService.insertGeometryRecords(propertyRecordBuckets.geometryRecords));
     }
 
     await Promise.all(promises);

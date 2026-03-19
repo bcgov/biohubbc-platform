@@ -6,13 +6,13 @@ import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
 import { IFlattenedBlock } from '../../models/submission-feature';
 import { UploadArchive } from '../../models/upload-archive';
 import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
-import { SubmissionFeaturePropertyIndexRepository } from '../../repositories/submission-feature-property-index-repository';
 import * as biohubTarParser from '../../utils/biohub-tar-parser';
 import { IUploadedCodesetFile, IUploadedMediaFile } from '../../utils/biohub-tar-parser';
 import * as fileUtils from '../../utils/file-utils';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { ContributorService } from '../contributor-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { SubmissionFeaturePropertyIndexService } from '../submission-feature-property-index-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
 import { FeatureValidationService } from './feature-validation-service';
@@ -170,7 +170,7 @@ describe('SubmissionIngestionService', () => {
         client_id: 'test-client'
       });
       const persistContributorCodesStub = sinon
-        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'persistContributorCodesByContributorId')
+        .stub(SubmissionFeaturePropertyIndexService.prototype, 'persistContributorCodesByContributorId')
         .resolves(new Map<string, number>());
 
       const deleteSubmissionFeaturesBySubmissionUploadIdStub = sinon
