@@ -809,13 +809,14 @@ export class SearchFeatureService extends DBService {
     const uniqueCodeReferences = [
       ...new Map(pendingCodeRecords.map((record) => [record.codeReference.slug, record.codeReference])).values()
     ];
-    const codesetSlugMap = await submissionFeaturePropertyIndexService.resolveContributorCodesetCodeIdsByCodeReferences(
-      contributor.contributor_id,
-      uniqueCodeReferences
-    );
+    const contributorCodeIdsBySlug =
+      await submissionFeaturePropertyIndexService.resolveContributorCodesetCodeIdsByCodeReferences(
+        contributor.contributor_id,
+        uniqueCodeReferences
+      );
 
     for (const pendingCodeRecord of pendingCodeRecords) {
-      const contributorCodesetCodeId = codesetSlugMap.get(pendingCodeRecord.codeReference.slug);
+      const contributorCodesetCodeId = contributorCodeIdsBySlug.get(pendingCodeRecord.codeReference.slug);
 
       if (contributorCodesetCodeId === undefined) {
         throw new ApiExecuteSQLError('Failed to resolve code slug to contributor_codeset_code_id', [

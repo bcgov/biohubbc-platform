@@ -6,12 +6,8 @@ import sinonChai from 'sinon-chai';
 import * as tar from 'tar-stream';
 import { IFlattenedBlock } from '../models/submission-feature';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
-import {
-  extractAndUploadCodesets,
-  extractAndUploadMedia,
-  extractBlocksFromArchive,
-  IExtractedBlocks
-} from './biohub-tar-parser';
+import { extractAndUploadCodesets, extractAndUploadMedia, extractBlocksFromArchive } from './biohub-tar-parser';
+import { IExtractedBlocks } from './biohub-tar-parser.interface';
 
 chai.use(sinonChai);
 

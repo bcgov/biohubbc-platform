@@ -40,21 +40,19 @@ describe('SubmissionFeaturePropertyIndexService', () => {
       external_id: 'v1'
     };
 
-    it('returns empty map when no referenced codes exist', async () => {
+    it('returns early when no referenced codes exist', async () => {
       const createCodesetsStub = sinon.stub(ContributorCodesetService.prototype, 'createCodesets').resolves([]);
       const createCodesStub = sinon
         .stub(ContributorCodesetCodeService.prototype, 'createContributorCodesetCodes')
         .resolves([]);
       const service = new SubmissionFeaturePropertyIndexService(getMockDBConnection());
 
-      const result = await service.persistContributorCodesByContributorId(999, {}, []);
-
-      expect(result.size).to.equal(0);
+      await service.persistContributorCodesByContributorId(999, {}, []);
       expect(createCodesetsStub.called).to.be.false;
       expect(createCodesStub.called).to.be.false;
     });
 
-    it('persists referenced codesets/codes via contributor services and returns slug map', async () => {
+    it('persists referenced codesets/codes via contributor services', async () => {
       const createCodesetsStub = sinon
         .stub(ContributorCodesetService.prototype, 'createCodesets')
         .resolves([mockCodesetRow]);
@@ -63,7 +61,7 @@ describe('SubmissionFeaturePropertyIndexService', () => {
         .resolves([mockCodeRow]);
       const service = new SubmissionFeaturePropertyIndexService(getMockDBConnection());
 
-      const result = await service.persistContributorCodesByContributorId(
+      await service.persistContributorCodesByContributorId(
         999,
         {
           agency: {
@@ -102,7 +100,6 @@ describe('SubmissionFeaturePropertyIndexService', () => {
           description: 'aardvark code'
         }
       ]);
-      expect(result.get('code::agency::aarde')).to.equal(20);
     });
 
     it('throws when service resolves duplicate codeset keys', async () => {

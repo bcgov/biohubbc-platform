@@ -679,9 +679,9 @@ describe('FeatureValidationService', () => {
         }
       ];
 
-      const codeSlugIndex = new Set<string>(['code::agency::aarde']);
+      const codeSlugs = new Set<string>(['code::agency::aarde']);
 
-      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codeSlugIndex);
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codeSlugs);
 
       expect(errors).to.have.length(0);
     });
@@ -738,9 +738,9 @@ describe('FeatureValidationService', () => {
         }
       ];
 
-      const codeSlugIndex = new Set<string>(['code::agency::aarde']);
+      const codeSlugs = new Set<string>(['code::agency::aarde']);
 
-      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codeSlugIndex);
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codeSlugs);
 
       expect(errors).to.have.length(1);
       expect(errors[0].type).to.equal(ValidationErrorType.INVALID_CODE_REFERENCE);
@@ -769,9 +769,9 @@ describe('FeatureValidationService', () => {
         }
       ];
 
-      const codeSlugIndex = new Set<string>(['code::agency::aarde', 'code::agency::aventrix']);
+      const codeSlugs = new Set<string>(['code::agency::aarde', 'code::agency::aventrix']);
 
-      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codeSlugIndex);
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codeSlugs);
 
       expect(errors).to.have.length(0);
     });

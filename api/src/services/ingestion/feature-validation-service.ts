@@ -39,6 +39,7 @@ export class FeatureValidationService extends DBService {
    * Collects ALL validation errors instead of stopping at the first error.
    *
    * @param {IFlattenedBlock[]} features - Array of flat submission features
+   * @param {Record<string, unknown>} [codesets] - Optional in-memory codeset payload keyed by contributor codeset key
    * @return {Promise<IValidationResult>} Validation result with all collected errors
    * @memberof FeatureValidationService
    */
@@ -49,7 +50,7 @@ export class FeatureValidationService extends DBService {
     const errors: IValidationError[] = [];
 
     // Build once per submission for O(1) code slug existence checks during property validation.
-    const codeSlugIndex = codesets ? this.buildCodeSlugIndex(codesets) : new Set<string>();
+    const codeSlugs = codesets ? this.buildCodeSlugs(codesets) : new Set<string>();
 
     // First pass: collect all feature IDs and check for duplicates
     const allIds = new Set<string>();
@@ -93,11 +94,7 @@ export class FeatureValidationService extends DBService {
       if (typeErrors.length === 0) {
         const featureTypeWithProps = await this.findFeatureTypeWithPropertiesCached(feature.type);
         if (featureTypeWithProps) {
-          const propertyErrors = this.validateFeaturePropertyFlat(
-            feature,
-            featureTypeWithProps.properties,
-            codeSlugIndex
-          );
+          const propertyErrors = this.validateFeaturePropertyFlat(feature, featureTypeWithProps.properties, codeSlugs);
           errors.push(...propertyErrors);
         }
       }
@@ -205,13 +202,14 @@ export class FeatureValidationService extends DBService {
    *
    * @param {IFlattenedBlock} feature - Feature to validate
    * @param {FeatureProperty[]} allowedProperties - Properties defined for this feature type
+   * @param {Set<string>} codeSlugs - In-memory set of valid code slug values
    * @return {IValidationError[]} Array of validation errors (empty if valid)
    * @memberof FeatureValidationService
    */
   validateFeaturePropertyFlat(
     feature: IFlattenedBlock,
     allowedProperties: FeatureProperty[],
-    codeSlugIndex: Set<string>
+    codeSlugs: Set<string>
   ): IValidationError[] {
     const errors: IValidationError[] = [];
 
@@ -242,7 +240,7 @@ export class FeatureValidationService extends DBService {
       }
 
       // Check property type
-      const typeError = this.validatePropertyType(feature, property, value, codeSlugIndex);
+      const typeError = this.validatePropertyType(feature, property, value, codeSlugs);
       if (typeError) {
         errors.push(typeError);
       }
@@ -257,6 +255,7 @@ export class FeatureValidationService extends DBService {
    * @param {IFlattenedBlock} feature - Feature being validated
    * @param {FeatureProperty} property - Property definition
    * @param {unknown} value - Actual value to validate
+   * @param {Set<string>} codeSlugs - In-memory set of valid code slug values
    * @return {IValidationError | null} Validation error if type mismatch, null otherwise
    * @memberof FeatureValidationService
    */
@@ -264,55 +263,72 @@ export class FeatureValidationService extends DBService {
     feature: IFlattenedBlock,
     property: FeatureProperty,
     value: unknown,
-    codeSlugIndex: Set<string>
+    codeSlugs: Set<string>
   ): IValidationError | null {
-    const createTypeError = (expected: string): IValidationError => ({
+    const propertyValidators: Record<string, () => IValidationError | null> = {
+      code: () => this.validateCodeProperty(feature, property, value, codeSlugs),
+      string: () =>
+        typeof value === 'string' ? null : this.createInvalidPropertyTypeError(feature, property, 'string', value),
+      number: () =>
+        typeof value === 'number' ? null : this.createInvalidPropertyTypeError(feature, property, 'number', value),
+      boolean: () =>
+        typeof value === 'boolean' ? null : this.createInvalidPropertyTypeError(feature, property, 'boolean', value),
+      object: () =>
+        typeof value === 'object' && !Array.isArray(value)
+          ? null
+          : this.createInvalidPropertyTypeError(feature, property, 'object', value),
+      array: () =>
+        Array.isArray(value) ? null : this.createInvalidPropertyTypeError(feature, property, 'array', value),
+      spatial: () =>
+        GeoJSONFeatureCollectionZodSchema.safeParse(value).success
+          ? null
+          : this.createInvalidPropertyTypeError(feature, property, 'spatial (GeoJSON FeatureCollection)', value),
+      datetime: () => {
+        const expectedType = this.validateDatetimeType(value);
+        return expectedType ? this.createInvalidPropertyTypeError(feature, property, expectedType, value) : null;
+      }
+    };
+
+    return propertyValidators[property.type_name]?.() ?? null;
+  }
+
+  /**
+   * Create a standardized invalid property type error.
+   *
+   * @private
+   * @param {IFlattenedBlock} feature
+   * @param {FeatureProperty} property
+   * @param {string} expectedType
+   * @param {unknown} value
+   * @return {IValidationError}
+   * @memberof FeatureValidationService
+   */
+  private createInvalidPropertyTypeError(
+    feature: IFlattenedBlock,
+    property: FeatureProperty,
+    expectedType: string,
+    value: unknown
+  ): IValidationError {
+    return {
       type: ValidationErrorType.INVALID_PROPERTY_TYPE,
       featureId: feature.id,
       featureType: feature.type,
       field: property.name,
-      message: `Property '${property.name}' expected type '${expected}', got '${typeof value}'`
-    });
-
-    if (property.type_name === 'code') {
-      return this.validateCodeProperty(feature, property, value, codeSlugIndex);
-    }
-
-    // Type validators return error message if invalid, null if valid
-    const typeValidators: Record<string, () => string | null> = {
-      string: () => (typeof value === 'string' ? null : 'string'),
-      number: () => (typeof value === 'number' ? null : 'number'),
-      boolean: () => (typeof value === 'boolean' ? null : 'boolean'),
-      object: () => (typeof value === 'object' && !Array.isArray(value) ? null : 'object'),
-      array: () => (Array.isArray(value) ? null : 'array'),
-      spatial: () =>
-        GeoJSONFeatureCollectionZodSchema.safeParse(value).success ? null : 'spatial (GeoJSON FeatureCollection)',
-      datetime: () => this.validateDatetimeType(value)
+      message: `Property '${property.name}' expected type '${expectedType}', got '${typeof value}'`
     };
-
-    const validator = typeValidators[property.type_name];
-    if (!validator) {
-      return null;
-    }
-
-    const expectedType = validator();
-    if (expectedType) {
-      return createTypeError(expectedType);
-    }
-
-    return null;
   }
 
   /**
-   * Validate code property slug(s) against in-memory codeset definitions.
+   * Validate code property slugs against in-memory codeset definitions.
    *
    * Accepted slug format: `code::<contributor-codeset-key>::<contributor-codeset-code-key>`.
-   * Resolution path: O(1) membership checks against a prebuilt slug index.
+   * Resolution path: O(1) membership checks against a prebuilt code slug map.
    *
    * @private
    * @param {IFlattenedBlock} feature
+   * @param {FeatureProperty} property
    * @param {unknown} value
-   * @param {Set<string>} codeSlugIndex
+   * @param {Set<string>} codeSlugs
    * @return {IValidationError | null}
    * @memberof FeatureValidationService
    */
@@ -320,19 +336,13 @@ export class FeatureValidationService extends DBService {
     feature: IFlattenedBlock,
     property: FeatureProperty,
     value: unknown,
-    codeSlugIndex: Set<string>
+    codeSlugs: Set<string>
   ): IValidationError | null {
     const values = Array.isArray(value) ? value : [value];
 
     for (const currentValue of values) {
       if (typeof currentValue !== 'string') {
-        return {
-          type: ValidationErrorType.INVALID_PROPERTY_TYPE,
-          featureId: feature.id,
-          featureType: feature.type,
-          field: property.name,
-          message: `Property '${property.name}' expected type 'code slug string', got '${typeof currentValue}'`
-        };
+        return this.createInvalidPropertyTypeError(feature, property, 'code slug string', currentValue);
       }
 
       const parsed = parseCodeReference(currentValue);
@@ -349,7 +359,7 @@ export class FeatureValidationService extends DBService {
         };
       }
 
-      if (!codeSlugIndex.has(parsed.slug)) {
+      if (!codeSlugs.has(parsed.slug)) {
         return {
           type: ValidationErrorType.INVALID_CODE_REFERENCE,
           featureId: feature.id,
@@ -381,7 +391,7 @@ export class FeatureValidationService extends DBService {
   }
 
   /**
-   * Build an in-memory index of valid `code::<codeset>::<code>` slugs.
+   * Build an in-memory map of valid `code::<codeset>::<code>` slugs.
    *
    * This is intentionally precomputed once and then reused for O(1) membership checks
    * while validating code-typed properties across all features.
@@ -391,8 +401,8 @@ export class FeatureValidationService extends DBService {
    * @return {Set<string>}
    * @memberof FeatureValidationService
    */
-  private buildCodeSlugIndex(codesets: Record<string, unknown>): Set<string> {
-    const codeSlugIndex = new Set<string>();
+  private buildCodeSlugs(codesets: Record<string, unknown>): Set<string> {
+    const codeSlugs = new Set<string>();
 
     for (const [contributorCodesetKey, contributorCodesetValue] of Object.entries(codesets)) {
       if (typeof contributorCodesetValue !== 'object' || contributorCodesetValue === null) {
@@ -405,11 +415,11 @@ export class FeatureValidationService extends DBService {
       }
 
       for (const contributorCodesetCodeKey of Object.keys(codes as Record<string, unknown>)) {
-        codeSlugIndex.add(`code::${contributorCodesetKey}::${contributorCodesetCodeKey}`);
+        codeSlugs.add(`code::${contributorCodesetKey}::${contributorCodesetCodeKey}`);
       }
     }
 
-    return codeSlugIndex;
+    return codeSlugs;
   }
 
   /**
