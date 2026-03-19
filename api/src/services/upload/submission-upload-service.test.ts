@@ -27,7 +27,8 @@ describe('SubmissionUploadService', () => {
       const fakeSubmissionUpload: SubmissionUpload = {
         submission_upload_id: 'artifact-1',
         submission_id: 1,
-        upload_id: 'upload-1'
+        upload_id: 'upload-1',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
       };
 
       const stub = sinon
@@ -59,12 +60,14 @@ describe('SubmissionUploadService', () => {
         {
           submission_upload_id: 'artifact-1',
           submission_id: mockSubmissionId,
-          upload_id: 'upload-1'
+          upload_id: 'upload-1',
+          ticket_id: '11111111-1111-1111-1111-111111111111'
         },
         {
           submission_upload_id: 'artifact-2',
           submission_id: mockSubmissionId,
-          upload_id: 'upload-2'
+          upload_id: 'upload-2',
+          ticket_id: '22222222-2222-2222-2222-222222222222'
         }
       ];
 
@@ -96,7 +99,8 @@ describe('SubmissionUploadService', () => {
     it('should insert a new submission_upload record and return its ID', async () => {
       const fakeInput: CreateSubmissionUpload = {
         submission_id: 1,
-        upload_id: 'upload-1'
+        upload_id: 'upload-1',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
       };
 
       const stub = sinon
@@ -112,7 +116,8 @@ describe('SubmissionUploadService', () => {
     it('should throw an error if repository fails', async () => {
       const fakeInput: CreateSubmissionUpload = {
         submission_id: 1,
-        upload_id: 'upload-1'
+        upload_id: 'upload-1',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
       };
 
       sinon.stub(SubmissionUploadRepository.prototype, 'insertSubmissionUpload').throws(new Error('Insert failed'));
@@ -130,7 +135,8 @@ describe('SubmissionUploadService', () => {
     it('should update an existing submission_upload record and return its ID', async () => {
       const fakeInput: UpdateSubmissionUpload = {
         submission_id: 2,
-        upload_id: 'upload-2'
+        upload_id: 'upload-2',
+        ticket_id: '22222222-2222-2222-2222-222222222222'
       };
 
       const stub = sinon
@@ -146,7 +152,8 @@ describe('SubmissionUploadService', () => {
     it('should throw an error if repository fails', async () => {
       const fakeInput: UpdateSubmissionUpload = {
         submission_id: 2,
-        upload_id: 'upload-2'
+        upload_id: 'upload-2',
+        ticket_id: '22222222-2222-2222-2222-222222222222'
       };
 
       sinon.stub(SubmissionUploadRepository.prototype, 'updateSubmissionUpload').throws(new Error('Update failed'));

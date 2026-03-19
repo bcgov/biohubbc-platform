@@ -25,7 +25,8 @@ describe('publisher', () => {
   const defaultSubmissionUpload: SubmissionUpload = {
     submission_upload_id: 'sub-upload-uuid-1',
     submission_id: 123,
-    upload_id: 'upload-uuid-1'
+    upload_id: 'upload-uuid-1',
+    ticket_id: '11111111-1111-1111-1111-111111111111'
   };
 
   describe('publishProcessSubmissionFeaturesJob', () => {
