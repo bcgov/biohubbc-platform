@@ -4,7 +4,6 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
-import { SubmissionFeaturePropertyIndexRepository } from '../repositories/submission-feature-property-index-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { TaxonomyRepository } from '../repositories/taxonomy-repository';
 import { getMockDBConnection } from '../__mocks__/db';
@@ -12,6 +11,7 @@ import { CodeService } from './code-service';
 import { ContributorService } from './contributor-service';
 import { SearchFeatureService } from './search-feature-service';
 import { SearchFeatureResultWithRelevancy } from './search-feature-service.interface';
+import { SubmissionFeaturePropertyIndexService } from './submission-feature-property-index-service';
 
 chai.use(sinonChai);
 
@@ -501,8 +501,8 @@ describe('SearchFeatureService', () => {
         }
       ]);
 
-      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
-      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'getFeatureTypePropertyMetadata').resolves([
+      sinon.stub(SubmissionFeaturePropertyIndexService.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
+      sinon.stub(SubmissionFeaturePropertyIndexService.prototype, 'getFeatureTypePropertyMetadata').resolves([
         {
           feature_type_id: 1,
           feature_type_property_id: 55,
@@ -512,7 +512,7 @@ describe('SearchFeatureService', () => {
         }
       ]);
       sinon
-        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'resolveContributorCodesetCodeIdsByCodeReferences')
+        .stub(SubmissionFeaturePropertyIndexService.prototype, 'resolveContributorCodesetCodeIdsByCodeReferences')
         .resolves(new Map([['code::agency::aarde', 32]]));
       sinon.stub(ContributorService.prototype, 'getContributorBySubmissionId').resolves({
         contributor_id: 999,
@@ -520,7 +520,7 @@ describe('SearchFeatureService', () => {
       });
 
       const insertCodeRecordsStub = sinon
-        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'insertCodeRecords')
+        .stub(SubmissionFeaturePropertyIndexService.prototype, 'insertCodeRecords')
         .resolves();
 
       await searchFeatureService.indexSubmissionPropertiesBySubmissionId(777);
@@ -563,8 +563,8 @@ describe('SearchFeatureService', () => {
         }
       ]);
 
-      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
-      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'getFeatureTypePropertyMetadata').resolves([
+      sinon.stub(SubmissionFeaturePropertyIndexService.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
+      sinon.stub(SubmissionFeaturePropertyIndexService.prototype, 'getFeatureTypePropertyMetadata').resolves([
         {
           feature_type_id: 1,
           feature_type_property_id: 55,
@@ -610,7 +610,7 @@ describe('SearchFeatureService', () => {
       ]);
 
       const insertTaxonRecordsStub = sinon
-        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'insertTaxonRecords')
+        .stub(SubmissionFeaturePropertyIndexService.prototype, 'insertTaxonRecords')
         .resolves();
 
       await searchFeatureService.indexSubmissionPropertiesBySubmissionId(777);
@@ -658,8 +658,8 @@ describe('SearchFeatureService', () => {
         }
       ]);
 
-      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
-      sinon.stub(SubmissionFeaturePropertyIndexRepository.prototype, 'getFeatureTypePropertyMetadata').resolves([
+      sinon.stub(SubmissionFeaturePropertyIndexService.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
+      sinon.stub(SubmissionFeaturePropertyIndexService.prototype, 'getFeatureTypePropertyMetadata').resolves([
         {
           feature_type_id: 1,
           feature_type_property_id: 55,

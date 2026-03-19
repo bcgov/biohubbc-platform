@@ -2,7 +2,8 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { CodeRepository, FeatureTypeWithFeaturePropertiesCode } from '../repositories/code-repository';
+import { FeatureTypeWithFeaturePropertiesCode } from '../models/feature-property';
+import { CodeRepository } from '../repositories/code-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CodeService } from './code-service';
 

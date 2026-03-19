@@ -4,8 +4,9 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiNotFoundError } from '../errors/api-error';
+import { FeatureTypeCode, FeatureTypePropertyCodeRow } from '../models/feature-property';
 import { getMockDBConnection } from '../__mocks__/db';
-import { CodeRepository, FeaturePropertyCode, FeatureTypeCode } from './code-repository';
+import { CodeRepository } from './code-repository';
 
 chai.use(sinonChai);
 
@@ -45,7 +46,7 @@ describe('CodeRepository', () => {
     });
 
     it('should return rows if succeeds', async () => {
-      const mockRow: FeatureTypeCode & FeaturePropertyCode = {
+      const mockRow: FeatureTypePropertyCodeRow = {
         feature_type_id: 1,
         feature_type_name: 'dataset',
         feature_type_display_name: 'Dataset',
@@ -103,7 +104,7 @@ describe('CodeRepository', () => {
     });
 
     it('should return row if succeeds', async () => {
-      const mockRow: FeatureTypeCode & FeaturePropertyCode = {
+      const mockRow: FeatureTypePropertyCodeRow = {
         feature_type_id: 1,
         feature_type_name: 'dataset',
         feature_type_display_name: 'Dataset',

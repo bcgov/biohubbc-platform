@@ -6,11 +6,11 @@ import { ContributorCodeset } from '../models/contributor-codeset';
 import { ContributorCodesetCode } from '../models/contributor-codeset-code';
 import { ContributorCodesetCodeService } from '../services/contributor-codeset-code-service';
 import { ContributorCodesetService } from '../services/contributor-codeset-service';
+import { SubmissionFeaturePropertyIndexService } from '../services/submission-feature-property-index-service';
 import { CodeReference } from '../utils/code-reference';
 import { getMockDBConnection } from '../__mocks__/db';
-import { SubmissionFeaturePropertyIndexRepository } from './submission-feature-property-index-repository';
 
-describe('SubmissionFeaturePropertyIndexRepository', () => {
+describe('SubmissionFeaturePropertyIndexService', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -45,9 +45,9 @@ describe('SubmissionFeaturePropertyIndexRepository', () => {
       const createCodesStub = sinon
         .stub(ContributorCodesetCodeService.prototype, 'createContributorCodesetCodes')
         .resolves([]);
-      const repository = new SubmissionFeaturePropertyIndexRepository(getMockDBConnection());
+      const service = new SubmissionFeaturePropertyIndexService(getMockDBConnection());
 
-      const result = await repository.persistContributorCodesByContributorId(999, {}, []);
+      const result = await service.persistContributorCodesByContributorId(999, {}, []);
 
       expect(result.size).to.equal(0);
       expect(createCodesetsStub.called).to.be.false;
@@ -61,9 +61,9 @@ describe('SubmissionFeaturePropertyIndexRepository', () => {
       const createCodesStub = sinon
         .stub(ContributorCodesetCodeService.prototype, 'createContributorCodesetCodes')
         .resolves([mockCodeRow]);
-      const repository = new SubmissionFeaturePropertyIndexRepository(getMockDBConnection());
+      const service = new SubmissionFeaturePropertyIndexService(getMockDBConnection());
 
-      const result = await repository.persistContributorCodesByContributorId(
+      const result = await service.persistContributorCodesByContributorId(
         999,
         {
           agency: {
@@ -110,10 +110,10 @@ describe('SubmissionFeaturePropertyIndexRepository', () => {
         .stub(ContributorCodesetService.prototype, 'createCodesets')
         .resolves([mockCodesetRow, { ...mockCodesetRow, contributor_codeset_id: 11 }]);
       sinon.stub(ContributorCodesetCodeService.prototype, 'createContributorCodesetCodes').resolves([mockCodeRow]);
-      const repository = new SubmissionFeaturePropertyIndexRepository(getMockDBConnection());
+      const service = new SubmissionFeaturePropertyIndexService(getMockDBConnection());
 
       try {
-        await repository.persistContributorCodesByContributorId(
+        await service.persistContributorCodesByContributorId(
           999,
           {
             agency: {

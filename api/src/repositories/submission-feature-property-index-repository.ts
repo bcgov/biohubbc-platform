@@ -2,86 +2,54 @@ import { Feature } from 'geojson';
 import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { ContributorCodeset, CreateContributorCodeset } from '../models/contributor-codeset';
+import { ContributorCodesetCode, ContributorCodesetCodeSchema } from '../models/contributor-codeset-code';
 import {
-  ContributorCodesetCode,
-  ContributorCodesetCodeSchema,
-  CreateContributorCodesetCode
-} from '../models/contributor-codeset-code';
-import { CreateSubmissionFeaturePropertyBoolean } from '../models/submission-feature-property-boolean';
-import { CreateSubmissionFeaturePropertyCode } from '../models/submission-feature-property-code';
-import { CreateSubmissionFeaturePropertyGeometry } from '../models/submission-feature-property-geometry';
+  CreateSubmissionFeaturePropertyBoolean,
+  SubmissionFeaturePropertyBoolean,
+  SubmissionFeaturePropertyBooleanSchema
+} from '../models/submission-feature-property-boolean';
+import {
+  CreateSubmissionFeaturePropertyCode,
+  SubmissionFeaturePropertyCode,
+  SubmissionFeaturePropertyCodeSchema
+} from '../models/submission-feature-property-code';
+import {
+  CreateSubmissionFeaturePropertyGeometry,
+  SubmissionFeaturePropertyGeometry,
+  SubmissionFeaturePropertyGeometrySchema
+} from '../models/submission-feature-property-geometry';
 import { ContributorCodeResolution, FeatureTypePropertyMetadata } from '../models/submission-feature-property-index';
-import { CreateSubmissionFeaturePropertyNumber } from '../models/submission-feature-property-number';
-import { CreateSubmissionFeaturePropertyString } from '../models/submission-feature-property-string';
-import { CreateSubmissionFeaturePropertyTaxon } from '../models/submission-feature-property-taxon';
-import { CreateSubmissionFeaturePropertyTimestamp } from '../models/submission-feature-property-timestamp';
-import { ContributorCodesetCodeService } from '../services/contributor-codeset-code-service';
-import { ContributorCodesetService } from '../services/contributor-codeset-service';
-import { CodeReference } from '../utils/code-reference';
+import {
+  CreateSubmissionFeaturePropertyNumber,
+  SubmissionFeaturePropertyNumber,
+  SubmissionFeaturePropertyNumberSchema
+} from '../models/submission-feature-property-number';
+import {
+  CreateSubmissionFeaturePropertyString,
+  SubmissionFeaturePropertyString,
+  SubmissionFeaturePropertyStringSchema
+} from '../models/submission-feature-property-string';
+import {
+  CreateSubmissionFeaturePropertyTaxon,
+  SubmissionFeaturePropertyTaxon,
+  SubmissionFeaturePropertyTaxonSchema
+} from '../models/submission-feature-property-taxon';
+import {
+  CreateSubmissionFeaturePropertyTimestamp,
+  SubmissionFeaturePropertyTimestamp,
+  SubmissionFeaturePropertyTimestampSchema
+} from '../models/submission-feature-property-timestamp';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
-type CreateContributorCodesetCodeDefinition = CreateContributorCodesetCode & {
-  contributor_codeset_key: string;
-};
-
 /**
- * Repository for canonical submission feature property indexing operations.
+ * Repository for canonical submission feature property indexing SQL operations.
  *
  * @export
  * @class SubmissionFeaturePropertyIndexRepository
  * @extends {BaseRepository}
  */
 export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
-  /**
-   * Persist contributor codeset definitions and codes in bulk for a submission.
-   *
-   * Why:
-   * - Processing must persist code dependencies so indexing can be DB-only.
-   * - Immutable-definition semantics are enforced during persistence.
-   *
-   * @param {number} contributorId
-   * @param {Record<string, unknown>} codesets
-   * @return {Promise<Map<string, number>>}
-   * @memberof SubmissionFeaturePropertyIndexRepository
-   */
-  async persistContributorCodesByContributorId(
-    contributorId: number,
-    codesets: Record<string, unknown>,
-    codeReferences: CodeReference[] = []
-  ): Promise<Map<string, number>> {
-    if (!Object.keys(codesets).length || !codeReferences.length) {
-      return new Map<string, number>();
-    }
-
-    const referencedCodeKeys = this.toReferencedCodeKeys(codeReferences);
-    const contributorCodesetDefinitions = this.toContributorCodesetDefinitions(
-      contributorId,
-      codesets,
-      referencedCodeKeys
-    );
-    const contributorCodesetService = new ContributorCodesetService(this.connection);
-    const existingCodesets = await contributorCodesetService.createCodesets(contributorCodesetDefinitions);
-    const contributorCodesetCodeDefinitions = this.toContributorCodesetCodeDefinitions(
-      codesets,
-      existingCodesets,
-      referencedCodeKeys
-    );
-    const contributorCodesetCodeService = new ContributorCodesetCodeService(this.connection);
-    const resolvedCodes = await contributorCodesetCodeService.createContributorCodesetCodes(
-      contributorCodesetCodeDefinitions.map((definition) => ({
-        contributor_codeset_id: definition.contributor_codeset_id,
-        key: definition.key,
-        external_id: definition.external_id,
-        label: definition.label,
-        description: definition.description
-      }))
-    );
-
-    return this.mapCodesToSlugMap(contributorCodesetCodeDefinitions, resolvedCodes);
-  }
-
   /**
    * Get active feature type property metadata for provided feature types.
    *
@@ -119,10 +87,10 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
    * Delete all canonical property records for a submission.
    *
    * @param {number} submissionId
-   * @return {Promise<void>}
+   * @return {Promise<Record<string, unknown>[]>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async deletePropertyRecordsBySubmissionId(submissionId: number): Promise<void> {
+  async deletePropertyRecordsBySubmissionId(submissionId: number): Promise<Record<string, unknown>[]> {
     const knex = getKnex();
     const featureIdsQuery = knex
       .select('submission_feature_id')
@@ -154,9 +122,11 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
       .with('deleted_geometry', (qb) => {
         qb.from('submission_feature_property_geometry').whereIn('submission_feature_id', cteFeatureIds).delete();
       })
-      .select(knex.raw('1'));
+      .select(knex.raw('1 as deleted'));
 
-    await this.connection.knex(query);
+    const response = await this.connection.knex(query);
+
+    return response.rows;
   }
 
   /**
@@ -182,35 +152,27 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
         'description'
       ])
       .whereIn('contributor_codeset_code_id', contributorCodesetCodeIds);
+
     const response = await this.connection.knex(query, ContributorCodesetCodeSchema);
 
     return response.rows;
   }
 
   /**
-   * Resolve contributor_codeset_code IDs for code references in bulk.
-   *
-   * Why:
-   * - Property indexing must not read codeset artifacts from object storage.
-   * - We load only contributor codesets referenced by the current submission, then map
-   *   slugs to IDs in memory for O(1) assignment while inserting code properties.
+   * Get contributor code resolution rows for a contributor and codeset keys.
    *
    * @param {number} contributorId
-   * @param {CodeReference[]} codeReferences
-   * @return {Promise<Map<string, number>>}
+   * @param {string[]} contributorCodesetKeys
+   * @return {Promise<ContributorCodeResolution[]>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async resolveContributorCodesetCodeIdsByCodeReferences(
+  async getContributorCodeResolutionsByContributorIdAndCodesetKeys(
     contributorId: number,
-    codeReferences: CodeReference[]
-  ): Promise<Map<string, number>> {
-    if (!codeReferences.length) {
-      return new Map<string, number>();
+    contributorCodesetKeys: string[]
+  ): Promise<ContributorCodeResolution[]> {
+    if (!contributorCodesetKeys.length) {
+      return [];
     }
-
-    const uniqueContributorCodesetKeys = [
-      ...new Set(codeReferences.map((reference) => reference.contributorCodesetKey))
-    ];
 
     const knex = getKnex();
     const codesQuery = knex('contributor_codeset_code as ccc')
@@ -223,390 +185,159 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
       .where('ccs.contributor_id', contributorId)
       .whereNull('ccs.record_end_date')
       .whereNull('ccc.record_end_date')
-      .whereIn('ccs.key', uniqueContributorCodesetKeys);
+      .whereIn('ccs.key', contributorCodesetKeys);
 
-    const codesResponse = await this.connection.knex(codesQuery, ContributorCodeResolution);
-    const slugToRows = new Map<string, typeof codesResponse.rows>();
+    const response = await this.connection.knex(codesQuery, ContributorCodeResolution);
 
-    for (const row of codesResponse.rows) {
-      const slug = `code::${row.contributor_codeset_key}::${row.contributor_codeset_code_key}`;
-      const existing = slugToRows.get(slug) ?? [];
-      existing.push(row);
-      slugToRows.set(slug, existing);
-    }
-
-    const slugToId = new Map<string, number>();
-    for (const reference of codeReferences) {
-      const matches = slugToRows.get(reference.slug) ?? [];
-      if (!matches.length) {
-        throw new ApiExecuteSQLError(
-          'Failed to resolve code slug to contributor_codeset_code_id. Ensure code definitions are ingested for this contributor.',
-          [
-            'SubmissionFeaturePropertyIndexRepository->resolveContributorCodesetCodeIdsByCodeReferences',
-            {
-              contributorId,
-              slug: reference.slug,
-              advice:
-                'Ingest contributor_codeset and contributor_codeset_code definitions first. If metadata changed, provide a new key.'
-            }
-          ]
-        );
-      }
-
-      if (matches.length > 1) {
-        throw new ApiExecuteSQLError(
-          'Ambiguous code slug resolution across multiple rows. Each contributor codeset key and codeset code key must be unique.',
-          [
-            'SubmissionFeaturePropertyIndexRepository->resolveContributorCodesetCodeIdsByCodeReferences',
-            {
-              contributorId,
-              slug: reference.slug,
-              advice: 'Use a new key when creating a new external_id.'
-            }
-          ]
-        );
-      }
-
-      slugToId.set(reference.slug, matches[0].contributor_codeset_code_id);
-    }
-
-    return slugToId;
-  }
-
-  /**
-   * Build normalized contributor codeset definitions from parsed codeset payload.
-   *
-   * @private
-   * @param {number} contributorId
-   * @param {Record<string, unknown>} codesets
-   * @return {CreateContributorCodeset[]}
-   * @memberof SubmissionFeaturePropertyIndexRepository
-   */
-  private toContributorCodesetDefinitions(
-    contributorId: number,
-    codesets: Record<string, unknown>,
-    referencedCodeKeys: Map<string, Set<string>>
-  ): CreateContributorCodeset[] {
-    const definitions: CreateContributorCodeset[] = [];
-
-    for (const contributorCodesetKey of referencedCodeKeys.keys()) {
-      const rawContributorCodeset = codesets[contributorCodesetKey];
-      if (typeof rawContributorCodeset !== 'object' || rawContributorCodeset === null) {
-        throw new ApiExecuteSQLError('Invalid contributor codeset payload', [
-          'SubmissionFeaturePropertyIndexRepository->toContributorCodesetDefinitions',
-          { contributorCodesetKey }
-        ]);
-      }
-
-      const contributorCodeset = rawContributorCodeset as Record<string, unknown>;
-      const externalId = this.normalizeExternalId(contributorCodeset);
-      const label = this.normalizeRequiredLabel(contributorCodeset.label, `codesets.${contributorCodesetKey}.label`);
-      const description = this.normalizeDescription(contributorCodeset.description);
-
-      definitions.push({
-        contributor_id: contributorId,
-        key: contributorCodesetKey,
-        external_id: externalId,
-        label,
-        description
-      });
-    }
-
-    return definitions;
-  }
-
-  /**
-   * Build normalized contributor code definitions from parsed codeset payload and resolved categories.
-   *
-   * @private
-   * @param {Record<string, unknown>} codesets
-   * @param {Map<string, ContributorCodeset>} codesetsByIdentity
-   * @return {CreateContributorCodesetCode[]}
-   * @memberof SubmissionFeaturePropertyIndexRepository
-   */
-  private toContributorCodesetCodeDefinitions(
-    codesets: Record<string, unknown>,
-    existingCodesets: ContributorCodeset[],
-    referencedCodeKeys: Map<string, Set<string>>
-  ): CreateContributorCodesetCodeDefinition[] {
-    const definitions: CreateContributorCodesetCodeDefinition[] = [];
-    const contributorCodesetsByKey = new Map<string, ContributorCodeset>();
-
-    for (const contributorCodeset of existingCodesets) {
-      const existing = contributorCodesetsByKey.get(contributorCodeset.key);
-      if (existing) {
-        throw new ApiExecuteSQLError('Ambiguous contributor codeset key resolution', [
-          'SubmissionFeaturePropertyIndexRepository->toContributorCodesetCodeDefinitions',
-          {
-            contributorCodesetKey: contributorCodeset.key,
-            advice: 'Use a unique contributor codeset key per contributor.'
-          }
-        ]);
-      }
-
-      contributorCodesetsByKey.set(contributorCodeset.key, contributorCodeset);
-    }
-
-    for (const [contributorCodesetKey, referencedCodesetCodeKeys] of referencedCodeKeys.entries()) {
-      const rawContributorCodeset = codesets[contributorCodesetKey];
-      const contributorCodesetPayload = rawContributorCodeset as Record<string, unknown>;
-      const contributorCodesetExternalId = String(contributorCodesetPayload.external_id ?? '').trim();
-      const contributorCodeset = contributorCodesetsByKey.get(contributorCodesetKey);
-
-      if (!contributorCodeset) {
-        throw new ApiExecuteSQLError('Failed to resolve contributor codeset row after upsert', [
-          'SubmissionFeaturePropertyIndexRepository->toContributorCodesetCodeDefinitions',
-          {
-            contributorCodesetKey,
-            contributorCodesetExternalId
-          }
-        ]);
-      }
-
-      const codes =
-        typeof contributorCodesetPayload.codes === 'object' && contributorCodesetPayload.codes !== null
-          ? (contributorCodesetPayload.codes as Record<string, unknown>)
-          : {};
-
-      for (const contributorCodesetCodeKey of referencedCodesetCodeKeys) {
-        const rawCode = codes[contributorCodesetCodeKey];
-        if (typeof rawCode !== 'object' || rawCode === null) {
-          throw new ApiExecuteSQLError('Invalid contributor code payload', [
-            'SubmissionFeaturePropertyIndexRepository->toContributorCodesetCodeDefinitions',
-            {
-              contributorCodesetKey,
-              contributorCodesetCodeKey
-            }
-          ]);
-        }
-
-        const code = rawCode as Record<string, unknown>;
-        const codeExternalId = this.normalizeExternalId(code);
-
-        definitions.push({
-          contributor_codeset_id: contributorCodeset.contributor_codeset_id,
-          contributor_codeset_key: contributorCodesetKey,
-          key: contributorCodesetCodeKey,
-          external_id: codeExternalId,
-          label: this.normalizeRequiredLabel(
-            code.label,
-            `codesets.${contributorCodesetKey}.codes.${contributorCodesetCodeKey}.label`
-          ),
-          description: this.normalizeDescription(code.description)
-        });
-      }
-    }
-
-    return definitions;
-  }
-
-  /**
-   * Create identity key for contributor codeset_code rows.
-   *
-   * @private
-   * @param {{ contributor_codeset_id: number; key: string }} payload
-   * @return {string}
-   * @memberof SubmissionFeaturePropertyIndexRepository
-   */
-  private makeContributorCodesetCodeIdentityKey(payload: { contributor_codeset_id: number; key: string }): string {
-    return `${payload.contributor_codeset_id}::${payload.key}`;
-  }
-
-  /**
-   * Normalize label values to lowercase and require non-empty input.
-   *
-   * @private
-   * @param {unknown} value
-   * @param {string} path
-   * @return {string}
-   * @memberof SubmissionFeaturePropertyIndexRepository
-   */
-  private normalizeRequiredLabel(value: unknown, path: string): string {
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim().toLowerCase();
-    }
-
-    throw new ApiExecuteSQLError('Contributor label is required', [
-      'SubmissionFeaturePropertyIndexRepository->normalizeRequiredLabel',
-      {
-        path,
-        advice: 'Provide a non-empty label for referenced contributor codesets/codes.'
-      }
-    ]);
-  }
-
-  /**
-   * Normalize external_id values to lowercase or null.
-   *
-   * @private
-   * @param {Record<string, unknown>} payload
-   * @return {(string | null)}
-   * @memberof SubmissionFeaturePropertyIndexRepository
-   */
-  private normalizeExternalId(payload: Record<string, unknown>): string | null {
-    const value = typeof payload.external_id === 'string' ? payload.external_id : null;
-
-    if (!value || !value.trim()) {
-      return null;
-    }
-
-    return value.trim();
-  }
-
-  /**
-   * Build a codeset->code-key map from referenced code slugs.
-   *
-   * @private
-   * @param {CodeReference[]} codeReferences
-   * @return {Map<string, Set<string>>}
-   * @memberof SubmissionFeaturePropertyIndexRepository
-   */
-  private toReferencedCodeKeys(codeReferences: CodeReference[]): Map<string, Set<string>> {
-    const referenced = new Map<string, Set<string>>();
-
-    for (const codeReference of codeReferences) {
-      const existing = referenced.get(codeReference.contributorCodesetKey) ?? new Set<string>();
-      existing.add(codeReference.contributorCodesetCodeKey);
-      referenced.set(codeReference.contributorCodesetKey, existing);
-    }
-
-    return referenced;
-  }
-
-  /**
-   * Normalize optional descriptions to lowercase or null.
-   *
-   * @private
-   * @param {unknown} value
-   * @return {(string | null)}
-   * @memberof SubmissionFeaturePropertyIndexRepository
-   */
-  private normalizeDescription(value: unknown): string | null {
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim().toLowerCase();
-    }
-
-    return null;
-  }
-
-  /**
-   * Build canonical slug map from resolved code rows and expected definitions.
-   *
-   * @private
-   * @param {CreateContributorCodesetCode[]} definitions
-   * @param {ContributorCodesetCode[]} resolvedRows
-   * @return {Map<string, number>}
-   * @memberof SubmissionFeaturePropertyIndexRepository
-   */
-  private mapCodesToSlugMap(
-    definitions: CreateContributorCodesetCodeDefinition[],
-    resolvedRows: ContributorCodesetCode[]
-  ): Map<string, number> {
-    const byIdentity = new Map<string, ContributorCodesetCode>();
-
-    for (const row of resolvedRows) {
-      byIdentity.set(this.makeContributorCodesetCodeIdentityKey(row), row);
-    }
-
-    const slugMap = new Map<string, number>();
-
-    for (const definition of definitions) {
-      const resolved = byIdentity.get(this.makeContributorCodesetCodeIdentityKey(definition));
-
-      if (!resolved) {
-        throw new ApiExecuteSQLError('Failed to resolve contributor code row after upsert', [
-          'SubmissionFeaturePropertyIndexRepository->mapCodesToTokenMap',
-          {
-            contributor_codeset_id: definition.contributor_codeset_id,
-            key: definition.key,
-            external_id: definition.external_id
-          }
-        ]);
-      }
-
-      const slug = `code::${definition.contributor_codeset_key}::${definition.key}`;
-      slugMap.set(slug, resolved.contributor_codeset_code_id);
-    }
-
-    return slugMap;
+    return response.rows;
   }
 
   /**
    * Bulk insert string property records.
    *
    * @param {CreateSubmissionFeaturePropertyString[]} records
-   * @return {Promise<void>}
+   * @return {Promise<SubmissionFeaturePropertyString[]>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async insertStringRecords(records: CreateSubmissionFeaturePropertyString[]): Promise<void> {
-    await this.insertRecords('submission_feature_property_string', records);
+  async insertStringRecords(
+    records: CreateSubmissionFeaturePropertyString[]
+  ): Promise<SubmissionFeaturePropertyString[]> {
+    if (!records.length) {
+      return [];
+    }
+
+    const knex = getKnex();
+    const query = knex('submission_feature_property_string').insert(records).returning('*');
+
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyStringSchema);
+    this.assertInsertedRowCount('submission_feature_property_string', records.length, response.rowCount);
+
+    return response.rows;
   }
 
   /**
    * Bulk insert number property records.
    *
    * @param {CreateSubmissionFeaturePropertyNumber[]} records
-   * @return {Promise<void>}
+   * @return {Promise<SubmissionFeaturePropertyNumber[]>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async insertNumberRecords(records: CreateSubmissionFeaturePropertyNumber[]): Promise<void> {
-    await this.insertRecords('submission_feature_property_number', records);
+  async insertNumberRecords(
+    records: CreateSubmissionFeaturePropertyNumber[]
+  ): Promise<SubmissionFeaturePropertyNumber[]> {
+    if (!records.length) {
+      return [];
+    }
+
+    const knex = getKnex();
+    const query = knex('submission_feature_property_number').insert(records).returning('*');
+
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyNumberSchema);
+    this.assertInsertedRowCount('submission_feature_property_number', records.length, response.rowCount);
+
+    return response.rows;
   }
 
   /**
    * Bulk insert boolean property records.
    *
    * @param {CreateSubmissionFeaturePropertyBoolean[]} records
-   * @return {Promise<void>}
+   * @return {Promise<SubmissionFeaturePropertyBoolean[]>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async insertBooleanRecords(records: CreateSubmissionFeaturePropertyBoolean[]): Promise<void> {
-    await this.insertRecords('submission_feature_property_boolean', records);
+  async insertBooleanRecords(
+    records: CreateSubmissionFeaturePropertyBoolean[]
+  ): Promise<SubmissionFeaturePropertyBoolean[]> {
+    if (!records.length) {
+      return [];
+    }
+
+    const knex = getKnex();
+    const query = knex('submission_feature_property_boolean').insert(records).returning('*');
+
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyBooleanSchema);
+    this.assertInsertedRowCount('submission_feature_property_boolean', records.length, response.rowCount);
+
+    return response.rows;
   }
 
   /**
    * Bulk insert timestamp property records.
    *
    * @param {CreateSubmissionFeaturePropertyTimestamp[]} records
-   * @return {Promise<void>}
+   * @return {Promise<SubmissionFeaturePropertyTimestamp[]>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async insertTimestampRecords(records: CreateSubmissionFeaturePropertyTimestamp[]): Promise<void> {
-    await this.insertRecords('submission_feature_property_timestamp', records);
+  async insertTimestampRecords(
+    records: CreateSubmissionFeaturePropertyTimestamp[]
+  ): Promise<SubmissionFeaturePropertyTimestamp[]> {
+    if (!records.length) {
+      return [];
+    }
+
+    const knex = getKnex();
+    const query = knex('submission_feature_property_timestamp').insert(records).returning('*');
+
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestampSchema);
+    this.assertInsertedRowCount('submission_feature_property_timestamp', records.length, response.rowCount);
+
+    return response.rows;
   }
 
   /**
    * Bulk insert code property records.
    *
    * @param {CreateSubmissionFeaturePropertyCode[]} records
-   * @return {Promise<void>}
+   * @return {Promise<SubmissionFeaturePropertyCode[]>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async insertCodeRecords(records: CreateSubmissionFeaturePropertyCode[]): Promise<void> {
-    await this.insertRecords('submission_feature_property_code', records);
+  async insertCodeRecords(records: CreateSubmissionFeaturePropertyCode[]): Promise<SubmissionFeaturePropertyCode[]> {
+    if (!records.length) {
+      return [];
+    }
+
+    const knex = getKnex();
+    const query = knex('submission_feature_property_code').insert(records).returning('*');
+
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
+    this.assertInsertedRowCount('submission_feature_property_code', records.length, response.rowCount);
+
+    return response.rows;
   }
 
   /**
    * Bulk insert taxon property records.
    *
    * @param {CreateSubmissionFeaturePropertyTaxon[]} records
-   * @return {Promise<void>}
+   * @return {Promise<SubmissionFeaturePropertyTaxon[]>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async insertTaxonRecords(records: CreateSubmissionFeaturePropertyTaxon[]): Promise<void> {
-    await this.insertRecords('submission_feature_property_taxon', records);
+  async insertTaxonRecords(records: CreateSubmissionFeaturePropertyTaxon[]): Promise<SubmissionFeaturePropertyTaxon[]> {
+    if (!records.length) {
+      return [];
+    }
+
+    const knex = getKnex();
+    const query = knex('submission_feature_property_taxon').insert(records).returning('*');
+
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyTaxonSchema);
+    this.assertInsertedRowCount('submission_feature_property_taxon', records.length, response.rowCount);
+
+    return response.rows;
   }
 
   /**
    * Bulk insert geometry property records.
    *
    * @param {CreateSubmissionFeaturePropertyGeometry[]} records
-   * @return {Promise<void>}
+   * @return {Promise<SubmissionFeaturePropertyGeometry[]>}
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  async insertGeometryRecords(records: CreateSubmissionFeaturePropertyGeometry[]): Promise<void> {
+  async insertGeometryRecords(
+    records: CreateSubmissionFeaturePropertyGeometry[]
+  ): Promise<SubmissionFeaturePropertyGeometry[]> {
     if (!records.length) {
-      return;
+      return [];
     }
 
     const query = SQL`INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, value) VALUES`;
@@ -620,39 +351,28 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
       }
     });
 
-    const response = await this.connection.sql(query);
+    query.append(SQL` RETURNING *`);
 
-    if (response.rowCount !== records.length) {
-      throw new ApiExecuteSQLError('Failed to insert submission feature geometry records', [
-        'SubmissionFeaturePropertyIndexRepository->insertGeometryRecords',
-        `rowCount was ${response.rowCount}, expected ${records.length}`
-      ]);
-    }
+    const response = await this.connection.sql(query, SubmissionFeaturePropertyGeometrySchema);
+    this.assertInsertedRowCount('submission_feature_property_geometry', records.length, response.rowCount);
+
+    return response.rows;
   }
 
   /**
-   * Bulk insert records to a canonical property table.
+   * Assert inserted row count matches requested row count.
    *
    * @private
-   * @template T
-   * @param {string} table
-   * @param {T[]} records
-   * @return {Promise<void>}
+   * @param {string} tableName
+   * @param {number} expectedCount
+   * @param {number} actualCount
    * @memberof SubmissionFeaturePropertyIndexRepository
    */
-  private async insertRecords<T>(table: string, records: T[]): Promise<void> {
-    if (!records.length) {
-      return;
-    }
-
-    const knex = getKnex();
-    const query = knex(table).insert(records);
-    const response = await this.connection.knex(query);
-
-    if (response.rowCount !== records.length) {
-      throw new ApiExecuteSQLError(`Failed to insert ${table} records`, [
-        'SubmissionFeaturePropertyIndexRepository->insertRecords',
-        `rowCount was ${response.rowCount}, expected ${records.length}`
+  private assertInsertedRowCount(tableName: string, expectedCount: number, actualCount: number | null): void {
+    if (actualCount !== expectedCount) {
+      throw new ApiExecuteSQLError(`Failed to insert ${tableName} records`, [
+        'SubmissionFeaturePropertyIndexRepository->assertInsertedRowCount',
+        `rowCount was ${actualCount ?? 'null'}, expected ${expectedCount}`
       ]);
     }
   }
