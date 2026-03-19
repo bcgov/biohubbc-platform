@@ -7,7 +7,7 @@ import { IFlattenedBlock } from '../../models/submission-feature';
 import { UploadArchive } from '../../models/upload-archive';
 import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
 import * as biohubTarParser from '../../utils/biohub-tar-parser';
-import { IUploadedCodesetFile, IUploadedMediaFile } from '../../utils/biohub-tar-parser';
+import { IUploadedCodesetFile, IUploadedMediaFile } from '../../utils/biohub-tar-parser.interface';
 import * as fileUtils from '../../utils/file-utils';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { ContributorService } from '../contributor-service';
@@ -171,7 +171,7 @@ describe('SubmissionIngestionService', () => {
       });
       const persistContributorCodesStub = sinon
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'persistContributorCodesByContributorId')
-        .resolves(new Map<string, number>());
+        .resolves();
 
       const deleteSubmissionFeaturesBySubmissionUploadIdStub = sinon
         .stub(IngestionRepository.prototype, 'deleteSubmissionFeaturesBySubmissionUploadId')

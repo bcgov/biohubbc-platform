@@ -8,9 +8,9 @@ import { IngestionRepository } from '../../repositories/ingestion/ingestion-repo
 import {
   extractAndUploadCodesets,
   extractAndUploadMedia,
-  extractBlocksFromArchive,
-  IUploadedMediaFile
+  extractBlocksFromArchive
 } from '../../utils/biohub-tar-parser';
+import { IUploadedMediaFile } from '../../utils/biohub-tar-parser.interface';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { getLogger } from '../../utils/logger';
 import { ContributorService } from '../contributor-service';
