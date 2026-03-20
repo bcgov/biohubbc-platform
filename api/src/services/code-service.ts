@@ -1,7 +1,6 @@
 import { IDBConnection } from '../database/db';
 import { IAllCodeSets } from '../models/codes';
 import { FeaturePropertyCode, FeatureTypeCode, FeatureTypeWithFeaturePropertiesCode } from '../models/feature-property';
-import { FeatureTypePropertyMetadata } from '../models/submission-feature-property-index';
 import { CodeRepository } from '../repositories/code-repository';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
@@ -98,16 +97,5 @@ export class CodeService extends DBService {
     defaultLog.debug({ message: 'getFeaturePropertyByName' });
 
     return this.codeRepository.getFeaturePropertyByName(featurePropertyName);
-  }
-
-  /**
-   * Get feature type property metadata rows for given feature type ids.
-   *
-   * @param {number[]} featureTypeIds
-   * @return {Promise<FeatureTypePropertyMetadata[]>}
-   * @memberof CodeService
-   */
-  async getFeatureTypePropertyMetadataByFeatureTypeIds(featureTypeIds: number[]): Promise<FeatureTypePropertyMetadata[]> {
-    return this.codeRepository.getFeatureTypePropertyMetadataByFeatureTypeIds(featureTypeIds);
   }
 }

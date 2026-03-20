@@ -20,7 +20,8 @@ export class UploadArtifactRepository extends BaseRepository {
         upload_id,
         artifact_id,
         role,
-        upload_archive_id
+        upload_archive_id,
+        path
       FROM
         upload_artifact
       WHERE
@@ -58,7 +59,8 @@ export class UploadArtifactRepository extends BaseRepository {
         upload_id,
         artifact_id,
         role,
-        upload_archive_id
+        upload_archive_id,
+        path
       FROM
         upload_artifact;
     `;
@@ -80,12 +82,14 @@ export class UploadArtifactRepository extends BaseRepository {
         upload_id,
         artifact_id,
         role,
-        upload_archive_id
+        upload_archive_id,
+        path
       ) VALUES (
         ${uploadArtifact.upload_id},
         ${uploadArtifact.artifact_id},
         ${uploadArtifact.role},
-        ${uploadArtifact.upload_archive_id}
+        ${uploadArtifact.upload_archive_id},
+        ${uploadArtifact.path ?? null}
       )
       RETURNING upload_artifact_id;
     `;
@@ -120,7 +124,8 @@ export class UploadArtifactRepository extends BaseRepository {
         upload_id = COALESCE(${uploadArtifact.upload_id}, upload_id),
         artifact_id = COALESCE(${uploadArtifact.artifact_id}, artifact_id),
         role = COALESCE(${uploadArtifact.role}, role),
-        upload_archive_id = COALESCE(${uploadArtifact.upload_archive_id}, upload_archive_id)
+        upload_archive_id = COALESCE(${uploadArtifact.upload_archive_id}, upload_archive_id),
+        path = COALESCE(${uploadArtifact.path ?? null}, path)
       WHERE
         upload_artifact_id = ${uploadArtifactId}
       RETURNING upload_artifact_id;
@@ -178,30 +183,35 @@ export class UploadArtifactRepository extends BaseRepository {
     }
 
     const sqlStatement = SQL`
-      WITH normalized_refs AS (
-        SELECT DISTINCT
-          refs.reference,
-          CASE
-            WHEN refs.reference LIKE 'files/%' THEN substr(refs.reference, 7)
-            ELSE refs.reference
-          END AS normalized_reference
+      WITH requested_refs AS (
+        SELECT DISTINCT refs.reference
         FROM unnest(${references}::text[]) AS refs(reference)
+      ),
+      upload_scope AS (
+        SELECT submission_upload.upload_id
+        FROM submission_upload
+        WHERE submission_upload.submission_upload_id = ${submissionUploadId}::uuid
+        LIMIT 1
+      ),
+      ranked_reference_artifacts AS (
+        SELECT
+          requested_refs.reference AS path,
+          upload_artifact.artifact_id,
+          row_number() OVER (
+            PARTITION BY requested_refs.reference
+            ORDER BY upload_artifact.create_date ASC, upload_artifact.upload_artifact_id ASC
+          ) AS match_rank
+        FROM upload_scope
+        INNER JOIN requested_refs
+          ON TRUE
+        INNER JOIN upload_artifact
+          ON upload_artifact.upload_id = upload_scope.upload_id
+         AND upload_artifact.path IS NOT NULL
+         AND upload_artifact.path = requested_refs.reference
       )
-      SELECT
-        normalized_refs.reference AS artifact_reference,
-        artifact.artifact_id
-      FROM normalized_refs
-      INNER JOIN submission_upload
-        ON submission_upload.submission_upload_id = ${submissionUploadId}
-      INNER JOIN upload_artifact
-        ON upload_artifact.upload_id = submission_upload.upload_id
-       AND upload_artifact.role = 'feature'
-      INNER JOIN artifact
-        ON artifact.artifact_id = upload_artifact.artifact_id
-      WHERE
-        artifact.object_key = normalized_refs.reference
-        OR artifact.object_key = normalized_refs.normalized_reference
-        OR substring(artifact.object_key FROM '[^/]+$') = normalized_refs.normalized_reference;
+      SELECT path, artifact_id
+      FROM ranked_reference_artifacts
+      WHERE match_rank = 1;
     `;
 
     const response = await this.connection.sql(sqlStatement, ArtifactReferenceResolution);

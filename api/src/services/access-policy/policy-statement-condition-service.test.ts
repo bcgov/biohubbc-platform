@@ -2,16 +2,15 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { ApiNotFoundError } from '../../errors/api-error';
+import { FeaturePropertyCode } from '../../models/feature-property';
 import {
   CreatePolicyStatementCondition,
   PolicyConditionOperator,
   PolicyStatementCondition
 } from '../../models/policy-statement-condition';
-import { FeaturePropertyCode } from '../../models/feature-property';
-import { CodeRepository } from '../../repositories/code-repository';
 import { PolicyStatementConditionRepository } from '../../repositories/authorization/policy-statement-condition-repository';
-import { ApiNotFoundError } from '../../errors/api-error';
-import { HTTP400 } from '../../errors/http-error';
+import { CodeRepository } from '../../repositories/code-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { PolicyStatementConditionService } from './policy-statement-condition-service';
 
@@ -46,7 +45,9 @@ describe('PolicyStatementConditionService', () => {
         operator: PolicyConditionOperator.STRING_EQUALS,
         value: 'some-value'
       };
-      const featurePropertyStub = sinon.stub(CodeRepository.prototype, 'getFeaturePropertyByName').resolves(featureProperty);
+      const featurePropertyStub = sinon
+        .stub(CodeRepository.prototype, 'getFeaturePropertyByName')
+        .resolves(featureProperty);
       const stub = sinon
         .stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition')
         .resolves(mockCondition);
@@ -68,7 +69,7 @@ describe('PolicyStatementConditionService', () => {
       expect(result).to.eql(mockCondition);
     });
 
-    it('should throw HTTP400 when condition key is unknown', async () => {
+    it('should bubble ApiNotFoundError when condition key is unknown', async () => {
       sinon
         .stub(CodeRepository.prototype, 'getFeaturePropertyByName')
         .rejects(new ApiNotFoundError('Feature property not found'));
@@ -83,7 +84,7 @@ describe('PolicyStatementConditionService', () => {
         } as CreatePolicyStatementCondition);
         expect.fail('Expected createPolicyStatementCondition to throw');
       } catch (error) {
-        expect(error).to.be.instanceOf(HTTP400);
+        expect(error).to.be.instanceOf(ApiNotFoundError);
       }
 
       expect(insertStub).not.to.have.been.called;
@@ -109,7 +110,7 @@ describe('PolicyStatementConditionService', () => {
         } as CreatePolicyStatementCondition);
         expect.fail('Expected createPolicyStatementCondition to throw');
       } catch (error) {
-        expect(error).to.be.instanceOf(HTTP400);
+        expect(error).to.have.property('status', 400);
       }
 
       expect(insertStub).not.to.have.been.called;

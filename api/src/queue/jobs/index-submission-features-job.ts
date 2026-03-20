@@ -1,7 +1,6 @@
 import PgBoss from 'pg-boss';
 import { getAPIUserDBConnection } from '../../database/db';
-import { ApiExecuteSQLError } from '../../errors/api-error';
-import { SearchFeatureService } from '../../services/search-feature-service';
+import { SubmissionFeaturePropertyIngestionService } from '../../services/ingestion/submission-feature-property-ingestion-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
 
@@ -21,9 +20,9 @@ export interface IIndexSubmissionFeaturesJobData {
 /**
  * Index submission features job handler.
  *
- * Indexes submission features for search asynchronously after validation completes.
- * Indexing is a separate concern from validation — a failed index does not invalidate
- * the submission. The DLQ handler logs but does not affect validation status.
+ * Indexes submission features for deep validation/property resolution after shallow ingestion.
+ * Indexing errors invalidate the submission upload because this stage performs canonical
+ * validation and relationship/artifact resolution.
  *
  * @param {PgBoss.Job<IIndexSubmissionFeaturesJobData>[]} jobs The jobs to process
  * @return {*}  {Promise<void>}
@@ -43,9 +42,12 @@ export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmiss
     try {
       await connection.open();
 
-      const searchFeatureService = new SearchFeatureService(connection);
+      const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(connection);
       const submissionUploadService = new SubmissionUploadService(connection);
-      await searchFeatureService.indexSubmissionPropertiesBySubmissionUploadId(submissionId, submissionUploadId);
+      await featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(
+        submissionId,
+        submissionUploadId
+      );
       await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'succeeded' });
 
       await connection.commit();
@@ -61,8 +63,7 @@ export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmiss
 
       try {
         const submissionUploadService = new SubmissionUploadService(connection);
-        const status = error instanceof ApiExecuteSQLError ? 'invalid' : 'failed';
-        await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status });
+        await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
         await connection.commit();
       } catch (statusError) {
         await connection.rollback();
@@ -94,10 +95,8 @@ export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmiss
 /**
  * Dead Letter Queue handler for failed index submission features jobs.
  *
- * Indexing failure is independent of validation — a failed index does not invalidate
- * the submission. This handler only logs the failure with error details. There is no
- * tracking record to update (unlike malware scan or download jobs), so no DB connection
- * is needed.
+ * Indexing DLQ handler logs final retry exhaustion details.
+ * Submission upload status is already set to `invalid` in the main handler catch path.
  *
  * @param {PgBoss.Job<IIndexSubmissionFeaturesJobData>[]} jobs The failed jobs
  * @return {*}  {Promise<void>}

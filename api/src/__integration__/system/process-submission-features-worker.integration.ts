@@ -4,14 +4,14 @@
 // Requires: make web && make queue
 import { expect } from 'chai';
 import { Knex, knex } from 'knex';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import * as tar from 'tar-stream';
-import { getOrCreateIntegrationTicketId } from '../helpers/test-submission-helpers';
 import { defaultPoolConfig, getAPIUserDBConnection, initDBPool } from '../../database/db';
 import { JobQueues } from '../../queue/jobs';
 import { getPgBoss, initPgBoss, stopPgBoss } from '../../queue/pg-boss-service';
 import { publishProcessSubmissionFeaturesJob } from '../../queue/publisher';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
+import { getOrCreateIntegrationTicketId } from '../helpers/test-submission-helpers';
 
 const TEST_PREFIX = '__integration-test__';
 const SYSTEM_USER_ID = 2; // biohub_api system user
@@ -68,6 +68,28 @@ async function waitForSubmissionUploadStatus(
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error('Timeout waiting for submission_upload status');
+}
+
+async function getArtifactKeyFeatureTypeProperty(
+  db: Knex
+): Promise<{ feature_type_name: string; property_name: string }> {
+  const row = await db('biohub.feature_type_property as ftp')
+    .join('biohub.feature_type as ft', 'ft.feature_type_id', 'ftp.feature_type_id')
+    .join('biohub.feature_property as fp', 'fp.feature_property_id', 'ftp.feature_property_id')
+    .join('biohub.feature_property_type as fpt', 'fpt.feature_property_type_id', 'fp.feature_property_type_id')
+    .where('fpt.name', 'artifact_key')
+    .whereNull('ftp.record_end_date')
+    .whereNull('ft.record_end_date')
+    .whereNull('fp.record_end_date')
+    .whereNull('fpt.record_end_date')
+    .select('ft.name as feature_type_name', 'fp.name as property_name')
+    .first();
+
+  if (!row) {
+    throw new Error('No active feature_type_property mapping for artifact_key exists');
+  }
+
+  return row;
 }
 
 describe('Process Submission Features Worker', function () {
@@ -461,7 +483,7 @@ describe('Process Submission Features Worker', function () {
     }
 
     const uploadStatus = await waitForSubmissionUploadStatus(db, submissionUploadId);
-    expect(uploadStatus.status).to.equal('failed');
+    expect(uploadStatus.status).to.equal('invalid');
   });
 
   it('should run full ingestion plus indexing and set submission_upload status to succeeded', async () => {
@@ -532,6 +554,87 @@ describe('Process Submission Features Worker', function () {
       .whereNotNull('parent_submission_feature_id')
       .count<{ count: string }[]>('* as count');
     expect(Number(parentRows[0].count)).to.be.greaterThan(0);
+  });
+
+  it('should resolve nested artifact_key values into submission_feature_artifact rows', async () => {
+    const datasetId = randomUUID();
+    const featureId = randomUUID();
+    const mediaRelativePath = 'nested/path/report.pdf';
+    const { feature_type_name: featureTypeName, property_name: artifactPropertyName } =
+      await getArtifactKeyFeatureTypeProperty(db);
+
+    const tarBuffer = await createTarBuffer([
+      { name: '.dataset-id', content: datasetId },
+      { name: `files/${mediaRelativePath}`, content: 'pdf-bytes' },
+      {
+        name: 'features/media.json',
+        content: JSON.stringify([
+          {
+            id: featureId,
+            type: featureTypeName,
+            properties: {
+              [artifactPropertyName]: `/${mediaRelativePath}`
+            },
+            content: [],
+            parent: null
+          }
+        ])
+      }
+    ]);
+
+    const { submissionId, uploadId, submissionUploadId, ticketId } = await setupSubmissionWithTar(tarBuffer);
+
+    const connection = getAPIUserDBConnection();
+    try {
+      await connection.open();
+      const result = await publishProcessSubmissionFeaturesJob(connection, {
+        submission_upload_id: submissionUploadId,
+        submission_id: submissionId,
+        upload_id: uploadId,
+        status: 'pending',
+        ticket_id: ticketId
+      });
+      await connection.commit();
+      expect(result.status).to.equal('published');
+    } finally {
+      connection.release();
+    }
+
+    const uploadStatus = await waitForSubmissionUploadStatus(db, submissionUploadId);
+    expect(uploadStatus.status).to.equal('succeeded');
+
+    const expectedObjectKey = `submissions/${submissionId}/media/${mediaRelativePath}`;
+
+    const [artifactRow] = await db('biohub.artifact')
+      .where('object_key', expectedObjectKey)
+      .select('artifact_id', 'checksum_sha256');
+
+    expect(artifactRow).to.exist;
+    expect(artifactRow.checksum_sha256).to.equal(createHash('sha256').update('pdf-bytes').digest('hex'));
+
+    const [uploadArtifactRow] = await db('biohub.upload_artifact')
+      .where('upload_id', uploadId)
+      .andWhere('path', mediaRelativePath)
+      .select('path', 'artifact_id');
+
+    expect(uploadArtifactRow).to.exist;
+    expect(uploadArtifactRow.artifact_id).to.equal(artifactRow.artifact_id);
+
+    const [featureRow] = await db('biohub.submission_feature')
+      .where('submission_upload_id', submissionUploadId)
+      .andWhere('source_id', featureId)
+      .whereNull('record_end_date')
+      .select('submission_feature_id');
+
+    expect(featureRow).to.exist;
+
+    const [linkRow] = await db('biohub.submission_feature_artifact')
+      .where('submission_feature_id', featureRow.submission_feature_id)
+      .andWhere('artifact_id', artifactRow.artifact_id)
+      .whereNull('record_end_date')
+      .select('submission_feature_artifact_id');
+
+    expect(linkRow).to.exist;
   });
 
   it('should mark submission_upload invalid when indexing cannot resolve parent references', async () => {

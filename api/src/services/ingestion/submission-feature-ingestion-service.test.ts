@@ -2,19 +2,19 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import { IFlattenedBlock } from '../../models/submission-feature';
-import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
+import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { FeatureIngestionService } from './feature-ingestion-service';
+import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
 
-describe('FeatureIngestionService', () => {
+describe('SubmissionFeatureIngestionService', () => {
   afterEach(() => {
     sinon.restore();
   });
 
   describe('ingestFeatureBatch', () => {
     it('persists shallow-validated feature rows with raw payload and byte size', async () => {
-      const service = new FeatureIngestionService(getMockDBConnection());
-      const insertStub = sinon.stub(IngestionRepository.prototype, 'insertSubmissionFeatureRecords').resolves();
+      const service = new SubmissionFeatureIngestionService(getMockDBConnection());
+      const insertStub = sinon.stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecords').resolves();
 
       const features: IFlattenedBlock[] = [
         {
@@ -56,8 +56,8 @@ describe('FeatureIngestionService', () => {
     });
 
     it('returns early when batch is empty', async () => {
-      const service = new FeatureIngestionService(getMockDBConnection());
-      const insertStub = sinon.stub(IngestionRepository.prototype, 'insertSubmissionFeatureRecords').resolves();
+      const service = new SubmissionFeatureIngestionService(getMockDBConnection());
+      const insertStub = sinon.stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecords').resolves();
 
       await service.ingestFeatureBatch(42, 'submission-upload-1', []);
 
@@ -67,9 +67,9 @@ describe('FeatureIngestionService', () => {
 
   describe('deleteFeaturesBySubmissionUploadId', () => {
     it('soft-deletes features scoped to one submission upload attempt', async () => {
-      const service = new FeatureIngestionService(getMockDBConnection());
+      const service = new SubmissionFeatureIngestionService(getMockDBConnection());
       const deleteStub = sinon
-        .stub(IngestionRepository.prototype, 'deleteSubmissionFeaturesBySubmissionUploadId')
+        .stub(FeatureIngestionRepository.prototype, 'deleteSubmissionFeaturesBySubmissionUploadId')
         .resolves();
 
       await service.deleteFeaturesBySubmissionUploadId('submission-upload-1');

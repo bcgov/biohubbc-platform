@@ -11,7 +11,7 @@ import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
 import { CodesetIngestionService } from './codeset-ingestion-service';
-import { FeatureIngestionService } from './feature-ingestion-service';
+import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
 import { MediaIngestionService } from './media-ingestion-service';
 import { SubmissionIngestionService } from './submission-ingestion-service';
 
@@ -54,13 +54,13 @@ describe('SubmissionIngestionService', () => {
       sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
       const deleteFeaturesStub = sinon
-        .stub(FeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId')
+        .stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId')
         .resolves();
-      const ingestFeatureBatchStub = sinon.stub(FeatureIngestionService.prototype, 'ingestFeatureBatch').resolves();
+      const ingestFeatureBatchStub = sinon.stub(SubmissionFeatureIngestionService.prototype, 'ingestFeatureBatch').resolves();
       const ingestMediaStub = sinon.stub(MediaIngestionService.prototype, 'ingestMediaFiles').resolves();
-      const ingestCodesetsStub = sinon.stub(CodesetIngestionService.prototype, 'ingestCodesetsFromTarball').resolves();
+      const ingestCodesetsStub = sinon.stub(CodesetIngestionService.prototype, 'ingestCodesets').resolves();
 
-      sinon.stub(biohubTarParser, 'streamFeaturesFromTarball').callsFake(async (_stream, _batchSize, onBatch) => {
+      sinon.stub(biohubTarParser, 'streamFeatures').callsFake(async (_stream, _batchSize, onBatch) => {
         const featureBatch: IFlattenedBlock[] = [
           {
             id: 'feature-1',
@@ -108,11 +108,11 @@ describe('SubmissionIngestionService', () => {
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
       sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
-      sinon.stub(FeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
+      sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
       sinon.stub(MediaIngestionService.prototype, 'ingestMediaFiles').resolves();
-      sinon.stub(CodesetIngestionService.prototype, 'ingestCodesetsFromTarball').resolves();
+      sinon.stub(CodesetIngestionService.prototype, 'ingestCodesets').resolves();
       sinon
-        .stub(biohubTarParser, 'streamFeaturesFromTarball')
+        .stub(biohubTarParser, 'streamFeatures')
         .rejects(new Error('Feature entry is missing required string field: id'));
 
       try {
@@ -160,10 +160,10 @@ describe('SubmissionIngestionService', () => {
 
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
       sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
-      sinon.stub(FeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
+      sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
       sinon.stub(MediaIngestionService.prototype, 'ingestMediaFiles').rejects(new Error('media upload failed'));
-      const ingestCodesetsStub = sinon.stub(CodesetIngestionService.prototype, 'ingestCodesetsFromTarball').resolves();
-      const streamFeaturesStub = sinon.stub(biohubTarParser, 'streamFeaturesFromTarball').resolves({ featureCount: 0 });
+      const ingestCodesetsStub = sinon.stub(CodesetIngestionService.prototype, 'ingestCodesets').resolves();
+      const streamFeaturesStub = sinon.stub(biohubTarParser, 'streamFeatures').resolves({ featureCount: 0 });
 
       try {
         await service.ingestSubmissionUpload(mockSubmissionUpload);
@@ -200,12 +200,12 @@ describe('SubmissionIngestionService', () => {
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
       sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
-      sinon.stub(FeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
+      sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
       sinon.stub(MediaIngestionService.prototype, 'ingestMediaFiles').resolves();
       sinon
-        .stub(CodesetIngestionService.prototype, 'ingestCodesetsFromTarball')
+        .stub(CodesetIngestionService.prototype, 'ingestCodesets')
         .rejects(new Error('codeset persist failed'));
-      const streamFeaturesStub = sinon.stub(biohubTarParser, 'streamFeaturesFromTarball').resolves({ featureCount: 0 });
+      const streamFeaturesStub = sinon.stub(biohubTarParser, 'streamFeatures').resolves({ featureCount: 0 });
 
       try {
         await service.ingestSubmissionUpload(mockSubmissionUpload);
@@ -241,13 +241,13 @@ describe('SubmissionIngestionService', () => {
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
       sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
-      sinon.stub(FeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
+      sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
       sinon.stub(MediaIngestionService.prototype, 'ingestMediaFiles').resolves();
-      sinon.stub(CodesetIngestionService.prototype, 'ingestCodesetsFromTarball').resolves();
+      sinon.stub(CodesetIngestionService.prototype, 'ingestCodesets').resolves();
       sinon
-        .stub(FeatureIngestionService.prototype, 'ingestFeatureBatch')
+        .stub(SubmissionFeatureIngestionService.prototype, 'ingestFeatureBatch')
         .rejects(new Error('insert feature batch failed'));
-      sinon.stub(biohubTarParser, 'streamFeaturesFromTarball').callsFake(async (_stream, _batchSize, onBatch) => {
+      sinon.stub(biohubTarParser, 'streamFeatures').callsFake(async (_stream, _batchSize, onBatch) => {
         await onBatch([
           {
             id: 'feature-1',

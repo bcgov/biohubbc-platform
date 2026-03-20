@@ -12,10 +12,12 @@ import { CreateSubmissionFeaturePropertyString } from '../models/submission-feat
 import { CreateSubmissionFeaturePropertyTaxon } from '../models/submission-feature-property-taxon';
 import { CreateSubmissionFeaturePropertyTimestamp } from '../models/submission-feature-property-timestamp';
 import { CodeReference } from '../utils/code-reference';
-import { CodeService } from './code-service';
+import { FeaturePropertyTypeName } from '../models/feature-property';
 import { ContributorCodesetCodeService } from './contributor-codeset-code-service';
 import { ContributorCodesetService } from './contributor-codeset-service';
 import { DBService } from './db-service';
+import type { TarCodeset, TarCodesets } from './ingestion/submission-ingestion-codes-service.interface';
+import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
 import { SubmissionFeatureArtifactService } from './submission-feature-artifact-service';
 import { SubmissionFeaturePropertyBooleanService } from './submission-feature-property-boolean-service';
 import { SubmissionFeaturePropertyCodeService } from './submission-feature-property-code-service';
@@ -25,7 +27,6 @@ import { SubmissionFeaturePropertyStringService } from './submission-feature-pro
 import { SubmissionFeaturePropertyTaxonService } from './submission-feature-property-taxon-service';
 import { SubmissionFeaturePropertyTimestampService } from './submission-feature-property-timestamp-service';
 import { UploadArtifactService } from './upload/upload-artifact-service';
-import type { TarCodeset, TarCodesets } from './ingestion/submission-ingestion-codes-service.interface';
 
 export class SubmissionFeaturePropertyIndexService extends DBService {
   submissionFeaturePropertyStringService: SubmissionFeaturePropertyStringService;
@@ -39,7 +40,7 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
   contributorCodesetService: ContributorCodesetService;
   contributorCodesetCodeService: ContributorCodesetCodeService;
   uploadArtifactService: UploadArtifactService;
-  codeService: CodeService;
+  ingestionRepository: FeatureIngestionRepository;
 
   /**
    * Creates an instance of SubmissionFeaturePropertyIndexService.
@@ -60,7 +61,7 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
     this.contributorCodesetService = new ContributorCodesetService(connection);
     this.contributorCodesetCodeService = new ContributorCodesetCodeService(connection);
     this.uploadArtifactService = new UploadArtifactService(connection);
-    this.codeService = new CodeService(connection);
+    this.ingestionRepository = new FeatureIngestionRepository(connection);
   }
 
   /**
@@ -75,11 +76,15 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
       this.submissionFeaturePropertyStringService.deleteSubmissionFeaturePropertyStringsBySubmissionId(submissionId),
       this.submissionFeaturePropertyNumberService.deleteSubmissionFeaturePropertyNumbersBySubmissionId(submissionId),
       this.submissionFeaturePropertyBooleanService.deleteSubmissionFeaturePropertyBooleansBySubmissionId(submissionId),
-      this.submissionFeaturePropertyTimestampService.deleteSubmissionFeaturePropertyTimestampsBySubmissionId(submissionId),
+      this.submissionFeaturePropertyTimestampService.deleteSubmissionFeaturePropertyTimestampsBySubmissionId(
+        submissionId
+      ),
       this.submissionFeatureArtifactService.deleteSubmissionFeatureArtifactsBySubmissionId(submissionId),
       this.submissionFeaturePropertyCodeService.deleteSubmissionFeaturePropertyCodesBySubmissionId(submissionId),
       this.submissionFeaturePropertyTaxonService.deleteSubmissionFeaturePropertyTaxonsBySubmissionId(submissionId),
-      this.submissionFeaturePropertyGeometryService.deleteSubmissionFeaturePropertyGeometriesBySubmissionId(submissionId)
+      this.submissionFeaturePropertyGeometryService.deleteSubmissionFeaturePropertyGeometriesBySubmissionId(
+        submissionId
+      )
     ]);
   }
 
@@ -104,9 +109,7 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
       this.submissionFeaturePropertyTimestampService.deleteSubmissionFeaturePropertyTimestampsBySubmissionUploadId(
         submissionUploadId
       ),
-      this.submissionFeatureArtifactService.deleteSubmissionFeatureArtifactsBySubmissionUploadId(
-        submissionUploadId
-      ),
+      this.submissionFeatureArtifactService.deleteSubmissionFeatureArtifactsBySubmissionUploadId(submissionUploadId),
       this.submissionFeaturePropertyCodeService.deleteSubmissionFeaturePropertyCodesBySubmissionUploadId(
         submissionUploadId
       ),
@@ -120,14 +123,54 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
   }
 
   /**
-   * Get active feature type property metadata for feature type ids.
+   * Get active feature type property metadata for feature types.
    *
-   * @param {number[]} featureTypeIds
+   * @param {{ feature_type_id: number; feature_type_name: string }[]} featureTypes
    * @return {Promise<FeatureTypePropertyMetadata[]>}
    * @memberof SubmissionFeaturePropertyIndexService
    */
-  async getFeatureTypePropertyMetadata(featureTypeIds: number[]): Promise<FeatureTypePropertyMetadata[]> {
-    return this.codeService.getFeatureTypePropertyMetadataByFeatureTypeIds(featureTypeIds);
+  async getFeatureTypePropertyMetadata(
+    featureTypes: { feature_type_id: number; feature_type_name: string }[]
+  ): Promise<FeatureTypePropertyMetadata[]> {
+    if (!featureTypes.length) {
+      return [];
+    }
+
+    const uniqueFeatureTypes = [...new Map(featureTypes.map((item) => [item.feature_type_id, item])).values()];
+    const metadataByFeatureType: FeatureTypePropertyMetadata[] = [];
+
+    for (const featureType of uniqueFeatureTypes) {
+      const featureTypeWithProperties = await this.ingestionRepository.findFeatureTypeWithProperties(
+        featureType.feature_type_name
+      );
+
+      if (!featureTypeWithProperties) {
+        continue;
+      }
+
+      for (const featureProperty of featureTypeWithProperties.properties) {
+        if (typeof featureProperty.feature_type_property_id !== 'number') {
+          throw new ApiExecuteSQLError('Missing feature_type_property_id in feature type property metadata', [
+            'SubmissionFeaturePropertyIndexService->getFeatureTypePropertyMetadata',
+            {
+              featureTypeId: featureType.feature_type_id,
+              featureTypeName: featureType.feature_type_name,
+              featurePropertyName: featureProperty.name
+            }
+          ]);
+        }
+
+        metadataByFeatureType.push({
+          feature_type_id: featureType.feature_type_id,
+          feature_type_property_id: featureProperty.feature_type_property_id,
+          allow_multiple: featureProperty.allow_multiple ?? false,
+          feature_property_name: featureProperty.name,
+          feature_property_type_name: FeaturePropertyTypeName.parse(featureProperty.type_name)
+        });
+      }
+    }
+
+    return metadataByFeatureType;
   }
 
   /**
@@ -311,17 +354,23 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
     }
 
     const uniqueCodeReferences = [...new Map(codeReferences.map((reference) => [reference.slug, reference])).values()];
-    const uniqueContributorCodesetKeys = [...new Set(uniqueCodeReferences.map((reference) => reference.contributorCodesetKey))];
+    const uniqueContributorCodesetKeys = [
+      ...new Set(uniqueCodeReferences.map((reference) => reference.contributorCodesetKey))
+    ];
     const contributorCodesets = await this.contributorCodesetService.getContributorCodesetsByContributorIdAndKeys(
       contributorId,
       uniqueContributorCodesetKeys
     );
     const contributorCodesetIdToKey = new Map(
-      contributorCodesets.map((contributorCodeset) => [contributorCodeset.contributor_codeset_id, contributorCodeset.key])
+      contributorCodesets.map((contributorCodeset) => [
+        contributorCodeset.contributor_codeset_id,
+        contributorCodeset.key
+      ])
     );
-    const contributorCodesetCodes = await this.contributorCodesetCodeService.getContributorCodesetCodesByContributorCodesetIds(
-      [...contributorCodesetIdToKey.keys()]
-    );
+    const contributorCodesetCodes =
+      await this.contributorCodesetCodeService.getContributorCodesetCodesByContributorCodesetIds([
+        ...contributorCodesetIdToKey.keys()
+      ]);
 
     const slugToContributorCodesetCodeId = new Map<string, number>();
 
@@ -389,18 +438,18 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
     const referenceToArtifactId = new Map<string, string>();
 
     for (const row of rows) {
-      const existing = referenceToArtifactId.get(row.artifact_reference);
+      const existing = referenceToArtifactId.get(row.path);
       if (existing && existing !== row.artifact_id) {
         throw new ApiExecuteSQLError('Ambiguous artifact reference resolution', [
           'SubmissionFeaturePropertyIndexService->resolveArtifactIdsByReferences',
           {
             submissionUploadId,
-            artifactReference: row.artifact_reference
+            path: row.path
           }
         ]);
       }
 
-      referenceToArtifactId.set(row.artifact_reference, row.artifact_id);
+      referenceToArtifactId.set(row.path, row.artifact_id);
     }
 
     return referenceToArtifactId;

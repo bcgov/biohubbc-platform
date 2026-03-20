@@ -136,58 +136,51 @@ export async function getOrCreateIntegrationTicketId(
       `)
     ).rows[0].team_id;
 
-  const nextSlug = await connection.sql(SQL`
-    WITH
-      day_context AS (
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const nextSlug = await connection.sql(SQL`
+      WITH day_context AS (
         SELECT TO_CHAR((now() AT TIME ZONE 'UTC')::date, 'DDD') AS day_of_year
-      ),
-      latest AS (
-        SELECT
-          COALESCE(MAX(RIGHT(ticket_slug, 5)::integer), -1) AS last_value
-        FROM ticket, day_context
-        WHERE ticket_slug LIKE day_context.day_of_year || '%'
-      ),
-      next_value AS (
-        SELECT
-          day_context.day_of_year,
-          latest.last_value + 1 AS next_sequence
-        FROM day_context, latest
       )
-    SELECT
-      day_of_year || LPAD(next_sequence::text, 5, '0') AS ticket_slug
-    FROM next_value;
-  `);
+      SELECT day_of_year || LPAD(FLOOR(random() * 100000)::text, 5, '0') AS ticket_slug
+      FROM day_context;
+    `);
 
-  const ticketSlug = nextSlug.rows[0].ticket_slug as string;
+    const ticketSlug = nextSlug.rows[0].ticket_slug as string;
 
-  const createdTicket = await connection.sql(SQL`
-    INSERT INTO ticket (
-      ticket_slug,
-      subject,
-      description,
-      team_id,
-      priority,
-      status,
-      create_user
-    )
-    VALUES (
-      ${ticketSlug},
-      ${subject},
-      ${description},
-      ${teamId},
-      'medium',
-      'open',
-      ${systemUserId}
-    )
-    RETURNING ticket_id;
-  `);
+    const createdTicket = await connection.sql(SQL`
+      INSERT INTO ticket (
+        ticket_slug,
+        subject,
+        description,
+        team_id,
+        priority,
+        status,
+        create_user
+      )
+      VALUES (
+        ${ticketSlug},
+        ${subject},
+        ${description},
+        ${teamId},
+        'medium',
+        'open',
+        ${systemUserId}
+      )
+      ON CONFLICT (ticket_slug) DO NOTHING
+      RETURNING ticket_id;
+    `);
 
-  const ticketId = createdTicket.rows[0].ticket_id as string;
+    const ticketId = createdTicket.rows[0]?.ticket_id as string | undefined;
 
-  await connection.sql(SQL`
-    INSERT INTO ticket_status (ticket_id, status, create_user)
-    VALUES (${ticketId}, 'open', ${systemUserId});
-  `);
+    if (ticketId) {
+      await connection.sql(SQL`
+        INSERT INTO ticket_status (ticket_id, status, create_user)
+        VALUES (${ticketId}, 'open', ${systemUserId});
+      `);
 
-  return ticketId;
+      return ticketId;
+    }
+  }
+
+  throw new Error('Unable to generate a unique integration test ticket slug');
 }

@@ -107,7 +107,9 @@ export class SubmissionFeaturePropertyCodeService extends DBService {
   }
 
   deleteSubmissionFeaturePropertyCodesBySubmissionId(submissionId: number): Promise<void> {
-    return this.submissionFeaturePropertyCodeRepository.deleteSubmissionFeaturePropertyCodesBySubmissionId(submissionId);
+    return this.submissionFeaturePropertyCodeRepository.deleteSubmissionFeaturePropertyCodesBySubmissionId(
+      submissionId
+    );
   }
 
   /**

@@ -99,13 +99,13 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
 
       try {
         const submissionUploadService = new SubmissionUploadService(connection);
-        await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'failed' });
+        await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
         await connection.commit();
       } catch (statusError) {
         await connection.rollback();
         defaultLog.error({
           label: 'processSubmissionFeaturesJobHandler',
-          message: 'Failed to update submission upload status to failed',
+          message: 'Failed to update submission upload status to invalid',
           jobId: job.id,
           submissionUploadId,
           error: statusError
@@ -120,8 +120,8 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
         error
       });
 
-      // Don't update status to 'failed' here — rethrow so pg-boss moves the job to DLQ.
-      // DLQ handler sets the validation status to 'failed'.
+      // Rethrow so pg-boss moves the job to DLQ.
+      // DLQ handler persists final validation failure state for observability.
       throw error;
     } finally {
       connection.release();
@@ -170,7 +170,7 @@ export const processSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<Submissi
           error: jobOutput ?? 'Job failed after all retries'
         }
       );
-      await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'failed' });
+      await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
 
       await connection.commit();
 

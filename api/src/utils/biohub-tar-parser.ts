@@ -1,10 +1,14 @@
 import mime from 'mime';
-import path from 'node:path';
-import { PassThrough, Readable } from 'node:stream';
+import { createHash } from 'node:crypto';
+import nodePath from 'node:path';
+import { PassThrough, Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import * as tar from 'tar-stream';
+import { ZodError, z } from 'zod';
 import { IFlattenedBlock } from '../models/submission-feature';
-import type { TarCodesets } from '../services/ingestion/submission-ingestion-codes-service.interface';
+import {
+  TarCodesets
+} from '../services/ingestion/submission-ingestion-codes-service.interface';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
 import { IUploadedMediaFile } from './biohub-tar-parser.interface';
 
@@ -52,6 +56,23 @@ function drainStream(stream: Readable): Promise<void> {
     stream.on('error', reject);
     stream.resume();
   });
+}
+
+function extractCodesetsFromTarballEntry(value: unknown): TarCodesets {
+  const parsedRoot = z.record(z.string(), z.unknown()).parse(value);
+  const codesetsValue = Object.prototype.hasOwnProperty.call(parsedRoot, 'categories')
+    ? parsedRoot.categories
+    : parsedRoot;
+
+  try {
+    return TarCodesets.parse(codesetsValue);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new Error('Codeset entry failed shallow validation');
+    }
+
+    throw error;
+  }
 }
 
 /**
@@ -125,7 +146,7 @@ export function buildFeatureDataPayload(block: IFlattenedBlock): Record<string, 
  *
  * This is shallow validation only: shape checks needed to persist raw rows safely.
  */
-export async function streamFeaturesFromTarball(
+export async function streamFeatures(
   inputStream: Readable,
   batchSize: number,
   ingestFeatureBatch: (blocks: IFlattenedBlock[]) => Promise<void>
@@ -209,7 +230,7 @@ export async function streamFeaturesFromTarball(
 /**
  * Stream codesets from a TAR archive and emit each parsed file payload.
  */
-export async function streamCodesetsFromTarball(
+export async function streamCodesets(
   inputStream: Readable,
   ingestCodesets: (codesets: TarCodesets) => Promise<void>
 ): Promise<void> {
@@ -235,15 +256,8 @@ export async function streamCodesetsFromTarball(
         }
 
         const buffer = await streamToBuffer(stream);
-        const parsed = JSON.parse(buffer.toString('utf-8')) as Record<string, unknown>;
-        const categories =
-          typeof parsed.categories === 'object' && parsed.categories !== null
-            ? (parsed.categories as Record<string, unknown>)
-            : parsed;
-        const codesets: TarCodesets = {};
-        for (const [categoryKey, categoryValue] of Object.entries(categories)) {
-          codesets[categoryKey] = categoryValue as TarCodesets[string];
-        }
+        const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
+        const codesets = extractCodesetsFromTarballEntry(parsed);
 
         await ingestCodesets(codesets);
         next();
@@ -267,7 +281,7 @@ export async function streamCodesetsFromTarball(
  * Stream media files from a TAR archive to object storage.
  * Non-media entries are skipped.
  */
-export async function streamMediaFromTarball(
+export async function streamMedia(
   inputStream: Readable,
   objectStorageService: ObjectStorageService,
   s3KeyPrefix: string,
@@ -287,19 +301,38 @@ export async function streamMediaFromTarball(
 
         // Only process media files under files/
         if (entryName.startsWith('files/') && header.type === 'file') {
-          const fileName = path.basename(entryName);
-          const s3Key = `${s3KeyPrefix}/${fileName}`;
+          const path = entryName.substring('files/'.length).replace(/^\/+/, '');
+          const fileName = nodePath.basename(path);
+          const s3Key = `${s3KeyPrefix}/${path}`;
           const mimetype = mime.getType(fileName) ?? 'application/octet-stream';
           const byteSize = header.size ?? 0;
+          const checksum = createHash('sha256');
 
           // Create a PassThrough to pipe the tar entry to S3
           const passThrough = new PassThrough();
+          const checksumStream = new Transform({
+            transform(chunk, _encoding, callback) {
+              checksum.update(chunk as Buffer);
+              callback(null, chunk);
+            }
+          });
+          const checksumReady = new Promise<string>((resolve, reject) => {
+            checksumStream.on('finish', () => resolve(checksum.digest('hex')));
+            checksumStream.on('error', reject);
+          });
 
           // Start the upload (don't await — let data flow through the pipe)
           const uploadPromise = objectStorageService
             .uploadStream(BucketType.MAIN, passThrough, mimetype, s3Key)
-            .then(() => {
-              const uploadedFile: IUploadedMediaFile = { fileName, s3Key, byteSize };
+            .then(async () => {
+              const checksumSha256 = await checksumReady;
+              const uploadedFile: IUploadedMediaFile = {
+                fileName,
+                s3Key,
+                path,
+                byteSize,
+                checksumSha256
+              };
               uploadedCount += 1;
 
               if (ingestMediaFile) {
@@ -310,7 +343,7 @@ export async function streamMediaFromTarball(
             });
 
           // Pipe the tar entry stream into the PassThrough
-          stream.pipe(passThrough);
+          stream.pipe(checksumStream).pipe(passThrough);
 
           // Wait for the S3 upload to finish before advancing to the next entry.
           // This serializes uploads so only one PassThrough buffer exists at a time.

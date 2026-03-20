@@ -137,5 +137,4 @@ export class SubmissionUploadService extends DBService {
   async deleteSubmissionUpload(submissionUploadId: string): Promise<void> {
     return this.submissionUploadRepository.deleteSubmissionUpload(submissionUploadId);
   }
-
 }

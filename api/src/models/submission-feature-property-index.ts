@@ -27,7 +27,7 @@ export type ContributorCodeResolution = z.infer<typeof ContributorCodeResolution
  * Query row schema for artifact reference resolution rows.
  */
 export const ArtifactReferenceResolution = z.object({
-  artifact_reference: z.string(),
+  path: z.string(),
   artifact_id: z.string().uuid()
 });
 export type ArtifactReferenceResolution = z.infer<typeof ArtifactReferenceResolution>;

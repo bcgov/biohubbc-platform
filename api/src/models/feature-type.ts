@@ -5,6 +5,7 @@ import { z } from 'zod';
  * Represents an allowed property for a feature type.
  */
 export const FeatureProperty = z.object({
+  feature_type_property_id: z.number().optional(),
   name: z.string(),
   display_name: z.string(),
   description: z.string(),

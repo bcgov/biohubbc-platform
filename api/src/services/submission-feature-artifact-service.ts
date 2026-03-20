@@ -29,7 +29,9 @@ export class SubmissionFeatureArtifactService extends DBService {
    * @return {Promise<SubmissionFeatureArtifact[]>}
    * @memberof SubmissionFeatureArtifactService
    */
-  getSubmissionFeatureArtifactsBySubmissionFeatureId(submissionFeatureId: number): Promise<SubmissionFeatureArtifact[]> {
+  getSubmissionFeatureArtifactsBySubmissionFeatureId(
+    submissionFeatureId: number
+  ): Promise<SubmissionFeatureArtifact[]> {
     return this.submissionFeatureArtifactRepository.getSubmissionFeatureArtifactsBySubmissionFeatureId(
       submissionFeatureId
     );

@@ -1,19 +1,28 @@
 import chai, { expect } from 'chai';
 import dayjs from 'dayjs';
-import { describe } from 'mocha';
+import { beforeEach, describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
+import { SubmissionFeaturePropertyIndexRepository } from '../repositories/submission-feature-property-index-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { TaxonomyRepository } from '../repositories/taxonomy-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CodeService } from './code-service';
 import { ContributorService } from './contributor-service';
+import { SubmissionFeaturePropertyIngestionService } from './ingestion/submission-feature-property-ingestion-service';
 import { SearchFeatureService } from './search-feature-service';
 import { SearchFeatureResultWithRelevancy } from './search-feature-service.interface';
 import { SubmissionFeaturePropertyIndexService } from './submission-feature-property-index-service';
 
 chai.use(sinonChai);
+
+const asAsyncGenerator = <T>(...batches: T[]): AsyncGenerator<T> =>
+  (async function* () {
+    for (const batch of batches) {
+      yield batch;
+    }
+  })();
 
 describe('SearchFeatureService', () => {
   afterEach(() => {
@@ -472,34 +481,45 @@ describe('SearchFeatureService', () => {
   });
 
   describe('indexSubmissionPropertiesBySubmissionUploadId', () => {
+    beforeEach(() => {
+      sinon.stub(ContributorService.prototype, 'getContributorBySubmissionId').resolves({
+        contributor_id: 999,
+        client_id: 'test-client'
+      });
+    });
+
     it('validates code values against codeset categories codes', async () => {
       const mockDBConnection = getMockDBConnection();
-      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+      const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(mockDBConnection);
 
-      sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBatchBySubmissionUploadId').resolves([
-        {
-          submission_feature_id: 100,
-          submission_id: 777,
-          feature_type_id: 1,
-          urn: 'urn:777:dataset:100',
-          data: {
-            agency: 'code::agency::aarde'
-          },
-          source_id: null,
-          uuid: '123-456-789',
-          parent_submission_feature_id: null,
-          record_effective_date: '2024-01-01',
-          record_end_date: null,
-          create_date: '2024-01-01',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0,
-          feature_type_name: 'dataset',
-          feature_type_display_name: 'Dataset',
-          submission_feature_security_ids: []
-        }
-      ]);
+      sinon
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'streamSubmissionFeaturesBySubmissionUploadId')
+        .returns(
+          asAsyncGenerator([
+            {
+              submission_feature_id: 100,
+              submission_id: 777,
+              feature_type_id: 1,
+              urn: 'urn:777:dataset:100',
+              data: {
+                agency: 'code::agency::aarde'
+              },
+              source_id: null,
+              uuid: '123-456-789',
+              parent_submission_feature_id: null,
+              record_effective_date: '2024-01-01',
+              record_end_date: null,
+              create_date: '2024-01-01',
+              create_user: 1,
+              update_date: null,
+              update_user: null,
+              revision_count: 0,
+              feature_type_name: 'dataset',
+              feature_type_display_name: 'Dataset',
+              submission_feature_security_ids: []
+            }
+          ])
+        );
 
       sinon
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'deletePropertyRecordsBySubmissionUploadId')
@@ -516,16 +536,11 @@ describe('SearchFeatureService', () => {
       sinon
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'resolveContributorCodesetCodeIdsByCodeReferences')
         .resolves(new Map([['code::agency::aarde', 32]]));
-      sinon.stub(ContributorService.prototype, 'getContributorBySubmissionId').resolves({
-        contributor_id: 999,
-        client_id: 'test-client'
-      });
-
       const insertCodeRecordsStub = sinon
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'insertCodeRecords')
         .resolves();
 
-      await searchFeatureService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
+      await featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
 
       expect(insertCodeRecordsStub).to.have.been.calledOnceWith([
         {
@@ -538,32 +553,36 @@ describe('SearchFeatureService', () => {
 
     it('throws when array values are provided for a property that does not allow multiple values', async () => {
       const mockDBConnection = getMockDBConnection();
-      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+      const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(mockDBConnection);
 
-      sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBatchBySubmissionUploadId').resolves([
-        {
-          submission_feature_id: 100,
-          submission_id: 777,
-          feature_type_id: 1,
-          urn: 'urn:777:dataset:100',
-          data: {
-            title: ['one', 'two']
-          },
-          source_id: null,
-          uuid: '123-456-789',
-          parent_submission_feature_id: null,
-          record_effective_date: '2024-01-01',
-          record_end_date: null,
-          create_date: '2024-01-01',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0,
-          feature_type_name: 'dataset',
-          feature_type_display_name: 'Dataset',
-          submission_feature_security_ids: []
-        }
-      ]);
+      sinon
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'streamSubmissionFeaturesBySubmissionUploadId')
+        .returns(
+          asAsyncGenerator([
+            {
+              submission_feature_id: 100,
+              submission_id: 777,
+              feature_type_id: 1,
+              urn: 'urn:777:dataset:100',
+              data: {
+                title: ['one', 'two']
+              },
+              source_id: null,
+              uuid: '123-456-789',
+              parent_submission_feature_id: null,
+              record_effective_date: '2024-01-01',
+              record_end_date: null,
+              create_date: '2024-01-01',
+              create_user: 1,
+              update_date: null,
+              update_user: null,
+              revision_count: 0,
+              feature_type_name: 'dataset',
+              feature_type_display_name: 'Dataset',
+              submission_feature_security_ids: []
+            }
+          ])
+        );
 
       sinon
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'deletePropertyRecordsBySubmissionUploadId')
@@ -583,7 +602,7 @@ describe('SearchFeatureService', () => {
         .resolves();
 
       try {
-        await searchFeatureService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
+        await featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
         expect.fail();
       } catch (error) {
         expect((error as Error).message).to.equal('Property does not allow multiple values');
@@ -594,32 +613,36 @@ describe('SearchFeatureService', () => {
 
     it('accepts a single scalar when allow_multiple=true and indexes it as one record', async () => {
       const mockDBConnection = getMockDBConnection();
-      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+      const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(mockDBConnection);
 
-      sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBatchBySubmissionUploadId').resolves([
-        {
-          submission_feature_id: 100,
-          submission_id: 777,
-          feature_type_id: 1,
-          urn: 'urn:777:dataset:100',
-          data: {
-            tags: 'single-tag'
-          },
-          source_id: null,
-          uuid: '123-456-789',
-          parent_submission_feature_id: null,
-          record_effective_date: '2024-01-01',
-          record_end_date: null,
-          create_date: '2024-01-01',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0,
-          feature_type_name: 'dataset',
-          feature_type_display_name: 'Dataset',
-          submission_feature_security_ids: []
-        }
-      ]);
+      sinon
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'streamSubmissionFeaturesBySubmissionUploadId')
+        .returns(
+          asAsyncGenerator([
+            {
+              submission_feature_id: 100,
+              submission_id: 777,
+              feature_type_id: 1,
+              urn: 'urn:777:dataset:100',
+              data: {
+                tags: 'single-tag'
+              },
+              source_id: null,
+              uuid: '123-456-789',
+              parent_submission_feature_id: null,
+              record_effective_date: '2024-01-01',
+              record_end_date: null,
+              create_date: '2024-01-01',
+              create_user: 1,
+              update_date: null,
+              update_user: null,
+              revision_count: 0,
+              feature_type_name: 'dataset',
+              feature_type_display_name: 'Dataset',
+              submission_feature_security_ids: []
+            }
+          ])
+        );
 
       sinon
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'deletePropertyRecordsBySubmissionUploadId')
@@ -638,7 +661,7 @@ describe('SearchFeatureService', () => {
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'insertStringRecords')
         .resolves();
 
-      await searchFeatureService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
+      await featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
 
       expect(insertStringRecordsStub).to.have.been.calledOnceWith([
         {
@@ -651,32 +674,36 @@ describe('SearchFeatureService', () => {
 
     it('resolves artifact_key values and inserts resolved artifact_id records', async () => {
       const mockDBConnection = getMockDBConnection();
-      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+      const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(mockDBConnection);
 
-      sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBatchBySubmissionUploadId').resolves([
-        {
-          submission_feature_id: 100,
-          submission_id: 777,
-          feature_type_id: 1,
-          urn: 'urn:777:dataset:100',
-          data: {
-            artifact_key: ['files/photo-1.jpg', 'files/photo-2.jpg']
-          },
-          source_id: null,
-          uuid: '123-456-789',
-          parent_submission_feature_id: null,
-          record_effective_date: '2024-01-01',
-          record_end_date: null,
-          create_date: '2024-01-01',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0,
-          feature_type_name: 'dataset',
-          feature_type_display_name: 'Dataset',
-          submission_feature_security_ids: []
-        }
-      ]);
+      sinon
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'streamSubmissionFeaturesBySubmissionUploadId')
+        .returns(
+          asAsyncGenerator([
+            {
+              submission_feature_id: 100,
+              submission_id: 777,
+              feature_type_id: 1,
+              urn: 'urn:777:dataset:100',
+              data: {
+                artifact_key: ['files/photo-1.jpg', 'files/photo-2.jpg']
+              },
+              source_id: null,
+              uuid: '123-456-789',
+              parent_submission_feature_id: null,
+              record_effective_date: '2024-01-01',
+              record_end_date: null,
+              create_date: '2024-01-01',
+              create_user: 1,
+              update_date: null,
+              update_user: null,
+              revision_count: 0,
+              feature_type_name: 'dataset',
+              feature_type_display_name: 'Dataset',
+              submission_feature_security_ids: []
+            }
+          ])
+        );
 
       sinon
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'deletePropertyRecordsBySubmissionUploadId')
@@ -692,15 +719,15 @@ describe('SearchFeatureService', () => {
       ]);
       sinon.stub(SubmissionFeaturePropertyIndexService.prototype, 'resolveArtifactIdsByReferences').resolves(
         new Map([
-          ['files/photo-1.jpg', 'a65abf71-d4a4-4b6f-aec3-9f8dc4d9e924'],
-          ['files/photo-2.jpg', '2b4b6ec0-6f95-4d84-8eca-8f5eddb1f078']
+          ['photo-1.jpg', 'a65abf71-d4a4-4b6f-aec3-9f8dc4d9e924'],
+          ['photo-2.jpg', '2b4b6ec0-6f95-4d84-8eca-8f5eddb1f078']
         ])
       );
       const insertArtifactRecordsStub = sinon
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'insertArtifactRecords')
         .resolves();
 
-      await searchFeatureService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
+      await featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
 
       expect(insertArtifactRecordsStub).to.have.been.calledOnceWith([
         {
@@ -716,32 +743,36 @@ describe('SearchFeatureService', () => {
 
     it('resolves taxon TSN values and inserts resolved taxon_id records', async () => {
       const mockDBConnection = getMockDBConnection();
-      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+      const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(mockDBConnection);
 
-      sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBatchBySubmissionUploadId').resolves([
-        {
-          submission_feature_id: 100,
-          submission_id: 777,
-          feature_type_id: 1,
-          urn: 'urn:777:dataset:100',
-          data: {
-            focal_species: [180544, 552421]
-          },
-          source_id: null,
-          uuid: '123-456-789',
-          parent_submission_feature_id: null,
-          record_effective_date: '2024-01-01',
-          record_end_date: null,
-          create_date: '2024-01-01',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0,
-          feature_type_name: 'dataset',
-          feature_type_display_name: 'Dataset',
-          submission_feature_security_ids: []
-        }
-      ]);
+      sinon
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'streamSubmissionFeaturesBySubmissionUploadId')
+        .returns(
+          asAsyncGenerator([
+            {
+              submission_feature_id: 100,
+              submission_id: 777,
+              feature_type_id: 1,
+              urn: 'urn:777:dataset:100',
+              data: {
+                focal_species: [180544, 552421]
+              },
+              source_id: null,
+              uuid: '123-456-789',
+              parent_submission_feature_id: null,
+              record_effective_date: '2024-01-01',
+              record_end_date: null,
+              create_date: '2024-01-01',
+              create_user: 1,
+              update_date: null,
+              update_user: null,
+              revision_count: 0,
+              feature_type_name: 'dataset',
+              feature_type_display_name: 'Dataset',
+              submission_feature_security_ids: []
+            }
+          ])
+        );
 
       sinon
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'deletePropertyRecordsBySubmissionUploadId')
@@ -795,7 +826,7 @@ describe('SearchFeatureService', () => {
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'insertTaxonRecords')
         .resolves();
 
-      await searchFeatureService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
+      await featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
 
       expect(insertTaxonRecordsStub).to.have.been.calledOnceWith([
         {
@@ -813,32 +844,36 @@ describe('SearchFeatureService', () => {
 
     it('throws when taxon TSN cannot be resolved', async () => {
       const mockDBConnection = getMockDBConnection();
-      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+      const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(mockDBConnection);
 
-      sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBatchBySubmissionUploadId').resolves([
-        {
-          submission_feature_id: 100,
-          submission_id: 777,
-          feature_type_id: 1,
-          urn: 'urn:777:dataset:100',
-          data: {
-            focal_species: [180544]
-          },
-          source_id: null,
-          uuid: '123-456-789',
-          parent_submission_feature_id: null,
-          record_effective_date: '2024-01-01',
-          record_end_date: null,
-          create_date: '2024-01-01',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0,
-          feature_type_name: 'dataset',
-          feature_type_display_name: 'Dataset',
-          submission_feature_security_ids: []
-        }
-      ]);
+      sinon
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'streamSubmissionFeaturesBySubmissionUploadId')
+        .returns(
+          asAsyncGenerator([
+            {
+              submission_feature_id: 100,
+              submission_id: 777,
+              feature_type_id: 1,
+              urn: 'urn:777:dataset:100',
+              data: {
+                focal_species: [180544]
+              },
+              source_id: null,
+              uuid: '123-456-789',
+              parent_submission_feature_id: null,
+              record_effective_date: '2024-01-01',
+              record_end_date: null,
+              create_date: '2024-01-01',
+              create_user: 1,
+              update_date: null,
+              update_user: null,
+              revision_count: 0,
+              feature_type_name: 'dataset',
+              feature_type_display_name: 'Dataset',
+              submission_feature_security_ids: []
+            }
+          ])
+        );
 
       sinon
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'deletePropertyRecordsBySubmissionUploadId')
@@ -856,7 +891,7 @@ describe('SearchFeatureService', () => {
       sinon.stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds').resolves([]);
 
       try {
-        await searchFeatureService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
+        await featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
         expect.fail();
       } catch (error) {
         expect((error as Error).message).to.equal('Failed to resolve taxon value');
@@ -865,32 +900,36 @@ describe('SearchFeatureService', () => {
 
     it('throws when artifact_key value cannot be resolved', async () => {
       const mockDBConnection = getMockDBConnection();
-      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+      const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(mockDBConnection);
 
-      sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBatchBySubmissionUploadId').resolves([
-        {
-          submission_feature_id: 100,
-          submission_id: 777,
-          feature_type_id: 1,
-          urn: 'urn:777:dataset:100',
-          data: {
-            artifact_key: 'files/missing.jpg'
-          },
-          source_id: 'feature-100',
-          uuid: '123-456-789',
-          parent_submission_feature_id: null,
-          record_effective_date: '2024-01-01',
-          record_end_date: null,
-          create_date: '2024-01-01',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0,
-          feature_type_name: 'dataset',
-          feature_type_display_name: 'Dataset',
-          submission_feature_security_ids: []
-        }
-      ]);
+      sinon
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'streamSubmissionFeaturesBySubmissionUploadId')
+        .returns(
+          asAsyncGenerator([
+            {
+              submission_feature_id: 100,
+              submission_id: 777,
+              feature_type_id: 1,
+              urn: 'urn:777:dataset:100',
+              data: {
+                artifact_key: 'files/missing.jpg'
+              },
+              source_id: 'feature-100',
+              uuid: '123-456-789',
+              parent_submission_feature_id: null,
+              record_effective_date: '2024-01-01',
+              record_end_date: null,
+              create_date: '2024-01-01',
+              create_user: 1,
+              update_date: null,
+              update_user: null,
+              revision_count: 0,
+              feature_type_name: 'dataset',
+              feature_type_display_name: 'Dataset',
+              submission_feature_security_ids: []
+            }
+          ])
+        );
 
       sinon
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'deletePropertyRecordsBySubmissionUploadId')
@@ -907,7 +946,7 @@ describe('SearchFeatureService', () => {
       sinon.stub(SubmissionFeaturePropertyIndexService.prototype, 'resolveArtifactIdsByReferences').resolves(new Map());
 
       try {
-        await searchFeatureService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
+        await featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
         expect.fail();
       } catch (error) {
         expect((error as Error).message).to.equal('Failed to resolve artifact_key value');
@@ -916,33 +955,37 @@ describe('SearchFeatureService', () => {
 
     it('throws when parent feature id cannot be resolved within upload scope', async () => {
       const mockDBConnection = getMockDBConnection();
-      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+      const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(mockDBConnection);
 
-      sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBatchBySubmissionUploadId').resolves([
-        {
-          submission_feature_id: 100,
-          submission_id: 777,
-          feature_type_id: 1,
-          urn: 'urn:777:dataset:100',
-          data: {
-            parent: 'missing-parent',
-            properties: {}
-          },
-          source_id: 'feature-100',
-          uuid: '123-456-789',
-          parent_submission_feature_id: null,
-          record_effective_date: '2024-01-01',
-          record_end_date: null,
-          create_date: '2024-01-01',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0,
-          feature_type_name: 'dataset',
-          feature_type_display_name: 'Dataset',
-          submission_feature_security_ids: []
-        }
-      ]);
+      sinon
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'streamSubmissionFeaturesBySubmissionUploadId')
+        .returns(
+          asAsyncGenerator([
+            {
+              submission_feature_id: 100,
+              submission_id: 777,
+              feature_type_id: 1,
+              urn: 'urn:777:dataset:100',
+              data: {
+                parent: 'missing-parent',
+                properties: {}
+              },
+              source_id: 'feature-100',
+              uuid: '123-456-789',
+              parent_submission_feature_id: null,
+              record_effective_date: '2024-01-01',
+              record_end_date: null,
+              create_date: '2024-01-01',
+              create_user: 1,
+              update_date: null,
+              update_user: null,
+              revision_count: 0,
+              feature_type_name: 'dataset',
+              feature_type_display_name: 'Dataset',
+              submission_feature_security_ids: []
+            }
+          ])
+        );
 
       sinon
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'deletePropertyRecordsBySubmissionUploadId')
@@ -951,7 +994,7 @@ describe('SearchFeatureService', () => {
       sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeatureIdMapBySourceIds').resolves([]);
 
       try {
-        await searchFeatureService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
+        await featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
         expect.fail();
       } catch (error) {
         expect((error as Error).message).to.equal('Failed to resolve parent feature id');
@@ -960,33 +1003,37 @@ describe('SearchFeatureService', () => {
 
     it('throws when feature reference id cannot be resolved within upload scope', async () => {
       const mockDBConnection = getMockDBConnection();
-      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+      const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(mockDBConnection);
 
-      sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBatchBySubmissionUploadId').resolves([
-        {
-          submission_feature_id: 100,
-          submission_id: 777,
-          feature_type_id: 1,
-          urn: 'urn:777:dataset:100',
-          data: {
-            references: ['missing-reference'],
-            properties: {}
-          },
-          source_id: 'feature-100',
-          uuid: '123-456-789',
-          parent_submission_feature_id: null,
-          record_effective_date: '2024-01-01',
-          record_end_date: null,
-          create_date: '2024-01-01',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0,
-          feature_type_name: 'dataset',
-          feature_type_display_name: 'Dataset',
-          submission_feature_security_ids: []
-        }
-      ]);
+      sinon
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'streamSubmissionFeaturesBySubmissionUploadId')
+        .returns(
+          asAsyncGenerator([
+            {
+              submission_feature_id: 100,
+              submission_id: 777,
+              feature_type_id: 1,
+              urn: 'urn:777:dataset:100',
+              data: {
+                references: ['missing-reference'],
+                properties: {}
+              },
+              source_id: 'feature-100',
+              uuid: '123-456-789',
+              parent_submission_feature_id: null,
+              record_effective_date: '2024-01-01',
+              record_end_date: null,
+              create_date: '2024-01-01',
+              create_user: 1,
+              update_date: null,
+              update_user: null,
+              revision_count: 0,
+              feature_type_name: 'dataset',
+              feature_type_display_name: 'Dataset',
+              submission_feature_security_ids: []
+            }
+          ])
+        );
 
       sinon
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'deletePropertyRecordsBySubmissionUploadId')
@@ -995,7 +1042,7 @@ describe('SearchFeatureService', () => {
       sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeatureIdMapBySourceIds').resolves([]);
 
       try {
-        await searchFeatureService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
+        await featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
         expect.fail();
       } catch (error) {
         expect((error as Error).message).to.equal('Failed to resolve feature reference id');
@@ -1004,7 +1051,7 @@ describe('SearchFeatureService', () => {
 
     it('iterates over submission features in cursor batches until no rows remain', async () => {
       const mockDBConnection = getMockDBConnection();
-      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+      const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(mockDBConnection);
       const firstBatch = Array.from({ length: 10000 }, (_value, index) => ({
         submission_feature_id: index + 1,
         submission_id: 777,
@@ -1032,47 +1079,48 @@ describe('SearchFeatureService', () => {
       sinon.stub(SubmissionRepository.prototype, 'clearSubmissionFeatureParentsBySubmissionUploadId').resolves();
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatureRelationshipsBySubmissionUploadId').resolves();
       const batchFetchStub = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBatchBySubmissionUploadId')
-        .onFirstCall()
-        .resolves(firstBatch as any)
-        .onSecondCall()
-        .resolves([
-          {
-            submission_feature_id: 10001,
-            submission_id: 777,
-            feature_type_id: 11,
-            feature_type_name: 'dataset',
-            feature_type_display_name: 'Dataset',
-            data: { id: 'f-10001', type: 'dataset', properties: {}, references: [], parent: null },
-            source_id: 'f-10001',
-            uuid: '00000000-0000-0000-0000-000000010001',
-            urn: 'urn:777:dataset:10001',
-            parent_submission_feature_id: null,
-            record_effective_date: dayjs().toISOString(),
-            record_end_date: null,
-            create_date: dayjs().toISOString(),
-            create_user: 1,
-            update_date: null,
-            update_user: null,
-            revision_count: 0,
-            submission_feature_security_ids: []
-          }
-        ]);
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'streamSubmissionFeaturesBySubmissionUploadId')
+        .returns(
+          asAsyncGenerator(
+            firstBatch as any,
+            [
+              {
+                submission_feature_id: 10001,
+                submission_id: 777,
+                feature_type_id: 11,
+                feature_type_name: 'dataset',
+                feature_type_display_name: 'Dataset',
+                data: { id: 'f-10001', type: 'dataset', properties: {}, references: [], parent: null },
+                source_id: 'f-10001',
+                uuid: '00000000-0000-0000-0000-000000010001',
+                urn: 'urn:777:dataset:10001',
+                parent_submission_feature_id: null,
+                record_effective_date: dayjs().toISOString(),
+                record_end_date: null,
+                create_date: dayjs().toISOString(),
+                create_user: 1,
+                update_date: null,
+                update_user: null,
+                revision_count: 0,
+                submission_feature_security_ids: []
+              }
+            ] as any
+          )
+        );
       const metadataStub = sinon
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'getFeatureTypePropertyMetadata')
         .resolves([]);
 
-      await searchFeatureService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
+      await featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
 
-      expect(batchFetchStub.callCount).to.equal(2);
-      expect(batchFetchStub.firstCall.args).to.deep.equal(['sub-upload-1', 0, 10000]);
-      expect(batchFetchStub.secondCall.args).to.deep.equal(['sub-upload-1', 10000, 10000]);
+      expect(batchFetchStub.callCount).to.equal(1);
+      expect(batchFetchStub.firstCall.args).to.deep.equal(['sub-upload-1', 10000]);
       expect(metadataStub.calledOnce).to.be.true;
     });
 
     it('propagates cursor batch fetch failures', async () => {
       const mockDBConnection = getMockDBConnection();
-      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+      const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(mockDBConnection);
 
       sinon
         .stub(SubmissionFeaturePropertyIndexService.prototype, 'deletePropertyRecordsBySubmissionUploadId')
@@ -1080,11 +1128,11 @@ describe('SearchFeatureService', () => {
       sinon.stub(SubmissionRepository.prototype, 'clearSubmissionFeatureParentsBySubmissionUploadId').resolves();
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatureRelationshipsBySubmissionUploadId').resolves();
       sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBatchBySubmissionUploadId')
+        .stub(SubmissionFeaturePropertyIndexRepository.prototype, 'streamSubmissionFeaturesBySubmissionUploadId')
         .rejects(new Error('batch fetch failed'));
 
       try {
-        await searchFeatureService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
+        await featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(777, 'sub-upload-1');
         expect.fail();
       } catch (error) {
         expect((error as Error).message).to.equal('batch fetch failed');

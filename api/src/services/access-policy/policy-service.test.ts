@@ -2,14 +2,14 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { FeaturePropertyCode } from '../../models/feature-property';
+import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyEffect, PolicyStatement } from '../../models/policy-statement';
 import { PolicyConditionOperator, PolicyStatementCondition } from '../../models/policy-statement-condition';
-import { CodeRepository } from '../../repositories/code-repository';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
 import { PolicyStatementConditionRepository } from '../../repositories/authorization/policy-statement-condition-repository';
 import { PolicyStatementRepository } from '../../repositories/authorization/policy-statement-repository';
+import { CodeRepository } from '../../repositories/code-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { PolicyService } from './policy-service';
 
@@ -269,7 +269,9 @@ describe('PolicyService', () => {
       };
 
       const insertPolicyStub = sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
-      const featurePropertyStub = sinon.stub(CodeRepository.prototype, 'getFeaturePropertyByName').resolves(featureProperty);
+      const featurePropertyStub = sinon
+        .stub(CodeRepository.prototype, 'getFeaturePropertyByName')
+        .resolves(featureProperty);
       const insertStatementStub = sinon
         .stub(PolicyStatementRepository.prototype, 'insertPolicyStatement')
         .resolves(mockStatement);

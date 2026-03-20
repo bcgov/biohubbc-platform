@@ -9,10 +9,10 @@ import { ISubmissionFeature } from '../submission-repository';
  * A repository class for ingestion-related data access.
  *
  * @export
- * @class IngestionRepository
+ * @class FeatureIngestionRepository
  * @extends {BaseRepository}
  */
-export class IngestionRepository extends BaseRepository {
+export class FeatureIngestionRepository extends BaseRepository {
   /**
    * Bulk insert submission feature rows (raw payload persisted in `data`).
    *
@@ -25,7 +25,7 @@ export class IngestionRepository extends BaseRepository {
    *   dataByteSize: number;
    * }>} records
    * @return {Promise<void>}
-   * @memberof IngestionRepository
+   * @memberof FeatureIngestionRepository
    */
   async insertSubmissionFeatureRecords(
     records: Array<{
@@ -90,7 +90,7 @@ export class IngestionRepository extends BaseRepository {
     const response = await this.connection.sql(sqlStatement);
     if (response.rowCount !== records.length) {
       throw new ApiExecuteSQLError('Failed to bulk insert submission feature records', [
-        'IngestionRepository->insertSubmissionFeatureRecords',
+        'FeatureIngestionRepository->insertSubmissionFeatureRecords',
         `rowCount was ${response.rowCount ?? 'null'}, expected ${records.length}`
       ]);
     }
@@ -110,7 +110,7 @@ export class IngestionRepository extends BaseRepository {
    * @param {ISubmissionFeature['properties']} featureProperties The properties of the submission feature.
    * @param {number} dataByteSizeBytes The byte size of the data.
    * @return {*}  {Promise<{ submission_feature_id: number }>}
-   * @memberof IngestionRepository
+   * @memberof FeatureIngestionRepository
    */
   async insertSubmissionFeatureRecord(
     submissionId: number,
@@ -149,7 +149,7 @@ export class IngestionRepository extends BaseRepository {
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission feature record', [
-        'IngestionRepository->insertSubmissionFeatureRecord',
+        'FeatureIngestionRepository->insertSubmissionFeatureRecord',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
@@ -163,7 +163,7 @@ export class IngestionRepository extends BaseRepository {
    * @param {number} submissionFeatureId The ID of the feature to update.
    * @param {number} parentSubmissionFeatureId The ID of the parent feature.
    * @return {*}  {Promise<void>}
-   * @memberof IngestionRepository
+   * @memberof FeatureIngestionRepository
    */
   async updateSubmissionFeatureParent(submissionFeatureId: number, parentSubmissionFeatureId: number): Promise<void> {
     const sqlStatement = SQL`
@@ -182,7 +182,7 @@ export class IngestionRepository extends BaseRepository {
    *
    * @param {string} submissionUploadId The submission_upload_id (UUID).
    * @return {Promise<void>}
-   * @memberof IngestionRepository
+   * @memberof FeatureIngestionRepository
    */
   async deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sqlStatement = SQL`
@@ -201,7 +201,7 @@ export class IngestionRepository extends BaseRepository {
    *
    * @param {number} submissionId The submission ID.
    * @return {Promise<void>}
-   * @memberof IngestionRepository
+   * @memberof FeatureIngestionRepository
    */
   async deleteSubmissionFeatures(submissionId: number): Promise<void> {
     const sqlStatement = SQL`
@@ -221,7 +221,7 @@ export class IngestionRepository extends BaseRepository {
    *
    * @param {string} name - The feature type name to look up
    * @return {Promise<FeatureTypeWithProperties | null>} The feature type with properties, or null if not found
-   * @memberof IngestionRepository
+   * @memberof FeatureIngestionRepository
    */
   async findFeatureTypeWithProperties(name: string): Promise<FeatureTypeWithProperties | null> {
     const sqlStatement = SQL`
@@ -238,6 +238,7 @@ export class IngestionRepository extends BaseRepository {
       properties_cte AS (
         SELECT
           ftp.feature_type_id,
+          ftp.feature_type_property_id,
           fp.name,
           fp.display_name,
           fp.description,
@@ -262,6 +263,7 @@ export class IngestionRepository extends BaseRepository {
         COALESCE(
           JSON_AGG(
             JSON_BUILD_OBJECT(
+              'feature_type_property_id', p.feature_type_property_id,
               'name', p.name,
               'display_name', p.display_name,
               'description', p.description,

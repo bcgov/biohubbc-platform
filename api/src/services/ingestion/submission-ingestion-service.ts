@@ -1,12 +1,12 @@
 import { SubmissionUpload } from '../../models/submission-upload';
-import { streamFeaturesFromTarball } from '../../utils/biohub-tar-parser';
+import { streamFeatures } from '../../utils/biohub-tar-parser';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
 import { CodesetIngestionService } from './codeset-ingestion-service';
-import { FeatureIngestionService } from './feature-ingestion-service';
-import { IValidationResult } from './feature-validation-service.interface';
+import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
+import { IValidationResult } from './submission-ingestion-service.interface';
 import { MediaIngestionService } from './media-ingestion-service';
 
 const FEATURE_INSERT_BATCH_SIZE = 10000;
@@ -19,7 +19,7 @@ const FEATURE_INSERT_BATCH_SIZE = 10000;
  * @extends {DBService}
  */
 export class SubmissionIngestionService extends DBService {
-  featureIngestionService = new FeatureIngestionService(this.connection);
+  featureIngestionService = new SubmissionFeatureIngestionService(this.connection);
   mediaIngestionService = new MediaIngestionService(this.connection);
   codesetIngestionService = new CodesetIngestionService(this.connection);
   uploadArchiveService = new UploadArchiveService(this.connection);
@@ -56,15 +56,33 @@ export class SubmissionIngestionService extends DBService {
 
     // Checkpointed streaming passes keep memory bounded while avoiding concurrent
     // full-archive scans against object storage for the same tarball.
-    await this.mediaIngestionService.ingestMediaFiles(objectKey, submissionId, uploadId, uploadArchiveId);
-    await this.codesetIngestionService.ingestCodesetsFromTarball(objectKey, submissionUploadId);
-
-    const tarStream = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
-    await streamFeaturesFromTarball(tarStream, FEATURE_INSERT_BATCH_SIZE, async (featureBatch) => {
-      await this.featureIngestionService.ingestFeatureBatch(submissionId, submissionUploadId, featureBatch);
-    });
+    await this.mediaIngestionService.ingestMediaFiles(
+      objectKey,
+      submissionId,
+      uploadId,
+      uploadArchiveId
+    );
+    await this.codesetIngestionService.ingestCodesets(objectKey, submissionUploadId);
+    await this.ingestFeatures(objectKey, submissionId, submissionUploadId);
 
     return { valid: true, errors: [] };
+  }
+
+  /**
+   * Stream feature entries from the tarball and ingest them in batches.
+   *
+   * @private
+   * @param {string} objectKey
+   * @param {number} submissionId
+   * @param {string} submissionUploadId
+   * @returns {Promise<void>}
+   */
+  private async ingestFeatures(objectKey: string, submissionId: number, submissionUploadId: string): Promise<void> {
+    const tarStream = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
+
+    await streamFeatures(tarStream, FEATURE_INSERT_BATCH_SIZE, async (featureBatch) => {
+      await this.featureIngestionService.ingestFeatureBatch(submissionId, submissionUploadId, featureBatch);
+    });
   }
 
   /**

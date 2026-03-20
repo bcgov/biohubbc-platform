@@ -59,7 +59,9 @@ export class SubmissionFeatureArtifactRepository extends BaseRepository {
    * @return {Promise<SubmissionFeatureArtifact[]>}
    * @memberof SubmissionFeatureArtifactRepository
    */
-  async insertSubmissionFeatureArtifacts(payloads: CreateSubmissionFeatureArtifact[]): Promise<SubmissionFeatureArtifact[]> {
+  async insertSubmissionFeatureArtifacts(
+    payloads: CreateSubmissionFeatureArtifact[]
+  ): Promise<SubmissionFeatureArtifact[]> {
     if (!payloads.length) {
       return [];
     }

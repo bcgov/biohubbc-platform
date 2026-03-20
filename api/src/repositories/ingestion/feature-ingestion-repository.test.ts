@@ -5,9 +5,9 @@ import sinon from 'sinon';
 import { ApiGeneralError } from '../../errors/api-error';
 import { FeatureTypeWithProperties, FeatureTypeWithPropertiesRow } from '../../models/feature-type';
 import { getMockDBConnection } from '../../__mocks__/db';
-import { IngestionRepository } from './ingestion-repository';
+import { FeatureIngestionRepository } from './feature-ingestion-repository';
 
-describe('IngestionRepository', () => {
+describe('FeatureIngestionRepository', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -18,7 +18,7 @@ describe('IngestionRepository', () => {
 
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
 
-      const ingestionRepository = new IngestionRepository(mockDBConnection);
+      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
 
       const feature = {
         id: '',
@@ -42,7 +42,7 @@ describe('IngestionRepository', () => {
 
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
 
-      const ingestionRepository = new IngestionRepository(mockDBConnection);
+      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
 
       const feature = {
         id: '',
@@ -77,7 +77,7 @@ describe('IngestionRepository', () => {
       const sqlStub = sinon.stub().resolves(mockQueryResponse);
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
-      const ingestionRepository = new IngestionRepository(mockDBConnection);
+      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
 
       await ingestionRepository.updateSubmissionFeatureParent(10, 5);
 
@@ -94,7 +94,7 @@ describe('IngestionRepository', () => {
       });
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
-      const ingestionRepository = new IngestionRepository(mockDBConnection);
+      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
 
       await ingestionRepository.deleteSubmissionFeaturesBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
 
@@ -115,7 +115,7 @@ describe('IngestionRepository', () => {
       const sqlStub = sinon.stub().resolves(mockQueryResponse);
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
-      const ingestionRepository = new IngestionRepository(mockDBConnection);
+      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
 
       await ingestionRepository.deleteSubmissionFeatures(1);
 
@@ -134,7 +134,7 @@ describe('IngestionRepository', () => {
       const sqlStub = sinon.stub().resolves(mockQueryResponse);
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
-      const ingestionRepository = new IngestionRepository(mockDBConnection);
+      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
 
       // Should not throw even when rowCount is 0
       await ingestionRepository.deleteSubmissionFeatures(999);
@@ -184,7 +184,7 @@ describe('IngestionRepository', () => {
         sql: async () => mockQueryResponse
       });
 
-      const ingestionRepository = new IngestionRepository(mockDBConnection);
+      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
       const response = await ingestionRepository.findFeatureTypeWithProperties('dataset');
 
       const expectedResponse: FeatureTypeWithProperties = {
@@ -231,7 +231,7 @@ describe('IngestionRepository', () => {
         sql: async () => mockQueryResponse
       });
 
-      const ingestionRepository = new IngestionRepository(mockDBConnection);
+      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
       const response = await ingestionRepository.findFeatureTypeWithProperties('nonexistent_type');
 
       expect(response).to.be.null;
@@ -258,7 +258,7 @@ describe('IngestionRepository', () => {
         sql: async () => mockQueryResponse
       });
 
-      const ingestionRepository = new IngestionRepository(mockDBConnection);
+      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
       const response = await ingestionRepository.findFeatureTypeWithProperties('empty_type');
 
       const expectedResponse: FeatureTypeWithProperties = {

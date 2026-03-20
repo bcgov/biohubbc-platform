@@ -55,11 +55,42 @@ export async function up(knex: Knex): Promise<void> {
     CREATE TRIGGER journal_submission_feature_artifact
       AFTER INSERT OR UPDATE OR DELETE ON submission_feature_artifact
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
+
+    ALTER TABLE upload_artifact
+      ADD COLUMN IF NOT EXISTS path text;
+
+    ALTER TABLE upload_artifact
+      DROP CONSTRAINT IF EXISTS upload_artifact_archive_path_chk;
+
+    ALTER TABLE upload_artifact
+      ADD CONSTRAINT upload_artifact_archive_path_chk
+      CHECK (
+        (upload_archive_id IS NULL AND path IS NULL)
+        OR
+        (upload_archive_id IS NOT NULL AND path IS NOT NULL)
+      );
+
+    CREATE INDEX IF NOT EXISTS upload_artifact_path_idx
+      ON upload_artifact(path);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS upload_artifact_upload_path_uq
+      ON upload_artifact(upload_id, path)
+      WHERE path IS NOT NULL;
+
+    COMMENT ON COLUMN upload_artifact.path IS 'Normalized archive-relative path for extracted archive files. NULL for non-archive artifacts.';
   `);
 }
 
 export async function down(knex: Knex): Promise<void> {
   await knex.raw(`
+    ALTER TABLE upload_artifact
+      DROP CONSTRAINT IF EXISTS upload_artifact_archive_path_chk;
+
+    DROP INDEX IF EXISTS upload_artifact_upload_path_uq;
+    DROP INDEX IF EXISTS upload_artifact_path_idx;
+    ALTER TABLE upload_artifact
+      DROP COLUMN IF EXISTS path;
+
     DROP TRIGGER IF EXISTS journal_submission_feature_artifact ON submission_feature_artifact;
     DROP TRIGGER IF EXISTS audit_submission_feature_artifact ON submission_feature_artifact;
 

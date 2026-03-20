@@ -126,8 +126,12 @@ export class ContributorCodesetCodeService extends DBService {
    * @return {Promise<ContributorCodesetCode[]>}
    * @memberof ContributorCodesetCodeService
    */
-  getContributorCodesetCodesByContributorCodesetIds(contributorCodesetIds: number[]): Promise<ContributorCodesetCode[]> {
-    return this.contributorCodesetCodeRepository.getContributorCodesetCodesByContributorCodesetIds(contributorCodesetIds);
+  getContributorCodesetCodesByContributorCodesetIds(
+    contributorCodesetIds: number[]
+  ): Promise<ContributorCodesetCode[]> {
+    return this.contributorCodesetCodeRepository.getContributorCodesetCodesByContributorCodesetIds(
+      contributorCodesetIds
+    );
   }
 
   /**

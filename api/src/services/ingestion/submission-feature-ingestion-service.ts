@@ -1,6 +1,6 @@
 import { IDBConnection } from '../../database/db';
 import { IFlattenedBlock } from '../../models/submission-feature';
-import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
+import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { buildFeatureDataPayload } from '../../utils/biohub-tar-parser';
 import { DBService } from '../db-service';
 
@@ -9,15 +9,15 @@ import { DBService } from '../db-service';
  * Deep validation and relationship resolution run later in indexing.
  *
  * @export
- * @class FeatureIngestionService
+ * @class SubmissionFeatureIngestionService
  * @extends {DBService}
  */
-export class FeatureIngestionService extends DBService {
-  ingestionRepository: IngestionRepository;
+export class SubmissionFeatureIngestionService extends DBService {
+  ingestionRepository: FeatureIngestionRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
-    this.ingestionRepository = new IngestionRepository(connection);
+    this.ingestionRepository = new FeatureIngestionRepository(connection);
   }
 
   /**

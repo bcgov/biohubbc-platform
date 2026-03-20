@@ -1,11 +1,23 @@
 import { IDBConnection } from '../../database/db';
-import { ApiNotFoundError } from '../../errors/api-error';
 import { HTTP400 } from '../../errors/http-error';
-import { CreatePolicyStatementCondition, PolicyStatementCondition } from '../../models/policy-statement-condition';
-import { CodeRepository } from '../../repositories/code-repository';
+import { FeaturePropertyTypeName } from '../../models/feature-property';
+import {
+  CreatePolicyStatementCondition,
+  PolicyConditionOperator,
+  PolicyStatementCondition
+} from '../../models/policy-statement-condition';
 import { PolicyStatementConditionRepository } from '../../repositories/authorization/policy-statement-condition-repository';
+import { CodeRepository } from '../../repositories/code-repository';
+import {
+  ALLOWED_OPERATORS_BY_PROPERTY_TYPE,
+  DATE_OPERATORS,
+  isNumberArray,
+  isObject,
+  isStringArray,
+  SPATIAL_OPERATORS,
+  STRING_OPERATORS
+} from '../../utils/policy-condition-utils';
 import { DBService } from '../db-service';
-import { validatePolicyConditionInput } from './policy-condition-validation';
 
 export class PolicyStatementConditionService extends DBService {
   codeRepository: CodeRepository;
@@ -27,21 +39,13 @@ export class PolicyStatementConditionService extends DBService {
   async createPolicyStatementCondition(
     policyStatementConditionData: CreatePolicyStatementCondition
   ): Promise<PolicyStatementCondition> {
-    try {
-      const featureProperty = await this.codeRepository.getFeaturePropertyByName(policyStatementConditionData.key);
-      validatePolicyConditionInput(
-        policyStatementConditionData.key,
-        policyStatementConditionData.operator,
-        policyStatementConditionData.value,
-        featureProperty.feature_property_type_name
-      );
-    } catch (error) {
-      if (error instanceof ApiNotFoundError) {
-        throw new HTTP400(`Invalid policy condition key: ${policyStatementConditionData.key}`);
-      }
-
-      throw error;
-    }
+    const featureProperty = await this.codeRepository.getFeaturePropertyByName(policyStatementConditionData.key);
+    this.validatePolicyCondition(
+      policyStatementConditionData.key,
+      policyStatementConditionData.operator,
+      policyStatementConditionData.value,
+      featureProperty.feature_property_type_name
+    );
 
     return this.policyStatementConditionRepository.insertPolicyStatementCondition(policyStatementConditionData);
   }
@@ -77,5 +81,64 @@ export class PolicyStatementConditionService extends DBService {
    */
   async deletePolicyStatementCondition(policyStatementConditionId: string): Promise<void> {
     await this.policyStatementConditionRepository.deletePolicyStatementCondition(policyStatementConditionId);
+  }
+
+  validatePolicyCondition(
+    key: string,
+    operator: CreatePolicyStatementCondition['operator'],
+    value: unknown,
+    propertyTypeName: FeaturePropertyTypeName | 'datetime' | 'spatial' | 'array'
+  ): void {
+    const allowedOperators = ALLOWED_OPERATORS_BY_PROPERTY_TYPE[propertyTypeName];
+
+    this.assertCondition(`Unknown property type: ${propertyTypeName}`, !!allowedOperators);
+    this.assertCondition(
+      `Operator ${operator} is not valid for property type ${propertyTypeName}`,
+      allowedOperators.includes(operator)
+    );
+
+    if (operator === PolicyConditionOperator.BOOL || operator === PolicyConditionOperator.EXISTS) {
+      this.assertCondition(`${operator} operator requires a boolean value`, typeof value === 'boolean');
+      return;
+    }
+
+    if (operator === PolicyConditionOperator.NUMERIC_EQUALS) {
+      const isValidNumber = typeof value === 'number' && Number.isFinite(value);
+      this.assertCondition('NumericEquals requires a number or array of numbers', isValidNumber || isNumberArray(value));
+      return;
+    }
+
+    if (STRING_OPERATORS.has(operator)) {
+      this.assertCondition(
+        `${operator} requires a string or array of strings`,
+        typeof value === 'string' || isStringArray(value)
+      );
+      return;
+    }
+
+    if (DATE_OPERATORS.has(operator)) {
+      this.assertCondition(
+        `${operator} requires a date string or array of date strings`,
+        typeof value === 'string' || isStringArray(value)
+      );
+      return;
+    }
+
+    if (SPATIAL_OPERATORS.has(operator)) {
+      this.assertCondition(`${operator} requires a GeoJSON-like object value`, isObject(value));
+      this.assertCondition(
+        `${operator} requires a GeoJSON-like object with a "type" field`,
+        isObject(value) && typeof value.type === 'string'
+      );
+      return;
+    }
+
+    throw new HTTP400(`Unsupported policy condition operator: ${operator} for key ${key}`);
+  }
+
+  private assertCondition(message: string, condition: boolean): void {
+    if (!condition) {
+      throw new HTTP400(message);
+    }
   }
 }

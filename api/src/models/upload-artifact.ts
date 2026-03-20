@@ -16,7 +16,8 @@ export const UploadArtifact = z.object({
   upload_id: z.string().uuid(),
   artifact_id: z.string().uuid(),
   role: UploadArtifactRoleZod,
-  upload_archive_id: z.string().uuid().nullable()
+  upload_archive_id: z.string().uuid().nullable(),
+  path: z.string().nullable()
 });
 export type UploadArtifact = z.infer<typeof UploadArtifact>;
 
@@ -27,7 +28,8 @@ export const CreateUploadArtifact = z.object({
   upload_id: z.string().uuid(),
   artifact_id: z.string().uuid(),
   role: UploadArtifactRoleZod,
-  upload_archive_id: z.string().uuid().nullable()
+  upload_archive_id: z.string().uuid().nullable(),
+  path: z.string().nullable().optional()
 });
 export type CreateUploadArtifact = z.infer<typeof CreateUploadArtifact>;
 
@@ -39,6 +41,7 @@ export const UpdateUploadArtifact = z.object({
   upload_id: z.string().uuid().optional(),
   artifact_id: z.string().uuid().optional(),
   role: UploadArtifactRoleZod.optional(),
-  upload_archive_id: z.string().uuid().nullable()
+  upload_archive_id: z.string().uuid().nullable(),
+  path: z.string().nullable().optional()
 });
 export type UpdateUploadArtifact = z.infer<typeof UpdateUploadArtifact>;

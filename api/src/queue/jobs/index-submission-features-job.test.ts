@@ -4,7 +4,7 @@ import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../database/db';
-import { SearchFeatureService } from '../../services/search-feature-service';
+import { SubmissionFeaturePropertyIngestionService } from '../../services/ingestion/submission-feature-property-ingestion-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getMockDBConnection } from '../../__mocks__/db';
 import {
@@ -49,7 +49,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     const indexStub = sinon
-      .stub(SearchFeatureService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
+      .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
       .resolves();
 
     await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
@@ -71,7 +71,9 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     const testError = new Error('Indexing failed');
-    sinon.stub(SearchFeatureService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId').rejects(testError);
+    sinon
+      .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
+      .rejects(testError);
 
     try {
       await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
@@ -97,7 +99,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     const indexStub = sinon
-      .stub(SearchFeatureService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
+      .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
       .resolves();
 
     await indexSubmissionFeaturesJobHandler([
