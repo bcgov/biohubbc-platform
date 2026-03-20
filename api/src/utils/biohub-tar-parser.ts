@@ -4,13 +4,50 @@ import nodePath from 'node:path';
 import { PassThrough, Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import * as tar from 'tar-stream';
-import { ZodError, z } from 'zod';
+import { z, ZodError } from 'zod';
 import { IFlattenedBlock } from '../models/submission-feature';
 import {
   TarCodesets
 } from '../services/ingestion/submission-ingestion-codes-service.interface';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
 import { IUploadedMediaFile } from './biohub-tar-parser.interface';
+
+const FlattenedFeatureEntrySchema = z
+  .object({
+    id: z.string(),
+    type: z.string(),
+    properties: z.record(z.unknown()),
+    parent: z.string().nullable().optional(),
+    references: z.array(z.string()).optional(),
+    content: z.array(z.string()).optional()
+  })
+  .superRefine((value, ctx) => {
+    if (!value.id.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Feature entry is missing required string field: id'
+      });
+    }
+
+    if (!value.type.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Feature entry is missing required string field: type'
+      });
+    }
+  });
+
+const FlattenedFeatureSchema = FlattenedFeatureEntrySchema.transform((record) => {
+  const normalizedReferences = record.references ?? record.content ?? [];
+
+  return {
+    id: record.id.trim(),
+    type: record.type.trim(),
+    properties: record.properties as Record<string, unknown>,
+    content: normalizedReferences,
+    parent: record.parent ?? null
+  } as IFlattenedBlock;
+});
 
 /**
  * Strip the optional archive directory prefix added by SIMS.
@@ -22,7 +59,7 @@ import { IUploadedMediaFile } from './biohub-tar-parser.interface';
  * This normalizes entry names so the parser works with both flat and prefixed archives.
  *
  * @param {string} entryName
- * @returns {string}
+ * @returns {string} Entry name without the archive root folder prefix.
  */
 function stripArchivePrefix(entryName: string): string {
   const slashIndex = entryName.indexOf('/');
@@ -39,10 +76,10 @@ function stripArchivePrefix(entryName: string): string {
 }
 
 /**
- * Collect all data from a stream into a single Buffer.
+ * Collect all bytes from a readable stream.
  *
- * @param {Readable} stream
- * @returns {Promise<Buffer>}
+ * @param {Readable} stream - Source stream to buffer.
+ * @returns {Promise<Buffer>} Buffer containing all chunks from `stream`.
  */
 function streamToBuffer(stream: Readable): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -56,7 +93,9 @@ function streamToBuffer(stream: Readable): Promise<Buffer> {
 /**
  * Drain a stream without buffering its content.
  *
- * @param {Readable} stream
+ * Used for tar entries we intentionally skip so the extractor can continue.
+ *
+ * @param {Readable} stream - Source stream to consume.
  * @returns {Promise<void>}
  */
 function drainStream(stream: Readable): Promise<void> {
@@ -68,23 +107,18 @@ function drainStream(stream: Readable): Promise<void> {
 }
 
 /**
- * Extract and shallow-validate codeset payload data from a parsed tarball JSON entry.
+ * Parse and shallow-validate one codeset JSON entry.
  *
- * Supports both payload shapes:
- * - direct codeset map at root
- * - wrapped payload with `categories` root property
+ * Expected JSON shape is an object where each top-level key is a codeset key.
+ * Validation errors are normalized to a stable ingestion error message.
  *
- * @param {unknown} value
+ * @param {unknown} value - Parsed JSON payload from a `codes/*.json` file.
  * @returns {TarCodesets}
+ * @throws {Error} When payload shape does not satisfy `TarCodesets`.
  */
 function extractCodesetsFromTarballEntry(value: unknown): TarCodesets {
-  const parsedRoot = z.record(z.string(), z.unknown()).parse(value);
-  const codesetsValue = Object.prototype.hasOwnProperty.call(parsedRoot, 'categories')
-    ? parsedRoot.categories
-    : parsedRoot;
-
   try {
-    return TarCodesets.parse(codesetsValue);
+    return TarCodesets.parse(value);
   } catch (error) {
     if (error instanceof ZodError) {
       throw new Error('Codeset entry failed shallow validation');
@@ -95,63 +129,37 @@ function extractCodesetsFromTarballEntry(value: unknown): TarCodesets {
 }
 
 /**
- * Parse a single unknown JSON value into a shallow-validated flattened feature block.
+ * Parse and shallow-validate one feature JSON object.
  *
- * @param {unknown} value
+ * Normalization behavior:
+ * - trims `id` and `type`
+ * - accepts references from `references` or legacy `content`
+ * - coerces missing parent to `null`
+ *
+ * @param {unknown} value - Parsed JSON object for a single feature.
  * @returns {IFlattenedBlock}
+ * @throws {Error} When required fields are missing or incorrectly typed.
  */
 function extractFeatureFromTarballEntry(value: unknown): IFlattenedBlock {
-  if (typeof value !== 'object' || value === null) {
-    throw new Error('Feature entry must be an object');
-  }
-
-  const record = value as Record<string, unknown>;
-  if (typeof record.id !== 'string' || !record.id.trim()) {
-    throw new Error('Feature entry is missing required string field: id');
-  }
-
-  if (typeof record.type !== 'string' || !record.type.trim()) {
-    throw new Error('Feature entry is missing required string field: type');
-  }
-
-  if (typeof record.properties !== 'object' || record.properties === null || Array.isArray(record.properties)) {
-    throw new Error('Feature entry is missing required object field: properties');
-  }
-
-  const parent =
-    record.parent === undefined || record.parent === null
-      ? null
-      : typeof record.parent === 'string'
-      ? record.parent
-      : (() => {
-          throw new Error('Feature entry field parent must be a string when provided');
-        })();
-
-  const rawReferences = Array.isArray(record.references)
-    ? record.references
-    : Array.isArray(record.content)
-    ? record.content
-    : [];
-  const content: string[] = [];
-  for (const reference of rawReferences) {
-    if (typeof reference !== 'string') {
-      throw new Error('Feature entry references/content must contain only strings');
+  try {
+    return FlattenedFeatureSchema.parse(value);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new Error('Feature entry failed shallow validation');
     }
 
-    content.push(reference);
+    throw error;
   }
-
-  return {
-    id: record.id.trim(),
-    type: record.type.trim(),
-    properties: record.properties as Record<string, unknown>,
-    content,
-    parent
-  };
 }
 
 /**
- * Build the raw JSONB payload persisted in submission_feature.data.
+ * Convert a flattened feature block into the persisted raw feature payload.
+ *
+ * This keeps DB payload naming consistent (`references`) even though the
+ * in-memory flattened block uses `content`.
+ *
+ * @param {IFlattenedBlock} block
+ * @returns {Record<string, unknown>}
  */
 export function buildFeatureDataPayload(block: IFlattenedBlock): Record<string, unknown> {
   return {
@@ -167,6 +175,13 @@ export function buildFeatureDataPayload(block: IFlattenedBlock): Record<string, 
  * Stream features from a TAR archive and emit fixed-size flattened batches.
  *
  * This is shallow validation only: shape checks needed to persist raw rows safely.
+ * Only entries under `features/*.json` are parsed.
+ *
+ * @param {Readable} inputStream - Tar archive stream.
+ * @param {number} batchSize - Max features per callback invocation.
+ * @param {(blocks: IFlattenedBlock[]) => Promise<void>} ingestFeatureBatch - Async sink for parsed feature batches.
+ * @returns {Promise<{ featureCount: number }>} Count of parsed feature objects.
+ * @throws {Error} When JSON parsing, shallow validation, or callback processing fails.
  */
 export async function streamFeatures(
   inputStream: Readable,
@@ -200,9 +215,7 @@ export async function streamFeatures(
         }
 
         const entryName = stripArchivePrefix(header.name);
-        const isFeatureJson =
-          (entryName.startsWith('features/') && entryName.endsWith('.json')) ||
-          (entryName.endsWith('.json') && !entryName.includes('/') && entryName !== 'dataset.json');
+        const isFeatureJson = entryName.startsWith('features/') && entryName.endsWith('.json');
 
         if (!isFeatureJson) {
           await drainStream(stream);
@@ -251,6 +264,13 @@ export async function streamFeatures(
 
 /**
  * Stream codesets from a TAR archive and emit each parsed file payload.
+ *
+ * Only `codes/*.json` file entries are parsed.
+ *
+ * @param {Readable} inputStream - Tar archive stream.
+ * @param {(codesets: TarCodesets) => Promise<void>} ingestCodesets - Async sink for each parsed codeset file.
+ * @returns {Promise<void>}
+ * @throws {Error} When JSON parsing, validation, or callback processing fails.
  */
 export async function streamCodesets(
   inputStream: Readable,
@@ -302,6 +322,17 @@ export async function streamCodesets(
 /**
  * Stream media files from a TAR archive to object storage.
  * Non-media entries are skipped.
+ *
+ * Only `files/*` file entries are uploaded. Uploads are processed serially.
+ * For each uploaded file, checksum and metadata are produced and optionally
+ * passed to `ingestMediaFile`.
+ *
+ * @param {Readable} inputStream - Tar archive stream.
+ * @param {ObjectStorageService} objectStorageService - Object storage client.
+ * @param {string} s3KeyPrefix - Prefix prepended to uploaded media object keys.
+ * @param {(uploadedFile: IUploadedMediaFile) => Promise<void>} [ingestMediaFile] - Optional callback after each upload.
+ * @returns {Promise<{ uploadedCount: number }>} Count of uploaded media files.
+ * @throws {Error} When stream processing, upload, or callback processing fails.
  */
 export async function streamMedia(
   inputStream: Readable,

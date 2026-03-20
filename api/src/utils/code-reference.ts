@@ -10,7 +10,7 @@ export interface CodeReference {
  * Accepted format: `code::<contributor-codeset-key>::<contributor-codeset-code-key>`.
  *
  * @param {string} value
- * @return {(CodeReference | null)}
+ * @return {( | null)}
  */
 export const parseCodeReference = (value: string): CodeReference | null => {
   const split = value.trim().split('::');

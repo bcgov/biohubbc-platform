@@ -3,13 +3,13 @@ import { Knex } from 'knex';
 /**
  * Consolidated migration for:
  * 1) remove policy-statement-condition DB trigger validation (moved to API)
- * 2) taxon feature property type
- * 3) feature_property_type renames:
- *    - datetime -> timestamp
- *    - spatial -> geometry
- * 4) upload_artifact role = codeset
- * 5) submission_feature_property_timestamp value split (date_value/time_value)
- * 6) removal of feature_property_type = array
+ * 2) add submission_upload.status for ingestion lifecycle
+ * 3) add upload_artifact.path for archive-relative artifact lookup
+ * 4) taxon feature property type
+ * 5) keep legacy feature_property_type names (datetime/spatial)
+ * 6) upload_artifact role = codeset
+ * 7) submission_feature_property_timestamp value split (date_value/time_value)
+ * 8) removal of feature_property_type = array
  *    - Re-map former array-typed properties to scalar types inferred from existing indexed values.
  */
 export async function up(knex: Knex): Promise<void> {
@@ -23,7 +23,50 @@ export async function up(knex: Knex): Promise<void> {
     DROP FUNCTION IF EXISTS biohub.tr_validate_policy_condition_key();
 
     --------------------------------------------------------------------------------
-    -- 2) Ensure feature_property_type = taxon exists
+    -- 2) Add submission_upload.status for ingestion job lifecycle
+    --------------------------------------------------------------------------------
+    CREATE TYPE submission_upload_job_status AS ENUM (
+      'pending',
+      'in_progress',
+      'succeeded',
+      'invalid',
+      'failed'
+    );
+
+    ALTER TABLE submission_upload
+      ADD COLUMN IF NOT EXISTS status submission_upload_job_status NOT NULL DEFAULT 'pending';
+
+    CREATE INDEX IF NOT EXISTS submission_upload_status_idx ON submission_upload(status);
+
+    COMMENT ON COLUMN submission_upload.status IS 'Background ingestion job lifecycle status for this upload attempt (pending, in_progress, succeeded, invalid, failed).';
+
+    --------------------------------------------------------------------------------
+    -- 3) Add upload_artifact.path for archive-extracted media tracking
+    --------------------------------------------------------------------------------
+    ALTER TABLE upload_artifact
+      ADD COLUMN IF NOT EXISTS path text;
+
+    ALTER TABLE upload_artifact
+      DROP CONSTRAINT IF EXISTS upload_artifact_archive_path_chk;
+
+    ALTER TABLE upload_artifact
+      ADD CONSTRAINT upload_artifact_archive_path_chk
+      CHECK (
+        path IS NULL
+        OR upload_archive_id IS NOT NULL
+      );
+
+    CREATE INDEX IF NOT EXISTS upload_artifact_path_idx
+      ON upload_artifact(path);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS upload_artifact_upload_path_uq
+      ON upload_artifact(upload_id, path)
+      WHERE path IS NOT NULL;
+
+    COMMENT ON COLUMN upload_artifact.path IS 'Normalized archive-relative path for extracted archive files. NULL for non-archive artifacts.';
+
+    --------------------------------------------------------------------------------
+    -- 4) Ensure feature_property_type = taxon exists
     --------------------------------------------------------------------------------
     INSERT INTO feature_property_type (name, description)
     SELECT 'taxon', 'A taxon reference type'
@@ -35,27 +78,17 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     --------------------------------------------------------------------------------
-    -- 3) Rename feature_property_type values to canonical names
-    --    datetime -> timestamp
-    --    spatial -> geometry
+    -- 5) Keep legacy feature_property_type names (datetime/spatial)
     --------------------------------------------------------------------------------
-    UPDATE feature_property_type
-    SET name = 'timestamp'
-    WHERE name = 'datetime'
-      AND record_end_date IS NULL;
-
-    UPDATE feature_property_type
-    SET name = 'geometry'
-    WHERE name = 'spatial'
-      AND record_end_date IS NULL;
+    -- No-op by design for this branch scope.
 
     --------------------------------------------------------------------------------
-    -- 4) Ensure upload_artifact_role supports codeset
+    -- 6) Ensure upload_artifact_role supports codeset
     --------------------------------------------------------------------------------
     ALTER TYPE upload_artifact_role ADD VALUE IF NOT EXISTS 'codeset';
 
     --------------------------------------------------------------------------------
-    -- 5) Split submission_feature_property_timestamp.value into date/time columns
+    -- 7) Split submission_feature_property_timestamp.value into date/time columns
     --------------------------------------------------------------------------------
     ALTER TABLE submission_feature_property_timestamp
       ADD COLUMN IF NOT EXISTS date_value date,
@@ -85,7 +118,7 @@ export async function up(knex: Knex): Promise<void> {
       DROP COLUMN IF EXISTS value;
 
     --------------------------------------------------------------------------------
-    -- 6) Array refactor: dynamic scalar type remap
+    -- 8) Array refactor: dynamic scalar type remap
     --------------------------------------------------------------------------------
     CREATE TEMP TABLE tmp_array_feature_properties (
       feature_property_id integer PRIMARY KEY
@@ -133,7 +166,7 @@ export async function up(knex: Knex): Promise<void> {
 
       UNION ALL
 
-      SELECT ftp.feature_property_id, 'timestamp'::text AS target_type_name, COUNT(*)::bigint AS hit_count
+      SELECT ftp.feature_property_id, 'datetime'::text AS target_type_name, COUNT(*)::bigint AS hit_count
       FROM feature_type_property ftp
       JOIN tmp_array_feature_properties ap
         ON ap.feature_property_id = ftp.feature_property_id
@@ -163,7 +196,7 @@ export async function up(knex: Knex): Promise<void> {
 
       UNION ALL
 
-      SELECT ftp.feature_property_id, 'geometry'::text AS target_type_name, COUNT(*)::bigint AS hit_count
+      SELECT ftp.feature_property_id, 'spatial'::text AS target_type_name, COUNT(*)::bigint AS hit_count
       FROM feature_type_property ftp
       JOIN tmp_array_feature_properties ap
         ON ap.feature_property_id = ftp.feature_property_id
@@ -284,22 +317,7 @@ export async function down(knex: Knex): Promise<void> {
       );
 
     --------------------------------------------------------------------------------
-    -- 2) Restore legacy feature_property_type names
-    --    timestamp -> datetime
-    --    geometry -> spatial
-    --------------------------------------------------------------------------------
-    UPDATE feature_property_type
-    SET name = 'datetime'
-    WHERE name = 'timestamp'
-      AND record_end_date IS NULL;
-
-    UPDATE feature_property_type
-    SET name = 'spatial'
-    WHERE name = 'geometry'
-      AND record_end_date IS NULL;
-
-    --------------------------------------------------------------------------------
-    -- 3) Restore single submission_feature_property_timestamp.value column
+    -- 2) Restore single submission_feature_property_timestamp.value column
     --------------------------------------------------------------------------------
     ALTER TABLE submission_feature_property_timestamp
       ADD COLUMN IF NOT EXISTS value timestamptz(6);
@@ -332,7 +350,7 @@ export async function down(knex: Knex): Promise<void> {
       DROP COLUMN IF EXISTS time_value;
 
     --------------------------------------------------------------------------------
-    -- 4) Remove upload_artifact_role value = codeset
+    -- 3) Remove upload_artifact_role value = codeset
     --------------------------------------------------------------------------------
     DO $$
     BEGIN
@@ -353,5 +371,24 @@ export async function down(knex: Knex): Promise<void> {
       USING role::text::upload_artifact_role;
 
     DROP TYPE upload_artifact_role_old;
+
+    --------------------------------------------------------------------------------
+    -- 4) Remove upload_artifact.path and submission_upload.status changes
+    --------------------------------------------------------------------------------
+    ALTER TABLE upload_artifact
+      DROP CONSTRAINT IF EXISTS upload_artifact_archive_path_chk;
+
+    DROP INDEX IF EXISTS upload_artifact_upload_path_uq;
+    DROP INDEX IF EXISTS upload_artifact_path_idx;
+
+    ALTER TABLE upload_artifact
+      DROP COLUMN IF EXISTS path;
+
+    DROP INDEX IF EXISTS submission_upload_status_idx;
+
+    ALTER TABLE submission_upload
+      DROP COLUMN IF EXISTS status;
+
+    DROP TYPE IF EXISTS submission_upload_job_status;
   `);
 }

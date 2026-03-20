@@ -5,8 +5,8 @@ export const FeaturePropertyTypeName = z.enum([
   'number',
   'boolean',
   'object',
-  'geometry',
-  'timestamp',
+  'spatial',
+  'datetime',
   'code',
   'taxon',
   'artifact_key'
