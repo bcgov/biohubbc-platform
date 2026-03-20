@@ -20,11 +20,11 @@ import {
   InsertNumberSearchableRecord,
   InsertSpatialSearchableRecord,
   InsertStringSearchableRecord,
-  ISearchFeaturesFilters,
   PendingCodeRecord,
   PendingTaxonRecord,
   PropertyRecordBuckets,
-  SearchFeatureResultWithRelevancy
+  SearchFeatureResultWithRelevancy,
+  SearchFeaturesFilters
 } from './search-feature-service.interface';
 import { SubmissionFeaturePropertyIndexService } from './submission-feature-property-index-service';
 
@@ -52,12 +52,12 @@ export class SearchFeatureService extends DBService {
    * Accepts multiple filter types (keywords, property filters, ITIS TSNs, property types)
    * and returns results matching all criteria with aggregated relevancy scores.
    *
-   * @param {ISearchFeaturesFilters} filters - Search filter criteria
+   * @param {SearchFeaturesFilters} filters - Search filter criteria
    * @param {ApiPaginationOptions} [pagination] - Optional pagination settings
    * @return {Promise<SearchFeatureResultWithRelevancy[]>} Array of features sorted by relevancy
    */
   async searchFeatures(
-    filters: ISearchFeaturesFilters,
+    filters: SearchFeaturesFilters,
     pagination?: ApiPaginationOptions
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     defaultLog.debug({ label: 'searchFeatures', filters, pagination });
@@ -69,10 +69,10 @@ export class SearchFeatureService extends DBService {
    * Accepts multiple filter types (keywords, property filters, ITIS TSNs, property types)
    * and returns the count of results matching all criteria.
    *
-   * @param {ISearchFeaturesFilters} filters - Search filter criteria
+   * @param {SearchFeaturesFilters} filters - Search filter criteria
    * @return {Promise<number>} Total count of matching features
    */
-  async getSearchFeaturesCount(filters: ISearchFeaturesFilters): Promise<number> {
+  async getSearchFeaturesCount(filters: SearchFeaturesFilters): Promise<number> {
     defaultLog.debug({ label: 'getSearchFeaturesCount', filters });
     return this.searchFeatureRepository.searchFeaturesByFiltersCount(filters);
   }
@@ -81,17 +81,17 @@ export class SearchFeatureService extends DBService {
    * Returns submission feature IDs matching the provided search filters.
    * Delegates to repository for the CTE-based query.
    *
-   * @param {ISearchFeaturesFilters} filters - Search filters (keyword, feature_types, species, properties)
+   * @param {SearchFeaturesFilters} filters - Search filters (keyword, feature_types, species, properties)
    * @returns {Promise<number[]>} Array of matching submission_feature_id values
    */
-  async getSearchFeatureIds(filters: ISearchFeaturesFilters): Promise<number[]> {
+  async getSearchFeatureIds(filters: SearchFeaturesFilters): Promise<number[]> {
     defaultLog.debug({ label: 'getSearchFeatureIds', filters });
     const rows = await this.searchFeatureRepository.searchFeatureIdsByFilters(filters);
     return rows.map((row) => row.submission_feature_id);
   }
 
   /**
-   * Creates search indexes for datetime, number, spatial and string properties belonging to
+   * Creates search indexes for timestamp, number, geometry and string properties belonging to
    * all features found for the given submission.
    *
    * Deletes existing search records first for idempotency - job retries and manual re-indexing
@@ -109,9 +109,9 @@ export class SearchFeatureService extends DBService {
     // Delete existing search records for idempotency (safe for retries and manual re-indexing)
     await this.searchFeatureRepository.deleteSearchRecordsBySubmissionId(submissionId);
 
-    const datetimeRecords: InsertDatetimeSearchableRecord[] = [];
+    const timestampRecords: InsertDatetimeSearchableRecord[] = [];
     const numberRecords: InsertNumberSearchableRecord[] = [];
-    const spatialRecords: InsertSpatialSearchableRecord[] = [];
+    const geometryRecords: InsertSpatialSearchableRecord[] = [];
     const stringRecords: InsertStringSearchableRecord[] = [];
 
     const submissionRepository = new SubmissionRepository(this.connection);
@@ -141,8 +141,8 @@ export class SearchFeatureService extends DBService {
         }
 
         switch (matchingFeatureProperty.feature_property_type_name) {
-          case 'datetime':
-            datetimeRecords.push({
+          case 'timestamp':
+            timestampRecords.push({
               submission_feature_id: currentFeature.submission_feature_id,
               feature_property_id: matchingFeatureProperty.feature_property_id,
               value: currentFeaturePropertyValue as string
@@ -157,8 +157,8 @@ export class SearchFeatureService extends DBService {
             });
             break;
 
-          case 'spatial':
-            spatialRecords.push({
+          case 'geometry':
+            geometryRecords.push({
               submission_feature_id: currentFeature.submission_feature_id,
               feature_property_id: matchingFeatureProperty.feature_property_id,
               value: currentFeaturePropertyValue as FeatureCollection
@@ -178,16 +178,16 @@ export class SearchFeatureService extends DBService {
 
     const promises: Promise<unknown>[] = [];
 
-    if (datetimeRecords.length) {
-      promises.push(this.searchFeatureRepository.insertSearchableDatetimeRecords(datetimeRecords));
+    if (timestampRecords.length) {
+      promises.push(this.searchFeatureRepository.insertSearchableDatetimeRecords(timestampRecords));
     }
 
     if (numberRecords.length) {
       promises.push(this.searchFeatureRepository.insertSearchableNumberRecords(numberRecords));
     }
 
-    if (spatialRecords.length) {
-      promises.push(this.searchFeatureRepository.insertSearchableSpatialRecords(spatialRecords));
+    if (geometryRecords.length) {
+      promises.push(this.searchFeatureRepository.insertSearchableSpatialRecords(geometryRecords));
     }
 
     if (stringRecords.length) {
@@ -450,7 +450,7 @@ export class SearchFeatureService extends DBService {
           propertyRecordBuckets
         );
         return;
-      case 'spatial':
+      case 'geometry':
         this.collectSpatialRecord(
           submissionId,
           feature,
@@ -676,7 +676,7 @@ export class SearchFeatureService extends DBService {
   }
 
   /**
-   * Validate, normalize, and collect a spatial property record.
+   * Validate, normalize, and collect a geometry property record.
    *
    * @private
    * @param {number} submissionId
@@ -696,7 +696,7 @@ export class SearchFeatureService extends DBService {
     propertyRecordBuckets: PropertyRecordBuckets
   ): void {
     if (typeof currentValue !== 'object' || currentValue === null) {
-      this.throwTypeMismatch(submissionId, feature.submission_feature_id, propertyName, 'spatial', currentValue);
+      this.throwTypeMismatch(submissionId, feature.submission_feature_id, propertyName, 'geometry', currentValue);
     }
 
     propertyRecordBuckets.geometryRecords.push({
@@ -707,7 +707,7 @@ export class SearchFeatureService extends DBService {
   }
 
   /**
-   * Normalize accepted spatial payload shapes to a GeoJSON Feature.
+   * Normalize accepted geometry payload shapes to a GeoJSON Feature.
    *
    * @private
    * @param {number} submissionId
@@ -735,9 +735,9 @@ export class SearchFeatureService extends DBService {
       };
     }
 
-    const spatialFeature = value as { type?: unknown; geometry?: unknown };
-    if (spatialFeature.type !== 'Feature' || !spatialFeature.geometry) {
-      throw new ApiExecuteSQLError('Invalid spatial value for geometry property', [
+    const geometryFeature = value as { type?: unknown; geometry?: unknown };
+    if (geometryFeature.type !== 'Feature' || !geometryFeature.geometry) {
+      throw new ApiExecuteSQLError('Invalid geometry value for geometry property', [
         'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
         {
           submissionId,

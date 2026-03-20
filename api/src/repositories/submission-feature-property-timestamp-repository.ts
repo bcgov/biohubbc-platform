@@ -2,8 +2,7 @@ import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import {
   CreateSubmissionFeaturePropertyTimestamp,
-  SubmissionFeaturePropertyTimestamp,
-  SubmissionFeaturePropertyTimestampSchema
+  SubmissionFeaturePropertyTimestamp
 } from '../models/submission-feature-property-timestamp';
 import { BaseRepository } from './base-repository';
 
@@ -29,7 +28,7 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
         'time_value'
       ]);
 
-    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestampSchema);
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestamp);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission_feature_property_timestamp', [
@@ -62,7 +61,7 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
       ])
       .where('submission_feature_property_timestamp_id', submissionFeaturePropertyTimestampId);
 
-    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestampSchema);
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestamp);
 
     if (response.rowCount === 0) {
       throw new ApiNotFoundError('submission_feature_property_timestamp not found', [
@@ -102,7 +101,7 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
       ])
       .where('submission_feature_id', submissionFeatureId);
 
-    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestampSchema);
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestamp);
 
     return response.rows;
   }
@@ -128,7 +127,7 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
       ])
       .where('feature_type_property_id', featureTypePropertyId);
 
-    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestampSchema);
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestamp);
 
     return response.rows;
   }

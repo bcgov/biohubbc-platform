@@ -128,14 +128,14 @@ export class ValidationService extends DBService {
             throwPropertyError(property);
           }
           break;
-        case 'spatial': {
+        case 'geometry': {
           const { success } = GeoJSONFeatureCollectionZodSchema.safeParse(dataProperty);
           if (!success) {
             throwPropertyError(property);
           }
           break;
         }
-        case 'datetime': {
+        case 'timestamp': {
           if (typeof dataProperty !== 'string') {
             throwPropertyError(property);
             break;

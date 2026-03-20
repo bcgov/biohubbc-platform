@@ -291,7 +291,7 @@ describe('ValidationService', () => {
           name: 'geometry',
           display_name: '',
           description: '',
-          type_name: 'spatial',
+          type_name: 'geometry',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -300,7 +300,7 @@ describe('ValidationService', () => {
           name: 'start_date',
           display_name: '',
           description: '',
-          type_name: 'datetime',
+          type_name: 'timestamp',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -380,7 +380,7 @@ describe('ValidationService', () => {
           name: 'geometry',
           display_name: '',
           description: '',
-          type_name: 'spatial',
+          type_name: 'geometry',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -389,7 +389,7 @@ describe('ValidationService', () => {
           name: 'start_date',
           display_name: '',
           description: '',
-          type_name: 'datetime',
+          type_name: 'timestamp',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -470,7 +470,7 @@ describe('ValidationService', () => {
           name: 'geometry',
           display_name: '',
           description: '',
-          type_name: 'spatial',
+          type_name: 'geometry',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -479,7 +479,7 @@ describe('ValidationService', () => {
           name: 'start_date',
           display_name: '',
           description: '',
-          type_name: 'datetime',
+          type_name: 'timestamp',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -560,7 +560,7 @@ describe('ValidationService', () => {
           name: 'geometry',
           display_name: '',
           description: '',
-          type_name: 'spatial',
+          type_name: 'geometry',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -569,7 +569,7 @@ describe('ValidationService', () => {
           name: 'start_date',
           display_name: '',
           description: '',
-          type_name: 'datetime',
+          type_name: 'timestamp',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -650,7 +650,7 @@ describe('ValidationService', () => {
           name: 'geometry',
           display_name: '',
           description: '',
-          type_name: 'spatial',
+          type_name: 'geometry',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -659,7 +659,7 @@ describe('ValidationService', () => {
           name: 'start_date',
           display_name: '',
           description: '',
-          type_name: 'datetime',
+          type_name: 'timestamp',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -740,7 +740,7 @@ describe('ValidationService', () => {
           name: 'geometry',
           display_name: '',
           description: '',
-          type_name: 'spatial',
+          type_name: 'geometry',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -749,7 +749,7 @@ describe('ValidationService', () => {
           name: 'start_date',
           display_name: '',
           description: '',
-          type_name: 'datetime',
+          type_name: 'timestamp',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -812,7 +812,7 @@ describe('ValidationService', () => {
       expect(response).to.be.true;
     });
 
-    it('should throw an error if a spatial property is the wrong type', () => {
+    it('should throw an error if a geometry property is the wrong type', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
@@ -856,7 +856,7 @@ describe('ValidationService', () => {
           name: 'geometry',
           display_name: '',
           description: '',
-          type_name: 'spatial',
+          type_name: 'geometry',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -865,7 +865,7 @@ describe('ValidationService', () => {
           name: 'start_date',
           display_name: '',
           description: '',
-          type_name: 'datetime',
+          type_name: 'timestamp',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -886,11 +886,11 @@ describe('ValidationService', () => {
       try {
         validationService.validateProperties(properties, dataProperties);
       } catch (error) {
-        expect((error as Error).message).to.equal('Property geometry is not of type spatial');
+        expect((error as Error).message).to.equal('Property geometry is not of type geometry');
       }
     });
 
-    it('should throw an error if a datetime property is the wrong type', () => {
+    it('should throw an error if a timestamp property is the wrong type', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
@@ -934,7 +934,7 @@ describe('ValidationService', () => {
           name: 'geometry',
           display_name: '',
           description: '',
-          type_name: 'spatial',
+          type_name: 'geometry',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -943,7 +943,7 @@ describe('ValidationService', () => {
           name: 'start_date',
           display_name: '',
           description: '',
-          type_name: 'datetime',
+          type_name: 'timestamp',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -976,11 +976,11 @@ describe('ValidationService', () => {
       try {
         validationService.validateProperties(properties, dataProperties);
       } catch (error) {
-        expect((error as Error).message).to.equal('Property start_date is not of type datetime');
+        expect((error as Error).message).to.equal('Property start_date is not of type timestamp');
       }
     });
 
-    it('should throw an error if a datetime property is not a valid date', () => {
+    it('should throw an error if a timestamp property is not a valid date', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
@@ -1024,7 +1024,7 @@ describe('ValidationService', () => {
           name: 'geometry',
           display_name: '',
           description: '',
-          type_name: 'spatial',
+          type_name: 'geometry',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -1033,7 +1033,7 @@ describe('ValidationService', () => {
           name: 'start_date',
           display_name: '',
           description: '',
-          type_name: 'datetime',
+          type_name: 'timestamp',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -1123,7 +1123,7 @@ describe('ValidationService', () => {
           name: 'geometry',
           display_name: '',
           description: '',
-          type_name: 'spatial',
+          type_name: 'geometry',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -1132,7 +1132,7 @@ describe('ValidationService', () => {
           name: 'start_date',
           display_name: '',
           description: '',
-          type_name: 'datetime',
+          type_name: 'timestamp',
           allow_multiple: false,
           required_value: true,
           calculated_value: false

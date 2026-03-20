@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SearchFeatureFiltersSchema } from '../services/search-feature-service.interface';
+import { SearchFeatureFilters } from '../services/search-feature-service.interface';
 import { DownloadStatusZod } from './download-status';
 
 export const DownloadRecord = z.object({
@@ -79,7 +79,7 @@ export interface DownloadSizeEstimate {
  */
 export const CreateDownload = z.object({
   fragmentSizeBytes: z.number().optional(),
-  filters: SearchFeatureFiltersSchema.optional()
+  filters: SearchFeatureFilters.optional()
 });
 export type CreateDownload = z.infer<typeof CreateDownload>;
 
@@ -93,7 +93,7 @@ export type CreateDownload = z.infer<typeof CreateDownload>;
 export const CreateDownloadRequest = z.object({
   submissionFeatureIds: z.array(z.number()),
   fragmentSizeMb: z.number().optional(),
-  filters: SearchFeatureFiltersSchema.optional()
+  filters: SearchFeatureFilters.optional()
 });
 export type CreateDownloadRequest = z.infer<typeof CreateDownloadRequest>;
 

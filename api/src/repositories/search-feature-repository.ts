@@ -11,10 +11,10 @@ import {
   InsertStringSearchableRecord,
   ISearchFeaturePropertyCondition,
   ISearchFeaturePropertyGroup,
-  ISearchFeaturesFilters,
   NumberSearchableRecord,
   SearchComparisonOperator,
   SearchFeatureResultWithRelevancy,
+  SearchFeaturesFilters,
   SpatialSearchableRecord,
   StringSearchableRecord
 } from '../services/search-feature-service.interface';
@@ -149,12 +149,12 @@ export class SearchFeatureRepository extends BaseRepository {
 
   /**
    * Searches for submission features matching the provided filters with relevancy scoring.
-   * @param {ISearchFeaturesFilters} filters - Search filters including keyword, feature types, species, and property conditions
+   * @param {SearchFeaturesFilters} filters - Search filters including keyword, feature types, species, and property conditions
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options (page, limit, sort, and order)
    * @returns {Promise<SearchFeatureResultWithRelevancy[]>} Promise resolving to array of matching features with relevancy scores
    */
   async searchFeaturesByFilters(
-    filters: ISearchFeaturesFilters,
+    filters: SearchFeaturesFilters,
     pagination?: ApiPaginationOptions
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     defaultLog.debug({ label: 'searchFeaturesByFilters', filters, pagination });
@@ -177,10 +177,10 @@ export class SearchFeatureRepository extends BaseRepository {
 
   /**
    * Gets the count of features matching the provided search criteria.
-   * @param {ISearchFeaturesFilters} filters - Search filters to count results for
+   * @param {SearchFeaturesFilters} filters - Search filters to count results for
    * @returns {Promise<number>} Promise resolving to the count of matching features
    */
-  async searchFeaturesByFiltersCount(filters: ISearchFeaturesFilters): Promise<number> {
+  async searchFeaturesByFiltersCount(filters: SearchFeaturesFilters): Promise<number> {
     defaultLog.debug({ label: 'searchFeaturesByFiltersCount', filters });
     const knex = getKnex();
     const query = this.buildSearchQuery(knex, filters);
@@ -195,10 +195,10 @@ export class SearchFeatureRepository extends BaseRepository {
    * Used by POST /api/download to resolve filter criteria into the canonical set of
    * feature IDs for the download pipeline. No pagination — returns ALL matching IDs.
    *
-   * @param {ISearchFeaturesFilters} filters - Search filters (keyword, feature_types, species, properties)
+   * @param {SearchFeaturesFilters} filters - Search filters (keyword, feature_types, species, properties)
    * @returns {Promise<{ submission_feature_id: number }[]>} Raw rows with submission_feature_id
    */
-  async searchFeatureIdsByFilters(filters: ISearchFeaturesFilters): Promise<{ submission_feature_id: number }[]> {
+  async searchFeatureIdsByFilters(filters: SearchFeaturesFilters): Promise<{ submission_feature_id: number }[]> {
     defaultLog.debug({ label: 'searchFeatureIdsByFilters', filters });
 
     if (!filters || Object.keys(filters).length === 0) {
@@ -216,10 +216,10 @@ export class SearchFeatureRepository extends BaseRepository {
   /**
    * Builds the search query combining all filter types and CTEs.
    * @param {Knex} knex - Knex instance
-   * @param {ISearchFeaturesFilters} filters - Search filters to apply
+   * @param {SearchFeaturesFilters} filters - Search filters to apply
    * @returns {Knex.QueryBuilder} Knex query builder with all filters applied
    */
-  private buildSearchQuery(knex: Knex, filters: ISearchFeaturesFilters): Knex.QueryBuilder {
+  private buildSearchQuery(knex: Knex, filters: SearchFeaturesFilters): Knex.QueryBuilder {
     const keyword = filters.keyword ?? '';
     const featureTypes = filters.feature_types ?? [];
     const speciesFilters = filters.species ?? [];

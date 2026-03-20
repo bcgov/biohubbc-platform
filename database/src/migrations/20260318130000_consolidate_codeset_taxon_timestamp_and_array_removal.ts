@@ -3,15 +3,16 @@ import { Knex } from 'knex';
 /**
  * Consolidated migration for:
  * 1) taxon feature property type
- * 2) upload_artifact role = codeset
- * 3) submission_feature_property_timestamp value split (date_value/time_value)
- * 4) removal of feature_property_type = array
+ * 2) feature_property_type renames:
+ *    - datetime -> timestamp
+ *    - spatial -> geometry
+ * 3) upload_artifact role = codeset
+ * 4) submission_feature_property_timestamp value split (date_value/time_value)
+ * 5) removal of feature_property_type = array
  *
  * Array removal compatibility strategy:
  * - Preserve existing multi-value behavior by setting feature_type_property.allow_multiple = true.
- * - Re-map former array-typed properties to scalar types:
- *   - focal_species, associated_species -> taxon
- *   - all others -> string
+ * - Re-map former array-typed properties to scalar types inferred from existing indexed values.
  */
 export async function up(knex: Knex): Promise<void> {
   await knex.raw(`--sql
@@ -30,12 +31,27 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     --------------------------------------------------------------------------------
-    -- 2) Ensure upload_artifact_role supports codeset
+    -- 2) Rename feature_property_type values to canonical names
+    --    datetime -> timestamp
+    --    spatial -> geometry
+    --------------------------------------------------------------------------------
+    UPDATE feature_property_type
+    SET name = 'timestamp'
+    WHERE name = 'datetime'
+      AND record_end_date IS NULL;
+
+    UPDATE feature_property_type
+    SET name = 'geometry'
+    WHERE name = 'spatial'
+      AND record_end_date IS NULL;
+
+    --------------------------------------------------------------------------------
+    -- 3) Ensure upload_artifact_role supports codeset
     --------------------------------------------------------------------------------
     ALTER TYPE upload_artifact_role ADD VALUE IF NOT EXISTS 'codeset';
 
     --------------------------------------------------------------------------------
-    -- 3) Split submission_feature_property_timestamp.value into date/time columns
+    -- 4) Split submission_feature_property_timestamp.value into date/time columns
     --------------------------------------------------------------------------------
     ALTER TABLE submission_feature_property_timestamp
       ADD COLUMN IF NOT EXISTS date_value date,
@@ -65,7 +81,7 @@ export async function up(knex: Knex): Promise<void> {
       DROP COLUMN IF EXISTS value;
 
     --------------------------------------------------------------------------------
-    -- 4) Array refactor: explicit remap + multiplicity update (no generic fallback)
+    -- 5) Array refactor: dynamic remap + multiplicity update
     --------------------------------------------------------------------------------
     CREATE TEMP TABLE tmp_array_feature_properties (
       feature_property_id integer PRIMARY KEY
@@ -149,7 +165,7 @@ export async function up(knex: Knex): Promise<void> {
 
       UNION ALL
 
-      SELECT ftp.feature_property_id, 'spatial'::text AS target_type_name, COUNT(*)::bigint AS hit_count
+      SELECT ftp.feature_property_id, 'geometry'::text AS target_type_name, COUNT(*)::bigint AS hit_count
       FROM feature_type_property ftp
       JOIN tmp_array_feature_properties ap
         ON ap.feature_property_id = ftp.feature_property_id
@@ -197,23 +213,14 @@ export async function up(knex: Knex): Promise<void> {
     WHERE fp.feature_property_id = target_type_ids.feature_property_id
       AND fp.feature_property_id IN (SELECT feature_property_id FROM tmp_array_feature_properties);
 
-    -- Soft-retire feature_property_type='array' once no rows reference it.
-    WITH array_type AS (
-      SELECT feature_property_type_id
-      FROM feature_property_type
-      WHERE name = 'array'
-        AND record_end_date IS NULL
-      LIMIT 1
-    )
-    UPDATE feature_property_type fpt
-    SET record_end_date = NOW(),
-        update_date = NOW()
-    FROM array_type a
-    WHERE fpt.feature_property_type_id = a.feature_property_type_id
+    -- Hard-delete feature_property_type='array' once no rows reference it.
+    DELETE FROM feature_property_type
+    WHERE name = 'array'
+      AND record_end_date IS NULL
       AND NOT EXISTS (
         SELECT 1
         FROM feature_property fp
-        WHERE fp.feature_property_type_id = fpt.feature_property_type_id
+        WHERE fp.feature_property_type_id = feature_property_type.feature_property_type_id
       );
   `);
 }
@@ -279,7 +286,22 @@ export async function down(knex: Knex): Promise<void> {
       );
 
     --------------------------------------------------------------------------------
-    -- 2) Restore single submission_feature_property_timestamp.value column
+    -- 2) Restore legacy feature_property_type names
+    --    timestamp -> datetime
+    --    geometry -> spatial
+    --------------------------------------------------------------------------------
+    UPDATE feature_property_type
+    SET name = 'datetime'
+    WHERE name = 'timestamp'
+      AND record_end_date IS NULL;
+
+    UPDATE feature_property_type
+    SET name = 'spatial'
+    WHERE name = 'geometry'
+      AND record_end_date IS NULL;
+
+    --------------------------------------------------------------------------------
+    -- 3) Restore single submission_feature_property_timestamp.value column
     --------------------------------------------------------------------------------
     ALTER TABLE submission_feature_property_timestamp
       ADD COLUMN IF NOT EXISTS value timestamptz(6);
@@ -312,7 +334,7 @@ export async function down(knex: Knex): Promise<void> {
       DROP COLUMN IF EXISTS time_value;
 
     --------------------------------------------------------------------------------
-    -- 3) Remove upload_artifact_role value = codeset
+    -- 4) Remove upload_artifact_role value = codeset
     --------------------------------------------------------------------------------
     DO $$
     BEGIN

@@ -57,7 +57,7 @@ describe('FeatureIngestionService', () => {
           name: 'start_date',
           display_name: 'Start Date',
           description: '',
-          type_name: 'datetime',
+          type_name: 'timestamp',
           allow_multiple: false,
           required_value: true,
           calculated_value: false
@@ -418,7 +418,7 @@ describe('FeatureIngestionService', () => {
             name: 'start_date',
             display_name: 'Start Date',
             description: '',
-            type_name: 'datetime',
+            type_name: 'timestamp',
             allow_multiple: false,
             required_value: true,
             calculated_value: false
