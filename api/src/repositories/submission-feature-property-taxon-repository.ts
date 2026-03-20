@@ -9,6 +9,42 @@ import { BaseRepository } from './base-repository';
 
 export class SubmissionFeaturePropertyTaxonRepository extends BaseRepository {
   /**
+   * Insert multiple submission_feature_property_taxon rows.
+   *
+   * @param {CreateSubmissionFeaturePropertyTaxon[]} payloads
+   * @return {Promise<SubmissionFeaturePropertyTaxon[]>}
+   * @memberof SubmissionFeaturePropertyTaxonRepository
+   */
+  async insertSubmissionFeaturePropertyTaxons(
+    payloads: CreateSubmissionFeaturePropertyTaxon[]
+  ): Promise<SubmissionFeaturePropertyTaxon[]> {
+    if (!payloads.length) {
+      return [];
+    }
+
+    const knex = getKnex();
+    const query = knex('submission_feature_property_taxon')
+      .insert(payloads)
+      .returning([
+        'submission_feature_property_taxon_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'taxon_id'
+      ]);
+
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyTaxonSchema);
+
+    if (response.rowCount !== payloads.length) {
+      throw new ApiExecuteSQLError('Failed to insert submission_feature_property_taxon rows', [
+        'SubmissionFeaturePropertyTaxonRepository->insertSubmissionFeaturePropertyTaxons',
+        `rowCount was ${response.rowCount}, expected ${payloads.length}`
+      ]);
+    }
+
+    return response.rows;
+  }
+
+  /**
    * Insert a submission_feature_property_taxon row.
    *
    * @param {CreateSubmissionFeaturePropertyTaxon} payload
@@ -112,5 +148,43 @@ export class SubmissionFeaturePropertyTaxonRepository extends BaseRepository {
     const response = await this.connection.knex(query, SubmissionFeaturePropertyTaxonSchema);
 
     return response.rows;
+  }
+
+  /**
+   * Delete submission_feature_property_taxon rows for a submission.
+   *
+   * @param {number} submissionId
+   * @return {Promise<void>}
+   * @memberof SubmissionFeaturePropertyTaxonRepository
+   */
+  async deleteSubmissionFeaturePropertyTaxonsBySubmissionId(submissionId: number): Promise<void> {
+    const knex = getKnex();
+    const query = knex('submission_feature_property_taxon')
+      .whereIn(
+        'submission_feature_id',
+        knex('submission_feature').select('submission_feature_id').where('submission_id', submissionId)
+      )
+      .delete();
+
+    await this.connection.knex(query);
+  }
+
+  /**
+   * Delete submission_feature_property_taxon rows for a submission upload.
+   *
+   * @param {string} submissionUploadId
+   * @return {Promise<void>}
+   * @memberof SubmissionFeaturePropertyTaxonRepository
+   */
+  async deleteSubmissionFeaturePropertyTaxonsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const knex = getKnex();
+    const query = knex('submission_feature_property_taxon')
+      .whereIn(
+        'submission_feature_id',
+        knex('submission_feature').select('submission_feature_id').where('submission_upload_id', submissionUploadId)
+      )
+      .delete();
+
+    await this.connection.knex(query);
   }
 }

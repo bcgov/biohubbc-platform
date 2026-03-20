@@ -36,34 +36,42 @@ describe('FeatureIngestionService', () => {
       featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
       properties: [
         {
+          feature_type_property_id: 1,
           name: 'name',
           display_name: 'Name',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
         {
+          feature_type_property_id: 2,
           name: 'focal_species',
           display_name: 'Focal Species',
           description: '',
           type_name: 'array',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
         {
+          feature_type_property_id: 3,
           name: 'start_date',
           display_name: 'Start Date',
           description: '',
           type_name: 'datetime',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
         {
+          feature_type_property_id: 4,
           name: 'description',
           display_name: 'Description',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: false,
           calculated_value: false
         }
@@ -393,42 +401,52 @@ describe('FeatureIngestionService', () => {
         featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
         properties: [
           {
+            feature_type_property_id: 1,
             name: 'name',
             display_name: 'Name',
             description: '',
             type_name: 'string',
+            allow_multiple: false,
             required_value: true,
             calculated_value: false
           },
           {
+            feature_type_property_id: 2,
             name: 'focal_species',
             display_name: 'Focal Species',
             description: '',
             type_name: 'array',
+            allow_multiple: false,
             required_value: true,
             calculated_value: false
           },
           {
+            feature_type_property_id: 3,
             name: 'start_date',
             display_name: 'Start Date',
             description: '',
             type_name: 'datetime',
+            allow_multiple: false,
             required_value: true,
             calculated_value: false
           },
           {
+            feature_type_property_id: 4,
             name: 'description',
             display_name: 'Description',
             description: '',
             type_name: 'string',
+            allow_multiple: false,
             required_value: false,
             calculated_value: false
           },
           {
+            feature_type_property_id: 5,
             name: 'count',
             display_name: 'Count',
             description: '',
             type_name: 'number',
+            allow_multiple: false,
             required_value: false,
             calculated_value: false
           }

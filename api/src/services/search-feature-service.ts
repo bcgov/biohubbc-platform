@@ -128,7 +128,7 @@ export class SearchFeatureService extends DBService {
         }
 
         switch (matchingFeatureProperty.feature_property_type_name) {
-          case 'datetime':
+          case 'timestamp':
             datetimeRecords.push({
               submission_feature_id: currentFeature.submission_feature_id,
               feature_property_id: matchingFeatureProperty.feature_property_id,
@@ -144,7 +144,7 @@ export class SearchFeatureService extends DBService {
             });
             break;
 
-          case 'spatial':
+          case 'geometry':
             spatialRecords.push({
               submission_feature_id: currentFeature.submission_feature_id,
               feature_property_id: matchingFeatureProperty.feature_property_id,

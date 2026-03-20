@@ -5,7 +5,7 @@ import { PassThrough, Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import * as tar from 'tar-stream';
 import { ZodError, z } from 'zod';
-import { CreateSubmissionFeature, IFlattenedBlock } from '../models/submission-feature';
+import { IFlattenedBlock } from '../models/submission-feature';
 import {
   TarCodesets
 } from '../services/ingestion/submission-ingestion-codes-service.interface';
@@ -20,6 +20,9 @@ import { IUploadedMediaFile } from './biohub-tar-parser.interface';
  *   `6b916891-22d5-4c63-a972-33261b1f7c6b/files/photo.jpg`
  *
  * This normalizes entry names so the parser works with both flat and prefixed archives.
+ *
+ * @param {string} entryName
+ * @returns {string}
  */
 function stripArchivePrefix(entryName: string): string {
   const slashIndex = entryName.indexOf('/');
@@ -37,6 +40,9 @@ function stripArchivePrefix(entryName: string): string {
 
 /**
  * Collect all data from a stream into a single Buffer.
+ *
+ * @param {Readable} stream
+ * @returns {Promise<Buffer>}
  */
 function streamToBuffer(stream: Readable): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -49,6 +55,9 @@ function streamToBuffer(stream: Readable): Promise<Buffer> {
 
 /**
  * Drain a stream without buffering its content.
+ *
+ * @param {Readable} stream
+ * @returns {Promise<void>}
  */
 function drainStream(stream: Readable): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -59,13 +68,14 @@ function drainStream(stream: Readable): Promise<void> {
 }
 
 /**
- * Parse and shallow-validate one codeset JSON entry from the tarball.
+ * Extract and shallow-validate codeset payload data from a parsed tarball JSON entry.
  *
- * Supports both accepted payload shapes:
- * - Root object is the codesets map
- * - Root object contains a `categories` property with the codesets map
+ * Supports both payload shapes:
+ * - direct codeset map at root
+ * - wrapped payload with `categories` root property
  *
- * Throws a generic shallow-validation error message for schema failures.
+ * @param {unknown} value
+ * @returns {TarCodesets}
  */
 function extractCodesetsFromTarballEntry(value: unknown): TarCodesets {
   const parsedRoot = z.record(z.string(), z.unknown()).parse(value);
@@ -86,6 +96,9 @@ function extractCodesetsFromTarballEntry(value: unknown): TarCodesets {
 
 /**
  * Parse a single unknown JSON value into a shallow-validated flattened feature block.
+ *
+ * @param {unknown} value
+ * @returns {IFlattenedBlock}
  */
 function extractFeatureFromTarballEntry(value: unknown): IFlattenedBlock {
   if (typeof value !== 'object' || value === null) {
@@ -140,7 +153,7 @@ function extractFeatureFromTarballEntry(value: unknown): IFlattenedBlock {
 /**
  * Build the raw JSONB payload persisted in submission_feature.data.
  */
-export function buildFeatureDataPayload(block: IFlattenedBlock): CreateSubmissionFeature {
+export function buildFeatureDataPayload(block: IFlattenedBlock): Record<string, unknown> {
   return {
     id: block.id,
     type: block.type,

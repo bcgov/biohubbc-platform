@@ -4,6 +4,7 @@ import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
+import { CodesetIngestionService } from './codeset-ingestion-service';
 import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
 import { IValidationResult } from './submission-ingestion-service.interface';
 import { MediaIngestionService } from './media-ingestion-service';
@@ -20,6 +21,7 @@ const FEATURE_INSERT_BATCH_SIZE = 10000;
 export class SubmissionIngestionService extends DBService {
   featureIngestionService = new SubmissionFeatureIngestionService(this.connection);
   mediaIngestionService = new MediaIngestionService(this.connection);
+  codesetIngestionService = new CodesetIngestionService(this.connection);
   uploadArchiveService = new UploadArchiveService(this.connection);
   artifactService = new ArtifactService(this.connection);
   objectStorageService = new ObjectStorageService();
@@ -60,6 +62,7 @@ export class SubmissionIngestionService extends DBService {
       uploadId,
       uploadArchiveId
     );
+    await this.codesetIngestionService.ingestCodesets(objectKey, submissionUploadId);
     await this.ingestFeatures(objectKey, submissionId, submissionUploadId);
 
     return { valid: true, errors: [] };

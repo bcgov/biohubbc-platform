@@ -1,5 +1,5 @@
 import { IDBConnection } from '../../database/db';
-import { IFlattenedBlock } from '../../models/submission-feature';
+import { CreateSubmissionFeature, IFlattenedBlock } from '../../models/submission-feature';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { buildFeatureDataPayload } from '../../utils/biohub-tar-parser';
 import { DBService } from '../db-service';
@@ -15,6 +15,11 @@ import { DBService } from '../db-service';
 export class SubmissionFeatureIngestionService extends DBService {
   ingestionRepository: FeatureIngestionRepository;
 
+  /**
+   * Creates an instance of SubmissionFeatureIngestionService.
+   *
+   * @param {IDBConnection} connection
+   */
   constructor(connection: IDBConnection) {
     super(connection);
     this.ingestionRepository = new FeatureIngestionRepository(connection);
@@ -47,7 +52,7 @@ export class SubmissionFeatureIngestionService extends DBService {
         submissionUploadId,
         sourceId: feature.id,
         featureTypeName: feature.type,
-        data: featureData,
+        data: featureData as CreateSubmissionFeature,
         dataByteSize: Buffer.byteLength(JSON.stringify(featureData))
       };
     });

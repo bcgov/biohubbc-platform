@@ -185,18 +185,22 @@ describe('FeatureIngestionRepository', () => {
           display_name: 'Dataset',
           properties: [
             {
+              feature_type_property_id: 11,
               name: 'name',
               display_name: 'Name',
               description: 'The name of the dataset',
               type_name: 'string',
+              allow_multiple: false,
               required_value: true,
               calculated_value: false
             },
             {
+              feature_type_property_id: 12,
               name: 'description',
               display_name: 'Description',
               description: 'The description of the dataset',
               type_name: 'string',
+              allow_multiple: false,
               required_value: false,
               calculated_value: false
             }
@@ -226,18 +230,22 @@ describe('FeatureIngestionRepository', () => {
         },
         properties: [
           {
+            feature_type_property_id: 11,
             name: 'name',
             display_name: 'Name',
             description: 'The name of the dataset',
             type_name: 'string',
+            allow_multiple: false,
             required_value: true,
             calculated_value: false
           },
           {
+            feature_type_property_id: 12,
             name: 'description',
             display_name: 'Description',
             description: 'The description of the dataset',
             type_name: 'string',
+            allow_multiple: false,
             required_value: false,
             calculated_value: false
           }

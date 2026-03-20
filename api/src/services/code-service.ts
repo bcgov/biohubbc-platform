@@ -1,11 +1,7 @@
 import { IDBConnection } from '../database/db';
-import {
-  CodeRepository,
-  FeaturePropertyCode,
-  FeatureTypeCode,
-  FeatureTypeWithFeaturePropertiesCode,
-  IAllCodeSets
-} from '../repositories/code-repository';
+import { IAllCodeSets } from '../models/codes';
+import { FeaturePropertyCode, FeatureTypeCode, FeatureTypeWithFeaturePropertiesCode } from '../models/feature-property';
+import { CodeRepository } from '../repositories/code-repository';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
 

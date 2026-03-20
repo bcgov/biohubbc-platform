@@ -2,12 +2,53 @@ import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import {
   CreateSubmissionFeaturePropertyGeometry,
-  SubmissionFeaturePropertyGeometry,
-  SubmissionFeaturePropertyGeometrySchema
+  SubmissionFeaturePropertyGeometry
 } from '../models/submission-feature-property-geometry';
+import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
 export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository {
+  /**
+   * Insert multiple submission_feature_property_geometry rows.
+   *
+   * @param {CreateSubmissionFeaturePropertyGeometry[]} payloads
+   * @return {Promise<SubmissionFeaturePropertyGeometry[]>}
+   * @memberof SubmissionFeaturePropertyGeometryRepository
+   */
+  async insertSubmissionFeaturePropertyGeometries(
+    payloads: CreateSubmissionFeaturePropertyGeometry[]
+  ): Promise<SubmissionFeaturePropertyGeometry[]> {
+    if (!payloads.length) {
+      return [];
+    }
+
+    const query = SQL`INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, value) VALUES`;
+
+    payloads.forEach((payload, index) => {
+      query.append(SQL`(${payload.submission_feature_id}, ${payload.feature_type_property_id},`);
+      query.append(generateGeometryCollectionSQL(payload.value));
+      query.append(SQL`)`);
+      if (index < payloads.length - 1) {
+        query.append(SQL`,`);
+      }
+    });
+
+    query.append(
+      SQL` RETURNING submission_feature_property_geometry_id, submission_feature_id, feature_type_property_id, ST_AsGeoJSON(value)::json AS value`
+    );
+
+    const response = await this.connection.sql(query, SubmissionFeaturePropertyGeometry);
+
+    if (response.rowCount !== payloads.length) {
+      throw new ApiExecuteSQLError('Failed to insert submission_feature_property_geometry rows', [
+        'SubmissionFeaturePropertyGeometryRepository->insertSubmissionFeaturePropertyGeometries',
+        `rowCount was ${response.rowCount}, expected ${payloads.length}`
+      ]);
+    }
+
+    return response.rows;
+  }
+
   /**
    * Insert a submission_feature_property_geometry row.
    *
@@ -35,7 +76,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
         ST_AsGeoJSON(value)::json AS value;
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometrySchema);
+    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometry);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission_feature_property_geometry', [
@@ -67,7 +108,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
       WHERE submission_feature_property_geometry_id = ${submissionFeaturePropertyGeometryId};
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometrySchema);
+    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometry);
 
     if (response.rowCount === 0) {
       throw new ApiNotFoundError('submission_feature_property_geometry not found', [
@@ -106,7 +147,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
       WHERE submission_feature_id = ${submissionFeatureId};
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometrySchema);
+    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometry);
 
     return response.rows;
   }
@@ -131,8 +172,48 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
       WHERE feature_type_property_id = ${featureTypePropertyId};
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometrySchema);
+    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometry);
 
     return response.rows;
+  }
+
+  /**
+   * Delete submission_feature_property_geometry rows for a submission.
+   *
+   * @param {number} submissionId
+   * @return {Promise<void>}
+   * @memberof SubmissionFeaturePropertyGeometryRepository
+   */
+  async deleteSubmissionFeaturePropertyGeometriesBySubmissionId(submissionId: number): Promise<void> {
+    const sqlStatement = SQL`
+      DELETE FROM submission_feature_property_geometry
+      WHERE submission_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_id = ${submissionId}
+      );
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Delete submission_feature_property_geometry rows for a submission upload.
+   *
+   * @param {string} submissionUploadId
+   * @return {Promise<void>}
+   * @memberof SubmissionFeaturePropertyGeometryRepository
+   */
+  async deleteSubmissionFeaturePropertyGeometriesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      DELETE FROM submission_feature_property_geometry
+      WHERE submission_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      );
+    `;
+
+    await this.connection.sql(sqlStatement);
   }
 }

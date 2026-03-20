@@ -2,12 +2,48 @@ import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import {
   CreateSubmissionFeaturePropertyTimestamp,
-  SubmissionFeaturePropertyTimestamp,
-  SubmissionFeaturePropertyTimestampSchema
+  SubmissionFeaturePropertyTimestamp
 } from '../models/submission-feature-property-timestamp';
 import { BaseRepository } from './base-repository';
 
 export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository {
+  /**
+   * Insert multiple submission_feature_property_timestamp rows.
+   *
+   * @param {CreateSubmissionFeaturePropertyTimestamp[]} payloads
+   * @return {Promise<SubmissionFeaturePropertyTimestamp[]>}
+   * @memberof SubmissionFeaturePropertyTimestampRepository
+   */
+  async insertSubmissionFeaturePropertyTimestamps(
+    payloads: CreateSubmissionFeaturePropertyTimestamp[]
+  ): Promise<SubmissionFeaturePropertyTimestamp[]> {
+    if (!payloads.length) {
+      return [];
+    }
+
+    const knex = getKnex();
+    const query = knex('submission_feature_property_timestamp')
+      .insert(payloads)
+      .returning([
+        'submission_feature_property_timestamp_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'date_value',
+        'time_value'
+      ]);
+
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestamp);
+
+    if (response.rowCount !== payloads.length) {
+      throw new ApiExecuteSQLError('Failed to insert submission_feature_property_timestamp rows', [
+        'SubmissionFeaturePropertyTimestampRepository->insertSubmissionFeaturePropertyTimestamps',
+        `rowCount was ${response.rowCount}, expected ${payloads.length}`
+      ]);
+    }
+
+    return response.rows;
+  }
+
   /**
    * Insert a submission_feature_property_timestamp row.
    *
@@ -25,10 +61,11 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
         'submission_feature_property_timestamp_id',
         'submission_feature_id',
         'feature_type_property_id',
-        'value'
+        'date_value',
+        'time_value'
       ]);
 
-    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestampSchema);
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestamp);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission_feature_property_timestamp', [
@@ -56,11 +93,12 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
         'submission_feature_property_timestamp_id',
         'submission_feature_id',
         'feature_type_property_id',
-        'value'
+        'date_value',
+        'time_value'
       ])
       .where('submission_feature_property_timestamp_id', submissionFeaturePropertyTimestampId);
 
-    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestampSchema);
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestamp);
 
     if (response.rowCount === 0) {
       throw new ApiNotFoundError('submission_feature_property_timestamp not found', [
@@ -95,11 +133,12 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
         'submission_feature_property_timestamp_id',
         'submission_feature_id',
         'feature_type_property_id',
-        'value'
+        'date_value',
+        'time_value'
       ])
       .where('submission_feature_id', submissionFeatureId);
 
-    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestampSchema);
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestamp);
 
     return response.rows;
   }
@@ -120,12 +159,51 @@ export class SubmissionFeaturePropertyTimestampRepository extends BaseRepository
         'submission_feature_property_timestamp_id',
         'submission_feature_id',
         'feature_type_property_id',
-        'value'
+        'date_value',
+        'time_value'
       ])
       .where('feature_type_property_id', featureTypePropertyId);
 
-    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestampSchema);
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestamp);
 
     return response.rows;
+  }
+
+  /**
+   * Delete submission_feature_property_timestamp rows for a submission.
+   *
+   * @param {number} submissionId
+   * @return {Promise<void>}
+   * @memberof SubmissionFeaturePropertyTimestampRepository
+   */
+  async deleteSubmissionFeaturePropertyTimestampsBySubmissionId(submissionId: number): Promise<void> {
+    const knex = getKnex();
+    const query = knex('submission_feature_property_timestamp')
+      .whereIn(
+        'submission_feature_id',
+        knex('submission_feature').select('submission_feature_id').where('submission_id', submissionId)
+      )
+      .delete();
+
+    await this.connection.knex(query);
+  }
+
+  /**
+   * Delete submission_feature_property_timestamp rows for a submission upload.
+   *
+   * @param {string} submissionUploadId
+   * @return {Promise<void>}
+   * @memberof SubmissionFeaturePropertyTimestampRepository
+   */
+  async deleteSubmissionFeaturePropertyTimestampsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const knex = getKnex();
+    const query = knex('submission_feature_property_timestamp')
+      .whereIn(
+        'submission_feature_id',
+        knex('submission_feature').select('submission_feature_id').where('submission_upload_id', submissionUploadId)
+      )
+      .delete();
+
+    await this.connection.knex(query);
   }
 }

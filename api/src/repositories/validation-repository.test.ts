@@ -55,10 +55,12 @@ describe('ValidationRepository', () => {
       // Type mock data with Zod-inferred type - TypeScript will catch field name errors
       const mockData: FeatureProperty[] = [
         {
+          feature_type_property_id: 1,
           name: 'dataset',
           display_name: 'Dataset',
           description: 'asd',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
