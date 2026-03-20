@@ -130,7 +130,7 @@ export function submissionIntake(): RequestHandler {
 
     const submissionFeature: ISubmissionFeature = req.body.content;
 
-    const connection = getDBConnection(req.keycloak_token!);
+    const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();

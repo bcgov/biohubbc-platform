@@ -80,6 +80,12 @@ const systemUsers: SystemUserSeed[] = [
  * Note: This seed will only be necessary while there is no in-app functionality to manage users.
  */
 export async function seed(knex: Knex): Promise<void> {
+  const contributorClientId = process.env.KEYCLOAK_CLIENT_ID;
+
+  if (!contributorClientId) {
+    throw new Error('KEYCLOAK_CLIENT_ID is required to seed contributor system users');
+  }
+
   await knex.raw(`
     set schema '${DB_SCHEMA}';
     set search_path = ${DB_SCHEMA};
@@ -104,6 +110,14 @@ export async function seed(knex: Knex): Promise<void> {
       `);
     }
   }
+
+  await knex.raw(`
+    ${insertContributorSQL(contributorClientId)}
+  `);
+
+  await knex.raw(`
+    ${insertContributorSystemUserSQL(contributorClientId)}
+  `);
 }
 
 /**
@@ -162,4 +176,56 @@ const insertSystemUserRoleSQL = (systemUser: SystemUserSeed) => `
     (SELECT system_user_id from "system_user" where LOWER(user_identifier) = LOWER('${systemUser.identifier}')),
     (SELECT system_role_id from system_role where LOWER(name) = LOWER('${systemUser.role_name}'))
   );
+`;
+
+/**
+ * SQL to insert a contributor row if it does not already exist.
+ *
+ * @param {string} contributorClientId
+ */
+const insertContributorSQL = (contributorClientId: string) => `
+  INSERT INTO contributor (
+    client_id,
+    description,
+    create_user
+  )
+  SELECT
+    '${contributorClientId}',
+    'Seeded contributor for system users',
+    1
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM contributor
+    WHERE LOWER(client_id) = LOWER('${contributorClientId}')
+      AND record_end_date IS NULL
+  );
+`;
+
+/**
+ * SQL to join all active system users to the contributor.
+ *
+ * @param {string} contributorClientId
+ */
+const insertContributorSystemUserSQL = (contributorClientId: string) => `
+  INSERT INTO contributor_system_user (
+    contributor_id,
+    system_user_id,
+    create_user
+  )
+  SELECT
+    c.contributor_id,
+    su.system_user_id,
+    1
+  FROM contributor c
+  CROSS JOIN system_user su
+  WHERE LOWER(c.client_id) = LOWER('${contributorClientId}')
+    AND c.record_end_date IS NULL
+    AND su.record_end_date IS NULL
+    AND NOT EXISTS (
+      SELECT 1
+      FROM contributor_system_user csu
+      WHERE csu.contributor_id = c.contributor_id
+        AND csu.system_user_id = su.system_user_id
+        AND csu.record_end_date IS NULL
+    );
 `;
