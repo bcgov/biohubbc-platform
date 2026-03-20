@@ -46,14 +46,17 @@ export async function seed(knex: Knex): Promise<void> {
     throw new Error('KEYCLOAK_CLIENT_ID is required to seed mock submission data');
   }
 
-  await knex.raw(`
-    SET SCHEMA 'biohub';
-    SET SEARCH_PATH = 'biohub','public';
-  `);
+  // Transaction so that the schema and search path is set for the SQL statements in insertRecord()
+  await knex.transaction(async (trx) => {
+    await trx.raw(`
+      SET SCHEMA 'biohub';
+      SET SEARCH_PATH = 'biohub','public';
+    `);
 
-  for (let i = 0; i < NUM_MOCK_FEATURE_SUBMISSIONS; i++) {
-    await insertRecord(knex);
-  }
+    for (let i = 0; i < NUM_MOCK_FEATURE_SUBMISSIONS; i++) {
+      await insertRecord(trx); // pass the transaction instead of knex
+    }
+  });
 }
 
 /**
