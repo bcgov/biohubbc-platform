@@ -59,7 +59,7 @@ export class ContributorRepository extends BaseRepository {
       INNER JOIN contributor_system_user csu ON csu.system_user_id = s.system_user_id
       INNER JOIN contributor c ON c.contributor_id = csu.contributor_id
       WHERE su.submission_upload_id = ${submissionUploadId}
-        AND s.record_end_date IS NULL
+        AND (s.record_end_date IS NULL OR s.record_end_date > NOW())
         AND csu.record_end_date IS NULL
         AND c.record_end_date IS NULL;
     `;
@@ -99,7 +99,7 @@ export class ContributorRepository extends BaseRepository {
       INNER JOIN contributor_system_user csu ON csu.system_user_id = s.system_user_id
       INNER JOIN contributor c ON c.contributor_id = csu.contributor_id
       WHERE s.submission_id = ${submissionId}
-        AND s.record_end_date IS NULL
+        AND (s.record_end_date IS NULL OR s.record_end_date > NOW())
         AND csu.record_end_date IS NULL
         AND c.record_end_date IS NULL;
     `;

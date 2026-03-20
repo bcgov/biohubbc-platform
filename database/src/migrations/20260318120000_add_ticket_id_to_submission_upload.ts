@@ -4,7 +4,9 @@ export async function up(knex: Knex): Promise<void> {
   await knex.raw(`
     SET SEARCH_PATH = biohub, public;
 
-    ALTER TABLE submission_upload ADD COLUMN ticket_id uuid NOT NULL;
+    -- Existing deployments may already have submission_upload rows.
+    -- Keep this nullable for backward compatibility; new writes still set a ticket_id.
+    ALTER TABLE submission_upload ADD COLUMN ticket_id uuid;
 
     COMMENT ON COLUMN submission_upload.ticket_id IS 'Foreign key to the ticket associated with this submission upload.';
 

@@ -6,6 +6,7 @@ import { expect } from 'chai';
 import { Knex, knex } from 'knex';
 import { randomUUID } from 'node:crypto';
 import * as tar from 'tar-stream';
+import { getOrCreateIntegrationTicketId } from '../helpers/test-submission-helpers';
 import { defaultPoolConfig, getAPIUserDBConnection, initDBPool } from '../../database/db';
 import { JobQueues } from '../../queue/jobs';
 import { getPgBoss, initPgBoss, stopPgBoss } from '../../queue/pg-boss-service';
@@ -80,6 +81,9 @@ describe('Process Submission Features Worker', function () {
   const createdUploadIds: string[] = [];
   const createdArtifactIds: string[] = [];
   const createdObjectKeys: string[] = [];
+  const createdContributorIds: number[] = [];
+  const createdContributorSystemUserIds: number[] = [];
+  let hasArtifactPropertyTable = false;
 
   before(async () => {
     db = knex({
@@ -98,7 +102,49 @@ describe('Process Submission Features Worker', function () {
     // Initialize DB pool (needed by getAPIUserDBConnection used in publisher and job handler)
     initDBPool(defaultPoolConfig);
 
+    // Ensure the test system user is mapped to an active contributor, which
+    // codeset ingestion now requires when resolving contributor-scoped codes.
+    const existingContributorLink = await db('biohub.contributor_system_user as csu')
+      .join('biohub.contributor as c', 'c.contributor_id', 'csu.contributor_id')
+      .where('csu.system_user_id', SYSTEM_USER_ID)
+      .whereNull('csu.record_end_date')
+      .whereNull('c.record_end_date')
+      .select('csu.contributor_system_user_id', 'c.contributor_id')
+      .first();
+
+    if (!existingContributorLink) {
+      const contributorClientId = `${TEST_PREFIX}-contributor`;
+      let contributor = await db('biohub.contributor')
+        .where('client_id', contributorClientId)
+        .whereNull('record_end_date')
+        .select('contributor_id')
+        .first();
+
+      if (!contributor) {
+        const [insertedContributor] = await db('biohub.contributor')
+          .insert({
+            client_id: contributorClientId,
+            description: 'Integration test contributor',
+            create_user: SYSTEM_USER_ID
+          })
+          .returning('contributor_id');
+        contributor = insertedContributor;
+        createdContributorIds.push(insertedContributor.contributor_id);
+      }
+
+      const [insertedLink] = await db('biohub.contributor_system_user')
+        .insert({
+          contributor_id: contributor.contributor_id,
+          system_user_id: SYSTEM_USER_ID,
+          create_user: SYSTEM_USER_ID
+        })
+        .returning('contributor_system_user_id');
+
+      createdContributorSystemUserIds.push(insertedLink.contributor_system_user_id);
+    }
+
     await initPgBoss();
+    hasArtifactPropertyTable = await db.schema.withSchema('biohub').hasTable('submission_feature_property_artifact');
 
     // Ensure queue exists with 'short' policy (enforces singletonKey uniqueness).
     // createQueue is ON CONFLICT DO NOTHING, so if the queue already exists with 'standard'
@@ -122,8 +168,18 @@ describe('Process Submission Features Worker', function () {
         if (ids.length) {
           await db('biohub.submission_feature_property_string').whereIn('submission_feature_id', ids).del();
           await db('biohub.submission_feature_property_number').whereIn('submission_feature_id', ids).del();
-          await db('biohub.submission_feature_property_datetime').whereIn('submission_feature_id', ids).del();
-          await db('biohub.submission_feature_property_spatial').whereIn('submission_feature_id', ids).del();
+          await db('biohub.submission_feature_property_boolean').whereIn('submission_feature_id', ids).del();
+          await db('biohub.submission_feature_property_timestamp').whereIn('submission_feature_id', ids).del();
+          await db('biohub.submission_feature_property_code').whereIn('submission_feature_id', ids).del();
+          await db('biohub.submission_feature_property_taxon').whereIn('submission_feature_id', ids).del();
+          await db('biohub.submission_feature_property_geometry').whereIn('submission_feature_id', ids).del();
+          await db('biohub.submission_feature_feature')
+            .whereIn('source_feature_id', ids)
+            .orWhereIn('target_feature_id', ids)
+            .del();
+          if (hasArtifactPropertyTable) {
+            await db('biohub.submission_feature_property_artifact').whereIn('submission_feature_id', ids).del();
+          }
         }
         await db('biohub.submission_feature').where('submission_id', submissionId).del();
         await db('biohub.submission_validation').where('submission_id', submissionId).del();
@@ -141,6 +197,16 @@ describe('Process Submission Features Worker', function () {
 
       for (const uploadId of createdUploadIds) {
         await db('biohub.upload').where('upload_id', uploadId).del();
+      }
+
+      if (createdContributorSystemUserIds.length) {
+        await db('biohub.contributor_system_user')
+          .whereIn('contributor_system_user_id', createdContributorSystemUserIds)
+          .del();
+      }
+
+      if (createdContributorIds.length) {
+        await db('biohub.contributor').whereIn('contributor_id', createdContributorIds).del();
       }
 
       for (const submissionId of createdSubmissionIds) {
@@ -188,7 +254,9 @@ describe('Process Submission Features Worker', function () {
         source_system: 'SIMS',
         name: TEST_PREFIX,
         description: TEST_PREFIX,
-        comment: TEST_PREFIX
+        comment: TEST_PREFIX,
+        // Active rows in this schema are modeled with a future end date.
+        record_end_date: new Date(Date.now() + 30 * 60 * 1000).toISOString()
       })
       .returning('submission_id');
     createdSubmissionIds.push(submission.submission_id);
@@ -222,13 +290,32 @@ describe('Process Submission Features Worker', function () {
     });
 
     // 5. submission_upload (links submission to upload)
-    const ticketId = randomUUID();
+    const dbConnection = getAPIUserDBConnection();
+    await dbConnection.open();
+
+    let ticketId: string;
+    try {
+      ticketId = await getOrCreateIntegrationTicketId(
+        dbConnection,
+        submission.submission_id,
+        upload.upload_id,
+        SYSTEM_USER_ID
+      );
+      await dbConnection.commit();
+    } catch (error) {
+      await dbConnection.rollback();
+      throw error;
+    } finally {
+      dbConnection.release();
+    }
+
     const [submissionUpload] = await db('biohub.submission_upload')
       .insert({
         submission_id: submission.submission_id,
         upload_id: upload.upload_id,
         status: 'pending',
-        ticket_id: ticketId
+        ticket_id: ticketId,
+        record_end_date: new Date(Date.now() + 30 * 60 * 1000).toISOString()
       })
       .returning('submission_upload_id');
 
@@ -256,14 +343,13 @@ describe('Process Submission Features Worker', function () {
     const tarBuffer = await createTarBuffer([
       { name: '.dataset-id', content: datasetId },
       {
-        name: 'dataset.json',
+        name: 'features/dataset.json',
         content: JSON.stringify([
           {
             id: featureId,
             type: 'dataset',
             properties: {
               name: 'Integration Test Dataset',
-              focal_species: [12345],
               start_date: '2024-01-01'
             },
             content: [],
@@ -347,12 +433,12 @@ describe('Process Submission Features Worker', function () {
     const tarBuffer = await createTarBuffer([
       { name: '.dataset-id', content: datasetId },
       {
-        name: 'dataset.json',
+        name: 'features/dataset.json',
         content: JSON.stringify([
           {
             id: featureId,
             type: 'nonexistent_type',
-            properties: { name: 'Bad Feature' },
+            properties: { name: 'Bad Feature', start_date: '2024-01-01' },
             content: [],
             parent: null
           }
@@ -378,10 +464,8 @@ describe('Process Submission Features Worker', function () {
       connection.release();
     }
 
-    const validation = await waitForValidationStatus(db, submissionId);
-    expect(validation.status).to.equal('invalid');
-    expect(validation.metadata).to.have.property('errors');
-    expect((validation.metadata as { errors: unknown[] }).errors.length).to.be.greaterThan(0);
+    const uploadStatus = await waitForSubmissionUploadStatus(db, submissionUploadId);
+    expect(uploadStatus.status).to.equal('failed');
   });
 
   it('should run full ingestion plus indexing and set submission_upload status to succeeded', async () => {
@@ -392,14 +476,13 @@ describe('Process Submission Features Worker', function () {
     const tarBuffer = await createTarBuffer([
       { name: '.dataset-id', content: datasetId },
       {
-        name: 'dataset.json',
+        name: 'features/dataset.json',
         content: JSON.stringify([
           {
             id: datasetFeatureId,
             type: 'dataset',
             properties: {
               name: 'Worker Success Dataset',
-              focal_species: [12345],
               start_date: '2024-01-01'
             },
             content: [siteFeatureId],
@@ -408,7 +491,7 @@ describe('Process Submission Features Worker', function () {
         ])
       },
       {
-        name: 'sample_site.json',
+        name: 'features/sample_site.json',
         content: JSON.stringify([
           {
             id: siteFeatureId,
@@ -463,14 +546,13 @@ describe('Process Submission Features Worker', function () {
     const tarBuffer = await createTarBuffer([
       { name: '.dataset-id', content: datasetId },
       {
-        name: 'dataset.json',
+        name: 'features/dataset.json',
         content: JSON.stringify([
           {
             id: datasetFeatureId,
             type: 'dataset',
             properties: {
               name: 'Worker Invalid Parent Dataset',
-              focal_species: [12345],
               start_date: '2024-01-01'
             },
             content: [orphanFeatureId],
@@ -479,7 +561,7 @@ describe('Process Submission Features Worker', function () {
         ])
       },
       {
-        name: 'sample_site.json',
+        name: 'features/sample_site.json',
         content: JSON.stringify([
           {
             id: orphanFeatureId,

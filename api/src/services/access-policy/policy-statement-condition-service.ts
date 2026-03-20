@@ -1,13 +1,19 @@
 import { IDBConnection } from '../../database/db';
+import { ApiNotFoundError } from '../../errors/api-error';
+import { HTTP400 } from '../../errors/http-error';
 import { CreatePolicyStatementCondition, PolicyStatementCondition } from '../../models/policy-statement-condition';
+import { CodeRepository } from '../../repositories/code-repository';
 import { PolicyStatementConditionRepository } from '../../repositories/authorization/policy-statement-condition-repository';
 import { DBService } from '../db-service';
+import { validatePolicyConditionInput } from './policy-condition-validation';
 
 export class PolicyStatementConditionService extends DBService {
+  codeRepository: CodeRepository;
   policyStatementConditionRepository: PolicyStatementConditionRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
+    this.codeRepository = new CodeRepository(connection);
     this.policyStatementConditionRepository = new PolicyStatementConditionRepository(connection);
   }
 
@@ -18,9 +24,25 @@ export class PolicyStatementConditionService extends DBService {
    * @return {Promise<PolicyStatementCondition>} - The created policy statement condition record.
    * @memberof PolicyStatementConditionService
    */
-  createPolicyStatementCondition(
+  async createPolicyStatementCondition(
     policyStatementConditionData: CreatePolicyStatementCondition
   ): Promise<PolicyStatementCondition> {
+    try {
+      const featureProperty = await this.codeRepository.getFeaturePropertyByName(policyStatementConditionData.key);
+      validatePolicyConditionInput(
+        policyStatementConditionData.key,
+        policyStatementConditionData.operator,
+        policyStatementConditionData.value,
+        featureProperty.feature_property_type_name
+      );
+    } catch (error) {
+      if (error instanceof ApiNotFoundError) {
+        throw new HTTP400(`Invalid policy condition key: ${policyStatementConditionData.key}`);
+      }
+
+      throw error;
+    }
+
     return this.policyStatementConditionRepository.insertPolicyStatementCondition(policyStatementConditionData);
   }
 

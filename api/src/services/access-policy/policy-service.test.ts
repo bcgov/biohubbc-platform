@@ -3,8 +3,10 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
+import { FeaturePropertyCode } from '../../models/feature-property';
 import { PolicyEffect, PolicyStatement } from '../../models/policy-statement';
 import { PolicyConditionOperator, PolicyStatementCondition } from '../../models/policy-statement-condition';
+import { CodeRepository } from '../../repositories/code-repository';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
 import { PolicyStatementConditionRepository } from '../../repositories/authorization/policy-statement-condition-repository';
 import { PolicyStatementRepository } from '../../repositories/authorization/policy-statement-repository';
@@ -244,6 +246,13 @@ describe('PolicyService', () => {
 
   describe('createPolicyWithStatements', () => {
     it('should call repository.insertPolicy and return created policy with statements', async () => {
+      const featureProperty: FeaturePropertyCode = {
+        feature_property_id: 1,
+        feature_property_name: 'region',
+        feature_property_display_name: 'Region',
+        feature_property_type_id: 1,
+        feature_property_type_name: 'string'
+      };
       const mockPolicy: Policy = { policy_id: '1', name: 'New Policy', description: 'Desc' };
       const mockStatement: PolicyStatement = {
         policy_statement_id: 's1',
@@ -260,6 +269,7 @@ describe('PolicyService', () => {
       };
 
       const insertPolicyStub = sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
+      const featurePropertyStub = sinon.stub(CodeRepository.prototype, 'getFeaturePropertyByName').resolves(featureProperty);
       const insertStatementStub = sinon
         .stub(PolicyStatementRepository.prototype, 'insertPolicyStatement')
         .resolves(mockStatement);
@@ -281,6 +291,7 @@ describe('PolicyService', () => {
       expect(insertPolicyStub).to.have.been.calledWith({ name: 'New Policy', description: 'Desc' });
       expect(insertStatementStub).to.have.been.calledOnce;
       expect(insertConditionStub).to.have.been.calledOnce;
+      expect(featurePropertyStub).to.have.been.calledOnceWith('region');
       expect(result).to.eql({
         ...mockPolicy,
         statements: [{ ...mockStatement, conditions: [mockCondition] }]

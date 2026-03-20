@@ -1,4 +1,5 @@
 import SQL from 'sql-template-strings';
+import { z } from 'zod';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { ContributorCodesetCode, ContributorCodesetCodeSchema } from '../models/contributor-codeset-code';
@@ -130,17 +131,19 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
       .select(knex.raw('1 as deleted'));
 
     const response = await this.connection.knex(query);
-    await this.connection.sql(SQL`
-      DO $$
-      BEGIN
-        IF to_regclass('biohub.submission_feature_property_artifact') IS NOT NULL THEN
-          DELETE FROM submission_feature_property_artifact
-          WHERE submission_feature_id IN (
-            SELECT submission_feature_id FROM submission_feature WHERE submission_id = ${submissionId}
-          );
-        END IF;
-      END $$;
-    `);
+    const artifactTableCheck = await this.connection.sql(
+      SQL`SELECT to_regclass('biohub.submission_feature_property_artifact') IS NOT NULL AS has_table;`,
+      z.object({ has_table: z.boolean() })
+    );
+    const hasArtifactTable = artifactTableCheck.rows[0]?.has_table ?? false;
+    if (hasArtifactTable) {
+      await this.connection.knex(
+        getKnex()('submission_feature_property_artifact').whereIn(
+          'submission_feature_id',
+          getKnex()('submission_feature').select('submission_feature_id').where('submission_id', submissionId)
+        ).delete()
+      );
+    }
 
     return response.rows;
   }
@@ -187,17 +190,21 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
       .select(knex.raw('1 as deleted'));
 
     const response = await this.connection.knex(query);
-    await this.connection.sql(SQL`
-      DO $$
-      BEGIN
-        IF to_regclass('biohub.submission_feature_property_artifact') IS NOT NULL THEN
-          DELETE FROM submission_feature_property_artifact
-          WHERE submission_feature_id IN (
-            SELECT submission_feature_id FROM submission_feature WHERE submission_upload_id = ${submissionUploadId}
-          );
-        END IF;
-      END $$;
-    `);
+    const artifactTableCheck = await this.connection.sql(
+      SQL`SELECT to_regclass('biohub.submission_feature_property_artifact') IS NOT NULL AS has_table;`,
+      z.object({ has_table: z.boolean() })
+    );
+    const hasArtifactTable = artifactTableCheck.rows[0]?.has_table ?? false;
+    if (hasArtifactTable) {
+      await this.connection.knex(
+        getKnex()('submission_feature_property_artifact').whereIn(
+          'submission_feature_id',
+          getKnex()('submission_feature')
+            .select('submission_feature_id')
+            .where('submission_upload_id', submissionUploadId)
+        ).delete()
+      );
+    }
     return response.rows;
   }
 

@@ -65,7 +65,7 @@ export class IngestionRepository extends BaseRepository {
         NULL,
         staged.source_id,
         ft.feature_type_id,
-        staged.data,
+        parsed.data,
         staged.data_byte_size,
         now()
       FROM unnest(
