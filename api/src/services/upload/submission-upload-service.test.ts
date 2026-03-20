@@ -28,6 +28,7 @@ describe('SubmissionUploadService', () => {
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
+        status: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       };
 
@@ -61,12 +62,14 @@ describe('SubmissionUploadService', () => {
           submission_upload_id: 'artifact-1',
           submission_id: mockSubmissionId,
           upload_id: 'upload-1',
+          status: 'pending',
           ticket_id: '11111111-1111-1111-1111-111111111111'
         },
         {
           submission_upload_id: 'artifact-2',
           submission_id: mockSubmissionId,
           upload_id: 'upload-2',
+          status: 'pending',
           ticket_id: '22222222-2222-2222-2222-222222222222'
         }
       ];

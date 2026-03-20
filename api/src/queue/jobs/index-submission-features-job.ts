@@ -1,6 +1,8 @@
 import PgBoss from 'pg-boss';
 import { getAPIUserDBConnection } from '../../database/db';
+import { ApiExecuteSQLError } from '../../errors/api-error';
 import { SearchFeatureService } from '../../services/search-feature-service';
+import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('queue/jobs/index-submission-features-job');
@@ -12,6 +14,8 @@ const defaultLog = getLogger('queue/jobs/index-submission-features-job');
 export interface IIndexSubmissionFeaturesJobData {
   /** The submission ID whose features should be indexed for search */
   submissionId: number;
+  /** The submission upload ID whose rows should be validated/indexed */
+  submissionUploadId: string;
 }
 
 /**
@@ -26,7 +30,7 @@ export interface IIndexSubmissionFeaturesJobData {
  */
 export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmissionFeaturesJobData> = async (jobs) => {
   for (const job of jobs) {
-    const { submissionId } = job.data;
+    const { submissionId, submissionUploadId } = job.data;
 
     defaultLog.info({
       label: 'indexSubmissionFeaturesJobHandler',
@@ -40,7 +44,9 @@ export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmiss
       await connection.open();
 
       const searchFeatureService = new SearchFeatureService(connection);
-      await searchFeatureService.indexSubmissionPropertiesBySubmissionId(submissionId);
+      const submissionUploadService = new SubmissionUploadService(connection);
+      await searchFeatureService.indexSubmissionPropertiesBySubmissionUploadId(submissionId, submissionUploadId);
+      await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'succeeded' });
 
       await connection.commit();
 
@@ -53,11 +59,28 @@ export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmiss
     } catch (error) {
       await connection.rollback();
 
+      try {
+        const submissionUploadService = new SubmissionUploadService(connection);
+        const status = error instanceof ApiExecuteSQLError ? 'invalid' : 'failed';
+        await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status });
+        await connection.commit();
+      } catch (statusError) {
+        await connection.rollback();
+        defaultLog.error({
+          label: 'indexSubmissionFeaturesJobHandler',
+          message: 'Failed to update submission upload status',
+          jobId: job.id,
+          submissionUploadId,
+          error: statusError
+        });
+      }
+
       defaultLog.error({
         label: 'indexSubmissionFeaturesJobHandler',
         message: 'Index submission features job failed',
         jobId: job.id,
         submissionId,
+        submissionUploadId,
         error
       });
 
@@ -83,7 +106,7 @@ export const indexSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IIndexSubm
   jobs
 ) => {
   for (const job of jobs) {
-    const { submissionId } = job.data;
+    const { submissionId, submissionUploadId } = job.data;
 
     // Cast to access output field available on failed jobs
     const jobOutput = (job as PgBoss.JobWithMetadata<IIndexSubmissionFeaturesJobData>).output;
@@ -93,6 +116,7 @@ export const indexSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IIndexSubm
       message: 'Index submission features job failed after all retries',
       jobId: job.id,
       submissionId,
+      submissionUploadId,
       output: jobOutput ?? 'Job failed after all retries'
     });
   }

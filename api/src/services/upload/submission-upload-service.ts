@@ -137,4 +137,25 @@ export class SubmissionUploadService extends DBService {
   async deleteSubmissionUpload(submissionUploadId: string): Promise<void> {
     return this.submissionUploadRepository.deleteSubmissionUpload(submissionUploadId);
   }
+
+  /**
+   * Get invalid upload attempt ids eligible for cleanup.
+   *
+   * @param {number} retentionHours
+   * @param {number} limit
+   * @returns {Promise<string[]>}
+   */
+  async getInvalidSubmissionUploadIdsForCleanup(retentionHours: number, limit: number): Promise<string[]> {
+    return this.submissionUploadRepository.getInvalidSubmissionUploadIdsForCleanup(retentionHours, limit);
+  }
+
+  /**
+   * Cleanup one invalid upload attempt by submission_upload_id.
+   *
+   * @param {string} submissionUploadId
+   * @returns {Promise<void>}
+   */
+  async cleanupInvalidSubmissionUploadById(submissionUploadId: string): Promise<void> {
+    return this.submissionUploadRepository.cleanupInvalidSubmissionUploadById(submissionUploadId);
+  }
 }

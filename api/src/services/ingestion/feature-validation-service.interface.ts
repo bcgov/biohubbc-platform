@@ -20,6 +20,8 @@ export enum ValidationErrorType {
   INVALID_CODE_SLUG = 'Invalid Code Slug',
   /** Code property slug does not resolve in provided codeset definitions */
   INVALID_CODE_REFERENCE = 'Invalid Code Reference',
+  /** Code property resolves ambiguously and cannot map to a single code */
+  AMBIGUOUS_CODE_REFERENCE = 'Ambiguous Code Reference',
 
   // Reference errors
   /** Multiple features have the same id */
@@ -31,7 +33,9 @@ export enum ValidationErrorType {
 
   // Media errors
   /** A file/report block references a media file not found in the archive */
-  MISSING_MEDIA_FILE = 'Missing Media File'
+  MISSING_MEDIA_FILE = 'Missing Media File',
+  /** Media reference resolves ambiguously and cannot map to a single archive file */
+  AMBIGUOUS_MEDIA_REFERENCE = 'Ambiguous Media Reference'
 }
 
 /**

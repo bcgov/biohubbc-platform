@@ -2,6 +2,7 @@ import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { ContributorCodeset, CreateContributorCodeset } from '../models/contributor-codeset';
 import { ContributorCodesetCode, CreateContributorCodesetCode } from '../models/contributor-codeset-code';
+import { CreateSubmissionFeaturePropertyArtifact } from '../models/submission-feature-property-artifact';
 import { CreateSubmissionFeaturePropertyBoolean } from '../models/submission-feature-property-boolean';
 import { CreateSubmissionFeaturePropertyCode } from '../models/submission-feature-property-code';
 import { CreateSubmissionFeaturePropertyGeometry } from '../models/submission-feature-property-geometry';
@@ -40,6 +41,17 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
    */
   async deletePropertyRecordsBySubmissionId(submissionId: number): Promise<void> {
     await this.submissionFeaturePropertyIndexRepository.deletePropertyRecordsBySubmissionId(submissionId);
+  }
+
+  /**
+   * Delete all canonical property records for one upload attempt.
+   *
+   * @param {string} submissionUploadId
+   * @return {Promise<void>}
+   * @memberof SubmissionFeaturePropertyIndexService
+   */
+  async deletePropertyRecordsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    await this.submissionFeaturePropertyIndexRepository.deletePropertyRecordsBySubmissionUploadId(submissionUploadId);
   }
 
   /**
@@ -95,6 +107,17 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
    */
   async insertTimestampRecords(records: CreateSubmissionFeaturePropertyTimestamp[]): Promise<void> {
     await this.submissionFeaturePropertyIndexRepository.insertTimestampRecords(records);
+  }
+
+  /**
+   * Insert canonical artifact property records.
+   *
+   * @param {CreateSubmissionFeaturePropertyArtifact[]} records
+   * @return {Promise<void>}
+   * @memberof SubmissionFeaturePropertyIndexService
+   */
+  async insertArtifactRecords(records: CreateSubmissionFeaturePropertyArtifact[]): Promise<void> {
+    await this.submissionFeaturePropertyIndexRepository.insertArtifactRecords(records);
   }
 
   /**
@@ -273,6 +296,44 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
     }
 
     return slugToContributorCodesetCodeId;
+  }
+
+  /**
+   * Resolve artifact references to artifact_id values for one upload attempt.
+   *
+   * @param {string} submissionUploadId
+   * @param {string[]} references
+   * @return {Promise<Map<string, string>>}
+   * @memberof SubmissionFeaturePropertyIndexService
+   */
+  async resolveArtifactIdsByReferences(submissionUploadId: string, references: string[]): Promise<Map<string, string>> {
+    if (!references.length) {
+      return new Map<string, string>();
+    }
+
+    const rows =
+      await this.submissionFeaturePropertyIndexRepository.getArtifactResolutionsBySubmissionUploadIdAndReferences(
+        submissionUploadId,
+        references
+      );
+    const referenceToArtifactId = new Map<string, string>();
+
+    for (const row of rows) {
+      const existing = referenceToArtifactId.get(row.artifact_reference);
+      if (existing && existing !== row.artifact_id) {
+        throw new ApiExecuteSQLError('Ambiguous artifact reference resolution', [
+          'SubmissionFeaturePropertyIndexService->resolveArtifactIdsByReferences',
+          {
+            submissionUploadId,
+            artifactReference: row.artifact_reference
+          }
+        ]);
+      }
+
+      referenceToArtifactId.set(row.artifact_reference, row.artifact_id);
+    }
+
+    return referenceToArtifactId;
   }
 
   /**

@@ -39,7 +39,11 @@ export const JobQueues = {
    * Dead letter queue for failed index-submission-features jobs.
    * Jobs are moved here after all retries are exhausted.
    */
-  INDEX_SUBMISSION_FEATURES_FAILED: 'index-submission-features-failed'
+  INDEX_SUBMISSION_FEATURES_FAILED: 'index-submission-features-failed',
+  /**
+   * Scheduled cleanup queue for invalid submission uploads beyond retention.
+   */
+  CLEANUP_INVALID_SUBMISSION_UPLOADS: 'cleanup-invalid-submission-uploads'
 } as const;
 
 export type JobQueueName = (typeof JobQueues)[keyof typeof JobQueues];

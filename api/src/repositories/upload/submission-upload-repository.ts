@@ -25,6 +25,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_upload_id,
         submission_id,
         upload_id,
+        status,
         ticket_id
       FROM
         submission_upload
@@ -71,6 +72,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         su.submission_upload_id,
         su.submission_id,
         su.upload_id,
+        su.status,
         su.ticket_id,
         su.record_end_date
       FROM
@@ -120,6 +122,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         'submission_upload.submission_upload_id',
         'submission_upload.submission_id',
         'submission_upload.upload_id',
+        'submission_upload.status',
         'submission_upload.ticket_id'
       )
       .from('submission_upload')
@@ -232,6 +235,7 @@ export class SubmissionUploadRepository extends BaseRepository {
       SET
         submission_id = COALESCE(${submissionUpload.submission_id}, submission_id),
         upload_id = COALESCE(${submissionUpload.upload_id}, upload_id),
+        status = COALESCE(${submissionUpload.status}, status),
         ticket_id = COALESCE(${submissionUpload.ticket_id}, ticket_id)
       WHERE
         submission_upload_id = ${submissionUploadId}
@@ -264,6 +268,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_upload_id,
         submission_id,
         upload_id,
+        status,
         ticket_id
       FROM
         submission_upload
@@ -332,6 +337,190 @@ export class SubmissionUploadRepository extends BaseRepository {
     const response = await this.connection.sql(sqlStatement);
 
     return response.rowCount ?? 0;
+  }
+
+  /**
+   * Get invalid upload attempts eligible for cleanup.
+   *
+   * @param {number} retentionHours
+   * @param {number} limit
+   * @returns {Promise<string[]>}
+   */
+  async getInvalidSubmissionUploadIdsForCleanup(retentionHours: number, limit: number): Promise<string[]> {
+    const sqlStatement = SQL`
+      SELECT submission_upload_id
+      FROM submission_upload
+      WHERE status = 'invalid'
+        AND record_end_date IS NULL
+        AND create_date < NOW() - (${retentionHours} * INTERVAL '1 hour')
+      ORDER BY create_date ASC
+      LIMIT ${limit};
+    `;
+
+    const response = await this.connection.sql<{ submission_upload_id: string }>(sqlStatement);
+    return response.rows.map((row) => row.submission_upload_id);
+  }
+
+  /**
+   * Delete attempt-owned data for one invalid submission_upload_id.
+   *
+   * @param {string} submissionUploadId
+   * @returns {Promise<void>}
+   */
+  async cleanupInvalidSubmissionUploadById(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      WITH upload_features AS (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      )
+      DELETE FROM submission_feature_feature
+      WHERE source_feature_id IN (SELECT submission_feature_id FROM upload_features)
+         OR target_feature_id IN (SELECT submission_feature_id FROM upload_features);
+    `;
+    await this.connection.sql(sqlStatement);
+
+    await this.connection.sql(SQL`
+      DELETE FROM submission_feature_security
+      WHERE submission_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      );
+    `);
+
+    await this.connection.sql(SQL`
+      DELETE FROM search_string
+      WHERE submission_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      );
+    `);
+    await this.connection.sql(SQL`
+      DELETE FROM search_number
+      WHERE submission_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      );
+    `);
+    await this.connection.sql(SQL`
+      DELETE FROM search_datetime
+      WHERE submission_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      );
+    `);
+    await this.connection.sql(SQL`
+      DELETE FROM search_spatial
+      WHERE submission_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      );
+    `);
+
+    await this.connection.sql(SQL`
+      DELETE FROM submission_feature_property_string
+      WHERE submission_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      );
+    `);
+    await this.connection.sql(SQL`
+      DELETE FROM submission_feature_property_number
+      WHERE submission_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      );
+    `);
+    await this.connection.sql(SQL`
+      DELETE FROM submission_feature_property_boolean
+      WHERE submission_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      );
+    `);
+    await this.connection.sql(SQL`
+      DELETE FROM submission_feature_property_timestamp
+      WHERE submission_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      );
+    `);
+    await this.connection.sql(SQL`
+      DELETE FROM submission_feature_property_code
+      WHERE submission_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      );
+    `);
+    await this.connection.sql(SQL`
+      DELETE FROM submission_feature_property_taxon
+      WHERE submission_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      );
+    `);
+    await this.connection.sql(SQL`
+      DELETE FROM submission_feature_property_geometry
+      WHERE submission_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      );
+    `);
+    await this.connection.sql(SQL`
+      DO $$
+      BEGIN
+        IF to_regclass('biohub.submission_feature_property_artifact') IS NOT NULL THEN
+          DELETE FROM submission_feature_property_artifact
+          WHERE submission_feature_id IN (
+            SELECT submission_feature_id
+            FROM submission_feature
+            WHERE submission_upload_id = ${submissionUploadId}
+          );
+        END IF;
+      END $$;
+    `);
+
+    await this.connection.sql(SQL`
+      DELETE FROM submission_feature
+      WHERE submission_upload_id = ${submissionUploadId};
+    `);
+
+    await this.connection.sql(SQL`
+      DELETE FROM upload_artifact
+      WHERE upload_id = (
+        SELECT upload_id
+        FROM submission_upload
+        WHERE submission_upload_id = ${submissionUploadId}
+      );
+    `);
+
+    await this.connection.sql(SQL`
+      DELETE FROM submission_validation
+      WHERE submission_upload_id = ${submissionUploadId};
+    `);
+
+    await this.connection.sql(SQL`
+      DELETE FROM submission_upload_status
+      WHERE submission_upload_id = ${submissionUploadId};
+    `);
+
+    await this.connection.sql(SQL`
+      DELETE FROM submission_upload
+      WHERE submission_upload_id = ${submissionUploadId}
+        AND status = 'invalid';
+    `);
   }
 
   /**

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { CreateSubmissionFeaturePropertyArtifact } from '../models/submission-feature-property-artifact';
 import type { CreateSubmissionFeaturePropertyBoolean } from '../models/submission-feature-property-boolean';
 import type { CreateSubmissionFeaturePropertyCode } from '../models/submission-feature-property-code';
 import type { CreateSubmissionFeaturePropertyGeometry } from '../models/submission-feature-property-geometry';
@@ -144,7 +145,6 @@ export const SearchFeaturePropertyCondition = z.object({
   value: z.union([z.string(), z.number(), z.boolean(), z.array(z.union([z.string(), z.number()]))])
 });
 export type SearchFeaturePropertyCondition = z.infer<typeof SearchFeaturePropertyCondition>;
-export type ISearchFeaturePropertyCondition = SearchFeaturePropertyCondition;
 
 /**
  * Defines a group of property conditions combined by a logical operand.
@@ -154,7 +154,6 @@ export const SearchFeaturePropertyGroup = z.object({
   conditions: z.array(SearchFeaturePropertyCondition)
 });
 export type SearchFeaturePropertyGroup = z.infer<typeof SearchFeaturePropertyGroup>;
-export type ISearchFeaturePropertyGroup = SearchFeaturePropertyGroup;
 
 /**
  * Canonical filters for feature search (frontend + backend aligned)
@@ -183,17 +182,22 @@ export const SearchFeatureFilters = z.object({
 
 export type SearchFeaturesFilters = z.infer<typeof SearchFeatureFilters>;
 
-export type PendingTaxonRecord = {
+export interface PendingPropertyRecord {
   submission_feature_id: number;
   feature_type_property_id: number;
   propertyName: string;
+}
+
+export type PendingTaxonRecord = PendingPropertyRecord & {
   tsn: number;
 };
 
-export type PendingCodeRecord = {
-  submission_feature_id: number;
-  feature_type_property_id: number;
+export type PendingCodeRecord = PendingPropertyRecord & {
   codeReference: CodeReference;
+};
+
+export type PendingArtifactRecord = PendingPropertyRecord & {
+  reference: string;
 };
 
 export type PropertyRecordBuckets = {
@@ -201,6 +205,8 @@ export type PropertyRecordBuckets = {
   numberRecords: CreateSubmissionFeaturePropertyNumber[];
   booleanRecords: CreateSubmissionFeaturePropertyBoolean[];
   timestampRecords: CreateSubmissionFeaturePropertyTimestamp[];
+  artifactRecords: CreateSubmissionFeaturePropertyArtifact[];
+  pendingArtifactRecords: PendingArtifactRecord[];
   codeRecords: CreateSubmissionFeaturePropertyCode[];
   pendingCodeRecords: PendingCodeRecord[];
   geometryRecords: CreateSubmissionFeaturePropertyGeometry[];

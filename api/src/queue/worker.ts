@@ -2,6 +2,10 @@ import { SubmissionUpload } from '../models/submission-upload';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
 import {
+  cleanupInvalidSubmissionUploadsJobHandler,
+  ICleanupInvalidSubmissionUploadsJobData
+} from './jobs/cleanup-invalid-submission-uploads-job';
+import {
   IIndexSubmissionFeaturesJobData,
   indexSubmissionFeaturesFailedHandler,
   indexSubmissionFeaturesJobHandler
@@ -107,6 +111,22 @@ export const registerWorkers = async (): Promise<void> => {
   await boss.work<IIndexSubmissionFeaturesJobData>(
     JobQueues.INDEX_SUBMISSION_FEATURES_FAILED,
     indexSubmissionFeaturesFailedHandler
+  );
+
+  await boss.createQueue(JobQueues.CLEANUP_INVALID_SUBMISSION_UPLOADS, {
+    retryLimit: 3,
+    retryDelay: 60,
+    retryBackoff: true
+  });
+  await boss.work<ICleanupInvalidSubmissionUploadsJobData>(
+    JobQueues.CLEANUP_INVALID_SUBMISSION_UPLOADS,
+    cleanupInvalidSubmissionUploadsJobHandler
+  );
+  await boss.schedule(
+    JobQueues.CLEANUP_INVALID_SUBMISSION_UPLOADS,
+    '0 3 * * *',
+    {},
+    { singletonKey: 'cleanup-invalid-submission-uploads' }
   );
 
   defaultLog.info({

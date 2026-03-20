@@ -1,10 +1,10 @@
-import { ISearchFeaturePropertyCondition } from '../services/search-feature-service.interface';
+import { SearchFeaturePropertyCondition } from '../services/search-feature-service.interface';
 
 /**
  * Normalizes a property condition value for consistent handling in search queries.
  *
  * @remarks
- * This function is necessary because `ISearchFeaturePropertyCondition.value` can be:
+ * This function is necessary because `SearchFeaturePropertyCondition.value` can be:
  * - a single `string`, `number`, or `boolean`
  * - an array of strings and/or numbers (`(string | number)[]`)
  *
@@ -26,12 +26,12 @@ import { ISearchFeaturePropertyCondition } from '../services/search-feature-serv
  * normalizeSearchValue([1, "2", 3]); // ["1", "2", "3"]
  * normalizeSearchValue(true); // true
  *
- * @param val - The raw value from a `ISearchFeaturePropertyCondition`
+ * @param val - The raw value from a `SearchFeaturePropertyCondition`
  * @returns The normalized value suitable for query builders:
  *          `string | number | boolean | string[] | number[]`
  */
 export const normalizeSearchValue = (
-  val: ISearchFeaturePropertyCondition['value']
+  val: SearchFeaturePropertyCondition['value']
 ): string | number | boolean | string[] | number[] => {
   if (Array.isArray(val)) {
     if (val.every((v): v is number => typeof v === 'number')) {

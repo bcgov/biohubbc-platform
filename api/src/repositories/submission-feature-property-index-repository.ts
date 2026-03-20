@@ -3,6 +3,11 @@ import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { ContributorCodesetCode, ContributorCodesetCodeSchema } from '../models/contributor-codeset-code';
 import {
+  CreateSubmissionFeaturePropertyArtifact,
+  SubmissionFeaturePropertyArtifact,
+  SubmissionFeaturePropertyArtifactSchema
+} from '../models/submission-feature-property-artifact';
+import {
   CreateSubmissionFeaturePropertyBoolean,
   SubmissionFeaturePropertyBoolean,
   SubmissionFeaturePropertyBooleanSchema
@@ -16,7 +21,11 @@ import {
   CreateSubmissionFeaturePropertyGeometry,
   SubmissionFeaturePropertyGeometry
 } from '../models/submission-feature-property-geometry';
-import { ContributorCodeResolution, FeatureTypePropertyMetadata } from '../models/submission-feature-property-index';
+import {
+  ArtifactReferenceResolution,
+  ContributorCodeResolution,
+  FeatureTypePropertyMetadata
+} from '../models/submission-feature-property-index';
 import {
   CreateSubmissionFeaturePropertyNumber,
   SubmissionFeaturePropertyNumber,
@@ -122,7 +131,121 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
       .select(knex.raw('1 as deleted'));
 
     const response = await this.connection.knex(query);
+    await this.connection.sql(SQL`
+      DO $$
+      BEGIN
+        IF to_regclass('biohub.submission_feature_property_artifact') IS NOT NULL THEN
+          DELETE FROM submission_feature_property_artifact
+          WHERE submission_feature_id IN (
+            SELECT submission_feature_id FROM submission_feature WHERE submission_id = ${submissionId}
+          );
+        END IF;
+      END $$;
+    `);
 
+    return response.rows;
+  }
+
+  /**
+   * Delete canonical property records for one upload attempt.
+   *
+   * @param {string} submissionUploadId
+   * @return {Promise<Record<string, unknown>[]>}
+   * @memberof SubmissionFeaturePropertyIndexRepository
+   */
+  async deletePropertyRecordsBySubmissionUploadId(submissionUploadId: string): Promise<Record<string, unknown>[]> {
+    const knex = getKnex();
+    const featureIdsQuery = knex
+      .select('submission_feature_id')
+      .from('submission_feature')
+      .where('submission_upload_id', submissionUploadId);
+
+    const cteFeatureIds = knex.select('submission_feature_id').from('feature_ids');
+
+    const query = knex
+      .with('feature_ids', featureIdsQuery)
+      .with('deleted_string', (qb) => {
+        qb.from('submission_feature_property_string').whereIn('submission_feature_id', cteFeatureIds).delete();
+      })
+      .with('deleted_number', (qb) => {
+        qb.from('submission_feature_property_number').whereIn('submission_feature_id', cteFeatureIds).delete();
+      })
+      .with('deleted_boolean', (qb) => {
+        qb.from('submission_feature_property_boolean').whereIn('submission_feature_id', cteFeatureIds).delete();
+      })
+      .with('deleted_timestamp', (qb) => {
+        qb.from('submission_feature_property_timestamp').whereIn('submission_feature_id', cteFeatureIds).delete();
+      })
+      .with('deleted_code', (qb) => {
+        qb.from('submission_feature_property_code').whereIn('submission_feature_id', cteFeatureIds).delete();
+      })
+      .with('deleted_taxon', (qb) => {
+        qb.from('submission_feature_property_taxon').whereIn('submission_feature_id', cteFeatureIds).delete();
+      })
+      .with('deleted_geometry', (qb) => {
+        qb.from('submission_feature_property_geometry').whereIn('submission_feature_id', cteFeatureIds).delete();
+      })
+      .select(knex.raw('1 as deleted'));
+
+    const response = await this.connection.knex(query);
+    await this.connection.sql(SQL`
+      DO $$
+      BEGIN
+        IF to_regclass('biohub.submission_feature_property_artifact') IS NOT NULL THEN
+          DELETE FROM submission_feature_property_artifact
+          WHERE submission_feature_id IN (
+            SELECT submission_feature_id FROM submission_feature WHERE submission_upload_id = ${submissionUploadId}
+          );
+        END IF;
+      END $$;
+    `);
+    return response.rows;
+  }
+
+  /**
+   * Resolve artifact references to artifact_id rows for one upload attempt.
+   *
+   * @param {string} submissionUploadId
+   * @param {string[]} references
+   * @return {Promise<ArtifactReferenceResolution[]>}
+   * @memberof SubmissionFeaturePropertyIndexRepository
+   */
+  async getArtifactResolutionsBySubmissionUploadIdAndReferences(
+    submissionUploadId: string,
+    references: string[]
+  ): Promise<ArtifactReferenceResolution[]> {
+    if (!references.length) {
+      return [];
+    }
+
+    const sqlStatement = SQL`
+      WITH normalized_refs AS (
+        SELECT DISTINCT
+          refs.reference,
+          CASE
+            WHEN refs.reference LIKE 'files/%' THEN substr(refs.reference, 7)
+            ELSE refs.reference
+          END AS normalized_reference
+        FROM unnest(${references}::text[]) AS refs(reference)
+      )
+      SELECT
+        normalized_refs.reference AS artifact_reference,
+        artifact.artifact_id
+      FROM normalized_refs
+      INNER JOIN submission_upload
+        ON submission_upload.submission_upload_id = ${submissionUploadId}
+      INNER JOIN upload_artifact
+        ON upload_artifact.upload_id = submission_upload.upload_id
+       AND upload_artifact.role = 'feature'
+      INNER JOIN artifact
+        ON artifact.artifact_id = upload_artifact.artifact_id
+      WHERE
+        artifact.object_key = normalized_refs.reference
+        OR artifact.object_key = normalized_refs.normalized_reference
+        OR substring(artifact.object_key FROM '[^/]+$') = normalized_refs.normalized_reference;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, ArtifactReferenceResolution);
     return response.rows;
   }
 
@@ -306,6 +429,48 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestamp);
     this.assertInsertedRowCount('submission_feature_property_timestamp', records.length, response.rowCount);
+
+    return response.rows;
+  }
+
+  /**
+   * Bulk insert artifact property records.
+   *
+   * @param {CreateSubmissionFeaturePropertyArtifact[]} records
+   * @return {Promise<SubmissionFeaturePropertyArtifact[]>}
+   * @memberof SubmissionFeaturePropertyIndexRepository
+   */
+  async insertArtifactRecords(
+    records: CreateSubmissionFeaturePropertyArtifact[]
+  ): Promise<SubmissionFeaturePropertyArtifact[]> {
+    if (!records.length) {
+      return [];
+    }
+
+    const sqlStatement = SQL`
+      INSERT INTO submission_feature_property_artifact (
+        submission_feature_id,
+        feature_type_property_id,
+        artifact_id
+      )
+      SELECT
+        staged.submission_feature_id,
+        staged.feature_type_property_id,
+        staged.artifact_id
+      FROM unnest(
+        ${records.map((record) => record.submission_feature_id)}::integer[],
+        ${records.map((record) => record.feature_type_property_id)}::integer[],
+        ${records.map((record) => record.artifact_id)}::uuid[]
+      ) AS staged(submission_feature_id, feature_type_property_id, artifact_id)
+      RETURNING
+        submission_feature_property_artifact_id,
+        submission_feature_id,
+        feature_type_property_id,
+        artifact_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyArtifactSchema);
+    this.assertInsertedRowCount('submission_feature_property_artifact', records.length, response.rowCount);
 
     return response.rows;
   }

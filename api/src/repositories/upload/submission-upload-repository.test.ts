@@ -36,6 +36,7 @@ describe('SubmissionUploadRepository', () => {
         submission_upload_id: 'id-1',
         submission_id: 123,
         upload_id: 'upload-id',
+        status: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
@@ -67,6 +68,7 @@ describe('SubmissionUploadRepository', () => {
         submission_upload_id: 'upload-id',
         submission_id: 123,
         upload_id: 'upload-uuid',
+        status: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
@@ -87,12 +89,14 @@ describe('SubmissionUploadRepository', () => {
             submission_upload_id: 'id-1',
             submission_id: 123,
             upload_id: 'a-1',
+            status: 'pending',
             ticket_id: '11111111-1111-1111-1111-111111111111'
           },
           {
             submission_upload_id: 'id-2',
             submission_id: 123,
             upload_id: 'a-2',
+            status: 'pending',
             ticket_id: '22222222-2222-2222-2222-222222222222'
           }
         ]
@@ -110,12 +114,14 @@ describe('SubmissionUploadRepository', () => {
           submission_upload_id: 'id-1',
           submission_id: 123,
           upload_id: 'a-1',
+          status: 'pending',
           ticket_id: '11111111-1111-1111-1111-111111111111'
         },
         {
           submission_upload_id: 'id-2',
           submission_id: 123,
           upload_id: 'a-2',
+          status: 'pending',
           ticket_id: '22222222-2222-2222-2222-222222222222'
         }
       ]);
@@ -129,6 +135,7 @@ describe('SubmissionUploadRepository', () => {
             submission_upload_id: 'id-1',
             submission_id: 123,
             upload_id: 'a-1',
+            status: 'pending',
             ticket_id: '11111111-1111-1111-1111-111111111111'
           }
         ]
@@ -146,6 +153,7 @@ describe('SubmissionUploadRepository', () => {
           submission_upload_id: 'id-1',
           submission_id: 123,
           upload_id: 'a-1',
+          status: 'pending',
           ticket_id: '11111111-1111-1111-1111-111111111111'
         }
       ]);
@@ -157,12 +165,14 @@ describe('SubmissionUploadRepository', () => {
           submission_upload_id: 'id-1',
           submission_id: 123,
           upload_id: 'a-1',
+          status: 'pending',
           ticket_id: '11111111-1111-1111-1111-111111111111'
         },
         {
           submission_upload_id: 'id-2',
           submission_id: 123,
           upload_id: 'a-2',
+          status: 'pending',
           ticket_id: '22222222-2222-2222-2222-222222222222'
         }
       ];

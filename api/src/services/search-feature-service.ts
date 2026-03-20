@@ -20,6 +20,7 @@ import {
   InsertNumberSearchableRecord,
   InsertSpatialSearchableRecord,
   InsertStringSearchableRecord,
+  PendingArtifactRecord,
   PendingCodeRecord,
   PendingTaxonRecord,
   PropertyRecordBuckets,
@@ -110,6 +111,7 @@ export class SearchFeatureService extends DBService {
     await this.searchFeatureRepository.deleteSearchRecordsBySubmissionId(submissionId);
 
     const timestampRecords: InsertDatetimeSearchableRecord[] = [];
+    const artifactRecords: InsertStringSearchableRecord[] = [];
     const numberRecords: InsertNumberSearchableRecord[] = [];
     const geometryRecords: InsertSpatialSearchableRecord[] = [];
     const stringRecords: InsertStringSearchableRecord[] = [];
@@ -156,6 +158,20 @@ export class SearchFeatureService extends DBService {
               value: currentFeaturePropertyValue as number
             });
             break;
+          case 'artifact_key':
+            {
+              const artifactReference = this.normalizeArtifactReference(currentFeaturePropertyValue);
+              if (!artifactReference) {
+                continue;
+              }
+
+              artifactRecords.push({
+                submission_feature_id: currentFeature.submission_feature_id,
+                feature_property_id: matchingFeatureProperty.feature_property_id,
+                value: artifactReference
+              });
+            }
+            break;
 
           case 'geometry':
             geometryRecords.push({
@@ -182,6 +198,10 @@ export class SearchFeatureService extends DBService {
       promises.push(this.searchFeatureRepository.insertSearchableDatetimeRecords(timestampRecords));
     }
 
+    if (artifactRecords.length) {
+      promises.push(this.searchFeatureRepository.insertSearchableStringRecords(artifactRecords));
+    }
+
     if (numberRecords.length) {
       promises.push(this.searchFeatureRepository.insertSearchableNumberRecords(numberRecords));
     }
@@ -201,45 +221,99 @@ export class SearchFeatureService extends DBService {
    * Indexes feature properties into canonical typed submission_feature_property_* tables.
    *
    * @param {number} submissionId
+   * @param {string} submissionUploadId
    * @return {Promise<void>}
    */
-  async indexSubmissionPropertiesBySubmissionId(submissionId: number): Promise<void> {
+  async indexSubmissionPropertiesBySubmissionUploadId(submissionId: number, submissionUploadId: string): Promise<void> {
     defaultLog.debug({
-      label: 'indexSubmissionPropertiesBySubmissionId',
+      label: 'indexSubmissionPropertiesBySubmissionUploadId',
       message: 'start',
-      submissionId
+      submissionId,
+      submissionUploadId
     });
 
     const submissionFeaturePropertyIndexService = new SubmissionFeaturePropertyIndexService(this.connection);
-    // Idempotency: canonical typed property tables are fully rebuilt per submission.
-    await submissionFeaturePropertyIndexService.deletePropertyRecordsBySubmissionId(submissionId);
-
     const submissionRepository = new SubmissionRepository(this.connection);
-    const allFeatures = await submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
+    await submissionFeaturePropertyIndexService.deletePropertyRecordsBySubmissionUploadId(submissionUploadId);
+    await submissionRepository.clearSubmissionFeatureParentsBySubmissionUploadId(submissionUploadId);
+    await submissionRepository.deleteSubmissionFeatureRelationshipsBySubmissionUploadId(submissionUploadId);
 
-    if (!allFeatures.length) {
-      return;
+    const metadataByFeatureType = new Map<number, Map<string, FeatureTypePropertyMetadata>>();
+    const loadedFeatureTypeIds = new Set<number>();
+    let cursorSubmissionFeatureId = 0;
+    const batchSize = 10000;
+
+    while (true) {
+      const featureBatch = await submissionRepository.getSubmissionFeaturesBatchBySubmissionUploadId(
+        submissionUploadId,
+        cursorSubmissionFeatureId,
+        batchSize
+      );
+      if (!featureBatch.length) {
+        break;
+      }
+
+      const featureTypeIdsToLoad = [
+        ...new Set(
+          featureBatch
+            .map((feature) => feature.feature_type_id)
+            .filter((featureTypeId) => !loadedFeatureTypeIds.has(featureTypeId))
+        )
+      ];
+      if (featureTypeIdsToLoad.length) {
+        const metadataRows = await submissionFeaturePropertyIndexService.getFeatureTypePropertyMetadata(
+          featureTypeIdsToLoad
+        );
+        const groupedMetadata = this.groupFeatureTypePropertyMetadata(metadataRows);
+
+        for (const featureTypeId of featureTypeIdsToLoad) {
+          loadedFeatureTypeIds.add(featureTypeId);
+          if (!metadataByFeatureType.has(featureTypeId)) {
+            metadataByFeatureType.set(featureTypeId, new Map<string, FeatureTypePropertyMetadata>());
+          }
+        }
+
+        for (const [featureTypeId, metadataMap] of groupedMetadata.entries()) {
+          metadataByFeatureType.set(featureTypeId, metadataMap);
+        }
+      }
+
+      const propertyRecordBuckets = this.createPropertyRecordBuckets();
+      this.extractPropertyRecordsFromFeatureBatch(
+        submissionId,
+        featureBatch,
+        metadataByFeatureType,
+        propertyRecordBuckets
+      );
+
+      await this.resolveArtifactProperties(
+        submissionId,
+        submissionUploadId,
+        submissionFeaturePropertyIndexService,
+        propertyRecordBuckets.pendingArtifactRecords,
+        propertyRecordBuckets.artifactRecords
+      );
+      await this.resolveCodeProperties(
+        submissionId,
+        submissionFeaturePropertyIndexService,
+        propertyRecordBuckets.pendingCodeRecords,
+        propertyRecordBuckets.codeRecords
+      );
+      await this.resolveTaxonProperties(
+        submissionId,
+        propertyRecordBuckets.pendingTaxonRecords,
+        propertyRecordBuckets.taxonRecords
+      );
+      await this.persistPropertyRecords(submissionFeaturePropertyIndexService, propertyRecordBuckets);
+      await this.resolveFeatureRelationships(submissionId, submissionUploadId, featureBatch);
+      await this.resolveFeatureParents(submissionId, submissionUploadId, featureBatch);
+
+      if (featureBatch.length < batchSize) {
+        break;
+      }
+
+      cursorSubmissionFeatureId = featureBatch[featureBatch.length - 1].submission_feature_id;
     }
-
-    const featureTypeIds = [...new Set(allFeatures.map((feature) => feature.feature_type_id))];
-    const metadataRows = await submissionFeaturePropertyIndexService.getFeatureTypePropertyMetadata(featureTypeIds);
-    const metadataByFeatureType = this.groupFeatureTypePropertyMetadata(metadataRows);
-    const propertyRecordBuckets = this.createPropertyRecordBuckets();
-
-    this.collectPropertyRecordsForFeatures(submissionId, allFeatures, metadataByFeatureType, propertyRecordBuckets);
-
-    await this.resolvePendingCodeRecords(
-      submissionId,
-      submissionFeaturePropertyIndexService,
-      propertyRecordBuckets.pendingCodeRecords,
-      propertyRecordBuckets.codeRecords
-    );
-    await this.resolvePendingTaxonRecords(
-      submissionId,
-      propertyRecordBuckets.pendingTaxonRecords,
-      propertyRecordBuckets.taxonRecords
-    );
-    await this.persistPropertyRecords(submissionFeaturePropertyIndexService, propertyRecordBuckets);
   }
 
   /**
@@ -254,6 +328,8 @@ export class SearchFeatureService extends DBService {
       numberRecords: [],
       booleanRecords: [],
       timestampRecords: [],
+      artifactRecords: [],
+      pendingArtifactRecords: [],
       codeRecords: [],
       pendingCodeRecords: [],
       geometryRecords: [],
@@ -272,7 +348,7 @@ export class SearchFeatureService extends DBService {
    * @param {PropertyRecordBuckets} propertyRecordBuckets
    * @return {void}
    */
-  private collectPropertyRecordsForFeatures(
+  private extractPropertyRecordsFromFeatureBatch(
     submissionId: number,
     allFeatures: SubmissionFeatureRecordWithTypeAndSecurity[],
     metadataByFeatureType: Map<number, Map<string, FeatureTypePropertyMetadata>>,
@@ -284,7 +360,7 @@ export class SearchFeatureService extends DBService {
         continue;
       }
 
-      this.collectPropertyRecordsForFeature(submissionId, feature, featureTypeMetadata, propertyRecordBuckets);
+      this.extractPropertyRecordsFromFeature(submissionId, feature, featureTypeMetadata, propertyRecordBuckets);
     }
   }
 
@@ -298,13 +374,14 @@ export class SearchFeatureService extends DBService {
    * @param {PropertyRecordBuckets} propertyRecordBuckets
    * @return {void}
    */
-  private collectPropertyRecordsForFeature(
+  private extractPropertyRecordsFromFeature(
     submissionId: number,
     feature: SubmissionFeatureRecordWithTypeAndSecurity,
     featureTypeMetadata: Map<string, FeatureTypePropertyMetadata>,
     propertyRecordBuckets: PropertyRecordBuckets
   ): void {
-    for (const [propertyName, propertyValue] of Object.entries(feature.data)) {
+    const featureProperties = this.getFeatureProperties(feature.data);
+    for (const [propertyName, propertyValue] of Object.entries(featureProperties)) {
       if (propertyValue === null || propertyValue === undefined) {
         continue;
       }
@@ -337,6 +414,140 @@ export class SearchFeatureService extends DBService {
   }
 
   /**
+   * Resolve and insert feature-to-feature relationships for one feature batch.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {string} submissionUploadId
+   * @param {SubmissionFeatureRecordWithTypeAndSecurity[]} featureBatch
+   * @return {Promise<void>}
+   */
+  private async resolveFeatureRelationships(
+    submissionId: number,
+    submissionUploadId: string,
+    featureBatch: SubmissionFeatureRecordWithTypeAndSecurity[]
+  ): Promise<void> {
+    const submissionRepository = new SubmissionRepository(this.connection);
+    const referenceSourceIds = new Set<string>();
+    const relationshipPairs: Array<{ source_feature_id: number; target_feature_id: number }> = [];
+
+    for (const feature of featureBatch) {
+      for (const referenceSourceId of this.getFeatureReferenceSourceIds(feature.data)) {
+        referenceSourceIds.add(referenceSourceId);
+      }
+    }
+
+    if (!referenceSourceIds.size) {
+      return;
+    }
+
+    const resolvedSourceIdToFeatureId = await this.resolveFeatureSourceIdsByUpload(submissionUploadId, [
+      ...referenceSourceIds
+    ]);
+
+    for (const feature of featureBatch) {
+      for (const referenceSourceId of this.getFeatureReferenceSourceIds(feature.data)) {
+        const targetSubmissionFeatureId = resolvedSourceIdToFeatureId.get(referenceSourceId);
+        if (targetSubmissionFeatureId === undefined) {
+          throw new ApiExecuteSQLError('Failed to resolve feature reference id', [
+            'SearchFeatureService->indexSubmissionPropertiesBySubmissionUploadId',
+            {
+              submissionId,
+              submission_feature_id: feature.submission_feature_id,
+              referenceSourceId
+            }
+          ]);
+        }
+
+        relationshipPairs.push({
+          source_feature_id: feature.submission_feature_id,
+          target_feature_id: targetSubmissionFeatureId
+        });
+      }
+    }
+
+    await submissionRepository.insertSubmissionFeatureRelationships(relationshipPairs);
+  }
+
+  /**
+   * Resolve and set parent links for one feature batch.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {string} submissionUploadId
+   * @param {SubmissionFeatureRecordWithTypeAndSecurity[]} featureBatch
+   * @return {Promise<void>}
+   */
+  private async resolveFeatureParents(
+    submissionId: number,
+    submissionUploadId: string,
+    featureBatch: SubmissionFeatureRecordWithTypeAndSecurity[]
+  ): Promise<void> {
+    const submissionRepository = new SubmissionRepository(this.connection);
+    const parentSourceIds = new Set<string>();
+    const parentUpdates: Array<{ child_submission_feature_id: number; parent_submission_feature_id: number }> = [];
+
+    for (const feature of featureBatch) {
+      const parentSourceId = this.getFeatureParentSourceId(feature.data);
+      if (parentSourceId) {
+        parentSourceIds.add(parentSourceId);
+      }
+    }
+
+    if (!parentSourceIds.size) {
+      return;
+    }
+
+    const resolvedSourceIdToFeatureId = await this.resolveFeatureSourceIdsByUpload(submissionUploadId, [
+      ...parentSourceIds
+    ]);
+
+    for (const feature of featureBatch) {
+      const parentSourceId = this.getFeatureParentSourceId(feature.data);
+      if (!parentSourceId) {
+        continue;
+      }
+
+      const parentSubmissionFeatureId = resolvedSourceIdToFeatureId.get(parentSourceId);
+      if (parentSubmissionFeatureId === undefined) {
+        throw new ApiExecuteSQLError('Failed to resolve parent feature id', [
+          'SearchFeatureService->indexSubmissionPropertiesBySubmissionUploadId',
+          {
+            submissionId,
+            submission_feature_id: feature.submission_feature_id,
+            parentSourceId
+          }
+        ]);
+      }
+
+      parentUpdates.push({
+        child_submission_feature_id: feature.submission_feature_id,
+        parent_submission_feature_id: parentSubmissionFeatureId
+      });
+    }
+
+    await submissionRepository.updateSubmissionFeatureParents(parentUpdates);
+  }
+
+  /**
+   * Resolve external source IDs to submission_feature IDs for one upload.
+   *
+   * @private
+   * @param {string} submissionUploadId
+   * @param {string[]} sourceIds
+   * @return {Promise<Map<string, number>>}
+   */
+  private async resolveFeatureSourceIdsByUpload(
+    submissionUploadId: string,
+    sourceIds: string[]
+  ): Promise<Map<string, number>> {
+    const submissionRepository = new SubmissionRepository(this.connection);
+    const resolvedRows = await submissionRepository.getSubmissionFeatureIdMapBySourceIds(submissionUploadId, sourceIds);
+
+    return new Map(resolvedRows.map((resolvedRow) => [resolvedRow.source_id, resolvedRow.submission_feature_id]));
+  }
+
+  /**
    * Validate that multiple values are only provided when property metadata allows it.
    *
    * @private
@@ -359,7 +570,7 @@ export class SearchFeatureService extends DBService {
     }
 
     throw new ApiExecuteSQLError('Property does not allow multiple values', [
-      'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
+      'SearchFeatureService->indexSubmissionPropertiesBySubmissionUploadId',
       {
         submissionId,
         submission_feature_id: submissionFeatureId,
@@ -422,6 +633,16 @@ export class SearchFeatureService extends DBService {
         return;
       case 'timestamp':
         this.collectTimestampRecord(
+          submissionId,
+          feature,
+          matchingFeatureProperty,
+          propertyName,
+          currentValue,
+          propertyRecordBuckets
+        );
+        return;
+      case 'artifact_key':
+        this.collectArtifactRecord(
           submissionId,
           feature,
           matchingFeatureProperty,
@@ -585,7 +806,7 @@ export class SearchFeatureService extends DBService {
     const splitTimestamp = splitTimestampValue(currentValue);
     if (!splitTimestamp.date && !splitTimestamp.time) {
       throw new ApiExecuteSQLError('Invalid timestamp property value', [
-        'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
+        'SearchFeatureService->indexSubmissionPropertiesBySubmissionUploadId',
         {
           submissionId,
           submission_feature_id: feature.submission_feature_id,
@@ -633,7 +854,40 @@ export class SearchFeatureService extends DBService {
     propertyRecordBuckets.pendingCodeRecords.push({
       submission_feature_id: feature.submission_feature_id,
       feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
+      propertyName,
       codeReference
+    });
+  }
+
+  /**
+   * Parse and collect an artifact property record for deferred artifact-id resolution.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {SubmissionFeatureRecord} feature
+   * @param {FeatureTypePropertyMetadata} matchingFeatureProperty
+   * @param {string} propertyName
+   * @param {unknown} currentValue
+   * @param {PropertyRecordBuckets} propertyRecordBuckets
+   * @return {void}
+   */
+  private collectArtifactRecord(
+    submissionId: number,
+    feature: SubmissionFeatureRecordWithTypeAndSecurity,
+    matchingFeatureProperty: FeatureTypePropertyMetadata,
+    propertyName: string,
+    currentValue: unknown,
+    propertyRecordBuckets: PropertyRecordBuckets
+  ): void {
+    if (typeof currentValue !== 'string' || !currentValue.trim()) {
+      this.throwTypeMismatch(submissionId, feature.submission_feature_id, propertyName, 'artifact key', currentValue);
+    }
+
+    propertyRecordBuckets.pendingArtifactRecords.push({
+      submission_feature_id: feature.submission_feature_id,
+      feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
+      propertyName,
+      reference: currentValue.trim()
     });
   }
 
@@ -738,7 +992,7 @@ export class SearchFeatureService extends DBService {
     const geometryFeature = value as { type?: unknown; geometry?: unknown };
     if (geometryFeature.type !== 'Feature' || !geometryFeature.geometry) {
       throw new ApiExecuteSQLError('Invalid geometry value for geometry property', [
-        'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
+        'SearchFeatureService->indexSubmissionPropertiesBySubmissionUploadId',
         {
           submissionId,
           submission_feature_id: submissionFeatureId,
@@ -760,7 +1014,7 @@ export class SearchFeatureService extends DBService {
    * @param {PropertyRecordBuckets['codeRecords']} codeRecords
    * @return {Promise<void>}
    */
-  private async resolvePendingCodeRecords(
+  private async resolveCodeProperties(
     submissionId: number,
     submissionFeaturePropertyIndexService: SubmissionFeaturePropertyIndexService,
     pendingCodeRecords: PendingCodeRecord[],
@@ -786,10 +1040,11 @@ export class SearchFeatureService extends DBService {
 
       if (contributorCodesetCodeId === undefined) {
         throw new ApiExecuteSQLError('Failed to resolve code slug to contributor_codeset_code_id', [
-          'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
+          'SearchFeatureService->indexSubmissionPropertiesBySubmissionUploadId',
           {
             submissionId,
             submission_feature_id: pendingCodeRecord.submission_feature_id,
+            propertyName: pendingCodeRecord.propertyName,
             slug: pendingCodeRecord.codeReference.slug,
             advice: 'Ensure the slug exists and resolves to a unique contributor_codeset_code row for this contributor.'
           }
@@ -805,6 +1060,57 @@ export class SearchFeatureService extends DBService {
   }
 
   /**
+   * Resolve pending artifact references to artifact IDs.
+   *
+   * @private
+   * @param {number} submissionId
+   * @param {string} submissionUploadId
+   * @param {SubmissionFeaturePropertyIndexService} submissionFeaturePropertyIndexService
+   * @param {PendingArtifactRecord[]} pendingArtifactRecords
+   * @param {PropertyRecordBuckets['artifactRecords']} artifactRecords
+   * @return {Promise<void>}
+   */
+  private async resolveArtifactProperties(
+    submissionId: number,
+    submissionUploadId: string,
+    submissionFeaturePropertyIndexService: SubmissionFeaturePropertyIndexService,
+    pendingArtifactRecords: PendingArtifactRecord[],
+    artifactRecords: PropertyRecordBuckets['artifactRecords']
+  ): Promise<void> {
+    if (!pendingArtifactRecords.length) {
+      return;
+    }
+
+    const uniqueReferences = [...new Set(pendingArtifactRecords.map((record) => record.reference))];
+    const artifactIdByReference = await submissionFeaturePropertyIndexService.resolveArtifactIdsByReferences(
+      submissionUploadId,
+      uniqueReferences
+    );
+
+    for (const pendingArtifactRecord of pendingArtifactRecords) {
+      const artifactId = artifactIdByReference.get(pendingArtifactRecord.reference);
+
+      if (!artifactId) {
+        throw new ApiExecuteSQLError('Failed to resolve artifact_key value', [
+          'SearchFeatureService->indexSubmissionPropertiesBySubmissionUploadId',
+          {
+            submissionId,
+            submission_feature_id: pendingArtifactRecord.submission_feature_id,
+            propertyName: pendingArtifactRecord.propertyName,
+            value: pendingArtifactRecord.reference
+          }
+        ]);
+      }
+
+      artifactRecords.push({
+        submission_feature_id: pendingArtifactRecord.submission_feature_id,
+        feature_type_property_id: pendingArtifactRecord.feature_type_property_id,
+        artifact_id: artifactId
+      });
+    }
+  }
+
+  /**
    * Resolve pending taxon TSN records to internal taxon IDs.
    *
    * @private
@@ -813,7 +1119,7 @@ export class SearchFeatureService extends DBService {
    * @param {PropertyRecordBuckets['taxonRecords']} taxonRecords
    * @return {Promise<void>}
    */
-  private async resolvePendingTaxonRecords(
+  private async resolveTaxonProperties(
     submissionId: number,
     pendingTaxonRecords: PendingTaxonRecord[],
     taxonRecords: PropertyRecordBuckets['taxonRecords']
@@ -834,7 +1140,7 @@ export class SearchFeatureService extends DBService {
 
       if (resolvedTaxonId === undefined) {
         throw new ApiExecuteSQLError('Failed to resolve taxon value', [
-          'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
+          'SearchFeatureService->indexSubmissionPropertiesBySubmissionUploadId',
           {
             submissionId,
             submission_feature_id: pendingTaxonRecord.submission_feature_id,
@@ -882,6 +1188,10 @@ export class SearchFeatureService extends DBService {
       promises.push(
         submissionFeaturePropertyIndexService.insertTimestampRecords(propertyRecordBuckets.timestampRecords)
       );
+    }
+
+    if (propertyRecordBuckets.artifactRecords.length) {
+      promises.push(submissionFeaturePropertyIndexService.insertArtifactRecords(propertyRecordBuckets.artifactRecords));
     }
 
     if (propertyRecordBuckets.codeRecords.length) {
@@ -951,7 +1261,7 @@ export class SearchFeatureService extends DBService {
     const parsed = parseCodeReference(value);
     if (!parsed) {
       throw new ApiExecuteSQLError('Invalid code slug format', [
-        'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
+        'SearchFeatureService->indexSubmissionPropertiesBySubmissionUploadId',
         {
           submissionId,
           submission_feature_id: submissionFeatureId,
@@ -984,7 +1294,7 @@ export class SearchFeatureService extends DBService {
     value: unknown
   ): never {
     throw new ApiExecuteSQLError('Property value type mismatch', [
-      'SearchFeatureService->indexSubmissionPropertiesBySubmissionId',
+      'SearchFeatureService->indexSubmissionPropertiesBySubmissionUploadId',
       {
         submissionId,
         submission_feature_id: submissionFeatureId,
@@ -993,5 +1303,79 @@ export class SearchFeatureService extends DBService {
         receivedType: typeof value
       }
     ]);
+  }
+
+  /**
+   * Extract properties from persisted raw feature payload.
+   * Falls back to legacy payload shape for previously-ingested rows.
+   *
+   * @private
+   * @param {Record<string, unknown>} data
+   * @return {Record<string, unknown>}
+   */
+  private getFeatureProperties(data: Record<string, unknown>): Record<string, unknown> {
+    const value = data.properties;
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+
+    return data;
+  }
+
+  /**
+   * Normalize legacy search indexing value for artifact keys.
+   *
+   * @private
+   * @param {unknown} value
+   * @return {string | null}
+   */
+  private normalizeArtifactReference(value: unknown): string | null {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+
+    if (typeof value === 'object' && value !== null) {
+      const objectValue = value as Record<string, unknown>;
+      if (typeof objectValue.file === 'string' && objectValue.file.trim()) {
+        return objectValue.file.trim();
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract parent source id from persisted raw feature payload.
+   *
+   * @private
+   * @param {Record<string, unknown>} data
+   * @return {string | null}
+   */
+  private getFeatureParentSourceId(data: Record<string, unknown>): string | null {
+    return typeof data.parent === 'string' && data.parent ? data.parent : null;
+  }
+
+  /**
+   * Extract feature reference source ids from persisted raw feature payload.
+   *
+   * @private
+   * @param {Record<string, unknown>} data
+   * @return {string[]}
+   */
+  private getFeatureReferenceSourceIds(data: Record<string, unknown>): string[] {
+    const references = Array.isArray(data.references)
+      ? data.references
+      : Array.isArray(data.content)
+      ? data.content
+      : [];
+    const referenceSourceIds: string[] = [];
+
+    for (const reference of references) {
+      if (typeof reference === 'string' && reference) {
+        referenceSourceIds.push(reference);
+      }
+    }
+
+    return referenceSourceIds;
   }
 }

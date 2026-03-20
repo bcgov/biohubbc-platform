@@ -22,3 +22,12 @@ export const ContributorCodeResolution = z.object({
   contributor_codeset_code_key: z.string()
 });
 export type ContributorCodeResolution = z.infer<typeof ContributorCodeResolution>;
+
+/**
+ * Query row schema for artifact reference resolution rows.
+ */
+export const ArtifactReferenceResolution = z.object({
+  artifact_reference: z.string(),
+  artifact_id: z.string().uuid()
+});
+export type ArtifactReferenceResolution = z.infer<typeof ArtifactReferenceResolution>;

@@ -14,6 +14,89 @@ import { ISubmissionFeature } from '../submission-repository';
  */
 export class IngestionRepository extends BaseRepository {
   /**
+   * Bulk insert submission feature rows (raw payload persisted in `data`).
+   *
+   * @param {Array<{
+   *   submissionId: number;
+   *   submissionUploadId: string;
+   *   sourceId: string;
+   *   featureTypeName: string;
+   *   data: Record<string, unknown>;
+   *   dataByteSize: number;
+   * }>} records
+   * @return {Promise<void>}
+   * @memberof IngestionRepository
+   */
+  async insertSubmissionFeatureRecords(
+    records: Array<{
+      submissionId: number;
+      submissionUploadId: string;
+      sourceId: string;
+      featureTypeName: string;
+      data: Record<string, unknown>;
+      dataByteSize: number;
+    }>
+  ): Promise<void> {
+    if (!records.length) {
+      return;
+    }
+
+    const submissionIds = records.map((record) => record.submissionId);
+    const submissionUploadIds = records.map((record) => record.submissionUploadId);
+    const sourceIds = records.map((record) => record.sourceId);
+    const featureTypeNames = records.map((record) => record.featureTypeName);
+    const dataValues = records.map((record) => JSON.stringify(record.data));
+    const dataByteSizes = records.map((record) => record.dataByteSize);
+
+    const sqlStatement = SQL`
+      INSERT INTO submission_feature (
+        submission_id,
+        submission_upload_id,
+        parent_submission_feature_id,
+        source_id,
+        feature_type_id,
+        data,
+        data_byte_size,
+        record_effective_date
+      )
+      SELECT
+        staged.submission_id,
+        staged.submission_upload_id,
+        NULL,
+        staged.source_id,
+        ft.feature_type_id,
+        staged.data,
+        staged.data_byte_size,
+        now()
+      FROM unnest(
+        ${submissionIds}::integer[],
+        ${submissionUploadIds}::uuid[],
+        ${sourceIds}::text[],
+        ${featureTypeNames}::text[],
+        ${dataValues}::text[],
+        ${dataByteSizes}::integer[]
+      ) AS staged(
+        submission_id,
+        submission_upload_id,
+        source_id,
+        feature_type_name,
+        data_text,
+        data_byte_size
+      )
+      INNER JOIN feature_type ft ON ft.name = staged.feature_type_name
+      CROSS JOIN LATERAL (SELECT staged.data_text::jsonb AS data) parsed;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+    if (response.rowCount !== records.length) {
+      throw new ApiExecuteSQLError('Failed to bulk insert submission feature records', [
+        'IngestionRepository->insertSubmissionFeatureRecords',
+        `rowCount was ${response.rowCount ?? 'null'}, expected ${records.length}`
+      ]);
+    }
+  }
+
+  /**
    * Insert a new submission feature record.
    * Features belong to a submission (submission_id) but are produced by a specific
    * upload event (submission_upload_id). This distinction enables multi-upload-per-submission
