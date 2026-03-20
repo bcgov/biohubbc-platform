@@ -4,7 +4,7 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiGeneralError, ApiNotFoundError } from '../errors/api-error';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
 import {
@@ -194,10 +194,10 @@ describe('SubmissionRepository', () => {
 
       const response = await submissionRepository.getSubmissionIdByUUID('test_uuid');
 
-      expect(response?.submission_id).to.equal(1);
+      expect(response.submission_id).to.equal(1);
     });
 
-    it('should return null', async () => {
+    it('should throw ApiNotFoundError when submission not found', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
@@ -206,9 +206,13 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.getSubmissionIdByUUID('test_uuid');
-
-      expect(response).to.be.null;
+      try {
+        await submissionRepository.getSubmissionIdByUUID('test_uuid');
+        expect.fail('Expected ApiNotFoundError');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ApiNotFoundError);
+        expect((err as ApiNotFoundError).message).to.equal('Submission not found');
+      }
     });
   });
 

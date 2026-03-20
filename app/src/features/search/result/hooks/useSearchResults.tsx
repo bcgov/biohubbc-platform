@@ -108,12 +108,9 @@ export const useSearchResults = () => {
         }
       });
 
-      // Reset page if any updated param is not PAGE or LIMIT
+      // Reset page unless the only param being changed is PAGE itself
       const shouldResetPage = Object.keys(updates).some(
-        (k) =>
-          ![URL_PARAMS.PAGE.toLowerCase() as UrlParamKey, URL_PARAMS.LIMIT.toLowerCase() as UrlParamKey].includes(
-            k.toLowerCase() as UrlParamKey
-          )
+        (k) => k.toLowerCase() !== (URL_PARAMS.PAGE.toLowerCase() as UrlParamKey)
       );
       if (shouldResetPage) {
         newParams.set(URL_PARAMS.PAGE as UrlParamKey, '1');
@@ -144,12 +141,8 @@ export const useSearchResults = () => {
         newParams.delete(normalizedKey);
       }
 
-      // Reset page unless updating page/limit
-      if (
-        ![URL_PARAMS.PAGE.toLowerCase() as UrlParamKey, URL_PARAMS.LIMIT.toLowerCase() as UrlParamKey].includes(
-          normalizedKey
-        )
-      ) {
+      // Reset page unless the param being removed is PAGE itself
+      if (normalizedKey !== (URL_PARAMS.PAGE.toLowerCase() as UrlParamKey)) {
         newParams.set(URL_PARAMS.PAGE as UrlParamKey, '1');
       }
 

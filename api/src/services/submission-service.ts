@@ -8,6 +8,7 @@ import {
   ISubmissionFeature,
   ISubmissionModel,
   PatchSubmissionRecord,
+  RelatedSubmissionFeature,
   SubmissionFeature,
   SubmissionFeatureDownloadRecord,
   SubmissionFeatureRecord,
@@ -169,7 +170,7 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number } | null> {
+  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
     return this.submissionRepository.getSubmissionIdByUUID(uuid);
   }
 
@@ -443,6 +444,17 @@ export class SubmissionService extends DBService {
    */
   async getSubmissionFeatureById(submissionFeatureId: number): Promise<SubmissionFeature> {
     return this.submissionRepository.getSubmissionFeatureById(submissionFeatureId);
+  }
+
+  /**
+   * Get all related submission features with their type names.
+   *
+   * @param {number} submissionFeatureId
+   * @return {Promise<RelatedSubmissionFeature[]>}
+   * @memberof SubmissionService
+   */
+  async getRelatedSubmissionFeatures(submissionFeatureId: number): Promise<RelatedSubmissionFeature[]> {
+    return this.submissionRepository.getRelatedSubmissionFeatures(submissionFeatureId);
   }
 
   /**

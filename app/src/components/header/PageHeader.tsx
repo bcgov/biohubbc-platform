@@ -62,7 +62,7 @@ export const PageHeader = ({
               </Box>
             )}
             {subheader && (
-              <Box mt={1}>
+              <Box mt={1.5}>
                 {typeof subheader === 'string' ? (
                   <Typography color="text.secondary">{subheader}</Typography>
                 ) : (

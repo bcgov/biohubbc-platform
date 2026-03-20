@@ -43,6 +43,13 @@ GET.apiDoc = {
         format: 'uuid'
       }
     },
+    {
+      in: 'query',
+      name: 'submissionFeatureId',
+      required: false,
+      schema: { type: 'integer' },
+      description: 'Filter results to a specific submission feature ID'
+    },
     ...paginationRequestQueryParamSchema
   ],
   responses: {
@@ -72,11 +79,16 @@ export function getCartSubmissionFeatures(): RequestHandler {
       await connection.open();
 
       const pagination = makePaginationOptionsFromRequest(req);
+      const submissionFeatureId = Number(req.query.submissionFeatureId) || undefined;
 
       const cartId = req.params.cartId;
       const cartSubmissionFeatureService = new CartSubmissionFeatureService(connection);
 
-      const response = await cartSubmissionFeatureService.getPaginatedCartFeaturesResponse(cartId, pagination);
+      const response = await cartSubmissionFeatureService.getPaginatedCartFeaturesResponse(
+        cartId,
+        pagination,
+        submissionFeatureId
+      );
 
       await connection.commit();
 

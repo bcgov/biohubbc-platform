@@ -89,7 +89,7 @@ export function downloadSubmission(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json(result);
+      return res.status(200).json(result);
     } catch (error) {
       defaultLog.error({ label: 'downloadSubmission', message: 'error', error });
       await connection.rollback();

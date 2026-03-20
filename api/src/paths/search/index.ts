@@ -69,7 +69,7 @@ export function searchAll(): RequestHandler {
 
       res.setHeader('Cache-Control', 'public, max-age=90');
 
-      res.status(200).json(result);
+      return res.status(200).json(result);
     } catch (error) {
       defaultLog.error({ label: 'searchAll', message: 'error', error });
       await connection.rollback();

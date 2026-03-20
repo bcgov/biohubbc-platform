@@ -24,7 +24,8 @@ describe('archive upload handler', () => {
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
     const mockUploadResponse: PresignedUploadUrlResponse = {
-      submissionId: 1,
+      submissionId: 'mock-submission-uuid',
+      submissionUploadId: 'mock-submission-upload-id',
       uploadId: 'mock-upload-id',
       s3UploadId: 'mock-s3-upload-id',
       uploadArchiveId: 'mock-archive-id',
@@ -118,7 +119,8 @@ describe('archive upload handler', () => {
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
     const startArchiveUploadStub = sinon.stub(UploadIngestionService.prototype, 'startArchiveUpload').resolves({
-      submissionId: 1,
+      submissionId: 'mock-submission-uuid',
+      submissionUploadId: 'mock-submission-upload-id',
       uploadId: 'mock-upload-id',
       s3UploadId: 'mock-s3-upload-id',
       uploadArchiveId: 'mock-archive-id',

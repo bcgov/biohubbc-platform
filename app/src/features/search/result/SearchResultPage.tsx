@@ -3,22 +3,26 @@ import { PageHeader } from 'components/header/PageHeader';
 import { URL_PARAMS, UrlParamKey } from 'constants/query-params';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useCartContext, useCodesContext, useDialogContext } from 'hooks/useContext';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router';
 import { normalizeQueryParam } from 'utils/query-param';
+import { DownloadUrlDisplay } from './components/DownloadUrlDisplay';
 import { SearchResultOptions } from './content/option/SearchResultOptions';
+import { CustomPagination } from 'components/pagination/CustomPagination';
 import { SearchResultToolbar } from './content/toolbar/SearchResultToolbar';
 import { SearchResultHeader } from './header/SearchResultHeader';
 import { useSearchResults } from './hooks/useSearchResults';
 import { ResultPageContainer } from './layout/ResultPageContainer';
 import { DownloadSidebar } from './sidebar/download/DownloadSidebar';
+import { DOWNLOAD_SIDEBAR_VIEW } from './sidebar/download/toolbar/DownloadSidebarToolbar';
 import { SearchSidebar } from './sidebar/search/SearchSidebar';
 import {
   OmitListedRecommendedState,
   RecommendedFiltersInput,
   useRecommendedFilters
 } from './sidebar/search/hooks/useRecommendedFilters';
+import { useNavigate } from 'react-router';
 
 export enum SEARCH_RESULT_OPTION_VIEW {
   LIST = 'list',
@@ -29,12 +33,15 @@ export const SearchResultPage = () => {
   const navigate = useNavigate();
   const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination, filters } = useSearchResults();
   const api = useApi();
+  const { auth } = useAuthStateContext();
+
   const { codesDataLoader } = useCodesContext();
   const { features, pagination: cartPagination, addToCart, checkout } = useCartContext();
   const dialogContext = useDialogContext();
 
   const [view, setView] = useState<SEARCH_RESULT_OPTION_VIEW>(SEARCH_RESULT_OPTION_VIEW.LIST);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadView, setDownloadView] = useState<DOWNLOAD_SIDEBAR_VIEW>(DOWNLOAD_SIDEBAR_VIEW.CART);
   const { recommended, handleRefresh: refreshRecommended } = useRecommendedFilters();
 
   /**
@@ -204,37 +211,64 @@ export const SearchResultPage = () => {
    * Download all features matching the current search filters in one click.
    * Bypasses the shopping cart — sends filters to POST /api/download which resolves
    * them to feature IDs server-side and creates a download record.
+   *
+   * Anonymous users have no "My Downloads" page, so the download UUID is their only
+   * credential. Instead of an ephemeral snackbar, they get a persistent dialog with
+   * the API status URL they can use with curl to check progress and get download links.
    */
   const handleDownloadAll = useCallback(async () => {
     try {
       setIsDownloading(true);
-      await api.search.createDownload(filters);
-      dialogContext.setSnackbar({
-        snackbarMessage: 'Download started. You can track its progress in your downloads.',
-        open: true
-      });
+      const { download_url: downloadUrl } = await api.search.createDownload(filters);
+
+      if (auth.isAuthenticated) {
+        dialogContext.setSnackbar({
+          snackbarMessage: 'Download started. You can track its progress in your downloads.',
+          open: true
+        });
+      } else {
+        dialogContext.setOkDialog({
+          dialogTitle: 'Download Started',
+          dialogText:
+            'Your download is being prepared. Use this URL to check its status and get download links when ready.',
+          dialogContent: <DownloadUrlDisplay url={downloadUrl} />,
+          open: true,
+          onClose: () => dialogContext.setOkDialog({ open: false })
+        });
+      }
     } catch (error) {
       dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
     } finally {
       setIsDownloading(false);
     }
-  }, [filters, api.search, dialogContext]);
+  }, [filters, api.search, dialogContext, auth.isAuthenticated]);
+
+  const handlePageChange = useCallback(
+    (page: number) => {
+      setSearchParams({ [URL_PARAMS.PAGE]: String(page) });
+    },
+    [setSearchParams]
+  );
+
+  const handlePageSizeChange = useCallback(
+    (limit: number) => {
+      setSearchParams({ [URL_PARAMS.LIMIT]: String(limit), [URL_PARAMS.PAGE]: '1' });
+    },
+    [setSearchParams]
+  );
 
   const handleCheckout = useCallback(async () => {
     try {
-      const download = await checkout();
-
-      if (download?.download_id) {
-        // Navigate to the download
-        navigate(`/download/${download.download_id}`);
-      }
+      await checkout();
+      setDownloadView(DOWNLOAD_SIDEBAR_VIEW.DOWNLOADS);
     } catch (error) {
       dialogContext.setSnackbar({ snackbarMessage: (error as APIError).message, open: true });
     }
-  }, [checkout, dialogContext, navigate]);
+  }, [checkout, dialogContext]);
 
   return (
     <ResultPageContainer
+      rightSidebarTitle={downloadView === DOWNLOAD_SIDEBAR_VIEW.CART ? 'Cart' : 'Downloads'}
       leftSidebar={
         <SearchSidebar
           recommended={recommended}
@@ -246,7 +280,13 @@ export const SearchResultPage = () => {
         />
       }
       rightSidebar={
-        <DownloadSidebar features={features} itemCount={cartPagination?.total ?? 0} onDownload={handleCheckout} />
+        <DownloadSidebar
+          features={features}
+          itemCount={cartPagination?.total ?? 0}
+          activeView={downloadView}
+          onViewChange={setDownloadView}
+          onDownload={handleCheckout}
+        />
       }>
       <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
         <PageHeader>
@@ -275,7 +315,25 @@ export const SearchResultPage = () => {
           <Divider />
 
           <Box sx={{ flex: 1, overflow: 'auto' }}>
-            <SearchResultOptions rows={rows} isLoading={isLoading} view={view} />
+            <SearchResultOptions
+              rows={rows}
+              isLoading={isLoading}
+              view={view}
+              onClick={(result) => navigate(`/search/${result.submission_id}/feature/${result.submission_feature_id}`)}
+            />
+          </Box>
+
+          <Divider />
+
+          <Box sx={{ px: 2, py: 1 }}>
+            <CustomPagination
+              currentPage={pagination?.current_page ?? 1}
+              pageSize={pagination?.per_page ?? 10}
+              totalCount={pagination?.total ?? 0}
+              lastPage={pagination?.last_page ?? 1}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
           </Box>
         </Paper>
       </Box>

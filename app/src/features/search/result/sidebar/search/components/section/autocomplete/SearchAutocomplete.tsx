@@ -29,21 +29,22 @@ export const SearchAutocomplete = ({
   placeholder = 'Search...',
   onChange,
   onInputChange,
+  size = 'small',
   ...autocompleteProps
 }: SearchAutocompleteProps) => {
-  // Track the current input value with state for proper re-renders
   const [inputValue, setInputValue] = useState('');
 
   return (
     <CustomAutocomplete<string | number>
       {...autocompleteProps}
       fullWidth
+      size={size}
       options={options}
       value={value}
       filterOptions={(x) => x}
       getOptionLabel={(option) => option.label}
       onChange={(_, newValue) => {
-        setInputValue(''); // Clear the input value
+        setInputValue('');
         onChange(newValue);
       }}
       inputValue={inputValue}
@@ -57,11 +58,23 @@ export const SearchAutocomplete = ({
           setInputValue(newValue);
         }
       }}
+      onKeyDown={(event) => {
+        autocompleteProps.onKeyDown?.(event);
+
+        if (event.key === 'Backspace' && value) {
+          event.preventDefault();
+          onChange(null);
+        }
+      }}
       renderInput={(params) => (
         <CustomTextField
           {...params}
           label={label}
           placeholder={placeholder}
+          inputProps={{
+            ...params.inputProps,
+            readOnly: Boolean(value)
+          }}
           InputProps={{
             ...params.InputProps,
             startAdornment: showStartAdornment ? (

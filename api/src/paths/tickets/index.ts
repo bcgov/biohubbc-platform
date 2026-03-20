@@ -69,7 +69,7 @@ POST.apiDoc = {
 };
 
 GET.apiDoc = {
-  description: 'List tickets by team ID, optionally filtered by status',
+  description: 'List tickets by team ID, optionally filtered by status or search text',
   tags: ['tickets'],
   security: [
     {
@@ -95,6 +95,15 @@ GET.apiDoc = {
         type: 'string',
         enum: ['open', 'closed']
       }
+    },
+    {
+      in: 'query',
+      name: 'search',
+      required: false,
+      schema: {
+        type: 'string'
+      },
+      description: 'Optional case-insensitive search across ticket slug, subject, and description.'
     },
     ...paginationRequestQueryParamSchema
   ],
@@ -144,8 +153,9 @@ export function getTickets(): RequestHandler {
       const ticketService = new TicketService(connection);
       const teamId = req.query.team_id as string | undefined;
       const status = req.query.status as 'open' | 'closed' | undefined;
+      const search = req.query.search as string | undefined;
       const pagination = makePaginationOptionsFromRequest(req);
-      const filters = { team_id: teamId, status };
+      const filters = { team_id: teamId, status, search };
 
       const [tickets, count] = await Promise.all([
         ticketService.getTickets(filters, ensureCompletePaginationOptions(pagination)),

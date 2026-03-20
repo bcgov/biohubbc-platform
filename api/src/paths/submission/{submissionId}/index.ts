@@ -158,7 +158,7 @@ export function getSubmissionRecordWithSecurity(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json(result);
+      return res.status(200).json(result);
     } catch (error) {
       defaultLog.error({ label: 'getSubmissionRecordWithSecurity', message: 'error', error });
       await connection.rollback();
