@@ -213,6 +213,7 @@ describe('ValidationService', () => {
           display_name: 'Field 1',
           description: 'A Field 1',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -255,6 +256,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -263,6 +265,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'number',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -271,6 +274,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'boolean',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -279,6 +283,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'object',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -287,6 +292,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'spatial',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -295,6 +301,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'datetime',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -338,6 +345,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -346,6 +354,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'number',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -354,6 +363,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'boolean',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -362,6 +372,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'object',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -370,6 +381,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'spatial',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -378,6 +390,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'datetime',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -422,6 +435,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -430,6 +444,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'number',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -438,6 +453,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'boolean',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -446,6 +462,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'object',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -454,6 +471,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'spatial',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -462,6 +480,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'datetime',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -506,6 +525,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -514,6 +534,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'number',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -522,6 +543,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'boolean',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -530,6 +552,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'object',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -538,6 +561,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'spatial',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -546,6 +570,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'datetime',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -590,6 +615,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -598,6 +624,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'number',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -606,6 +633,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'boolean',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -614,6 +642,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'object',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -622,6 +651,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'spatial',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -630,6 +660,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'datetime',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -674,6 +705,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -682,6 +714,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'number',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -690,6 +723,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'boolean',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -698,6 +732,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'array',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -706,6 +741,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'spatial',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -714,6 +750,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'datetime',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -758,6 +795,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'array',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -783,6 +821,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -791,6 +830,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'number',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -799,6 +839,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'boolean',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -807,6 +848,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'object',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -815,6 +857,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'spatial',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -823,6 +866,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'datetime',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -855,6 +899,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -863,6 +908,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'number',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -871,6 +917,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'boolean',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -879,6 +926,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'object',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -887,6 +935,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'spatial',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -895,6 +944,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'datetime',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -939,6 +989,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -947,6 +998,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'number',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -955,6 +1007,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'boolean',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -963,6 +1016,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'object',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -971,6 +1025,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'spatial',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -979,6 +1034,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'datetime',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -1023,6 +1079,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -1031,6 +1088,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'number',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -1039,6 +1097,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'boolean',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -1047,6 +1106,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'object',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -1055,6 +1115,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'array',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -1063,6 +1124,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'spatial',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -1071,6 +1133,7 @@ describe('ValidationService', () => {
           display_name: '',
           description: '',
           type_name: 'datetime',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -1116,6 +1179,7 @@ describe('ValidationService', () => {
           display_name: 'Name',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -1124,6 +1188,7 @@ describe('ValidationService', () => {
           display_name: 'Description',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -1152,6 +1217,7 @@ describe('ValidationService', () => {
           display_name: 'Name',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -1160,6 +1226,7 @@ describe('ValidationService', () => {
           display_name: 'Description',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -1180,6 +1247,7 @@ describe('ValidationService', () => {
           display_name: 'Count',
           description: '',
           type_name: 'number',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -1200,6 +1268,7 @@ describe('ValidationService', () => {
           display_name: 'Name',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -1208,6 +1277,7 @@ describe('ValidationService', () => {
           display_name: 'Description',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }

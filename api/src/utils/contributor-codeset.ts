@@ -1,7 +1,8 @@
 /**
- * Build a deterministic identity cache key from ordered identity parts.
+ * Build a deterministic string slug from ordered identity parts.
  *
- * This is shared by contributor codeset services to avoid duplicating string
- * composition logic while keeping service-specific identity semantics local.
+ * String-form identities in the contributor codeset flow are always expressed
+ * as prefixed slugs: `code::<part1>::<part2>...`.
  */
-export const makeIdentityKey = (...parts: Array<string | number | null>): string => parts.join('::');
+export const makeSlug = (...parts: Array<string | number | null>): string =>
+  `code::${parts.map((part) => (part ?? '').toString()).join('::')}`;

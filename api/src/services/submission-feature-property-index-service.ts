@@ -15,6 +15,7 @@ import { CodeReference } from '../utils/code-reference';
 import { ContributorCodesetCodeService } from './contributor-codeset-code-service';
 import { ContributorCodesetService } from './contributor-codeset-service';
 import { DBService } from './db-service';
+import type { TarCodeset, TarCodesets } from './ingestion/submission-ingestion-codes-service.interface';
 
 export class SubmissionFeaturePropertyIndexService extends DBService {
   submissionFeaturePropertyIndexRepository: SubmissionFeaturePropertyIndexRepository;
@@ -133,14 +134,14 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
    * Persist referenced contributor codesets and codes for a contributor.
    *
    * @param {number} contributorId
-   * @param {Record<string, unknown>} codesets
+   * @param {TarCodesets} codesets
    * @param {CodeReference[]} [codeReferences=[]]
    * @return {Promise<void>}
    * @memberof SubmissionFeaturePropertyIndexService
    */
   async persistContributorCodesByContributorId(
     contributorId: number,
-    codesets: Record<string, unknown>,
+    codesets: TarCodesets,
     codeReferences: CodeReference[] = []
   ): Promise<void> {
     if (!Object.keys(codesets).length || !codeReferences.length) {
@@ -279,14 +280,14 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
    *
    * @private
    * @param {string} contributorCodesetKey
-   * @param {unknown} rawContributorCodeset
+   * @param {(TarCodeset | undefined)} rawContributorCodeset
    * @param {Set<string>} referencedCodesetCodeKeys
    * @return {Omit<ContributorCodeset, 'contributor_codeset_id' | 'contributor_id'> & { codesByKey: Map<string, Omit<ContributorCodesetCode, 'contributor_codeset_code_id' | 'contributor_codeset_id'>> }}
    * @memberof SubmissionFeaturePropertyIndexService
    */
   private normalizeCodeset(
     contributorCodesetKey: string,
-    rawContributorCodeset: unknown,
+    rawContributorCodeset: TarCodeset | undefined,
     referencedCodesetCodeKeys: Set<string>
   ): Omit<ContributorCodeset, 'contributor_codeset_id' | 'contributor_id'> & {
     codesByKey: Map<string, Omit<ContributorCodesetCode, 'contributor_codeset_code_id' | 'contributor_codeset_id'>>;

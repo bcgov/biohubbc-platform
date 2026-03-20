@@ -534,6 +534,115 @@ describe('SearchFeatureService', () => {
       ]);
     });
 
+    it('throws when array values are provided for a property that does not allow multiple values', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+
+      sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBySubmissionId').resolves([
+        {
+          submission_feature_id: 100,
+          submission_id: 777,
+          feature_type_id: 1,
+          urn: 'urn:777:dataset:100',
+          data: {
+            title: ['one', 'two']
+          },
+          source_id: null,
+          uuid: '123-456-789',
+          parent_submission_feature_id: null,
+          record_effective_date: '2024-01-01',
+          record_end_date: null,
+          create_date: '2024-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          feature_type_name: 'dataset',
+          feature_type_display_name: 'Dataset',
+          submission_feature_security_ids: []
+        }
+      ]);
+
+      sinon.stub(SubmissionFeaturePropertyIndexService.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
+      sinon.stub(SubmissionFeaturePropertyIndexService.prototype, 'getFeatureTypePropertyMetadata').resolves([
+        {
+          feature_type_id: 1,
+          feature_type_property_id: 10,
+          feature_property_name: 'title',
+          feature_property_type_name: 'string',
+          allow_multiple: false
+        }
+      ]);
+
+      const insertStringRecordsStub = sinon
+        .stub(SubmissionFeaturePropertyIndexService.prototype, 'insertStringRecords')
+        .resolves();
+
+      try {
+        await searchFeatureService.indexSubmissionPropertiesBySubmissionId(777);
+        expect.fail();
+      } catch (error) {
+        expect((error as Error).message).to.equal('Property does not allow multiple values');
+      }
+
+      expect(insertStringRecordsStub).not.to.have.been.called;
+    });
+
+    it('accepts a single scalar when allow_multiple=true and indexes it as one record', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+
+      sinon.stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBySubmissionId').resolves([
+        {
+          submission_feature_id: 100,
+          submission_id: 777,
+          feature_type_id: 1,
+          urn: 'urn:777:dataset:100',
+          data: {
+            tags: 'single-tag'
+          },
+          source_id: null,
+          uuid: '123-456-789',
+          parent_submission_feature_id: null,
+          record_effective_date: '2024-01-01',
+          record_end_date: null,
+          create_date: '2024-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          feature_type_name: 'dataset',
+          feature_type_display_name: 'Dataset',
+          submission_feature_security_ids: []
+        }
+      ]);
+
+      sinon.stub(SubmissionFeaturePropertyIndexService.prototype, 'deletePropertyRecordsBySubmissionId').resolves();
+      sinon.stub(SubmissionFeaturePropertyIndexService.prototype, 'getFeatureTypePropertyMetadata').resolves([
+        {
+          feature_type_id: 1,
+          feature_type_property_id: 11,
+          feature_property_name: 'tags',
+          feature_property_type_name: 'string',
+          allow_multiple: true
+        }
+      ]);
+
+      const insertStringRecordsStub = sinon
+        .stub(SubmissionFeaturePropertyIndexService.prototype, 'insertStringRecords')
+        .resolves();
+
+      await searchFeatureService.indexSubmissionPropertiesBySubmissionId(777);
+
+      expect(insertStringRecordsStub).to.have.been.calledOnceWith([
+        {
+          submission_feature_id: 100,
+          feature_type_property_id: 11,
+          value: 'single-tag'
+        }
+      ]);
+    });
+
     it('resolves taxon TSN values and inserts resolved taxon_id records', async () => {
       const mockDBConnection = getMockDBConnection();
       const searchFeatureService = new SearchFeatureService(mockDBConnection);

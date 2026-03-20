@@ -26,17 +26,15 @@ describe('SubmissionIngestionCodesService', () => {
       expect(slugs).to.eql(['code::agency::aarde', 'code::agency::bevr']);
     });
 
-    it('ignores non-string and malformed values', () => {
+    it('ignores malformed code slug values', () => {
       const service = new SubmissionIngestionCodesService();
       const blocks: IFlattenedBlock[] = [
         {
           id: 'feature-1',
           type: 'dataset',
           properties: {
-            count: 5,
-            nested: { key: 'value' },
             invalidCode: 'code::missing-part',
-            mixed: ['code::agency::aarde', true, 7]
+            mixed: ['code::agency::aarde', 'code::agency']
           },
           content: [],
           parent: null

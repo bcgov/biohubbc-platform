@@ -40,6 +40,7 @@ describe('FeatureValidationService', () => {
           display_name: 'Name',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -47,7 +48,8 @@ describe('FeatureValidationService', () => {
           name: 'focal_species',
           display_name: 'Focal Species',
           description: '',
-          type_name: 'array',
+          type_name: 'object',
+          allow_multiple: true,
           required_value: true,
           calculated_value: false
         },
@@ -56,6 +58,7 @@ describe('FeatureValidationService', () => {
           display_name: 'Start Date',
           description: '',
           type_name: 'datetime',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -64,6 +67,7 @@ describe('FeatureValidationService', () => {
           display_name: 'Description',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: false,
           calculated_value: false
         }
@@ -437,6 +441,7 @@ describe('FeatureValidationService', () => {
         display_name: 'Name',
         description: '',
         type_name: 'string',
+        allow_multiple: false,
         required_value: true,
         calculated_value: false
       },
@@ -445,6 +450,7 @@ describe('FeatureValidationService', () => {
         display_name: 'Count',
         description: '',
         type_name: 'number',
+        allow_multiple: false,
         required_value: false,
         calculated_value: false
       },
@@ -453,6 +459,7 @@ describe('FeatureValidationService', () => {
         display_name: 'Active',
         description: '',
         type_name: 'boolean',
+        allow_multiple: false,
         required_value: false,
         calculated_value: false
       }
@@ -582,6 +589,7 @@ describe('FeatureValidationService', () => {
           display_name: 'Name',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -590,6 +598,7 @@ describe('FeatureValidationService', () => {
           display_name: 'Filename',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: true
         }
@@ -618,6 +627,7 @@ describe('FeatureValidationService', () => {
           display_name: 'Name',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -626,6 +636,7 @@ describe('FeatureValidationService', () => {
           display_name: 'Calculated Required',
           description: '',
           type_name: 'string',
+          allow_multiple: false,
           required_value: true,
           calculated_value: true
         },
@@ -634,6 +645,7 @@ describe('FeatureValidationService', () => {
           display_name: 'Calculated Optional',
           description: '',
           type_name: 'number',
+          allow_multiple: false,
           required_value: false,
           calculated_value: true
         }
@@ -674,6 +686,7 @@ describe('FeatureValidationService', () => {
           display_name: 'Agency',
           description: '',
           type_name: 'code',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -704,6 +717,7 @@ describe('FeatureValidationService', () => {
           display_name: 'Agency',
           description: '',
           type_name: 'code',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -733,6 +747,7 @@ describe('FeatureValidationService', () => {
           display_name: 'Agency',
           description: '',
           type_name: 'code',
+          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }
@@ -764,6 +779,7 @@ describe('FeatureValidationService', () => {
           display_name: 'Agency',
           description: '',
           type_name: 'code',
+          allow_multiple: true,
           required_value: true,
           calculated_value: false
         }
@@ -774,6 +790,158 @@ describe('FeatureValidationService', () => {
       const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codeSlugs);
 
       expect(errors).to.have.length(0);
+    });
+
+    it('returns INVALID_PROPERTY_TYPE when property does not allow multiple values but receives an array', () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new FeatureValidationService(mockDBConnection);
+
+      const feature: IFlattenedBlock = {
+        id: '14ebb420-4cfa-4be1-99db-8122253e3106',
+        type: 'dataset',
+        properties: { agency: ['code::agency::aarde'] },
+        content: [],
+        parent: null
+      };
+
+      const allowedProperties: FeatureProperty[] = [
+        {
+          name: 'agency',
+          display_name: 'Agency',
+          description: '',
+          type_name: 'code',
+          allow_multiple: false,
+          required_value: true,
+          calculated_value: false
+        }
+      ];
+
+      const codeSlugs = new Set<string>(['code::agency::aarde']);
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codeSlugs);
+
+      expect(errors).to.have.length(1);
+      expect(errors[0].type).to.equal(ValidationErrorType.INVALID_PROPERTY_TYPE);
+    });
+
+    it('returns INVALID_PROPERTY_TYPE when property allows multiple values but receives a non-array value', () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new FeatureValidationService(mockDBConnection);
+
+      const feature: IFlattenedBlock = {
+        id: '14ebb420-4cfa-4be1-99db-8122253e3106',
+        type: 'dataset',
+        properties: { agency: 'code::agency::aarde' },
+        content: [],
+        parent: null
+      };
+
+      const allowedProperties: FeatureProperty[] = [
+        {
+          name: 'agency',
+          display_name: 'Agency',
+          description: '',
+          type_name: 'code',
+          allow_multiple: true,
+          required_value: true,
+          calculated_value: false
+        }
+      ];
+
+      const codeSlugs = new Set<string>(['code::agency::aarde']);
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, codeSlugs);
+
+      expect(errors).to.have.length(1);
+      expect(errors[0].type).to.equal(ValidationErrorType.INVALID_PROPERTY_TYPE);
+    });
+
+    it('treats allow_multiple=null as single-value and rejects arrays', () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new FeatureValidationService(mockDBConnection);
+
+      const feature: IFlattenedBlock = {
+        id: 'feature-allow-multiple-null-array',
+        type: 'dataset',
+        properties: { title: ['one'] },
+        content: [],
+        parent: null
+      };
+
+      const allowedProperties: FeatureProperty[] = [
+        {
+          name: 'title',
+          display_name: 'Title',
+          description: '',
+          type_name: 'string',
+          allow_multiple: null,
+          required_value: true,
+          calculated_value: false
+        }
+      ];
+
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, new Set<string>());
+
+      expect(errors).to.have.length(1);
+      expect(errors[0].type).to.equal(ValidationErrorType.INVALID_PROPERTY_TYPE);
+    });
+
+    it('accepts allow_multiple=null with a valid single scalar value', () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new FeatureValidationService(mockDBConnection);
+
+      const feature: IFlattenedBlock = {
+        id: 'feature-allow-multiple-null-scalar',
+        type: 'dataset',
+        properties: { title: 'one' },
+        content: [],
+        parent: null
+      };
+
+      const allowedProperties: FeatureProperty[] = [
+        {
+          name: 'title',
+          display_name: 'Title',
+          description: '',
+          type_name: 'string',
+          allow_multiple: null,
+          required_value: true,
+          calculated_value: false
+        }
+      ];
+
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, new Set<string>());
+
+      expect(errors).to.have.length(0);
+    });
+
+    it('validates each value when allow_multiple=true and rejects mixed-type arrays', () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new FeatureValidationService(mockDBConnection);
+
+      const feature: IFlattenedBlock = {
+        id: 'feature-allow-multiple-mixed',
+        type: 'dataset',
+        properties: { values: ['ok', 42] },
+        content: [],
+        parent: null
+      };
+
+      const allowedProperties: FeatureProperty[] = [
+        {
+          name: 'values',
+          display_name: 'Values',
+          description: '',
+          type_name: 'string',
+          allow_multiple: true,
+          required_value: true,
+          calculated_value: false
+        }
+      ];
+
+      const errors = service.validateFeaturePropertyFlat(feature, allowedProperties, new Set<string>());
+
+      expect(errors).to.have.length(1);
+      expect(errors[0].type).to.equal(ValidationErrorType.INVALID_PROPERTY_TYPE);
+      expect(errors[0].field).to.equal('values');
     });
   });
 
@@ -790,6 +958,7 @@ describe('FeatureValidationService', () => {
             display_name: 'Name',
             description: '',
             type_name: 'string',
+            allow_multiple: false,
             required_value: true,
             calculated_value: false
           }
