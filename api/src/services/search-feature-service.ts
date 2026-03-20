@@ -1,16 +1,12 @@
 import { Feature, FeatureCollection, Geometry } from 'geojson';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { CreateSubmissionFeaturePropertyBoolean } from '../models/submission-feature-property-boolean';
-import { CreateSubmissionFeaturePropertyCode } from '../models/submission-feature-property-code';
-import { CreateSubmissionFeaturePropertyGeometry } from '../models/submission-feature-property-geometry';
 import { FeatureTypePropertyMetadata } from '../models/submission-feature-property-index';
-import { CreateSubmissionFeaturePropertyNumber } from '../models/submission-feature-property-number';
-import { CreateSubmissionFeaturePropertyString } from '../models/submission-feature-property-string';
-import { CreateSubmissionFeaturePropertyTaxon } from '../models/submission-feature-property-taxon';
-import { CreateSubmissionFeaturePropertyTimestamp } from '../models/submission-feature-property-timestamp';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
-import { SubmissionRepository } from '../repositories/submission-repository';
+import {
+  SubmissionFeatureRecordWithTypeAndSecurity,
+  SubmissionRepository
+} from '../repositories/submission-repository';
 import { TaxonomyRepository } from '../repositories/taxonomy-repository';
 import { CodeReference, parseCodeReference } from '../utils/code-reference';
 import { getLogger } from '../utils/logger';
@@ -25,42 +21,14 @@ import {
   InsertSpatialSearchableRecord,
   InsertStringSearchableRecord,
   ISearchFeaturesFilters,
+  PendingCodeRecord,
+  PendingTaxonRecord,
+  PropertyRecordBuckets,
   SearchFeatureResultWithRelevancy
 } from './search-feature-service.interface';
 import { SubmissionFeaturePropertyIndexService } from './submission-feature-property-index-service';
 
 const defaultLog = getLogger('services/search-feature-service');
-
-type PendingTaxonRecord = {
-  submission_feature_id: number;
-  feature_type_property_id: number;
-  propertyName: string;
-  tsn: number;
-};
-
-type PendingCodeRecord = {
-  submission_feature_id: number;
-  feature_type_property_id: number;
-  codeReference: CodeReference;
-};
-
-type SubmissionFeatureRecord = {
-  submission_feature_id: number;
-  feature_type_id: number;
-  data: Record<string, unknown>;
-};
-
-type PropertyRecordBuckets = {
-  stringRecords: CreateSubmissionFeaturePropertyString[];
-  numberRecords: CreateSubmissionFeaturePropertyNumber[];
-  booleanRecords: CreateSubmissionFeaturePropertyBoolean[];
-  timestampRecords: CreateSubmissionFeaturePropertyTimestamp[];
-  codeRecords: CreateSubmissionFeaturePropertyCode[];
-  pendingCodeRecords: PendingCodeRecord[];
-  geometryRecords: CreateSubmissionFeaturePropertyGeometry[];
-  taxonRecords: CreateSubmissionFeaturePropertyTaxon[];
-  pendingTaxonRecords: PendingTaxonRecord[];
-};
 
 /**
  * Service for searching features with multiple filter types.
@@ -129,7 +97,7 @@ export class SearchFeatureService extends DBService {
    * Deletes existing search records first for idempotency - job retries and manual re-indexing
    * can run this multiple times for the same submission. Without delete-before-insert, duplicate
    * records accumulate because the search tables have no unique constraint on
-   * (submission_feature_id, feature_property_id). Upsert was rejected because it cannot clean up
+   * (submission_feature_id, feature_property_id). Upsert was rejected because it can't clean up
    * orphaned rows when properties are removed between runs.
    *
    * @param {number} submissionId
@@ -247,9 +215,7 @@ export class SearchFeatureService extends DBService {
     await submissionFeaturePropertyIndexService.deletePropertyRecordsBySubmissionId(submissionId);
 
     const submissionRepository = new SubmissionRepository(this.connection);
-    const allFeatures = (await submissionRepository.getSubmissionFeaturesBySubmissionId(
-      submissionId
-    )) as SubmissionFeatureRecord[];
+    const allFeatures = await submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
 
     if (!allFeatures.length) {
       return;
@@ -308,7 +274,7 @@ export class SearchFeatureService extends DBService {
    */
   private collectPropertyRecordsForFeatures(
     submissionId: number,
-    allFeatures: SubmissionFeatureRecord[],
+    allFeatures: SubmissionFeatureRecordWithTypeAndSecurity[],
     metadataByFeatureType: Map<number, Map<string, FeatureTypePropertyMetadata>>,
     propertyRecordBuckets: PropertyRecordBuckets
   ): void {
@@ -334,7 +300,7 @@ export class SearchFeatureService extends DBService {
    */
   private collectPropertyRecordsForFeature(
     submissionId: number,
-    feature: SubmissionFeatureRecord,
+    feature: SubmissionFeatureRecordWithTypeAndSecurity,
     featureTypeMetadata: Map<string, FeatureTypePropertyMetadata>,
     propertyRecordBuckets: PropertyRecordBuckets
   ): void {
@@ -417,7 +383,7 @@ export class SearchFeatureService extends DBService {
    */
   private collectPropertyRecordByType(
     submissionId: number,
-    feature: SubmissionFeatureRecord,
+    feature: SubmissionFeatureRecordWithTypeAndSecurity,
     matchingFeatureProperty: FeatureTypePropertyMetadata,
     propertyName: string,
     currentValue: unknown,
@@ -513,7 +479,7 @@ export class SearchFeatureService extends DBService {
    */
   private collectStringRecord(
     submissionId: number,
-    feature: SubmissionFeatureRecord,
+    feature: SubmissionFeatureRecordWithTypeAndSecurity,
     matchingFeatureProperty: FeatureTypePropertyMetadata,
     propertyName: string,
     currentValue: unknown,
@@ -544,7 +510,7 @@ export class SearchFeatureService extends DBService {
    */
   private collectNumberRecord(
     submissionId: number,
-    feature: SubmissionFeatureRecord,
+    feature: SubmissionFeatureRecordWithTypeAndSecurity,
     matchingFeatureProperty: FeatureTypePropertyMetadata,
     propertyName: string,
     currentValue: unknown,
@@ -575,7 +541,7 @@ export class SearchFeatureService extends DBService {
    */
   private collectBooleanRecord(
     submissionId: number,
-    feature: SubmissionFeatureRecord,
+    feature: SubmissionFeatureRecordWithTypeAndSecurity,
     matchingFeatureProperty: FeatureTypePropertyMetadata,
     propertyName: string,
     currentValue: unknown,
@@ -606,7 +572,7 @@ export class SearchFeatureService extends DBService {
    */
   private collectTimestampRecord(
     submissionId: number,
-    feature: SubmissionFeatureRecord,
+    feature: SubmissionFeatureRecordWithTypeAndSecurity,
     matchingFeatureProperty: FeatureTypePropertyMetadata,
     propertyName: string,
     currentValue: unknown,
@@ -651,7 +617,7 @@ export class SearchFeatureService extends DBService {
    */
   private collectCodeRecord(
     submissionId: number,
-    feature: SubmissionFeatureRecord,
+    feature: SubmissionFeatureRecordWithTypeAndSecurity,
     matchingFeatureProperty: FeatureTypePropertyMetadata,
     propertyName: string,
     currentValue: unknown,
@@ -685,7 +651,7 @@ export class SearchFeatureService extends DBService {
    */
   private collectTaxonRecord(
     submissionId: number,
-    feature: SubmissionFeatureRecord,
+    feature: SubmissionFeatureRecordWithTypeAndSecurity,
     matchingFeatureProperty: FeatureTypePropertyMetadata,
     propertyName: string,
     currentValue: unknown,
@@ -723,7 +689,7 @@ export class SearchFeatureService extends DBService {
    */
   private collectSpatialRecord(
     submissionId: number,
-    feature: SubmissionFeatureRecord,
+    feature: SubmissionFeatureRecordWithTypeAndSecurity,
     matchingFeatureProperty: FeatureTypePropertyMetadata,
     propertyName: string,
     currentValue: unknown,
@@ -791,14 +757,14 @@ export class SearchFeatureService extends DBService {
    * @param {number} submissionId
    * @param {SubmissionFeaturePropertyIndexService} submissionFeaturePropertyIndexService
    * @param {PendingCodeRecord[]} pendingCodeRecords
-   * @param {CreateSubmissionFeaturePropertyCode[]} codeRecords
+   * @param {PropertyRecordBuckets['codeRecords']} codeRecords
    * @return {Promise<void>}
    */
   private async resolvePendingCodeRecords(
     submissionId: number,
     submissionFeaturePropertyIndexService: SubmissionFeaturePropertyIndexService,
     pendingCodeRecords: PendingCodeRecord[],
-    codeRecords: CreateSubmissionFeaturePropertyCode[]
+    codeRecords: PropertyRecordBuckets['codeRecords']
   ): Promise<void> {
     if (!pendingCodeRecords.length) {
       return;
@@ -844,13 +810,13 @@ export class SearchFeatureService extends DBService {
    * @private
    * @param {number} submissionId
    * @param {PendingTaxonRecord[]} pendingTaxonRecords
-   * @param {CreateSubmissionFeaturePropertyTaxon[]} taxonRecords
+   * @param {PropertyRecordBuckets['taxonRecords']} taxonRecords
    * @return {Promise<void>}
    */
   private async resolvePendingTaxonRecords(
     submissionId: number,
     pendingTaxonRecords: PendingTaxonRecord[],
-    taxonRecords: CreateSubmissionFeaturePropertyTaxon[]
+    taxonRecords: PropertyRecordBuckets['taxonRecords']
   ): Promise<void> {
     if (!pendingTaxonRecords.length) {
       return;

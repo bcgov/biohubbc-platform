@@ -38,7 +38,7 @@ export class SubmissionIngestionCodesService {
     codeReferencesBySlug: Map<string, CodeReference>
   ): void {
     for (const propertyValue of Object.values(properties)) {
-      this.addCodeReferencesFromValue(propertyValue, codeReferencesBySlug);
+      this.addCodeReferencesFromValue(propertyValue as string | string[], codeReferencesBySlug);
     }
   }
 
@@ -48,11 +48,14 @@ export class SubmissionIngestionCodesService {
    * Supports single string values and arrays of values.
    *
    * @private
-   * @param {unknown} propertyValue
+   * @param {(string | string[])} propertyValue
    * @param {Map<string, CodeReference>} codeReferencesBySlug
    * @memberof SubmissionIngestionCodesService
    */
-  private addCodeReferencesFromValue(propertyValue: unknown, codeReferencesBySlug: Map<string, CodeReference>): void {
+  private addCodeReferencesFromValue(
+    propertyValue: string | string[],
+    codeReferencesBySlug: Map<string, CodeReference>
+  ): void {
     if (Array.isArray(propertyValue)) {
       for (const value of propertyValue) {
         this.addSingleCodeReference(value, codeReferencesBySlug);
@@ -68,16 +71,12 @@ export class SubmissionIngestionCodesService {
    * Parse and add a single code slug value if valid.
    *
    * @private
-   * @param {unknown} value
+   * @param {string} codeSlug
    * @param {Map<string, CodeReference>} codeReferencesBySlug
    * @memberof SubmissionIngestionCodesService
    */
-  private addSingleCodeReference(value: unknown, codeReferencesBySlug: Map<string, CodeReference>): void {
-    if (typeof value !== 'string') {
-      return;
-    }
-
-    const parsedCodeReference = parseCodeReference(value);
+  private addSingleCodeReference(codeSlug: string, codeReferencesBySlug: Map<string, CodeReference>): void {
+    const parsedCodeReference = parseCodeReference(codeSlug);
 
     if (!parsedCodeReference) {
       return;

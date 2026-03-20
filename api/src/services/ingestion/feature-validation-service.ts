@@ -6,6 +6,7 @@ import { parseCodeReference } from '../../utils/code-reference';
 import { GeoJSONFeatureCollectionZodSchema } from '../../zod-schema/geoJsonZodSchema';
 import { DBService } from '../db-service';
 import { IValidationError, IValidationResult, ValidationErrorType } from './feature-validation-service.interface';
+import type { TarCodesets } from './submission-ingestion-codes-service.interface';
 
 /**
  * Service for validating flat submission features against the database schema.
@@ -39,13 +40,13 @@ export class FeatureValidationService extends DBService {
    * Collects ALL validation errors instead of stopping at the first error.
    *
    * @param {IFlattenedBlock[]} features - Array of flat submission features
-   * @param {Record<string, unknown>} [codesets] - Optional in-memory codeset payload keyed by contributor codeset key
+   * @param {TarCodesets} [codesets] - Optional in-memory codeset payload keyed by contributor codeset key
    * @return {Promise<IValidationResult>} Validation result with all collected errors
    * @memberof FeatureValidationService
    */
   async validateFlatSubmissionFeatures(
     features: IFlattenedBlock[],
-    codesets?: Record<string, unknown>
+    codesets?: TarCodesets
   ): Promise<IValidationResult> {
     const errors: IValidationError[] = [];
 
@@ -77,27 +78,7 @@ export class FeatureValidationService extends DBService {
 
     // Second pass: validate each feature
     for (const feature of features) {
-      // Structure validation (required fields per ticket spec item 1)
-      const structureErrors = this.validateFeatureStructure(feature);
-      errors.push(...structureErrors);
-
-      // Skip further validation if structure is invalid
-      if (structureErrors.length > 0) {
-        continue;
-      }
-
-      // Feature type validation (exists in DB)
-      const typeErrors = await this.validateFeatureType(feature);
-      errors.push(...typeErrors);
-
-      // If type is valid, validate properties
-      if (typeErrors.length === 0) {
-        const featureTypeWithProps = await this.findFeatureTypeWithPropertiesCached(feature.type);
-        if (featureTypeWithProps) {
-          const propertyErrors = this.validateFeaturePropertyFlat(feature, featureTypeWithProps.properties, codeSlugs);
-          errors.push(...propertyErrors);
-        }
-      }
+      errors.push(...(await this.validateSingleFeature(feature, codeSlugs)));
     }
 
     // Third pass: validate references (parent/content)
@@ -108,6 +89,47 @@ export class FeatureValidationService extends DBService {
       valid: errors.length === 0,
       errors
     };
+  }
+
+  /**
+   * Validate a single feature through structure, type, and property passes.
+   *
+   * @private
+   * @param {IFlattenedBlock} feature
+   * @param {Set<string>} codeSlugs
+   * @return {Promise<IValidationError[]>}
+   * @memberof FeatureValidationService
+   */
+  private async validateSingleFeature(feature: IFlattenedBlock, codeSlugs: Set<string>): Promise<IValidationError[]> {
+    const errors: IValidationError[] = [];
+
+    // Structure validation (required fields per ticket spec item 1)
+    const structureErrors = this.validateFeatureStructure(feature);
+    errors.push(...structureErrors);
+
+    // Skip further validation if structure is invalid
+    if (structureErrors.length > 0) {
+      return errors;
+    }
+
+    // Feature type validation (exists in DB)
+    const typeErrors = await this.validateFeatureType(feature);
+    errors.push(...typeErrors);
+
+    // If type is valid, validate properties
+    if (typeErrors.length > 0) {
+      return errors;
+    }
+
+    const featureTypeWithProperties = await this.findFeatureTypeWithPropertiesCached(feature.type);
+    if (!featureTypeWithProperties) {
+      return errors;
+    }
+
+    const propertyErrors = this.validateFeaturePropertyFlat(feature, featureTypeWithProperties.properties, codeSlugs);
+    errors.push(...propertyErrors);
+
+    return errors;
   }
 
   /**
@@ -265,31 +287,36 @@ export class FeatureValidationService extends DBService {
     value: unknown,
     codeSlugs: Set<string>
   ): IValidationError | null {
-    const propertyValidators: Record<string, () => IValidationError | null> = {
-      code: () => this.validateCodeProperty(feature, property, value, codeSlugs),
-      string: () =>
-        typeof value === 'string' ? null : this.createInvalidPropertyTypeError(feature, property, 'string', value),
-      number: () =>
-        typeof value === 'number' ? null : this.createInvalidPropertyTypeError(feature, property, 'number', value),
-      boolean: () =>
-        typeof value === 'boolean' ? null : this.createInvalidPropertyTypeError(feature, property, 'boolean', value),
-      object: () =>
-        typeof value === 'object' && !Array.isArray(value)
-          ? null
-          : this.createInvalidPropertyTypeError(feature, property, 'object', value),
-      array: () =>
-        Array.isArray(value) ? null : this.createInvalidPropertyTypeError(feature, property, 'array', value),
-      spatial: () =>
-        GeoJSONFeatureCollectionZodSchema.safeParse(value).success
-          ? null
-          : this.createInvalidPropertyTypeError(feature, property, 'spatial (GeoJSON FeatureCollection)', value),
-      datetime: () => {
-        const expectedType = this.validateDatetimeType(value);
-        return expectedType ? this.createInvalidPropertyTypeError(feature, property, expectedType, value) : null;
-      }
+    const values = this.getPropertyValues(feature, property, value);
+    if ('error' in values) {
+      return values.error;
+    }
+
+    const propertyValidators: Record<string, (propertyValue: unknown) => IValidationError | null> = {
+      code: (propertyValue) => this.validateCodeProperty(feature, property, propertyValue, codeSlugs),
+      string: (propertyValue) => this.validateStringProperty(feature, property, propertyValue),
+      number: (propertyValue) => this.validateNumberProperty(feature, property, propertyValue),
+      boolean: (propertyValue) => this.validateBooleanProperty(feature, property, propertyValue),
+      object: (propertyValue) => this.validateObjectProperty(feature, property, propertyValue),
+      spatial: (propertyValue) => this.validateSpatialProperty(feature, property, propertyValue),
+      datetime: (propertyValue) => this.validateDatetimeProperty(feature, property, propertyValue),
+      timestamp: (propertyValue) => this.validateTimestampProperty(feature, property, propertyValue),
+      taxon: (propertyValue) => this.validateTaxonProperty(feature, property, propertyValue)
     };
 
-    return propertyValidators[property.type_name]?.() ?? null;
+    const validator = propertyValidators[property.type_name];
+    if (!validator) {
+      return null;
+    }
+
+    for (const propertyValue of values.values) {
+      const error = validator(propertyValue);
+      if (error) {
+        return error;
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -319,6 +346,193 @@ export class FeatureValidationService extends DBService {
   }
 
   /**
+   * Normalize a property value into a list of values according to allow_multiple.
+   *
+   * @private
+   * @param {IFlattenedBlock} feature
+   * @param {FeatureProperty} property
+   * @param {unknown} value
+   * @return {{ values: unknown[] } | { error: IValidationError }}
+   * @memberof FeatureValidationService
+   */
+  private getPropertyValues(
+    feature: IFlattenedBlock,
+    property: FeatureProperty,
+    value: unknown
+  ): { values: unknown[] } | { error: IValidationError } {
+    if (property.allow_multiple) {
+      if (!Array.isArray(value)) {
+        return {
+          error: this.createInvalidPropertyTypeError(feature, property, `array of ${property.type_name} values`, value)
+        };
+      }
+
+      return { values: value };
+    }
+
+    if (Array.isArray(value)) {
+      return {
+        error: this.createInvalidPropertyTypeError(feature, property, property.type_name, value)
+      };
+    }
+
+    return { values: [value] };
+  }
+
+  /**
+   * Validate string property values.
+   *
+   * @private
+   * @param {IFlattenedBlock} feature
+   * @param {FeatureProperty} property
+   * @param {unknown} value
+   * @return {IValidationError | null}
+   * @memberof FeatureValidationService
+   */
+  private validateStringProperty(
+    feature: IFlattenedBlock,
+    property: FeatureProperty,
+    value: unknown
+  ): IValidationError | null {
+    return typeof value === 'string' ? null : this.createInvalidPropertyTypeError(feature, property, 'string', value);
+  }
+
+  /**
+   * Validate number property values.
+   *
+   * @private
+   * @param {IFlattenedBlock} feature
+   * @param {FeatureProperty} property
+   * @param {unknown} value
+   * @return {IValidationError | null}
+   * @memberof FeatureValidationService
+   */
+  private validateNumberProperty(
+    feature: IFlattenedBlock,
+    property: FeatureProperty,
+    value: unknown
+  ): IValidationError | null {
+    return typeof value === 'number' ? null : this.createInvalidPropertyTypeError(feature, property, 'number', value);
+  }
+
+  /**
+   * Validate boolean property values.
+   *
+   * @private
+   * @param {IFlattenedBlock} feature
+   * @param {FeatureProperty} property
+   * @param {unknown} value
+   * @return {IValidationError | null}
+   * @memberof FeatureValidationService
+   */
+  private validateBooleanProperty(
+    feature: IFlattenedBlock,
+    property: FeatureProperty,
+    value: unknown
+  ): IValidationError | null {
+    return typeof value === 'boolean' ? null : this.createInvalidPropertyTypeError(feature, property, 'boolean', value);
+  }
+
+  /**
+   * Validate object property values.
+   *
+   * @private
+   * @param {IFlattenedBlock} feature
+   * @param {FeatureProperty} property
+   * @param {unknown} value
+   * @return {IValidationError | null}
+   * @memberof FeatureValidationService
+   */
+  private validateObjectProperty(
+    feature: IFlattenedBlock,
+    property: FeatureProperty,
+    value: unknown
+  ): IValidationError | null {
+    return typeof value === 'object' && !Array.isArray(value)
+      ? null
+      : this.createInvalidPropertyTypeError(feature, property, 'object', value);
+  }
+
+  /**
+   * Validate spatial property values.
+   *
+   * @private
+   * @param {IFlattenedBlock} feature
+   * @param {FeatureProperty} property
+   * @param {unknown} value
+   * @return {IValidationError | null}
+   * @memberof FeatureValidationService
+   */
+  private validateSpatialProperty(
+    feature: IFlattenedBlock,
+    property: FeatureProperty,
+    value: unknown
+  ): IValidationError | null {
+    return GeoJSONFeatureCollectionZodSchema.safeParse(value).success
+      ? null
+      : this.createInvalidPropertyTypeError(feature, property, 'spatial (GeoJSON FeatureCollection)', value);
+  }
+
+  /**
+   * Validate datetime property values.
+   *
+   * @private
+   * @param {IFlattenedBlock} feature
+   * @param {FeatureProperty} property
+   * @param {unknown} value
+   * @return {IValidationError | null}
+   * @memberof FeatureValidationService
+   */
+  private validateDatetimeProperty(
+    feature: IFlattenedBlock,
+    property: FeatureProperty,
+    value: unknown
+  ): IValidationError | null {
+    const expectedType = this.validateDatetimeType(value);
+    return expectedType ? this.createInvalidPropertyTypeError(feature, property, expectedType, value) : null;
+  }
+
+  /**
+   * Validate timestamp property values.
+   *
+   * @private
+   * @param {IFlattenedBlock} feature
+   * @param {FeatureProperty} property
+   * @param {unknown} value
+   * @return {IValidationError | null}
+   * @memberof FeatureValidationService
+   */
+  private validateTimestampProperty(
+    feature: IFlattenedBlock,
+    property: FeatureProperty,
+    value: unknown
+  ): IValidationError | null {
+    return typeof value === 'string'
+      ? null
+      : this.createInvalidPropertyTypeError(feature, property, 'timestamp', value);
+  }
+
+  /**
+   * Validate taxon property values.
+   *
+   * @private
+   * @param {IFlattenedBlock} feature
+   * @param {FeatureProperty} property
+   * @param {unknown} value
+   * @return {IValidationError | null}
+   * @memberof FeatureValidationService
+   */
+  private validateTaxonProperty(
+    feature: IFlattenedBlock,
+    property: FeatureProperty,
+    value: unknown
+  ): IValidationError | null {
+    return typeof value === 'number' && Number.isInteger(value)
+      ? null
+      : this.createInvalidPropertyTypeError(feature, property, 'taxon TSN (integer)', value);
+  }
+
+  /**
    * Validate code property slugs against in-memory codeset definitions.
    *
    * Accepted slug format: `code::<contributor-codeset-key>::<contributor-codeset-code-key>`.
@@ -338,37 +552,33 @@ export class FeatureValidationService extends DBService {
     value: unknown,
     codeSlugs: Set<string>
   ): IValidationError | null {
-    const values = Array.isArray(value) ? value : [value];
+    if (typeof value !== 'string') {
+      return this.createInvalidPropertyTypeError(feature, property, 'code slug string', value);
+    }
 
-    for (const currentValue of values) {
-      if (typeof currentValue !== 'string') {
-        return this.createInvalidPropertyTypeError(feature, property, 'code slug string', currentValue);
-      }
+    const parsed = parseCodeReference(value);
 
-      const parsed = parseCodeReference(currentValue);
+    if (!parsed) {
+      return {
+        type: ValidationErrorType.INVALID_CODE_SLUG,
+        featureId: feature.id,
+        featureType: feature.type,
+        field: property.name,
+        value,
+        message:
+          "Invalid code slug format. Expected 'code::<contributor-codeset-key>::<contributor-codeset-code-key>' and ensure a codeset file is provided."
+      };
+    }
 
-      if (!parsed) {
-        return {
-          type: ValidationErrorType.INVALID_CODE_SLUG,
-          featureId: feature.id,
-          featureType: feature.type,
-          field: property.name,
-          value: currentValue,
-          message:
-            "Invalid code slug format. Expected 'code::<contributor-codeset-key>::<contributor-codeset-code-key>' and ensure a codeset file is provided."
-        };
-      }
-
-      if (!codeSlugs.has(parsed.slug)) {
-        return {
-          type: ValidationErrorType.INVALID_CODE_REFERENCE,
-          featureId: feature.id,
-          featureType: feature.type,
-          field: property.name,
-          value: currentValue,
-          message: `Code slug '${currentValue}' not found in codeset. Ensure codeset[${parsed.contributorCodesetKey}].codes[${parsed.contributorCodesetCodeKey}] exists.`
-        };
-      }
+    if (!codeSlugs.has(parsed.slug)) {
+      return {
+        type: ValidationErrorType.INVALID_CODE_REFERENCE,
+        featureId: feature.id,
+        featureType: feature.type,
+        field: property.name,
+        value,
+        message: `Code slug '${value}' not found in codeset. Ensure codeset[${parsed.contributorCodesetKey}].codes[${parsed.contributorCodesetCodeKey}] exists.`
+      };
     }
 
     return null;
@@ -397,24 +607,20 @@ export class FeatureValidationService extends DBService {
    * while validating code-typed properties across all features.
    *
    * @private
-   * @param {Record<string, unknown>} codesets
+   * @param {TarCodesets} codesets
    * @return {Set<string>}
    * @memberof FeatureValidationService
    */
-  private buildCodeSlugs(codesets: Record<string, unknown>): Set<string> {
+  private buildCodeSlugs(codesets: TarCodesets): Set<string> {
     const codeSlugs = new Set<string>();
 
     for (const [contributorCodesetKey, contributorCodesetValue] of Object.entries(codesets)) {
-      if (typeof contributorCodesetValue !== 'object' || contributorCodesetValue === null) {
+      const codes = contributorCodesetValue.codes;
+      if (!codes) {
         continue;
       }
 
-      const codes = (contributorCodesetValue as Record<string, unknown>).codes;
-      if (typeof codes !== 'object' || codes === null) {
-        continue;
-      }
-
-      for (const contributorCodesetCodeKey of Object.keys(codes as Record<string, unknown>)) {
+      for (const contributorCodesetCodeKey of Object.keys(codes)) {
         codeSlugs.add(`code::${contributorCodesetKey}::${contributorCodesetCodeKey}`);
       }
     }

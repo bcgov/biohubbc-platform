@@ -4,6 +4,7 @@ import { PassThrough, Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import * as tar from 'tar-stream';
 import { IFlattenedBlock } from '../models/submission-feature';
+import type { TarCodesets } from '../services/ingestion/submission-ingestion-codes-service.interface';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
 import { IExtractedBlocks, IUploadedCodesetFile, IUploadedMediaFile } from './biohub-tar-parser.interface';
 
@@ -63,7 +64,7 @@ export async function extractBlocksFromArchive(inputStream: Readable): Promise<I
   let datasetId: string | undefined;
   const blocksByType = new Map<string, IFlattenedBlock[]>();
   const mediaFileNames = new Set<string>();
-  const codesets: Record<string, unknown> = {};
+  const codesets: TarCodesets = {};
 
   let rejectEntryPromise: (err: unknown) => void;
 
@@ -94,7 +95,7 @@ export async function extractBlocksFromArchive(inputStream: Readable): Promise<I
               : parsed;
 
           for (const [categoryKey, categoryValue] of Object.entries(categories)) {
-            codesets[categoryKey] = categoryValue;
+            codesets[categoryKey] = categoryValue as TarCodesets[string];
           }
         } else if (entryName.endsWith('.json') && !entryName.includes('/')) {
           // Root-level JSON file → parse as blocks

@@ -1,3 +1,5 @@
+import type { TarCodesets } from '../services/ingestion/submission-ingestion-codes-service.interface';
+
 export interface CodeReference {
   slug: string;
   contributorCodesetKey: string;
@@ -36,20 +38,17 @@ export const parseCodeReference = (value: string): CodeReference | null => {
 /**
  * Resolve a parsed code reference against loaded contributor codesets.
  *
- * @param {Record<string, unknown>} codesets
+ * @param {TarCodesets} codesets
  * @param {CodeReference} codeReference
  * @return {unknown}
  */
-export const resolveCodeReference = (codesets: Record<string, unknown>, codeReference: CodeReference): unknown => {
+export const resolveCodeReference = (codesets: TarCodesets, codeReference: CodeReference): unknown => {
   const contributorCodeset = codesets[codeReference.contributorCodesetKey];
-  const codes =
-    typeof contributorCodeset === 'object' && contributorCodeset !== null
-      ? (contributorCodeset as Record<string, unknown>)['codes']
-      : undefined;
+  const codes = contributorCodeset?.codes;
 
-  if (typeof codes !== 'object' || codes === null) {
+  if (!codes) {
     return undefined;
   }
 
-  return (codes as Record<string, unknown>)[codeReference.contributorCodesetCodeKey];
+  return codes[codeReference.contributorCodesetCodeKey];
 };

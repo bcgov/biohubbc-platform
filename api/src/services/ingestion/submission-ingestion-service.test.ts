@@ -17,6 +17,7 @@ import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
 import { FeatureValidationService } from './feature-validation-service';
 import { IValidationError, ValidationErrorType } from './feature-validation-service.interface';
+import type { TarCodesets } from './submission-ingestion-codes-service.interface';
 import { SubmissionIngestionService, validateMediaReferences } from './submission-ingestion-service';
 
 describe('SubmissionIngestionService', () => {
@@ -111,6 +112,20 @@ describe('SubmissionIngestionService', () => {
       { id: 'file-1', type: 'file', properties: { filename: 'photo.jpg' }, content: [], parent: 'obs-1' }
     ];
     const mockMediaFileNames = new Set(['photo.jpg']);
+    const mockCodesets: TarCodesets = {
+      agency: {
+        external_id: 'agency-ext',
+        label: 'Agency',
+        description: 'Agency codeset',
+        codes: {
+          aarde: {
+            external_id: 'aarde-ext',
+            label: 'Aarde',
+            description: 'Aarde code'
+          }
+        }
+      }
+    };
     const mockUploadedMedia = new Map<string, IUploadedMediaFile>([
       ['photo.jpg', { fileName: 'photo.jpg', s3Key: 'submissions/123/media/photo.jpg', byteSize: 5000 }]
     ]);
@@ -153,7 +168,7 @@ describe('SubmissionIngestionService', () => {
         blocksByType: new Map(),
         allBlocks: blocks,
         mediaFileNames: mockMediaFileNames,
-        codesets: {}
+        codesets: mockCodesets
       });
 
       const extractAndUploadMediaStub = sinon
@@ -235,7 +250,9 @@ describe('SubmissionIngestionService', () => {
       // validateFlatSubmissionFeatures called with the blocks
       expect(stubs.validateStub.calledOnce).to.be.true;
       expect(stubs.validateStub.getCall(0).args[0]).to.eql(mockBlocks);
+      expect(stubs.validateStub.getCall(0).args[1]).to.eql(mockCodesets);
       expect(stubs.persistContributorCodesStub.calledOnce).to.be.true;
+      expect(stubs.persistContributorCodesStub.getCall(0).args[1]).to.eql(mockCodesets);
       sinon.assert.callOrder(
         stubs.validateStub,
         stubs.persistContributorCodesStub,
@@ -294,7 +311,7 @@ describe('SubmissionIngestionService', () => {
         blocksByType: new Map(),
         allBlocks: blocksWithMissing,
         mediaFileNames: new Set(['photo.jpg']),
-        codesets: {}
+        codesets: mockCodesets
       });
 
       const dbConnection = getMockDBConnection();

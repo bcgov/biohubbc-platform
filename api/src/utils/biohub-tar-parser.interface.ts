@@ -1,4 +1,5 @@
 import { IFlattenedBlock } from '../models/submission-feature';
+import type { TarCodesets } from '../services/ingestion/submission-ingestion-codes-service.interface';
 
 export interface IExtractedBlocks {
   /** Dataset UUID from .dataset-id file */
@@ -10,7 +11,7 @@ export interface IExtractedBlocks {
   /** Filenames found in files/ directory (for media reference validation) */
   mediaFileNames: Set<string>;
   /** Contributor codesets loaded from codes/*.json files. */
-  codesets: Record<string, unknown>;
+  codesets: TarCodesets;
 }
 
 export interface IUploadedMediaFile {

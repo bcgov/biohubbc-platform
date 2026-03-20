@@ -1,4 +1,12 @@
 import { z } from 'zod';
+import type { CreateSubmissionFeaturePropertyBoolean } from '../models/submission-feature-property-boolean';
+import type { CreateSubmissionFeaturePropertyCode } from '../models/submission-feature-property-code';
+import type { CreateSubmissionFeaturePropertyGeometry } from '../models/submission-feature-property-geometry';
+import type { CreateSubmissionFeaturePropertyNumber } from '../models/submission-feature-property-number';
+import type { CreateSubmissionFeaturePropertyString } from '../models/submission-feature-property-string';
+import type { CreateSubmissionFeaturePropertyTaxon } from '../models/submission-feature-property-taxon';
+import type { CreateSubmissionFeaturePropertyTimestamp } from '../models/submission-feature-property-timestamp';
+import type { CodeReference } from '../utils/code-reference';
 import { GeoJSONFeatureCollectionZodSchema } from '../zod-schema/geoJsonZodSchema';
 
 // Searchable record schemas
@@ -172,3 +180,28 @@ export const SearchFeatureFiltersSchema = z.object({
 });
 
 export type ISearchFeaturesFilters = z.infer<typeof SearchFeatureFiltersSchema>;
+
+export type PendingTaxonRecord = {
+  submission_feature_id: number;
+  feature_type_property_id: number;
+  propertyName: string;
+  tsn: number;
+};
+
+export type PendingCodeRecord = {
+  submission_feature_id: number;
+  feature_type_property_id: number;
+  codeReference: CodeReference;
+};
+
+export type PropertyRecordBuckets = {
+  stringRecords: CreateSubmissionFeaturePropertyString[];
+  numberRecords: CreateSubmissionFeaturePropertyNumber[];
+  booleanRecords: CreateSubmissionFeaturePropertyBoolean[];
+  timestampRecords: CreateSubmissionFeaturePropertyTimestamp[];
+  codeRecords: CreateSubmissionFeaturePropertyCode[];
+  pendingCodeRecords: PendingCodeRecord[];
+  geometryRecords: CreateSubmissionFeaturePropertyGeometry[];
+  taxonRecords: CreateSubmissionFeaturePropertyTaxon[];
+  pendingTaxonRecords: PendingTaxonRecord[];
+};

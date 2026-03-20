@@ -1,4 +1,3 @@
-import { Feature } from 'geojson';
 import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
@@ -344,7 +343,7 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
 
     records.forEach((record, index) => {
       query.append(SQL`(${record.submission_feature_id}, ${record.feature_type_property_id},`);
-      query.append(generateGeometryCollectionSQL(record.value as Feature));
+      query.append(generateGeometryCollectionSQL(record.value));
       query.append(SQL`)`);
       if (index < records.length - 1) {
         query.append(SQL`,`);

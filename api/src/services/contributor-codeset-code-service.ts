@@ -2,7 +2,7 @@ import { IDBConnection } from '../database/db';
 import { ApiConflictError } from '../errors/api-error';
 import { ContributorCodesetCode, CreateContributorCodesetCode } from '../models/contributor-codeset-code';
 import { ContributorCodesetCodeRepository } from '../repositories/contributor-codeset-code-repository';
-import { makeIdentityKey } from '../utils/contributor-codeset';
+import { makeSlug } from '../utils/contributor-codeset';
 import { ContributorCodesetCodeIdentity } from './contributor-codeset-code-service.interface';
 import { DBService } from './db-service';
 
@@ -36,9 +36,9 @@ export class ContributorCodesetCodeService extends DBService {
    * Create contributor_codeset_code rows in bulk.
    *
    * Rules:
-   * - identity: (contributor_codeset_id, key)
-   * - same identity + same metadata => reuse existing
-   * - same identity + different metadata => conflict
+   * - slug identity: `code::<contributor_codeset_id>::<key>`
+   * - same slug + same metadata => reuse existing
+   * - same slug + different metadata => conflict
    *
    * @param {CreateContributorCodesetCode[]} payloads
    * @return {Promise<ContributorCodesetCode[]>}
@@ -51,10 +51,10 @@ export class ContributorCodesetCodeService extends DBService {
 
     const payloadEntries = payloads.map((payload) => ({
       payload,
-      identityKey: makeIdentityKey(payload.contributor_codeset_id, payload.key)
+      slug: makeSlug(payload.contributor_codeset_id, payload.key)
     }));
-    const payloadByIdentity = new Map(payloadEntries.map((entry) => [entry.identityKey, entry.payload]));
-    const requestedIdentityKeys = new Set(payloadEntries.map((entry) => entry.identityKey));
+    const payloadBySlug = new Map(payloadEntries.map((entry) => [entry.slug, entry.payload]));
+    const requestedSlugs = new Set(payloadEntries.map((entry) => entry.slug));
 
     // Fetch all active rows for the touched contributor codesets in one query.
     // This gives us the current persisted identities for comparison.
@@ -64,37 +64,34 @@ export class ContributorCodesetCodeService extends DBService {
     );
     const existingEntries = existingRows.map((existingRow) => ({
       existingRow,
-      identityKey: makeIdentityKey(existingRow.contributor_codeset_id, existingRow.key)
+      slug: makeSlug(existingRow.contributor_codeset_id, existingRow.key)
     }));
 
-    // Enforce immutable definitions for identities that already exist in the database.
-    this.assertNoDatabaseConflicts(existingEntries, payloadByIdentity);
-    const existingIdentityKeys = new Set(existingEntries.map((entry) => entry.identityKey));
+    // Enforce immutable definitions for slugs that already exist in the database.
+    this.assertNoDatabaseConflicts(existingEntries, payloadBySlug);
+    const existingSlugs = new Set(existingEntries.map((entry) => entry.slug));
 
     // Keep only payloads that are not already persisted.
     // Filtering prevents redundant inserts and leaves duplicate-key enforcement to the database.
     const payloadsToInsert = payloadEntries
-      .filter((entry) => !existingIdentityKeys.has(entry.identityKey))
+      .filter((entry) => !existingSlugs.has(entry.slug))
       .map((entry) => entry.payload);
 
-    // Insert only new identities. Existing rows are reused.
+    // Insert only new slugs. Existing rows are reused.
     const insertedRows = payloadsToInsert.length
       ? await this.contributorCodesetCodeRepository.insertContributorCodesetCodes(payloadsToInsert)
       : [];
 
-    // Return only rows relevant to requested identities.
+    // Return only rows relevant to requested slugs.
     const requestedExistingRows = existingEntries
-      .filter((entry) => requestedIdentityKeys.has(entry.identityKey))
+      .filter((entry) => requestedSlugs.has(entry.slug))
       .map((entry) => entry.existingRow);
 
-    const insertedRowsByIdentity = new Map(
-      insertedRows.map((insertedRow) => [
-        makeIdentityKey(insertedRow.contributor_codeset_id, insertedRow.key),
-        insertedRow
-      ])
+    const insertedRowsBySlug = new Map(
+      insertedRows.map((insertedRow) => [makeSlug(insertedRow.contributor_codeset_id, insertedRow.key), insertedRow])
     );
     const deduplicatedInsertedRows = payloadEntries
-      .map((entry) => insertedRowsByIdentity.get(entry.identityKey))
+      .map((entry) => insertedRowsBySlug.get(entry.slug))
       .filter((row): row is ContributorCodesetCode => !!row);
 
     return [...requestedExistingRows, ...deduplicatedInsertedRows];
@@ -138,15 +135,15 @@ export class ContributorCodesetCodeService extends DBService {
   /**
    * Validate that existing database rows match expected incoming definitions.
    *
-   * If an existing row for an identity has different metadata, this throws a
+   * If an existing row for a slug has different metadata, this throws a
    * conflict to preserve the immutable definition rule.
    */
   private assertNoDatabaseConflicts(
-    existingEntries: Array<{ existingRow: ContributorCodesetCode; identityKey: string }>,
-    payloadByIdentity: Map<string, CreateContributorCodesetCode>
+    existingEntries: Array<{ existingRow: ContributorCodesetCode; slug: string }>,
+    payloadBySlug: Map<string, CreateContributorCodesetCode>
   ): void {
     for (const existingEntry of existingEntries) {
-      const expected = payloadByIdentity.get(existingEntry.identityKey);
+      const expected = payloadBySlug.get(existingEntry.slug);
       const existing = existingEntry.existingRow;
 
       if (!expected) {
