@@ -116,7 +116,15 @@ describe('Download Worker', function () {
         await db('biohub.artifact').whereIn('artifact_id', createdArtifactIds).del();
       }
 
-      // 3. Delete submissions
+      // 3. Delete submission_upload and its children (child of submission via FK)
+      if (createdSubmissionIds.length > 0) {
+        const uploadSubIds = db('biohub.submission_upload').select('submission_upload_id').whereIn('submission_id', createdSubmissionIds);
+        await db('biohub.submission_validation').whereIn('submission_upload_id', uploadSubIds).del();
+        await db('biohub.submission_upload_status').whereIn('submission_upload_id', uploadSubIds).del();
+        await db('biohub.submission_upload').whereIn('submission_id', createdSubmissionIds).del();
+      }
+
+      // 4. Delete submissions
       if (createdSubmissionIds.length > 0) {
         await db('biohub.submission').whereIn('submission_id', createdSubmissionIds).del();
       }
@@ -181,10 +189,20 @@ describe('Download Worker', function () {
       })
       .returning('upload_id');
 
+    const [team] = await db('biohub.team')
+      .insert({ name: `${TEST_PREFIX}-${Date.now()}`, create_user: SYSTEM_USER_ID })
+      .returning('team_id');
+
+    const slug = String(Date.now()).slice(-8);
+    const [ticket] = await db('biohub.ticket')
+      .insert({ ticket_slug: slug, subject: TEST_PREFIX, team_id: team.team_id, create_user: SYSTEM_USER_ID })
+      .returning('ticket_id');
+
     const [bridge] = await db('biohub.submission_upload')
       .insert({
         submission_id: submissionId,
         upload_id: upload.upload_id,
+        ticket_id: ticket.ticket_id,
         create_user: SYSTEM_USER_ID
       })
       .returning('submission_upload_id');

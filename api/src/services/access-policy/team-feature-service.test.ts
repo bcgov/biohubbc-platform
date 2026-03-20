@@ -29,12 +29,10 @@ describe('TeamFeatureService', () => {
         .callsFake(async () => {
           callOrder.push('delete');
         });
-      const getIdsStub = sinon
-        .stub(TeamFeatureRepository.prototype, 'getSecuredSubmissionIds')
-        .callsFake(async () => {
-          callOrder.push('getIds');
-          return [1, 2, 3];
-        });
+      const getIdsStub = sinon.stub(TeamFeatureRepository.prototype, 'getSecuredSubmissionIds').callsFake(async () => {
+        callOrder.push('getIds');
+        return [1, 2, 3];
+      });
       const populateStub = sinon
         .stub(TeamFeatureRepository.prototype, 'populateTeamFeatureCacheBatch')
         .callsFake(async () => {

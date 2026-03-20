@@ -205,8 +205,18 @@ describe('Process Submission Features Worker', function () {
       archive_status: 'completed'
     });
 
-    // 5. submission_upload (links submission to upload)
-    const ticketId = randomUUID();
+    // 5. team + ticket (submission_upload requires a real ticket row)
+    const [team] = await db('biohub.team')
+      .insert({ name: `${TEST_PREFIX}-${Date.now()}`, create_user: SYSTEM_USER_ID })
+      .returning('team_id');
+
+    const slug = String(Date.now()).slice(-8);
+    const [ticket] = await db('biohub.ticket')
+      .insert({ ticket_slug: slug, subject: TEST_PREFIX, team_id: team.team_id, create_user: SYSTEM_USER_ID })
+      .returning('ticket_id');
+    const ticketId = ticket.ticket_id;
+
+    // 6. submission_upload (links submission to upload)
     const [submissionUpload] = await db('biohub.submission_upload')
       .insert({
         submission_id: submission.submission_id,
@@ -447,8 +457,23 @@ describe('SubmissionIngestionService pipeline (system)', function () {
           VALUES (${uploadId}, ${artifactId}, 'completed')`
     );
 
-    // 5. submission_upload
-    const ticketId = randomUUID();
+    // 5. team + ticket (ticket FK requires a real ticket row, which requires a team)
+    const teamResult = await connection.sql<{ team_id: string }>(
+      SQL`INSERT INTO biohub.team (name, create_user)
+          VALUES (${TEST_PREFIX + '-' + Date.now()}, ${SYSTEM_USER_ID})
+          RETURNING team_id`
+    );
+    const teamId = teamResult.rows[0].team_id;
+
+    const slug = String(Date.now()).slice(-8);
+    const ticketResult = await connection.sql<{ ticket_id: string }>(
+      SQL`INSERT INTO biohub.ticket (ticket_slug, subject, team_id, create_user)
+          VALUES (${slug}, ${TEST_PREFIX}, ${teamId}, ${SYSTEM_USER_ID})
+          RETURNING ticket_id`
+    );
+    const ticketId = ticketResult.rows[0].ticket_id;
+
+    // 6. submission_upload
     const submissionUploadResult = await connection.sql<{ submission_upload_id: string }>(
       SQL`INSERT INTO biohub.submission_upload (submission_id, upload_id, ticket_id)
           VALUES (${submissionId}, ${uploadId}, ${ticketId})
@@ -456,7 +481,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     );
     const submissionUploadId = submissionUploadResult.rows[0].submission_upload_id;
 
-    // 6. upload_artifact
+    // 7. upload_artifact
     await connection.sql(
       SQL`INSERT INTO biohub.upload_artifact (upload_id, artifact_id, role)
           VALUES (${uploadId}, ${artifactId}, 'feature')`
