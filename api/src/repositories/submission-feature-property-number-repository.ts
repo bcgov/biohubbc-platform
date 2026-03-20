@@ -9,6 +9,42 @@ import { BaseRepository } from './base-repository';
 
 export class SubmissionFeaturePropertyNumberRepository extends BaseRepository {
   /**
+   * Insert multiple submission_feature_property_number rows.
+   *
+   * @param {CreateSubmissionFeaturePropertyNumber[]} payloads
+   * @return {Promise<SubmissionFeaturePropertyNumber[]>}
+   * @memberof SubmissionFeaturePropertyNumberRepository
+   */
+  async insertSubmissionFeaturePropertyNumbers(
+    payloads: CreateSubmissionFeaturePropertyNumber[]
+  ): Promise<SubmissionFeaturePropertyNumber[]> {
+    if (!payloads.length) {
+      return [];
+    }
+
+    const knex = getKnex();
+    const query = knex('submission_feature_property_number')
+      .insert(payloads)
+      .returning([
+        'submission_feature_property_number_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'value'
+      ]);
+
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyNumberSchema);
+
+    if (response.rowCount !== payloads.length) {
+      throw new ApiExecuteSQLError('Failed to insert submission_feature_property_number rows', [
+        'SubmissionFeaturePropertyNumberRepository->insertSubmissionFeaturePropertyNumbers',
+        `rowCount was ${response.rowCount}, expected ${payloads.length}`
+      ]);
+    }
+
+    return response.rows;
+  }
+
+  /**
    * Insert a submission_feature_property_number row.
    *
    * @param {CreateSubmissionFeaturePropertyNumber} payload
@@ -112,5 +148,43 @@ export class SubmissionFeaturePropertyNumberRepository extends BaseRepository {
     const response = await this.connection.knex(query, SubmissionFeaturePropertyNumberSchema);
 
     return response.rows;
+  }
+
+  /**
+   * Delete submission_feature_property_number rows for a submission.
+   *
+   * @param {number} submissionId
+   * @return {Promise<void>}
+   * @memberof SubmissionFeaturePropertyNumberRepository
+   */
+  async deleteSubmissionFeaturePropertyNumbersBySubmissionId(submissionId: number): Promise<void> {
+    const knex = getKnex();
+    const query = knex('submission_feature_property_number')
+      .whereIn(
+        'submission_feature_id',
+        knex('submission_feature').select('submission_feature_id').where('submission_id', submissionId)
+      )
+      .delete();
+
+    await this.connection.knex(query);
+  }
+
+  /**
+   * Delete submission_feature_property_number rows for a submission upload.
+   *
+   * @param {string} submissionUploadId
+   * @return {Promise<void>}
+   * @memberof SubmissionFeaturePropertyNumberRepository
+   */
+  async deleteSubmissionFeaturePropertyNumbersBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const knex = getKnex();
+    const query = knex('submission_feature_property_number')
+      .whereIn(
+        'submission_feature_id',
+        knex('submission_feature').select('submission_feature_id').where('submission_upload_id', submissionUploadId)
+      )
+      .delete();
+
+    await this.connection.knex(query);
   }
 }

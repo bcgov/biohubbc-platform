@@ -1104,7 +1104,6 @@ export class SearchFeatureService extends DBService {
 
       artifactRecords.push({
         submission_feature_id: pendingArtifactRecord.submission_feature_id,
-        feature_type_property_id: pendingArtifactRecord.feature_type_property_id,
         artifact_id: artifactId
       });
     }

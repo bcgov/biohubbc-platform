@@ -705,12 +705,10 @@ describe('SearchFeatureService', () => {
       expect(insertArtifactRecordsStub).to.have.been.calledOnceWith([
         {
           submission_feature_id: 100,
-          feature_type_property_id: 91,
           artifact_id: 'a65abf71-d4a4-4b6f-aec3-9f8dc4d9e924'
         },
         {
           submission_feature_id: 100,
-          feature_type_property_id: 91,
           artifact_id: '2b4b6ec0-6f95-4d84-8eca-8f5eddb1f078'
         }
       ]);

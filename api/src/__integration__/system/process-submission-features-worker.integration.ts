@@ -83,7 +83,6 @@ describe('Process Submission Features Worker', function () {
   const createdObjectKeys: string[] = [];
   const createdContributorIds: number[] = [];
   const createdContributorSystemUserIds: number[] = [];
-  let hasArtifactPropertyTable = false;
 
   before(async () => {
     db = knex({
@@ -144,7 +143,6 @@ describe('Process Submission Features Worker', function () {
     }
 
     await initPgBoss();
-    hasArtifactPropertyTable = await db.schema.withSchema('biohub').hasTable('submission_feature_property_artifact');
 
     // Ensure queue exists with 'short' policy (enforces singletonKey uniqueness).
     // createQueue is ON CONFLICT DO NOTHING, so if the queue already exists with 'standard'
@@ -177,9 +175,7 @@ describe('Process Submission Features Worker', function () {
             .whereIn('source_feature_id', ids)
             .orWhereIn('target_feature_id', ids)
             .del();
-          if (hasArtifactPropertyTable) {
-            await db('biohub.submission_feature_property_artifact').whereIn('submission_feature_id', ids).del();
-          }
+          await db('biohub.submission_feature_artifact').whereIn('submission_feature_id', ids).del();
         }
         await db('biohub.submission_feature').where('submission_id', submissionId).del();
         await db('biohub.submission_validation').where('submission_id', submissionId).del();

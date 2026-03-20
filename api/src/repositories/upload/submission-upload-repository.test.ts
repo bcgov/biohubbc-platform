@@ -259,7 +259,7 @@ describe('SubmissionUploadRepository', () => {
   });
 
   describe('deleteSubmissionUpload', () => {
-    it('throws an error if delete fails', async () => {
+    it('throws an error if soft delete fails', async () => {
       const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new SubmissionUploadRepository(mockDBConnection);
@@ -269,11 +269,11 @@ describe('SubmissionUploadRepository', () => {
         expect.fail();
       } catch (error) {
         expect(error).to.be.instanceOf(ApiExecuteSQLError);
-        expect((error as ApiExecuteSQLError).message).to.equal('Failed to delete submission_upload record');
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to soft-delete submission_upload record');
       }
     });
 
-    it('succeeds if delete affects one row', async () => {
+    it('succeeds if soft delete affects one row', async () => {
       const mockQueryResponse = { rowCount: 1, rows: [] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
       const repo = new SubmissionUploadRepository(mockDBConnection);

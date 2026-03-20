@@ -340,205 +340,23 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
-   * Get invalid upload attempts eligible for cleanup.
+   * Soft-delete a single active submission_upload record by ID.
    *
-   * @param {number} retentionHours
-   * @param {number} limit
-   * @returns {Promise<string[]>}
-   */
-  async getInvalidSubmissionUploadIdsForCleanup(retentionHours: number, limit: number): Promise<string[]> {
-    const sqlStatement = SQL`
-      SELECT submission_upload_id
-      FROM submission_upload
-      WHERE status = 'invalid'
-        AND record_end_date IS NULL
-        AND create_date < NOW() - (${retentionHours} * INTERVAL '1 hour')
-      ORDER BY create_date ASC
-      LIMIT ${limit};
-    `;
-
-    const response = await this.connection.sql<{ submission_upload_id: string }>(sqlStatement);
-    return response.rows.map((row) => row.submission_upload_id);
-  }
-
-  /**
-   * Delete attempt-owned data for one invalid submission_upload_id.
-   *
-   * @param {string} submissionUploadId
-   * @returns {Promise<void>}
-   */
-  async cleanupInvalidSubmissionUploadById(submissionUploadId: string): Promise<void> {
-    const sqlStatement = SQL`
-      WITH upload_features AS (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      )
-      DELETE FROM submission_feature_feature
-      WHERE source_feature_id IN (SELECT submission_feature_id FROM upload_features)
-         OR target_feature_id IN (SELECT submission_feature_id FROM upload_features);
-    `;
-    await this.connection.sql(sqlStatement);
-
-    await this.connection.sql(SQL`
-      DELETE FROM submission_feature_security
-      WHERE submission_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      );
-    `);
-
-    await this.connection.sql(SQL`
-      DELETE FROM search_string
-      WHERE submission_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      );
-    `);
-    await this.connection.sql(SQL`
-      DELETE FROM search_number
-      WHERE submission_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      );
-    `);
-    await this.connection.sql(SQL`
-      DELETE FROM search_datetime
-      WHERE submission_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      );
-    `);
-    await this.connection.sql(SQL`
-      DELETE FROM search_spatial
-      WHERE submission_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      );
-    `);
-
-    await this.connection.sql(SQL`
-      DELETE FROM submission_feature_property_string
-      WHERE submission_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      );
-    `);
-    await this.connection.sql(SQL`
-      DELETE FROM submission_feature_property_number
-      WHERE submission_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      );
-    `);
-    await this.connection.sql(SQL`
-      DELETE FROM submission_feature_property_boolean
-      WHERE submission_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      );
-    `);
-    await this.connection.sql(SQL`
-      DELETE FROM submission_feature_property_timestamp
-      WHERE submission_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      );
-    `);
-    await this.connection.sql(SQL`
-      DELETE FROM submission_feature_property_code
-      WHERE submission_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      );
-    `);
-    await this.connection.sql(SQL`
-      DELETE FROM submission_feature_property_taxon
-      WHERE submission_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      );
-    `);
-    await this.connection.sql(SQL`
-      DELETE FROM submission_feature_property_geometry
-      WHERE submission_feature_id IN (
-        SELECT submission_feature_id
-        FROM submission_feature
-        WHERE submission_upload_id = ${submissionUploadId}
-      );
-    `);
-    await this.connection.sql(SQL`
-      DO $$
-      BEGIN
-        IF to_regclass('biohub.submission_feature_property_artifact') IS NOT NULL THEN
-          DELETE FROM submission_feature_property_artifact
-          WHERE submission_feature_id IN (
-            SELECT submission_feature_id
-            FROM submission_feature
-            WHERE submission_upload_id = ${submissionUploadId}
-          );
-        END IF;
-      END $$;
-    `);
-
-    await this.connection.sql(SQL`
-      DELETE FROM submission_feature
-      WHERE submission_upload_id = ${submissionUploadId};
-    `);
-
-    await this.connection.sql(SQL`
-      DELETE FROM upload_artifact
-      WHERE upload_id = (
-        SELECT upload_id
-        FROM submission_upload
-        WHERE submission_upload_id = ${submissionUploadId}
-      );
-    `);
-
-    await this.connection.sql(SQL`
-      DELETE FROM submission_validation
-      WHERE submission_upload_id = ${submissionUploadId};
-    `);
-
-    await this.connection.sql(SQL`
-      DELETE FROM submission_upload_status
-      WHERE submission_upload_id = ${submissionUploadId};
-    `);
-
-    await this.connection.sql(SQL`
-      DELETE FROM submission_upload
-      WHERE submission_upload_id = ${submissionUploadId}
-        AND status = 'invalid';
-    `);
-  }
-
-  /**
-   * Hard-delete a submission_upload record by ID.
-   *
-   * @param {string} submissionUploadId - The ID of the submission_upload record to delete.
-   * @throws {ApiExecuteSQLError} - If the deletion fails.
+   * @param {string} submissionUploadId - The ID of the submission_upload record to soft-delete.
+   * @throws {ApiExecuteSQLError} - If the soft-delete fails.
    */
   async deleteSubmissionUpload(submissionUploadId: string): Promise<void> {
     const sqlStatement = SQL`
-      DELETE FROM submission_upload
-      WHERE submission_upload_id = ${submissionUploadId};
+      UPDATE submission_upload
+      SET record_end_date = NOW()
+      WHERE submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL;
     `;
 
     const response = await this.connection.sql(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to delete submission_upload record', [
+      throw new ApiExecuteSQLError('Failed to soft-delete submission_upload record', [
         'SubmissionUploadRepository->deleteSubmissionUpload',
         `rowCount was ${response.rowCount}, expected 1`
       ]);

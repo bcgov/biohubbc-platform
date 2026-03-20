@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { CreateSubmissionFeaturePropertyArtifact } from '../models/submission-feature-property-artifact';
+import type { CreateSubmissionFeatureArtifact } from '../models/submission-feature-artifact';
 import type { CreateSubmissionFeaturePropertyBoolean } from '../models/submission-feature-property-boolean';
 import type { CreateSubmissionFeaturePropertyCode } from '../models/submission-feature-property-code';
 import type { CreateSubmissionFeaturePropertyGeometry } from '../models/submission-feature-property-geometry';
@@ -205,7 +205,7 @@ export type PropertyRecordBuckets = {
   numberRecords: CreateSubmissionFeaturePropertyNumber[];
   booleanRecords: CreateSubmissionFeaturePropertyBoolean[];
   timestampRecords: CreateSubmissionFeaturePropertyTimestamp[];
-  artifactRecords: CreateSubmissionFeaturePropertyArtifact[];
+  artifactRecords: CreateSubmissionFeatureArtifact[];
   pendingArtifactRecords: PendingArtifactRecord[];
   codeRecords: CreateSubmissionFeaturePropertyCode[];
   pendingCodeRecords: PendingCodeRecord[];

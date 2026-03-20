@@ -171,7 +171,7 @@ describe('SubmissionUploadService', () => {
   });
 
   describe('deleteSubmissionUpload', () => {
-    it('should delete a submission_upload record', async () => {
+    it('should soft-delete a submission_upload record', async () => {
       const stub = sinon.stub(SubmissionUploadRepository.prototype, 'deleteSubmissionUpload').resolves();
 
       await service.deleteSubmissionUpload('artifact-1');

@@ -120,6 +120,28 @@ export class ContributorCodesetCodeService extends DBService {
   }
 
   /**
+   * Get contributor_codeset_code rows by contributor_codeset ids.
+   *
+   * @param {number[]} contributorCodesetIds
+   * @return {Promise<ContributorCodesetCode[]>}
+   * @memberof ContributorCodesetCodeService
+   */
+  getContributorCodesetCodesByContributorCodesetIds(contributorCodesetIds: number[]): Promise<ContributorCodesetCode[]> {
+    return this.contributorCodesetCodeRepository.getContributorCodesetCodesByContributorCodesetIds(contributorCodesetIds);
+  }
+
+  /**
+   * Get contributor_codeset_code rows by ids.
+   *
+   * @param {number[]} contributorCodesetCodeIds
+   * @return {Promise<ContributorCodesetCode[]>}
+   * @memberof ContributorCodesetCodeService
+   */
+  getContributorCodesetCodesByIds(contributorCodesetCodeIds: number[]): Promise<ContributorCodesetCode[]> {
+    return this.contributorCodesetCodeRepository.getContributorCodesetCodesByIds(contributorCodesetCodeIds);
+  }
+
+  /**
    * Find a contributor_codeset_code row by identity.
    *
    * @param {ContributorCodesetCodeIdentity} identity

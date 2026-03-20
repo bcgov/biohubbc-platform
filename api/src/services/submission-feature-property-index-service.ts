@@ -2,7 +2,7 @@ import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { ContributorCodeset, CreateContributorCodeset } from '../models/contributor-codeset';
 import { ContributorCodesetCode, CreateContributorCodesetCode } from '../models/contributor-codeset-code';
-import { CreateSubmissionFeaturePropertyArtifact } from '../models/submission-feature-property-artifact';
+import { CreateSubmissionFeatureArtifact } from '../models/submission-feature-artifact';
 import { CreateSubmissionFeaturePropertyBoolean } from '../models/submission-feature-property-boolean';
 import { CreateSubmissionFeaturePropertyCode } from '../models/submission-feature-property-code';
 import { CreateSubmissionFeaturePropertyGeometry } from '../models/submission-feature-property-geometry';
@@ -11,15 +11,35 @@ import { CreateSubmissionFeaturePropertyNumber } from '../models/submission-feat
 import { CreateSubmissionFeaturePropertyString } from '../models/submission-feature-property-string';
 import { CreateSubmissionFeaturePropertyTaxon } from '../models/submission-feature-property-taxon';
 import { CreateSubmissionFeaturePropertyTimestamp } from '../models/submission-feature-property-timestamp';
-import { SubmissionFeaturePropertyIndexRepository } from '../repositories/submission-feature-property-index-repository';
 import { CodeReference } from '../utils/code-reference';
+import { CodeService } from './code-service';
 import { ContributorCodesetCodeService } from './contributor-codeset-code-service';
 import { ContributorCodesetService } from './contributor-codeset-service';
 import { DBService } from './db-service';
+import { SubmissionFeatureArtifactService } from './submission-feature-artifact-service';
+import { SubmissionFeaturePropertyBooleanService } from './submission-feature-property-boolean-service';
+import { SubmissionFeaturePropertyCodeService } from './submission-feature-property-code-service';
+import { SubmissionFeaturePropertyGeometryService } from './submission-feature-property-geometry-service';
+import { SubmissionFeaturePropertyNumberService } from './submission-feature-property-number-service';
+import { SubmissionFeaturePropertyStringService } from './submission-feature-property-string-service';
+import { SubmissionFeaturePropertyTaxonService } from './submission-feature-property-taxon-service';
+import { SubmissionFeaturePropertyTimestampService } from './submission-feature-property-timestamp-service';
+import { UploadArtifactService } from './upload/upload-artifact-service';
 import type { TarCodeset, TarCodesets } from './ingestion/submission-ingestion-codes-service.interface';
 
 export class SubmissionFeaturePropertyIndexService extends DBService {
-  submissionFeaturePropertyIndexRepository: SubmissionFeaturePropertyIndexRepository;
+  submissionFeaturePropertyStringService: SubmissionFeaturePropertyStringService;
+  submissionFeaturePropertyNumberService: SubmissionFeaturePropertyNumberService;
+  submissionFeaturePropertyBooleanService: SubmissionFeaturePropertyBooleanService;
+  submissionFeaturePropertyTimestampService: SubmissionFeaturePropertyTimestampService;
+  submissionFeatureArtifactService: SubmissionFeatureArtifactService;
+  submissionFeaturePropertyCodeService: SubmissionFeaturePropertyCodeService;
+  submissionFeaturePropertyTaxonService: SubmissionFeaturePropertyTaxonService;
+  submissionFeaturePropertyGeometryService: SubmissionFeaturePropertyGeometryService;
+  contributorCodesetService: ContributorCodesetService;
+  contributorCodesetCodeService: ContributorCodesetCodeService;
+  uploadArtifactService: UploadArtifactService;
+  codeService: CodeService;
 
   /**
    * Creates an instance of SubmissionFeaturePropertyIndexService.
@@ -29,7 +49,18 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
    */
   constructor(connection: IDBConnection) {
     super(connection);
-    this.submissionFeaturePropertyIndexRepository = new SubmissionFeaturePropertyIndexRepository(connection);
+    this.submissionFeaturePropertyStringService = new SubmissionFeaturePropertyStringService(connection);
+    this.submissionFeaturePropertyNumberService = new SubmissionFeaturePropertyNumberService(connection);
+    this.submissionFeaturePropertyBooleanService = new SubmissionFeaturePropertyBooleanService(connection);
+    this.submissionFeaturePropertyTimestampService = new SubmissionFeaturePropertyTimestampService(connection);
+    this.submissionFeatureArtifactService = new SubmissionFeatureArtifactService(connection);
+    this.submissionFeaturePropertyCodeService = new SubmissionFeaturePropertyCodeService(connection);
+    this.submissionFeaturePropertyTaxonService = new SubmissionFeaturePropertyTaxonService(connection);
+    this.submissionFeaturePropertyGeometryService = new SubmissionFeaturePropertyGeometryService(connection);
+    this.contributorCodesetService = new ContributorCodesetService(connection);
+    this.contributorCodesetCodeService = new ContributorCodesetCodeService(connection);
+    this.uploadArtifactService = new UploadArtifactService(connection);
+    this.codeService = new CodeService(connection);
   }
 
   /**
@@ -40,7 +71,16 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
    * @memberof SubmissionFeaturePropertyIndexService
    */
   async deletePropertyRecordsBySubmissionId(submissionId: number): Promise<void> {
-    await this.submissionFeaturePropertyIndexRepository.deletePropertyRecordsBySubmissionId(submissionId);
+    await Promise.all([
+      this.submissionFeaturePropertyStringService.deleteSubmissionFeaturePropertyStringsBySubmissionId(submissionId),
+      this.submissionFeaturePropertyNumberService.deleteSubmissionFeaturePropertyNumbersBySubmissionId(submissionId),
+      this.submissionFeaturePropertyBooleanService.deleteSubmissionFeaturePropertyBooleansBySubmissionId(submissionId),
+      this.submissionFeaturePropertyTimestampService.deleteSubmissionFeaturePropertyTimestampsBySubmissionId(submissionId),
+      this.submissionFeatureArtifactService.deleteSubmissionFeatureArtifactsBySubmissionId(submissionId),
+      this.submissionFeaturePropertyCodeService.deleteSubmissionFeaturePropertyCodesBySubmissionId(submissionId),
+      this.submissionFeaturePropertyTaxonService.deleteSubmissionFeaturePropertyTaxonsBySubmissionId(submissionId),
+      this.submissionFeaturePropertyGeometryService.deleteSubmissionFeaturePropertyGeometriesBySubmissionId(submissionId)
+    ]);
   }
 
   /**
@@ -51,7 +91,32 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
    * @memberof SubmissionFeaturePropertyIndexService
    */
   async deletePropertyRecordsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    await this.submissionFeaturePropertyIndexRepository.deletePropertyRecordsBySubmissionUploadId(submissionUploadId);
+    await Promise.all([
+      this.submissionFeaturePropertyStringService.deleteSubmissionFeaturePropertyStringsBySubmissionUploadId(
+        submissionUploadId
+      ),
+      this.submissionFeaturePropertyNumberService.deleteSubmissionFeaturePropertyNumbersBySubmissionUploadId(
+        submissionUploadId
+      ),
+      this.submissionFeaturePropertyBooleanService.deleteSubmissionFeaturePropertyBooleansBySubmissionUploadId(
+        submissionUploadId
+      ),
+      this.submissionFeaturePropertyTimestampService.deleteSubmissionFeaturePropertyTimestampsBySubmissionUploadId(
+        submissionUploadId
+      ),
+      this.submissionFeatureArtifactService.deleteSubmissionFeatureArtifactsBySubmissionUploadId(
+        submissionUploadId
+      ),
+      this.submissionFeaturePropertyCodeService.deleteSubmissionFeaturePropertyCodesBySubmissionUploadId(
+        submissionUploadId
+      ),
+      this.submissionFeaturePropertyTaxonService.deleteSubmissionFeaturePropertyTaxonsBySubmissionUploadId(
+        submissionUploadId
+      ),
+      this.submissionFeaturePropertyGeometryService.deleteSubmissionFeaturePropertyGeometriesBySubmissionUploadId(
+        submissionUploadId
+      )
+    ]);
   }
 
   /**
@@ -62,7 +127,7 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
    * @memberof SubmissionFeaturePropertyIndexService
    */
   async getFeatureTypePropertyMetadata(featureTypeIds: number[]): Promise<FeatureTypePropertyMetadata[]> {
-    return this.submissionFeaturePropertyIndexRepository.getFeatureTypePropertyMetadata(featureTypeIds);
+    return this.codeService.getFeatureTypePropertyMetadataByFeatureTypeIds(featureTypeIds);
   }
 
   /**
@@ -73,7 +138,7 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
    * @memberof SubmissionFeaturePropertyIndexService
    */
   async insertStringRecords(records: CreateSubmissionFeaturePropertyString[]): Promise<void> {
-    await this.submissionFeaturePropertyIndexRepository.insertStringRecords(records);
+    await this.submissionFeaturePropertyStringService.createSubmissionFeaturePropertyStrings(records);
   }
 
   /**
@@ -84,7 +149,7 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
    * @memberof SubmissionFeaturePropertyIndexService
    */
   async insertNumberRecords(records: CreateSubmissionFeaturePropertyNumber[]): Promise<void> {
-    await this.submissionFeaturePropertyIndexRepository.insertNumberRecords(records);
+    await this.submissionFeaturePropertyNumberService.createSubmissionFeaturePropertyNumbers(records);
   }
 
   /**
@@ -95,7 +160,7 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
    * @memberof SubmissionFeaturePropertyIndexService
    */
   async insertBooleanRecords(records: CreateSubmissionFeaturePropertyBoolean[]): Promise<void> {
-    await this.submissionFeaturePropertyIndexRepository.insertBooleanRecords(records);
+    await this.submissionFeaturePropertyBooleanService.createSubmissionFeaturePropertyBooleans(records);
   }
 
   /**
@@ -106,18 +171,18 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
    * @memberof SubmissionFeaturePropertyIndexService
    */
   async insertTimestampRecords(records: CreateSubmissionFeaturePropertyTimestamp[]): Promise<void> {
-    await this.submissionFeaturePropertyIndexRepository.insertTimestampRecords(records);
+    await this.submissionFeaturePropertyTimestampService.createSubmissionFeaturePropertyTimestamps(records);
   }
 
   /**
    * Insert canonical artifact property records.
    *
-   * @param {CreateSubmissionFeaturePropertyArtifact[]} records
+   * @param {CreateSubmissionFeatureArtifact[]} records
    * @return {Promise<void>}
    * @memberof SubmissionFeaturePropertyIndexService
    */
-  async insertArtifactRecords(records: CreateSubmissionFeaturePropertyArtifact[]): Promise<void> {
-    await this.submissionFeaturePropertyIndexRepository.insertArtifactRecords(records);
+  async insertArtifactRecords(records: CreateSubmissionFeatureArtifact[]): Promise<void> {
+    await this.submissionFeatureArtifactService.createSubmissionFeatureArtifacts(records);
   }
 
   /**
@@ -128,7 +193,7 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
    * @memberof SubmissionFeaturePropertyIndexService
    */
   async insertCodeRecords(records: CreateSubmissionFeaturePropertyCode[]): Promise<void> {
-    await this.submissionFeaturePropertyIndexRepository.insertCodeRecords(records);
+    await this.submissionFeaturePropertyCodeService.createSubmissionFeaturePropertyCodes(records);
   }
 
   /**
@@ -139,7 +204,7 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
    * @memberof SubmissionFeaturePropertyIndexService
    */
   async insertTaxonRecords(records: CreateSubmissionFeaturePropertyTaxon[]): Promise<void> {
-    await this.submissionFeaturePropertyIndexRepository.insertTaxonRecords(records);
+    await this.submissionFeaturePropertyTaxonService.createSubmissionFeaturePropertyTaxons(records);
   }
 
   /**
@@ -150,7 +215,7 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
    * @memberof SubmissionFeaturePropertyIndexService
    */
   async insertGeometryRecords(records: CreateSubmissionFeaturePropertyGeometry[]): Promise<void> {
-    await this.submissionFeaturePropertyIndexRepository.insertGeometryRecords(records);
+    await this.submissionFeaturePropertyGeometryService.createSubmissionFeaturePropertyGeometries(records);
   }
 
   /**
@@ -183,8 +248,7 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
       description: normalizedCodeset.description
     }));
 
-    const contributorCodesetService = new ContributorCodesetService(this.connection);
-    const existingCodesets = await contributorCodesetService.createCodesets(contributorCodesetDefinitions);
+    const existingCodesets = await this.contributorCodesetService.createCodesets(contributorCodesetDefinitions);
     const contributorCodesetsByKey = new Map<string, ContributorCodeset>();
 
     for (const contributorCodeset of existingCodesets) {
@@ -227,8 +291,7 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
       }
     }
 
-    const contributorCodesetCodeService = new ContributorCodesetCodeService(this.connection);
-    await contributorCodesetCodeService.createContributorCodesetCodes(contributorCodesetCodeDefinitions);
+    await this.contributorCodesetCodeService.createContributorCodesetCodes(contributorCodesetCodeDefinitions);
   }
 
   /**
@@ -248,19 +311,27 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
     }
 
     const uniqueCodeReferences = [...new Map(codeReferences.map((reference) => [reference.slug, reference])).values()];
-    const uniqueContributorCodesetKeys = [
-      ...new Set(uniqueCodeReferences.map((reference) => reference.contributorCodesetKey))
-    ];
-    const rows =
-      await this.submissionFeaturePropertyIndexRepository.getContributorCodeResolutionsByContributorIdAndCodesetKeys(
-        contributorId,
-        uniqueContributorCodesetKeys
-      );
+    const uniqueContributorCodesetKeys = [...new Set(uniqueCodeReferences.map((reference) => reference.contributorCodesetKey))];
+    const contributorCodesets = await this.contributorCodesetService.getContributorCodesetsByContributorIdAndKeys(
+      contributorId,
+      uniqueContributorCodesetKeys
+    );
+    const contributorCodesetIdToKey = new Map(
+      contributorCodesets.map((contributorCodeset) => [contributorCodeset.contributor_codeset_id, contributorCodeset.key])
+    );
+    const contributorCodesetCodes = await this.contributorCodesetCodeService.getContributorCodesetCodesByContributorCodesetIds(
+      [...contributorCodesetIdToKey.keys()]
+    );
 
     const slugToContributorCodesetCodeId = new Map<string, number>();
 
-    for (const row of rows) {
-      const slug = `code::${row.contributor_codeset_key}::${row.contributor_codeset_code_key}`;
+    for (const contributorCodesetCode of contributorCodesetCodes) {
+      const contributorCodesetKey = contributorCodesetIdToKey.get(contributorCodesetCode.contributor_codeset_id);
+      if (!contributorCodesetKey) {
+        continue;
+      }
+
+      const slug = `code::${contributorCodesetKey}::${contributorCodesetCode.key}`;
       if (slugToContributorCodesetCodeId.has(slug)) {
         throw new ApiExecuteSQLError(
           'Ambiguous code slug resolution across multiple rows. Each contributor codeset key and codeset code key must be unique.',
@@ -275,7 +346,7 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
         );
       }
 
-      slugToContributorCodesetCodeId.set(slug, row.contributor_codeset_code_id);
+      slugToContributorCodesetCodeId.set(slug, contributorCodesetCode.contributor_codeset_code_id);
     }
 
     for (const reference of uniqueCodeReferences) {
@@ -311,11 +382,10 @@ export class SubmissionFeaturePropertyIndexService extends DBService {
       return new Map<string, string>();
     }
 
-    const rows =
-      await this.submissionFeaturePropertyIndexRepository.getArtifactResolutionsBySubmissionUploadIdAndReferences(
-        submissionUploadId,
-        references
-      );
+    const rows = await this.uploadArtifactService.getFeatureArtifactResolutionsBySubmissionUploadIdAndReferences(
+      submissionUploadId,
+      references
+    );
     const referenceToArtifactId = new Map<string, string>();
 
     for (const row of rows) {

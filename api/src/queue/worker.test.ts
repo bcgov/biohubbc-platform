@@ -17,8 +17,7 @@ describe('worker', () => {
     it('registers the process submission features job handler with pg-boss', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const scheduleStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: sinon.stub().resolves() };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
@@ -32,8 +31,7 @@ describe('worker', () => {
     it('registers the malware scan job handler with pg-boss', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const scheduleStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: sinon.stub().resolves() };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
@@ -55,8 +53,8 @@ describe('worker', () => {
       await registerWorkers();
 
       // createQueue is called for all queues (including dead letter queues)
-      // 9 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, CLEANUP_INVALID_SUBMISSION_UPLOADS
-      expect(createQueueStub.callCount).to.equal(9);
+      // 8 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, INDEX_SUBMISSION_FEATURES + FAILED
+      expect(createQueueStub.callCount).to.equal(8);
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
       expect(createQueueStub.thirdCall.args[0]).to.equal(JobQueues.MALWARE_SCAN_FAILED);
@@ -65,15 +63,13 @@ describe('worker', () => {
       expect(createQueueStub.getCall(5).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD);
       expect(createQueueStub.getCall(6).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.getCall(7).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
-      expect(createQueueStub.getCall(8).args[0]).to.equal(JobQueues.CLEANUP_INVALID_SUBMISSION_UPLOADS);
-      expect(scheduleStub.calledOnce).to.be.true;
+      expect(scheduleStub.notCalled).to.be.true;
     });
 
     it('configures dead letter queue for process-submission-features', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const scheduleStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: sinon.stub().resolves() };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
@@ -91,8 +87,7 @@ describe('worker', () => {
     it('registers dead letter queue handler for failed jobs', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const scheduleStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: sinon.stub().resolves() };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
@@ -106,8 +101,7 @@ describe('worker', () => {
     it('registers the index submission features job handler with pg-boss', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const scheduleStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: sinon.stub().resolves() };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
@@ -124,8 +118,7 @@ describe('worker', () => {
     it('configures dead letter queue for index-submission-features', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const scheduleStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: sinon.stub().resolves() };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 

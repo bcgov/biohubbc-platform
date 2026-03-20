@@ -1,6 +1,7 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { FeaturePropertyCode, FeatureTypeCode, FeatureTypePropertyCodeRow } from '../models/feature-property';
+import { FeatureTypePropertyMetadata } from '../models/submission-feature-property-index';
 import { BaseRepository } from './base-repository';
 
 /**
@@ -117,5 +118,40 @@ export class CodeRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Get feature type property metadata rows for given feature type ids.
+   *
+   * @param {number[]} featureTypeIds
+   * @return {Promise<FeatureTypePropertyMetadata[]>}
+   * @memberof CodeRepository
+   */
+  async getFeatureTypePropertyMetadataByFeatureTypeIds(featureTypeIds: number[]): Promise<FeatureTypePropertyMetadata[]> {
+    if (!featureTypeIds.length) {
+      return [];
+    }
+
+    const sqlStatement = SQL`
+      SELECT
+        ftp.feature_type_id,
+        ftp.feature_type_property_id,
+        ftp.allow_multiple,
+        fp.name AS feature_property_name,
+        fpt.name AS feature_property_type_name
+      FROM feature_type_property AS ftp
+      INNER JOIN feature_property AS fp
+        ON fp.feature_property_id = ftp.feature_property_id
+      INNER JOIN feature_property_type AS fpt
+        ON fpt.feature_property_type_id = fp.feature_property_type_id
+      WHERE
+        ftp.feature_type_id = ANY(${featureTypeIds}::int[])
+        AND ftp.record_end_date IS NULL
+        AND fp.record_end_date IS NULL
+        AND fpt.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, FeatureTypePropertyMetadata);
+    return response.rows;
   }
 }

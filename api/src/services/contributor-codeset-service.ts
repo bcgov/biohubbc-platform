@@ -119,6 +119,21 @@ export class ContributorCodesetService extends DBService {
   }
 
   /**
+   * Get contributor_codeset rows by contributor id and codeset keys.
+   *
+   * @param {number} contributorId
+   * @param {string[]} codesetKeys
+   * @return {Promise<ContributorCodeset[]>}
+   * @memberof ContributorCodesetService
+   */
+  getContributorCodesetsByContributorIdAndKeys(
+    contributorId: number,
+    codesetKeys: string[]
+  ): Promise<ContributorCodeset[]> {
+    return this.contributorCodesetRepository.getContributorCodesetsByContributorIdAndKeys(contributorId, codesetKeys);
+  }
+
+  /**
    * Validate that existing database rows match expected incoming definitions.
    *
    * If an existing row for a slug has different metadata, this throws a

@@ -34,6 +34,19 @@ export class SubmissionFeaturePropertyCodeService extends DBService {
   }
 
   /**
+   * Create submission_feature_property_code rows in bulk.
+   *
+   * @param {CreateSubmissionFeaturePropertyCode[]} payloads
+   * @return {Promise<SubmissionFeaturePropertyCode[]>}
+   * @memberof SubmissionFeaturePropertyCodeService
+   */
+  createSubmissionFeaturePropertyCodes(
+    payloads: CreateSubmissionFeaturePropertyCode[]
+  ): Promise<SubmissionFeaturePropertyCode[]> {
+    return this.submissionFeaturePropertyCodeRepository.insertSubmissionFeaturePropertyCodes(payloads);
+  }
+
+  /**
    * Get a submission_feature_property_code row by id.
    *
    * @param {number} submissionFeaturePropertyCodeId
@@ -90,6 +103,23 @@ export class SubmissionFeaturePropertyCodeService extends DBService {
   ): Promise<SubmissionFeaturePropertyCode[]> {
     return this.submissionFeaturePropertyCodeRepository.getSubmissionFeaturePropertyCodesByContributorCodesetCodeId(
       contributorCodesetCodeId
+    );
+  }
+
+  deleteSubmissionFeaturePropertyCodesBySubmissionId(submissionId: number): Promise<void> {
+    return this.submissionFeaturePropertyCodeRepository.deleteSubmissionFeaturePropertyCodesBySubmissionId(submissionId);
+  }
+
+  /**
+   * Delete submission_feature_property_code rows for a submission upload.
+   *
+   * @param {string} submissionUploadId
+   * @return {Promise<void>}
+   * @memberof SubmissionFeaturePropertyCodeService
+   */
+  deleteSubmissionFeaturePropertyCodesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    return this.submissionFeaturePropertyCodeRepository.deleteSubmissionFeaturePropertyCodesBySubmissionUploadId(
+      submissionUploadId
     );
   }
 }

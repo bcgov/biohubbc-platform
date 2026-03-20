@@ -1,5 +1,6 @@
 import { SQL } from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
+import { ArtifactReferenceResolution } from '../../models/submission-feature-property-index';
 import { CreateUploadArtifact, UpdateUploadArtifact, UploadArtifact } from '../../models/upload-artifact';
 import { BaseRepository } from '../base-repository';
 
@@ -158,5 +159,52 @@ export class UploadArtifactRepository extends BaseRepository {
         `rowCount was ${response.rowCount}, expected 1`
       ]);
     }
+  }
+
+  /**
+   * Resolve artifact references to artifact IDs for feature artifacts under one submission upload.
+   *
+   * @param {string} submissionUploadId
+   * @param {string[]} references
+   * @return {Promise<ArtifactReferenceResolution[]>}
+   * @memberof UploadArtifactRepository
+   */
+  async getFeatureArtifactResolutionsBySubmissionUploadIdAndReferences(
+    submissionUploadId: string,
+    references: string[]
+  ): Promise<ArtifactReferenceResolution[]> {
+    if (!references.length) {
+      return [];
+    }
+
+    const sqlStatement = SQL`
+      WITH normalized_refs AS (
+        SELECT DISTINCT
+          refs.reference,
+          CASE
+            WHEN refs.reference LIKE 'files/%' THEN substr(refs.reference, 7)
+            ELSE refs.reference
+          END AS normalized_reference
+        FROM unnest(${references}::text[]) AS refs(reference)
+      )
+      SELECT
+        normalized_refs.reference AS artifact_reference,
+        artifact.artifact_id
+      FROM normalized_refs
+      INNER JOIN submission_upload
+        ON submission_upload.submission_upload_id = ${submissionUploadId}
+      INNER JOIN upload_artifact
+        ON upload_artifact.upload_id = submission_upload.upload_id
+       AND upload_artifact.role = 'feature'
+      INNER JOIN artifact
+        ON artifact.artifact_id = upload_artifact.artifact_id
+      WHERE
+        artifact.object_key = normalized_refs.reference
+        OR artifact.object_key = normalized_refs.normalized_reference
+        OR substring(artifact.object_key FROM '[^/]+$') = normalized_refs.normalized_reference;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, ArtifactReferenceResolution);
+    return response.rows;
   }
 }
