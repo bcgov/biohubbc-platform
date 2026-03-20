@@ -217,15 +217,15 @@ const insertContributorSystemUserSQL = (contributorClientId: string) => `
     su.system_user_id,
     1
   FROM contributor c
-  CROSS JOIN system_user su
+  CROSS JOIN "system_user" su
   WHERE LOWER(c.client_id) = LOWER('${contributorClientId}')
     AND c.record_end_date IS NULL
     AND su.record_end_date IS NULL
     AND NOT EXISTS (
       SELECT 1
       FROM contributor_system_user csu
-      WHERE csu.contributor_id = c.contributor_id
-        AND csu.system_user_id = su.system_user_id
+      WHERE csu.system_user_id = su.system_user_id
         AND csu.record_end_date IS NULL
-    );
+    )
+  ON CONFLICT DO NOTHING;
 `;

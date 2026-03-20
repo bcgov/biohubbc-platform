@@ -6,6 +6,7 @@ import { Knex } from 'knex';
 // Disable mock data seeding by default. Set `ENABLE_MOCK_FEATURE_DATA=true` to enable.
 const ENABLE_MOCK_FEATURE_SEEDING = Boolean(process.env.ENABLE_MOCK_FEATURE_SEEDING === 'true' || false);
 const NUM_MOCK_FEATURE_SUBMISSIONS = Number(process.env.NUM_MOCK_FEATURE_SUBMISSIONS || 0);
+const CONTRIBUTOR_CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID;
 
 /**
  * Search query for performance testing.
@@ -41,20 +42,13 @@ export async function seed(knex: Knex): Promise<void> {
     return knex.raw(`SELECT null;`); // dummy query to appease knex
   }
 
+  if (!CONTRIBUTOR_CLIENT_ID) {
+    throw new Error('KEYCLOAK_CLIENT_ID is required to seed mock submission data');
+  }
+
   await knex.raw(`
     SET SCHEMA 'biohub';
     SET SEARCH_PATH = 'biohub','public';
-  `);
-
-  await knex.raw(`
-    INSERT INTO contributor (client_id, description)
-    SELECT 'SIMS', 'Seed contributor'
-    WHERE NOT EXISTS (
-      SELECT 1
-      FROM contributor
-      WHERE client_id = 'SIMS'
-        AND record_end_date IS NULL
-    );
   `);
 
   for (let i = 0; i < NUM_MOCK_FEATURE_SUBMISSIONS; i++) {
@@ -438,8 +432,22 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
       $$Comment: ${faker.lorem.words({ min: 5, max: 100 })}$$,
       ${securityReviewTimestamp},
       ${publishTimestamp},
-      (SELECT system_user_id from "system_user" where user_identifier = 'SIMS'),
-      (SELECT contributor_id FROM contributor WHERE client_id = 'SIMS' AND record_end_date IS NULL LIMIT 1)
+      (
+        SELECT csu.system_user_id
+        FROM contributor_system_user csu
+        JOIN contributor c ON c.contributor_id = csu.contributor_id
+        WHERE LOWER(c.client_id) = LOWER('${CONTRIBUTOR_CLIENT_ID}')
+          AND c.record_end_date IS NULL
+          AND csu.record_end_date IS NULL
+        LIMIT 1
+      ),
+      (
+        SELECT contributor_id
+        FROM contributor
+        WHERE LOWER(client_id) = LOWER('${CONTRIBUTOR_CLIENT_ID}')
+          AND record_end_date IS NULL
+        LIMIT 1
+      )
   )
   RETURNING submission_id;
 `;
