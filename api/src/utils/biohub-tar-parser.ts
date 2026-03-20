@@ -6,9 +6,7 @@ import { pipeline } from 'node:stream/promises';
 import * as tar from 'tar-stream';
 import { z, ZodError } from 'zod';
 import { IFlattenedBlock } from '../models/submission-feature';
-import {
-  TarCodesets
-} from '../services/ingestion/submission-ingestion-codes-service.interface';
+import { TarCodesets } from '../services/ingestion/submission-ingestion-codes-service.interface';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
 import { IUploadedMediaFile } from './biohub-tar-parser.interface';
 

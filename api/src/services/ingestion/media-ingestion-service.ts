@@ -37,28 +37,23 @@ export class MediaIngestionService extends DBService {
     uploadArchiveId: string
   ): Promise<void> {
     const tarStream = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
-    await streamMedia(
-      tarStream,
-      this.objectStorageService,
-      `submissions/${submissionId}/media`,
-      async (mediaFile) => {
-        const artifact = await this.artifactService.insertArtifact({
-          bucket: getObjectStoreBucketName(),
-          object_key: mediaFile.s3Key,
-          byte_size: mediaFile.byteSize,
-          artifact_status: ArtifactStatusEnum.UPLOADED,
-          checksum_sha256: mediaFile.checksumSha256,
-          uploaded_at: dayjs().toISOString()
-        });
+    await streamMedia(tarStream, this.objectStorageService, `submissions/${submissionId}/media`, async (mediaFile) => {
+      const artifact = await this.artifactService.insertArtifact({
+        bucket: getObjectStoreBucketName(),
+        object_key: mediaFile.s3Key,
+        byte_size: mediaFile.byteSize,
+        artifact_status: ArtifactStatusEnum.UPLOADED,
+        checksum_sha256: mediaFile.checksumSha256,
+        uploaded_at: dayjs().toISOString()
+      });
 
-        await this.uploadArtifactService.insertUploadArtifact({
-          upload_id: uploadId,
-          artifact_id: artifact.artifact_id,
-          role: UploadArtifactRoleEnum.ATTACHMENT,
-          upload_archive_id: uploadArchiveId,
-          path: mediaFile.path
-        });
-      }
-    );
+      await this.uploadArtifactService.insertUploadArtifact({
+        upload_id: uploadId,
+        artifact_id: artifact.artifact_id,
+        role: UploadArtifactRoleEnum.ATTACHMENT,
+        upload_archive_id: uploadArchiveId,
+        path: mediaFile.path
+      });
+    });
   }
 }

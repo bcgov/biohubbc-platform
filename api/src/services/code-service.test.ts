@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { FeatureTypeWithFeaturePropertiesCode } from '../models/feature-property';
+import { FeatureTypeWithFeatureProperties } from '../models/feature-property';
 import { CodeRepository } from '../repositories/code-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CodeService } from './code-service';
@@ -18,7 +18,7 @@ describe('codeService', () => {
     it('should return id value', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      const mockFeatureTypePropertyCodes: FeatureTypeWithFeaturePropertiesCode[] = [
+      const mockFeatureTypePropertyCodes: FeatureTypeWithFeatureProperties[] = [
         {
           feature_type: {
             feature_type_id: 1,
@@ -85,7 +85,7 @@ describe('codeService', () => {
     it('should return id value', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      const expectedResult: FeatureTypeWithFeaturePropertiesCode[] = [
+      const expectedResult: FeatureTypeWithFeatureProperties[] = [
         {
           feature_type: {
             feature_type_id: 1,

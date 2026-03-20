@@ -11,8 +11,8 @@ import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
 import { CodesetIngestionService } from './codeset-ingestion-service';
-import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
 import { MediaIngestionService } from './media-ingestion-service';
+import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
 import { SubmissionIngestionService } from './submission-ingestion-service';
 
 describe('SubmissionIngestionService', () => {
@@ -56,7 +56,9 @@ describe('SubmissionIngestionService', () => {
       const deleteFeaturesStub = sinon
         .stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId')
         .resolves();
-      const ingestFeatureBatchStub = sinon.stub(SubmissionFeatureIngestionService.prototype, 'ingestFeatureBatch').resolves();
+      const ingestFeatureBatchStub = sinon
+        .stub(SubmissionFeatureIngestionService.prototype, 'ingestFeatureBatch')
+        .resolves();
       const ingestMediaStub = sinon.stub(MediaIngestionService.prototype, 'ingestMediaFiles').resolves();
       const ingestCodesetsStub = sinon.stub(CodesetIngestionService.prototype, 'ingestCodesets').resolves();
 
@@ -202,9 +204,7 @@ describe('SubmissionIngestionService', () => {
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
       sinon.stub(MediaIngestionService.prototype, 'ingestMediaFiles').resolves();
-      sinon
-        .stub(CodesetIngestionService.prototype, 'ingestCodesets')
-        .rejects(new Error('codeset persist failed'));
+      sinon.stub(CodesetIngestionService.prototype, 'ingestCodesets').rejects(new Error('codeset persist failed'));
       const streamFeaturesStub = sinon.stub(biohubTarParser, 'streamFeatures').resolves({ featureCount: 0 });
 
       try {

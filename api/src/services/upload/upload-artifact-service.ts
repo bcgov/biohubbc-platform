@@ -81,20 +81,23 @@ export class UploadArtifactService extends DBService {
   }
 
   /**
-   * Resolve artifact references to artifact IDs for feature artifacts under one submission upload.
+   * Resolve feature artifact keys to persisted artifact IDs for one submission upload.
    *
-   * @param {string} submissionUploadId
-   * @param {string[]} references
-   * @return {Promise<ArtifactReferenceResolution[]>}
+   * `artifactPaths` should be normalized archive-relative paths extracted from
+   * feature `artifact_key` values before invocation.
+   *
+   * @param {string} submissionUploadId - Submission upload scope used for resolution.
+   * @param {string[]} artifactPaths - Canonical archive-relative artifact paths.
+   * @return {Promise<ArtifactReferenceResolution[]>} Resolved pairs of `path` -> `artifact_id`.
    * @memberof UploadArtifactService
    */
   async getFeatureArtifactResolutionsBySubmissionUploadIdAndReferences(
     submissionUploadId: string,
-    references: string[]
+    artifactPaths: string[]
   ): Promise<ArtifactReferenceResolution[]> {
     return this.uploadArtifactServiceRepository.getFeatureArtifactResolutionsBySubmissionUploadIdAndReferences(
       submissionUploadId,
-      references
+      artifactPaths
     );
   }
 }

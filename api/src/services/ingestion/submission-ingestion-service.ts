@@ -5,9 +5,9 @@ import { BucketType, ObjectStorageService } from '../object-storage/object-stora
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
 import { CodesetIngestionService } from './codeset-ingestion-service';
+import { MediaIngestionService } from './media-ingestion-service';
 import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
 import { IValidationResult } from './submission-ingestion-service.interface';
-import { MediaIngestionService } from './media-ingestion-service';
 
 const FEATURE_INSERT_BATCH_SIZE = 10000;
 
@@ -56,12 +56,7 @@ export class SubmissionIngestionService extends DBService {
 
     // Checkpointed streaming passes keep memory bounded while avoiding concurrent
     // full-archive scans against object storage for the same tarball.
-    await this.mediaIngestionService.ingestMediaFiles(
-      objectKey,
-      submissionId,
-      uploadId,
-      uploadArchiveId
-    );
+    await this.mediaIngestionService.ingestMediaFiles(objectKey, submissionId, uploadId, uploadArchiveId);
     await this.codesetIngestionService.ingestCodesets(objectKey, submissionUploadId);
     await this.ingestFeatures(objectKey, submissionId, submissionUploadId);
 

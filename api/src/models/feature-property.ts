@@ -1,28 +1,28 @@
 import { z } from 'zod';
 
-export const FeaturePropertyTypeName = z.enum([
-  'string',
-  'number',
-  'boolean',
-  'object',
-  'spatial',
-  'datetime',
-  'code',
-  'taxon',
-  'artifact_key'
-]);
+export enum FEATURE_PROPERTY_TYPE {
+  STRING = 'string',
+  NUMBER = 'number',
+  BOOLEAN = 'boolean',
+  OBJECT = 'object',
+  SPATIAL = 'spatial',
+  DATETIME = 'datetime',
+  CODE = 'code',
+  TAXON = 'taxon',
+  ARTIFACT_KEY = 'artifact_key'
+}
 
-export type FeaturePropertyTypeName = z.infer<typeof FeaturePropertyTypeName>;
+export const FeaturePropertyTypeName = z.nativeEnum(FEATURE_PROPERTY_TYPE);
 
-export const FeatureTypeCode = z.object({
+export const FeatureType = z.object({
   feature_type_id: z.number(),
   feature_type_name: z.string(),
   feature_type_display_name: z.string()
 });
 
-export type FeatureTypeCode = z.infer<typeof FeatureTypeCode>;
+export type FeatureType = z.infer<typeof FeatureType>;
 
-export const FeaturePropertyCode = z.object({
+export const FeatureProperty = z.object({
   feature_property_id: z.number(),
   feature_property_name: z.string(),
   feature_property_display_name: z.string(),
@@ -30,15 +30,15 @@ export const FeaturePropertyCode = z.object({
   feature_property_type_name: FeaturePropertyTypeName
 });
 
-export type FeaturePropertyCode = z.infer<typeof FeaturePropertyCode>;
+export type FeatureProperty = z.infer<typeof FeatureProperty>;
 
-export const FeatureTypePropertyCodeRow = FeatureTypeCode.merge(FeaturePropertyCode);
+export const FeatureTypePropertyExtended = FeatureType.merge(FeatureProperty);
 
-export type FeatureTypePropertyCodeRow = z.infer<typeof FeatureTypePropertyCodeRow>;
+export type FeatureTypePropertyExtended = z.infer<typeof FeatureTypePropertyExtended>;
 
-export const FeatureTypeWithFeaturePropertiesCode = z.object({
-  feature_type: FeatureTypeCode,
-  feature_type_properties: z.array(FeaturePropertyCode)
+export const FeatureTypeWithFeatureProperties = z.object({
+  feature_type: FeatureType,
+  feature_type_properties: z.array(FeatureProperty)
 });
 
-export type FeatureTypeWithFeaturePropertiesCode = z.infer<typeof FeatureTypeWithFeaturePropertiesCode>;
+export type FeatureTypeWithFeatureProperties = z.infer<typeof FeatureTypeWithFeatureProperties>;

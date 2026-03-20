@@ -5,12 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as tar from 'tar-stream';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
-import {
-  buildFeatureDataPayload,
-  streamCodesets,
-  streamFeatures,
-  streamMedia
-} from './biohub-tar-parser';
+import { buildFeatureDataPayload, streamCodesets, streamFeatures, streamMedia } from './biohub-tar-parser';
 
 chai.use(sinonChai);
 
@@ -266,9 +261,7 @@ describe('biohub-tar-parser', () => {
     });
 
     it('preserves nested files/ paths in uploaded object keys', async () => {
-      const tarBuffer = await createTestTar([
-        { name: 'files/nested/path/report.pdf', content: 'pdf-data' }
-      ]);
+      const tarBuffer = await createTestTar([{ name: 'files/nested/path/report.pdf', content: 'pdf-data' }]);
 
       const uploadStreamStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
       const uploaded: Array<{

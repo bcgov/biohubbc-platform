@@ -11,7 +11,7 @@ import {
 } from '../../models/download';
 import { DownloadFragmentId, DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { FeatureTypeWithFeaturePropertiesCode } from '../../models/feature-property';
+import { FeatureTypeWithFeatureProperties } from '../../models/feature-property';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -172,7 +172,7 @@ describe('DownloadPipelineService', () => {
         );
 
       sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
-      const mockCodes: FeatureTypeWithFeaturePropertiesCode[] = [
+      const mockCodes: FeatureTypeWithFeatureProperties[] = [
         {
           feature_type: { feature_type_id: 1, feature_type_name: 'file', feature_type_display_name: 'File' },
           feature_type_properties: [
@@ -233,7 +233,7 @@ describe('DownloadPipelineService', () => {
       sinon
         .stub(DownloadRepository.prototype, 'findDownloadById')
         .resolves(createMockDownloadRecord({ total_fragments: 3 }));
-      const mockCodes: FeatureTypeWithFeaturePropertiesCode[] = [
+      const mockCodes: FeatureTypeWithFeatureProperties[] = [
         {
           feature_type: {
             feature_type_id: 2,

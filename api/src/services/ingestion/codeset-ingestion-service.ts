@@ -164,7 +164,11 @@ export class CodesetIngestionService extends DBService {
    * @param {string} context
    * @returns {string}
    */
-  private resolveRequiredLabel(incomingLabel: string | undefined, existingLabel: string | undefined, context: string): string {
+  private resolveRequiredLabel(
+    incomingLabel: string | undefined,
+    existingLabel: string | undefined,
+    context: string
+  ): string {
     const normalizedIncomingLabel = normalizeOptionalText(incomingLabel);
     if (normalizedIncomingLabel) {
       return normalizedIncomingLabel;

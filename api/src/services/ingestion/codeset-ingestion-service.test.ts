@@ -25,9 +25,9 @@ describe('CodesetIngestionService', () => {
         .resolves({ contributor_id: 123 } as any);
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
       sinon.stub(ContributorCodesetService.prototype, 'getContributorCodesetsByContributorIdAndKeys').resolves([]);
-      sinon.stub(ContributorCodesetCodeService.prototype, 'getContributorCodesetCodesByContributorCodesetIds').resolves(
-        []
-      );
+      sinon
+        .stub(ContributorCodesetCodeService.prototype, 'getContributorCodesetCodesByContributorCodesetIds')
+        .resolves([]);
       sinon.stub(ContributorCodesetService.prototype, 'createCodeset').resolves({ contributor_codeset_id: 321 } as any);
 
       const createCodesStub = sinon
@@ -106,9 +106,9 @@ describe('CodesetIngestionService', () => {
         .resolves({ contributor_id: 123 } as any);
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
       sinon.stub(ContributorCodesetService.prototype, 'getContributorCodesetsByContributorIdAndKeys').resolves([]);
-      sinon.stub(ContributorCodesetCodeService.prototype, 'getContributorCodesetCodesByContributorCodesetIds').resolves(
-        []
-      );
+      sinon
+        .stub(ContributorCodesetCodeService.prototype, 'getContributorCodesetCodesByContributorCodesetIds')
+        .resolves([]);
       sinon.stub(ContributorCodesetService.prototype, 'createCodeset').rejects(new Error('create codeset failed'));
       sinon.stub(biohubTarParser, 'streamCodesets').callsFake(async (_stream, onCodesets) => {
         await onCodesets({
@@ -149,16 +149,18 @@ describe('CodesetIngestionService', () => {
           external_id: 'agency-existing'
         } as any
       ]);
-      sinon.stub(ContributorCodesetCodeService.prototype, 'getContributorCodesetCodesByContributorCodesetIds').resolves([
-        {
-          contributor_codeset_code_id: 77,
-          contributor_codeset_id: 50,
-          key: 'aarde',
-          label: 'Existing Aarde',
-          description: null,
-          external_id: null
-        } as any
-      ]);
+      sinon
+        .stub(ContributorCodesetCodeService.prototype, 'getContributorCodesetCodesByContributorCodesetIds')
+        .resolves([
+          {
+            contributor_codeset_code_id: 77,
+            contributor_codeset_id: 50,
+            key: 'aarde',
+            label: 'Existing Aarde',
+            description: null,
+            external_id: null
+          } as any
+        ]);
       const createCodesetStub = sinon
         .stub(ContributorCodesetService.prototype, 'createCodeset')
         .resolves({ contributor_codeset_id: 50 } as any);
@@ -193,9 +195,9 @@ describe('CodesetIngestionService', () => {
         .resolves({ contributor_id: 123 } as any);
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
       sinon.stub(ContributorCodesetService.prototype, 'getContributorCodesetsByContributorIdAndKeys').resolves([]);
-      sinon.stub(ContributorCodesetCodeService.prototype, 'getContributorCodesetCodesByContributorCodesetIds').resolves(
-        []
-      );
+      sinon
+        .stub(ContributorCodesetCodeService.prototype, 'getContributorCodesetCodesByContributorCodesetIds')
+        .resolves([]);
       const createCodesetStub = sinon.stub(ContributorCodesetService.prototype, 'createCodeset').resolves({
         contributor_codeset_id: 50
       } as any);

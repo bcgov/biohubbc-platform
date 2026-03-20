@@ -171,25 +171,28 @@ export class UploadArtifactRepository extends BaseRepository {
   }
 
   /**
-   * Resolve artifact references to artifact IDs for feature artifacts under one submission upload.
+   * Resolve feature artifact keys to persisted artifact IDs for a single submission upload.
    *
-   * @param {string} submissionUploadId
-   * @param {string[]} references
-   * @return {Promise<ArtifactReferenceResolution[]>}
+   * `artifactPaths` should contain normalized archive-relative paths (for example `images/photo.jpg`)
+   * derived from feature `artifact_key` values before this method is called.
+   *
+   * @param {string} submissionUploadId - Submission upload scope used to resolve the backing upload.
+   * @param {string[]} artifactPaths - Canonical archive-relative artifact paths to resolve.
+   * @return {Promise<ArtifactReferenceResolution[]>} Resolved pairs of `path` -> `artifact_id`.
    * @memberof UploadArtifactRepository
    */
   async getFeatureArtifactResolutionsBySubmissionUploadIdAndReferences(
     submissionUploadId: string,
-    references: string[]
+    artifactPaths: string[]
   ): Promise<ArtifactReferenceResolution[]> {
-    if (!references.length) {
+    if (!artifactPaths.length) {
       return [];
     }
 
     const sqlStatement = SQL`
       WITH requested_refs AS (
         SELECT DISTINCT refs.reference
-        FROM unnest(${references}::text[]) AS refs(reference)
+        FROM unnest(${artifactPaths}::text[]) AS refs(reference)
       ),
       upload_scope AS (
         SELECT submission_upload.upload_id

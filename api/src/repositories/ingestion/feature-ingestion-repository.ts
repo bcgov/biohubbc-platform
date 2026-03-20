@@ -28,9 +28,7 @@ export class FeatureIngestionRepository extends BaseRepository {
    * @return {Promise<void>}
    * @memberof FeatureIngestionRepository
    */
-  async insertSubmissionFeatureRecords(
-    records: CreateSubmissionFeatureIngestionRecord[]
-  ): Promise<void> {
+  async insertSubmissionFeatureRecords(records: CreateSubmissionFeatureIngestionRecord[]): Promise<void> {
     if (!records.length) {
       return;
     }
