@@ -34,7 +34,8 @@ describe('UploadArtifactService', () => {
         upload_id: 'upload-1',
         artifact_id: 'artifact-id-1',
         role: UploadArtifactRoleEnum.FEATURE,
-        upload_archive_id: null
+        upload_archive_id: null,
+        path: null
       };
 
       const stub = sinon.stub(UploadArtifactRepository.prototype, 'getUploadArtifact').resolves(fakeUploadArtifact);
@@ -65,14 +66,16 @@ describe('UploadArtifactService', () => {
           upload_id: 'upload-1',
           artifact_id: 'artifact-id-1',
           role: UploadArtifactRoleEnum.ATTACHMENT,
-          upload_archive_id: null
+          upload_archive_id: null,
+          path: null
         },
         {
           upload_artifact_id: 'artifact-2',
           upload_id: 'upload-2',
           artifact_id: 'artifact-id-2',
           role: UploadArtifactRoleEnum.ATTACHMENT,
-          upload_archive_id: null
+          upload_archive_id: null,
+          path: null
         }
       ];
 

@@ -1,5 +1,10 @@
 import { IDBConnection } from '../../database/db';
-import { CreateUploadArtifact, UpdateUploadArtifact, UploadArtifact } from '../../models/upload-artifact';
+import {
+  ArtifactReferenceResolution,
+  CreateUploadArtifact,
+  UpdateUploadArtifact,
+  UploadArtifact
+} from '../../models/upload-artifact';
 import { UploadArtifactRepository } from '../../repositories/upload/upload-artifact-repository';
 import { DBService } from '../db-service';
 
@@ -73,5 +78,23 @@ export class UploadArtifactService extends DBService {
    */
   async deleteUploadArtifact(uploadArtifactId: string): Promise<void> {
     return this.uploadArtifactServiceRepository.deleteUploadArtifact(uploadArtifactId);
+  }
+
+  /**
+   * Resolve artifact references to artifact IDs for feature artifacts under one submission upload.
+   *
+   * @param {string} submissionUploadId
+   * @param {string[]} references
+   * @return {Promise<ArtifactReferenceResolution[]>}
+   * @memberof UploadArtifactService
+   */
+  async getFeatureArtifactResolutionsBySubmissionUploadIdAndReferences(
+    submissionUploadId: string,
+    references: string[]
+  ): Promise<ArtifactReferenceResolution[]> {
+    return this.uploadArtifactServiceRepository.getFeatureArtifactResolutionsBySubmissionUploadIdAndReferences(
+      submissionUploadId,
+      references
+    );
   }
 }

@@ -3,6 +3,7 @@ import { getAPIUserDBConnection } from '../../database/db';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
+import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
 import { publishIndexSubmissionFeaturesJob } from '../publisher';
 
@@ -16,9 +17,8 @@ const defaultLog = getLogger('queue/jobs/process-submission-features-job');
  *
  * Processes a submission asynchronously:
  * 1. Downloads tarball from object storage
- * 2. Extracts and validates features
- * 3. Inserts feature records
- * 4. Indexes features for search
+ * 2. Streams and shallow-ingests features/media
+ * 3. Enqueues indexing job for deep validation and property resolution
  *
  * @param {PgBoss.Job<SubmissionUpload>[]} jobs The jobs to process
  * @return {*}  {Promise<void>}
@@ -42,20 +42,23 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
       });
 
       const submissionValidationService = new SubmissionValidationService(connection);
+      const submissionUploadService = new SubmissionUploadService(connection);
 
       // Commit 'started' status immediately so it's visible even if processing fails
       await submissionValidationService.updateSubmissionValidationStatus(job.id, 'started');
+      await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'in_progress' });
       await connection.commit();
 
-      // Process the submission (two-pass: validate → ingest)
+      // Process the submission (streaming shallow-ingestion).
       const submissionIngestionService = new SubmissionIngestionService(connection);
-      const result = await submissionIngestionService.processSubmission(submissionUpload);
+      const result = await submissionIngestionService.ingestSubmissionUpload(submissionUpload);
 
       if (!result.valid) {
         // Validation failure — permanent condition, don't retry
         await submissionValidationService.updateSubmissionValidationStatus(job.id, 'invalid', {
           errors: result.errors
         });
+        await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
         await connection.commit();
 
         defaultLog.info({
@@ -69,7 +72,7 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
         return;
       }
 
-      // Update validation status to completed
+      // Update ingestion status to completed; deep validation is handled by indexing.
       await submissionValidationService.updateSubmissionValidationStatus(job.id, 'completed');
       await connection.commit();
 
@@ -94,6 +97,21 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
     } catch (error) {
       await connection.rollback();
 
+      try {
+        const submissionUploadService = new SubmissionUploadService(connection);
+        await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
+        await connection.commit();
+      } catch (statusError) {
+        await connection.rollback();
+        defaultLog.error({
+          label: 'processSubmissionFeaturesJobHandler',
+          message: 'Failed to update submission upload status to invalid',
+          jobId: job.id,
+          submissionUploadId,
+          error: statusError
+        });
+      }
+
       defaultLog.error({
         label: 'processSubmissionFeaturesJobHandler',
         message: 'Process submission features job failed',
@@ -102,8 +120,8 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
         error
       });
 
-      // Don't update status to 'failed' here — rethrow so pg-boss moves the job to DLQ.
-      // DLQ handler sets the validation status to 'failed'.
+      // Rethrow so pg-boss moves the job to DLQ.
+      // DLQ handler persists final validation failure state for observability.
       throw error;
     } finally {
       connection.release();
@@ -141,6 +159,7 @@ export const processSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<Submissi
       await connection.open();
 
       const submissionValidationService = new SubmissionValidationService(connection);
+      const submissionUploadService = new SubmissionUploadService(connection);
 
       // Update validation status to failed (all retries exhausted)
       // Use submissionUploadId since DLQ job has a new job ID, not the original
@@ -151,6 +170,7 @@ export const processSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<Submissi
           error: jobOutput ?? 'Job failed after all retries'
         }
       );
+      await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
 
       await connection.commit();
 

@@ -17,7 +17,7 @@ describe('worker', () => {
     it('registers the process submission features job handler with pg-boss', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: sinon.stub().resolves() };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
@@ -31,7 +31,7 @@ describe('worker', () => {
     it('registers the malware scan job handler with pg-boss', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: sinon.stub().resolves() };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
@@ -45,7 +45,8 @@ describe('worker', () => {
     it('creates queues before registering workers (pg-boss v10 requirement)', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const scheduleStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: scheduleStub };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
@@ -62,12 +63,13 @@ describe('worker', () => {
       expect(createQueueStub.getCall(5).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD);
       expect(createQueueStub.getCall(6).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.getCall(7).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
+      expect(scheduleStub.notCalled).to.be.true;
     });
 
     it('configures dead letter queue for process-submission-features', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: sinon.stub().resolves() };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
@@ -85,7 +87,7 @@ describe('worker', () => {
     it('registers dead letter queue handler for failed jobs', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: sinon.stub().resolves() };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
@@ -99,7 +101,7 @@ describe('worker', () => {
     it('registers the index submission features job handler with pg-boss', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: sinon.stub().resolves() };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
@@ -116,7 +118,7 @@ describe('worker', () => {
     it('configures dead letter queue for index-submission-features', async () => {
       const workStub = sinon.stub().resolves();
       const createQueueStub = sinon.stub().resolves();
-      const mockBoss = { work: workStub, createQueue: createQueueStub };
+      const mockBoss = { work: workStub, createQueue: createQueueStub, schedule: sinon.stub().resolves() };
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 

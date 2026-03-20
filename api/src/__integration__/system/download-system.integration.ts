@@ -22,6 +22,26 @@ import { createTestFeature, createTestSubmission } from '../helpers/test-submiss
 const TEST_PREFIX = 'dev-artifacts';
 const SYSTEM_USER_ID = 1;
 
+async function createTestTicketId(db: Knex): Promise<string> {
+  const [team] = await db('biohub.team').select('team_id').limit(1);
+  if (!team?.team_id) {
+    throw new Error('No team row found for ticket setup');
+  }
+
+  const ticketSlug = String(Math.floor(Math.random() * 1e8)).padStart(8, '0');
+  const [ticket] = await db('biohub.ticket')
+    .insert({
+      ticket_slug: ticketSlug,
+      subject: `${TEST_PREFIX}-ticket`,
+      description: 'System integration test ticket',
+      team_id: team.team_id,
+      create_user: SYSTEM_USER_ID
+    })
+    .returning('ticket_id');
+
+  return ticket.ticket_id;
+}
+
 /** Parse CSV text into trimmed lines. */
 function parseCsvLines(csv: string): string[] {
   return csv.trim().split('\n');
@@ -78,6 +98,7 @@ describe('Download Worker', function () {
   const createdDownloadIds: number[] = [];
   const createdSubmissionFeatureIds: number[] = [];
   const createdSubmissionIds: number[] = [];
+  const createdTicketIds: string[] = [];
   const createdS3Keys: string[] = [];
   const createdArtifactIds: string[] = [];
 
@@ -119,6 +140,10 @@ describe('Download Worker', function () {
       // 3. Delete submissions
       if (createdSubmissionIds.length > 0) {
         await db('biohub.submission').whereIn('submission_id', createdSubmissionIds).del();
+      }
+
+      if (createdTicketIds.length > 0) {
+        await db('biohub.ticket').whereIn('ticket_id', createdTicketIds).del();
       }
 
       // 4. Delete S3 objects
@@ -181,10 +206,14 @@ describe('Download Worker', function () {
       })
       .returning('upload_id');
 
+    const ticketId = await createTestTicketId(db);
+    createdTicketIds.push(ticketId);
+
     const [bridge] = await db('biohub.submission_upload')
       .insert({
         submission_id: submissionId,
         upload_id: upload.upload_id,
+        ticket_id: ticketId,
         create_user: SYSTEM_USER_ID
       })
       .returning('submission_upload_id');
