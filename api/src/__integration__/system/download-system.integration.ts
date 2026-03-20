@@ -118,7 +118,9 @@ describe('Download Worker', function () {
 
       // 3. Delete submission_upload and its children (child of submission via FK)
       if (createdSubmissionIds.length > 0) {
-        const uploadSubIds = db('biohub.submission_upload').select('submission_upload_id').whereIn('submission_id', createdSubmissionIds);
+        const uploadSubIds = db('biohub.submission_upload')
+          .select('submission_upload_id')
+          .whereIn('submission_id', createdSubmissionIds);
         await db('biohub.submission_validation').whereIn('submission_upload_id', uploadSubIds).del();
         await db('biohub.submission_upload_status').whereIn('submission_upload_id', uploadSubIds).del();
         await db('biohub.submission_upload').whereIn('submission_id', createdSubmissionIds).del();
