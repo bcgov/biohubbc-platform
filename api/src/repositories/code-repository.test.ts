@@ -4,7 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiNotFoundError } from '../errors/api-error';
-import { FeatureType, FeatureTypePropertyExtended } from '../models/feature-property';
+import { FEATURE_PROPERTY_TYPE, FeatureType, FeatureTypePropertyExtended } from '../models/feature-property';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CodeRepository } from './code-repository';
 
@@ -54,7 +54,7 @@ describe('CodeRepository', () => {
         feature_property_name: 'name',
         feature_property_display_name: 'Name',
         feature_property_type_id: 3,
-        feature_property_type_name: 'string'
+        feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
       };
 
       const mockQueryResponse = {
@@ -112,7 +112,7 @@ describe('CodeRepository', () => {
         feature_property_name: 'name',
         feature_property_display_name: 'Name',
         feature_property_type_id: 3,
-        feature_property_type_name: 'string'
+        feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
       };
 
       const mockQueryResponse = {

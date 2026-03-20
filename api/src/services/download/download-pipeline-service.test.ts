@@ -11,7 +11,7 @@ import {
 } from '../../models/download';
 import { DownloadFragmentId, DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { FeatureTypeWithFeatureProperties } from '../../models/feature-property';
+import { FEATURE_PROPERTY_TYPE, FeatureTypeWithFeatureProperties } from '../../models/feature-property';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -181,7 +181,7 @@ describe('DownloadPipelineService', () => {
               feature_property_name: 'artifact_key',
               feature_property_display_name: 'Artifact Key',
               feature_property_type_id: 1,
-              feature_property_type_name: 'artifact_key'
+              feature_property_type_name: FEATURE_PROPERTY_TYPE.ARTIFACT_KEY
             }
           ]
         }
@@ -246,7 +246,7 @@ describe('DownloadPipelineService', () => {
               feature_property_name: 'species',
               feature_property_display_name: 'Species',
               feature_property_type_id: 1,
-              feature_property_type_name: 'string'
+              feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
             }
           ]
         }

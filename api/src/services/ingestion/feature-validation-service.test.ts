@@ -39,7 +39,8 @@ describe('FeatureValidationService', () => {
           name: 'name',
           display_name: 'Name',
           description: '',
-          type_name: 'string',
+          feature_type_property_id: 1,
+      type_name: 'string',
           required_value: true,
           calculated_value: false
         },
@@ -47,7 +48,8 @@ describe('FeatureValidationService', () => {
           name: 'focal_species',
           display_name: 'Focal Species',
           description: '',
-          type_name: 'array',
+          feature_type_property_id: 1,
+      type_name: 'array',
           required_value: true,
           calculated_value: false
         },
@@ -55,7 +57,8 @@ describe('FeatureValidationService', () => {
           name: 'start_date',
           display_name: 'Start Date',
           description: '',
-          type_name: 'datetime',
+          feature_type_property_id: 1,
+      type_name: 'datetime',
           required_value: true,
           calculated_value: false
         },
@@ -63,7 +66,8 @@ describe('FeatureValidationService', () => {
           name: 'description',
           display_name: 'Description',
           description: '',
-          type_name: 'string',
+          feature_type_property_id: 1,
+      type_name: 'string',
           required_value: false,
           calculated_value: false
         }
@@ -436,7 +440,8 @@ describe('FeatureValidationService', () => {
         name: 'name',
         display_name: 'Name',
         description: '',
-        type_name: 'string',
+        feature_type_property_id: 1,
+      type_name: 'string',
         required_value: true,
         calculated_value: false
       },
@@ -444,7 +449,8 @@ describe('FeatureValidationService', () => {
         name: 'count',
         display_name: 'Count',
         description: '',
-        type_name: 'number',
+        feature_type_property_id: 1,
+      type_name: 'number',
         required_value: false,
         calculated_value: false
       },
@@ -452,7 +458,8 @@ describe('FeatureValidationService', () => {
         name: 'active',
         display_name: 'Active',
         description: '',
-        type_name: 'boolean',
+        feature_type_property_id: 1,
+      type_name: 'boolean',
         required_value: false,
         calculated_value: false
       }
@@ -581,7 +588,8 @@ describe('FeatureValidationService', () => {
           name: 'name',
           display_name: 'Name',
           description: '',
-          type_name: 'string',
+          feature_type_property_id: 1,
+      type_name: 'string',
           required_value: true,
           calculated_value: false
         },
@@ -589,7 +597,8 @@ describe('FeatureValidationService', () => {
           name: 'filename',
           display_name: 'Filename',
           description: '',
-          type_name: 'string',
+          feature_type_property_id: 1,
+      type_name: 'string',
           required_value: true,
           calculated_value: true
         }
@@ -617,7 +626,8 @@ describe('FeatureValidationService', () => {
           name: 'name',
           display_name: 'Name',
           description: '',
-          type_name: 'string',
+          feature_type_property_id: 1,
+      type_name: 'string',
           required_value: true,
           calculated_value: false
         },
@@ -625,7 +635,8 @@ describe('FeatureValidationService', () => {
           name: 'calculated_required',
           display_name: 'Calculated Required',
           description: '',
-          type_name: 'string',
+          feature_type_property_id: 1,
+      type_name: 'string',
           required_value: true,
           calculated_value: true
         },
@@ -633,7 +644,8 @@ describe('FeatureValidationService', () => {
           name: 'calculated_optional',
           display_name: 'Calculated Optional',
           description: '',
-          type_name: 'number',
+          feature_type_property_id: 1,
+      type_name: 'number',
           required_value: false,
           calculated_value: true
         }
@@ -669,7 +681,8 @@ describe('FeatureValidationService', () => {
             name: 'name',
             display_name: 'Name',
             description: '',
-            type_name: 'string',
+            feature_type_property_id: 1,
+      type_name: 'string',
             required_value: true,
             calculated_value: false
           }

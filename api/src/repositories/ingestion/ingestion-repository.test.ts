@@ -157,7 +157,6 @@ describe('IngestionRepository', () => {
               display_name: 'Name',
               description: 'The name of the dataset',
               type_name: 'string',
-              allow_multiple: false,
               required_value: true,
               calculated_value: false
             },
@@ -167,7 +166,6 @@ describe('IngestionRepository', () => {
               display_name: 'Description',
               description: 'The description of the dataset',
               type_name: 'string',
-              allow_multiple: false,
               required_value: false,
               calculated_value: false
             }
@@ -202,7 +200,6 @@ describe('IngestionRepository', () => {
             display_name: 'Name',
             description: 'The name of the dataset',
             type_name: 'string',
-            allow_multiple: false,
             required_value: true,
             calculated_value: false
           },
@@ -212,7 +209,6 @@ describe('IngestionRepository', () => {
             display_name: 'Description',
             description: 'The description of the dataset',
             type_name: 'string',
-            allow_multiple: false,
             required_value: false,
             calculated_value: false
           }

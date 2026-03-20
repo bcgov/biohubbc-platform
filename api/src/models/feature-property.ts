@@ -12,7 +12,17 @@ export enum FEATURE_PROPERTY_TYPE {
   ARTIFACT_KEY = 'artifact_key'
 }
 
-export const FeaturePropertyTypeName = z.nativeEnum(FEATURE_PROPERTY_TYPE);
+export const FeaturePropertyTypeName = z.enum([
+  'string',
+  'number',
+  'boolean',
+  'object',
+  'spatial',
+  'datetime',
+  'code',
+  'taxon',
+  'artifact_key'
+]);
 
 export const FeatureType = z.object({
   feature_type_id: z.number(),

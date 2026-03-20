@@ -3,7 +3,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { FeatureProperty } from '../models/feature-property';
+import { FEATURE_PROPERTY_TYPE, FeatureProperty } from '../models/feature-property';
 import { Artifact, ArtifactRepository } from '../repositories/artifact-repository';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SecurityRepository } from '../repositories/security-repository';
@@ -78,7 +78,7 @@ describe('ArtifactService', () => {
         feature_property_name: 'artifact_key',
         feature_property_display_name: 'S3 Key',
         feature_property_type_id: 1,
-        feature_property_type_name: 'string'
+        feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
       };
 
       const getFeaturePropertyByNameStub = sinon

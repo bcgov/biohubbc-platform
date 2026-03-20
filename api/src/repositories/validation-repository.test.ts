@@ -60,7 +60,6 @@ describe('ValidationRepository', () => {
           display_name: 'Dataset',
           description: 'asd',
           type_name: 'string',
-          allow_multiple: false,
           required_value: true,
           calculated_value: false
         }

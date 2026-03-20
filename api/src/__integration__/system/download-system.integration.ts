@@ -10,6 +10,7 @@
 import AdmZip from 'adm-zip';
 import { expect } from 'chai';
 import { Knex, knex } from 'knex';
+import { randomInt } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
@@ -28,7 +29,7 @@ async function createTestTicketId(db: Knex): Promise<string> {
     throw new Error('No team row found for ticket setup');
   }
 
-  const ticketSlug = String(Math.floor(Math.random() * 1e8)).padStart(8, '0');
+  const ticketSlug = String(randomInt(0, 100_000_000)).padStart(8, '0');
   const [ticket] = await db('biohub.ticket')
     .insert({
       ticket_slug: ticketSlug,

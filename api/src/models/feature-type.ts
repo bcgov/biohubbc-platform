@@ -10,7 +10,6 @@ export const FeatureProperty = z.object({
   display_name: z.string(),
   description: z.string(),
   type_name: z.string(),
-  allow_multiple: z.boolean().nullable(),
   required_value: z.boolean(),
   calculated_value: z.boolean()
 });

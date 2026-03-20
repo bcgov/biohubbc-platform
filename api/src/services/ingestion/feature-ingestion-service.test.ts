@@ -41,7 +41,6 @@ describe('FeatureIngestionService', () => {
           display_name: 'Name',
           description: '',
           type_name: 'string',
-          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -51,7 +50,6 @@ describe('FeatureIngestionService', () => {
           display_name: 'Focal Species',
           description: '',
           type_name: 'array',
-          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -61,7 +59,6 @@ describe('FeatureIngestionService', () => {
           display_name: 'Start Date',
           description: '',
           type_name: 'datetime',
-          allow_multiple: false,
           required_value: true,
           calculated_value: false
         },
@@ -71,7 +68,6 @@ describe('FeatureIngestionService', () => {
           display_name: 'Description',
           description: '',
           type_name: 'string',
-          allow_multiple: false,
           required_value: false,
           calculated_value: false
         }
@@ -406,7 +402,6 @@ describe('FeatureIngestionService', () => {
             display_name: 'Name',
             description: '',
             type_name: 'string',
-            allow_multiple: false,
             required_value: true,
             calculated_value: false
           },
@@ -416,7 +411,6 @@ describe('FeatureIngestionService', () => {
             display_name: 'Focal Species',
             description: '',
             type_name: 'array',
-            allow_multiple: false,
             required_value: true,
             calculated_value: false
           },
@@ -426,7 +420,6 @@ describe('FeatureIngestionService', () => {
             display_name: 'Start Date',
             description: '',
             type_name: 'datetime',
-            allow_multiple: false,
             required_value: true,
             calculated_value: false
           },
@@ -436,7 +429,6 @@ describe('FeatureIngestionService', () => {
             display_name: 'Description',
             description: '',
             type_name: 'string',
-            allow_multiple: false,
             required_value: false,
             calculated_value: false
           },
@@ -446,7 +438,6 @@ describe('FeatureIngestionService', () => {
             display_name: 'Count',
             description: '',
             type_name: 'number',
-            allow_multiple: false,
             required_value: false,
             calculated_value: false
           }

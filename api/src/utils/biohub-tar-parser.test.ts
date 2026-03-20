@@ -109,7 +109,7 @@ describe('biohub-tar-parser', () => {
         await streamFeatures(bufferToStream(tarBuffer), 10000, async () => undefined);
         expect.fail('expected streamFeatures to throw');
       } catch (error) {
-        expect((error as Error).message).to.equal('Feature entry is missing required string field: id');
+        expect((error as Error).message).to.equal('Feature entry failed shallow validation');
       }
     });
 
@@ -171,17 +171,15 @@ describe('biohub-tar-parser', () => {
         {
           name: 'codes/agency.json',
           content: JSON.stringify({
-            categories: {
-              agency: {
-                label: 'Agency',
-                external_id: 'agency',
-                description: 'Agency codes',
-                codes: {
-                  aarde: {
-                    label: 'Aarde Environmental Ltd.',
-                    external_id: 'aarde',
-                    description: 'Aarde Environmental Ltd.'
-                  }
+            agency: {
+              label: 'Agency',
+              external_id: 'agency',
+              description: 'Agency codes',
+              codes: {
+                aarde: {
+                  label: 'Aarde Environmental Ltd.',
+                  external_id: 'aarde',
+                  description: 'Aarde Environmental Ltd.'
                 }
               }
             }

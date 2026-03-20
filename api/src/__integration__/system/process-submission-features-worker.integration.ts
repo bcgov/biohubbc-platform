@@ -4,7 +4,7 @@
 // Requires: make web && make queue
 import { expect } from 'chai';
 import { Knex, knex } from 'knex';
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import * as tar from 'tar-stream';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
@@ -26,7 +26,7 @@ async function createTestTicketId(db: Knex): Promise<string> {
     throw new Error('No team row found for ticket setup');
   }
 
-  const ticketSlug = String(Math.floor(Math.random() * 1e8)).padStart(8, '0');
+  const ticketSlug = String(randomInt(0, 100_000_000)).padStart(8, '0');
   const [ticket] = await db('biohub.ticket')
     .insert({
       ticket_slug: ticketSlug,
@@ -450,7 +450,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       throw new Error('No team row found for ticket setup');
     }
 
-    const ticketSlug = String(Math.floor(Math.random() * 1e8)).padStart(8, '0');
+    const ticketSlug = String(randomInt(0, 100_000_000)).padStart(8, '0');
     const ticketResult = await connection.sql<{ ticket_id: string }>(
       SQL`INSERT INTO biohub.ticket (ticket_slug, subject, description, team_id, create_user)
           VALUES (${ticketSlug}, ${`${TEST_PREFIX}-ticket`}, ${'System integration test ticket'}, ${
