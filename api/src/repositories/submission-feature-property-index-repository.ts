@@ -4,8 +4,7 @@ import { ApiExecuteSQLError } from '../errors/api-error';
 import { ContributorCodesetCode, ContributorCodesetCodeSchema } from '../models/contributor-codeset-code';
 import {
   CreateSubmissionFeaturePropertyArtifact,
-  SubmissionFeaturePropertyArtifact,
-  SubmissionFeaturePropertyArtifactSchema
+  SubmissionFeaturePropertyArtifact
 } from '../models/submission-feature-property-artifact';
 import {
   CreateSubmissionFeaturePropertyBoolean,
@@ -469,7 +468,7 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
         artifact_id;
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyArtifactSchema);
+    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyArtifact);
     this.assertInsertedRowCount('submission_feature_property_artifact', records.length, response.rowCount);
 
     return response.rows;
