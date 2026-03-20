@@ -5,6 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../../errors/api-error';
 import { FeatureTypeWithProperties, FeatureTypeWithPropertiesRow } from '../../models/feature-type';
+import { CreateSubmissionFeatureIngestionRecord } from '../../models/submission-feature';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { FeatureIngestionRepository } from './feature-ingestion-repository';
 
@@ -13,6 +14,39 @@ chai.use(sinonChai);
 describe('FeatureIngestionRepository', () => {
   afterEach(() => {
     sinon.restore();
+  });
+
+  describe('insertSubmissionFeatureRecords', () => {
+    it('should build SQL with active feature type join and bigint data_byte_size cast', async () => {
+      const records: CreateSubmissionFeatureIngestionRecord[] = [
+        {
+          submissionId: 1,
+          submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
+          sourceId: 'feature-1',
+          featureTypeName: 'dataset',
+          data: {
+            id: 'feature-1',
+            type: 'dataset',
+            properties: { name: 'Dataset 1' },
+            references: [],
+            parent: null
+          },
+          dataByteSize: 123
+        }
+      ];
+
+      const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
+        expect(sqlStatement.text).to.include('::bigint[]');
+        expect(sqlStatement.text).to.include('ft.name = staged.feature_type_name AND ft.record_end_date IS NULL');
+        return Promise.resolve({ rowCount: 1, rows: [], command: '', oid: 0, fields: [] });
+      });
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
+
+      await ingestionRepository.insertSubmissionFeatureRecords(records);
+
+      expect(sqlStub).to.have.been.calledOnce;
+    });
   });
 
   describe('insertSubmissionFeatureRecord', () => {

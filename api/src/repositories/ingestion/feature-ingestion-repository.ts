@@ -2,17 +2,9 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { FeatureTypeWithProperties, FeatureTypeWithPropertiesRow } from '../../models/feature-type';
+import { CreateSubmissionFeatureIngestionRecord } from '../../models/submission-feature';
 import { BaseRepository } from '../base-repository';
 import type { ISubmissionFeature } from '../submission-repository';
-
-export interface SubmissionFeatureIngestionRecord {
-  submissionId: number;
-  submissionUploadId: string;
-  sourceId: string;
-  featureTypeName: string;
-  data: Record<string, unknown>;
-  dataByteSize: number;
-}
 
 /**
  * A repository class for ingestion-related data access.
@@ -37,7 +29,7 @@ export class FeatureIngestionRepository extends BaseRepository {
    * @memberof FeatureIngestionRepository
    */
   async insertSubmissionFeatureRecords(
-    records: SubmissionFeatureIngestionRecord[]
+    records: CreateSubmissionFeatureIngestionRecord[]
   ): Promise<void> {
     if (!records.length) {
       return;
@@ -76,7 +68,7 @@ export class FeatureIngestionRepository extends BaseRepository {
         ${sourceIds}::text[],
         ${featureTypeNames}::text[],
         ${dataValues}::text[],
-        ${dataByteSizes}::integer[]
+        ${dataByteSizes}::bigint[]
       ) AS staged(
         submission_id,
         submission_upload_id,
@@ -85,7 +77,7 @@ export class FeatureIngestionRepository extends BaseRepository {
         data_text,
         data_byte_size
       )
-      INNER JOIN feature_type ft ON ft.name = staged.feature_type_name
+      INNER JOIN feature_type ft ON ft.name = staged.feature_type_name AND ft.record_end_date IS NULL
       CROSS JOIN LATERAL (SELECT staged.data_text::jsonb AS data) parsed;
     `;
 

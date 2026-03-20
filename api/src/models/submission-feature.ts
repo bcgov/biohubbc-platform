@@ -20,6 +20,25 @@ export const PostSubmissionFeatureArraySchema = z.array(PostSubmissionFeatureSch
 export type PostSubmissionFeature = z.infer<typeof PostSubmissionFeatureSchema>;
 export type PostSubmissionFeatureArray = z.infer<typeof PostSubmissionFeatureArraySchema>;
 
+export const CreateSubmissionFeatureSchema = z.object({
+  id: z.string().min(1, 'Feature id is required'),
+  type: z.string().min(1, 'Feature type is required'),
+  properties: z.record(z.unknown()),
+  references: z.array(z.string()),
+  parent: z.string().nullable()
+});
+
+export type CreateSubmissionFeature = z.infer<typeof CreateSubmissionFeatureSchema>;
+
+export interface CreateSubmissionFeatureIngestionRecord {
+  submissionId: number;
+  submissionUploadId: string;
+  sourceId: string;
+  featureTypeName: string;
+  data: CreateSubmissionFeature;
+  dataByteSize: number;
+}
+
 /**
  * Flat submission feature structure matching SIMS IFlattenedBlock.
  * Parent-child relationships are expressed via UUID references.

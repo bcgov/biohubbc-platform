@@ -5,7 +5,7 @@ import { PassThrough, Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import * as tar from 'tar-stream';
 import { ZodError, z } from 'zod';
-import { IFlattenedBlock } from '../models/submission-feature';
+import { CreateSubmissionFeature, IFlattenedBlock } from '../models/submission-feature';
 import {
   TarCodesets
 } from '../services/ingestion/submission-ingestion-codes-service.interface';
@@ -140,7 +140,7 @@ function extractFeatureFromTarballEntry(value: unknown): IFlattenedBlock {
 /**
  * Build the raw JSONB payload persisted in submission_feature.data.
  */
-export function buildFeatureDataPayload(block: IFlattenedBlock): Record<string, unknown> {
+export function buildFeatureDataPayload(block: IFlattenedBlock): CreateSubmissionFeature {
   return {
     id: block.id,
     type: block.type,

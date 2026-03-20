@@ -71,7 +71,23 @@ describe('biohub-tar-parser', () => {
             { id: 'feature-2', type: 'sample_site', properties: { name: 'Site A' }, content: [], parent: 'feature-1' }
           ])
         },
-        { name: 'codes/agency.json', content: JSON.stringify({ agency: { codes: { x: { label: 'X' } } } }) },
+        {
+          name: 'codes/agency.json',
+          content: JSON.stringify({
+            agency: {
+              label: 'Agency',
+              external_id: 'agency',
+              description: 'Agency codes',
+              codes: {
+                x: {
+                  label: 'X',
+                  external_id: 'x',
+                  description: 'Code X'
+                }
+              }
+            }
+          })
+        },
         { name: 'files/photo.jpg', content: 'binary-data' }
       ]);
 
@@ -163,8 +179,14 @@ describe('biohub-tar-parser', () => {
             categories: {
               agency: {
                 label: 'Agency',
+                external_id: 'agency',
+                description: 'Agency codes',
                 codes: {
-                  aarde: { label: 'Aarde Environmental Ltd.' }
+                  aarde: {
+                    label: 'Aarde Environmental Ltd.',
+                    external_id: 'aarde',
+                    description: 'Aarde Environmental Ltd.'
+                  }
                 }
               }
             }

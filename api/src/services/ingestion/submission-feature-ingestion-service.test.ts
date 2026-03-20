@@ -1,11 +1,8 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
-import { IFlattenedBlock } from '../../models/submission-feature';
-import {
-  FeatureIngestionRepository,
-  SubmissionFeatureIngestionRecord
-} from '../../repositories/ingestion/feature-ingestion-repository';
+import { CreateSubmissionFeatureIngestionRecord, IFlattenedBlock } from '../../models/submission-feature';
+import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
 
@@ -39,7 +36,7 @@ describe('SubmissionFeatureIngestionService', () => {
       await service.ingestFeatureBatch(42, 'submission-upload-1', features);
 
       expect(insertStub.calledOnce).to.be.true;
-      const insertedRows = insertStub.firstCall.args[0] as SubmissionFeatureIngestionRecord[];
+      const insertedRows = insertStub.firstCall.args[0] as CreateSubmissionFeatureIngestionRecord[];
       expect(insertedRows).to.have.length(2);
 
       expect(insertedRows[0]).to.include({
