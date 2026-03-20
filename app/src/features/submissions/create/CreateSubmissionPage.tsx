@@ -6,7 +6,7 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createTarData, fileToUint8Array, uploadMultipartTar } from 'utils/submission-upload-utils';
+import { fileToUint8Array, uploadMultipartTar } from 'utils/submission-upload-utils';
 import yup from 'utils/YupSchema';
 import { CreateSubmissionForm } from './form/CreateSubmissionForm';
 import { ICreateSubmissionForm } from './form/CreateSubmissionForm.interface';
@@ -24,9 +24,9 @@ export const SubmissionYupSchema = yup.object().shape({
   comment: yup.string().max(500).required('Comment is required'),
   file: yup
     .mixed<File>()
-    .required('You must submit a .json file')
-    .test('fileType', 'Only .json files are supported', (value) => {
-      return value instanceof File && value.name.toLowerCase().endsWith('.json');
+    .required('You must submit a .tar file')
+    .test('fileType', 'Only .tar files are supported', (value) => {
+      return value instanceof File && value.name.toLowerCase().endsWith('.tar');
     })
 });
 
@@ -39,7 +39,7 @@ export const CreateSubmissionPage = () => {
   const formikRef = useRef<FormikProps<ICreateSubmissionForm>>(null);
 
   /**
-   * NOTE: The logic in creating the .tar file should be improved, where possible
+   * Upload a user-provided TAR archive as a multipart submission upload.
    */
   const handleSubmit = async (values: ICreateSubmissionForm) => {
     setIsSubmitting(true);
@@ -47,19 +47,7 @@ export const CreateSubmissionPage = () => {
     const { file, ...submission } = values;
 
     try {
-      // Convert the JSON file to Uint8Array
-      const fileBytes = await fileToUint8Array(file);
-
-      // Prepare files for TAR - just the JSON file
-      const filesToTar = [
-        {
-          name: 'features.json',
-          content: fileBytes
-        }
-      ];
-
-      // Create TAR data
-      const tarData = createTarData(filesToTar);
+      const tarData = await fileToUint8Array(file);
 
       // Request pre-signed upload URLs for multipart upload
       const uploadResponse = await bioHubApi.submissions.getSubmissionUploadUrls({

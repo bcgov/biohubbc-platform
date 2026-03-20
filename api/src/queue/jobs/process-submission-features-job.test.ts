@@ -180,6 +180,43 @@ describe('process-submission-features-job', () => {
       }
     });
 
+    it('marks submission invalid and does not throw on shallow validation exceptions', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const rollbackStub = sinon.stub().resolves();
+      const commitStub = sinon.stub().resolves();
+
+      mockDBConnection.open = sinon.stub().resolves();
+      mockDBConnection.commit = commitStub;
+      mockDBConnection.rollback = rollbackStub;
+      mockDBConnection.release = sinon.stub();
+
+      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+
+      const updateStatusStub = sinon
+        .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus')
+        .resolves();
+
+      sinon
+        .stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload')
+        .rejects(new Error('Feature entry failed shallow validation'));
+
+      const publishStub = sinon.stub(publisher, 'publishIndexSubmissionFeaturesJob').resolves({
+        status: 'published',
+        jobId: 'index-job-id'
+      });
+
+      const mockJobs = [createMockJob()];
+
+      await processSubmissionFeaturesJobHandler(mockJobs);
+
+      expect(updateStatusStub.calledWith('test-job-id', 'started')).to.be.true;
+      expect(updateStatusStub.calledWith('test-job-id', 'invalid', sinon.match.object)).to.be.true;
+      expect(updateSubmissionUploadStub.calledWith('test-sub-upload-id', { status: 'invalid' })).to.be.true;
+      expect(publishStub.called).to.be.false;
+      expect(commitStub.called).to.be.true;
+      expect(rollbackStub.called).to.be.true;
+    });
+
     it('processes multiple jobs in sequence', async () => {
       const openStub = sinon.stub().resolves();
       const commitStub = sinon.stub().resolves();

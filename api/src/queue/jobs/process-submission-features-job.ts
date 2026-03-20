@@ -10,6 +10,46 @@ import { publishIndexSubmissionFeaturesJob } from '../publisher';
 const defaultLog = getLogger('queue/jobs/process-submission-features-job');
 
 /**
+ * Serialize unknown thrown values into structured log-safe metadata.
+ *
+ * @param {unknown} error - Unknown thrown value.
+ * @returns {{ name: string; message: string; stack?: string }} Serializable error details.
+ */
+function toErrorMetadata(error: unknown): { name: string; message: string; stack?: string } {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    };
+  }
+
+  return {
+    name: 'UnknownError',
+    message: String(error)
+  };
+}
+
+/**
+ * Return true when a thrown ingestion error represents permanent validation failure.
+ *
+ * These cases should mark validation/upload as invalid and avoid DLQ retries.
+ *
+ * @param {unknown} error - Thrown ingestion error.
+ * @returns {boolean} True when the error is a validation failure.
+ */
+function isValidationFailure(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return (
+    error.message.includes('Feature entry failed shallow validation') ||
+    error.message.includes('Codeset entry failed shallow validation')
+  );
+}
+
+/**
  * Process submission features job handler.
  *
  * Receives the full SubmissionUpload bridge record in the job payload,
@@ -97,6 +137,30 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
     } catch (error) {
       await connection.rollback();
 
+      const errorMetadata = toErrorMetadata(error);
+      const submissionValidationService = new SubmissionValidationService(connection);
+
+      if (isValidationFailure(error)) {
+        // Validation failure from ingestion parser/shape checks — permanent condition, don't retry.
+        const submissionUploadService = new SubmissionUploadService(connection);
+        await submissionValidationService.updateSubmissionValidationStatus(job.id, 'invalid', {
+          error: errorMetadata
+        });
+        await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
+        await connection.commit();
+
+        defaultLog.warn({
+          label: 'processSubmissionFeaturesJobHandler',
+          message: 'Submission validation failed during ingestion',
+          jobId: job.id,
+          submissionUploadId,
+          submissionId,
+          error: errorMetadata
+        });
+
+        return;
+      }
+
       try {
         const submissionUploadService = new SubmissionUploadService(connection);
         await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
@@ -117,7 +181,7 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
         message: 'Process submission features job failed',
         jobId: job.id,
         submissionUploadId,
-        error
+        error: errorMetadata
       });
 
       // Rethrow so pg-boss moves the job to DLQ.
