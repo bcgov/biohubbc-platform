@@ -58,12 +58,15 @@ export class FeatureValidationService extends DBService {
     const duplicateIds = new Set<string>();
 
     for (const feature of features) {
-      if (feature.id) {
-        if (allIds.has(feature.id)) {
-          duplicateIds.add(feature.id);
-        }
-        allIds.add(feature.id);
+      if (!feature.id) {
+        continue;
       }
+
+      if (allIds.has(feature.id)) {
+        duplicateIds.add(feature.id);
+      }
+
+      allIds.add(feature.id);
     }
 
     // Report duplicate IDs
@@ -142,10 +145,10 @@ export class FeatureValidationService extends DBService {
    */
   validateFeatureStructure(feature: IFlattenedBlock): IValidationError[] {
     const errors: IValidationError[] = [];
-    const featureId = feature.id || 'unknown';
+    const featureId = feature.id;
 
     // Check required fields per ticket spec: ID, feature_type, properties, references
-    if (feature.id === undefined || feature.id === null) {
+    if (featureId === undefined || featureId === null) {
       errors.push({
         type: ValidationErrorType.MISSING_FIELD,
         featureId,
@@ -287,9 +290,9 @@ export class FeatureValidationService extends DBService {
     value: unknown,
     codeSlugs: Set<string>
   ): IValidationError | null {
-    const values = this.getPropertyValues(feature, property, value);
-    if ('error' in values) {
-      return values.error;
+    const propertyValuesResult = this.getPropertyValues(feature, property, value);
+    if (propertyValuesResult.errors.length) {
+      return propertyValuesResult.errors[0];
     }
 
     const propertyValidators: Record<string, (propertyValue: unknown) => IValidationError | null> = {
@@ -298,8 +301,7 @@ export class FeatureValidationService extends DBService {
       number: (propertyValue) => this.validateNumberProperty(feature, property, propertyValue),
       boolean: (propertyValue) => this.validateBooleanProperty(feature, property, propertyValue),
       object: (propertyValue) => this.validateObjectProperty(feature, property, propertyValue),
-      spatial: (propertyValue) => this.validateSpatialProperty(feature, property, propertyValue),
-      datetime: (propertyValue) => this.validateDatetimeProperty(feature, property, propertyValue),
+      geometry: (propertyValue) => this.validateGeometryProperty(feature, property, propertyValue),
       timestamp: (propertyValue) => this.validateTimestampProperty(feature, property, propertyValue),
       taxon: (propertyValue) => this.validateTaxonProperty(feature, property, propertyValue)
     };
@@ -309,7 +311,7 @@ export class FeatureValidationService extends DBService {
       return null;
     }
 
-    for (const propertyValue of values.values) {
+    for (const propertyValue of propertyValuesResult.values) {
       const error = validator(propertyValue);
       if (error) {
         return error;
@@ -352,31 +354,35 @@ export class FeatureValidationService extends DBService {
    * @param {IFlattenedBlock} feature
    * @param {FeatureProperty} property
    * @param {unknown} value
-   * @return {{ values: unknown[] } | { error: IValidationError }}
+   * @return {{ values: unknown[]; errors: IValidationError[] }}
    * @memberof FeatureValidationService
    */
   private getPropertyValues(
     feature: IFlattenedBlock,
     property: FeatureProperty,
     value: unknown
-  ): { values: unknown[] } | { error: IValidationError } {
+  ): { values: unknown[]; errors: IValidationError[] } {
     if (property.allow_multiple) {
       if (!Array.isArray(value)) {
         return {
-          error: this.createInvalidPropertyTypeError(feature, property, `array of ${property.type_name} values`, value)
+          values: [],
+          errors: [
+            this.createInvalidPropertyTypeError(feature, property, `array of ${property.type_name} values`, value)
+          ]
         };
       }
 
-      return { values: value };
+      return { values: value, errors: [] };
     }
 
     if (Array.isArray(value)) {
       return {
-        error: this.createInvalidPropertyTypeError(feature, property, property.type_name, value)
+        values: [],
+        errors: [this.createInvalidPropertyTypeError(feature, property, property.type_name, value)]
       };
     }
 
-    return { values: [value] };
+    return { values: [value], errors: [] };
   }
 
   /**
@@ -454,7 +460,7 @@ export class FeatureValidationService extends DBService {
   }
 
   /**
-   * Validate spatial property values.
+   * Validate geometry property values.
    *
    * @private
    * @param {IFlattenedBlock} feature
@@ -463,33 +469,14 @@ export class FeatureValidationService extends DBService {
    * @return {IValidationError | null}
    * @memberof FeatureValidationService
    */
-  private validateSpatialProperty(
+  private validateGeometryProperty(
     feature: IFlattenedBlock,
     property: FeatureProperty,
     value: unknown
   ): IValidationError | null {
     return GeoJSONFeatureCollectionZodSchema.safeParse(value).success
       ? null
-      : this.createInvalidPropertyTypeError(feature, property, 'spatial (GeoJSON FeatureCollection)', value);
-  }
-
-  /**
-   * Validate datetime property values.
-   *
-   * @private
-   * @param {IFlattenedBlock} feature
-   * @param {FeatureProperty} property
-   * @param {unknown} value
-   * @return {IValidationError | null}
-   * @memberof FeatureValidationService
-   */
-  private validateDatetimeProperty(
-    feature: IFlattenedBlock,
-    property: FeatureProperty,
-    value: unknown
-  ): IValidationError | null {
-    const expectedType = this.validateDatetimeType(value);
-    return expectedType ? this.createInvalidPropertyTypeError(feature, property, expectedType, value) : null;
+      : this.createInvalidPropertyTypeError(feature, property, 'geometry (GeoJSON FeatureCollection)', value);
   }
 
   /**
@@ -536,7 +523,7 @@ export class FeatureValidationService extends DBService {
    * Validate code property slugs against in-memory codeset definitions.
    *
    * Accepted slug format: `code::<contributor-codeset-key>::<contributor-codeset-code-key>`.
-   * Resolution path: O(1) membership checks against a prebuilt code slug map.
+   * Resolution path: O(1) membership checks against a prebuilt code slug set.
    *
    * @private
    * @param {IFlattenedBlock} feature
@@ -585,23 +572,7 @@ export class FeatureValidationService extends DBService {
   }
 
   /**
-   * Validate datetime type value.
-   *
-   * @private
-   * @param {unknown} value - Value to validate
-   * @return {string | null} Expected type string if invalid, null if valid
-   * @memberof FeatureValidationService
-   */
-  private validateDatetimeType(value: unknown): string | null {
-    if (typeof value !== 'string') {
-      return 'datetime (ISO string)';
-    }
-    const date = new Date(value);
-    return date.toString() === 'Invalid Date' ? 'datetime (ISO string)' : null;
-  }
-
-  /**
-   * Build an in-memory map of valid `code::<codeset>::<code>` slugs.
+   * Build an in-memory set of valid `code::<codeset>::<code>` slugs.
    *
    * This is intentionally precomputed once and then reused for O(1) membership checks
    * while validating code-typed properties across all features.

@@ -81,7 +81,7 @@ export type SearchFeatureResultWithRelevancy = z.infer<typeof SearchFeatureResul
 export const SearchPropertyFilter = z.object({
   featureTypeName: z.string(),
   propertyName: z.string(),
-  propertyType: z.enum(['string', 'number', 'datetime']),
+  propertyType: z.enum(['string', 'number', 'timestamp']),
   operator: z.enum([
     'eq',
     'neq',
@@ -125,7 +125,7 @@ export type SearchPropertyValue = string | number | boolean | Array<string | num
 /**
  * Defines a single property condition in a filter group.
  */
-export const SearchFeaturePropertyConditionSchema = z.object({
+export const SearchFeaturePropertyCondition = z.object({
   name: z.string(),
   operator: z.enum([
     'eq',
@@ -143,21 +143,23 @@ export const SearchFeaturePropertyConditionSchema = z.object({
   ]),
   value: z.union([z.string(), z.number(), z.boolean(), z.array(z.union([z.string(), z.number()]))])
 });
-export type ISearchFeaturePropertyCondition = z.infer<typeof SearchFeaturePropertyConditionSchema>;
+export type SearchFeaturePropertyCondition = z.infer<typeof SearchFeaturePropertyCondition>;
+export type ISearchFeaturePropertyCondition = SearchFeaturePropertyCondition;
 
 /**
  * Defines a group of property conditions combined by a logical operand.
  */
-export const SearchFeaturePropertyGroupSchema = z.object({
+export const SearchFeaturePropertyGroup = z.object({
   operand: z.enum(['and', 'or']),
-  conditions: z.array(SearchFeaturePropertyConditionSchema)
+  conditions: z.array(SearchFeaturePropertyCondition)
 });
-export type ISearchFeaturePropertyGroup = z.infer<typeof SearchFeaturePropertyGroupSchema>;
+export type SearchFeaturePropertyGroup = z.infer<typeof SearchFeaturePropertyGroup>;
+export type ISearchFeaturePropertyGroup = SearchFeaturePropertyGroup;
 
 /**
  * Canonical filters for feature search (frontend + backend aligned)
  */
-export const SearchFeatureFiltersSchema = z.object({
+export const SearchFeatureFilters = z.object({
   /**
    * Free-text keyword search across all searchable properties.
    */
@@ -176,10 +178,10 @@ export const SearchFeatureFiltersSchema = z.object({
   /**
    * Structured property filters grouped by logical operand.
    */
-  properties: z.array(SearchFeaturePropertyGroupSchema).optional()
+  properties: z.array(SearchFeaturePropertyGroup).optional()
 });
 
-export type ISearchFeaturesFilters = z.infer<typeof SearchFeatureFiltersSchema>;
+export type SearchFeaturesFilters = z.infer<typeof SearchFeatureFilters>;
 
 export type PendingTaxonRecord = {
   submission_feature_id: number;

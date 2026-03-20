@@ -14,8 +14,7 @@ import {
 } from '../models/submission-feature-property-code';
 import {
   CreateSubmissionFeaturePropertyGeometry,
-  SubmissionFeaturePropertyGeometry,
-  SubmissionFeaturePropertyGeometrySchema
+  SubmissionFeaturePropertyGeometry
 } from '../models/submission-feature-property-geometry';
 import { ContributorCodeResolution, FeatureTypePropertyMetadata } from '../models/submission-feature-property-index';
 import {
@@ -35,8 +34,7 @@ import {
 } from '../models/submission-feature-property-taxon';
 import {
   CreateSubmissionFeaturePropertyTimestamp,
-  SubmissionFeaturePropertyTimestamp,
-  SubmissionFeaturePropertyTimestampSchema
+  SubmissionFeaturePropertyTimestamp
 } from '../models/submission-feature-property-timestamp';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
@@ -206,7 +204,14 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
     }
 
     const knex = getKnex();
-    const query = knex('submission_feature_property_string').insert(records).returning('*');
+    const query = knex('submission_feature_property_string')
+      .insert(records)
+      .returning([
+        'submission_feature_property_string_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'value'
+      ]);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyStringSchema);
     this.assertInsertedRowCount('submission_feature_property_string', records.length, response.rowCount);
@@ -229,7 +234,14 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
     }
 
     const knex = getKnex();
-    const query = knex('submission_feature_property_number').insert(records).returning('*');
+    const query = knex('submission_feature_property_number')
+      .insert(records)
+      .returning([
+        'submission_feature_property_number_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'value'
+      ]);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyNumberSchema);
     this.assertInsertedRowCount('submission_feature_property_number', records.length, response.rowCount);
@@ -252,7 +264,14 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
     }
 
     const knex = getKnex();
-    const query = knex('submission_feature_property_boolean').insert(records).returning('*');
+    const query = knex('submission_feature_property_boolean')
+      .insert(records)
+      .returning([
+        'submission_feature_property_boolean_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'value'
+      ]);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyBooleanSchema);
     this.assertInsertedRowCount('submission_feature_property_boolean', records.length, response.rowCount);
@@ -275,9 +294,17 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
     }
 
     const knex = getKnex();
-    const query = knex('submission_feature_property_timestamp').insert(records).returning('*');
+    const query = knex('submission_feature_property_timestamp')
+      .insert(records)
+      .returning([
+        'submission_feature_property_timestamp_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'date_value',
+        'time_value'
+      ]);
 
-    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestampSchema);
+    const response = await this.connection.knex(query, SubmissionFeaturePropertyTimestamp);
     this.assertInsertedRowCount('submission_feature_property_timestamp', records.length, response.rowCount);
 
     return response.rows;
@@ -296,7 +323,14 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
     }
 
     const knex = getKnex();
-    const query = knex('submission_feature_property_code').insert(records).returning('*');
+    const query = knex('submission_feature_property_code')
+      .insert(records)
+      .returning([
+        'submission_feature_property_code_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'contributor_codeset_code_id'
+      ]);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyCodeSchema);
     this.assertInsertedRowCount('submission_feature_property_code', records.length, response.rowCount);
@@ -317,7 +351,14 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
     }
 
     const knex = getKnex();
-    const query = knex('submission_feature_property_taxon').insert(records).returning('*');
+    const query = knex('submission_feature_property_taxon')
+      .insert(records)
+      .returning([
+        'submission_feature_property_taxon_id',
+        'submission_feature_id',
+        'feature_type_property_id',
+        'taxon_id'
+      ]);
 
     const response = await this.connection.knex(query, SubmissionFeaturePropertyTaxonSchema);
     this.assertInsertedRowCount('submission_feature_property_taxon', records.length, response.rowCount);
@@ -350,9 +391,11 @@ export class SubmissionFeaturePropertyIndexRepository extends BaseRepository {
       }
     });
 
-    query.append(SQL` RETURNING *`);
+    query.append(
+      SQL` RETURNING submission_feature_property_geometry_id, submission_feature_id, feature_type_property_id, value`
+    );
 
-    const response = await this.connection.sql(query, SubmissionFeaturePropertyGeometrySchema);
+    const response = await this.connection.sql(query, SubmissionFeaturePropertyGeometry);
     this.assertInsertedRowCount('submission_feature_property_geometry', records.length, response.rowCount);
 
     return response.rows;

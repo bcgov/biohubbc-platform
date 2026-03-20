@@ -77,27 +77,6 @@ export class SubmissionFeaturePropertyTaxonRepository extends BaseRepository {
   }
 
   /**
-   * Delete submission_feature_property_taxon rows for all features under a submission.
-   *
-   * @param {number} submissionId
-   * @return {Promise<void>}
-   * @memberof SubmissionFeaturePropertyTaxonRepository
-   */
-  async deleteSubmissionFeaturePropertyTaxonBySubmissionId(submissionId: number): Promise<void> {
-    const knex = getKnex();
-    const featureIdSubquery = knex
-      .select('submission_feature_id')
-      .from('submission_feature')
-      .where('submission_id', submissionId);
-
-    const query = knex('submission_feature_property_taxon')
-      .whereIn('submission_feature_id', featureIdSubquery)
-      .delete();
-
-    await this.connection.knex(query);
-  }
-
-  /**
    * Get a submission_feature_property_taxon row by id.
    *
    * @param {number} submissionFeaturePropertyTaxonId

@@ -129,15 +129,5 @@ describe('SubmissionFeaturePropertyTaxonRepository', () => {
       const result = await repository.getSubmissionFeaturePropertyTaxonByFeatureTypePropertyId(20);
       expect(result).to.eql([mockRow]);
     });
-
-    it('deletes rows by submission_id', async () => {
-      const knexStub = sinon.stub().resolves(mockQueryResult([]));
-      const mockDBConnection = getMockDBConnection({ knex: knexStub });
-      const repository = new SubmissionFeaturePropertyTaxonRepository(mockDBConnection);
-
-      await repository.deleteSubmissionFeaturePropertyTaxonBySubmissionId(999);
-
-      expect(knexStub).to.have.been.calledOnce;
-    });
   });
 });

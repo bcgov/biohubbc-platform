@@ -7,7 +7,7 @@ import {
   featureSearchResponseSchema
 } from '../../../openapi/schemas/search/search-feature';
 import { SearchFeatureService } from '../../../services/search-feature-service';
-import { ISearchFeaturesFilters } from '../../../services/search-feature-service.interface';
+import { SearchFeaturesFilters } from '../../../services/search-feature-service.interface';
 import { getLogger } from '../../../utils/logger';
 import { makePaginationOptionsFromBody, makePaginationResponse } from '../../../utils/pagination';
 
@@ -42,7 +42,7 @@ export function searchFeatures(): RequestHandler {
     try {
       await connection.open();
 
-      const filters = req.body.filters as ISearchFeaturesFilters;
+      const filters = req.body.filters as SearchFeaturesFilters;
 
       const service = new SearchFeatureService(connection);
 

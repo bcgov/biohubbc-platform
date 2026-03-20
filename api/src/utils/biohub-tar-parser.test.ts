@@ -4,7 +4,12 @@ import { Readable } from 'node:stream';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as tar from 'tar-stream';
+import { FeatureTypeWithProperties } from '../models/feature-type';
 import { IFlattenedBlock } from '../models/submission-feature';
+import { IngestionRepository } from '../repositories/ingestion/ingestion-repository';
+import { getMockDBConnection } from '../__mocks__/db';
+import { FeatureValidationService } from '../services/ingestion/feature-validation-service';
+import { ValidationErrorType } from '../services/ingestion/feature-validation-service.interface';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
 import { extractAndUploadCodesets, extractAndUploadMedia, extractBlocksFromArchive } from './biohub-tar-parser';
 import { IExtractedBlocks } from './biohub-tar-parser.interface';
@@ -256,6 +261,226 @@ describe('biohub-tar-parser', () => {
 
       // Step 3: Verify extensionless filename is in mediaFileNames
       expect(result.mediaFileNames.has('LICENSE')).to.be.true;
+    });
+
+    it('parses codesets from tarball and validates matching code slug values', async () => {
+      const featureTypeWithProperties: FeatureTypeWithProperties = {
+        featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
+        properties: [
+          {
+            name: 'agency',
+            display_name: 'Agency',
+            description: '',
+            type_name: 'code',
+            allow_multiple: false,
+            required_value: true,
+            calculated_value: false
+          }
+        ]
+      };
+
+      const tarBuf = await createTestTar([
+        { name: '.dataset-id', content: 'dataset-uuid' },
+        {
+          name: 'dataset.json',
+          content: JSON.stringify([
+            {
+              id: 'feature-1',
+              type: 'dataset',
+              properties: { agency: 'code::agency::aarde' },
+              content: [],
+              parent: null
+            }
+          ])
+        },
+        {
+          name: 'codes/agency.json',
+          content: JSON.stringify({
+            agency: {
+              codes: {
+                aarde: { label: 'Aarde Environmental Ltd.' }
+              }
+            }
+          })
+        }
+      ]);
+
+      const parsed = await extractBlocksFromArchive(bufferToStream(tarBuf));
+
+      const mockDBConnection = getMockDBConnection();
+      const validationService = new FeatureValidationService(mockDBConnection);
+      sinon.stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties').resolves(featureTypeWithProperties);
+
+      const validationResult = await validationService.validateFlatSubmissionFeatures(parsed.allBlocks, parsed.codesets);
+
+      expect(parsed.codesets).to.have.property('agency');
+      expect(validationResult.valid).to.be.true;
+      expect(validationResult.errors).to.have.length(0);
+    });
+
+    it('parses codesets from tarball and returns INVALID_CODE_REFERENCE for unknown slug', async () => {
+      const featureTypeWithProperties: FeatureTypeWithProperties = {
+        featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
+        properties: [
+          {
+            name: 'agency',
+            display_name: 'Agency',
+            description: '',
+            type_name: 'code',
+            allow_multiple: false,
+            required_value: true,
+            calculated_value: false
+          }
+        ]
+      };
+
+      const tarBuf = await createTestTar([
+        { name: '.dataset-id', content: 'dataset-uuid' },
+        {
+          name: 'dataset.json',
+          content: JSON.stringify([
+            {
+              id: 'feature-1',
+              type: 'dataset',
+              properties: { agency: 'code::agency::missing' },
+              content: [],
+              parent: null
+            }
+          ])
+        },
+        {
+          name: 'codes/agency.json',
+          content: JSON.stringify({
+            agency: {
+              codes: {
+                aarde: { label: 'Aarde Environmental Ltd.' }
+              }
+            }
+          })
+        }
+      ]);
+
+      const parsed = await extractBlocksFromArchive(bufferToStream(tarBuf));
+
+      const mockDBConnection = getMockDBConnection();
+      const validationService = new FeatureValidationService(mockDBConnection);
+      sinon.stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties').resolves(featureTypeWithProperties);
+
+      const validationResult = await validationService.validateFlatSubmissionFeatures(parsed.allBlocks, parsed.codesets);
+
+      expect(validationResult.valid).to.be.false;
+      expect(validationResult.errors.some((error) => error.type === ValidationErrorType.INVALID_CODE_REFERENCE)).to.be
+        .true;
+    });
+
+    it('parses codesets from tarball and validates allow_multiple code arrays', async () => {
+      const featureTypeWithProperties: FeatureTypeWithProperties = {
+        featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
+        properties: [
+          {
+            name: 'agencies',
+            display_name: 'Agencies',
+            description: '',
+            type_name: 'code',
+            allow_multiple: true,
+            required_value: true,
+            calculated_value: false
+          }
+        ]
+      };
+
+      const tarBuf = await createTestTar([
+        { name: '.dataset-id', content: 'dataset-uuid' },
+        {
+          name: 'dataset.json',
+          content: JSON.stringify([
+            {
+              id: 'feature-1',
+              type: 'dataset',
+              properties: { agencies: ['code::agency::aarde', 'code::agency::bio'] },
+              content: [],
+              parent: null
+            }
+          ])
+        },
+        {
+          name: 'codes/agency.json',
+          content: JSON.stringify({
+            agency: {
+              codes: {
+                aarde: { label: 'Aarde Environmental Ltd.' },
+                bio: { label: 'BioHub BC' }
+              }
+            }
+          })
+        }
+      ]);
+
+      const parsed = await extractBlocksFromArchive(bufferToStream(tarBuf));
+
+      const mockDBConnection = getMockDBConnection();
+      const validationService = new FeatureValidationService(mockDBConnection);
+      sinon.stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties').resolves(featureTypeWithProperties);
+
+      const validationResult = await validationService.validateFlatSubmissionFeatures(parsed.allBlocks, parsed.codesets);
+
+      expect(validationResult.valid).to.be.true;
+      expect(validationResult.errors).to.have.length(0);
+    });
+
+    it('parses codesets from tarball and rejects allow_multiple arrays with unknown slugs', async () => {
+      const featureTypeWithProperties: FeatureTypeWithProperties = {
+        featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
+        properties: [
+          {
+            name: 'agencies',
+            display_name: 'Agencies',
+            description: '',
+            type_name: 'code',
+            allow_multiple: true,
+            required_value: true,
+            calculated_value: false
+          }
+        ]
+      };
+
+      const tarBuf = await createTestTar([
+        { name: '.dataset-id', content: 'dataset-uuid' },
+        {
+          name: 'dataset.json',
+          content: JSON.stringify([
+            {
+              id: 'feature-1',
+              type: 'dataset',
+              properties: { agencies: ['code::agency::aarde', 'code::agency::missing'] },
+              content: [],
+              parent: null
+            }
+          ])
+        },
+        {
+          name: 'codes/agency.json',
+          content: JSON.stringify({
+            agency: {
+              codes: {
+                aarde: { label: 'Aarde Environmental Ltd.' }
+              }
+            }
+          })
+        }
+      ]);
+
+      const parsed = await extractBlocksFromArchive(bufferToStream(tarBuf));
+
+      const mockDBConnection = getMockDBConnection();
+      const validationService = new FeatureValidationService(mockDBConnection);
+      sinon.stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties').resolves(featureTypeWithProperties);
+
+      const validationResult = await validationService.validateFlatSubmissionFeatures(parsed.allBlocks, parsed.codesets);
+
+      expect(validationResult.valid).to.be.false;
+      expect(validationResult.errors.some((error) => error.type === ValidationErrorType.INVALID_CODE_REFERENCE)).to.be
+        .true;
     });
   });
 
