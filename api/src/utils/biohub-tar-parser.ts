@@ -5,47 +5,32 @@ import { PassThrough, Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import * as tar from 'tar-stream';
 import { z, ZodError } from 'zod';
-import { IngestionValidationError } from '../errors/ingestion-validation-error';
+import { IngestionValidationError } from '../errors/submission-errors';
 import { IFlattenedBlock } from '../models/submission-feature';
 import { TarCodesets } from '../services/ingestion/submission-ingestion-codes-service.interface';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
 import { IUploadedMediaFile } from './biohub-tar-parser.interface';
 
-const FlattenedFeatureEntrySchema = z
-  .object({
-    id: z.string(),
-    type: z.string(),
-    properties: z.record(z.unknown()),
-    parent: z.string().nullable().optional(),
-    references: z.array(z.string()).optional(),
-    content: z.array(z.string()).optional()
-  })
-  .superRefine((value, ctx) => {
-    if (!value.id.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Feature entry is missing required string field: id'
-      });
-    }
-
-    if (!value.type.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Feature entry is missing required string field: type'
-      });
-    }
-  });
-
-const FlattenedFeatureSchema = FlattenedFeatureEntrySchema.transform((record) => {
-  const normalizedReferences = record.references ?? record.content ?? [];
-
-  return {
-    id: record.id.trim(),
-    type: record.type.trim(),
-    properties: record.properties as Record<string, unknown>,
-    content: normalizedReferences,
-    parent: record.parent ?? null
-  } as IFlattenedBlock;
+/**
+ * TAR ingestion helpers for submission archives.
+ *
+ * Expected logical archive layout after optional SIMS prefix stripping:
+ * - `features/*.json` => feature payloads (`IFlattenedBlock` entries)
+ * - `codes/*.json` => contributor codeset payloads (`TarCodesets`)
+ * - `files/*` => binary media uploaded to object storage
+ *
+ * Design notes:
+ * - Streaming-first: entries are consumed as they arrive (no full archive buffering).
+ * - Strict folder scoping: only recognized folders are processed; everything else is ignored.
+ * - Fail-fast: malformed JSON, schema errors, or callback failures reject the stream.
+ * - Callback-driven orchestration: persistence is delegated to caller-provided async handlers.
+ */
+const FlattenedFeatureSchema: z.ZodType<IFlattenedBlock> = z.object({
+  id: z.string().min(1, 'Feature entry is missing required string field: id'),
+  type: z.string().min(1, 'Feature entry is missing required string field: type'),
+  properties: z.record(z.unknown()),
+  content: z.array(z.string()),
+  parent: z.string().nullable()
 });
 
 /**
@@ -148,10 +133,9 @@ function extractCodesetsFromTarballEntry(value: unknown, entryName: string): Tar
 /**
  * Parse and shallow-validate one feature JSON object.
  *
- * Normalization behavior:
- * - trims `id` and `type`
- * - accepts references from `references` or legacy `content`
- * - coerces missing parent to `null`
+ * Validation behavior:
+ * - requires `id`, `type`, `properties`, `content`, and `parent`
+ * - validates payload shape without remapping fields
  *
  * @param {unknown} value - Parsed JSON object for a single feature.
  * @param {string} entryName - Tar entry path for context.
@@ -173,29 +157,23 @@ function extractFeatureFromTarballEntry(value: unknown, entryName: string): IFla
 }
 
 /**
- * Convert a flattened feature block into the persisted raw feature payload.
- *
- * This keeps DB payload naming consistent (`references`) even though the
- * in-memory flattened block uses `content`.
- *
- * @param {IFlattenedBlock} block
- * @returns {Record<string, unknown>}
- */
-export function buildFeatureDataPayload(block: IFlattenedBlock): Record<string, unknown> {
-  return {
-    id: block.id,
-    type: block.type,
-    properties: block.properties,
-    references: block.content,
-    parent: block.parent
-  };
-}
-
-/**
  * Stream features from a TAR archive and emit fixed-size flattened batches.
  *
- * This is shallow validation only: shape checks needed to persist raw rows safely.
- * Only entries under `features/*.json` are parsed.
+ * Processing rules:
+ * - Only `features/*.json` file entries are parsed.
+ * - Non-feature entries are drained and ignored so extraction can continue.
+ * - Each parsed entry may be a single object or an array of objects.
+ * - Objects are validated against `IFlattenedBlock` shape (shallow validation only).
+ * - Valid objects are buffered into `batchSize` chunks and sent to `ingestFeatureBatch`.
+ *
+ * Error behavior:
+ * - Invalid JSON rejects the stream.
+ * - Schema validation rejects with `IngestionValidationError`.
+ * - Any error thrown by `ingestFeatureBatch` rejects the stream.
+ *
+ * Usage contract:
+ * - Caller is responsible for transactional behavior and persistence inside `ingestFeatureBatch`.
+ * - `batchSize` should be > 0; very small values increase callback overhead.
  *
  * @param {Readable} inputStream - Tar archive stream.
  * @param {number} batchSize - Max features per callback invocation.
@@ -235,8 +213,7 @@ export async function streamFeatures(
         }
 
         const entryName = stripArchivePrefix(header.name);
-        const isRootFeatureJson = !entryName.includes('/') && entryName.endsWith('.json');
-        const isFeatureJson = entryName.startsWith('features/') || isRootFeatureJson;
+        const isFeatureJson = entryName.startsWith('features/') && entryName.endsWith('.json');
 
         if (!isFeatureJson) {
           await drainStream(stream);
@@ -286,7 +263,18 @@ export async function streamFeatures(
 /**
  * Stream codesets from a TAR archive and emit each parsed file payload.
  *
- * Only `codes/*.json` file entries are parsed.
+ * Processing rules:
+ * - Only `codes/*.json` file entries are parsed.
+ * - Each codes file is parsed and validated independently.
+ * - Non-codes entries are drained and ignored.
+ *
+ * Error behavior:
+ * - Invalid JSON rejects the stream.
+ * - Schema validation rejects with `IngestionValidationError`.
+ * - Any error thrown by `ingestCodesets` rejects the stream.
+ *
+ * Usage contract:
+ * - Caller handles persistence/merge strategy for each parsed codes payload.
  *
  * @param {Readable} inputStream - Tar archive stream.
  * @param {(codesets: TarCodesets) => Promise<void>} ingestCodesets - Async sink for each parsed codeset file.
@@ -344,9 +332,22 @@ export async function streamCodesets(
  * Stream media files from a TAR archive to object storage.
  * Non-media entries are skipped.
  *
- * Only `files/*` file entries are uploaded. Uploads are processed serially.
- * For each uploaded file, checksum and metadata are produced and optionally
- * passed to `ingestMediaFile`.
+ * Processing rules:
+ * - Only `files/*` file entries are uploaded.
+ * - Uploads are intentionally serialized (one active upload at a time).
+ * - SHA-256 is computed while streaming to storage (no duplicate full buffering).
+ * - Relative archive path under `files/` is preserved in the stored object key.
+ *
+ * For each uploaded file, metadata is generated:
+ * - `fileName`: basename of the archive path
+ * - `path`: archive-relative path under `files/`
+ * - `s3Key`: `${s3KeyPrefix}/${path}`
+ * - `byteSize`: tar header size
+ * - `checksumSha256`: streaming digest of uploaded bytes
+ *
+ * Error behavior:
+ * - Upload failures reject the stream.
+ * - Any error thrown by `ingestMediaFile` rejects the stream.
  *
  * @param {Readable} inputStream - Tar archive stream.
  * @param {ObjectStorageService} objectStorageService - Object storage client.

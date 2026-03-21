@@ -498,13 +498,13 @@ export class SubmissionRepository extends BaseRepository {
    * Bulk update parent references for features belonging to a submission upload.
    *
    * @param {string} submissionUploadId The submission_upload_id scope.
-   * @param {Array<{ submission_feature_id: number; parent_submission_feature_id: number }>} pairs The child-parent pairs.
+   * @param {{ submission_feature_id: number; parent_submission_feature_id: number }[]} pairs The child-parent pairs.
    * @return {Promise<void>}
    * @memberof SubmissionRepository
    */
   async updateSubmissionFeatureParents(
     submissionUploadId: string,
-    pairs: Array<{ submission_feature_id: number; parent_submission_feature_id: number }>
+    pairs: { submission_feature_id: number; parent_submission_feature_id: number }[]
   ): Promise<void> {
     if (!pairs.length) {
       return;

@@ -2,7 +2,7 @@ import { IDBConnection } from '../database/db';
 import { ApiConflictError } from '../errors/api-error';
 import { ContributorCodesetCode, CreateContributorCodesetCode } from '../models/contributor-codeset-code';
 import { ContributorCodesetCodeRepository } from '../repositories/contributor-codeset-code-repository';
-import { makeSlug } from '../utils/contributor-codeset';
+import { hasSameContributorCodeDefinition, makeSlug } from '../utils/contributor-codeset';
 import { ContributorCodesetCodeIdentity } from './contributor-codeset-code-service.interface';
 import { DBService } from './db-service';
 
@@ -56,25 +56,23 @@ export class ContributorCodesetCodeService extends DBService {
     const payloadBySlug = new Map(payloadEntries.map((entry) => [entry.slug, entry.payload]));
     const requestedSlugs = new Set(payloadEntries.map((entry) => entry.slug));
 
-    // Fetch all active rows for the touched contributor codesets in one query.
+    // Fetch all active rows for the touched contributor codesets.
     // This gives us the current persisted identities for comparison.
     const contributorCodesetIds = [...new Set(payloads.map((payload) => payload.contributor_codeset_id))];
     const existingRows = await this.contributorCodesetCodeRepository.getContributorCodesetCodesByContributorCodesetIds(
       contributorCodesetIds
     );
-    const existingEntries = existingRows.map((existingRow) => ({
-      existingRow,
-      slug: makeSlug(existingRow.contributor_codeset_id, existingRow.key)
-    }));
+    const existingBySlug = new Map(
+      existingRows.map((existingRow) => [makeSlug(existingRow.contributor_codeset_id, existingRow.key), existingRow])
+    );
 
     // Enforce immutable definitions for slugs that already exist in the database.
-    this.assertNoDatabaseConflicts(existingEntries, payloadBySlug);
-    const existingSlugs = new Set(existingEntries.map((entry) => entry.slug));
+    this.assertNoMetadataConflicts(existingBySlug, payloadBySlug);
 
     // Keep only payloads that are not already persisted.
     // Filtering prevents redundant inserts and leaves duplicate-key enforcement to the database.
     const payloadsToInsert = payloadEntries
-      .filter((entry) => !existingSlugs.has(entry.slug))
+      .filter((entry) => !existingBySlug.has(entry.slug))
       .map((entry) => entry.payload);
 
     // Insert only new slugs. Existing rows are reused.
@@ -82,19 +80,20 @@ export class ContributorCodesetCodeService extends DBService {
       ? await this.contributorCodesetCodeRepository.insertContributorCodesetCodes(payloadsToInsert)
       : [];
 
-    // Return only rows relevant to requested slugs.
-    const requestedExistingRows = existingEntries
-      .filter((entry) => requestedSlugs.has(entry.slug))
-      .map((entry) => entry.existingRow);
-
-    const insertedRowsBySlug = new Map(
+    const insertedBySlug = new Map(
       insertedRows.map((insertedRow) => [makeSlug(insertedRow.contributor_codeset_id, insertedRow.key), insertedRow])
     );
-    const deduplicatedInsertedRows = payloadEntries
-      .map((entry) => insertedRowsBySlug.get(entry.slug))
-      .filter((row): row is ContributorCodesetCode => !!row);
+    const result: ContributorCodesetCode[] = [];
 
-    return [...requestedExistingRows, ...deduplicatedInsertedRows];
+    for (const slug of requestedSlugs) {
+      const row = existingBySlug.get(slug) ?? insertedBySlug.get(slug);
+
+      if (row) {
+        result.push(row);
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -164,23 +163,18 @@ export class ContributorCodesetCodeService extends DBService {
    * If an existing row for a slug has different metadata, this throws a
    * conflict to preserve the immutable definition rule.
    */
-  private assertNoDatabaseConflicts(
-    existingEntries: Array<{ existingRow: ContributorCodesetCode; slug: string }>,
+  private assertNoMetadataConflicts(
+    existingBySlug: Map<string, ContributorCodesetCode>,
     payloadBySlug: Map<string, CreateContributorCodesetCode>
   ): void {
-    for (const existingEntry of existingEntries) {
-      const expected = payloadBySlug.get(existingEntry.slug);
-      const existing = existingEntry.existingRow;
+    for (const [slug, existing] of existingBySlug) {
+      const expected = payloadBySlug.get(slug);
 
       if (!expected) {
         continue;
       }
 
-      if (
-        existing.external_id !== expected.external_id ||
-        existing.label !== expected.label ||
-        (existing.description ?? null) !== (expected.description ?? null)
-      ) {
+      if (!hasSameContributorCodeDefinition(existing, expected)) {
         throw new ApiConflictError('Contributor codeset code definition conflict', [
           'ContributorCodesetCodeService->createContributorCodesetCodes',
           `The code (${existing.contributor_codeset_id}, ${existing.key}) already exists with different metadata. If metadata changed, provide a new unique key.`

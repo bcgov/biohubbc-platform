@@ -91,6 +91,24 @@ describe('authorizeRequest', function () {
     expect(isAuthorized).to.equal(true);
   });
 
+  it('calls executeAuthorizationScheme even if the user is a system administrator', async function () {
+    registerMockDBConnection();
+
+    const mockSystemUserObject = { role_names: [] } as unknown as SystemUserExtended;
+    sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(mockSystemUserObject);
+
+    sinon.stub(AuthorizationService.prototype, 'authorizeSystemAdministrator').resolves(true);
+    const executeAuthorizationSchemeStub = sinon
+      .stub(AuthorizationService.prototype, 'executeAuthorizationScheme')
+      .resolves(false);
+
+    const mockReq = { authorization_scheme: {} } as unknown as Request;
+    const isAuthorized = await authorization.authorizeRequest(mockReq);
+
+    expect(isAuthorized).to.equal(true);
+    expect(executeAuthorizationSchemeStub).to.have.been.calledOnce;
+  });
+
   it('returns true if the authorization_scheme is undefined', async function () {
     registerMockDBConnection();
 

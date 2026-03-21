@@ -323,14 +323,13 @@ export class AuthorizationService extends DBService {
       return false;
     }
 
-    const systemUser = await this.getCachedSystemUser();
-    if (!systemUser?.system_user_id) {
+    const systemUserId = this.connection.systemUserId();
+
+    if (!systemUserId) {
       return false;
     }
 
-    const contributorSystemUser = await this._contributorSystemUserService.findContributorSystemUser(
-      systemUser.system_user_id
-    );
+    const contributorSystemUser = await this._contributorSystemUserService.findContributorSystemUser(systemUserId);
     if (!contributorSystemUser) {
       return false;
     }

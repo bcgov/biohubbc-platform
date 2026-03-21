@@ -47,7 +47,6 @@ export class ContributorRepository extends BaseRepository {
    * @memberof ContributorRepository
    */
   async getContributorBySubmissionUploadId(submissionUploadId: string): Promise<Contributor> {
-    console.log(submissionUploadId, 'submissuioiploadid');
     const sql = SQL`
       WITH w_submission_upload AS (
         SELECT
@@ -71,8 +70,6 @@ export class ContributorRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sql, Contributor);
-
-    console.log(response.rows);
 
     if (response.rowCount === 0) {
       throw new ApiNotFoundError('Contributor not found for submission upload', [
