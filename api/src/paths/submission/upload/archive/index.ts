@@ -16,7 +16,7 @@ const defaultLog = getLogger('paths/submission/upload/archive');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({
-    or: [{ discriminator: 'Contributor' }]
+    and: [{ discriminator: 'Contributor' }]
   })),
   startUpload()
 ];
@@ -61,7 +61,7 @@ export function startUpload(): RequestHandler {
       await connection.open();
 
       const system_user_id = req.system_user!.system_user_id;
-      const contributorId = req.contributor_id!;
+      const contributorId = req.contributor_id;
 
       const { bytes, ...rest } = req.body;
       const submission = { ...rest, uuid: v4(), system_user_id, contributor_id: contributorId } as ICreateSubmission;

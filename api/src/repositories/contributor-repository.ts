@@ -43,10 +43,10 @@ export class ContributorRepository extends BaseRepository {
    * Get the contributor linked to a submission upload.
    *
    * @param {string} submissionUploadId
-   * @return {Promise<GetContributor>}
+   * @return {Promise<Contributor>}
    * @memberof ContributorRepository
    */
-  async getContributorBySubmissionUploadId(submissionUploadId: string): Promise<GetContributor> {
+  async getContributorBySubmissionUploadId(submissionUploadId: string): Promise<Contributor> {
     const sql = SQL`
       SELECT
         c.contributor_id,
@@ -61,7 +61,7 @@ export class ContributorRepository extends BaseRepository {
         AND c.record_end_date IS NULL;
     `;
 
-    const response = await this.connection.sql(sql, GetContributor);
+    const response = await this.connection.sql(sql, Contributor);
 
     if (response.rowCount === 0) {
       throw new ApiNotFoundError('Contributor not found for submission upload', [
@@ -84,10 +84,10 @@ export class ContributorRepository extends BaseRepository {
    * Get the contributor linked to a submission.
    *
    * @param {number} submissionId
-   * @return {Promise<GetContributor>}
+   * @return {Promise<Contributor>}
    * @memberof ContributorRepository
    */
-  async getContributorBySubmissionId(submissionId: number): Promise<GetContributor> {
+  async getContributorBySubmissionId(submissionId: number): Promise<Contributor> {
     const sql = SQL`
       SELECT
         c.contributor_id,
@@ -101,7 +101,7 @@ export class ContributorRepository extends BaseRepository {
         AND c.record_end_date IS NULL;
     `;
 
-    const response = await this.connection.sql(sql, GetContributor);
+    const response = await this.connection.sql(sql, Contributor);
 
     if (response.rowCount === 0) {
       throw new ApiNotFoundError('Contributor not found for submission', [

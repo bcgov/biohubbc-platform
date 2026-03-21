@@ -172,4 +172,23 @@ describe('authorizeRequest', function () {
 
     expect(isAuthorized).to.equal(true);
   });
+
+  it('populates contributor_id for system admins when contributor authorization runs', async function () {
+    registerMockDBConnection();
+
+    sinon.stub(AuthorizationService.prototype, 'authorizeSystemAdministrator').resolves(true);
+    const executeAuthorizationSchemeStub = sinon
+      .stub(AuthorizationService.prototype, 'executeAuthorizationScheme')
+      .callsFake(async function () {
+        this['_contributorId'] = 77;
+        return false;
+      });
+
+    const mockReq = { authorization_scheme: { and: [{ discriminator: 'Contributor' }] } } as unknown as Request;
+    const isAuthorized = await authorization.authorizeRequest(mockReq);
+
+    expect(isAuthorized).to.equal(true);
+    expect(executeAuthorizationSchemeStub).to.have.been.calledOnce;
+    expect(mockReq.contributor_id).to.equal(77);
+  });
 });

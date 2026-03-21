@@ -1,4 +1,5 @@
 import { IDBConnection } from '../database/db';
+import { Contributor } from '../models/contributor';
 import { ContributorRepository } from '../repositories/contributor-repository';
 import { ContributorSystemUserService } from './contributor-system-user-service';
 import { DBService } from './db-service';
@@ -33,9 +34,9 @@ export class ContributorService extends DBService {
    * Get the contributor linked to a submission upload.
    *
    * @param {string} submissionUploadId
-   * @returns {Promise<GetContributor>}
+   * @returns {Promise<Contributor>}
    */
-  async getContributorBySubmissionUploadId(submissionUploadId: string): Promise<GetContributor> {
+  async getContributorBySubmissionUploadId(submissionUploadId: string): Promise<Contributor> {
     return this.contributorRepository.getContributorBySubmissionUploadId(submissionUploadId);
   }
 
@@ -43,9 +44,9 @@ export class ContributorService extends DBService {
    * Get the contributor linked to a submission.
    *
    * @param {number} submissionId
-   * @returns {Promise<GetContributor>}
+   * @returns {Promise<Contributor>}
    */
-  async getContributorBySubmissionId(submissionId: number): Promise<GetContributor> {
+  async getContributorBySubmissionId(submissionId: number): Promise<Contributor> {
     return this.contributorRepository.getContributorBySubmissionId(submissionId);
   }
 

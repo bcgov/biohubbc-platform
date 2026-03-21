@@ -103,6 +103,34 @@ describe('ContributorRepository', () => {
 
       const result = await repository.findContributorByClientId('non-existent-client-id');
 
+      expect(result).to.equal(null);
+    });
+
+    it('throws ApiExecuteSQLError when duplicate rows are returned', async () => {
+      const mockQueryResponse = {
+        rowCount: 2,
+        rows: [
+          { contributor_id: 1, client_id: 'a' },
+          { contributor_id: 2, client_id: 'b' }
+        ]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => mockQueryResponse
+      });
+
+      const repository = new ContributorRepository(mockDBConnection);
+
+      try {
+        await repository.findContributorByClientId('duplicate-client-id');
+        expect.fail('Expected error to be thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(ApiExecuteSQLError);
+        expect((err as ApiExecuteSQLError).message).to.equal('Unexpected row count');
+      }
+    });
+  });
+
   describe('getContributorBySubmissionUploadId', () => {
     it('returns contributor when found', async () => {
       const mockQueryResponse = {
@@ -231,11 +259,11 @@ describe('ContributorRepository', () => {
     });
   });
 
-  describe('contributorMemberExists', () => {
-    it('returns true when relationship exists', async () => {
+  describe('contributorExists', () => {
+    it('returns true when contributor exists', async () => {
       const mockQueryResponse = {
         rowCount: 1,
-        rows: [{ contributor_system_user_id: 1 }]
+        rows: [{ contributor_id: 42 }]
       } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
@@ -244,12 +272,12 @@ describe('ContributorRepository', () => {
 
       const repository = new ContributorRepository(mockDBConnection);
 
-      const result = await repository.contributorMemberExists(123, 456);
+      const result = await repository.contributorExists('my-client-id');
 
       expect(result).to.be.true;
     });
 
-    it('returns false when relationship does not exist', async () => {
+    it('returns false when contributor does not exist', async () => {
       const mockQueryResponse = {
         rowCount: 0,
         rows: []
@@ -261,77 +289,25 @@ describe('ContributorRepository', () => {
 
       const repository = new ContributorRepository(mockDBConnection);
 
-      const result = await repository.contributorMemberExists(123, 456);
+      const result = await repository.contributorExists('non-existent-client-id');
 
       expect(result).to.be.false;
     });
-  });
 
-  describe('createContributorMember', () => {
-    it('calls the SQL insert with correct params when relationship does not exist', async () => {
-      let callCount = 0;
-      const sqlSpy = sinon.stub().callsFake(async () => {
-        callCount++;
-        if (callCount === 1) {
-          // First call: check existence
-          return { rowCount: 0, rows: [] };
-        }
-        // Second call: insert
-        return { rowCount: 1 };
-      });
+    it('returns false when rowCount is undefined', async () => {
+      const mockQueryResponse = {
+        rows: [{ contributor_id: 42 }]
+      } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: sqlSpy
+        sql: async () => mockQueryResponse
       });
 
       const repository = new ContributorRepository(mockDBConnection);
 
-      await repository.createContributorMember(123, 456);
+      const result = await repository.contributorExists('my-client-id');
 
-      expect(sqlSpy).to.have.been.calledTwice;
-      const insertQueryText = sqlSpy.getCall(1).args[0].text;
-      expect(insertQueryText).to.contain('INSERT INTO contributor_system_user');
-      expect(insertQueryText).to.contain('(contributor_id, system_user_id)');
-    });
-
-    it('handles duplicate gracefully by checking existence first', async () => {
-      const sqlSpy = sinon.stub().resolves({
-        rowCount: 1,
-        rows: [{ contributor_system_user_id: 1 }]
-      });
-
-      const mockDBConnection = getMockDBConnection({
-        sql: sqlSpy
-      });
-
-      const repository = new ContributorRepository(mockDBConnection);
-
-      // Should not throw when duplicate exists (checked first)
-      await repository.createContributorMember(123, 456);
-
-      expect(sqlSpy).to.have.been.calledOnce;
-      const queryText = sqlSpy.getCall(0).args[0].text;
-      expect(queryText).to.contain('SELECT');
-      expect(queryText).to.contain('contributor_system_user');
-    });
-
-    it('throws error if insert fails (e.g., FK constraint)', async () => {
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          throw new Error('insert or update on table "contributor_system_user" violates foreign key constraint');
-        }
-      });
-
-      const repository = new ContributorRepository(mockDBConnection);
-
-      try {
-        await repository.createContributorMember(999, 999);
-        expect.fail('Expected error to be thrown');
-      } catch (err) {
-        expect(err).to.be.instanceOf(Error);
-        expect((err as Error).message).to.contain('violates foreign key constraint');
-      }
-      expect(result).to.equal(null);
+      expect(result).to.be.false;
     });
   });
 });
