@@ -430,6 +430,7 @@ const insertAnimalRecord = async (
   options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number }
 ): Promise<number> => {
   const taxonId = await getRandomTaxonId(knex);
+  const sexCodeId = await getContributorCodeId(knex, 'sex', faker.helpers.arrayElement(['male', 'female', 'unknown']));
 
   const response = await knex.raw(
     `${insertSubmissionFeature({
@@ -442,7 +443,7 @@ const insertAnimalRecord = async (
         count: faker.number.int({ min: 0, max: 100 }),
         taxon_id: taxonId,
         animal_identifier: faker.lorem.word(),
-        sex: faker.helpers.arrayElement(['male', 'female', 'unknown']),
+        sex_code_id: sexCodeId,
         start_date: faker.date.past().toISOString(),
         end_date: faker.date.future().toISOString()
       }
@@ -711,6 +712,17 @@ const ensureTaxonomySeed = async (knex: Knex) => {
 const getRandomTaxonId = async (knex: Knex): Promise<number> => {
   const res = await knex.raw(`SELECT itis_tsn FROM taxon ORDER BY random() LIMIT 1`);
   return res.rows?.[0]?.itis_tsn ?? faker.number.int({ min: 10000, max: 99999 });
+};
+
+const getContributorCodeId = async (knex: Knex, codesetKey: string, codeKey: string): Promise<number | null> => {
+  const res = await knex.raw(`
+    SELECT ccc.contributor_codeset_code_id
+    FROM contributor_codeset_code ccc
+    JOIN contributor_codeset cc ON ccc.contributor_codeset_id = cc.contributor_codeset_id
+    WHERE cc.key = '${codesetKey}' AND ccc.key = '${codeKey}' AND cc.record_end_date IS NULL AND ccc.record_end_date IS NULL
+    LIMIT 1
+  `);
+  return res.rows?.[0]?.contributor_codeset_code_id ?? null;
 };
 
 export const insertSubmissionFeatureSecurity = async (

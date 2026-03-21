@@ -45,13 +45,15 @@ related_animals AS (
         rf.deployment_id,
         sf.submission_feature_id AS animal_feature_id,
         sf.data->>'taxon_id' AS taxon_id,
-        sf.data->>'sex' AS sex,
+        COALESCE(ccc.label, sf.data->>'sex') AS sex,
         sf.data->>'animal_identifier' AS animal_identifier
     FROM related_features rf
     JOIN biohub.submission_feature sf
       ON sf.submission_feature_id = rf.related_feature_id
     JOIN biohub.feature_type ft_animal
       ON sf.feature_type_id = ft_animal.feature_type_id
+    LEFT JOIN biohub.contributor_codeset_code ccc
+      ON (sf.data->>'sex_code_id')::int = ccc.contributor_codeset_code_id
     WHERE ft_animal.name = 'animal'
       AND sf.record_end_date IS NULL
 )
@@ -147,13 +149,15 @@ related_animals AS (
       rf.deployment_id,
       sf.submission_feature_id,
       sf.data->>'taxon_id' AS taxon_id,
-      sf.data->>'sex' AS sex,
+      COALESCE(ccc.label, sf.data->>'sex') AS sex,
       sf.data->>'animal_identifier' AS animal_identifier
     FROM related_features rf
     JOIN biohub.submission_feature sf
       ON sf.submission_feature_id = rf.related_feature_id
     JOIN biohub.feature_type ft_animal
       ON sf.feature_type_id = ft_animal.feature_type_id
+    LEFT JOIN biohub.contributor_codeset_code ccc
+      ON (sf.data->>'sex_code_id')::int = ccc.contributor_codeset_code_id
     WHERE ft_animal.name = 'animal'
       AND sf.record_end_date IS NULL
 )
@@ -211,13 +215,17 @@ CREATE MATERIALIZED VIEW bcgw.observations_public AS
 WITH measurements AS (
     SELECT
         m.parent_submission_feature_id   AS observation_id,
-        (m.data->>'sex')::text           AS sex,
-        (m.data->>'life_stage')::text    AS life_stage,
+        COALESCE(ccc_sex.label, (m.data->>'sex')::text)           AS sex,
+        COALESCE(ccc_life_stage.label, (m.data->>'life_stage')::text)    AS life_stage,
         (m.data->>'measurement_type')::text   AS measurement_type,
         (m.data->>'measurement_value')::text  AS measurement_value
     FROM biohub.submission_feature m
     JOIN biohub.feature_type ft_m
       ON m.feature_type_id = ft_m.feature_type_id
+    LEFT JOIN biohub.contributor_codeset_code ccc_sex
+      ON (m.data->>'sex_code_id')::int = ccc_sex.contributor_codeset_code_id
+    LEFT JOIN biohub.contributor_codeset_code ccc_life_stage
+      ON (m.data->>'life_stage_code_id')::int = ccc_life_stage.contributor_codeset_code_id
     WHERE ft_m.name = 'measurement'
       AND m.record_end_date IS NULL
 )
