@@ -131,15 +131,15 @@ export class SubmissionService extends DBService {
         const parentSubmissionFeatureId = parentSubmissionFeatureIdMap.get(parentJsonPath) || null;
 
         // Validate the submissionFeature object
-        const response = await this.ingestionRepository.insertSubmissionFeatureRecord(
+        const response = await this.ingestionRepository.insertSubmissionFeatureRecord({
           submissionId,
           submissionUploadId,
           parentSubmissionFeatureId,
-          featureNode.id,
-          featureNode.type,
-          featureNode.properties,
-          0 // Legacy tree path — byte size not computed
-        );
+          featureSourceId: featureNode.id,
+          featureTypeName: featureNode.type,
+          featureProperties: featureNode.properties,
+          dataByteSizeBytes: 0 // Legacy tree path — byte size not computed
+        });
 
         // Cache the submission_feature_id for the current jsonPath
         parentSubmissionFeatureIdMap.set(jsonPath, response.submission_feature_id);

@@ -39,6 +39,16 @@ export interface CreateSubmissionFeatureIngestionRecord {
   dataByteSize: number;
 }
 
+export interface InsertSubmissionFeatureRecord {
+  submissionId: number;
+  submissionUploadId: string;
+  parentSubmissionFeatureId: number | null;
+  featureSourceId: string | null;
+  featureTypeName: string;
+  featureProperties: Record<string, unknown>;
+  dataByteSizeBytes: number;
+}
+
 /**
  * Flat submission feature structure matching SIMS IFlattenedBlock.
  * Parent-child relationships are expressed via UUID references.

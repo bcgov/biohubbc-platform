@@ -2,8 +2,8 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { FeatureTypeWithProperties, FeatureTypeWithPropertiesRow } from '../../models/feature-type';
+import { InsertSubmissionFeatureRecord } from '../../models/submission-feature';
 import { BaseRepository } from '../base-repository';
-import { ISubmissionFeature } from '../submission-repository';
 
 /**
  * A repository class for ingestion-related data access.
@@ -19,25 +19,21 @@ export class IngestionRepository extends BaseRepository {
    * upload event (submission_upload_id). This distinction enables multi-upload-per-submission
    * (append, replace).
    *
-   * @param {number} submissionId The ID of the submission.
-   * @param {string} submissionUploadId The submission_upload_id that produced these features.
-   * @param {(number | null)} parentSubmissionFeatureId The ID of the parent submission feature, or null.
-   * @param {(string | null)} featureSourceId The source ID of the feature, or null.
-   * @param {string} featureTypeName The name of the feature type.
-   * @param {ISubmissionFeature['properties']} featureProperties The properties of the submission feature.
-   * @param {number} dataByteSizeBytes The byte size of the data.
+   * @param {InsertSubmissionFeatureRecord} record The submission feature insert payload.
    * @return {*}  {Promise<{ submission_feature_id: number }>}
    * @memberof IngestionRepository
    */
-  async insertSubmissionFeatureRecord(
-    submissionId: number,
-    submissionUploadId: string,
-    parentSubmissionFeatureId: number | null,
-    featureSourceId: string | null,
-    featureTypeName: string,
-    featureProperties: ISubmissionFeature['properties'],
-    dataByteSizeBytes: number
-  ): Promise<{ submission_feature_id: number }> {
+  async insertSubmissionFeatureRecord(record: InsertSubmissionFeatureRecord): Promise<{ submission_feature_id: number }> {
+    const {
+      submissionId,
+      submissionUploadId,
+      parentSubmissionFeatureId,
+      featureSourceId,
+      featureTypeName,
+      featureProperties,
+      dataByteSizeBytes
+    } = record;
+
     const sqlStatement = SQL`
       INSERT INTO submission_feature (
         submission_id,

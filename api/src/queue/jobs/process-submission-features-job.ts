@@ -1,5 +1,6 @@
 import PgBoss from 'pg-boss';
 import { getAPIUserDBConnection } from '../../database/db';
+import { IngestionValidationError } from '../../errors/ingestion-validation-error';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
@@ -39,14 +40,7 @@ function toErrorMetadata(error: unknown): { name: string; message: string; stack
  * @returns {boolean} True when the error is a validation failure.
  */
 function isValidationFailure(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  return (
-    error.message.includes('Feature entry failed shallow validation') ||
-    error.message.includes('Codeset entry failed shallow validation')
-  );
+  return error instanceof IngestionValidationError;
 }
 
 /**
@@ -163,13 +157,13 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
 
       try {
         const submissionUploadService = new SubmissionUploadService(connection);
-        await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
+        await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'failed' });
         await connection.commit();
       } catch (statusError) {
         await connection.rollback();
         defaultLog.error({
           label: 'processSubmissionFeaturesJobHandler',
-          message: 'Failed to update submission upload status to invalid',
+          message: 'Failed to update submission upload status to failed',
           jobId: job.id,
           submissionUploadId,
           error: statusError
@@ -234,7 +228,7 @@ export const processSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<Submissi
           error: jobOutput ?? 'Job failed after all retries'
         }
       );
-      await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
+      await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'failed' });
 
       await connection.commit();
 
