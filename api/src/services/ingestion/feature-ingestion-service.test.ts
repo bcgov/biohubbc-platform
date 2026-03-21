@@ -91,7 +91,7 @@ describe('FeatureIngestionService', () => {
       insertStub.onFirstCall().resolves({ submission_feature_id: 100 });
       insertStub.onSecondCall().resolves({ submission_feature_id: 101 });
 
-      const updateParentStub = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent').resolves();
+      const updateParentStub = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParents').resolves();
 
       const insertRelationshipsStub = sinon
         .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRelationships')
@@ -109,7 +109,9 @@ describe('FeatureIngestionService', () => {
       expect(deleteStub).to.have.been.calledOnceWith(1);
       expect(deleteRelationshipsStub).to.have.been.calledOnceWith(1);
       expect(insertStub).to.have.been.calledTwice;
-      expect(updateParentStub).to.have.been.calledOnceWith(101, 100);
+      expect(updateParentStub).to.have.been.calledOnceWith('some-uuid', [
+        { submission_feature_id: 101, parent_submission_feature_id: 100 }
+      ]);
       expect(insertRelationshipsStub).to.have.been.calledOnceWith([{ source_feature_id: 100, target_feature_id: 101 }]);
     });
 
@@ -159,7 +161,7 @@ describe('FeatureIngestionService', () => {
         .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord')
         .resolves({ submission_feature_id: 100 });
 
-      const updateParentStub = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent');
+      const updateParentStub = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParents');
 
       const features: IFlattenedBlock[] = [createValidFeature({ id: 'uuid-root', parent: null })];
 
@@ -185,7 +187,7 @@ describe('FeatureIngestionService', () => {
       insertStub.onSecondCall().resolves({ submission_feature_id: 2 });
       insertStub.onThirdCall().resolves({ submission_feature_id: 3 });
 
-      const updateParentStub = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent').resolves();
+      const updateParentStub = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParents').resolves();
 
       const features: IFlattenedBlock[] = [
         createValidFeature({ id: 'root', parent: null, content: ['child1'] }),
@@ -197,9 +199,10 @@ describe('FeatureIngestionService', () => {
 
       expect(result.valid).to.be.true;
       expect(insertStub).to.have.been.calledThrice;
-      expect(updateParentStub).to.have.been.calledTwice;
-      expect(updateParentStub).to.have.been.calledWith(2, 1); // child1 -> root
-      expect(updateParentStub).to.have.been.calledWith(3, 2); // grandchild -> child1
+      expect(updateParentStub).to.have.been.calledOnceWith('some-uuid', [
+        { submission_feature_id: 2, parent_submission_feature_id: 1 }, // child1 -> root
+        { submission_feature_id: 3, parent_submission_feature_id: 2 } // grandchild -> child1
+      ]);
     });
 
     it('should insert multiple features successfully', async () => {
@@ -217,7 +220,7 @@ describe('FeatureIngestionService', () => {
       insertStub.onSecondCall().resolves({ submission_feature_id: 501 });
       insertStub.onThirdCall().resolves({ submission_feature_id: 502 });
 
-      sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent').resolves();
+      sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParents').resolves();
 
       const features: IFlattenedBlock[] = [
         createValidFeature({ id: 'aaa-111' }),
@@ -248,7 +251,7 @@ describe('FeatureIngestionService', () => {
         .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord')
         .resolves({ submission_feature_id: 1 });
 
-      sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent').resolves();
+      sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParents').resolves();
 
       const feature: IFlattenedBlock = {
         id: 'test-uuid-123',
@@ -281,7 +284,7 @@ describe('FeatureIngestionService', () => {
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
 
       const insertStub = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord');
-      const updateParentStub = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent');
+      const updateParentStub = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParents');
 
       const result = await service.ingestFeatures(1, 'some-uuid', []);
 
@@ -305,7 +308,7 @@ describe('FeatureIngestionService', () => {
       insertStub.onCall(1).resolves({ submission_feature_id: 20 });
       insertStub.onCall(2).resolves({ submission_feature_id: 30 });
 
-      const updateParentStub = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent');
+      const updateParentStub = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParents');
 
       const features: IFlattenedBlock[] = [
         createValidFeature({ id: 'feat-1', parent: null }),
@@ -336,7 +339,7 @@ describe('FeatureIngestionService', () => {
       insertStub.onCall(2).resolves({ submission_feature_id: 3 }); // parent
       insertStub.onCall(3).resolves({ submission_feature_id: 4 }); // child
 
-      const updateParentStub = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent').resolves();
+      const updateParentStub = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParents').resolves();
 
       const features: IFlattenedBlock[] = [
         createValidFeature({ id: 'level-0', parent: null }),
@@ -348,10 +351,11 @@ describe('FeatureIngestionService', () => {
       const result = await service.ingestFeatures(1, 'some-uuid', features);
 
       expect(result.valid).to.be.true;
-      expect(updateParentStub).to.have.been.calledThrice;
-      expect(updateParentStub).to.have.been.calledWith(2, 1); // level-1 -> level-0
-      expect(updateParentStub).to.have.been.calledWith(3, 2); // level-2 -> level-1
-      expect(updateParentStub).to.have.been.calledWith(4, 3); // level-3 -> level-2
+      expect(updateParentStub).to.have.been.calledOnceWith('some-uuid', [
+        { submission_feature_id: 2, parent_submission_feature_id: 1 }, // level-1 -> level-0
+        { submission_feature_id: 3, parent_submission_feature_id: 2 }, // level-2 -> level-1
+        { submission_feature_id: 4, parent_submission_feature_id: 3 } // level-3 -> level-2
+      ]);
     });
 
     it('should handle sibling features with same parent', async () => {
@@ -370,7 +374,7 @@ describe('FeatureIngestionService', () => {
       insertStub.onCall(2).resolves({ submission_feature_id: 202 }); // child 2
       insertStub.onCall(3).resolves({ submission_feature_id: 203 }); // child 3
 
-      const updateParentStub = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent').resolves();
+      const updateParentStub = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParents').resolves();
 
       const features: IFlattenedBlock[] = [
         createValidFeature({ id: 'parent', parent: null, content: ['child-1', 'child-2', 'child-3'] }),
@@ -382,10 +386,11 @@ describe('FeatureIngestionService', () => {
       const result = await service.ingestFeatures(1, 'some-uuid', features);
 
       expect(result.valid).to.be.true;
-      expect(updateParentStub).to.have.been.calledThrice;
-      expect(updateParentStub).to.have.been.calledWith(201, 100); // child-1 -> parent
-      expect(updateParentStub).to.have.been.calledWith(202, 100); // child-2 -> parent
-      expect(updateParentStub).to.have.been.calledWith(203, 100); // child-3 -> parent
+      expect(updateParentStub).to.have.been.calledOnceWith('some-uuid', [
+        { submission_feature_id: 201, parent_submission_feature_id: 100 }, // child-1 -> parent
+        { submission_feature_id: 202, parent_submission_feature_id: 100 }, // child-2 -> parent
+        { submission_feature_id: 203, parent_submission_feature_id: 100 } // child-3 -> parent
+      ]);
     });
 
     it('should preserve feature properties when inserting', async () => {
@@ -454,7 +459,7 @@ describe('FeatureIngestionService', () => {
       insertStub.onCall(0).resolves({ submission_feature_id: 1 });
       insertStub.onCall(1).resolves({ submission_feature_id: 2 });
 
-      sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent').resolves();
+      sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParents').resolves();
 
       const propsWithMultipleFields = {
         name: 'Dataset One',
@@ -509,7 +514,7 @@ describe('FeatureIngestionService', () => {
           return { submission_feature_id: 1 };
         });
 
-      sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent').resolves();
+      sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParents').resolves();
       sinon.stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRelationships').resolves();
 
       const features: IFlattenedBlock[] = [createValidFeature()];
@@ -539,7 +544,7 @@ describe('FeatureIngestionService', () => {
         .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord')
         .resolves({ submission_feature_id: 1 });
 
-      sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent').resolves();
+      sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParents').resolves();
 
       const insertRelationshipsStub = sinon
         .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRelationships')
@@ -573,7 +578,7 @@ describe('FeatureIngestionService', () => {
       insertStub.onThirdCall().resolves({ submission_feature_id: 30 });
       insertStub.onCall(3).resolves({ submission_feature_id: 40 });
 
-      sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent').resolves();
+      sinon.stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParents').resolves();
 
       const insertRelationshipsStub = sinon
         .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRelationships')
@@ -615,7 +620,7 @@ describe('FeatureIngestionService', () => {
         });
 
       const updateParentStub = sinon
-        .stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParent')
+        .stub(SubmissionRepository.prototype, 'updateSubmissionFeatureParents')
         .callsFake(async () => {
           callOrder.push('updateParent');
         });
@@ -628,10 +633,10 @@ describe('FeatureIngestionService', () => {
 
       await service.ingestFeatures(1, 'some-uuid', features);
 
-      // Verify order: all 3 inserts, then 2 parent updates
-      expect(callOrder).to.deep.equal(['insert', 'insert', 'insert', 'updateParent', 'updateParent']);
+      // Verify order: all 3 inserts, then one bulk parent update
+      expect(callOrder).to.deep.equal(['insert', 'insert', 'insert', 'updateParent']);
       expect(insertStub).to.have.been.calledThrice;
-      expect(updateParentStub).to.have.been.calledTwice;
+      expect(updateParentStub).to.have.been.calledOnce;
     });
   });
 });

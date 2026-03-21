@@ -1,5 +1,4 @@
 import chai, { expect } from 'chai';
-import { Feature } from 'geojson';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import {
@@ -17,26 +16,20 @@ describe('SubmissionFeaturePropertyGeometryService', () => {
     sinon.restore();
   });
 
-  const mockGeometry: Feature = {
-    type: 'Feature',
-    geometry: {
-      type: 'Point',
-      coordinates: [-123.1, 49.2]
-    },
-    properties: {}
-  };
-
   const mockRow: SubmissionFeaturePropertyGeometry = {
     submission_feature_property_geometry_id: 1,
     submission_feature_id: 10,
     feature_type_property_id: 20,
-    value: mockGeometry
+    value: {
+      type: 'Point',
+      coordinates: [-123.1, 49.2]
+    }
   };
 
   const createPayload: CreateSubmissionFeaturePropertyGeometry = {
     submission_feature_id: 10,
     feature_type_property_id: 20,
-    value: mockGeometry
+    value: mockRow.value
   };
   it('delegates create', async () => {
     const service = new SubmissionFeaturePropertyGeometryService(getMockDBConnection());

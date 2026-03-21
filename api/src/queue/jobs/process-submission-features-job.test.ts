@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import * as db from '../../database/db';
+import { IngestionValidationError } from '../../errors/ingestion-validation-error';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { ValidationErrorType } from '../../services/ingestion/submission-ingestion-service.interface';
@@ -176,6 +177,7 @@ describe('process-submission-features-job', () => {
       } catch (error) {
         expect(error).to.equal(testError);
         expect(rollbackStub.calledOnce).to.be.true;
+        expect(updateSubmissionUploadStub.calledWith('test-sub-upload-id', { status: 'failed' })).to.be.true;
         expect(releaseStub.calledOnce).to.be.true;
       }
     });
@@ -198,7 +200,7 @@ describe('process-submission-features-job', () => {
 
       sinon
         .stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload')
-        .rejects(new Error('Feature entry failed shallow validation'));
+        .rejects(new IngestionValidationError('Feature entry failed shallow validation'));
 
       const publishStub = sinon.stub(publisher, 'publishIndexSubmissionFeaturesJob').resolves({
         status: 'published',
@@ -428,7 +430,7 @@ describe('process-submission-features-job', () => {
         output
       } as PgBoss.JobWithMetadata<SubmissionUpload>);
 
-    it('updates submission upload status to invalid with error from job output', async () => {
+    it('updates submission upload status to failed with error from job output', async () => {
       const mockDBConnection = getMockDBConnection();
 
       mockDBConnection.open = sinon.stub().resolves();
@@ -447,7 +449,7 @@ describe('process-submission-features-job', () => {
       await processSubmissionFeaturesFailedHandler(mockJobs);
 
       expect(updateStatusBySubmissionUploadIdStub.calledOnce).to.be.true;
-      expect(updateSubmissionUploadStub.calledWith('test-sub-upload-id', { status: 'invalid' })).to.be.true;
+      expect(updateSubmissionUploadStub.calledWith('test-sub-upload-id', { status: 'failed' })).to.be.true;
       expect(updateStatusBySubmissionUploadIdStub.firstCall.args[0]).to.equal('test-sub-upload-id');
       expect(updateStatusBySubmissionUploadIdStub.firstCall.args[1]).to.equal('failed');
       expect(updateStatusBySubmissionUploadIdStub.firstCall.args[2]).to.deep.equal({ error: errorOutput });

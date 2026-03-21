@@ -4,7 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiNotFoundError } from '../errors/api-error';
-import { FEATURE_PROPERTY_TYPE, FeatureType, FeatureTypePropertyExtended } from '../models/feature-property';
+import { FeatureType, FeatureTypePropertyExtended, FEATURE_PROPERTY_TYPE } from '../models/feature-property';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CodeRepository } from './code-repository';
 

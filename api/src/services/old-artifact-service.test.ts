@@ -3,7 +3,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { FEATURE_PROPERTY_TYPE, FeatureProperty } from '../models/feature-property';
+import { FeatureProperty, FEATURE_PROPERTY_TYPE } from '../models/feature-property';
 import { Artifact, ArtifactRepository } from '../repositories/artifact-repository';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SecurityRepository } from '../repositories/security-repository';

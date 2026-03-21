@@ -229,9 +229,9 @@ describe('csv-utils', () => {
       expect(buildSchemaHeaders(properties)).to.deep.equal(['name', 'count']);
     });
 
-    it('should expand geometry to decimalLatitude and decimalLongitude', () => {
+    it('should expand spatial to decimalLatitude and decimalLongitude', () => {
       const properties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'geometry', feature_property_type_name: 'geometry' }
+        { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
       ];
 
       expect(buildSchemaHeaders(properties)).to.deep.equal(['decimalLatitude', 'decimalLongitude']);
@@ -252,7 +252,7 @@ describe('csv-utils', () => {
     it('should preserve schema order', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'description', feature_property_type_name: 'string' },
-        { feature_property_name: 'geometry', feature_property_type_name: 'geometry' },
+        { feature_property_name: 'geometry', feature_property_type_name: 'spatial' },
         { feature_property_name: 'name', feature_property_type_name: 'string' }
       ];
 
@@ -272,8 +272,8 @@ describe('csv-utils', () => {
         { feature_property_name: 'animal_identifier', feature_property_type_name: 'string' }
       ];
       const childProperties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'timestamp', feature_property_type_name: 'timestamp' },
-        { feature_property_name: 'geometry', feature_property_type_name: 'geometry' }
+        { feature_property_name: 'timestamp', feature_property_type_name: 'datetime' },
+        { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
       ];
 
       const result = buildCombinedHeaders(parentProperties, childProperties, ['dataset_name', 'dataset_id']);
@@ -304,7 +304,7 @@ describe('csv-utils', () => {
         { feature_property_name: 'device_key', feature_property_type_name: 'string' }
       ];
       const childProperties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'timestamp', feature_property_type_name: 'timestamp' }
+        { feature_property_name: 'timestamp', feature_property_type_name: 'datetime' }
       ];
 
       const result = buildCombinedHeaders(parentProperties, childProperties);
@@ -330,7 +330,7 @@ describe('csv-utils', () => {
         { feature_property_name: 'animal_identifier', feature_property_type_name: 'string' }
       ];
       const childProperties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'timestamp', feature_property_type_name: 'timestamp' },
+        { feature_property_name: 'timestamp', feature_property_type_name: 'datetime' },
         { feature_property_name: 'temperature', feature_property_type_name: 'number' }
       ];
       const parentData = { device_key: 'TAG-001', animal_identifier: 'M12345' };
@@ -372,12 +372,12 @@ describe('csv-utils', () => {
       expect(result).to.deep.equal({ name: 'Child Name' });
     });
 
-    it('should handle geometry properties in both parent and child', () => {
+    it('should handle spatial properties in both parent and child', () => {
       const parentProperties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'deployment_location', feature_property_type_name: 'geometry' }
+        { feature_property_name: 'deployment_location', feature_property_type_name: 'spatial' }
       ];
       const childProperties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'geometry', feature_property_type_name: 'geometry' }
+        { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
       ];
       const parentData = {
         deployment_location: { type: 'Point', coordinates: [-120.0, 50.0] }
@@ -388,7 +388,7 @@ describe('csv-utils', () => {
 
       const result = flattenFeatureWithParent(childData, childProperties, parentData, parentProperties, 100);
 
-      // Child geometry overwrites parent geometry (both write to decimalLatitude/decimalLongitude)
+      // Child spatial overwrites parent spatial (both write to decimalLatitude/decimalLongitude)
       expect(result).to.deep.equal({
         decimalLatitude: '51.5',
         decimalLongitude: '-121.5'
@@ -397,11 +397,11 @@ describe('csv-utils', () => {
   });
 
   describe('flattenFeatureBySchema', () => {
-    it('should pass through string, number, timestamp, boolean values', () => {
+    it('should pass through string, number, datetime, boolean values', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'name', feature_property_type_name: 'string' },
         { feature_property_name: 'count', feature_property_type_name: 'number' },
-        { feature_property_name: 'timestamp', feature_property_type_name: 'timestamp' },
+        { feature_property_name: 'timestamp', feature_property_type_name: 'datetime' },
         { feature_property_name: 'active', feature_property_type_name: 'boolean' }
       ];
       const data = { name: 'Bear', count: 5, timestamp: '2024-01-01T00:00:00Z', active: true };
@@ -418,7 +418,7 @@ describe('csv-utils', () => {
 
     it('should extract coordinates from a FeatureCollection', () => {
       const properties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'geometry', feature_property_type_name: 'geometry' }
+        { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
       ];
       const data = {
         geometry: {
@@ -434,7 +434,7 @@ describe('csv-utils', () => {
 
     it('should extract coordinates from a bare Point', () => {
       const properties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'geometry', feature_property_type_name: 'geometry' }
+        { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
       ];
       const data = { geometry: { type: 'Point', coordinates: [-130.5, 56.2] } };
 
@@ -443,9 +443,9 @@ describe('csv-utils', () => {
       expect(result).to.deep.equal({ decimalLatitude: '56.2', decimalLongitude: '-130.5' });
     });
 
-    it('should return empty strings for null geometry value', () => {
+    it('should return empty strings for null spatial value', () => {
       const properties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'geometry', feature_property_type_name: 'geometry' }
+        { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
       ];
 
       const result = flattenFeatureBySchema({ geometry: null }, properties, 100);
@@ -453,9 +453,9 @@ describe('csv-utils', () => {
       expect(result).to.deep.equal({ decimalLatitude: '', decimalLongitude: '' });
     });
 
-    it('should return empty strings when no Point found in geometry', () => {
+    it('should return empty strings when no Point found in spatial', () => {
       const properties: CsvPropertyDefinition[] = [
-        { feature_property_name: 'geometry', feature_property_type_name: 'geometry' }
+        { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
       ];
       const data = {
         geometry: { type: 'FeatureCollection', features: [] }

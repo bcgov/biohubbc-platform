@@ -11,7 +11,7 @@ import {
 } from '../../models/download';
 import { DownloadFragmentId, DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { FEATURE_PROPERTY_TYPE, FeatureTypeWithFeatureProperties } from '../../models/feature-property';
+import { FeatureTypeWithFeatureProperties, FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { getMockDBConnection } from '../../__mocks__/db';

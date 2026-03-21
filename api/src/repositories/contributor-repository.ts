@@ -135,23 +135,6 @@ export class ContributorRepository extends BaseRepository {
   }
 
   /**
-   * Check if a contributor exists for a given clientId (active records only)
-   *
-   * @param {string} clientId
-   * @return {Promise<boolean>}
-   * @memberof ContributorRepository
-   */
-  async contributorExists(clientId: string): Promise<boolean> {
-    const sql = SQL`
-      SELECT contributor_id FROM contributor WHERE client_id = ${clientId} AND record_end_date IS NULL;
-    `;
-
-    const response = await this.connection.sql(sql);
-
-    return (response.rowCount ?? 0) > 0;
-  }
-
-  /**
    * Create a new contributor.
    *
    * @param {string} clientId

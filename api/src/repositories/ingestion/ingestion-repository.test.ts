@@ -26,7 +26,15 @@ describe('IngestionRepository', () => {
         properties: {}
       };
       try {
-        await ingestionRepository.insertSubmissionFeatureRecord(1, 'some-upload-uuid', 2, '321', 'type', feature, 0);
+        await ingestionRepository.insertSubmissionFeatureRecord({
+          submissionId: 1,
+          submissionUploadId: 'some-upload-uuid',
+          parentSubmissionFeatureId: 2,
+          featureSourceId: '321',
+          featureTypeName: 'type',
+          featureProperties: feature,
+          dataByteSizeBytes: 0
+        });
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission feature record');
@@ -50,15 +58,15 @@ describe('IngestionRepository', () => {
         properties: {}
       };
 
-      const response = await ingestionRepository.insertSubmissionFeatureRecord(
-        1,
-        'some-upload-uuid',
-        2,
-        '321',
-        'type',
-        feature,
-        0
-      );
+      const response = await ingestionRepository.insertSubmissionFeatureRecord({
+        submissionId: 1,
+        submissionUploadId: 'some-upload-uuid',
+        parentSubmissionFeatureId: 2,
+        featureSourceId: '321',
+        featureTypeName: 'type',
+        featureProperties: feature,
+        dataByteSizeBytes: 0
+      });
 
       expect(response).to.eql(mockResponse);
     });

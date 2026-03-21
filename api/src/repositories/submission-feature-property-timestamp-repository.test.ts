@@ -15,8 +15,7 @@ describe('SubmissionFeaturePropertyTimestampRepository', () => {
     submission_feature_property_timestamp_id: 1,
     submission_feature_id: 10,
     feature_type_property_id: 20,
-    date_value: '2026-01-01',
-    time_value: '00:00:00'
+    value: '2026-01-01T00:00:00.000Z'
   };
 
   describe('insert', () => {
@@ -27,8 +26,7 @@ describe('SubmissionFeaturePropertyTimestampRepository', () => {
       const result = await repository.insertSubmissionFeaturePropertyTimestamp({
         submission_feature_id: 10,
         feature_type_property_id: 20,
-        date_value: '2026-01-01',
-        time_value: '00:00:00'
+        value: '2026-01-01T00:00:00.000Z'
       });
 
       expect(result).to.eql(mockRow);
@@ -42,8 +40,7 @@ describe('SubmissionFeaturePropertyTimestampRepository', () => {
         await repository.insertSubmissionFeaturePropertyTimestamp({
           submission_feature_id: 10,
           feature_type_property_id: 20,
-          date_value: '2026-01-01',
-          time_value: null
+          value: '2026-01-01T00:00:00.000Z'
         });
         expect.fail();
       } catch (error) {

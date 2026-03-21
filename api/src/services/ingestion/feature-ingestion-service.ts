@@ -92,14 +92,9 @@ export class FeatureIngestionService extends DBService {
     }
 
     // Pass 2: Update parent references
-    for (const feature of features) {
-      if (feature.parent) {
-        const parentDbId = uuidToDbId.get(feature.parent);
-        const featureDbId = uuidToDbId.get(feature.id);
-        if (parentDbId && featureDbId) {
-          await submissionRepository.updateSubmissionFeatureParent(featureDbId, parentDbId);
-        }
-      }
+    const parentPairs = this.buildParentUpdatePairs(features, uuidToDbId);
+    if (parentPairs.length > 0) {
+      await submissionRepository.updateSubmissionFeatureParents(submissionUploadId, parentPairs);
     }
 
     // Pass 3: Insert content relationships (many-to-many)
@@ -144,6 +139,40 @@ export class FeatureIngestionService extends DBService {
         }
       }
     }
+    return pairs;
+  }
+
+  /**
+   * Build child-parent update pairs from features' parent UUID references.
+   *
+   * @private
+   * @param {IFlattenedBlock[]} features
+   * @param {Map<string, number>} uuidToDbId
+   * @return {Array<{ submission_feature_id: number; parent_submission_feature_id: number }>}
+   * @memberof FeatureIngestionService
+   */
+  private buildParentUpdatePairs(
+    features: IFlattenedBlock[],
+    uuidToDbId: Map<string, number>
+  ): Array<{ submission_feature_id: number; parent_submission_feature_id: number }> {
+    const pairs: Array<{ submission_feature_id: number; parent_submission_feature_id: number }> = [];
+
+    for (const feature of features) {
+      if (!feature.parent) {
+        continue;
+      }
+
+      const parentDbId = uuidToDbId.get(feature.parent);
+      const featureDbId = uuidToDbId.get(feature.id);
+
+      if (parentDbId !== undefined && featureDbId !== undefined) {
+        pairs.push({
+          submission_feature_id: featureDbId,
+          parent_submission_feature_id: parentDbId
+        });
+      }
+    }
+
     return pairs;
   }
 }

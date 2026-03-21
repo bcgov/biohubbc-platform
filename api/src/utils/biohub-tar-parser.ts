@@ -5,6 +5,7 @@ import { PassThrough, Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import * as tar from 'tar-stream';
 import { z, ZodError } from 'zod';
+import { IngestionValidationError } from '../errors/ingestion-validation-error';
 import { IFlattenedBlock } from '../models/submission-feature';
 import { TarCodesets } from '../services/ingestion/submission-ingestion-codes-service.interface';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
@@ -128,14 +129,14 @@ function formatZodIssues(error: ZodError): string {
  * @param {unknown} value - Parsed JSON payload from a `codes/*.json` file.
  * @param {string} entryName - Tar entry path for context.
  * @returns {TarCodesets}
- * @throws {Error} When payload shape does not satisfy `TarCodesets`.
+ * @throws {IngestionValidationError} When payload shape does not satisfy `TarCodesets`.
  */
 function extractCodesetsFromTarballEntry(value: unknown, entryName: string): TarCodesets {
   try {
     return TarCodesets.parse(value);
   } catch (error) {
     if (error instanceof ZodError) {
-      throw new Error(
+      throw new IngestionValidationError(
         `Codeset entry failed shallow validation: entry=${entryName}; issues=${formatZodIssues(error)}`
       );
     }
@@ -155,14 +156,14 @@ function extractCodesetsFromTarballEntry(value: unknown, entryName: string): Tar
  * @param {unknown} value - Parsed JSON object for a single feature.
  * @param {string} entryName - Tar entry path for context.
  * @returns {IFlattenedBlock}
- * @throws {Error} When required fields are missing or incorrectly typed.
+ * @throws {IngestionValidationError} When required fields are missing or incorrectly typed.
  */
 function extractFeatureFromTarballEntry(value: unknown, entryName: string): IFlattenedBlock {
   try {
     return FlattenedFeatureSchema.parse(value);
   } catch (error) {
     if (error instanceof ZodError) {
-      throw new Error(
+      throw new IngestionValidationError(
         `Feature entry failed shallow validation: entry=${entryName}; issues=${formatZodIssues(error)}`
       );
     }
@@ -234,7 +235,8 @@ export async function streamFeatures(
         }
 
         const entryName = stripArchivePrefix(header.name);
-        const isFeatureJson = entryName.startsWith('features/') && entryName.endsWith('.json');
+        const isRootFeatureJson = !entryName.includes('/') && entryName.endsWith('.json');
+        const isFeatureJson = entryName.startsWith('features/') || isRootFeatureJson;
 
         if (!isFeatureJson) {
           await drainStream(stream);
