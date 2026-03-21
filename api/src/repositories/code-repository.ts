@@ -1,6 +1,6 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { FeatureProperty, FeatureType, FeatureTypePropertyExtended } from '../models/feature-property';
+import { FeaturePropertyCode, FeatureTypeCode, FeatureTypePropertyCodeRow } from '../models/feature-property';
 import { BaseRepository } from './base-repository';
 
 /**
@@ -14,10 +14,10 @@ export class CodeRepository extends BaseRepository {
   /**
    * Get all feature types.
    *
-   * @return {*}  {Promise<FeatureType[]>}
+   * @return {*}  {Promise<FeatureTypeCode[]>}
    * @memberof CodeRepository
    */
-  async getFeatureTypes(): Promise<FeatureType[]> {
+  async getFeatureTypes(): Promise<FeatureTypeCode[]> {
     const sql = SQL`
       SELECT 
         feature_type_id, 
@@ -29,7 +29,7 @@ export class CodeRepository extends BaseRepository {
         feature_type.record_end_date IS NULL;
     `;
 
-    const response = await this.connection.sql(sql, FeatureType);
+    const response = await this.connection.sql(sql, FeatureTypeCode);
 
     return response.rows;
   }
@@ -37,10 +37,10 @@ export class CodeRepository extends BaseRepository {
   /**
    * Get all feature type property codes for all feature types.
    *
-   * @return {*}  {(Promise<FeatureTypePropertyExtended[]>)}
+   * @return {*}  {(Promise<FeatureTypePropertyCodeRow[]>)}
    * @memberof CodeRepository
    */
-  async getFeatureTypePropertyCodes(): Promise<FeatureTypePropertyExtended[]> {
+  async getFeatureTypePropertyCodes(): Promise<FeatureTypePropertyCodeRow[]> {
     const sql = SQL`
       SELECT
         ft.feature_type_id,
@@ -70,7 +70,7 @@ export class CodeRepository extends BaseRepository {
       ASC;
     `;
 
-    const response = await this.connection.sql(sql, FeatureTypePropertyExtended);
+    const response = await this.connection.sql(sql, FeatureTypePropertyCodeRow);
 
     return response.rows;
   }
@@ -79,10 +79,10 @@ export class CodeRepository extends BaseRepository {
    * Get a feature property record by name.
    *
    * @param {string} featurePropertyName
-   * @return {*}  {Promise<FeatureProperty>}
+   * @return {*}  {Promise<FeaturePropertyCode>}
    * @memberof CodeRepository
    */
-  async getFeaturePropertyByName(featurePropertyName: string): Promise<FeatureProperty> {
+  async getFeaturePropertyByName(featurePropertyName: string): Promise<FeaturePropertyCode> {
     const sqlStatement = SQL`
     SELECT
       fp.feature_property_id,
@@ -100,7 +100,7 @@ export class CodeRepository extends BaseRepository {
       AND fp.record_end_date IS NULL;
   `;
 
-    const response = await this.connection.sql(sqlStatement, FeatureProperty);
+    const response = await this.connection.sql(sqlStatement, FeaturePropertyCode);
 
     if (response.rowCount === 0) {
       throw new ApiNotFoundError('Feature property not found', [

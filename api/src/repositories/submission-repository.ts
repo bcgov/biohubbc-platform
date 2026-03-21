@@ -536,6 +536,115 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Resolve external feature source ids to internal submission_feature ids for one upload.
+   *
+   * @param {string} submissionUploadId
+   * @param {string[]} sourceIds
+   * @return {Promise<Array<{ source_id: string; submission_feature_id: number }>>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionFeatureIdMapBySourceIds(
+    submissionUploadId: string,
+    sourceIds: string[]
+  ): Promise<Array<{ source_id: string; submission_feature_id: number }>> {
+    if (!sourceIds.length) {
+      return [];
+    }
+
+    const sqlStatement = SQL`
+      SELECT
+        source_id,
+        submission_feature_id
+      FROM
+        submission_feature
+      WHERE
+        submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL
+        AND source_id = ANY(${sourceIds}::text[]);
+    `;
+
+    const response = await this.connection.sql<{ source_id: string; submission_feature_id: number }>(sqlStatement);
+    return response.rows;
+  }
+
+  /**
+   * Clear all parent links for one upload attempt.
+   *
+   * @param {string} submissionUploadId
+   * @return {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async clearSubmissionFeatureParentsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE submission_feature
+      SET parent_submission_feature_id = NULL
+      WHERE submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL;
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Bulk set parent links for child submission_feature rows.
+   *
+   * @param {Array<{ child_submission_feature_id: number; parent_submission_feature_id: number }>} updates
+   * @return {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionFeatureParents(
+    updates: Array<{ child_submission_feature_id: number; parent_submission_feature_id: number }>
+  ): Promise<void> {
+    if (!updates.length) {
+      return;
+    }
+
+    const childIds = updates.map((update) => update.child_submission_feature_id);
+    const parentIds = updates.map((update) => update.parent_submission_feature_id);
+    const sqlStatement = SQL`
+      UPDATE submission_feature AS target
+      SET parent_submission_feature_id = source.parent_submission_feature_id
+      FROM (
+        SELECT
+          child_submission_feature_id,
+          parent_submission_feature_id
+        FROM unnest(
+          ${childIds}::integer[],
+          ${parentIds}::integer[]
+        ) AS updates(child_submission_feature_id, parent_submission_feature_id)
+      ) AS source
+      WHERE target.submission_feature_id = source.child_submission_feature_id;
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Delete all feature relationships for one upload attempt.
+   *
+   * @param {string} submissionUploadId
+   * @return {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async deleteSubmissionFeatureRelationshipsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      DELETE FROM submission_feature_feature
+      WHERE source_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      )
+      OR target_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      );
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
    * Insert submission feature relationships (source-target from content array).
    * Uses ON CONFLICT DO NOTHING to avoid failures on duplicate pairs.
    *

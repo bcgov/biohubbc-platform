@@ -1,6 +1,6 @@
 import { IDBConnection } from '../database/db';
 import { IAllCodeSets } from '../models/codes';
-import { FeatureProperty, FeatureType, FeatureTypeWithFeatureProperties } from '../models/feature-property';
+import { FeaturePropertyCode, FeatureTypeCode, FeatureTypeWithFeaturePropertiesCode } from '../models/feature-property';
 import { CodeRepository } from '../repositories/code-repository';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
@@ -35,25 +35,25 @@ export class CodeService extends DBService {
   /**
    * Get all feature types.
    *
-   * @return {*}  {Promise<FeatureType[]>}
+   * @return {*}  {Promise<FeatureTypeCode[]>}
    * @memberof CodeService
    */
-  async getFeatureTypes(): Promise<FeatureType[]> {
+  async getFeatureTypes(): Promise<FeatureTypeCode[]> {
     return this.codeRepository.getFeatureTypes();
   }
 
   /**
    * Get all feature properties grouped by feature type.
    *
-   * @return {*}  {Promise<FeatureTypeWithFeatureProperties[]>}
+   * @return {*}  {Promise<FeatureTypeWithFeaturePropertiesCode[]>}
    * @memberof CodeService
    */
-  async getFeatureTypePropertyCodes(): Promise<FeatureTypeWithFeatureProperties[]> {
+  async getFeatureTypePropertyCodes(): Promise<FeatureTypeWithFeaturePropertiesCode[]> {
     defaultLog.debug({ message: 'getFeatureTypePropertyCodes' });
 
     const featureTypePropertyCodes = await this.codeRepository.getFeatureTypePropertyCodes();
 
-    const groupedFeatureTypePropertyCodes: FeatureTypeWithFeatureProperties[] = [];
+    const groupedFeatureTypePropertyCodes: FeatureTypeWithFeaturePropertiesCode[] = [];
 
     // Iterate over the raw array of feature type property codes and group them by feature type
     for (const featureTypePropertyCode of featureTypePropertyCodes) {
@@ -90,10 +90,10 @@ export class CodeService extends DBService {
    * Get a feature property record by name.
    *
    * @param {string} featurePropertyName
-   * @return {*}  {Promise<FeatureProperty>}
+   * @return {*}  {Promise<FeaturePropertyCode>}
    * @memberof CodeService
    */
-  async getFeaturePropertyByName(featurePropertyName: string): Promise<FeatureProperty> {
+  async getFeaturePropertyByName(featurePropertyName: string): Promise<FeaturePropertyCode> {
     defaultLog.debug({ message: 'getFeaturePropertyByName' });
 
     return this.codeRepository.getFeaturePropertyByName(featurePropertyName);

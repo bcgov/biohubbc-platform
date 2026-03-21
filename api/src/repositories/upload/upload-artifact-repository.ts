@@ -1,11 +1,7 @@
 import { SQL } from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
-import {
-  ArtifactReferenceResolution,
-  CreateUploadArtifact,
-  UpdateUploadArtifact,
-  UploadArtifact
-} from '../../models/upload-artifact';
+import { ArtifactReferenceResolution } from '../../models/submission-feature-property-index';
+import { CreateUploadArtifact, UpdateUploadArtifact, UploadArtifact } from '../../models/upload-artifact';
 import { BaseRepository } from '../base-repository';
 
 export class UploadArtifactRepository extends BaseRepository {
@@ -171,28 +167,25 @@ export class UploadArtifactRepository extends BaseRepository {
   }
 
   /**
-   * Resolve feature artifact keys to persisted artifact IDs for a single submission upload.
+   * Resolve artifact references to artifact IDs for feature artifacts under one submission upload.
    *
-   * `artifactPaths` should contain normalized archive-relative paths (for example `images/photo.jpg`)
-   * derived from feature `artifact_key` values before this method is called.
-   *
-   * @param {string} submissionUploadId - Submission upload scope used to resolve the backing upload.
-   * @param {string[]} artifactPaths - Canonical archive-relative artifact paths to resolve.
-   * @return {Promise<ArtifactReferenceResolution[]>} Resolved pairs of `path` -> `artifact_id`.
+   * @param {string} submissionUploadId
+   * @param {string[]} references
+   * @return {Promise<ArtifactReferenceResolution[]>}
    * @memberof UploadArtifactRepository
    */
   async getFeatureArtifactResolutionsBySubmissionUploadIdAndReferences(
     submissionUploadId: string,
-    artifactPaths: string[]
+    references: string[]
   ): Promise<ArtifactReferenceResolution[]> {
-    if (!artifactPaths.length) {
+    if (!references.length) {
       return [];
     }
 
     const sqlStatement = SQL`
       WITH requested_refs AS (
         SELECT DISTINCT refs.reference
-        FROM unnest(${artifactPaths}::text[]) AS refs(reference)
+        FROM unnest(${references}::text[]) AS refs(reference)
       ),
       upload_scope AS (
         SELECT submission_upload.upload_id

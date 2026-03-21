@@ -1,10 +1,6 @@
 import { IDBConnection } from '../../database/db';
-import {
-  ArtifactReferenceResolution,
-  CreateUploadArtifact,
-  UpdateUploadArtifact,
-  UploadArtifact
-} from '../../models/upload-artifact';
+import { ArtifactReferenceResolution } from '../../models/submission-feature-property-index';
+import { CreateUploadArtifact, UpdateUploadArtifact, UploadArtifact } from '../../models/upload-artifact';
 import { UploadArtifactRepository } from '../../repositories/upload/upload-artifact-repository';
 import { DBService } from '../db-service';
 
@@ -81,23 +77,20 @@ export class UploadArtifactService extends DBService {
   }
 
   /**
-   * Resolve feature artifact keys to persisted artifact IDs for one submission upload.
+   * Resolve artifact references to artifact IDs for feature artifacts under one submission upload.
    *
-   * `artifactPaths` should be normalized archive-relative paths extracted from
-   * feature `artifact_key` values before invocation.
-   *
-   * @param {string} submissionUploadId - Submission upload scope used for resolution.
-   * @param {string[]} artifactPaths - Canonical archive-relative artifact paths.
-   * @return {Promise<ArtifactReferenceResolution[]>} Resolved pairs of `path` -> `artifact_id`.
+   * @param {string} submissionUploadId
+   * @param {string[]} references
+   * @return {Promise<ArtifactReferenceResolution[]>}
    * @memberof UploadArtifactService
    */
   async getFeatureArtifactResolutionsBySubmissionUploadIdAndReferences(
     submissionUploadId: string,
-    artifactPaths: string[]
+    references: string[]
   ): Promise<ArtifactReferenceResolution[]> {
     return this.uploadArtifactServiceRepository.getFeatureArtifactResolutionsBySubmissionUploadIdAndReferences(
       submissionUploadId,
-      artifactPaths
+      references
     );
   }
 }

@@ -9,12 +9,12 @@ import {
   InsertNumberSearchableRecord,
   InsertSpatialSearchableRecord,
   InsertStringSearchableRecord,
-  ISearchFeaturePropertyCondition,
-  ISearchFeaturePropertyGroup,
-  ISearchFeaturesFilters,
   NumberSearchableRecord,
   SearchComparisonOperator,
+  SearchFeaturePropertyCondition,
+  SearchFeaturePropertyGroup,
   SearchFeatureResultWithRelevancy,
+  SearchFeaturesFilters,
   SpatialSearchableRecord,
   StringSearchableRecord
 } from '../services/search-feature-service.interface';
@@ -47,7 +47,14 @@ export class SearchFeatureRepository extends BaseRepository {
     const featureIdSubquery = knex
       .select('submission_feature_id')
       .from('submission_feature')
-      .where('submission_id', submissionId);
+      .innerJoin(
+        'submission_upload',
+        'submission_upload.submission_upload_id',
+        'submission_feature.submission_upload_id'
+      )
+      .where('submission_id', submissionId)
+      .where('submission_upload.status', 'succeeded')
+      .whereNull('submission_upload.record_end_date');
 
     const tables = ['search_string', 'search_number', 'search_datetime', 'search_spatial'];
 
@@ -149,12 +156,12 @@ export class SearchFeatureRepository extends BaseRepository {
 
   /**
    * Searches for submission features matching the provided filters with relevancy scoring.
-   * @param {ISearchFeaturesFilters} filters - Search filters including keyword, feature types, species, and property conditions
+   * @param {SearchFeaturesFilters} filters - Search filters including keyword, feature types, species, and property conditions
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options (page, limit, sort, and order)
    * @returns {Promise<SearchFeatureResultWithRelevancy[]>} Promise resolving to array of matching features with relevancy scores
    */
   async searchFeaturesByFilters(
-    filters: ISearchFeaturesFilters,
+    filters: SearchFeaturesFilters,
     pagination?: ApiPaginationOptions
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     defaultLog.debug({ label: 'searchFeaturesByFilters', filters, pagination });
@@ -177,10 +184,10 @@ export class SearchFeatureRepository extends BaseRepository {
 
   /**
    * Gets the count of features matching the provided search criteria.
-   * @param {ISearchFeaturesFilters} filters - Search filters to count results for
+   * @param {SearchFeaturesFilters} filters - Search filters to count results for
    * @returns {Promise<number>} Promise resolving to the count of matching features
    */
-  async searchFeaturesByFiltersCount(filters: ISearchFeaturesFilters): Promise<number> {
+  async searchFeaturesByFiltersCount(filters: SearchFeaturesFilters): Promise<number> {
     defaultLog.debug({ label: 'searchFeaturesByFiltersCount', filters });
     const knex = getKnex();
     const query = this.buildSearchQuery(knex, filters);
@@ -195,10 +202,10 @@ export class SearchFeatureRepository extends BaseRepository {
    * Used by POST /api/download to resolve filter criteria into the canonical set of
    * feature IDs for the download pipeline. No pagination — returns ALL matching IDs.
    *
-   * @param {ISearchFeaturesFilters} filters - Search filters (keyword, feature_types, species, properties)
+   * @param {SearchFeaturesFilters} filters - Search filters (keyword, feature_types, species, properties)
    * @returns {Promise<{ submission_feature_id: number }[]>} Raw rows with submission_feature_id
    */
-  async searchFeatureIdsByFilters(filters: ISearchFeaturesFilters): Promise<{ submission_feature_id: number }[]> {
+  async searchFeatureIdsByFilters(filters: SearchFeaturesFilters): Promise<{ submission_feature_id: number }[]> {
     defaultLog.debug({ label: 'searchFeatureIdsByFilters', filters });
 
     if (!filters || Object.keys(filters).length === 0) {
@@ -216,10 +223,10 @@ export class SearchFeatureRepository extends BaseRepository {
   /**
    * Builds the search query combining all filter types and CTEs.
    * @param {Knex} knex - Knex instance
-   * @param {ISearchFeaturesFilters} filters - Search filters to apply
+   * @param {SearchFeaturesFilters} filters - Search filters to apply
    * @returns {Knex.QueryBuilder} Knex query builder with all filters applied
    */
-  private buildSearchQuery(knex: Knex, filters: ISearchFeaturesFilters): Knex.QueryBuilder {
+  private buildSearchQuery(knex: Knex, filters: SearchFeaturesFilters): Knex.QueryBuilder {
     const keyword = filters.keyword ?? '';
     const featureTypes = filters.feature_types ?? [];
     const speciesFilters = filters.species ?? [];
@@ -233,7 +240,7 @@ export class SearchFeatureRepository extends BaseRepository {
    * @param {string} keyword - Search keyword for full-text search
    * @param {string[]} featureTypes - Feature type names to filter by
    * @param {string[]} speciesFilters - Species values to filter by
-   * @param {ISearchFeaturePropertyGroup[]} propertyGroups - Property condition groups to filter by
+   * @param {SearchFeaturePropertyGroup[]} propertyGroups - Property condition groups to filter by
    * @returns {Knex.QueryBuilder} Knex query builder with all CTEs and final selection
    */
   private buildQueryWithCTEs(
@@ -241,7 +248,7 @@ export class SearchFeatureRepository extends BaseRepository {
     keyword: string,
     featureTypes: string[],
     speciesFilters: string[],
-    propertyGroups: ISearchFeaturePropertyGroup[]
+    propertyGroups: SearchFeaturePropertyGroup[]
   ): Knex.QueryBuilder {
     const activeCteCount = [keyword.trim(), featureTypes.length, speciesFilters.length, propertyGroups.length].filter(
       (v) => {
@@ -404,10 +411,13 @@ export class SearchFeatureRepository extends BaseRepository {
         knex.raw(`ts_rank(${tsVector}, ${tsQuery}) as relevancy_score`)
       )
       .join('submission_feature as sf', 'ss.submission_feature_id', 'sf.submission_feature_id')
+      .join('submission_upload as su', 'su.submission_upload_id', 'sf.submission_upload_id')
       .join('submission as s', 'sf.submission_id', 's.submission_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .crossJoin(knex.raw('LATERAL (?) as security_check', [this.buildSecurityCheck(knex)]))
-      .whereRaw(`${tsVector} @@ ${tsQuery}`);
+      .whereRaw(`${tsVector} @@ ${tsQuery}`)
+      .where('su.status', 'succeeded')
+      .whereNull('su.record_end_date');
   }
 
   /**
@@ -433,9 +443,12 @@ export class SearchFeatureRepository extends BaseRepository {
         knex.raw('1.0 as relevancy_score')
       )
       .join('submission as s', 'sf.submission_id', 's.submission_id')
+      .join('submission_upload as su', 'su.submission_upload_id', 'sf.submission_upload_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .crossJoin(knex.raw('LATERAL (?) as security_check', [this.buildSecurityCheck(knex)]))
-      .whereIn('ft.name', featureTypes);
+      .whereIn('ft.name', featureTypes)
+      .where('su.status', 'succeeded')
+      .whereNull('su.record_end_date');
   }
 
   /**
@@ -462,22 +475,25 @@ export class SearchFeatureRepository extends BaseRepository {
         knex.raw('1.0 as relevancy_score')
       )
       .join('submission_feature as sf', 'ss.submission_feature_id', 'sf.submission_feature_id')
+      .join('submission_upload as su', 'su.submission_upload_id', 'sf.submission_upload_id')
       .join('submission as s', 'sf.submission_id', 's.submission_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .join('feature_property as fp', 'ss.feature_property_id', 'fp.feature_property_id')
       .crossJoin(knex.raw('LATERAL (?) as security_check', [this.buildSecurityCheck(knex)]))
       .where('fp.name', 'species')
-      .whereIn('ss.value', speciesFilters);
+      .whereIn('ss.value', speciesFilters)
+      .where('su.status', 'succeeded')
+      .whereNull('su.record_end_date');
   }
 
   /**
    * Builds CTE for property-based filtering with complex conditions.
    * Handles multiple property groups with AND/OR operands.
-   * @param {ISearchFeaturePropertyGroup[]} propertyGroups - Array of property condition groups
+   * @param {SearchFeaturePropertyGroup[]} propertyGroups - Array of property condition groups
    * @param {Knex} knex - Knex instance
    * @returns {Knex.QueryBuilder} Knex query builder for property search CTE
    */
-  private buildPropertySearchCTE(propertyGroups: ISearchFeaturePropertyGroup[], knex: Knex): Knex.QueryBuilder {
+  private buildPropertySearchCTE(propertyGroups: SearchFeaturePropertyGroup[], knex: Knex): Knex.QueryBuilder {
     const groupQueries = propertyGroups.map((group) => {
       return this.buildPropertyGroupQuery(group, knex);
     });
@@ -516,11 +532,11 @@ export class SearchFeatureRepository extends BaseRepository {
 
   /**
    * Builds query for a single property group with AND/OR logic.
-   * @param {ISearchFeaturePropertyGroup} group - Property group with operand and conditions
+   * @param {SearchFeaturePropertyGroup} group - Property group with operand and conditions
    * @param {Knex} knex - Knex instance
    * @returns {Knex.QueryBuilder} Knex query builder combining conditions
    */
-  private buildPropertyGroupQuery(group: ISearchFeaturePropertyGroup, knex: Knex): Knex.QueryBuilder {
+  private buildPropertyGroupQuery(group: SearchFeaturePropertyGroup, knex: Knex): Knex.QueryBuilder {
     const conditionQueries = group.conditions.map((cond) => {
       return this.buildConditionQuery(cond, knex);
     });
@@ -540,11 +556,11 @@ export class SearchFeatureRepository extends BaseRepository {
   /**
    * Builds query for a single property condition across all search types.
    * Unions results from string, number, and datetime search tables with operator applied.
-   * @param {ISearchFeaturePropertyCondition} condition - Property condition with name, operator, and value
+   * @param {SearchFeaturePropertyCondition} condition - Property condition with name, operator, and value
    * @param {Knex} knex - Knex instance
    * @returns {Knex.QueryBuilder} Knex query builder for condition
    */
-  private buildConditionQuery(condition: ISearchFeaturePropertyCondition, knex: Knex): Knex.QueryBuilder {
+  private buildConditionQuery(condition: SearchFeaturePropertyCondition, knex: Knex): Knex.QueryBuilder {
     const stringQuery = this.buildPropertyValueQuery('search_string', condition.name, knex);
     const numberQuery = this.buildPropertyValueQuery('search_number', condition.name, knex);
     const datetimeQuery = this.buildPropertyValueQuery('search_datetime', condition.name, knex);
@@ -583,11 +599,14 @@ export class SearchFeatureRepository extends BaseRepository {
         knex.raw('1.0 as relevancy_score')
       )
       .join('submission_feature as sf', 'ss.submission_feature_id', 'sf.submission_feature_id')
+      .join('submission_upload as su', 'su.submission_upload_id', 'sf.submission_upload_id')
       .join('submission as s', 'sf.submission_id', 's.submission_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .join('feature_property as fp', 'ss.feature_property_id', 'fp.feature_property_id')
       .crossJoin(knex.raw('LATERAL (?) as security_check', [this.buildSecurityCheck(knex)]))
-      .where('fp.name', propertyName);
+      .where('fp.name', propertyName)
+      .where('su.status', 'succeeded')
+      .whereNull('su.record_end_date');
   }
 
   /**

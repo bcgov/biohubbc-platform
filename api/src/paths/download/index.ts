@@ -8,7 +8,7 @@ import * as publisher from '../../queue/publisher';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { DownloadService } from '../../services/download/download-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
-import { ISearchFeaturesFilters } from '../../services/search-feature-service.interface';
+import { SearchFeaturesFilters } from '../../services/search-feature-service.interface';
 import { getLogger } from '../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../utils/pagination';
 
@@ -195,7 +195,7 @@ export function createDownload(): RequestHandler {
     try {
       await connection.open();
 
-      const filters: ISearchFeaturesFilters = req.body.filters;
+      const filters: SearchFeaturesFilters = req.body.filters;
 
       const searchFeatureService = new SearchFeatureService(connection);
       const downloadService = new DownloadService(connection);

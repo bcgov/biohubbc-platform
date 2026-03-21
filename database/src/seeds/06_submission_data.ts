@@ -267,6 +267,7 @@ const createArchiveUpload = async (
       upload_id,
       artifact_id,
       upload_archive_id,
+      path: file.path,
       role: file.role,
       create_user: 1
     });
