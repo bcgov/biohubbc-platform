@@ -2,12 +2,15 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { ApiNotFoundError } from '../../errors/api-error';
+import { FeaturePropertyCode } from '../../models/feature-property';
 import {
   CreatePolicyStatementCondition,
   PolicyConditionOperator,
   PolicyStatementCondition
 } from '../../models/policy-statement-condition';
 import { PolicyStatementConditionRepository } from '../../repositories/authorization/policy-statement-condition-repository';
+import { CodeRepository } from '../../repositories/code-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { PolicyStatementConditionService } from './policy-statement-condition-service';
 
@@ -28,6 +31,13 @@ describe('PolicyStatementConditionService', () => {
 
   describe('createPolicyStatementCondition', () => {
     it('should call repository.insertPolicyStatementCondition and return the created record', async () => {
+      const featureProperty: FeaturePropertyCode = {
+        feature_property_id: 1,
+        feature_property_name: 'key',
+        feature_property_display_name: 'Key',
+        feature_property_type_id: 1,
+        feature_property_type_name: 'string'
+      };
       const mockCondition: PolicyStatementCondition = {
         policy_statement_condition_id: '1',
         policy_statement_id: 'policy-1',
@@ -35,6 +45,9 @@ describe('PolicyStatementConditionService', () => {
         operator: PolicyConditionOperator.STRING_EQUALS,
         value: 'some-value'
       };
+      const featurePropertyStub = sinon
+        .stub(CodeRepository.prototype, 'getFeaturePropertyByName')
+        .resolves(featureProperty);
       const stub = sinon
         .stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition')
         .resolves(mockCondition);
@@ -52,7 +65,55 @@ describe('PolicyStatementConditionService', () => {
         operator: PolicyConditionOperator.STRING_EQUALS,
         value: 'some-value'
       });
+      expect(featurePropertyStub).to.have.been.calledOnceWith('key');
       expect(result).to.eql(mockCondition);
+    });
+
+    it('should bubble ApiNotFoundError when condition key is unknown', async () => {
+      sinon
+        .stub(CodeRepository.prototype, 'getFeaturePropertyByName')
+        .rejects(new ApiNotFoundError('Feature property not found'));
+      const insertStub = sinon.stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition');
+
+      try {
+        await service.createPolicyStatementCondition({
+          policy_statement_id: 'policy-1',
+          key: 'unknown_key',
+          operator: PolicyConditionOperator.STRING_EQUALS,
+          value: 'some-value'
+        } as CreatePolicyStatementCondition);
+        expect.fail('Expected createPolicyStatementCondition to throw');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiNotFoundError);
+      }
+
+      expect(insertStub).not.to.have.been.called;
+    });
+
+    it('should throw HTTP400 when condition value shape does not match operator', async () => {
+      const featureProperty: FeaturePropertyCode = {
+        feature_property_id: 1,
+        feature_property_name: 'key',
+        feature_property_display_name: 'Key',
+        feature_property_type_id: 1,
+        feature_property_type_name: 'string'
+      };
+      sinon.stub(CodeRepository.prototype, 'getFeaturePropertyByName').resolves(featureProperty);
+      const insertStub = sinon.stub(PolicyStatementConditionRepository.prototype, 'insertPolicyStatementCondition');
+
+      try {
+        await service.createPolicyStatementCondition({
+          policy_statement_id: 'policy-1',
+          key: 'key',
+          operator: PolicyConditionOperator.STRING_EQUALS,
+          value: 42
+        } as CreatePolicyStatementCondition);
+        expect.fail('Expected createPolicyStatementCondition to throw');
+      } catch (error) {
+        expect(error).to.have.property('status', 400);
+      }
+
+      expect(insertStub).not.to.have.been.called;
     });
   });
 

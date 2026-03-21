@@ -9,14 +9,7 @@ export const ALLOWED_OPERATORS_BY_PROPERTY_TYPE: Record<string, PolicyConditionO
   ],
   number: [PolicyConditionOperator.NUMERIC_EQUALS, PolicyConditionOperator.EXISTS],
   timestamp: [PolicyConditionOperator.DATE_BEFORE, PolicyConditionOperator.DATE_AFTER, PolicyConditionOperator.EXISTS],
-  datetime: [PolicyConditionOperator.DATE_BEFORE, PolicyConditionOperator.DATE_AFTER, PolicyConditionOperator.EXISTS],
   geometry: [
-    PolicyConditionOperator.WITHIN,
-    PolicyConditionOperator.INTERSECTS,
-    PolicyConditionOperator.CONTAINS,
-    PolicyConditionOperator.EXISTS
-  ],
-  spatial: [
     PolicyConditionOperator.WITHIN,
     PolicyConditionOperator.INTERSECTS,
     PolicyConditionOperator.CONTAINS,
@@ -24,7 +17,6 @@ export const ALLOWED_OPERATORS_BY_PROPERTY_TYPE: Record<string, PolicyConditionO
   ],
   boolean: [PolicyConditionOperator.BOOL, PolicyConditionOperator.EXISTS],
   object: [PolicyConditionOperator.EXISTS],
-  array: [PolicyConditionOperator.EXISTS],
   code: [PolicyConditionOperator.EXISTS],
   taxon: [PolicyConditionOperator.EXISTS],
   artifact_key: [
