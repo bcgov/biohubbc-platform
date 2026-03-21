@@ -123,7 +123,7 @@ const insertRecord = async (knex: Knex) => {
     // Wait for all animals and observations for this sample site
     const animalResults = await Promise.all(animalPromises);
     await Promise.all(observationPromises);
-    
+
     // Collect animal IDs
     animalIds.push(...animalResults);
   });
@@ -441,6 +441,8 @@ const insertAnimalRecord = async (
         species: faker.animal.type(),
         count: faker.number.int({ min: 0, max: 100 }),
         taxon_id: taxonId,
+        animal_identifier: faker.lorem.word(),
+        sex: faker.helpers.arrayElement(['male', 'female', 'unknown']),
         start_date: faker.date.past().toISOString(),
         end_date: faker.date.future().toISOString()
       }

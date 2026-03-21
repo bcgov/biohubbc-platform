@@ -46,7 +46,7 @@ related_animals AS (
         sf.submission_feature_id AS animal_feature_id,
         sf.data->>'taxon_id' AS taxon_id,
         sf.data->>'sex' AS sex,
-        sf.data->>'animal_identifier' AS related_animal_identifier
+        sf.data->>'animal_identifier' AS animal_identifier
     FROM related_features rf
     JOIN biohub.submission_feature sf
       ON sf.submission_feature_id = rf.related_feature_id
@@ -67,7 +67,9 @@ SELECT
     (sf.data->>'dop')::numeric AS dop,
     ra.taxon_id::int AS animal_taxon_id,
     ra.sex AS animal_sex,
-    ra.related_animal_identifier AS related_animal_identifier,
+    ra.animal_identifier AS animal_identifier,
+    t.itis_scientific_name AS species_scientific_name,
+    t.common_name AS species_english_name,
     CASE
       WHEN EXISTS (
         SELECT 1
@@ -87,6 +89,9 @@ LEFT JOIN deployments d
 LEFT JOIN related_animals ra
   ON ra.deployment_id = d.submission_feature_id
 
+LEFT JOIN biohub.taxon t
+  ON t.itis_tsn = ra.taxon_id::int
+
 WHERE ft.name = 'telemetry'
   AND sf.record_end_date IS NULL
   AND (sf.data->>'timestamp')::timestamptz <= (NOW() - INTERVAL '3 months');
@@ -103,7 +108,9 @@ WHERE ft.name = 'telemetry'
     COMMENT ON COLUMN bcgw.telemetry_all.animal_id IS 'The identifier of the animal wearing the telemetry device';
     COMMENT ON COLUMN bcgw.telemetry_all.animal_taxon_id IS 'Taxon ID loaded from the linked animal feature via submission_feature_feature relationships';
     COMMENT ON COLUMN bcgw.telemetry_all.animal_sex IS 'Sex loaded from the linked animal feature via submission_feature_feature relationships';
-    COMMENT ON COLUMN bcgw.telemetry_all.related_animal_identifier IS 'Animal identifier loaded from the linked animal feature via submission_feature_feature relationships';
+    COMMENT ON COLUMN bcgw.telemetry_all.animal_identifier IS 'Identifier of the animal that the telemetry device is deployed on';
+    COMMENT ON COLUMN bcgw.telemetry_all.species_scientific_name IS 'Scientific name from taxon table linked via ITIS TSN';
+    COMMENT ON COLUMN bcgw.telemetry_all.species_english_name IS 'Common English name from taxon table linked via ITIS TSN';
     COMMENT ON COLUMN bcgw.telemetry_all.SECURITY IS 'The security status of the feature';
   `);
 
@@ -120,39 +127,35 @@ WITH deployments AS (
     WHERE ft_dep.name = 'telemetry_deployment'
       AND dep.record_end_date IS NULL
 ),
-related_targets AS (
+related_features AS (
     SELECT
       sff.source_feature_id AS deployment_id,
       sff.target_feature_id AS related_feature_id
     FROM biohub.submission_feature_feature sff
     JOIN deployments d ON sff.source_feature_id = d.submission_feature_id
-),
-related_sources AS (
+
+    UNION
+
     SELECT
       sff.target_feature_id AS deployment_id,
       sff.source_feature_id AS related_feature_id
     FROM biohub.submission_feature_feature sff
     JOIN deployments d ON sff.target_feature_id = d.submission_feature_id
 ),
-related_feature_ids AS (
-    SELECT DISTINCT related_feature_id
-    FROM related_targets
-    UNION
-    SELECT DISTINCT related_feature_id
-    FROM related_sources
-),
 related_animals AS (
     SELECT
+      rf.deployment_id,
       sf.submission_feature_id,
       sf.data->>'taxon_id' AS taxon_id,
       sf.data->>'sex' AS sex,
-      sf.data->>'animal_identifier' AS related_animal_identifier
-    FROM biohub.submission_feature sf
+      sf.data->>'animal_identifier' AS animal_identifier
+    FROM related_features rf
+    JOIN biohub.submission_feature sf
+      ON sf.submission_feature_id = rf.related_feature_id
     JOIN biohub.feature_type ft_animal
       ON sf.feature_type_id = ft_animal.feature_type_id
     WHERE ft_animal.name = 'animal'
       AND sf.record_end_date IS NULL
-      AND sf.submission_feature_id IN (SELECT related_feature_id FROM related_feature_ids)
 )
 SELECT
     sf.submission_feature_id AS Feature_ID,
@@ -165,14 +168,19 @@ SELECT
     (sf.data->>'dop')::numeric AS dop,
     ra.taxon_id::int AS animal_taxon_id,
     ra.sex AS animal_sex,
-    ra.related_animal_identifier AS related_animal_identifier
+    ra.animal_identifier AS animal_identifier,
+    t.itis_scientific_name AS species_scientific_name,
+    t.common_name AS species_english_name,
+    'Open' AS SECURITY
 FROM biohub.submission_feature sf
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
 LEFT JOIN deployments d
   ON d.submission_feature_id = sf.parent_submission_feature_id
 LEFT JOIN related_animals ra
-  ON ra.submission_feature_id = d.submission_feature_id
+  ON ra.deployment_id = d.submission_feature_id
+LEFT JOIN biohub.taxon t
+  ON t.itis_tsn = ra.taxon_id::int
 WHERE ft.name = 'telemetry'
   AND sf.record_end_date IS NULL
   AND sf.submission_feature_id NOT IN (
@@ -193,7 +201,9 @@ WHERE ft.name = 'telemetry'
     COMMENT ON COLUMN bcgw.telemetry_public.animal_id IS 'The identifier of the animal wearing the telemetry device';
     COMMENT ON COLUMN bcgw.telemetry_public.animal_taxon_id IS 'Taxon ID loaded from the linked animal feature via submission_feature_feature relationships';
     COMMENT ON COLUMN bcgw.telemetry_public.animal_sex IS 'Sex loaded from the linked animal feature via submission_feature_feature relationships';
-    COMMENT ON COLUMN bcgw.telemetry_public.related_animal_identifier IS 'Animal identifier loaded from the linked animal feature via submission_feature_feature relationships';
+    COMMENT ON COLUMN bcgw.telemetry_public.animal_identifier IS 'Identifier of the animal that the telemetry device is deployed on';
+    COMMENT ON COLUMN bcgw.telemetry_public.species_scientific_name IS 'Scientific name from taxon table linked via ITIS TSN';
+    COMMENT ON COLUMN bcgw.telemetry_public.species_english_name IS 'Common English name from taxon table linked via ITIS TSN';
   `);
 
   await knex.raw(`
