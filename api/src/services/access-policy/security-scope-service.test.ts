@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { SecurityScope } from '../../models/security-scope';
+import * as publisher from '../../queue/publisher';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import * as scopeHashUtil from '../../utils/scope-hash';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -33,32 +34,40 @@ describe('SecurityScopeService', () => {
       sinon.stub(scopeHashUtil, 'computeScopeHash').returns(scopeHash);
     });
 
-    it('creates a new scope and mapping when scope_hash is new', async () => {
+    it('creates a new scope, mapping, and publishes anchor job when scope_hash is new', async () => {
       const newScope: SecurityScope = { security_scope_id: securityScopeId, scope_hash: scopeHash };
       const insertStub = sinon.stub(SecurityScopeRepository.prototype, 'insertSecurityScope').resolves(newScope);
       const mappingStub = sinon.stub(SecurityScopeRepository.prototype, 'insertPolicyStatementScope').resolves();
+      const publishStub = sinon
+        .stub(publisher, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
 
       const result = await service.createScopeForPolicyStatement(policyStatementId, urn);
 
       expect(scopeHashUtil.computeScopeHash).to.have.been.calledWith(urn);
       expect(insertStub).to.have.been.calledWith(scopeHash);
       expect(mappingStub).to.have.been.calledWith(policyStatementId, securityScopeId);
+      expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, { securityScopeId });
       expect(result).to.equal(securityScopeId);
     });
 
-    it('looks up existing scope and creates mapping when scope_hash already exists', async () => {
+    it('looks up existing scope and creates mapping without publishing when scope_hash already exists', async () => {
       const existingScope: SecurityScope = { security_scope_id: securityScopeId, scope_hash: scopeHash };
       const insertStub = sinon.stub(SecurityScopeRepository.prototype, 'insertSecurityScope').resolves(null);
       const getStub = sinon
         .stub(SecurityScopeRepository.prototype, 'getSecurityScopeByScopeHash')
         .resolves(existingScope);
       const mappingStub = sinon.stub(SecurityScopeRepository.prototype, 'insertPolicyStatementScope').resolves();
+      const publishStub = sinon
+        .stub(publisher, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
 
       const result = await service.createScopeForPolicyStatement(policyStatementId, urn);
 
       expect(insertStub).to.have.been.calledWith(scopeHash);
       expect(getStub).to.have.been.calledWith(scopeHash);
       expect(mappingStub).to.have.been.calledWith(policyStatementId, securityScopeId);
+      expect(publishStub).not.to.have.been.called;
       expect(result).to.equal(securityScopeId);
     });
 
@@ -67,6 +76,7 @@ describe('SecurityScopeService', () => {
       const newScope: SecurityScope = { security_scope_id: securityScopeId, scope_hash: scopeHash };
       sinon.stub(SecurityScopeRepository.prototype, 'insertSecurityScope').resolves(newScope);
       const mappingStub = sinon.stub(SecurityScopeRepository.prototype, 'insertPolicyStatementScope').resolves();
+      sinon.stub(publisher, 'publishComputeScopeAnchorsJob').resolves({ status: 'published', jobId: 'job-1' });
 
       await service.createScopeForPolicyStatement(policyStatementId, urn);
 
@@ -121,24 +131,42 @@ describe('SecurityScopeService', () => {
   });
 
   describe('triggerAnchorComputationForSubmission', () => {
-    it('finds matching scopes for the submission', async () => {
+    it('publishes anchor computation jobs for each matching scope', async () => {
       const findStub = sinon
         .stub(SecurityScopeRepository.prototype, 'findScopeIdsMatchingSubmission')
         .resolves(['scope-1', 'scope-2']);
+      const publishStub = sinon
+        .stub(publisher, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
 
       await service.triggerAnchorComputationForSubmission(42);
 
       expect(findStub).to.have.been.calledOnceWith(42);
-      // TODO: Phase 3 — verify publishComputeScopeAnchorsJob called for each scope
+      expect(publishStub).to.have.been.calledTwice;
+      expect(publishStub.firstCall).to.have.been.calledWith(mockDBConnection, { securityScopeId: 'scope-1' });
+      expect(publishStub.secondCall).to.have.been.calledWith(mockDBConnection, { securityScopeId: 'scope-2' });
     });
 
-    it('does nothing when no scopes match the submission', async () => {
+    it('does not publish when no scopes match the submission', async () => {
       const findStub = sinon.stub(SecurityScopeRepository.prototype, 'findScopeIdsMatchingSubmission').resolves([]);
+      const publishStub = sinon
+        .stub(publisher, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
 
       await service.triggerAnchorComputationForSubmission(999);
 
       expect(findStub).to.have.been.calledOnceWith(999);
-      // No publish calls should happen — verified implicitly by no errors
+      expect(publishStub).not.to.have.been.called;
+    });
+  });
+
+  describe('computeAnchorsForScope', () => {
+    it('delegates to repository', async () => {
+      const stub = sinon.stub(SecurityScopeRepository.prototype, 'computeAnchorsForScope').resolves();
+
+      await service.computeAnchorsForScope('scope-1');
+
+      expect(stub).to.have.been.calledOnceWith('scope-1');
     });
   });
 

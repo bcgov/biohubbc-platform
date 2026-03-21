@@ -1,4 +1,5 @@
 import { IDBConnection } from '../../database/db';
+import { publishComputeScopeAnchorsJob } from '../../queue/publisher';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { getLogger } from '../../utils/logger';
 import { computeScopeHash } from '../../utils/scope-hash';
@@ -43,10 +44,11 @@ export class SecurityScopeService extends DBService {
       // New scope — create mapping and schedule anchor computation
       await this.securityScopeRepository.insertPolicyStatementScope(policyStatementId, inserted.security_scope_id);
 
-      // TODO: Phase 3 — publishComputeScopeAnchorsJob(this.connection, { securityScopeId: inserted.security_scope_id })
+      await publishComputeScopeAnchorsJob(this.connection, { securityScopeId: inserted.security_scope_id });
+
       defaultLog.info({
         label: 'createScopeForPolicyStatement',
-        message: 'New security scope created, anchor computation pending Phase 3',
+        message: 'New security scope created, anchor computation job published',
         securityScopeId: inserted.security_scope_id,
         scopeHash
       });
@@ -121,15 +123,22 @@ export class SecurityScopeService extends DBService {
       return;
     }
 
-    // TODO: Phase 3 — publish anchor computation jobs for each scope
     for (const securityScopeId of scopeIds) {
-      defaultLog.info({
-        label: 'triggerAnchorComputationForSubmission',
-        message: 'Anchor computation pending Phase 3',
-        securityScopeId,
-        submissionId
-      });
+      await publishComputeScopeAnchorsJob(this.connection, { securityScopeId });
     }
+  }
+
+  /**
+   * Compute anchor features for a security scope.
+   *
+   * Anchors are the root-level secured features whose URN matches the scope's
+   * originating policy statement. Called by the compute-scope-anchors background
+   * job after a new scope is created.
+   *
+   * @param securityScopeId UUID of the security scope to compute anchors for
+   */
+  async computeAnchorsForScope(securityScopeId: string): Promise<void> {
+    await this.securityScopeRepository.computeAnchorsForScope(securityScopeId);
   }
 
   /**

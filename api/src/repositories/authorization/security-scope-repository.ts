@@ -113,7 +113,7 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
-   * Compute anchor features for a security scope.
+   * Compute anchor features for a security scope using cursor-based batching.
    *
    * Anchors are the root-level secured features whose URN matches the scope's
    * originating policy statement. A `urn:*:telemetry:*` scope anchors at ~200
@@ -125,20 +125,29 @@ export class SecurityScopeRepository extends BaseRepository {
    * anchors. This prevents duplicate walk-up hits when both parent and child
    * are secured by the same scope.
    *
+   * Uses a server-side cursor to avoid materializing the full result set in
+   * memory. Wildcard scopes (`urn:*:*:*`) can match millions of secured features;
+   * batching prevents memory/WAL/lock pressure from a single massive INSERT.
+   *
    * @param securityScopeId UUID of the security scope to compute anchors for
    */
   async computeAnchorsForScope(securityScopeId: string): Promise<void> {
-    const sqlStatement = SQL`
+    const BATCH_SIZE = 5000;
+    const cursorName = `scope_anchor_cursor_${securityScopeId.replace(/[^a-z0-9_]/gi, '_')}`;
+
+    // Declare a server-side cursor over matching root-level secured features.
+    // Follows the same pattern as DownloadFragmentRepository.streamFragmentFeaturesByType.
+    await this.connection.query(
+      `DECLARE ${cursorName} CURSOR FOR
       WITH scope_urn AS (
         SELECT ps.urn_submission_id, ps.urn_feature_type, ps.urn_feature_id
         FROM policy_statement_scope pss
         JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
-        WHERE pss.security_scope_id = ${securityScopeId}
+        WHERE pss.security_scope_id = $1
           AND ps.record_end_date IS NULL
         LIMIT 1
       )
-      INSERT INTO security_scope_anchor (security_scope_anchor_id, security_scope_id, anchor_submission_feature_id)
-      SELECT gen_random_uuid(), ${securityScopeId}, sf.submission_feature_id
+      SELECT sf.submission_feature_id
       FROM submission_feature sf
       JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
       JOIN submission_feature_security sfs
@@ -154,11 +163,45 @@ export class SecurityScopeRepository extends BaseRepository {
           FROM submission_feature_security psfs
           WHERE psfs.submission_feature_id = sf.parent_submission_feature_id
             AND psfs.record_end_date IS NULL
-        )
-      ON CONFLICT (security_scope_id, anchor_submission_feature_id) DO NOTHING;
-    `;
+        )`,
+      [securityScopeId]
+    );
 
-    await this.connection.sql(sqlStatement);
+    try {
+      // Fetch and insert in batches to bound memory and WAL usage
+      while (true) {
+        const fetchResult = await this.connection.query<{ submission_feature_id: number }>(
+          `FETCH ${BATCH_SIZE} FROM ${cursorName}`
+        );
+
+        if (fetchResult.rows.length === 0) {
+          break;
+        }
+
+        const featureIds = fetchResult.rows.map((row) => row.submission_feature_id);
+        const knex = getKnex();
+
+        const insertQuery = knex
+          .insert(
+            featureIds.map((id) => ({
+              security_scope_anchor_id: knex.raw('gen_random_uuid()'),
+              security_scope_id: securityScopeId,
+              anchor_submission_feature_id: id
+            }))
+          )
+          .into('security_scope_anchor')
+          .onConflict(['security_scope_id', 'anchor_submission_feature_id'])
+          .ignore();
+
+        await this.connection.knex(insertQuery);
+
+        if (fetchResult.rows.length < BATCH_SIZE) {
+          break;
+        }
+      }
+    } finally {
+      await this.connection.query(`CLOSE ${cursorName}`);
+    }
   }
 
   /**

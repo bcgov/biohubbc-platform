@@ -96,6 +96,123 @@ describe('SecurityScopeRepository', () => {
     });
   });
 
+  describe('computeAnchorsForScope', () => {
+    it('declares cursor, fetches batches, inserts anchors, and closes cursor', async () => {
+      const queryStub = sinon.stub();
+
+      // Call 1: DECLARE CURSOR — no rows needed
+      queryStub.onFirstCall().resolves({ rows: [], rowCount: 0 });
+
+      // Call 2: FETCH — returns 2 features (less than batch size → last batch)
+      queryStub.onSecondCall().resolves({
+        rows: [{ submission_feature_id: 101 }, { submission_feature_id: 102 }],
+        rowCount: 2
+      });
+
+      // Call 3: CLOSE cursor
+      queryStub.onThirdCall().resolves({ rows: [], rowCount: 0 });
+
+      const knexFake = sinon.fake.resolves(mockQueryResult([], 2));
+      const mockDBConnection = getMockDBConnection({ query: queryStub, knex: knexFake });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.computeAnchorsForScope('scope-uuid-1');
+
+      // DECLARE was called with the securityScopeId parameter
+      expect(queryStub.firstCall.args[0]).to.include('DECLARE');
+      expect(queryStub.firstCall.args[0]).to.include('CURSOR FOR');
+      expect(queryStub.firstCall.args[1]).to.eql(['scope-uuid-1']);
+
+      // FETCH was called
+      expect(queryStub.secondCall.args[0]).to.include('FETCH');
+
+      // Batch INSERT via knex
+      expect(knexFake).to.have.been.calledOnce;
+
+      // CLOSE was called
+      expect(queryStub.thirdCall.args[0]).to.include('CLOSE');
+    });
+
+    it('processes multiple batches when results exceed batch size', async () => {
+      const queryStub = sinon.stub();
+
+      // Call 1: DECLARE CURSOR
+      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
+
+      // Call 2: FETCH — returns full batch (5000 rows → more to fetch)
+      const fullBatch = Array.from({ length: 5000 }, (_, i) => ({ submission_feature_id: i + 1 }));
+      queryStub.onCall(1).resolves({ rows: fullBatch, rowCount: 5000 });
+
+      // Call 3: FETCH — returns partial batch (200 rows → last batch)
+      const partialBatch = Array.from({ length: 200 }, (_, i) => ({ submission_feature_id: 5001 + i }));
+      queryStub.onCall(2).resolves({ rows: partialBatch, rowCount: 200 });
+
+      // Call 4: CLOSE cursor
+      queryStub.onCall(3).resolves({ rows: [], rowCount: 0 });
+
+      const knexFake = sinon.fake.resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ query: queryStub, knex: knexFake });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.computeAnchorsForScope('scope-uuid-2');
+
+      // Two batch INSERTs
+      expect(knexFake).to.have.been.calledTwice;
+    });
+
+    it('skips insert when cursor returns no rows', async () => {
+      const queryStub = sinon.stub();
+
+      // Call 1: DECLARE CURSOR
+      queryStub.onFirstCall().resolves({ rows: [], rowCount: 0 });
+
+      // Call 2: FETCH — empty result
+      queryStub.onSecondCall().resolves({ rows: [], rowCount: 0 });
+
+      // Call 3: CLOSE cursor
+      queryStub.onThirdCall().resolves({ rows: [], rowCount: 0 });
+
+      const knexFake = sinon.fake.resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ query: queryStub, knex: knexFake });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.computeAnchorsForScope('scope-uuid-3');
+
+      // No INSERT called
+      expect(knexFake).not.to.have.been.called;
+
+      // Cursor was still closed
+      expect(queryStub.thirdCall.args[0]).to.include('CLOSE');
+    });
+
+    it('closes cursor even when fetch throws', async () => {
+      const queryStub = sinon.stub();
+
+      // Call 1: DECLARE CURSOR
+      queryStub.onFirstCall().resolves({ rows: [], rowCount: 0 });
+
+      // Call 2: FETCH — throws
+      queryStub.onSecondCall().rejects(new Error('fetch failed'));
+
+      // Call 3: CLOSE cursor (called in finally)
+      queryStub.onThirdCall().resolves({ rows: [], rowCount: 0 });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+
+      try {
+        await repository.computeAnchorsForScope('scope-uuid-4');
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('fetch failed');
+      }
+
+      // Cursor was still closed via finally block
+      expect(queryStub.thirdCall.args[0]).to.include('CLOSE');
+    });
+  });
+
   describe('deleteAnchorsForFeatures', () => {
     it('deletes anchor rows for the given submission feature IDs', async () => {
       const knexFake = sinon.fake.resolves(mockQueryResult([], 3));
