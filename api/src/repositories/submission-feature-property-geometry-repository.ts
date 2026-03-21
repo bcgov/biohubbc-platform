@@ -4,7 +4,6 @@ import {
   CreateSubmissionFeaturePropertyGeometry,
   SubmissionFeaturePropertyGeometry
 } from '../models/submission-feature-property-geometry';
-import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
 export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository {
@@ -22,22 +21,37 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
       return [];
     }
 
-    const query = SQL`INSERT INTO submission_feature_property_geometry (submission_feature_id, feature_type_property_id, value) VALUES`;
+    const submissionFeatureIds = payloads.map((payload) => payload.submission_feature_id);
+    const featureTypePropertyIds = payloads.map((payload) => payload.feature_type_property_id);
+    const geometryValues = payloads.map((payload) => JSON.stringify(payload.value.geometry));
 
-    payloads.forEach((payload, index) => {
-      query.append(SQL`(${payload.submission_feature_id}, ${payload.feature_type_property_id},`);
-      query.append(generateGeometryCollectionSQL(payload.value));
-      query.append(SQL`)`);
-      if (index < payloads.length - 1) {
-        query.append(SQL`,`);
-      }
-    });
+    const sqlStatement = SQL`
+      INSERT INTO submission_feature_property_geometry (
+        submission_feature_id,
+        feature_type_property_id,
+        value
+      )
+      SELECT
+        staged.submission_feature_id,
+        staged.feature_type_property_id,
+        public.ST_Force2D(public.ST_GeomFromGeoJSON(staged.geometry_geojson))
+      FROM unnest(
+        ${submissionFeatureIds}::integer[],
+        ${featureTypePropertyIds}::integer[],
+        ${geometryValues}::text[]
+      ) AS staged(
+        submission_feature_id,
+        feature_type_property_id,
+        geometry_geojson
+      )
+      RETURNING
+        submission_feature_property_geometry_id,
+        submission_feature_id,
+        feature_type_property_id,
+        ST_AsGeoJSON(value)::json AS value;
+    `;
 
-    query.append(
-      SQL` RETURNING submission_feature_property_geometry_id, submission_feature_id, feature_type_property_id, ST_AsGeoJSON(value)::json AS value`
-    );
-
-    const response = await this.connection.sql(query, SubmissionFeaturePropertyGeometry);
+    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometry);
 
     if (response.rowCount !== payloads.length) {
       throw new ApiExecuteSQLError('Failed to insert submission_feature_property_geometry rows', [

@@ -64,6 +64,48 @@ describe('SubmissionFeaturePropertyGeometryRepository', () => {
     });
   });
 
+  describe('bulk insert', () => {
+    it('uses unnest-based bulk insert and returns inserted rows', async () => {
+      const sqlStub = sinon.stub().callsFake((statement: any) => {
+        expect(statement.text).to.contain('FROM unnest');
+        expect(statement.text).to.contain('ST_GeomFromGeoJSON');
+        expect(statement.text).to.contain('ST_AsGeoJSON');
+        return Promise.resolve(mockQueryResult([mockRow], 1));
+      });
+      const repository = new SubmissionFeaturePropertyGeometryRepository(getMockDBConnection({ sql: sqlStub }));
+
+      const result = await repository.insertSubmissionFeaturePropertyGeometries([
+        {
+          submission_feature_id: 10,
+          feature_type_property_id: 20,
+          value: mockGeometry
+        }
+      ]);
+
+      expect(result).to.eql([mockRow]);
+      expect(sqlStub).to.have.been.calledOnce;
+    });
+
+    it('throws when rowCount does not match payload length', async () => {
+      const repository = new SubmissionFeaturePropertyGeometryRepository(
+        getMockDBConnection({ sql: () => Promise.resolve(mockQueryResult([mockRow], 0)) })
+      );
+
+      try {
+        await repository.insertSubmissionFeaturePropertyGeometries([
+          {
+            submission_feature_id: 10,
+            feature_type_property_id: 20,
+            value: mockGeometry
+          }
+        ]);
+        expect.fail();
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiExecuteSQLError);
+      }
+    });
+  });
+
   describe('getById', () => {
     it('returns row', async () => {
       const repository = new SubmissionFeaturePropertyGeometryRepository(
