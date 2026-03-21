@@ -20,6 +20,19 @@ export class SubmissionFeaturePropertyTimestampService extends DBService {
     return this.submissionFeaturePropertyTimestampRepository.insertSubmissionFeaturePropertyTimestamp(payload);
   }
 
+  /**
+   * Create submission_feature_property_timestamp rows in bulk.
+   *
+   * @param {CreateSubmissionFeaturePropertyTimestamp[]} payloads
+   * @return {Promise<SubmissionFeaturePropertyTimestamp[]>}
+   * @memberof SubmissionFeaturePropertyTimestampService
+   */
+  createSubmissionFeaturePropertyTimestamps(
+    payloads: CreateSubmissionFeaturePropertyTimestamp[]
+  ): Promise<SubmissionFeaturePropertyTimestamp[]> {
+    return this.submissionFeaturePropertyTimestampRepository.insertSubmissionFeaturePropertyTimestamps(payloads);
+  }
+
   getSubmissionFeaturePropertyTimestampById(
     submissionFeaturePropertyTimestampId: number
   ): Promise<SubmissionFeaturePropertyTimestamp> {
@@ -41,6 +54,32 @@ export class SubmissionFeaturePropertyTimestampService extends DBService {
   ): Promise<SubmissionFeaturePropertyTimestamp[]> {
     return this.submissionFeaturePropertyTimestampRepository.getSubmissionFeaturePropertyTimestampByFeatureTypePropertyId(
       featureTypePropertyId
+    );
+  }
+
+  /**
+   * Delete submission_feature_property_timestamp rows for a submission.
+   *
+   * @param {number} submissionId
+   * @return {Promise<void>}
+   * @memberof SubmissionFeaturePropertyTimestampService
+   */
+  deleteSubmissionFeaturePropertyTimestampsBySubmissionId(submissionId: number): Promise<void> {
+    return this.submissionFeaturePropertyTimestampRepository.deleteSubmissionFeaturePropertyTimestampsBySubmissionId(
+      submissionId
+    );
+  }
+
+  /**
+   * Delete submission_feature_property_timestamp rows for a submission upload.
+   *
+   * @param {string} submissionUploadId
+   * @return {Promise<void>}
+   * @memberof SubmissionFeaturePropertyTimestampService
+   */
+  deleteSubmissionFeaturePropertyTimestampsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    return this.submissionFeaturePropertyTimestampRepository.deleteSubmissionFeaturePropertyTimestampsBySubmissionUploadId(
+      submissionUploadId
     );
   }
 }
