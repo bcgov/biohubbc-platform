@@ -2,25 +2,18 @@ import { Knex } from 'knex';
 
 /**
  * Consolidated migration for:
- * 1) remove policy-statement-condition DB trigger validation (moved to API)
- * 2) add submission_upload.status for ingestion lifecycle
- * 3) add upload_artifact.path for archive-relative artifact lookup
- * 4) taxon feature property type
- * 5) upload_artifact role = codeset
- * 6) submission.record_end_date defaults to active records (NULL)
+ * 1) add submission_upload.status for ingestion lifecycle
+ * 2) add upload_artifact.path for archive-relative artifact lookup
+ * 3) taxon feature property type
+ * 4) upload_artifact role = codeset
+ * 5) submission.record_end_date defaults to active records (NULL)
  */
 export async function up(knex: Knex): Promise<void> {
   await knex.raw(`--sql
     SET SEARCH_PATH = biohub, public;
 
     --------------------------------------------------------------------------------
-    -- 1) Remove policy-condition DB trigger validation (validation lives in API)
-    --------------------------------------------------------------------------------
-    DROP TRIGGER IF EXISTS validate_policy_condition_key ON biohub.policy_statement_condition;
-    DROP FUNCTION IF EXISTS biohub.tr_validate_policy_condition_key();
-
-    --------------------------------------------------------------------------------
-    -- 2) Add submission_upload.status for ingestion job lifecycle
+    -- 1) Add submission_upload.status for ingestion job lifecycle
     --------------------------------------------------------------------------------
     CREATE TYPE submission_upload_job_status AS ENUM (
       'pending',
@@ -38,7 +31,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN submission_upload.status IS 'Background ingestion job lifecycle status for this upload attempt (pending, in_progress, succeeded, invalid, failed).';
 
     --------------------------------------------------------------------------------
-    -- 3) Add upload_artifact.path for archive-extracted media tracking
+    -- 2) Add upload_artifact.path for archive-extracted media tracking
     --------------------------------------------------------------------------------
     ALTER TABLE upload_artifact
       ADD COLUMN IF NOT EXISTS path text;
@@ -63,7 +56,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN upload_artifact.path IS 'Normalized archive-relative path for extracted archive files. NULL for non-archive artifacts.';
 
     --------------------------------------------------------------------------------
-    -- 4) Ensure feature_property_type = taxon exists
+    -- 3) Ensure feature_property_type = taxon exists
     --------------------------------------------------------------------------------
     INSERT INTO feature_property_type (name, description)
     SELECT 'taxon', 'A taxon reference type'
@@ -75,12 +68,12 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     --------------------------------------------------------------------------------
-    -- 5) Ensure upload_artifact_role supports codeset
+    -- 4) Ensure upload_artifact_role supports codeset
     --------------------------------------------------------------------------------
     ALTER TYPE upload_artifact_role ADD VALUE IF NOT EXISTS 'codeset';
 
     --------------------------------------------------------------------------------
-    -- 6) Ensure submissions are active by default
+    -- 5) Ensure submissions are active by default
     --------------------------------------------------------------------------------
     ALTER TABLE submission
       ALTER COLUMN record_end_date DROP DEFAULT;
@@ -109,12 +102,6 @@ export async function down(knex: Knex): Promise<void> {
     --------------------------------------------------------------------------------
     -- 2) Remove upload_artifact_role value = codeset
     --------------------------------------------------------------------------------
-    DO $$
-    BEGIN
-      IF EXISTS (SELECT 1 FROM upload_artifact WHERE role::text = 'codeset') THEN
-        RAISE EXCEPTION 'Cannot downgrade: upload_artifact contains role = codeset rows';
-      END IF;
-    END$$;
 
     ALTER TYPE upload_artifact_role RENAME TO upload_artifact_role_old;
 
