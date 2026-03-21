@@ -186,8 +186,8 @@ const UnreviewedSubmissionsTable = () => {
                       <dt>{getDaysSinceDate(dayjs(submissionRecord.create_date))}</dt>
                     </Stack>
                     <Stack flexDirection="row">
-                      <dd>Source:</dd>
-                      <dt>{submissionRecord.source_system}</dt>
+                      <dd>Contributor:</dd>
+                      <dt>{submissionRecord.contributor_id}</dt>
                     </Stack>
                     {submissionRecord.regions.length > 0 && (
                       <Stack flexDirection="row">

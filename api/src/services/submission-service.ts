@@ -62,7 +62,7 @@ export class SubmissionService extends DBService {
    * @param {string} comment An internal comment/description of the submission for administrative purposes. May contain
    * sensitive information. Should never be shared with the general public.
    * @param {number} systemUserId
-   * @param {string} systemUserIdentifier
+   * @param {number} contributorId
    * @return {*}  {Promise<SubmissionRecord>}
    * @memberof SubmissionService
    */
@@ -72,7 +72,7 @@ export class SubmissionService extends DBService {
     description: string,
     comment: string,
     systemUserId: number,
-    systemUserIdentifier: string
+    contributorId: number
   ): Promise<SubmissionRecord> {
     return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(
       uuid,
@@ -80,7 +80,7 @@ export class SubmissionService extends DBService {
       description,
       comment,
       systemUserId,
-      systemUserIdentifier
+      contributorId
     );
   }
 
