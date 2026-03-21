@@ -11,7 +11,7 @@ const defaultLog = getLogger('paths/submission/{submissionId}/history');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ discriminator: 'ServiceClient' }]
+    and: [{ discriminator: 'Contributor' }]
   })),
   getSubmissionHistory()
 ];

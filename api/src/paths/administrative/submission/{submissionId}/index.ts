@@ -81,7 +81,7 @@ PATCH.apiDoc = {
               'publish_timestamp',
               'submitted_timestamp',
               'system_user_id',
-              'source_system',
+              'contributor_id',
               'name',
               'description',
               'comment',
@@ -115,8 +115,9 @@ PATCH.apiDoc = {
                 type: 'integer',
                 minimum: 1
               },
-              source_system: {
-                type: 'string'
+              contributor_id: {
+                type: 'integer',
+                minimum: 1
               },
               name: {
                 type: 'string',

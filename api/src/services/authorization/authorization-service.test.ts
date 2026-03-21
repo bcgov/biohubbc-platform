@@ -7,9 +7,9 @@ import { SYSTEM_ROLE } from '../../constants/roles';
 import * as db from '../../database/db';
 import { Cart, CartStatus } from '../../models/cart';
 import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
-import * as keycloakUtils from '../../utils/keycloak-utils';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { CartService } from '../cart-service';
+import { ContributorSystemUserService } from '../contributor-system-user-service';
 import { UserService } from '../user-service';
 import {
   AuthorizationScheme,
@@ -94,14 +94,14 @@ describe('executeAuthorizeConfig', function () {
         discriminator: 'SystemUser'
       },
       {
-        discriminator: 'ServiceClient'
+        discriminator: 'Contributor'
       }
     ];
     const mockDBConnection = getMockDBConnection();
 
     sinon.stub(AuthorizationService.prototype, 'authorizeBySystemRole').resolves(false);
     sinon.stub(AuthorizationService.prototype, 'authorizeBySystemUser').resolves(true);
-    sinon.stub(AuthorizationService.prototype, 'authorizeByServiceClient').resolves(true);
+    sinon.stub(AuthorizationService.prototype, 'authorizeByContributor').resolves(true);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
@@ -111,7 +111,7 @@ describe('executeAuthorizeConfig', function () {
   });
 });
 
-describe('authorizeByServiceClient', function () {
+describe('authorizeSystemAdministrator', function () {
   afterEach(() => {
     sinon.restore();
   });
@@ -123,9 +123,9 @@ describe('authorizeByServiceClient', function () {
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
-    const isAuthorizedByServiceClient = await authorizationService.authorizeSystemAdministrator();
+    const isAuthorized = await authorizationService.authorizeSystemAdministrator();
 
-    expect(isAuthorizedByServiceClient).to.equal(false);
+    expect(isAuthorized).to.equal(false);
   });
 
   it('returns true if `systemUserObject` is not null and includes admin role', async function () {
@@ -145,9 +145,9 @@ describe('authorizeByServiceClient', function () {
 
     const authorizationService = new AuthorizationService(mockDBConnection);
 
-    const isAuthorizedByServiceClient = await authorizationService.authorizeSystemAdministrator();
+    const isAuthorized = await authorizationService.authorizeSystemAdministrator();
 
-    expect(isAuthorizedByServiceClient).to.equal(true);
+    expect(isAuthorized).to.equal(true);
   });
 });
 
@@ -300,80 +300,81 @@ describe('authorizeBySystemUser', function () {
   });
 });
 
-describe('authorizeByServiceClient', function () {
+describe('authorizeByContributor', function () {
   afterEach(() => {
     sinon.restore();
   });
 
   it('returns false if the keycloak token is null', async function () {
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
       keycloakToken: undefined
     });
 
-    const result = await authorizationService.authorizeByServiceClient();
+    const result = await authorizationService.authorizeByContributor();
 
     expect(result).to.be.false;
   });
 
-  it('returns false if the service client does not match a known service client system user', async function () {
-    const mockDBConnection = getMockDBConnection();
+  it('returns false when system user id cannot be resolved from connection', async function () {
+    const mockDBConnection = getMockDBConnection({
+      systemUserId: () => null as unknown as number
+    });
+    const findContributorSystemUserStub = sinon.stub(
+      ContributorSystemUserService.prototype,
+      'findContributorSystemUser'
+    );
 
-    const systemUser = null;
-
-    const getServiceClientSystemUserStub = sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(systemUser);
-
-    const keycloakToken = {
-      preferred_username: 'unknown-user'
-    };
     const authorizationService = new AuthorizationService(mockDBConnection, {
-      keycloakToken: keycloakToken
+      keycloakToken: { sub: 'some-guid' }
     });
 
-    const isAuthorizedBySystemRole = await authorizationService.authorizeByServiceClient();
+    const result = await authorizationService.authorizeByContributor();
 
-    expect(isAuthorizedBySystemRole).to.equal(false);
-    expect(getServiceClientSystemUserStub).to.have.been.calledOnceWith(keycloakToken);
+    expect(result).to.be.false;
+    expect(findContributorSystemUserStub).not.to.have.been.called;
   });
 
-  it('returns true if the service client matches a known service client system user', async function () {
-    const mockDBConnection = getMockDBConnection();
+  it('returns false when no contributor mapping exists for system user', async function () {
+    const mockDBConnection = getMockDBConnection({
+      systemUserId: () => 9
+    });
+    const findContributorSystemUserStub = sinon
+      .stub(ContributorSystemUserService.prototype, 'findContributorSystemUser')
+      .resolves(null);
 
-    const systemUser: SystemUser = {
-      system_user_id: 1,
-      user_identity_source_id: 2,
-      user_identifier: 'sims-svc-4464',
-      user_guid: 'service-account-sims-svc-4464',
-      record_effective_date: '',
-      record_end_date: '',
-      create_date: '2023-12-12',
-      create_user: 1,
-      update_date: null,
-      update_user: null,
-      revision_count: 0,
-      display_name: null,
-      given_name: null,
-      family_name: null,
-      email: null,
-      agency: null,
-      notes: null
-    };
-
-    const getServiceClientSystemUserStub = sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(systemUser);
-
-    const keycloakToken = {
-      preferred_username: 'sims-svc-4464'
-    };
     const authorizationService = new AuthorizationService(mockDBConnection, {
-      keycloakToken: keycloakToken
+      keycloakToken: { sub: 'some-guid' }
     });
 
-    const isAuthorizedBySystemRole = await authorizationService.authorizeByServiceClient();
+    const result = await authorizationService.authorizeByContributor();
 
-    expect(isAuthorizedBySystemRole).to.equal(true);
-    expect(getServiceClientSystemUserStub).to.have.been.calledOnceWith(keycloakToken);
+    expect(result).to.be.false;
+    expect(findContributorSystemUserStub).to.have.been.calledOnceWith(9);
+  });
+
+  it('returns true and sets contributorId when system user maps to contributor', async function () {
+    const mockDBConnection = getMockDBConnection({
+      systemUserId: () => 12
+    });
+    const findContributorSystemUserStub = sinon
+      .stub(ContributorSystemUserService.prototype, 'findContributorSystemUser')
+      .resolves({
+        contributor_system_user_id: 1,
+        contributor_id: 77,
+        system_user_id: 12
+      });
+
+    const authorizationService = new AuthorizationService(mockDBConnection, {
+      keycloakToken: { sub: 'some-guid' }
+    });
+
+    const result = await authorizationService.authorizeByContributor();
+
+    expect(result).to.be.true;
+    expect(findContributorSystemUserStub).to.have.been.calledOnceWith(12);
+    expect(authorizationService.contributorId).to.equal(77);
   });
 });
 

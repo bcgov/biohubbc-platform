@@ -6,10 +6,10 @@ import SubmissionsListSortMenu from './SubmissionsListSortMenu';
 
 const mockHandleSubmissions = vi.fn();
 
-const menuItems = { name: 'NAME', source_system: 'TEST' };
+const menuItems = { name: 'NAME', contributor_id: 'CONTRIBUTOR' };
 
-const first = { name: 'AAA', source_system: 'ZZZ' };
-const second = { name: 'BBB', source_system: 'QQQ' };
+const first = { name: 'AAA', contributor_id: 2 };
+const second = { name: 'BBB', contributor_id: 1 };
 
 const mockSubmissions: any[] = [first, second];
 
@@ -45,7 +45,7 @@ describe('SubmissionsListSortMenu', () => {
     fireEvent.click(menuBtn);
 
     const menuItemA = actions.getByText('NAME');
-    const menuItemB = actions.getByText('TEST');
+    const menuItemB = actions.getByText('CONTRIBUTOR');
 
     expect(menuItemA).toBeVisible();
     expect(menuItemB).toBeVisible();
@@ -58,7 +58,7 @@ describe('SubmissionsListSortMenu', () => {
     fireEvent.click(menuBtn);
 
     const menuItemA = actions.getByText('NAME');
-    const menuItemB = actions.getByText('TEST');
+    const menuItemB = actions.getByText('CONTRIBUTOR');
 
     fireEvent.click(menuItemA);
     fireEvent.click(menuItemB);

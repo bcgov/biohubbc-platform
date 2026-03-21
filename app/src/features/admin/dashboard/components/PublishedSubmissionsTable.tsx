@@ -103,7 +103,7 @@ const PublishedSubmissionsTable = () => {
               name: 'Name',
               security_review_timestamp: 'Review Complete',
               publish_timestamp: 'Publish Date',
-              source_system: 'Submitting System'
+              contributor_id: 'Contributor'
             }}
             submissions={submissionRecords}
             handleSubmissions={handleSortSubmissions}
@@ -207,8 +207,8 @@ const PublishedSubmissionsTable = () => {
                       </dt>
                     </Stack>
                     <Stack flexDirection="row">
-                      <dd>Source:</dd>
-                      <dt>{submissionRecord.source_system}</dt>
+                      <dd>Contributor:</dd>
+                      <dt>{submissionRecord.contributor_id}</dt>
                     </Stack>
                     {submissionRecord.regions.length > 0 && (
                       <Stack flexDirection="row">

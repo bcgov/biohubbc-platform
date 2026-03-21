@@ -100,7 +100,7 @@ const ReviewedSubmissionsTable = () => {
               publish_timestamp: 'Publish Date',
               name: 'Name',
               security_review_timestamp: 'Review Complete',
-              source_system: 'Submitting System'
+              contributor_id: 'Contributor'
             }}
             submissions={submissionRecords}
             handleSubmissions={handleSortSubmissions}
@@ -197,8 +197,8 @@ const ReviewedSubmissionsTable = () => {
                       <dt>{getFormattedDate(DATE_FORMAT.ShortDateFormat, submissionRecord.create_date)}</dt>
                     </Stack>
                     <Stack flexDirection="row">
-                      <dd>Source:</dd>
-                      <dt>{submissionRecord.source_system}</dt>
+                      <dd>Contributor:</dd>
+                      <dt>{submissionRecord.contributor_id}</dt>
                     </Stack>
                     {submissionRecord.regions.length > 0 && (
                       <Stack flexDirection="row">

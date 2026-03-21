@@ -68,6 +68,7 @@ export const authorizeRequest = async (req: Request): Promise<boolean> => {
 
     // Add the system_user to the request for future use, if needed
     req.system_user = authorizationService.systemUser;
+    req.contributor_id = authorizationService.contributorId;
 
     await connection.commit();
 

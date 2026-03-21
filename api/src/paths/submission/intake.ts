@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getServiceAccountDBConnection } from '../../database/db';
+import { getDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { UploadStatusEnum } from '../../models/upload';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
@@ -13,21 +13,14 @@ import { TicketService } from '../../services/ticket-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { UploadService } from '../../services/upload/upload-service';
 import { ValidationService } from '../../services/validation-service';
-import { getServiceClientSystemUser } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/submission/intake');
 
 export const POST: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          discriminator: 'ServiceClient'
-        }
-      ]
-    };
-  }),
+  authorizeRequestHandler(() => ({
+    or: [{ discriminator: 'Contributor' }]
+  })),
   submissionIntake()
 ];
 
@@ -130,26 +123,19 @@ POST.apiDoc = {
 
 export function submissionIntake(): RequestHandler {
   return async (req, res) => {
-    // TODO Allow system admins
-    const serviceClientSystemUser = getServiceClientSystemUser(req.keycloak_token);
-
-    if (!serviceClientSystemUser) {
-      throw new HTTP400('Failed to identify known submission source system', [
-        'token did not contain a sub or sub value is unknown'
-      ]);
-    }
-
     const submissionUuid = req.body.id;
     const submissionName = req.body.name;
     const submissionDescription = req.body.description;
     const submissionComment = req.body.comment;
+    const contributorId = req.contributor_id!;
 
     const submissionFeature: ISubmissionFeature = req.body.content;
 
-    const connection = getServiceAccountDBConnection(serviceClientSystemUser);
+    const connection = getDBConnection(req.keycloak_token);
 
     try {
       await connection.open();
+      const system_user_id = req.system_user!.system_user_id;
 
       const submissionService = new SubmissionService(connection);
       const validationService = new ValidationService(connection);
@@ -167,8 +153,8 @@ export function submissionIntake(): RequestHandler {
         submissionName,
         submissionDescription,
         submissionComment,
-        serviceClientSystemUser.system_user_id,
-        serviceClientSystemUser.user_identifier
+        system_user_id,
+        contributorId
       );
 
       /*

@@ -25,7 +25,7 @@ const createMockSubmission = (id: number): SubmissionRecordWithSecurityAndRootFe
   security_review_timestamp: null,
   publish_timestamp: '2024-01-01T00:00:00Z',
   submitted_timestamp: '2024-01-01T00:00:00Z',
-  source_system: 'test',
+  contributor_id: 1,
   name: `Submission ${id}`,
   description: 'Test submission',
   comment: '',

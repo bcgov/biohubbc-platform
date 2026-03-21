@@ -71,43 +71,7 @@ describe('ContributorRepository', () => {
     });
   });
 
-  describe('contributorExists', () => {
-    it('returns true when contributor exists', async () => {
-      const mockQueryResponse = {
-        rowCount: 1,
-        rows: [{ contributor_id: 42 }]
-      } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => mockQueryResponse
-      });
-
-      const repository = new ContributorRepository(mockDBConnection);
-
-      const result = await repository.contributorExists('my-client-id');
-
-      expect(result).to.be.true;
-    });
-
-    it('returns false when contributor does not exist', async () => {
-      const mockQueryResponse = {
-        rowCount: 0,
-        rows: []
-      } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => mockQueryResponse
-      });
-
-      const repository = new ContributorRepository(mockDBConnection);
-
-      const result = await repository.contributorExists('non-existent-client-id');
-
-      expect(result).to.be.false;
-    });
-  });
-
-  describe('getContributorByClientId', () => {
+  describe('findContributorByClientId', () => {
     it('returns contributor when found', async () => {
       const mockQueryResponse = {
         rowCount: 1,
@@ -120,12 +84,12 @@ describe('ContributorRepository', () => {
 
       const repository = new ContributorRepository(mockDBConnection);
 
-      const result = await repository.getContributorByClientId('my-client-id');
+      const result = await repository.findContributorByClientId('my-client-id');
 
       expect(result).to.eql({ contributor_id: 42, client_id: 'my-client-id' });
     });
 
-    it('throws ApiNotFoundError when contributor not found', async () => {
+    it('returns null when contributor not found', async () => {
       const mockQueryResponse = {
         rowCount: 0,
         rows: []
@@ -137,15 +101,7 @@ describe('ContributorRepository', () => {
 
       const repository = new ContributorRepository(mockDBConnection);
 
-      try {
-        await repository.getContributorByClientId('non-existent-client-id');
-        expect.fail('Expected error to be thrown');
-      } catch (err) {
-        expect(err).to.be.instanceOf(ApiNotFoundError);
-        expect((err as ApiNotFoundError).message).to.equal('Contributor not found');
-      }
-    });
-  });
+      const result = await repository.findContributorByClientId('non-existent-client-id');
 
   describe('getContributorBySubmissionUploadId', () => {
     it('returns contributor when found', async () => {
@@ -375,6 +331,7 @@ describe('ContributorRepository', () => {
         expect(err).to.be.instanceOf(Error);
         expect((err as Error).message).to.contain('violates foreign key constraint');
       }
+      expect(result).to.equal(null);
     });
   });
 });
