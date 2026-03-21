@@ -83,6 +83,7 @@ describe('authorizeRequest', function () {
     sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(mockSystemUserObject);
 
     sinon.stub(AuthorizationService.prototype, 'authorizeSystemAdministrator').resolves(true);
+    sinon.stub(AuthorizationService.prototype, 'executeAuthorizationScheme').resolves(false);
 
     const mockReq = { authorization_scheme: {} } as unknown as Request;
     const isAuthorized = await authorization.authorizeRequest(mockReq);
@@ -179,7 +180,7 @@ describe('authorizeRequest', function () {
     sinon.stub(AuthorizationService.prototype, 'authorizeSystemAdministrator').resolves(true);
     const executeAuthorizationSchemeStub = sinon
       .stub(AuthorizationService.prototype, 'executeAuthorizationScheme')
-      .callsFake(async function () {
+      .callsFake(async function (this: AuthorizationService) {
         this['_contributorId'] = 77;
         return false;
       });

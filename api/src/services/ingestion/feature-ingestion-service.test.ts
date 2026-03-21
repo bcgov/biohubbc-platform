@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { IFlattenedBlock } from '../../models/submission-feature';
-import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
+import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { SubmissionRepository } from '../../repositories/submission-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { FeatureIngestionService } from './feature-ingestion-service';
@@ -79,7 +79,7 @@ describe('FeatureIngestionService', () => {
       const service = new FeatureIngestionService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       const deleteStub = sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
@@ -119,7 +119,7 @@ describe('FeatureIngestionService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties').resolves(null);
+      sinon.stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties').resolves(null);
 
       const features: IFlattenedBlock[] = [createValidFeature({ type: 'unknown_type' })];
 
@@ -133,7 +133,7 @@ describe('FeatureIngestionService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureIngestionService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties').resolves(null);
+      sinon.stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties').resolves(null);
 
       const deleteStub = sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures');
       const insertStub = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord');
@@ -152,7 +152,7 @@ describe('FeatureIngestionService', () => {
       const service = new FeatureIngestionService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
@@ -177,7 +177,7 @@ describe('FeatureIngestionService', () => {
       const service = new FeatureIngestionService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
@@ -210,7 +210,7 @@ describe('FeatureIngestionService', () => {
       const service = new FeatureIngestionService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
@@ -242,7 +242,7 @@ describe('FeatureIngestionService', () => {
       const service = new FeatureIngestionService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
@@ -298,7 +298,7 @@ describe('FeatureIngestionService', () => {
       const service = new FeatureIngestionService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
@@ -328,7 +328,7 @@ describe('FeatureIngestionService', () => {
       const service = new FeatureIngestionService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
@@ -363,7 +363,7 @@ describe('FeatureIngestionService', () => {
       const service = new FeatureIngestionService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
@@ -450,7 +450,7 @@ describe('FeatureIngestionService', () => {
       };
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithMultipleProps);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
@@ -492,7 +492,7 @@ describe('FeatureIngestionService', () => {
       const service = new FeatureIngestionService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       const callOrder: string[] = [];
@@ -534,7 +534,7 @@ describe('FeatureIngestionService', () => {
       const service = new FeatureIngestionService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
@@ -566,7 +566,7 @@ describe('FeatureIngestionService', () => {
       const service = new FeatureIngestionService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();
@@ -605,7 +605,7 @@ describe('FeatureIngestionService', () => {
       const service = new FeatureIngestionService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatures').resolves();

@@ -1,7 +1,7 @@
 import { IDBConnection } from '../../database/db';
 import { FeatureProperty, FeatureTypeWithProperties } from '../../models/feature-type';
 import { IFlattenedBlock } from '../../models/submission-feature';
-import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
+import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { GeoJSONFeatureCollectionZodSchema } from '../../zod-schema/geoJsonZodSchema';
 import { DBService } from '../db-service';
 import { IValidationError, IValidationResult, ValidationErrorType } from './feature-validation-service.interface';
@@ -23,13 +23,13 @@ import { IValidationError, IValidationResult, ValidationErrorType } from './feat
  * @extends {DBService}
  */
 export class FeatureValidationService extends DBService {
-  ingestionRepository: IngestionRepository;
+  ingestionRepository: FeatureIngestionRepository;
   featureTypeCache: Map<string, FeatureTypeWithProperties | null>;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
-    this.ingestionRepository = new IngestionRepository(connection);
+    this.ingestionRepository = new FeatureIngestionRepository(connection);
     this.featureTypeCache = new Map<string, FeatureTypeWithProperties | null>();
   }
 

@@ -174,11 +174,13 @@ describe('biohub-tar-parser', () => {
           name: 'codes/agency.json',
           content: JSON.stringify({
             agency: {
+              key: 'agency',
               label: 'Agency',
               external_id: 'agency',
               description: 'Agency codes',
               codes: {
                 aarde: {
+                  key: 'aarde',
                   label: 'Aarde Environmental Ltd.',
                   external_id: 'aarde',
                   description: 'Aarde Environmental Ltd.'
