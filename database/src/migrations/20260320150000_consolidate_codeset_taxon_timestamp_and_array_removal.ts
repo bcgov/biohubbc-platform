@@ -6,10 +6,8 @@ import { Knex } from 'knex';
  * 2) add submission_upload.status for ingestion lifecycle
  * 3) add upload_artifact.path for archive-relative artifact lookup
  * 4) taxon feature property type
- * 5) keep legacy feature_property_type names (datetime/spatial)
- * 6) upload_artifact role = codeset
- * 7) submission_feature_property_timestamp value split (date_value/time_value)
- * 8) submission.record_end_date defaults to active records (NULL)
+ * 5) upload_artifact role = codeset
+ * 6) submission.record_end_date defaults to active records (NULL)
  */
 export async function up(knex: Knex): Promise<void> {
   await knex.raw(`--sql
@@ -77,47 +75,12 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     --------------------------------------------------------------------------------
-    -- 5) Keep legacy feature_property_type names (datetime/spatial)
-    --------------------------------------------------------------------------------
-    -- No-op by design for this branch scope.
-
-    --------------------------------------------------------------------------------
-    -- 6) Ensure upload_artifact_role supports codeset
+    -- 5) Ensure upload_artifact_role supports codeset
     --------------------------------------------------------------------------------
     ALTER TYPE upload_artifact_role ADD VALUE IF NOT EXISTS 'codeset';
 
     --------------------------------------------------------------------------------
-    -- 7) Split submission_feature_property_timestamp.value into date/time columns
-    --------------------------------------------------------------------------------
-    ALTER TABLE submission_feature_property_timestamp
-      ADD COLUMN IF NOT EXISTS date_value date,
-      ADD COLUMN IF NOT EXISTS time_value time;
-
-    UPDATE submission_feature_property_timestamp
-    SET
-      date_value = COALESCE(date_value, value::date),
-      time_value = COALESCE(time_value, value::time)
-    WHERE value IS NOT NULL;
-
-    DROP INDEX IF EXISTS submission_feature_property_timestamp_idx3;
-
-    CREATE INDEX IF NOT EXISTS submission_feature_property_timestamp_idx3
-      ON submission_feature_property_timestamp(date_value);
-
-    CREATE INDEX IF NOT EXISTS submission_feature_property_timestamp_idx4
-      ON submission_feature_property_timestamp(time_value);
-
-    
-    ALTER TABLE submission_feature_property_timestamp
-      ADD CONSTRAINT submission_feature_property_timestamp_ck1
-      CHECK (date_value IS NOT NULL OR time_value IS NOT NULL);
-    
-
-    ALTER TABLE submission_feature_property_timestamp
-      DROP COLUMN IF EXISTS value;
-
-    --------------------------------------------------------------------------------
-    -- 8) Ensure submissions are active by default
+    -- 6) Ensure submissions are active by default
     --------------------------------------------------------------------------------
     ALTER TABLE submission
       ALTER COLUMN record_end_date DROP DEFAULT;
@@ -144,40 +107,7 @@ export async function down(knex: Knex): Promise<void> {
       );
 
     --------------------------------------------------------------------------------
-    -- 2) Restore single submission_feature_property_timestamp.value column
-    --------------------------------------------------------------------------------
-    ALTER TABLE submission_feature_property_timestamp
-      ADD COLUMN IF NOT EXISTS value timestamptz(6);
-
-    UPDATE submission_feature_property_timestamp
-    SET value = CASE
-      WHEN date_value IS NOT NULL AND time_value IS NOT NULL THEN
-        (date_value::text || ' ' || time_value::text)::timestamptz
-      WHEN date_value IS NOT NULL THEN
-        date_value::timestamptz
-      ELSE
-        (CURRENT_DATE::text || ' ' || time_value::text)::timestamptz
-    END
-    WHERE value IS NULL;
-
-    ALTER TABLE submission_feature_property_timestamp
-      ALTER COLUMN value SET NOT NULL;
-
-    DROP INDEX IF EXISTS submission_feature_property_timestamp_idx4;
-    DROP INDEX IF EXISTS submission_feature_property_timestamp_idx3;
-
-    CREATE INDEX submission_feature_property_timestamp_idx3
-      ON submission_feature_property_timestamp(value);
-
-    ALTER TABLE submission_feature_property_timestamp
-      DROP CONSTRAINT IF EXISTS submission_feature_property_timestamp_ck1;
-
-    ALTER TABLE submission_feature_property_timestamp
-      DROP COLUMN IF EXISTS date_value,
-      DROP COLUMN IF EXISTS time_value;
-
-    --------------------------------------------------------------------------------
-    -- 3) Remove upload_artifact_role value = codeset
+    -- 2) Remove upload_artifact_role value = codeset
     --------------------------------------------------------------------------------
     DO $$
     BEGIN
@@ -200,7 +130,7 @@ export async function down(knex: Knex): Promise<void> {
     DROP TYPE upload_artifact_role_old;
 
     --------------------------------------------------------------------------------
-    -- 4) Remove upload_artifact.path and submission_upload.status changes
+    -- 3) Remove upload_artifact.path and submission_upload.status changes
     --------------------------------------------------------------------------------
     ALTER TABLE upload_artifact
       DROP CONSTRAINT IF EXISTS upload_artifact_archive_path_chk;
@@ -219,7 +149,7 @@ export async function down(knex: Knex): Promise<void> {
     DROP TYPE IF EXISTS submission_upload_job_status;
 
     --------------------------------------------------------------------------------
-    -- 5) Restore legacy submission.record_end_date defaults/constraint
+    -- 4) Restore legacy submission.record_end_date defaults/constraint
     --------------------------------------------------------------------------------
     UPDATE submission
     SET record_end_date = NOW()

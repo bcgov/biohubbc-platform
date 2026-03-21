@@ -11,7 +11,7 @@ export interface CsvPropertyDefinition {
 
 /**
  * Build CSV header names from schema property definitions.
- * Geometry properties expand to `decimalLatitude` and `decimalLongitude`.
+ * Spatial properties expand to `decimalLatitude` and `decimalLongitude`.
  *
  * @param {CsvPropertyDefinition[]} properties - Schema property definitions.
  * @returns {string[]} Ordered header names.
@@ -20,7 +20,7 @@ export function buildSchemaHeaders(properties: CsvPropertyDefinition[]): string[
   const headers: string[] = [];
 
   for (const prop of properties) {
-    if (prop.feature_property_type_name === 'geometry') {
+    if (prop.feature_property_type_name === 'spatial') {
       headers.push('decimalLatitude', 'decimalLongitude');
     } else if (prop.feature_property_type_name === 'artifact_key') {
       headers.push('filePath');
@@ -94,12 +94,12 @@ export function flattenFeatureWithParent(
  * Flatten a feature's JSONB data using schema-defined property types.
  *
  * Type-aware rules:
- * - string, number, timestamp, boolean → String(value)
- * - geometry → extract first Point from GeoJSON → decimalLatitude/decimalLongitude
+ * - string, number, datetime, boolean → String(value)
+ * - spatial → extract first Point from GeoJSON → decimalLatitude/decimalLongitude
  * - array → delegate to flattenArray()
  * - artifact_key → files/{submissionFeatureId}_{filename}
  * - object → JSON.stringify(value)
- * - null/undefined → empty string (geometry gets two empty strings)
+ * - null/undefined → empty string (spatial gets two empty strings)
  *
  * @param {Record<string, unknown>} data - The feature's JSONB data.
  * @param {CsvPropertyDefinition[]} properties - Schema property definitions.
@@ -118,7 +118,7 @@ export function flattenFeatureBySchema(
     const value = data[prop.feature_property_name];
 
     switch (prop.feature_property_type_name) {
-      case 'geometry':
+      case 'spatial':
         Object.assign(result, flattenSpatialValue(value));
         break;
       case 'artifact_key':
@@ -153,7 +153,7 @@ function toStringOrEmpty(value: unknown): string {
 }
 
 /**
- * Flatten a geometry property to decimalLatitude/decimalLongitude.
+ * Flatten a spatial property to decimalLatitude/decimalLongitude.
  */
 function flattenSpatialValue(value: unknown): Record<string, string> {
   const coords = extractFirstPointCoordinates(value);

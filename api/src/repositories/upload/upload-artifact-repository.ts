@@ -1,11 +1,6 @@
 import { SQL } from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
-import {
-  ArtifactReferenceResolution,
-  CreateUploadArtifact,
-  UpdateUploadArtifact,
-  UploadArtifact
-} from '../../models/upload-artifact';
+import { CreateUploadArtifact, UpdateUploadArtifact, UploadArtifact } from '../../models/upload-artifact';
 import { BaseRepository } from '../base-repository';
 
 export class UploadArtifactRepository extends BaseRepository {
@@ -168,60 +163,5 @@ export class UploadArtifactRepository extends BaseRepository {
         `rowCount was ${response.rowCount}, expected 1`
       ]);
     }
-  }
-
-  /**
-   * Resolve feature artifact keys to persisted artifact IDs for a single submission upload.
-   *
-   * `artifactPaths` should contain normalized archive-relative paths (for example `images/photo.jpg`)
-   * derived from feature `artifact_key` values before this method is called.
-   *
-   * @param {string} submissionUploadId - Submission upload scope used to resolve the backing upload.
-   * @param {string[]} artifactPaths - Canonical archive-relative artifact paths to resolve.
-   * @return {Promise<ArtifactReferenceResolution[]>} Resolved pairs of `path` -> `artifact_id`.
-   * @memberof UploadArtifactRepository
-   */
-  async getFeatureArtifactResolutionsBySubmissionUploadIdAndReferences(
-    submissionUploadId: string,
-    artifactPaths: string[]
-  ): Promise<ArtifactReferenceResolution[]> {
-    if (!artifactPaths.length) {
-      return [];
-    }
-
-    const sqlStatement = SQL`
-      WITH requested_refs AS (
-        SELECT DISTINCT refs.reference
-        FROM unnest(${artifactPaths}::text[]) AS refs(reference)
-      ),
-      upload_scope AS (
-        SELECT submission_upload.upload_id
-        FROM submission_upload
-        WHERE submission_upload.submission_upload_id = ${submissionUploadId}::uuid
-        LIMIT 1
-      ),
-      ranked_reference_artifacts AS (
-        SELECT
-          requested_refs.reference AS path,
-          upload_artifact.artifact_id,
-          row_number() OVER (
-            PARTITION BY requested_refs.reference
-            ORDER BY upload_artifact.create_date ASC, upload_artifact.upload_artifact_id ASC
-          ) AS match_rank
-        FROM upload_scope
-        INNER JOIN requested_refs
-          ON TRUE
-        INNER JOIN upload_artifact
-          ON upload_artifact.upload_id = upload_scope.upload_id
-         AND upload_artifact.path IS NOT NULL
-         AND upload_artifact.path = requested_refs.reference
-      )
-      SELECT path, artifact_id
-      FROM ranked_reference_artifacts
-      WHERE match_rank = 1;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, ArtifactReferenceResolution);
-    return response.rows;
   }
 }
