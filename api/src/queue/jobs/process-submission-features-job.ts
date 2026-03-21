@@ -1,5 +1,6 @@
 import PgBoss from 'pg-boss';
 import { getAPIUserDBConnection } from '../../database/db';
+import { IngestionValidationError } from '../../errors/submission-errors';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
@@ -8,6 +9,16 @@ import { getLogger } from '../../utils/logger';
 import { publishIndexSubmissionFeaturesJob } from '../publisher';
 
 const defaultLog = getLogger('queue/jobs/process-submission-features-job');
+
+/**
+ * Return true when a thrown ingestion error represents permanent validation failure.
+ *
+ * @param {unknown} error - Thrown ingestion error.
+ * @returns {boolean} True when the error is a validation failure.
+ */
+function isValidationFailure(error: unknown): boolean {
+  return error instanceof IngestionValidationError;
+}
 
 /**
  * Process submission features job handler.
@@ -97,15 +108,47 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
     } catch (error) {
       await connection.rollback();
 
+      if (isValidationFailure(error)) {
+        try {
+          const submissionValidationService = new SubmissionValidationService(connection);
+          const submissionUploadService = new SubmissionUploadService(connection);
+          await submissionValidationService.updateSubmissionValidationStatus(job.id, 'invalid', {
+            error: error instanceof Error ? error.message : String(error)
+          });
+          await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
+          await connection.commit();
+        } catch (statusError) {
+          await connection.rollback();
+          defaultLog.error({
+            label: 'processSubmissionFeaturesJobHandler',
+            message: 'Failed to update submission upload status to invalid',
+            jobId: job.id,
+            submissionUploadId,
+            error: statusError
+          });
+        }
+
+        defaultLog.warn({
+          label: 'processSubmissionFeaturesJobHandler',
+          message: 'Submission validation failed during ingestion',
+          jobId: job.id,
+          submissionUploadId,
+          submissionId,
+          error
+        });
+
+        return;
+      }
+
       try {
         const submissionUploadService = new SubmissionUploadService(connection);
-        await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
+        await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'failed' });
         await connection.commit();
       } catch (statusError) {
         await connection.rollback();
         defaultLog.error({
           label: 'processSubmissionFeaturesJobHandler',
-          message: 'Failed to update submission upload status to invalid',
+          message: 'Failed to update submission upload status to failed',
           jobId: job.id,
           submissionUploadId,
           error: statusError
@@ -170,7 +213,7 @@ export const processSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<Submissi
           error: jobOutput ?? 'Job failed after all retries'
         }
       );
-      await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
+      await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'failed' });
 
       await connection.commit();
 

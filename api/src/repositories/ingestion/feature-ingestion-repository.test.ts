@@ -4,6 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../../errors/api-error';
+import { IngestionValidationError } from '../../errors/submission-errors';
 import { FeatureTypeWithProperties, FeatureTypeWithPropertiesRow } from '../../models/feature-type';
 import { CreateSubmissionFeatureIngestionRecord } from '../../models/submission-feature';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -28,7 +29,7 @@ describe('FeatureIngestionRepository', () => {
             id: 'feature-1',
             type: 'dataset',
             properties: { name: 'Dataset 1' },
-            references: [],
+            content: [],
             parent: null
           },
           dataByteSize: 123
@@ -47,6 +48,37 @@ describe('FeatureIngestionRepository', () => {
 
       expect(sqlStub).to.have.been.calledOnce;
     });
+
+    it('should throw when inserted row count does not match records length', async () => {
+      const records: CreateSubmissionFeatureIngestionRecord[] = [
+        {
+          submissionId: 1,
+          submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
+          sourceId: 'feature-1',
+          featureTypeName: 'dataset',
+          data: {
+            id: 'feature-1',
+            type: 'dataset',
+            properties: { name: 'Dataset 1' },
+            content: [],
+            parent: null
+          },
+          dataByteSize: 123
+        }
+      ];
+
+      const mockDBConnection = getMockDBConnection({
+        sql: sinon.stub().resolves({ rowCount: 0, rows: [], command: '', oid: 0, fields: [] })
+      });
+      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
+
+      try {
+        await ingestionRepository.insertSubmissionFeatureRecords(records);
+        expect.fail();
+      } catch (actualError) {
+        expect(actualError).to.be.instanceof(IngestionValidationError);
+      }
+    });
   });
 
   describe('insertSubmissionFeatureRecord', () => {
@@ -57,17 +89,30 @@ describe('FeatureIngestionRepository', () => {
 
       const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
 
-      const feature = {
-        name: 'feature'
+      const feature: CreateSubmissionFeatureIngestionRecord = {
+        submissionId: 1,
+        submissionUploadId: 'some-upload-uuid',
+        sourceId: '321',
+        featureTypeName: 'type',
+        data: {
+          id: '321',
+          type: 'type',
+          properties: {
+            name: 'feature'
+          },
+          content: [],
+          parent: null
+        },
+        dataByteSize: 0
       };
       try {
         await ingestionRepository.insertSubmissionFeatureRecord({
-          submissionId: 1,
-          submissionUploadId: 'some-upload-uuid',
+          submissionId: feature.submissionId,
+          submissionUploadId: feature.submissionUploadId,
           parentSubmissionFeatureId: 2,
-          featureSourceId: '321',
-          featureTypeName: 'type',
-          featureProperties: feature,
+          featureSourceId: feature.sourceId,
+          featureTypeName: feature.featureTypeName,
+          featureProperties: feature.data.properties,
           dataByteSizeBytes: 0
         });
         expect.fail();
@@ -87,17 +132,30 @@ describe('FeatureIngestionRepository', () => {
 
       const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
 
-      const feature = {
-        name: 'feature'
+      const feature: CreateSubmissionFeatureIngestionRecord = {
+        submissionId: 1,
+        submissionUploadId: 'some-upload-uuid',
+        sourceId: '321',
+        featureTypeName: 'type',
+        data: {
+          id: '321',
+          type: 'type',
+          properties: {
+            name: 'feature'
+          },
+          content: [],
+          parent: null
+        },
+        dataByteSize: 0
       };
 
       const response = await ingestionRepository.insertSubmissionFeatureRecord({
-        submissionId: 1,
-        submissionUploadId: 'some-upload-uuid',
+        submissionId: feature.submissionId,
+        submissionUploadId: feature.submissionUploadId,
         parentSubmissionFeatureId: 2,
-        featureSourceId: '321',
-        featureTypeName: 'type',
-        featureProperties: feature,
+        featureSourceId: feature.sourceId,
+        featureTypeName: feature.featureTypeName,
+        featureProperties: feature.data.properties,
         dataByteSizeBytes: 0
       });
 
@@ -198,6 +256,7 @@ describe('FeatureIngestionRepository', () => {
               display_name: 'Name',
               description: 'The name of the dataset',
               type_name: 'string',
+              allow_multiple: false,
               required_value: true,
               calculated_value: false
             },
@@ -207,6 +266,7 @@ describe('FeatureIngestionRepository', () => {
               display_name: 'Description',
               description: 'The description of the dataset',
               type_name: 'string',
+              allow_multiple: false,
               required_value: false,
               calculated_value: false
             }
@@ -241,6 +301,7 @@ describe('FeatureIngestionRepository', () => {
             display_name: 'Name',
             description: 'The name of the dataset',
             type_name: 'string',
+            allow_multiple: false,
             required_value: true,
             calculated_value: false
           },
@@ -250,6 +311,7 @@ describe('FeatureIngestionRepository', () => {
             display_name: 'Description',
             description: 'The description of the dataset',
             type_name: 'string',
+            allow_multiple: false,
             required_value: false,
             calculated_value: false
           }

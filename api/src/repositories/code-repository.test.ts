@@ -4,7 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiNotFoundError } from '../errors/api-error';
-import { FeatureType, FeatureTypePropertyExtended, FEATURE_PROPERTY_TYPE } from '../models/feature-property';
+import { FeatureTypeCode, FeatureTypePropertyCodeRow } from '../models/feature-property';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CodeRepository } from './code-repository';
 
@@ -17,7 +17,7 @@ describe('CodeRepository', () => {
     });
 
     it('should return rows if succeeds', async () => {
-      const mockRow: FeatureType = {
+      const mockRow: FeatureTypeCode = {
         feature_type_id: 1,
         feature_type_name: 'dataset',
         feature_type_display_name: 'Dataset'
@@ -46,7 +46,7 @@ describe('CodeRepository', () => {
     });
 
     it('should return rows if succeeds', async () => {
-      const mockRow: FeatureTypePropertyExtended = {
+      const mockRow: FeatureTypePropertyCodeRow = {
         feature_type_id: 1,
         feature_type_name: 'dataset',
         feature_type_display_name: 'Dataset',
@@ -54,7 +54,7 @@ describe('CodeRepository', () => {
         feature_property_name: 'name',
         feature_property_display_name: 'Name',
         feature_property_type_id: 3,
-        feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
+        feature_property_type_name: 'string'
       };
 
       const mockQueryResponse = {
@@ -104,7 +104,7 @@ describe('CodeRepository', () => {
     });
 
     it('should return row if succeeds', async () => {
-      const mockRow: FeatureTypePropertyExtended = {
+      const mockRow: FeatureTypePropertyCodeRow = {
         feature_type_id: 1,
         feature_type_name: 'dataset',
         feature_type_display_name: 'Dataset',
@@ -112,7 +112,7 @@ describe('CodeRepository', () => {
         feature_property_name: 'name',
         feature_property_display_name: 'Name',
         feature_property_type_id: 3,
-        feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
+        feature_property_type_name: 'string'
       };
 
       const mockQueryResponse = {

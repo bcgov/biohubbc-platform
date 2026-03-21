@@ -1,7 +1,7 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { IngestionValidationError } from '../../errors/ingestion-validation-error';
+import { IngestionValidationError } from '../../errors/submission-errors';
 import { FeatureTypeWithProperties, FeatureTypeWithPropertiesRow } from '../../models/feature-type';
 import { CreateSubmissionFeatureIngestionRecord, InsertSubmissionFeatureRecord } from '../../models/submission-feature';
 import { BaseRepository } from '../base-repository';
@@ -73,31 +73,13 @@ export class FeatureIngestionRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement);
-    if (response.rowCount !== records.length) {
-      const uniqueFeatureTypeNames = [...new Set(featureTypeNames)];
-      const existingFeatureTypes = await this.connection.sql(
-        SQL`
-          SELECT name
-          FROM feature_type
-          WHERE record_end_date IS NULL
-            AND name = ANY(${uniqueFeatureTypeNames}::text[]);
-        `,
-        z.object({ name: z.string() })
+    const insertedCount = response.rowCount ?? 0;
+    const expectedCount = records.length;
+
+    if (insertedCount !== expectedCount) {
+      throw new IngestionValidationError(
+        `Failed to insert all submission feature records: inserted ${insertedCount} of ${expectedCount}`
       );
-
-      const existingFeatureTypeSet = new Set(existingFeatureTypes.rows.map((row) => row.name));
-      const missingFeatureTypes = uniqueFeatureTypeNames.filter((name) => !existingFeatureTypeSet.has(name));
-
-      if (missingFeatureTypes.length) {
-        throw new IngestionValidationError(
-          `Failed to bulk insert submission feature records: unknown feature type(s): ${missingFeatureTypes.join(', ')}`
-        );
-      }
-
-      throw new ApiExecuteSQLError('Failed to bulk insert submission feature records', [
-        'FeatureIngestionRepository->insertSubmissionFeatureRecords',
-        `rowCount was ${response.rowCount ?? 'null'}, expected ${records.length}`
-      ]);
     }
   }
 

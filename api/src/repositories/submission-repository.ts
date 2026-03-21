@@ -498,13 +498,13 @@ export class SubmissionRepository extends BaseRepository {
    * Bulk update parent references for features belonging to a submission upload.
    *
    * @param {string} submissionUploadId The submission_upload_id scope.
-   * @param {Array<{ submission_feature_id: number; parent_submission_feature_id: number }>} pairs The child-parent pairs.
+   * @param {{ submission_feature_id: number; parent_submission_feature_id: number }[]} pairs The child-parent pairs.
    * @return {Promise<void>}
    * @memberof SubmissionRepository
    */
   async updateSubmissionFeatureParents(
     submissionUploadId: string,
-    pairs: Array<{ submission_feature_id: number; parent_submission_feature_id: number }>
+    pairs: { submission_feature_id: number; parent_submission_feature_id: number }[]
   ): Promise<void> {
     if (!pairs.length) {
       return;
@@ -522,6 +522,40 @@ export class SubmissionRepository extends BaseRepository {
       ) AS mappings(submission_feature_id, parent_submission_feature_id)
       WHERE sf.submission_feature_id = mappings.submission_feature_id
         AND sf.submission_upload_id = ${submissionUploadId};
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Bulk update parent references by child submission_feature_id pairs.
+   *
+   * @param {Array<{ child_submission_feature_id: number; parent_submission_feature_id: number }>} updates
+   * @return {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionFeatureParentsByChildIds(
+    updates: Array<{ child_submission_feature_id: number; parent_submission_feature_id: number }>
+  ): Promise<void> {
+    if (!updates.length) {
+      return;
+    }
+
+    const childIds = updates.map((update) => update.child_submission_feature_id);
+    const parentIds = updates.map((update) => update.parent_submission_feature_id);
+    const sqlStatement = SQL`
+      UPDATE submission_feature AS target
+      SET parent_submission_feature_id = source.parent_submission_feature_id
+      FROM (
+        SELECT
+          child_submission_feature_id,
+          parent_submission_feature_id
+        FROM unnest(
+          ${childIds}::integer[],
+          ${parentIds}::integer[]
+        ) AS updates(child_submission_feature_id, parent_submission_feature_id)
+      ) AS source
+      WHERE target.submission_feature_id = source.child_submission_feature_id;
     `;
 
     await this.connection.sql(sqlStatement);
@@ -613,40 +647,6 @@ export class SubmissionRepository extends BaseRepository {
       SET parent_submission_feature_id = NULL
       WHERE submission_upload_id = ${submissionUploadId}
         AND record_end_date IS NULL;
-    `;
-
-    await this.connection.sql(sqlStatement);
-  }
-
-  /**
-   * Bulk set parent links for child submission_feature rows.
-   *
-   * @param {Array<{ child_submission_feature_id: number; parent_submission_feature_id: number }>} updates
-   * @return {Promise<void>}
-   * @memberof SubmissionRepository
-   */
-  async updateSubmissionFeatureParents(
-    updates: Array<{ child_submission_feature_id: number; parent_submission_feature_id: number }>
-  ): Promise<void> {
-    if (!updates.length) {
-      return;
-    }
-
-    const childIds = updates.map((update) => update.child_submission_feature_id);
-    const parentIds = updates.map((update) => update.parent_submission_feature_id);
-    const sqlStatement = SQL`
-      UPDATE submission_feature AS target
-      SET parent_submission_feature_id = source.parent_submission_feature_id
-      FROM (
-        SELECT
-          child_submission_feature_id,
-          parent_submission_feature_id
-        FROM unnest(
-          ${childIds}::integer[],
-          ${parentIds}::integer[]
-        ) AS updates(child_submission_feature_id, parent_submission_feature_id)
-      ) AS source
-      WHERE target.submission_feature_id = source.child_submission_feature_id;
     `;
 
     await this.connection.sql(sqlStatement);

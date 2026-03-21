@@ -24,7 +24,7 @@ export const CreateSubmissionFeatureSchema = z.object({
   id: z.string().min(1, 'Feature id is required'),
   type: z.string().min(1, 'Feature type is required'),
   properties: z.record(z.unknown()),
-  references: z.array(z.string()),
+  content: z.array(z.string()),
   parent: z.string().nullable()
 });
 
@@ -35,7 +35,7 @@ export interface CreateSubmissionFeatureIngestionRecord {
   submissionUploadId: string;
   sourceId: string;
   featureTypeName: string;
-  data: CreateSubmissionFeature;
+  data: IFlattenedBlock;
   dataByteSize: number;
 }
 

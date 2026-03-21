@@ -317,8 +317,10 @@ describe('authorizeByContributor', function () {
     expect(result).to.be.false;
   });
 
-  it('returns false when system user cannot be resolved', async function () {
-    const mockDBConnection = getMockDBConnection();
+  it('returns false when system user id cannot be resolved from connection', async function () {
+    const mockDBConnection = getMockDBConnection({
+      systemUserId: () => null as unknown as number
+    });
     const findContributorSystemUserStub = sinon.stub(
       ContributorSystemUserService.prototype,
       'findContributorSystemUser'
@@ -327,7 +329,6 @@ describe('authorizeByContributor', function () {
     const authorizationService = new AuthorizationService(mockDBConnection, {
       keycloakToken: { sub: 'some-guid' }
     });
-    sinon.stub(authorizationService, 'getCachedSystemUser').resolves(null);
 
     const result = await authorizationService.authorizeByContributor();
 
@@ -336,7 +337,9 @@ describe('authorizeByContributor', function () {
   });
 
   it('returns false when no contributor mapping exists for system user', async function () {
-    const mockDBConnection = getMockDBConnection();
+    const mockDBConnection = getMockDBConnection({
+      systemUserId: () => 9
+    });
     const findContributorSystemUserStub = sinon
       .stub(ContributorSystemUserService.prototype, 'findContributorSystemUser')
       .resolves(null);
@@ -344,7 +347,6 @@ describe('authorizeByContributor', function () {
     const authorizationService = new AuthorizationService(mockDBConnection, {
       keycloakToken: { sub: 'some-guid' }
     });
-    sinon.stub(authorizationService, 'getCachedSystemUser').resolves({ system_user_id: 9 } as any);
 
     const result = await authorizationService.authorizeByContributor();
 
@@ -353,7 +355,9 @@ describe('authorizeByContributor', function () {
   });
 
   it('returns true and sets contributorId when system user maps to contributor', async function () {
-    const mockDBConnection = getMockDBConnection();
+    const mockDBConnection = getMockDBConnection({
+      systemUserId: () => 12
+    });
     const findContributorSystemUserStub = sinon
       .stub(ContributorSystemUserService.prototype, 'findContributorSystemUser')
       .resolves({
@@ -365,7 +369,6 @@ describe('authorizeByContributor', function () {
     const authorizationService = new AuthorizationService(mockDBConnection, {
       keycloakToken: { sub: 'some-guid' }
     });
-    sinon.stub(authorizationService, 'getCachedSystemUser').resolves({ system_user_id: 12 } as any);
 
     const result = await authorizationService.authorizeByContributor();
 

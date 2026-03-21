@@ -562,7 +562,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
         ])
       },
       {
-        name: 'sample_site.json',
+        name: 'features/sample_site.json',
         content: JSON.stringify([
           {
             id: siteFeatureId,
@@ -637,7 +637,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       });
       expect.fail('Expected ingestion to throw for unknown feature type');
     } catch (error) {
-      expect(String(error)).to.include('Failed to bulk insert submission feature records');
+      expect(String(error)).to.include('Failed to insert all submission feature records');
     }
 
     // Verify NO features were inserted (zero side effects from pass 1)
@@ -671,7 +671,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
         ])
       },
       {
-        name: 'file.json',
+        name: 'features/file.json',
         content: JSON.stringify([
           {
             id: fileFeatureId,
@@ -754,7 +754,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
         ])
       },
       {
-        name: 'file.json',
+        name: 'features/file.json',
         content: JSON.stringify([
           {
             id: fileFeatureId,
@@ -884,7 +884,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       });
       expect.fail('Expected ingestion to throw for unknown feature types');
     } catch (error) {
-      expect(String(error)).to.include('Failed to bulk insert submission feature records');
+      expect(String(error)).to.include('Failed to insert all submission feature records');
     }
   });
 });

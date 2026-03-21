@@ -2,7 +2,8 @@ import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import {
   CreateSubmissionFeaturePropertyGeometry,
-  SubmissionFeaturePropertyGeometry
+  SubmissionFeaturePropertyGeometry,
+  SubmissionFeaturePropertyGeometrySchema
 } from '../models/submission-feature-property-geometry';
 import { BaseRepository } from './base-repository';
 
@@ -51,7 +52,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
         ST_AsGeoJSON(value)::json AS value;
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometry);
+    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometrySchema);
 
     if (response.rowCount !== payloads.length) {
       throw new ApiExecuteSQLError('Failed to insert submission_feature_property_geometry rows', [
@@ -90,7 +91,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
         ST_AsGeoJSON(value)::json AS value;
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometry);
+    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometrySchema);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission_feature_property_geometry', [
@@ -122,7 +123,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
       WHERE submission_feature_property_geometry_id = ${submissionFeaturePropertyGeometryId};
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometry);
+    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometrySchema);
 
     if (response.rowCount === 0) {
       throw new ApiNotFoundError('submission_feature_property_geometry not found', [
@@ -161,7 +162,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
       WHERE submission_feature_id = ${submissionFeatureId};
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometry);
+    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometrySchema);
 
     return response.rows;
   }
@@ -186,7 +187,7 @@ export class SubmissionFeaturePropertyGeometryRepository extends BaseRepository 
       WHERE feature_type_property_id = ${featureTypePropertyId};
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometry);
+    const response = await this.connection.sql(sqlStatement, SubmissionFeaturePropertyGeometrySchema);
 
     return response.rows;
   }

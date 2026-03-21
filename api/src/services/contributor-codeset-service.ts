@@ -2,7 +2,7 @@ import { IDBConnection } from '../database/db';
 import { ApiConflictError } from '../errors/api-error';
 import { ContributorCodeset, CreateContributorCodeset } from '../models/contributor-codeset';
 import { ContributorCodesetRepository } from '../repositories/contributor-codeset-repository';
-import { makeSlug } from '../utils/contributor-codeset';
+import { hasSameContributorCodeDefinition, makeSlug } from '../utils/contributor-codeset';
 import { DBService } from './db-service';
 
 export class ContributorCodesetService extends DBService {
@@ -151,11 +151,7 @@ export class ContributorCodesetService extends DBService {
         continue;
       }
 
-      if (
-        existing.external_id !== expected.external_id ||
-        existing.label !== expected.label ||
-        (existing.description ?? null) !== (expected.description ?? null)
-      ) {
+      if (!hasSameContributorCodeDefinition(existing, expected)) {
         throw new ApiConflictError('Contributor codeset definition conflict', [
           'ContributorCodesetService->createCodesets',
           `The contributor codeset (${existing.contributor_id}, ${existing.key}) already exists with different metadata. If metadata changed, provide a new unique key.`

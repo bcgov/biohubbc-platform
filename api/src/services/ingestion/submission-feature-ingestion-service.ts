@@ -1,7 +1,6 @@
 import { IDBConnection } from '../../database/db';
-import { CreateSubmissionFeature, IFlattenedBlock } from '../../models/submission-feature';
+import { IFlattenedBlock } from '../../models/submission-feature';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
-import { buildFeatureDataPayload } from '../../utils/biohub-tar-parser';
 import { DBService } from '../db-service';
 
 /**
@@ -46,14 +45,13 @@ export class SubmissionFeatureIngestionService extends DBService {
     }
 
     const records = features.map((feature) => {
-      const featureData = buildFeatureDataPayload(feature);
       return {
         submissionId,
         submissionUploadId,
         sourceId: feature.id,
         featureTypeName: feature.type,
-        data: featureData as CreateSubmissionFeature,
-        dataByteSize: Buffer.byteLength(JSON.stringify(featureData))
+        data: feature,
+        dataByteSize: Buffer.byteLength(JSON.stringify(feature))
       };
     });
 

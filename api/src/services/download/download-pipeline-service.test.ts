@@ -11,7 +11,7 @@ import {
 } from '../../models/download';
 import { DownloadFragmentId, DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { FeatureTypeWithFeatureProperties, FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
+import { FeatureTypeWithFeaturePropertiesCode } from '../../models/feature-property';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -172,7 +172,7 @@ describe('DownloadPipelineService', () => {
         );
 
       sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
-      const mockCodes: FeatureTypeWithFeatureProperties[] = [
+      const mockCodes: FeatureTypeWithFeaturePropertiesCode[] = [
         {
           feature_type: { feature_type_id: 1, feature_type_name: 'file', feature_type_display_name: 'File' },
           feature_type_properties: [
@@ -181,7 +181,7 @@ describe('DownloadPipelineService', () => {
               feature_property_name: 'artifact_key',
               feature_property_display_name: 'Artifact Key',
               feature_property_type_id: 1,
-              feature_property_type_name: FEATURE_PROPERTY_TYPE.ARTIFACT_KEY
+              feature_property_type_name: 'artifact_key'
             }
           ]
         }
@@ -233,7 +233,7 @@ describe('DownloadPipelineService', () => {
       sinon
         .stub(DownloadRepository.prototype, 'findDownloadById')
         .resolves(createMockDownloadRecord({ total_fragments: 3 }));
-      const mockCodes: FeatureTypeWithFeatureProperties[] = [
+      const mockCodes: FeatureTypeWithFeaturePropertiesCode[] = [
         {
           feature_type: {
             feature_type_id: 2,
@@ -246,7 +246,7 @@ describe('DownloadPipelineService', () => {
               feature_property_name: 'species',
               feature_property_display_name: 'Species',
               feature_property_type_id: 1,
-              feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
+              feature_property_type_name: 'string'
             }
           ]
         }

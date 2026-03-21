@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import * as db from '../../database/db';
-import { IngestionValidationError } from '../../errors/ingestion-validation-error';
+import { IngestionValidationError } from '../../errors/submission-errors';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { ValidationErrorType } from '../../services/ingestion/submission-ingestion-service.interface';
@@ -315,7 +315,8 @@ describe('process-submission-features-job', () => {
       expect(publishStub.calledOnce).to.be.true;
       expect(publishStub.firstCall.args[0]).to.equal(mockDBConnection);
       expect(publishStub.firstCall.args[1]).to.deep.equal({
-        submissionId: 123
+        submissionId: 123,
+        submissionUploadId: 'test-sub-upload-id'
       });
 
       // Publish must happen after 'completed' status update

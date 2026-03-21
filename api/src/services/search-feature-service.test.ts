@@ -153,14 +153,14 @@ describe('SearchFeatureService', () => {
               feature_property_name: 'start_date',
               feature_property_display_name: 'Start Date',
               feature_property_type_id: 4,
-              feature_property_type_name: 'datetime'
+              feature_property_type_name: 'timestamp'
             },
             {
               feature_property_id: 6,
               feature_property_name: 'end_date',
               feature_property_display_name: 'End Date',
               feature_property_type_id: 4,
-              feature_property_type_name: 'datetime'
+              feature_property_type_name: 'timestamp'
             },
             {
               feature_property_id: 7,
@@ -181,7 +181,7 @@ describe('SearchFeatureService', () => {
               feature_property_name: 'geometry',
               feature_property_display_name: 'Geometry',
               feature_property_type_id: 5,
-              feature_property_type_name: 'spatial'
+              feature_property_type_name: 'geometry'
             }
           ]
         },

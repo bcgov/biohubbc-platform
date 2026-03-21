@@ -49,7 +49,7 @@ describe('SubmissionFeatureIngestionService', () => {
         id: 'feature-1',
         type: 'dataset',
         properties: { name: 'Test Dataset' },
-        references: ['feature-2'],
+        content: ['feature-2'],
         parent: null
       });
       expect(insertedRows[0].dataByteSize).to.be.a('number').and.greaterThan(0);

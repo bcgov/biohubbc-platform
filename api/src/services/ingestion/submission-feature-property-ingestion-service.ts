@@ -463,7 +463,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
     }
 
     if (parentUpdates.length) {
-      await submissionRepository.updateSubmissionFeatureParents(parentUpdates);
+      await submissionRepository.updateSubmissionFeatureParentsByChildIds(parentUpdates);
     }
   }
 
@@ -827,7 +827,12 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
     propertyRecordBuckets.geometryRecords.push({
       submission_feature_id: feature.submission_feature_id,
       feature_type_property_id: matchingFeatureProperty.feature_type_property_id,
-      value: this.normalizeSpatialValue(submissionId, feature.submission_feature_id, propertyName, currentValue)
+      value: this.normalizeSpatialValue(
+        submissionId,
+        feature.submission_feature_id,
+        propertyName,
+        currentValue
+      ) as unknown as Record<string, unknown>
     });
   }
 

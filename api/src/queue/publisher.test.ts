@@ -366,7 +366,7 @@ describe('publisher', () => {
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
-      const data = { submissionId: 777 };
+      const data = { submissionId: 777, submissionUploadId: '550e8400-e29b-41d4-a716-446655440000' };
       const result = await publishIndexSubmissionFeaturesJob(mockConnection, data);
 
       expect(createQueueStub.calledOnce).to.be.true;
@@ -386,7 +386,10 @@ describe('publisher', () => {
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
-      await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 777 });
+      await publishIndexSubmissionFeaturesJob(mockConnection, {
+        submissionId: 777,
+        submissionUploadId: '550e8400-e29b-41d4-a716-446655440000'
+      });
 
       const options = sendStub.firstCall.args[2];
       expect(options.retryLimit).to.equal(3);
@@ -403,7 +406,10 @@ describe('publisher', () => {
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
-      await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 777 });
+      await publishIndexSubmissionFeaturesJob(mockConnection, {
+        submissionId: 777,
+        submissionUploadId: '550e8400-e29b-41d4-a716-446655440000'
+      });
 
       const options = sendStub.firstCall.args[2];
       expect(options.db).to.exist;
@@ -418,7 +424,10 @@ describe('publisher', () => {
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
-      await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 456 });
+      await publishIndexSubmissionFeaturesJob(mockConnection, {
+        submissionId: 456,
+        submissionUploadId: '550e8400-e29b-41d4-a716-446655440001'
+      });
 
       const options = sendStub.firstCall.args[2];
       expect(options.singletonKey).to.equal('submission-idx-456');
@@ -432,7 +441,10 @@ describe('publisher', () => {
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
-      const result = await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 777 });
+      const result = await publishIndexSubmissionFeaturesJob(mockConnection, {
+        submissionId: 777,
+        submissionUploadId: '550e8400-e29b-41d4-a716-446655440000'
+      });
 
       expect(result.status).to.equal('duplicate');
       expect((result as { status: 'duplicate'; message: string }).message).to.equal(
@@ -444,7 +456,10 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       sinon.stub(pgBossService, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
-      const result = await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 777 });
+      const result = await publishIndexSubmissionFeaturesJob(mockConnection, {
+        submissionId: 777,
+        submissionUploadId: '550e8400-e29b-41d4-a716-446655440000'
+      });
 
       expect(result.status).to.equal('error');
       expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');

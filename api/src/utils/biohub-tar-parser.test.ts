@@ -5,7 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as tar from 'tar-stream';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
-import { buildFeatureDataPayload, streamCodesets, streamFeatures, streamMedia } from './biohub-tar-parser';
+import { streamCodesets, streamFeatures, streamMedia } from './biohub-tar-parser';
 
 chai.use(sinonChai);
 
@@ -34,26 +34,6 @@ function bufferToStream(buffer: Buffer): Readable {
 describe('biohub-tar-parser', () => {
   afterEach(() => {
     sinon.restore();
-  });
-
-  describe('buildFeatureDataPayload', () => {
-    it('maps flattened feature content into raw submission_feature.data payload', () => {
-      const payload = buildFeatureDataPayload({
-        id: 'feature-1',
-        type: 'dataset',
-        properties: { name: 'Dataset A' },
-        content: ['feature-2'],
-        parent: null
-      });
-
-      expect(payload).to.deep.equal({
-        id: 'feature-1',
-        type: 'dataset',
-        properties: { name: 'Dataset A' },
-        references: ['feature-2'],
-        parent: null
-      });
-    });
   });
 
   describe('streamFeatures', () => {
@@ -86,7 +66,7 @@ describe('biohub-tar-parser', () => {
         { name: 'files/photo.jpg', content: 'binary-data' }
       ]);
 
-      const batches: Array<Array<{ id: string }>> = [];
+      const batches: Array<{ id: string }>[] = [];
       const result = await streamFeatures(bufferToStream(tarBuffer), 1, async (batch) => {
         batches.push(batch as Array<{ id: string }>);
       });
@@ -174,11 +154,13 @@ describe('biohub-tar-parser', () => {
           name: 'codes/agency.json',
           content: JSON.stringify({
             agency: {
+              key: 'agency',
               label: 'Agency',
               external_id: 'agency',
               description: 'Agency codes',
               codes: {
                 aarde: {
+                  key: 'aarde',
                   label: 'Aarde Environmental Ltd.',
                   external_id: 'aarde',
                   description: 'Aarde Environmental Ltd.'

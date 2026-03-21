@@ -2,7 +2,7 @@ import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
 import { SubmissionFeatureForReview } from '../models/submission';
-import { IngestionRepository } from '../repositories/ingestion/ingestion-repository';
+import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
 import {
   ICreateSubmission,
   ISubmissionFeature,
@@ -32,13 +32,13 @@ const defaultLog = getLogger('submission-service');
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
-  ingestionRepository: IngestionRepository;
+  ingestionRepository: FeatureIngestionRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.submissionRepository = new SubmissionRepository(connection);
-    this.ingestionRepository = new IngestionRepository(connection);
+    this.ingestionRepository = new FeatureIngestionRepository(connection);
   }
 
   /**

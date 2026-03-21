@@ -9,11 +9,24 @@ import { DBService } from './db-service';
 export class SubmissionFeaturePropertyTaxonService extends DBService {
   submissionFeaturePropertyTaxonRepository: SubmissionFeaturePropertyTaxonRepository;
 
+  /**
+   * Creates an instance of SubmissionFeaturePropertyTaxonService.
+   *
+   * @param {IDBConnection} connection
+   * @memberof SubmissionFeaturePropertyTaxonService
+   */
   constructor(connection: IDBConnection) {
     super(connection);
     this.submissionFeaturePropertyTaxonRepository = new SubmissionFeaturePropertyTaxonRepository(connection);
   }
 
+  /**
+   * Create a submission_feature_property_taxon row.
+   *
+   * @param {CreateSubmissionFeaturePropertyTaxon} payload
+   * @return {Promise<SubmissionFeaturePropertyTaxon>}
+   * @memberof SubmissionFeaturePropertyTaxonService
+   */
   createSubmissionFeaturePropertyTaxon(
     payload: CreateSubmissionFeaturePropertyTaxon
   ): Promise<SubmissionFeaturePropertyTaxon> {
@@ -33,6 +46,13 @@ export class SubmissionFeaturePropertyTaxonService extends DBService {
     return this.submissionFeaturePropertyTaxonRepository.insertSubmissionFeaturePropertyTaxons(payloads);
   }
 
+  /**
+   * Get a submission_feature_property_taxon row by id.
+   *
+   * @param {number} submissionFeaturePropertyTaxonId
+   * @return {Promise<SubmissionFeaturePropertyTaxon>}
+   * @memberof SubmissionFeaturePropertyTaxonService
+   */
   getSubmissionFeaturePropertyTaxonById(
     submissionFeaturePropertyTaxonId: number
   ): Promise<SubmissionFeaturePropertyTaxon> {
@@ -41,6 +61,13 @@ export class SubmissionFeaturePropertyTaxonService extends DBService {
     );
   }
 
+  /**
+   * Get submission_feature_property_taxon rows by submission feature id.
+   *
+   * @param {number} submissionFeatureId
+   * @return {Promise<SubmissionFeaturePropertyTaxon[]>}
+   * @memberof SubmissionFeaturePropertyTaxonService
+   */
   getSubmissionFeaturePropertyTaxonBySubmissionFeatureId(
     submissionFeatureId: number
   ): Promise<SubmissionFeaturePropertyTaxon[]> {
@@ -49,6 +76,13 @@ export class SubmissionFeaturePropertyTaxonService extends DBService {
     );
   }
 
+  /**
+   * Get submission_feature_property_taxon rows by feature type property id.
+   *
+   * @param {number} featureTypePropertyId
+   * @return {Promise<SubmissionFeaturePropertyTaxon[]>}
+   * @memberof SubmissionFeaturePropertyTaxonService
+   */
   getSubmissionFeaturePropertyTaxonByFeatureTypePropertyId(
     featureTypePropertyId: number
   ): Promise<SubmissionFeaturePropertyTaxon[]> {

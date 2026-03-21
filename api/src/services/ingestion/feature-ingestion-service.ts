@@ -148,14 +148,14 @@ export class FeatureIngestionService extends DBService {
    * @private
    * @param {IFlattenedBlock[]} features
    * @param {Map<string, number>} uuidToDbId
-   * @return {Array<{ submission_feature_id: number; parent_submission_feature_id: number }>}
+   * @return {{ submission_feature_id: number; parent_submission_feature_id: number }[]}
    * @memberof FeatureIngestionService
    */
   private buildParentUpdatePairs(
     features: IFlattenedBlock[],
     uuidToDbId: Map<string, number>
-  ): Array<{ submission_feature_id: number; parent_submission_feature_id: number }> {
-    const pairs: Array<{ submission_feature_id: number; parent_submission_feature_id: number }> = [];
+  ): { submission_feature_id: number; parent_submission_feature_id: number }[] {
+    const pairs: { submission_feature_id: number; parent_submission_feature_id: number }[] = [];
 
     for (const feature of features) {
       if (!feature.parent) {

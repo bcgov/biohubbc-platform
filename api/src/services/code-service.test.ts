@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { FeatureTypeWithFeatureProperties, FEATURE_PROPERTY_TYPE } from '../models/feature-property';
+import { FeatureTypeWithFeaturePropertiesCode } from '../models/feature-property';
 import { CodeRepository } from '../repositories/code-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CodeService } from './code-service';
@@ -18,7 +18,7 @@ describe('codeService', () => {
     it('should return id value', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      const mockFeatureTypePropertyCodes: FeatureTypeWithFeatureProperties[] = [
+      const mockFeatureTypePropertyCodes: FeatureTypeWithFeaturePropertiesCode[] = [
         {
           feature_type: {
             feature_type_id: 1,
@@ -31,7 +31,7 @@ describe('codeService', () => {
               feature_property_name: 'name',
               feature_property_display_name: 'Name',
               feature_property_type_id: 1,
-              feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
+              feature_property_type_name: 'string'
             }
           ]
         }
@@ -85,7 +85,7 @@ describe('codeService', () => {
     it('should return id value', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      const expectedResult: FeatureTypeWithFeatureProperties[] = [
+      const expectedResult: FeatureTypeWithFeaturePropertiesCode[] = [
         {
           feature_type: {
             feature_type_id: 1,
@@ -98,14 +98,14 @@ describe('codeService', () => {
               feature_property_name: 'name',
               feature_property_display_name: 'Name',
               feature_property_type_id: 1,
-              feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
+              feature_property_type_name: 'string'
             },
             {
               feature_property_id: 2,
               feature_property_name: 'age',
               feature_property_display_name: 'Age',
               feature_property_type_id: 2,
-              feature_property_type_name: FEATURE_PROPERTY_TYPE.NUMBER
+              feature_property_type_name: 'number'
             }
           ]
         },
@@ -121,7 +121,7 @@ describe('codeService', () => {
               feature_property_name: 'filename',
               feature_property_display_name: 'Filename',
               feature_property_type_id: 1,
-              feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
+              feature_property_type_name: 'string'
             }
           ]
         }
@@ -138,7 +138,7 @@ describe('codeService', () => {
             feature_property_name: 'name',
             feature_property_display_name: 'Name',
             feature_property_type_id: 1,
-            feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
+            feature_property_type_name: 'string'
           },
           {
             feature_type_id: 1,
@@ -148,7 +148,7 @@ describe('codeService', () => {
             feature_property_name: 'age',
             feature_property_display_name: 'Age',
             feature_property_type_id: 2,
-            feature_property_type_name: FEATURE_PROPERTY_TYPE.NUMBER
+            feature_property_type_name: 'number'
           },
           {
             feature_type_id: 2,
@@ -158,7 +158,7 @@ describe('codeService', () => {
             feature_property_name: 'filename',
             feature_property_display_name: 'Filename',
             feature_property_type_id: 1,
-            feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
+            feature_property_type_name: 'string'
           }
         ]);
 
