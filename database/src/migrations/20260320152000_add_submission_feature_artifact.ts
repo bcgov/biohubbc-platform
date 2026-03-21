@@ -1,0 +1,99 @@
+import type { Knex } from 'knex';
+
+/**
+ * Add submission_feature_artifact join table for linking file/media submission
+ * features to backing artifacts.
+ *
+ * @export
+ * @param {Knex} knex
+ * @return {*}  {Promise<void>}
+ */
+export async function up(knex: Knex): Promise<void> {
+  await knex.raw(`
+    SET SEARCH_PATH = biohub, public;
+
+    CREATE TABLE submission_feature_artifact (
+      submission_feature_artifact_id integer GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+      submission_feature_id integer NOT NULL,
+      artifact_id uuid NOT NULL,
+      record_end_date timestamptz(6),
+      create_date timestamptz(6) DEFAULT now() NOT NULL,
+      create_user integer NOT NULL,
+      update_date timestamptz(6),
+      update_user integer,
+      revision_count integer DEFAULT 0 NOT NULL,
+      CONSTRAINT submission_feature_artifact_pk PRIMARY KEY (submission_feature_artifact_id),
+      CONSTRAINT submission_feature_artifact_fk1
+        FOREIGN KEY (submission_feature_id)
+        REFERENCES submission_feature(submission_feature_id),
+      CONSTRAINT submission_feature_artifact_fk2
+        FOREIGN KEY (artifact_id)
+        REFERENCES artifact(artifact_id)
+    );
+
+    CREATE INDEX submission_feature_artifact_idx1 ON submission_feature_artifact(submission_feature_id);
+    CREATE INDEX submission_feature_artifact_idx2 ON submission_feature_artifact(artifact_id);
+    CREATE UNIQUE INDEX submission_feature_artifact_idx3
+      ON submission_feature_artifact (submission_feature_id, artifact_id)
+      WHERE record_end_date IS NULL;
+
+    COMMENT ON TABLE submission_feature_artifact IS 'Join table linking submission features to backing artifacts.';
+    COMMENT ON COLUMN submission_feature_artifact.submission_feature_artifact_id IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN submission_feature_artifact.submission_feature_id IS 'Foreign key to the submission_feature table.';
+    COMMENT ON COLUMN submission_feature_artifact.artifact_id IS 'Foreign key to the artifact table.';
+    COMMENT ON COLUMN submission_feature_artifact.record_end_date IS 'Date/time the record was retired.';
+    COMMENT ON COLUMN submission_feature_artifact.create_date IS 'The datetime the record was created.';
+    COMMENT ON COLUMN submission_feature_artifact.create_user IS 'The id of the user who created the record.';
+    COMMENT ON COLUMN submission_feature_artifact.update_date IS 'The datetime the record was updated.';
+    COMMENT ON COLUMN submission_feature_artifact.update_user IS 'The id of the user who updated the record.';
+    COMMENT ON COLUMN submission_feature_artifact.revision_count IS 'Revision count used for concurrency control.';
+
+    CREATE TRIGGER audit_submission_feature_artifact
+      BEFORE INSERT OR UPDATE OR DELETE ON submission_feature_artifact
+      FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
+
+    CREATE TRIGGER journal_submission_feature_artifact
+      AFTER INSERT OR UPDATE OR DELETE ON submission_feature_artifact
+      FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
+
+    ALTER TABLE upload_artifact
+      ADD COLUMN IF NOT EXISTS path text;
+
+    ALTER TABLE upload_artifact
+      DROP CONSTRAINT IF EXISTS upload_artifact_archive_path_chk;
+
+    ALTER TABLE upload_artifact
+      ADD CONSTRAINT upload_artifact_archive_path_chk
+      CHECK (
+        (upload_archive_id IS NULL AND path IS NULL)
+        OR
+        (upload_archive_id IS NOT NULL AND path IS NOT NULL)
+      );
+
+    CREATE INDEX IF NOT EXISTS upload_artifact_path_idx
+      ON upload_artifact(path);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS upload_artifact_upload_path_uq
+      ON upload_artifact(upload_id, path)
+      WHERE path IS NOT NULL;
+
+    COMMENT ON COLUMN upload_artifact.path IS 'Normalized archive-relative path for extracted archive files. NULL for non-archive artifacts.';
+  `);
+}
+
+export async function down(knex: Knex): Promise<void> {
+  await knex.raw(`
+    ALTER TABLE upload_artifact
+      DROP CONSTRAINT IF EXISTS upload_artifact_archive_path_chk;
+
+    DROP INDEX IF EXISTS upload_artifact_upload_path_uq;
+    DROP INDEX IF EXISTS upload_artifact_path_idx;
+    ALTER TABLE upload_artifact
+      DROP COLUMN IF EXISTS path;
+
+    DROP TRIGGER IF EXISTS journal_submission_feature_artifact ON submission_feature_artifact;
+    DROP TRIGGER IF EXISTS audit_submission_feature_artifact ON submission_feature_artifact;
+
+    DROP TABLE IF EXISTS submission_feature_artifact;
+  `);
+}

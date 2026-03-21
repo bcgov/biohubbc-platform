@@ -12,10 +12,6 @@ import { BucketType, ObjectStorageService } from '../object-storage/object-stora
 import type { TarCodesets } from './submission-ingestion-codes-service.interface';
 
 const CONTRIBUTOR_CODE_INSERT_BATCH_SIZE = 10000;
-type ExistingContributorCodeset = Awaited<
-  ReturnType<ContributorCodesetService['getContributorCodesetsByContributorIdAndKeys']>
->[number];
-type ExistingContributorCodesetMap = Map<string, ExistingContributorCodeset>;
 
 /**
  * Ingest contributor codesets/codes parsed from tarball entries.
@@ -97,7 +93,7 @@ export class CodesetIngestionService extends DBService {
     >[number]
   ): CreateContributorCodeset {
     const resolvedLabel = this.resolveRequiredLabel(
-      codeset.label ?? undefined,
+      codeset.label,
       existingCodeset?.label,
       `codeset "${codesetKey}"`
     );
@@ -105,7 +101,7 @@ export class CodesetIngestionService extends DBService {
     return {
       contributor_id: contributorId,
       key: codesetKey,
-      external_id: normalizeOptionalText(codeset.external_id) ?? undefined,
+      external_id: normalizeOptionalText(codeset.external_id),
       label: resolvedLabel.toLowerCase(),
       description: normalizeOptionalText(codeset.description, true)
     };
@@ -126,13 +122,13 @@ export class CodesetIngestionService extends DBService {
   ): CreateContributorCodesetCode[] {
     return Object.entries(codes).map(([codeKey, code]) => ({
       label: this.resolveRequiredLabel(
-        code.label ?? undefined,
+        code.label,
         existingCodesByKey.get(codeKey),
         `code "${codeKey}" in contributor_codeset_id=${contributorCodesetId}`
       ).toLowerCase(),
       contributor_codeset_id: contributorCodesetId,
       key: codeKey,
-      external_id: normalizeOptionalText(code.external_id) ?? undefined,
+      external_id: normalizeOptionalText(code.external_id),
       description: normalizeOptionalText(code.description, true)
     }));
   }
@@ -164,11 +160,7 @@ export class CodesetIngestionService extends DBService {
    * @param {string} context
    * @returns {string}
    */
-  private resolveRequiredLabel(
-    incomingLabel: string | undefined,
-    existingLabel: string | undefined,
-    context: string
-  ): string {
+  private resolveRequiredLabel(incomingLabel: string | undefined, existingLabel: string | undefined, context: string): string {
     const normalizedIncomingLabel = normalizeOptionalText(incomingLabel);
     if (normalizedIncomingLabel) {
       return normalizedIncomingLabel;
@@ -196,7 +188,12 @@ export class CodesetIngestionService extends DBService {
   private async getExistingCodesetsByKey(
     contributorId: number,
     codesetKeys: string[]
-  ): Promise<ExistingContributorCodesetMap> {
+  ): Promise<
+    Map<
+      string,
+      Awaited<ReturnType<ContributorCodesetService['getContributorCodesetsByContributorIdAndKeys']>>[number]
+    >
+  > {
     const existingCodesets = await this.contributorCodesetService.getContributorCodesetsByContributorIdAndKeys(
       contributorId,
       codesetKeys
@@ -209,14 +206,16 @@ export class CodesetIngestionService extends DBService {
    * Fetch existing codes for existing contributor codesets and index them by codeset id then key.
    *
    * @private
-   * @param {ExistingContributorCodesetMap} existingCodesetMap
+   * @param {Map<string, Awaited<ReturnType<ContributorCodesetService['getContributorCodesetsByContributorIdAndKeys']>>[number]>} existingCodesetsByKey
    * @returns {Promise<Map<number, Map<string, string>>>}
    */
   private async getExistingCodesByCodesetId(
-    existingCodesetMap: ExistingContributorCodesetMap
+    existingCodesetsByKey: Map<
+      string,
+      Awaited<ReturnType<ContributorCodesetService['getContributorCodesetsByContributorIdAndKeys']>>[number]
+    >
   ): Promise<Map<number, Map<string, string>>> {
-    // Step 1: Flatten keyed codesets into contributor_codeset_id values for one bulk fetch.
-    const contributorCodesetIds = [...existingCodesetMap.values()].map(
+    const contributorCodesetIds = [...existingCodesetsByKey.values()].map(
       (existingCodeset) => existingCodeset.contributor_codeset_id
     );
 
@@ -224,12 +223,10 @@ export class CodesetIngestionService extends DBService {
       return new Map();
     }
 
-    // Step 2: Fetch all existing code rows for those codeset ids in one query.
     const existingCodes = await this.contributorCodesetCodeService.getContributorCodesetCodesByContributorCodesetIds(
       contributorCodesetIds
     );
 
-    // Step 3: Re-index rows to Map<contributor_codeset_id, Map<code_key, code_label>> for O(1) lookups.
     const existingCodesByCodesetId = new Map<number, Map<string, string>>();
     for (const existingCode of existingCodes) {
       const existingCodesForCodeset =

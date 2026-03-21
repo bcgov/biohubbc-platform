@@ -1,4 +1,4 @@
-import { ISearchFeaturePropertyCondition } from '../services/search-feature-service.interface';
+import { SearchFeaturePropertyCondition } from '../services/search-feature-service.interface';
 
 /**
  * Normalizes a property condition value for consistent handling in search queries.
@@ -31,7 +31,7 @@ import { ISearchFeaturePropertyCondition } from '../services/search-feature-serv
  *          `string | number | boolean | string[] | number[]`
  */
 export const normalizeSearchValue = (
-  val: ISearchFeaturePropertyCondition['value']
+  val: SearchFeaturePropertyCondition['value']
 ): string | number | boolean | string[] | number[] => {
   if (Array.isArray(val)) {
     if (val.every((v): v is number => typeof v === 'number')) {

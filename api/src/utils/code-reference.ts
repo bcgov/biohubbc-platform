@@ -1,3 +1,5 @@
+import type { TarCodesets } from '../services/ingestion/submission-ingestion-codes-service.interface';
+
 export interface CodeReference {
   slug: string;
   contributorCodesetKey: string;
@@ -10,7 +12,7 @@ export interface CodeReference {
  * Accepted format: `code::<contributor-codeset-key>::<contributor-codeset-code-key>`.
  *
  * @param {string} value
- * @return {( | null)}
+ * @return {(CodeReference | null)}
  */
 export const parseCodeReference = (value: string): CodeReference | null => {
   const split = value.trim().split('::');
@@ -31,4 +33,22 @@ export const parseCodeReference = (value: string): CodeReference | null => {
     contributorCodesetKey,
     contributorCodesetCodeKey
   };
+};
+
+/**
+ * Resolve a parsed code reference against loaded contributor codesets.
+ *
+ * @param {TarCodesets} codesets
+ * @param {CodeReference} codeReference
+ * @return {unknown}
+ */
+export const resolveCodeReference = (codesets: TarCodesets, codeReference: CodeReference): unknown => {
+  const contributorCodeset = codesets[codeReference.contributorCodesetKey];
+  const codes = contributorCodeset?.codes;
+
+  if (!codes) {
+    return undefined;
+  }
+
+  return codes[codeReference.contributorCodesetCodeKey];
 };

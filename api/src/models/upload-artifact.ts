@@ -1,10 +1,11 @@
 import { z } from 'zod';
 
-export const UploadArtifactRoleZod = z.enum(['feature', 'attachment']);
+export const UploadArtifactRoleZod = z.enum(['feature', 'attachment', 'codeset']);
 
 export enum UploadArtifactRoleEnum {
   FEATURE = 'feature',
-  ATTACHMENT = 'attachment'
+  ATTACHMENT = 'attachment',
+  CODESET = 'codeset'
 }
 
 /**
@@ -44,10 +45,3 @@ export const UpdateUploadArtifact = z.object({
   path: z.string().nullable().optional()
 });
 export type UpdateUploadArtifact = z.infer<typeof UpdateUploadArtifact>;
-
-export const ArtifactReferenceResolution = z.object({
-  path: z.string(),
-  artifact_id: z.string().uuid()
-});
-
-export type ArtifactReferenceResolution = z.infer<typeof ArtifactReferenceResolution>;
