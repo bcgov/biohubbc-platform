@@ -132,6 +132,29 @@ describe('ContributorRepository', () => {
   });
 
   describe('getContributorBySubmissionUploadId', () => {
+    it('queries submission.contributor_id through submission_upload and submission CTEs', async () => {
+      const mockDBConnection = getMockDBConnection({
+        sql: async (sqlStatement: any) => {
+          expect(sqlStatement.text).to.include('WITH w_submission_upload AS');
+          expect(sqlStatement.text).to.include('FROM w_submission_upload wsu');
+          expect(sqlStatement.text).to.include('INNER JOIN submission s ON s.submission_id = wsu.submission_id');
+          expect(sqlStatement.text).to.include('FROM w_submission ws');
+          expect(sqlStatement.text).to.include('INNER JOIN contributor c ON c.contributor_id = ws.contributor_id');
+
+          return {
+            rowCount: 1,
+            rows: [{ contributor_id: 42, client_id: 'my-client-id' }]
+          } as any as Promise<QueryResult<any>>;
+        }
+      });
+
+      const repository = new ContributorRepository(mockDBConnection);
+
+      const result = await repository.getContributorBySubmissionUploadId('00000000-0000-0000-0000-000000000001');
+
+      expect(result).to.eql({ contributor_id: 42, client_id: 'my-client-id' });
+    });
+
     it('returns contributor when found', async () => {
       const mockQueryResponse = {
         rowCount: 1,
@@ -196,6 +219,27 @@ describe('ContributorRepository', () => {
   });
 
   describe('getContributorBySubmissionId', () => {
+    it('queries submission.contributor_id with contributor-system-user fallback', async () => {
+      const mockDBConnection = getMockDBConnection({
+        sql: async (sqlStatement: any) => {
+          expect(sqlStatement.text).to.include('WITH w_submission AS');
+          expect(sqlStatement.text).to.include('FROM w_submission ws');
+          expect(sqlStatement.text).to.include('INNER JOIN contributor c ON c.contributor_id = ws.contributor_id');
+
+          return {
+            rowCount: 1,
+            rows: [{ contributor_id: 42, client_id: 'my-client-id' }]
+          } as any as Promise<QueryResult<any>>;
+        }
+      });
+
+      const repository = new ContributorRepository(mockDBConnection);
+
+      const result = await repository.getContributorBySubmissionId(123);
+
+      expect(result).to.eql({ contributor_id: 42, client_id: 'my-client-id' });
+    });
+
     it('returns contributor when found', async () => {
       const mockQueryResponse = {
         rowCount: 1,

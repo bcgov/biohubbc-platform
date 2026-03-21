@@ -47,21 +47,32 @@ export class ContributorRepository extends BaseRepository {
    * @memberof ContributorRepository
    */
   async getContributorBySubmissionUploadId(submissionUploadId: string): Promise<Contributor> {
+    console.log(submissionUploadId, 'submissuioiploadid');
     const sql = SQL`
+      WITH w_submission_upload AS (
+        SELECT
+          submission_id
+        FROM submission_upload
+        WHERE submission_upload_id = ${submissionUploadId}
+      ),
+      w_submission AS (
+        SELECT
+          s.contributor_id
+        FROM w_submission_upload wsu
+        INNER JOIN submission s ON s.submission_id = wsu.submission_id
+        WHERE (s.record_end_date IS NULL OR s.record_end_date > NOW())
+      )
       SELECT
         c.contributor_id,
         c.client_id
-      FROM submission_upload su
-      INNER JOIN submission s ON s.submission_id = su.submission_id
-      INNER JOIN contributor_system_user csu ON csu.system_user_id = s.system_user_id
-      INNER JOIN contributor c ON c.contributor_id = csu.contributor_id
-      WHERE su.submission_upload_id = ${submissionUploadId}
-        AND (s.record_end_date IS NULL OR s.record_end_date > NOW())
-        AND csu.record_end_date IS NULL
-        AND c.record_end_date IS NULL;
+      FROM w_submission ws
+      INNER JOIN contributor c ON c.contributor_id = ws.contributor_id
+      WHERE c.record_end_date IS NULL;
     `;
 
     const response = await this.connection.sql(sql, Contributor);
+
+    console.log(response.rows);
 
     if (response.rowCount === 0) {
       throw new ApiNotFoundError('Contributor not found for submission upload', [
@@ -89,16 +100,19 @@ export class ContributorRepository extends BaseRepository {
    */
   async getContributorBySubmissionId(submissionId: number): Promise<Contributor> {
     const sql = SQL`
+      WITH w_submission AS (
+        SELECT
+          contributor_id
+        FROM submission
+        WHERE submission_id = ${submissionId}
+          AND (record_end_date IS NULL OR record_end_date > NOW())
+      )
       SELECT
         c.contributor_id,
         c.client_id
-      FROM submission s
-      INNER JOIN contributor_system_user csu ON csu.system_user_id = s.system_user_id
-      INNER JOIN contributor c ON c.contributor_id = csu.contributor_id
-      WHERE s.submission_id = ${submissionId}
-        AND (s.record_end_date IS NULL OR s.record_end_date > NOW())
-        AND csu.record_end_date IS NULL
-        AND c.record_end_date IS NULL;
+      FROM w_submission ws
+      INNER JOIN contributor c ON c.contributor_id = ws.contributor_id
+      WHERE c.record_end_date IS NULL;
     `;
 
     const response = await this.connection.sql(sql, Contributor);

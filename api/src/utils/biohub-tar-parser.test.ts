@@ -109,7 +109,9 @@ describe('biohub-tar-parser', () => {
         await streamFeatures(bufferToStream(tarBuffer), 10000, async () => undefined);
         expect.fail('expected streamFeatures to throw');
       } catch (error) {
-        expect((error as Error).message).to.equal('Feature entry failed shallow validation');
+        expect((error as Error).message).to.include('Feature entry failed shallow validation');
+        expect((error as Error).message).to.include('entry=features/bad.json');
+        expect((error as Error).message).to.include('id');
       }
     });
 
@@ -214,7 +216,9 @@ describe('biohub-tar-parser', () => {
         await streamCodesets(bufferToStream(tarBuffer), async () => undefined);
         expect.fail('expected streamCodesets to throw');
       } catch (error) {
-        expect((error as Error).message).to.equal('Codeset entry failed shallow validation');
+        expect((error as Error).message).to.include('Codeset entry failed shallow validation');
+        expect((error as Error).message).to.include('entry=codes/agency.json');
+        expect((error as Error).message).to.include('categories');
       }
     });
   });

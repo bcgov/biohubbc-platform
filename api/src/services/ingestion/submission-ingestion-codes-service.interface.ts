@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const TarCodesetCode = z.object({
+  key: z.string(),
   label: z.string().trim().min(1).nullable(),
   external_id: z.string().nullable(),
   description: z.string().nullable()
@@ -8,6 +9,7 @@ export const TarCodesetCode = z.object({
 export type TarCodesetCode = z.infer<typeof TarCodesetCode>;
 
 export const TarCodeset = z.object({
+  key: z.string(),
   label: z.string().trim().min(1).nullable(),
   external_id: z.string().nullable(),
   description: z.string().nullable(),

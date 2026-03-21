@@ -9,6 +9,7 @@ import { Knex } from 'knex';
  * 5) keep legacy feature_property_type names (datetime/spatial)
  * 6) upload_artifact role = codeset
  * 7) submission_feature_property_timestamp value split (date_value/time_value)
+ * 8) submission.record_end_date defaults to active records (NULL)
  */
 export async function up(knex: Knex): Promise<void> {
   await knex.raw(`--sql
@@ -114,6 +115,15 @@ export async function up(knex: Knex): Promise<void> {
 
     ALTER TABLE submission_feature_property_timestamp
       DROP COLUMN IF EXISTS value;
+
+    --------------------------------------------------------------------------------
+    -- 8) Ensure submissions are active by default
+    --------------------------------------------------------------------------------
+    ALTER TABLE submission
+      ALTER COLUMN record_end_date DROP DEFAULT;
+
+    ALTER TABLE submission
+      ALTER COLUMN record_end_date DROP NOT NULL;
   `);
 }
 
@@ -207,5 +217,18 @@ export async function down(knex: Knex): Promise<void> {
       DROP COLUMN IF EXISTS status;
 
     DROP TYPE IF EXISTS submission_upload_job_status;
+
+    --------------------------------------------------------------------------------
+    -- 5) Restore legacy submission.record_end_date defaults/constraint
+    --------------------------------------------------------------------------------
+    UPDATE submission
+    SET record_end_date = NOW()
+    WHERE record_end_date IS NULL;
+
+    ALTER TABLE submission
+      ALTER COLUMN record_end_date SET DEFAULT now();
+
+    ALTER TABLE submission
+      ALTER COLUMN record_end_date SET NOT NULL;
   `);
 }

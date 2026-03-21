@@ -105,21 +105,39 @@ function drainStream(stream: Readable): Promise<void> {
 }
 
 /**
+ * Build a compact, readable message from zod issues.
+ *
+ * @param {ZodError} error
+ * @returns {string}
+ */
+function formatZodIssues(error: ZodError): string {
+  return error.issues
+    .map((issue) => {
+      const path = issue.path.length ? issue.path.join('.') : '<root>';
+      return `${path}: ${issue.message}`;
+    })
+    .join('; ');
+}
+
+/**
  * Parse and shallow-validate one codeset JSON entry.
  *
  * Expected JSON shape is an object where each top-level key is a codeset key.
  * Validation errors are normalized to a stable ingestion error message.
  *
  * @param {unknown} value - Parsed JSON payload from a `codes/*.json` file.
+ * @param {string} entryName - Tar entry path for context.
  * @returns {TarCodesets}
  * @throws {Error} When payload shape does not satisfy `TarCodesets`.
  */
-function extractCodesetsFromTarballEntry(value: unknown): TarCodesets {
+function extractCodesetsFromTarballEntry(value: unknown, entryName: string): TarCodesets {
   try {
     return TarCodesets.parse(value);
   } catch (error) {
     if (error instanceof ZodError) {
-      throw new Error('Codeset entry failed shallow validation');
+      throw new Error(
+        `Codeset entry failed shallow validation: entry=${entryName}; issues=${formatZodIssues(error)}`
+      );
     }
 
     throw error;
@@ -135,15 +153,18 @@ function extractCodesetsFromTarballEntry(value: unknown): TarCodesets {
  * - coerces missing parent to `null`
  *
  * @param {unknown} value - Parsed JSON object for a single feature.
+ * @param {string} entryName - Tar entry path for context.
  * @returns {IFlattenedBlock}
  * @throws {Error} When required fields are missing or incorrectly typed.
  */
-function extractFeatureFromTarballEntry(value: unknown): IFlattenedBlock {
+function extractFeatureFromTarballEntry(value: unknown, entryName: string): IFlattenedBlock {
   try {
     return FlattenedFeatureSchema.parse(value);
   } catch (error) {
     if (error instanceof ZodError) {
-      throw new Error('Feature entry failed shallow validation');
+      throw new Error(
+        `Feature entry failed shallow validation: entry=${entryName}; issues=${formatZodIssues(error)}`
+      );
     }
 
     throw error;
@@ -226,7 +247,7 @@ export async function streamFeatures(
         const parsedEntries = Array.isArray(parsed) ? parsed : [parsed];
 
         for (const parsedEntry of parsedEntries) {
-          const block = extractFeatureFromTarballEntry(parsedEntry);
+          const block = extractFeatureFromTarballEntry(parsedEntry, entryName);
           pendingBlocks.push(block);
           featureCount += 1;
 
@@ -297,7 +318,7 @@ export async function streamCodesets(
 
         const buffer = await streamToBuffer(stream);
         const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
-        const codesets = extractCodesetsFromTarballEntry(parsed);
+        const codesets = extractCodesetsFromTarballEntry(parsed, entryName);
 
         await ingestCodesets(codesets);
         next();
