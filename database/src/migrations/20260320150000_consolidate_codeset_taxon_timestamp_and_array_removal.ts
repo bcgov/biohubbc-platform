@@ -49,8 +49,8 @@ export async function up(knex: Knex): Promise<void> {
     ALTER TABLE upload_artifact
       ADD CONSTRAINT upload_artifact_archive_path_chk
       CHECK (
-        path IS NULL
-        OR upload_archive_id IS NOT NULL
+        (upload_archive_id IS NULL AND path IS NULL)
+        OR (upload_archive_id IS NOT NULL AND path IS NOT NULL)
       );
 
     CREATE INDEX IF NOT EXISTS upload_artifact_path_idx

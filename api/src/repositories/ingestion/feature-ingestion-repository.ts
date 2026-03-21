@@ -1,6 +1,7 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { ApiExecuteSQLError } from '../../errors/api-error';
+import { IngestionValidationError } from '../../errors/ingestion-validation-error';
 import { FeatureTypeWithProperties, FeatureTypeWithPropertiesRow } from '../../models/feature-type';
 import { CreateSubmissionFeatureIngestionRecord, InsertSubmissionFeatureRecord } from '../../models/submission-feature';
 import { BaseRepository } from '../base-repository';
@@ -73,6 +74,26 @@ export class FeatureIngestionRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement);
     if (response.rowCount !== records.length) {
+      const uniqueFeatureTypeNames = [...new Set(featureTypeNames)];
+      const existingFeatureTypes = await this.connection.sql(
+        SQL`
+          SELECT name
+          FROM feature_type
+          WHERE record_end_date IS NULL
+            AND name = ANY(${uniqueFeatureTypeNames}::text[]);
+        `,
+        z.object({ name: z.string() })
+      );
+
+      const existingFeatureTypeSet = new Set(existingFeatureTypes.rows.map((row) => row.name));
+      const missingFeatureTypes = uniqueFeatureTypeNames.filter((name) => !existingFeatureTypeSet.has(name));
+
+      if (missingFeatureTypes.length) {
+        throw new IngestionValidationError(
+          `Failed to bulk insert submission feature records: unknown feature type(s): ${missingFeatureTypes.join(', ')}`
+        );
+      }
+
       throw new ApiExecuteSQLError('Failed to bulk insert submission feature records', [
         'FeatureIngestionRepository->insertSubmissionFeatureRecords',
         `rowCount was ${response.rowCount ?? 'null'}, expected ${records.length}`
@@ -90,7 +111,9 @@ export class FeatureIngestionRepository extends BaseRepository {
    * @return {*}  {Promise<{ submission_feature_id: number }>}
    * @memberof FeatureIngestionRepository
    */
-  async insertSubmissionFeatureRecord(record: InsertSubmissionFeatureRecord): Promise<{ submission_feature_id: number }> {
+  async insertSubmissionFeatureRecord(
+    record: InsertSubmissionFeatureRecord
+  ): Promise<{ submission_feature_id: number }> {
     const {
       submissionId,
       submissionUploadId,

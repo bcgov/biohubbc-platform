@@ -302,5 +302,4 @@ describe('ContributorRepository', () => {
       }
     });
   });
-
 });

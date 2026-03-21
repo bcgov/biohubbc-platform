@@ -23,7 +23,9 @@ export class IngestionRepository extends BaseRepository {
    * @return {*}  {Promise<{ submission_feature_id: number }>}
    * @memberof IngestionRepository
    */
-  async insertSubmissionFeatureRecord(record: InsertSubmissionFeatureRecord): Promise<{ submission_feature_id: number }> {
+  async insertSubmissionFeatureRecord(
+    record: InsertSubmissionFeatureRecord
+  ): Promise<{ submission_feature_id: number }> {
     const {
       submissionId,
       submissionUploadId,

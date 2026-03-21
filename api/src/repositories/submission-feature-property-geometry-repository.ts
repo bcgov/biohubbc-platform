@@ -2,8 +2,8 @@ import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import {
   CreateSubmissionFeaturePropertyGeometry,
-  SubmissionFeaturePropertyGeometrySchema,
-  SubmissionFeaturePropertyGeometry
+  SubmissionFeaturePropertyGeometry,
+  SubmissionFeaturePropertyGeometrySchema
 } from '../models/submission-feature-property-geometry';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';

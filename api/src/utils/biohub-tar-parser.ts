@@ -235,7 +235,8 @@ export async function streamFeatures(
         }
 
         const entryName = stripArchivePrefix(header.name);
-        const isFeatureJson = entryName.startsWith('features/') && entryName.endsWith('.json');
+        const isRootFeatureJson = !entryName.includes('/') && entryName.endsWith('.json');
+        const isFeatureJson = entryName.startsWith('features/') || isRootFeatureJson;
 
         if (!isFeatureJson) {
           await drainStream(stream);

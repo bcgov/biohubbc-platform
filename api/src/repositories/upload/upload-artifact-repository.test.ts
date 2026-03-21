@@ -4,7 +4,12 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
-import { CreateUploadArtifact, UpdateUploadArtifact, UploadArtifact, UploadArtifactRoleEnum } from '../../models/upload-artifact';
+import {
+  CreateUploadArtifact,
+  UpdateUploadArtifact,
+  UploadArtifact,
+  UploadArtifactRoleEnum
+} from '../../models/upload-artifact';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { UploadArtifactRepository } from './upload-artifact-repository';
 
