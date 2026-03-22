@@ -2,6 +2,7 @@ import { IDBConnection } from '../../database/db';
 import { parseFeatureUrn } from '../../database/urn-utils';
 import { CreatePolicy, Policy, UpdatePolicy } from '../../models/policy';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
+import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
 import {
@@ -12,17 +13,22 @@ import {
 } from './policy-service.interface';
 import { PolicyStatementConditionService } from './policy-statement-condition-service';
 import { PolicyStatementService } from './policy-statement-service';
+import { SecurityScopeService } from './security-scope-service';
 
 export class PolicyService extends DBService {
   policyRepository: PolicyRepository;
   policyStatementService: PolicyStatementService;
   policyStatementConditionService: PolicyStatementConditionService;
+  securityScopeService: SecurityScopeService;
+  teamPolicyRepository: TeamPolicyRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.policyRepository = new PolicyRepository(connection);
     this.policyStatementService = new PolicyStatementService(connection);
     this.policyStatementConditionService = new PolicyStatementConditionService(connection);
+    this.securityScopeService = new SecurityScopeService(connection);
+    this.teamPolicyRepository = new TeamPolicyRepository(connection);
   }
 
   /**
@@ -96,14 +102,33 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Delete a policy record.
+   * Delete a policy and clean up its security scope mappings.
+   *
+   * Must fetch affected team IDs and statement IDs BEFORE soft-deleting the policy,
+   * because after soft-delete the team_policy JOIN won't find the policy and
+   * getPolicyStatements filters on record_end_date IS NULL.
    *
    * @param {string} policyId - The id of the policy to delete
    * @return {Promise<void>}
    * @memberof PolicyService
    */
-  deletePolicy(policyId: string): Promise<void> {
-    return this.policyRepository.deletePolicy(policyId);
+  async deletePolicy(policyId: string): Promise<void> {
+    // Gather affected teams and statements before soft-delete makes them unreachable
+    const [teamPolicies, statements] = await Promise.all([
+      this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] }),
+      this.policyStatementService.getPolicyStatements(policyId)
+    ]);
+
+    const affectedTeamIds = teamPolicies.map((tp) => tp.team_id);
+    const statementIds = statements.map((s) => s.policy_statement_id);
+
+    // Soft-delete the policy
+    await this.policyRepository.deletePolicy(policyId);
+
+    // Clean up derived scope mappings and rebuild affected teams' scope grants
+    if (statementIds.length > 0) {
+      await this.securityScopeService.cleanupScopesForDeletedStatements(statementIds, affectedTeamIds);
+    }
   }
 
   /**
@@ -198,6 +223,15 @@ export class PolicyService extends DBService {
       })
     );
 
+    // Create security scopes for each statement — a new policy has no teams yet,
+    // so no team scope grants are needed. Anchor computation is triggered for new scopes.
+    for (const stmt of createdStatements) {
+      await this.securityScopeService.createScopeForPolicyStatement(
+        stmt.policy_statement_id,
+        stmt.submission_feature_urn
+      );
+    }
+
     return { ...policy, statements: createdStatements };
   }
 
@@ -218,8 +252,16 @@ export class PolicyService extends DBService {
   ): Promise<PolicyWithStatements> {
     const policy = await this.updatePolicy(policyId, policyData);
 
-    // Delete existing statements (soft delete)
+    // Collect old statement IDs and affected teams before soft-deleting statements.
+    // After soft-delete, the policy_statement_scope mappings must be cleaned up
+    // and affected teams' scope grants rebuilt from the remaining active chain.
     const existingStatements = await this.policyStatementService.getPolicyStatements(policyId);
+    const oldStatementIds = existingStatements.map((s) => s.policy_statement_id);
+
+    const teamPolicies = await this.teamPolicyRepository.getTeamPolicies({ policyIds: [policyId] });
+    const affectedTeamIds = teamPolicies.map((tp) => tp.team_id);
+
+    // Soft-delete old statements
     await Promise.all(
       existingStatements.map((stmt) => this.policyStatementService.deletePolicyStatement(stmt.policy_statement_id))
     );
@@ -247,6 +289,19 @@ export class PolicyService extends DBService {
         return { ...statement, conditions };
       })
     );
+
+    // Create scopes for new statements (triggers anchor computation for new scopes)
+    for (const stmt of createdStatements) {
+      await this.securityScopeService.createScopeForPolicyStatement(
+        stmt.policy_statement_id,
+        stmt.submission_feature_urn
+      );
+    }
+
+    // Clean up old scope mappings and rebuild affected teams' scope grants
+    if (oldStatementIds.length > 0) {
+      await this.securityScopeService.cleanupScopesForDeletedStatements(oldStatementIds, affectedTeamIds);
+    }
 
     return { ...policy, statements: createdStatements };
   }
