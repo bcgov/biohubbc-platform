@@ -319,4 +319,58 @@ describe('searchFeatures', () => {
       }
     });
   });
+
+  it('should pass null systemUserId for anonymous requests', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves(),
+      open: sinon.stub().resolves()
+    });
+    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    mockReq.body = {
+      filters: { keyword: 'moose' },
+      pagination: { page: '1', limit: '10' }
+    };
+
+    const searchStub = sinon.stub(SearchFeatureService.prototype, 'searchFeatures').resolves([]);
+    const countStub = sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(0);
+
+    const requestHandler = search.searchFeatures();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(searchStub.firstCall.args[2]).to.equal(null);
+    expect(countStub.firstCall.args[1]).to.equal(null);
+  });
+
+  it('should pass systemUserId for authenticated requests', async () => {
+    const dbConnectionObj = getMockDBConnection({
+      commit: sinon.stub().resolves(),
+      rollback: sinon.stub().resolves(),
+      release: sinon.stub().resolves(),
+      open: sinon.stub().resolves(),
+      systemUserId: () => 123
+    });
+    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    mockReq.keycloak_token = 'some-valid-token';
+    mockReq.body = {
+      filters: { keyword: 'moose' },
+      pagination: { page: '1', limit: '10' }
+    };
+
+    const searchStub = sinon.stub(SearchFeatureService.prototype, 'searchFeatures').resolves([]);
+    const countStub = sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(0);
+
+    const requestHandler = search.searchFeatures();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(searchStub.firstCall.args[2]).to.equal(123);
+    expect(countStub.firstCall.args[1]).to.equal(123);
+  });
 });

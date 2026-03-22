@@ -155,7 +155,8 @@ export class SearchFeatureRepository extends BaseRepository {
    */
   async searchFeaturesByFilters(
     filters: ISearchFeaturesFilters,
-    pagination?: ApiPaginationOptions
+    pagination?: ApiPaginationOptions,
+    systemUserId?: number | null
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     defaultLog.debug({ label: 'searchFeaturesByFilters', filters, pagination });
 
@@ -165,7 +166,7 @@ export class SearchFeatureRepository extends BaseRepository {
     }
 
     const knex = getKnex();
-    let query = this.buildSearchQuery(knex, filters);
+    let query = this.buildSearchQuery(knex, filters, systemUserId);
 
     // Apply pagination and sorting using base repository method
     query = this.applyPagination(query, pagination);
@@ -180,10 +181,10 @@ export class SearchFeatureRepository extends BaseRepository {
    * @param {ISearchFeaturesFilters} filters - Search filters to count results for
    * @returns {Promise<number>} Promise resolving to the count of matching features
    */
-  async searchFeaturesByFiltersCount(filters: ISearchFeaturesFilters): Promise<number> {
+  async searchFeaturesByFiltersCount(filters: ISearchFeaturesFilters, systemUserId?: number | null): Promise<number> {
     defaultLog.debug({ label: 'searchFeaturesByFiltersCount', filters });
     const knex = getKnex();
-    const query = this.buildSearchQuery(knex, filters);
+    const query = this.buildSearchQuery(knex, filters, systemUserId);
     const countQuery = knex.from(query.as('sf_filtered')).select(knex.raw('count(*)::integer as count'));
     const response = await this.connection.knex(countQuery);
     return response.rows[0]?.count ?? 0;
@@ -198,7 +199,10 @@ export class SearchFeatureRepository extends BaseRepository {
    * @param {ISearchFeaturesFilters} filters - Search filters (keyword, feature_types, species, properties)
    * @returns {Promise<{ submission_feature_id: number }[]>} Raw rows with submission_feature_id
    */
-  async searchFeatureIdsByFilters(filters: ISearchFeaturesFilters): Promise<{ submission_feature_id: number }[]> {
+  async searchFeatureIdsByFilters(
+    filters: ISearchFeaturesFilters,
+    systemUserId?: number | null
+  ): Promise<{ submission_feature_id: number }[]> {
     defaultLog.debug({ label: 'searchFeatureIdsByFilters', filters });
 
     if (!filters || Object.keys(filters).length === 0) {
@@ -206,7 +210,7 @@ export class SearchFeatureRepository extends BaseRepository {
     }
 
     const knex = getKnex();
-    const query = this.buildSearchQuery(knex, filters);
+    const query = this.buildSearchQuery(knex, filters, systemUserId);
     const idsQuery = knex.from(query.as('sf_filtered')).select('submission_feature_id');
     const response = await this.connection.knex(idsQuery);
 
@@ -219,12 +223,16 @@ export class SearchFeatureRepository extends BaseRepository {
    * @param {ISearchFeaturesFilters} filters - Search filters to apply
    * @returns {Knex.QueryBuilder} Knex query builder with all filters applied
    */
-  private buildSearchQuery(knex: Knex, filters: ISearchFeaturesFilters): Knex.QueryBuilder {
+  private buildSearchQuery(
+    knex: Knex,
+    filters: ISearchFeaturesFilters,
+    systemUserId?: number | null
+  ): Knex.QueryBuilder {
     const keyword = filters.keyword ?? '';
     const featureTypes = filters.feature_types ?? [];
     const speciesFilters = filters.species ?? [];
     const propertyGroups = filters.properties ?? [];
-    return this.buildQueryWithCTEs(knex, keyword, featureTypes, speciesFilters, propertyGroups);
+    return this.buildQueryWithCTEs(knex, keyword, featureTypes, speciesFilters, propertyGroups, systemUserId);
   }
 
   /**
@@ -241,7 +249,8 @@ export class SearchFeatureRepository extends BaseRepository {
     keyword: string,
     featureTypes: string[],
     speciesFilters: string[],
-    propertyGroups: ISearchFeaturePropertyGroup[]
+    propertyGroups: ISearchFeaturePropertyGroup[],
+    systemUserId?: number | null
   ): Knex.QueryBuilder {
     const activeCteCount = [keyword.trim(), featureTypes.length, speciesFilters.length, propertyGroups.length].filter(
       (v) => {
@@ -351,7 +360,7 @@ export class SearchFeatureRepository extends BaseRepository {
           );
       });
 
-    return query
+    const finalQuery = query
       .select(
         'submission_feature_id',
         'submission_id',
@@ -366,6 +375,22 @@ export class SearchFeatureRepository extends BaseRepository {
         'create_date'
       )
       .from('aggregated_results');
+
+    if (systemUserId !== undefined) {
+      const accessFilter = this.buildUserAccessFilter(knex, systemUserId);
+
+      if (accessFilter) {
+        // Authenticated user: unsecured features + scope-authorized secured features
+        finalQuery.where((qb) => {
+          qb.where('is_secured', false).orWhereRaw(accessFilter);
+        });
+      } else {
+        // Anonymous user: unsecured features only
+        finalQuery.where('is_secured', false);
+      }
+    }
+
+    return finalQuery;
   }
 
   /**
@@ -652,8 +677,59 @@ export class SearchFeatureRepository extends BaseRepository {
   }
 
   /**
+   * Build a walk-up ancestor check for authenticated user access to secured features.
+   *
+   * Walk-up (not expand-down) strategy: search filters have already narrowed 50M features
+   * to ~200 candidates. For each secured candidate, walk UP the parent chain (~3-5 levels)
+   * to check if any ancestor is a scope anchor for the user's teams. This is O(candidates × depth),
+   * not O(features in scope). Whether the policy covers 100K or 10M features, the cost is the same.
+   *
+   * No policy condition evaluation at runtime — structural scope access only in this ticket.
+   * policy_statement_condition infrastructure exists but won't be wired into search filtering
+   * until a future ticket.
+   *
+   * @param knex - Knex instance
+   * @param systemUserId - The authenticated user's ID, or null for anonymous.
+   * @returns Raw SQL fragment for WHERE clause, or null for anonymous users.
+   */
+  private buildUserAccessFilter(knex: Knex, systemUserId: number | null): Knex.Raw | null {
+    if (!systemUserId) {
+      return null;
+    }
+
+    return knex.raw(
+      `
+      EXISTS (
+        WITH RECURSIVE ancestors AS (
+          SELECT sf_inner.submission_feature_id, sf_inner.parent_submission_feature_id
+          FROM submission_feature sf_inner
+          WHERE sf_inner.submission_feature_id = aggregated_results.submission_feature_id
+          UNION ALL
+          SELECT p.submission_feature_id, p.parent_submission_feature_id
+          FROM submission_feature p
+          JOIN ancestors a ON a.parent_submission_feature_id = p.submission_feature_id
+        )
+        SELECT 1 FROM ancestors a
+        JOIN security_scope_anchor ssa ON ssa.anchor_submission_feature_id = a.submission_feature_id
+        JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
+        JOIN team_member tm ON tm.team_id = tss.team_id
+          AND tm.system_user_id = ?
+          AND tm.record_end_date IS NULL
+      )
+    `,
+      [systemUserId]
+    );
+  }
+
+  /**
    * Builds the security check subquery to determine if a feature or its ancestors are secured.
-   * Uses recursive CTE to traverse up the feature hierarchy.
+   * Uses recursive CTE to traverse up the feature hierarchy via LATERAL reference to the outer
+   * query's `sf` alias. The base case has no FROM clause — it references the outer `sf` directly,
+   * producing one row (the current feature). The recursion then walks up the parent chain.
+   *
+   * See docs/SIMSBIOHUB-914/query-plan-results.md (v4) for the performance analysis that
+   * established this pattern: shared ancestor walk, correct at any tree depth.
+   *
    * @param knex - Knex instance
    * @returns Knex raw query for lateral security check
    */
@@ -661,12 +737,10 @@ export class SearchFeatureRepository extends BaseRepository {
     return knex.raw(`
       WITH RECURSIVE ancestors AS (
         SELECT sf.submission_feature_id as ancestor_id, sf.parent_submission_feature_id
-        FROM submission_feature sf
-        WHERE sf.submission_feature_id = sf.submission_feature_id
         UNION ALL
-        SELECT sf2.submission_feature_id, sf2.parent_submission_feature_id
-        FROM submission_feature sf2
-        INNER JOIN ancestors a ON sf2.submission_feature_id = a.parent_submission_feature_id
+        SELECT p.submission_feature_id, p.parent_submission_feature_id
+        FROM submission_feature p
+        INNER JOIN ancestors a ON p.submission_feature_id = a.parent_submission_feature_id
       )
       SELECT EXISTS (
         SELECT 1

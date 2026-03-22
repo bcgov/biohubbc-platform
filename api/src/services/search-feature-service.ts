@@ -45,10 +45,11 @@ export class SearchFeatureService extends DBService {
    */
   async searchFeatures(
     filters: ISearchFeaturesFilters,
-    pagination?: ApiPaginationOptions
+    pagination?: ApiPaginationOptions,
+    systemUserId?: number | null
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     defaultLog.debug({ label: 'searchFeatures', filters, pagination });
-    return this.searchFeatureRepository.searchFeaturesByFilters(filters, pagination);
+    return this.searchFeatureRepository.searchFeaturesByFilters(filters, pagination, systemUserId);
   }
 
   /**
@@ -59,9 +60,9 @@ export class SearchFeatureService extends DBService {
    * @param {ISearchFeaturesFilters} filters - Search filter criteria
    * @return {Promise<number>} Total count of matching features
    */
-  async getSearchFeaturesCount(filters: ISearchFeaturesFilters): Promise<number> {
+  async getSearchFeaturesCount(filters: ISearchFeaturesFilters, systemUserId?: number | null): Promise<number> {
     defaultLog.debug({ label: 'getSearchFeaturesCount', filters });
-    return this.searchFeatureRepository.searchFeaturesByFiltersCount(filters);
+    return this.searchFeatureRepository.searchFeaturesByFiltersCount(filters, systemUserId);
   }
 
   /**
@@ -71,9 +72,9 @@ export class SearchFeatureService extends DBService {
    * @param {ISearchFeaturesFilters} filters - Search filters (keyword, feature_types, species, properties)
    * @returns {Promise<number[]>} Array of matching submission_feature_id values
    */
-  async getSearchFeatureIds(filters: ISearchFeaturesFilters): Promise<number[]> {
+  async getSearchFeatureIds(filters: ISearchFeaturesFilters, systemUserId?: number | null): Promise<number[]> {
     defaultLog.debug({ label: 'getSearchFeatureIds', filters });
-    const rows = await this.searchFeatureRepository.searchFeatureIdsByFilters(filters);
+    const rows = await this.searchFeatureRepository.searchFeatureIdsByFilters(filters, systemUserId);
     return rows.map((row) => row.submission_feature_id);
   }
 
