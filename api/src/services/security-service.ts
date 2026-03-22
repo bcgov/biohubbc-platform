@@ -16,6 +16,7 @@ import {
 import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { SecurityScopeService } from './access-policy/security-scope-service';
 import { DBService } from './db-service';
 import { ArtifactService } from './old-artifact-service';
 import { UserService } from './user-service';
@@ -338,6 +339,11 @@ export class SecurityService extends DBService {
    * particular rule happens to belong to both `applyRuleIds` and `removeRuleIds`, it will always be
    * added.
    *
+   * After mutations, updates the security scope model:
+   * - Removed rules: deletes scope anchors for affected features (unsecured features should not be anchors).
+   * - Applied rules: triggers anchor computation so newly-secured features are picked up by existing scopes.
+   *
+   * @param {number} submissionId ID of the submission the features belong to.
    * @param {number[]} submissionFeatureIds IDs of the submission features whose security will be updated.
    * @param {number[]} applyRuleIds IDs of the rules which will be applied after the patch operation
    * @param {number[]} removeRuleIds IDs of the rules which will be removed after the patch operation
@@ -345,6 +351,7 @@ export class SecurityService extends DBService {
    * @memberof SecurityService
    */
   async patchSecurityRulesOnSubmissionFeatures(
+    submissionId: number,
     submissionFeatureIds: number[],
     applyRuleIds: number[],
     removeRuleIds: number[]
@@ -362,11 +369,36 @@ export class SecurityService extends DBService {
     if (applyRuleIds.length > 0) {
       await this.securityRepository.applySecurityRulesToSubmissionFeatures(submissionFeatureIds, applyRuleIds);
     }
+
+    // Update security scope anchors after rule mutations
+    const securityScopeService = new SecurityScopeService(this.connection);
+
+    if (removeRuleIds.length > 0) {
+      // Only delete anchors for features that are now fully unsecured (no remaining rules).
+      // Features still secured by other rules must keep their anchors to avoid a coverage gap.
+      const remainingRules = await this.securityRepository.getSecurityRulesForSubmissionFeatures(submissionFeatureIds);
+      const stillSecuredIds = new Set(remainingRules.map((r) => r.submission_feature_id));
+      const fullyUnsecuredIds = submissionFeatureIds.filter((id) => !stillSecuredIds.has(id));
+
+      if (fullyUnsecuredIds.length > 0) {
+        await securityScopeService.deleteAnchorsForFeatures(fullyUnsecuredIds);
+      }
+    }
+
+    if (applyRuleIds.length > 0) {
+      await securityScopeService.triggerAnchorComputationForSubmission(submissionId);
+    }
   }
 
   /**
    * Patches security rules applied or removed for all features of a submission.
    * If a rule exists in both applyRuleIds and removeRuleIds, it will always be applied.
+   *
+   * After mutations, updates the security scope model:
+   * - Removed rules: deletes scope anchors for features that lost security rules, so unsecured
+   *   features are no longer treated as scope anchors.
+   * - Applied rules: triggers anchor computation so newly-secured features are picked up by
+   *   existing scopes whose URN covers this submission.
    *
    * @param {number} submissionId
    * @param {number[]} applyRuleIds IDs of rules to apply
@@ -386,21 +418,43 @@ export class SecurityService extends DBService {
       removeRuleIds
     });
 
-    // Remove rules first
-    if (removeRuleIds?.length) {
-      await this.securityRepository.removeSecurityFromSubmission(submissionId, removeRuleIds);
-    }
+    // Remove rules first — capture deleted records to identify affected feature IDs
+    const removedFeatureIds = removeRuleIds?.length
+      ? [...new Set((await this.securityRepository.removeSecurityFromSubmission(submissionId, removeRuleIds)).map((r) => r.submission_feature_id))]
+      : [];
 
     // Apply rules last (wins if overlap exists)
     if (applyRuleIds?.length) {
       await this.securityRepository.applySecurityToSubmission(submissionId, applyRuleIds);
+    }
+
+    // Update security scope anchors after rule mutations
+    const securityScopeService = new SecurityScopeService(this.connection);
+
+    if (removedFeatureIds.length > 0) {
+      // Only delete anchors for features that are now fully unsecured (no remaining rules).
+      // Features still secured by other rules must keep their anchors to avoid a coverage gap.
+      const remainingRules = await this.securityRepository.getSecurityRulesForSubmissionFeatures(removedFeatureIds);
+      const stillSecuredIds = new Set(remainingRules.map((r) => r.submission_feature_id));
+      const fullyUnsecuredIds = removedFeatureIds.filter((id) => !stillSecuredIds.has(id));
+
+      if (fullyUnsecuredIds.length > 0) {
+        await securityScopeService.deleteAnchorsForFeatures(fullyUnsecuredIds);
+      }
+    }
+
+    if (applyRuleIds?.length) {
+      await securityScopeService.triggerAnchorComputationForSubmission(submissionId);
     }
   }
 
   /**
    * Removes the given security rules from the given set of submission feature ids. If
    * no security rules ID is provided, all security rules will be removed for the given set
-   * of subission features.
+   * of submission features.
+   *
+   * After removal, deletes scope anchors for features that are fully unsecured (no remaining
+   * rules). Features still secured by other rules keep their anchors to avoid a coverage gap.
    *
    * @param {number[]} submissionFeatureIds
    * @param {number[]} [removeRuleIds]
@@ -416,11 +470,32 @@ export class SecurityService extends DBService {
       return [];
     }
 
+    const securityScopeService = new SecurityScopeService(this.connection);
+
     if (!removeRuleIds) {
-      return this.securityRepository.removeAllSecurityRulesFromSubmissionFeatures(submissionFeatureIds);
+      // Removing ALL rules — every feature is fully unsecured, delete all their anchors
+      const result = await this.securityRepository.removeAllSecurityRulesFromSubmissionFeatures(submissionFeatureIds);
+      await securityScopeService.deleteAnchorsForFeatures(submissionFeatureIds);
+      return result;
     }
 
-    return this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds, removeRuleIds);
+    // Removing specific rules — some features may still be secured by other rules
+    const result = await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(
+      submissionFeatureIds,
+      removeRuleIds
+    );
+
+    // Only delete anchors for features that are now fully unsecured (no remaining rules).
+    // Features still secured by other rules must keep their anchors to avoid a coverage gap.
+    const remainingRules = await this.securityRepository.getSecurityRulesForSubmissionFeatures(submissionFeatureIds);
+    const stillSecuredIds = new Set(remainingRules.map((r) => r.submission_feature_id));
+    const fullyUnsecuredIds = submissionFeatureIds.filter((id) => !stillSecuredIds.has(id));
+
+    if (fullyUnsecuredIds.length > 0) {
+      await securityScopeService.deleteAnchorsForFeatures(fullyUnsecuredIds);
+    }
+
+    return result;
   }
 
   /**

@@ -239,6 +239,11 @@ export class PolicyService extends DBService {
    * Update a policy with statements and conditions.
    * Strategy: Delete existing statements and recreate (simpler than diffing).
    *
+   * Note: When a statement's URN changes, the old security_scope row may become
+   * orphaned (no policy_statement_scope references it). We intentionally skip
+   * cleanup because the same scope may still be referenced by other statements
+   * via the shared scope_hash. Orphaned scopes are low-cost (~500 rows at scale).
+   *
    * @param {string} policyId - The ID of the policy to update.
    * @param {UpdatePolicy} policyData - Partial data to update the policy record.
    * @param {CreatePolicyStatementInput[]} statements - New statements for the policy.
