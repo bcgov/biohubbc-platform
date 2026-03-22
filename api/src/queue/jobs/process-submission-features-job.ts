@@ -21,6 +21,26 @@ function isValidationFailure(error: unknown): boolean {
 }
 
 /**
+ * Extract stable, log-friendly error metadata.
+ *
+ * @param {unknown} error
+ * @returns {{ name?: string; message: string; stack?: string }}
+ */
+function getErrorMetadata(error: unknown): { name?: string; message: string; stack?: string } {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    };
+  }
+
+  return {
+    message: String(error)
+  };
+}
+
+/**
  * Process submission features job handler.
  *
  * Receives the full SubmissionUpload bridge record in the job payload,
@@ -134,7 +154,8 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
           jobId: job.id,
           submissionUploadId,
           submissionId,
-          error
+          error,
+          errorMetadata: getErrorMetadata(error)
         });
 
         return;
@@ -160,7 +181,8 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
         message: 'Process submission features job failed',
         jobId: job.id,
         submissionUploadId,
-        error
+        error,
+        errorMetadata: getErrorMetadata(error)
       });
 
       // Rethrow so pg-boss moves the job to DLQ.
@@ -231,7 +253,8 @@ export const processSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<Submissi
         message: 'Failed to update failed job status',
         jobId: job.id,
         submissionUploadId,
-        error
+        error,
+        errorMetadata: getErrorMetadata(error)
       });
 
       throw error;

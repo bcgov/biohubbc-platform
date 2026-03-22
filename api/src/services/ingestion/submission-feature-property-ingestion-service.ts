@@ -1,4 +1,5 @@
 import { Feature, Geometry } from 'geojson';
+import { z } from 'zod';
 import { IDBConnection } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { FeatureTypePropertyMetadata } from '../../models/submission-feature-property-index';
@@ -12,6 +13,15 @@ import { normalizeArtifactReference } from '../../utils/artifact-reference-utils
 import { CodeReference, parseCodeReference } from '../../utils/code-reference';
 import { getLogger } from '../../utils/logger';
 import { splitTimestampValue } from '../../utils/timestamp-utils';
+import {
+  GeoJSONGeometryCollectionZodSchema,
+  GeoJSONLineStringZodSchema,
+  GeoJSONMultiLineStringZodSchema,
+  GeoJSONMultiPointZodSchema,
+  GeoJSONMultiPolygonZodSchema,
+  GeoJSONPointZodSchema,
+  GeoJSONPolygonZodSchema
+} from '../../zod-schema/geoJsonZodSchema';
 import { ContributorService } from '../contributor-service';
 import { DBService } from '../db-service';
 import {
@@ -24,6 +34,28 @@ import { SubmissionFeaturePropertyIndexService } from '../submission-feature-pro
 
 const defaultLog = getLogger('services/ingestion/submission-feature-property-ingestion-service');
 const INDEX_BATCH_SIZE = 10000;
+
+const GeoJSONGeometryZodSchema = z.union([
+  GeoJSONPointZodSchema,
+  GeoJSONLineStringZodSchema,
+  GeoJSONPolygonZodSchema,
+  GeoJSONMultiPointZodSchema,
+  GeoJSONMultiLineStringZodSchema,
+  GeoJSONMultiPolygonZodSchema,
+  GeoJSONGeometryCollectionZodSchema
+]);
+
+const GeoJSONFeatureWithGeometryZodSchema = z.object({
+  type: z.literal('Feature'),
+  geometry: GeoJSONGeometryZodSchema,
+  properties: z.unknown().optional(),
+  id: z.union([z.number(), z.string()]).optional()
+});
+
+const GeoJSONFeatureCollectionWithGeometryZodSchema = z.object({
+  type: z.literal('FeatureCollection'),
+  features: z.array(GeoJSONFeatureWithGeometryZodSchema)
+});
 
 type RelationshipCandidate = {
   source_feature_id: number;
@@ -847,32 +879,68 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
     propertyName: string,
     value: unknown
   ): Feature {
-    if ('features' in (value as object) && Array.isArray((value as { features?: unknown }).features)) {
+    const featureCollectionValidation = GeoJSONFeatureCollectionWithGeometryZodSchema.safeParse(value);
+    if (featureCollectionValidation.success) {
+      const geometries = featureCollectionValidation.data.features.map((featureItem) => featureItem.geometry);
+
+      if (!geometries.length) {
+        throw new ApiExecuteSQLError('Invalid geometry value for geometry property', [
+          'SubmissionFeaturePropertyIngestionService->indexSubmissionPropertiesBySubmissionUploadId',
+          {
+            submissionId,
+            submission_feature_id: submissionFeatureId,
+            propertyName,
+            reason: 'FeatureCollection does not contain any geometries'
+          }
+        ]);
+      }
+
       return {
         type: 'Feature',
         geometry: {
           type: 'GeometryCollection',
-          geometries: (value as { features: Array<{ geometry?: Geometry }> }).features
-            .map((feature) => feature.geometry)
-            .filter((geometry): geometry is Geometry => !!geometry)
-        },
+          geometries: geometries as unknown as Geometry[]
+        } as Geometry,
         properties: null
       };
     }
 
-    const geometryFeature = value as { type?: unknown; geometry?: unknown };
-    if (geometryFeature.type !== 'Feature' || !geometryFeature.geometry) {
-      throw new ApiExecuteSQLError('Invalid geometry value for geometry property', [
-        'SubmissionFeaturePropertyIngestionService->indexSubmissionPropertiesBySubmissionUploadId',
-        {
-          submissionId,
-          submission_feature_id: submissionFeatureId,
-          propertyName
-        }
-      ]);
+    const featureValidation = GeoJSONFeatureWithGeometryZodSchema.safeParse(value);
+    if (featureValidation.success) {
+      return {
+        type: 'Feature',
+        geometry: featureValidation.data.geometry as unknown as Geometry,
+        properties: null
+      };
     }
 
-    return value as Feature;
+    const geometryValidation = GeoJSONGeometryZodSchema.safeParse(value);
+    if (geometryValidation.success) {
+      return {
+        type: 'Feature',
+        geometry: geometryValidation.data as unknown as Geometry,
+        properties: null
+      };
+    }
+
+    const issues = [
+      ...featureCollectionValidation.error.issues,
+      ...featureValidation.error.issues,
+      ...geometryValidation.error.issues
+    ]
+      .map((issue) => `${issue.path.join('.') || '<root>'}: ${issue.message}`)
+      .slice(0, 8);
+
+    throw new ApiExecuteSQLError('Invalid geometry value for geometry property', [
+      'SubmissionFeaturePropertyIngestionService->indexSubmissionPropertiesBySubmissionUploadId',
+      {
+        submissionId,
+        submission_feature_id: submissionFeatureId,
+        propertyName,
+        reason: 'Expected GeoJSON Geometry, Feature, or FeatureCollection',
+        issues
+      }
+    ]);
   }
 
   /**

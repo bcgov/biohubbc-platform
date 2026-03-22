@@ -228,6 +228,7 @@ export class FeatureIngestionRepository extends BaseRepository {
           fp.display_name,
           fp.description,
           fpt.name AS type_name,
+          ftp.allow_multiple,
           ftp.required_value,
           fp.calculated_value
         FROM feature_type_property ftp
@@ -252,6 +253,7 @@ export class FeatureIngestionRepository extends BaseRepository {
               'display_name', p.display_name,
               'description', p.description,
               'type_name', p.type_name,
+              'allow_multiple', p.allow_multiple,
               'required_value', p.required_value,
               'calculated_value', p.calculated_value
             )
