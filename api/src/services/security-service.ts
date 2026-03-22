@@ -420,7 +420,13 @@ export class SecurityService extends DBService {
 
     // Remove rules first — capture deleted records to identify affected feature IDs
     const removedFeatureIds = removeRuleIds?.length
-      ? [...new Set((await this.securityRepository.removeSecurityFromSubmission(submissionId, removeRuleIds)).map((r) => r.submission_feature_id))]
+      ? [
+          ...new Set(
+            (await this.securityRepository.removeSecurityFromSubmission(submissionId, removeRuleIds)).map(
+              (r) => r.submission_feature_id
+            )
+          )
+        ]
       : [];
 
     // Apply rules last (wins if overlap exists)

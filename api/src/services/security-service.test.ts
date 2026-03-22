@@ -582,15 +582,48 @@ describe('SecurityService', () => {
       const service = new SecurityService(mockDBConnection);
 
       const removeStub = sinon.stub(SecurityRepository.prototype, 'removeSecurityFromSubmission').resolves([
-        { submission_feature_security_id: 1, submission_feature_id: 10, security_rule_id: 6, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 },
-        { submission_feature_security_id: 2, submission_feature_id: 20, security_rule_id: 7, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 }
+        {
+          submission_feature_security_id: 1,
+          submission_feature_id: 10,
+          security_rule_id: 6,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        },
+        {
+          submission_feature_security_id: 2,
+          submission_feature_id: 20,
+          security_rule_id: 7,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        }
       ]);
 
       const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityToSubmission').resolves([]);
 
       // Feature 20 still secured by another rule; feature 10 is fully unsecured
       sinon.stub(SecurityRepository.prototype, 'getSecurityRulesForSubmissionFeatures').resolves([
-        { submission_feature_security_id: 3, submission_feature_id: 20, security_rule_id: 9, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 }
+        {
+          submission_feature_security_id: 3,
+          submission_feature_id: 20,
+          security_rule_id: 9,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        }
       ]);
 
       const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
@@ -632,7 +665,18 @@ describe('SecurityService', () => {
       const service = new SecurityService(mockDBConnection);
 
       const removeStub = sinon.stub(SecurityRepository.prototype, 'removeSecurityFromSubmission').resolves([
-        { submission_feature_security_id: 1, submission_feature_id: 10, security_rule_id: 6, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 }
+        {
+          submission_feature_security_id: 1,
+          submission_feature_id: 10,
+          security_rule_id: 6,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        }
       ]);
 
       const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityToSubmission').resolves([]);
@@ -679,16 +723,60 @@ describe('SecurityService', () => {
       const service = new SecurityService(mockDBConnection);
 
       sinon.stub(SecurityRepository.prototype, 'removeSecurityFromSubmission').resolves([
-        { submission_feature_security_id: 1, submission_feature_id: 10, security_rule_id: 6, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 },
-        { submission_feature_security_id: 2, submission_feature_id: 20, security_rule_id: 6, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 }
+        {
+          submission_feature_security_id: 1,
+          submission_feature_id: 10,
+          security_rule_id: 6,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        },
+        {
+          submission_feature_security_id: 2,
+          submission_feature_id: 20,
+          security_rule_id: 6,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        }
       ]);
 
       sinon.stub(SecurityRepository.prototype, 'applySecurityToSubmission').resolves([]);
 
       // Both features still secured by another rule
       sinon.stub(SecurityRepository.prototype, 'getSecurityRulesForSubmissionFeatures').resolves([
-        { submission_feature_security_id: 3, submission_feature_id: 10, security_rule_id: 9, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 },
-        { submission_feature_security_id: 4, submission_feature_id: 20, security_rule_id: 9, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 }
+        {
+          submission_feature_security_id: 3,
+          submission_feature_id: 10,
+          security_rule_id: 9,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        },
+        {
+          submission_feature_security_id: 4,
+          submission_feature_id: 20,
+          security_rule_id: 9,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        }
       ]);
 
       const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
@@ -717,7 +805,18 @@ describe('SecurityService', () => {
 
       // Feature 2 still secured, features 1 and 3 fully unsecured
       sinon.stub(SecurityRepository.prototype, 'getSecurityRulesForSubmissionFeatures').resolves([
-        { submission_feature_security_id: 2, submission_feature_id: 2, security_rule_id: 9, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 }
+        {
+          submission_feature_security_id: 2,
+          submission_feature_id: 2,
+          security_rule_id: 9,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        }
       ]);
 
       const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
@@ -815,9 +914,42 @@ describe('SecurityService', () => {
 
       // All features still secured by another rule
       sinon.stub(SecurityRepository.prototype, 'getSecurityRulesForSubmissionFeatures').resolves([
-        { submission_feature_security_id: 1, submission_feature_id: 1, security_rule_id: 9, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 },
-        { submission_feature_security_id: 2, submission_feature_id: 2, security_rule_id: 9, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 },
-        { submission_feature_security_id: 3, submission_feature_id: 3, security_rule_id: 9, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 }
+        {
+          submission_feature_security_id: 1,
+          submission_feature_id: 1,
+          security_rule_id: 9,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        },
+        {
+          submission_feature_security_id: 2,
+          submission_feature_id: 2,
+          security_rule_id: 9,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        },
+        {
+          submission_feature_security_id: 3,
+          submission_feature_id: 3,
+          security_rule_id: 9,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        }
       ]);
 
       const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
@@ -839,12 +971,34 @@ describe('SecurityService', () => {
       const service = new SecurityService(mockDBConnection);
 
       sinon.stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures').resolves([
-        { submission_feature_security_id: 1, submission_feature_id: 1, security_rule_id: 4, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 }
+        {
+          submission_feature_security_id: 1,
+          submission_feature_id: 1,
+          security_rule_id: 4,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        }
       ]);
 
       // Feature 2 still has remaining rules; features 1 and 3 are fully unsecured
       sinon.stub(SecurityRepository.prototype, 'getSecurityRulesForSubmissionFeatures').resolves([
-        { submission_feature_security_id: 2, submission_feature_id: 2, security_rule_id: 9, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 }
+        {
+          submission_feature_security_id: 2,
+          submission_feature_id: 2,
+          security_rule_id: 9,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        }
       ]);
 
       const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
@@ -861,8 +1015,30 @@ describe('SecurityService', () => {
       sinon.stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures').resolves([]);
 
       sinon.stub(SecurityRepository.prototype, 'getSecurityRulesForSubmissionFeatures').resolves([
-        { submission_feature_security_id: 1, submission_feature_id: 1, security_rule_id: 9, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 },
-        { submission_feature_security_id: 2, submission_feature_id: 2, security_rule_id: 9, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 }
+        {
+          submission_feature_security_id: 1,
+          submission_feature_id: 1,
+          security_rule_id: 9,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        },
+        {
+          submission_feature_security_id: 2,
+          submission_feature_id: 2,
+          security_rule_id: 9,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        }
       ]);
 
       const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
@@ -877,7 +1053,18 @@ describe('SecurityService', () => {
       const service = new SecurityService(mockDBConnection);
 
       sinon.stub(SecurityRepository.prototype, 'removeAllSecurityRulesFromSubmissionFeatures').resolves([
-        { submission_feature_security_id: 1, submission_feature_id: 1, security_rule_id: 1, record_effective_date: '', record_end_date: null, create_date: '', create_user: 1, update_date: '', update_user: 1, revision_count: 1 }
+        {
+          submission_feature_security_id: 1,
+          submission_feature_id: 1,
+          security_rule_id: 1,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        }
       ]);
 
       const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
