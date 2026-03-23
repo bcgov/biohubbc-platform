@@ -1,4 +1,6 @@
-import { Button, Stack } from '@mui/material';
+import { mdiLock } from '@mdi/js';
+import Icon from '@mdi/react';
+import { Button, Stack, Typography } from '@mui/material';
 import { GridCellParams, GridRowSelectionModel } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
@@ -28,6 +30,27 @@ export const SearchResultTableLayout = ({
     }
 
     return [
+      {
+        field: 'is_secured',
+        headerName: '',
+        width: 50,
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        renderCell: (params: GridCellParams) => {
+          if (!params.value) {
+            return null;
+          }
+          return (
+            <Stack flexDirection="row" alignItems="center" color="error.main" height="100%" gap={1}>
+              <Icon path={mdiLock} size={0.75} />
+              <Typography variant="body2" component="span" fontWeight={700} textTransform="uppercase">
+                Secured
+              </Typography>
+            </Stack>
+          );
+        }
+      },
       {
         field: 'feature_type_name',
         headerName: 'Feature Type',
