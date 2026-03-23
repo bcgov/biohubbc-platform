@@ -227,6 +227,63 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
+   * Get the security_scope_id for each of the given policy statement IDs.
+   *
+   * Called before deleting policy_statement_scope rows so the service can
+   * identify which scopes may become orphaned after deletion.
+   *
+   * @param policyStatementIds UUIDs of the policy statements
+   * @returns Distinct security_scope_id values referenced by those statements
+   */
+  async getScopeIdsForStatements(policyStatementIds: string[]): Promise<string[]> {
+    if (policyStatementIds.length === 0) {
+      return [];
+    }
+
+    const knex = getKnex();
+    const query = knex
+      .distinct('security_scope_id')
+      .from('policy_statement_scope')
+      .whereIn('policy_statement_id', policyStatementIds);
+
+    const response = await this.connection.knex<{ security_scope_id: string }>(query);
+
+    return response.rows.map((row) => row.security_scope_id);
+  }
+
+  /**
+   * Delete security_scope_anchor rows for scopes that have no remaining
+   * policy_statement_scope references (orphaned scopes).
+   *
+   * When a policy is deleted, its policy_statement_scope rows are removed.
+   * If the scope was only referenced by that policy's statements, the scope
+   * becomes orphaned — no team can reach it via the policy chain, so its
+   * anchors are dead weight. This method cleans them up.
+   *
+   * Scopes shared by other policy statements are left intact — their anchors
+   * are still needed.
+   *
+   * @param scopeIds Candidate scope IDs to check for orphan status
+   */
+  async deleteAnchorsForOrphanedScopes(scopeIds: string[]): Promise<void> {
+    if (scopeIds.length === 0) {
+      return;
+    }
+
+    const knex = getKnex();
+
+    // Delete anchors only for scopes with zero remaining policy_statement_scope references.
+    // The subquery finds scopes that still have at least one mapping — those are excluded.
+    const query = knex
+      .table('security_scope_anchor')
+      .whereIn('security_scope_id', scopeIds)
+      .whereNotIn('security_scope_id', knex.select('security_scope_id').from('policy_statement_scope'))
+      .del();
+
+    await this.connection.knex(query);
+  }
+
+  /**
    * Insert team_security_scope rows for a team's scopes derived from a specific policy.
    *
    * Walks the policy → policy_statement → policy_statement_scope chain to find

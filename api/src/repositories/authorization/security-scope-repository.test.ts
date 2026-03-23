@@ -235,6 +235,54 @@ describe('SecurityScopeRepository', () => {
     });
   });
 
+  describe('getScopeIdsForStatements', () => {
+    it('returns distinct scope IDs for the given policy statement IDs', async () => {
+      const knexFake = sinon.fake.resolves(
+        mockQueryResult([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }])
+      );
+      const mockDBConnection = getMockDBConnection({ knex: knexFake });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      const result = await repository.getScopeIdsForStatements(['ps-1', 'ps-2']);
+
+      expect(result).to.eql(['scope-1', 'scope-2']);
+      expect(knexFake).to.have.been.calledOnce;
+    });
+
+    it('returns empty array when given empty input', async () => {
+      const knexFake = sinon.fake.resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ knex: knexFake });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      const result = await repository.getScopeIdsForStatements([]);
+
+      expect(result).to.eql([]);
+      expect(knexFake).not.to.have.been.called;
+    });
+  });
+
+  describe('deleteAnchorsForOrphanedScopes', () => {
+    it('deletes anchors for scopes with no remaining policy_statement_scope references', async () => {
+      const knexFake = sinon.fake.resolves(mockQueryResult([], 5));
+      const mockDBConnection = getMockDBConnection({ knex: knexFake });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.deleteAnchorsForOrphanedScopes(['scope-1', 'scope-2']);
+
+      expect(knexFake).to.have.been.calledOnce;
+    });
+
+    it('skips the query when given an empty array', async () => {
+      const knexFake = sinon.fake.resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ knex: knexFake });
+
+      const repository = new SecurityScopeRepository(mockDBConnection);
+      await repository.deleteAnchorsForOrphanedScopes([]);
+
+      expect(knexFake).not.to.have.been.called;
+    });
+  });
+
   describe('findScopeIdsMatchingSubmission', () => {
     it('returns an array of security_scope_id strings', async () => {
       const mockRows = [
