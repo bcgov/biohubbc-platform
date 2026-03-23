@@ -343,11 +343,15 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Returns which of the given secured feature IDs the user has policy access to.
+   * Returns which of the given secured feature IDs the user has access to
+   * via scope-based walk-up.
    *
-   * Checks the user's team memberships for ALLOW policy statements matching
-   * each feature's submission, feature type, and feature ID. Used at download
-   * creation time before the download_team link exists — unlike
+   * For each secured feature, walks UP the parent chain to check if any ancestor
+   * is a scope anchor for the user's teams. Same walk-up strategy as the search
+   * security filter — cost is O(input_size × tree_depth), bounded by the download's
+   * feature set (hundreds) and tree height (~5 levels), not by table size.
+   *
+   * Used at download creation time before the download_team link exists — unlike
    * getSecuredAuthorizedFeatures which checks via the download's teams.
    *
    * @param {number[]} submissionFeatureIds - Secured feature IDs to check.
@@ -363,19 +367,26 @@ export class DownloadRepository extends BaseRepository {
     const knex = getKnex();
 
     const query = knex
-      .distinct('sf.submission_feature_id')
+      .select('sf.submission_feature_id')
       .from('submission_feature as sf')
-      .innerJoin('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .whereIn('sf.submission_feature_id', submissionFeatureIds)
       .andWhereRaw(
         `EXISTS (
-          SELECT 1
-          FROM team_member tm
-          INNER JOIN team_policy tp ON tp.team_id = tm.team_id AND tp.record_end_date IS NULL
-          INNER JOIN policy_statement ps ON ps.policy_id = tp.policy_id AND ps.record_end_date IS NULL
-          WHERE tm.system_user_id = ?
+          WITH RECURSIVE ancestors AS (
+            SELECT sf2.submission_feature_id, sf2.parent_submission_feature_id
+            FROM submission_feature sf2
+            WHERE sf2.submission_feature_id = sf.submission_feature_id
+            UNION ALL
+            SELECT p.submission_feature_id, p.parent_submission_feature_id
+            FROM submission_feature p
+            JOIN ancestors a ON a.parent_submission_feature_id = p.submission_feature_id
+          )
+          SELECT 1 FROM ancestors a
+          JOIN security_scope_anchor ssa ON ssa.anchor_submission_feature_id = a.submission_feature_id
+          JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
+          JOIN team_member tm ON tm.team_id = tss.team_id
+            AND tm.system_user_id = ?
             AND tm.record_end_date IS NULL
-            AND ${this.buildPolicyMatchConditions()}
         )`,
         [systemUserId]
       );
@@ -489,22 +500,5 @@ export class DownloadRepository extends BaseRepository {
     const response = await this.connection.sql(sql, HasTeams);
 
     return response.rows[0]?.has_teams ?? false;
-  }
-
-  /**
-   * SQL conditions for policy statement feature-level authorization.
-   * Single source of truth for policy matching at download creation time.
-   *
-   * Requires outer query aliases: ps (policy_statement),
-   * sf (submission_feature), ft (feature_type).
-   *
-   * @return {string} Raw SQL conditions fragment.
-   * @memberof DownloadRepository
-   */
-  private buildPolicyMatchConditions(): string {
-    return `ps.effect = 'allow'
-            AND (ps.urn_submission_id = sf.submission_id::text OR ps.urn_submission_id = '*')
-            AND (ps.urn_feature_type = ft.name OR ps.urn_feature_type = '*')
-            AND (ps.urn_feature_id = sf.submission_feature_id::text OR ps.urn_feature_id = '*')`;
   }
 }

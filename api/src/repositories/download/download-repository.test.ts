@@ -334,30 +334,50 @@ describe('DownloadRepository', () => {
 
   describe('getUserAuthorizedSecuredFeatureIds', () => {
     it('returns empty set when given empty array', async () => {
-      const sqlStub = sinon.stub();
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const knexStub = sinon.stub();
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repo = new DownloadRepository(mockDBConnection);
       const result = await repo.getUserAuthorizedSecuredFeatureIds([], 1);
 
       expect(result).to.deep.equal(new Set());
-      expect(sqlStub).to.not.have.been.called;
+      expect(knexStub).to.not.have.been.called;
     });
 
-    it('checks user team policies for secured feature access', async () => {
+    it('uses scope-based walk-up with security_scope_anchor and team_security_scope', async () => {
       const knexStub = sinon.stub().resolves(mockQueryResult([{ submission_feature_id: 10 }], 1));
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.getUserAuthorizedSecuredFeatureIds([10, 20], 99);
+
+      expect(knexStub).to.have.been.calledOnce;
+      const queryString = knexStub.firstCall.args[0].toString();
+
+      // New scope-based tables
+      expect(queryString).to.include('security_scope_anchor');
+      expect(queryString).to.include('team_security_scope');
+      expect(queryString).to.include('team_member');
+
+      // Old policy-based tables no longer used
+      expect(queryString).to.not.include('team_policy');
+      expect(queryString).to.not.include('policy_statement');
+
+      // systemUserId threaded into SQL
+      expect(queryString).to.include('99');
+
+      expect(result).to.deep.equal(new Set([10]));
+    });
+
+    it('returns empty set when no features are authorized', async () => {
+      const knexStub = sinon.stub().resolves(mockQueryResult([], 0));
       const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repo = new DownloadRepository(mockDBConnection);
       const result = await repo.getUserAuthorizedSecuredFeatureIds([10, 20], 5);
 
       expect(knexStub).to.have.been.calledOnce;
-      const queryString = knexStub.firstCall.args[0].toString();
-      expect(queryString).to.include('team_member');
-      expect(queryString).to.include('team_policy');
-      expect(queryString).to.include('policy_statement');
-      expect(queryString).to.include('submission_feature');
-      expect(result).to.deep.equal(new Set([10]));
+      expect(result).to.deep.equal(new Set());
     });
   });
 });
