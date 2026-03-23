@@ -15,6 +15,10 @@ app:
   name: biohub-platform-db-setup
   nodeEnv: "" # NODE_ENV specification variable
 
+  # Keycloak
+  keycloak:
+    clientId: bio-hub-browser-4230 # Client ID for seed contributors
+
   dbSchema: biohub # Database schema
 
   database:
