@@ -55,7 +55,7 @@ describe('patchSubmissionRecord', () => {
       publish_timestamp: '2023-12-12',
       submitted_timestamp: '2023-12-12',
       system_user_id: 3,
-      source_system: 'SIMS',
+      contributor_id: 1,
       name: 'name',
       description: 'description',
       comment: 'comment',

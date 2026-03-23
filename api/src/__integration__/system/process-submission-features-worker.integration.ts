@@ -164,12 +164,12 @@ describe('Process Submission Features Worker', function () {
     await storageService.uploadBuffer(BucketType.MAIN, tarBuffer, 'application/x-tar', objectKey);
     createdObjectKeys.push(objectKey);
 
-    // 1. submission (uuid, system_user_id, source_system, name, description, comment required)
+    // 1. submission (uuid, system_user_id, contributor_id, name, description, comment required)
     const [submission] = await db('biohub.submission')
       .insert({
         uuid: randomUUID(),
         system_user_id: SYSTEM_USER_ID,
-        source_system: 'SIMS',
+        contributor_id: 1,
         name: TEST_PREFIX,
         description: TEST_PREFIX,
         comment: TEST_PREFIX
@@ -417,8 +417,8 @@ describe('SubmissionIngestionService pipeline (system)', function () {
 
     // 1. submission
     const submissionResult = await connection.sql<{ submission_id: number }>(
-      SQL`INSERT INTO biohub.submission (uuid, system_user_id, source_system, name, description, comment)
-          VALUES (${randomUUID()}, ${SYSTEM_USER_ID}, 'SIMS', ${TEST_PREFIX}, ${TEST_PREFIX}, ${TEST_PREFIX})
+      SQL`INSERT INTO biohub.submission (uuid, system_user_id, contributor_id, name, description, comment)
+          VALUES (${randomUUID()}, ${SYSTEM_USER_ID}, 1, ${TEST_PREFIX}, ${TEST_PREFIX}, ${TEST_PREFIX})
           RETURNING submission_id`
     );
     const submissionId = submissionResult.rows[0].submission_id;

@@ -9,15 +9,9 @@ import { getLogger } from '../../utils/logger';
 const defaultLog = getLogger('paths/dataset/search-index');
 
 export const POST: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          discriminator: 'ServiceClient'
-        }
-      ]
-    };
-  }),
+  authorizeRequestHandler(() => ({
+    or: [{ discriminator: 'Contributor' }]
+  })),
   indexSubmission()
 ];
 

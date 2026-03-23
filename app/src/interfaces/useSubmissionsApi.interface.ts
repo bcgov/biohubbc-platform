@@ -9,7 +9,7 @@ export type SubmissionRecord = {
   security_review_timestamp: string | null;
   publish_timestamp: string | null;
   submitted_timestamp: string;
-  source_system: string;
+  contributor_id: number;
   name: string;
   description: string;
   comment: string;

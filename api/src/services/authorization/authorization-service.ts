@@ -2,8 +2,9 @@ import dayjs from 'dayjs';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { IDBConnection } from '../../database/db';
 import { SystemUser, SystemUserExtended } from '../../repositories/user-repository';
-import { getServiceClientSystemUser, getUserGuid } from '../../utils/keycloak-utils';
+import { getUserGuid } from '../../utils/keycloak-utils';
 import { CartService } from '../cart-service';
+import { ContributorSystemUserService } from '../contributor-system-user-service';
 import { DBService } from '../db-service';
 import { UserService } from '../user-service';
 import { TeamAuthorizationService } from './team-authorization-service';
@@ -55,15 +56,13 @@ export type AuthorizeByTeam = TeamAuthorizationEntity & {
 };
 
 /**
- * Authorization rule that checks if a jwt token's client id matches at least one of the required client ids.
- *
- * Note: This is specifically for system-to-system communication.
+ * Authorization rule that checks if a jwt token maps to a known contributor by client id.
  *
  * @export
- * @interface AuthorizeByServiceClient
+ * @interface AuthorizeByContributor
  */
-export interface AuthorizeByServiceClient {
-  discriminator: 'ServiceClient';
+export interface AuthorizeByContributor {
+  discriminator: 'Contributor';
 }
 
 /**
@@ -80,7 +79,7 @@ export interface AuthorizeByCart {
 export type AuthorizeRule =
   | AuthorizeBySystemRoles
   | AuthorizeBySystemUser
-  | AuthorizeByServiceClient
+  | AuthorizeByContributor
   | AuthorizeByTeam
   | AuthorizeByCart;
 
@@ -98,8 +97,10 @@ export type AuthorizationScheme = AuthorizeConfigAnd | AuthorizeConfigOr;
 
 export class AuthorizationService extends DBService {
   _userService = new UserService(this.connection);
+  _contributorSystemUserService = new ContributorSystemUserService(this.connection);
   _systemUser: SystemUserExtended | undefined = undefined;
   _keycloakToken: object | undefined = undefined;
+  _contributorId: number | undefined = undefined;
 
   constructor(connection: IDBConnection, init?: { systemUser?: SystemUserExtended; keycloakToken?: object }) {
     super(connection);
@@ -110,6 +111,10 @@ export class AuthorizationService extends DBService {
 
   get systemUser(): SystemUserExtended | undefined {
     return this._systemUser;
+  }
+
+  get contributorId(): number | undefined {
+    return this._contributorId;
   }
 
   /**
@@ -143,8 +148,8 @@ export class AuthorizationService extends DBService {
         case 'SystemUser':
           authorizeResults.push(await this.authorizeBySystemUser());
           break;
-        case 'ServiceClient':
-          authorizeResults.push(await this.authorizeByServiceClient());
+        case 'Contributor':
+          authorizeResults.push(await this.authorizeByContributor());
           break;
         case 'Team':
           authorizeResults.push(await this.authorizeByTeam(authorizeRule));
@@ -307,23 +312,29 @@ export class AuthorizationService extends DBService {
   }
 
   /**
-   * Check if the user is a known service client system user.
+   * Check if the user is a known contributor by token client id.
    *
-   * @return {*}  {Promise<boolean>} `Promise<true>` if the user is a known service client system user,
-   * `Promise<false>` otherwise.
+   * Note: This is for submission-source attribution and authorization.
+   *
+   * @returns {Promise<boolean>}
    */
-  async authorizeByServiceClient(): Promise<boolean> {
+  async authorizeByContributor(): Promise<boolean> {
     if (!this._keycloakToken) {
-      // Cannot verify token source
       return false;
     }
 
-    const source = getServiceClientSystemUser(this._keycloakToken);
+    const systemUserId = this.connection.systemUserId();
 
-    if (!source) {
-      // Failed to find known service client system user
+    if (!systemUserId) {
       return false;
     }
+
+    const contributorSystemUser = await this._contributorSystemUserService.findContributorSystemUser(systemUserId);
+    if (!contributorSystemUser) {
+      return false;
+    }
+
+    this._contributorId = contributorSystemUser.contributor_id;
 
     return true;
   }
