@@ -4,9 +4,9 @@ export async function up(knex: Knex): Promise<void> {
   await knex.raw(`
     SET SEARCH_PATH = biohub, public;
 
-    ALTER TABLE submission_upload ADD COLUMN ticket_id uuid NOT NULL;
+    ALTER TABLE submission_upload ADD COLUMN ticket_id uuid;
 
-    COMMENT ON COLUMN submission_upload.ticket_id IS 'Foreign key to the ticket associated with this submission upload.';
+    COMMENT ON COLUMN submission_upload.ticket_id IS 'Foreign key to the ticket associated with this submission upload. May be NULL for rows created before this column existed.';
 
     ALTER TABLE submission_upload ADD CONSTRAINT submission_upload_ticket_fk
       FOREIGN KEY (ticket_id) REFERENCES ticket(ticket_id);
