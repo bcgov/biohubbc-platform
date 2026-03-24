@@ -1,7 +1,8 @@
 import { IDBConnection } from '../../database/db';
-import { FeatureProperty, FeatureTypeWithProperties } from '../../models/feature-type';
+import { FeatureTypeWithProperties } from '../../models/feature-type';
+import { FeatureTypeProperty } from '../../models/feature-type-property';
 import { IFlattenedBlock } from '../../models/submission-feature';
-import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
+import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { GeoJSONFeatureCollectionZodSchema } from '../../zod-schema/geoJsonZodSchema';
 import { DBService } from '../db-service';
 import { IValidationError, IValidationResult, ValidationErrorType } from './feature-validation-service.interface';
@@ -23,13 +24,13 @@ import { IValidationError, IValidationResult, ValidationErrorType } from './feat
  * @extends {DBService}
  */
 export class FeatureValidationService extends DBService {
-  ingestionRepository: IngestionRepository;
+  ingestionRepository: FeatureIngestionRepository;
   featureTypeCache: Map<string, FeatureTypeWithProperties | null>;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
-    this.ingestionRepository = new IngestionRepository(connection);
+    this.ingestionRepository = new FeatureIngestionRepository(connection);
     this.featureTypeCache = new Map<string, FeatureTypeWithProperties | null>();
   }
 
@@ -193,11 +194,11 @@ export class FeatureValidationService extends DBService {
    * Checks for unknown properties, missing required properties, and type mismatches.
    *
    * @param {IFlattenedBlock} feature - Feature to validate
-   * @param {FeatureProperty[]} allowedProperties - Properties defined for this feature type
+   * @param {FeatureTypeProperty[]} allowedProperties - Properties defined for this feature type
    * @return {IValidationError[]} Array of validation errors (empty if valid)
    * @memberof FeatureValidationService
    */
-  validateFeaturePropertyFlat(feature: IFlattenedBlock, allowedProperties: FeatureProperty[]): IValidationError[] {
+  validateFeaturePropertyFlat(feature: IFlattenedBlock, allowedProperties: FeatureTypeProperty[]): IValidationError[] {
     const errors: IValidationError[] = [];
 
     // Check required properties and types
@@ -240,12 +241,12 @@ export class FeatureValidationService extends DBService {
    * Validate a single property's type against its expected type.
    *
    * @param {IFlattenedBlock} feature - Feature being validated
-   * @param {FeatureProperty} prop - Property definition
+   * @param {FeatureTypeProperty} prop - Property definition
    * @param {unknown} value - Actual value to validate
    * @return {IValidationError | null} Validation error if type mismatch, null otherwise
    * @memberof FeatureValidationService
    */
-  validatePropertyType(feature: IFlattenedBlock, prop: FeatureProperty, value: unknown): IValidationError | null {
+  validatePropertyType(feature: IFlattenedBlock, prop: FeatureTypeProperty, value: unknown): IValidationError | null {
     const createTypeError = (expected: string): IValidationError => ({
       type: ValidationErrorType.INVALID_PROPERTY_TYPE,
       featureId: feature.id,

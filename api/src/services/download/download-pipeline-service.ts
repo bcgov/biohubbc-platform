@@ -394,10 +394,10 @@ export class DownloadPipelineService extends DBService {
     const lookup = new Map<string, CsvPropertyDefinition[]>();
     for (const ftCode of allFeatureTypeCodes) {
       lookup.set(
-        ftCode.feature_type.feature_type_name,
-        ftCode.feature_type_properties.map((p) => ({
-          feature_property_name: p.feature_property_name,
-          feature_property_type_name: p.feature_property_type_name
+        ftCode.feature_type.name,
+        ftCode.properties.map((p) => ({
+          feature_property_name: p.name,
+          feature_property_type_name: p.type_name
         }))
       );
     }

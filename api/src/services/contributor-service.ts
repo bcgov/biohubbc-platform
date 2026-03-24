@@ -1,4 +1,5 @@
 import { IDBConnection } from '../database/db';
+import { Contributor } from '../models/contributor';
 import { ContributorRepository } from '../repositories/contributor-repository';
 import { ContributorSystemUserService } from './contributor-system-user-service';
 import { DBService } from './db-service';
@@ -30,6 +31,27 @@ export class ContributorService extends DBService {
   }
 
   /**
+   * Get the contributor linked to a submission upload.
+   *
+   * @param {string} submissionUploadId
+   * @returns {Promise<Contributor>}
+   */
+  async getContributorBySubmissionUploadId(submissionUploadId: string): Promise<Contributor> {
+    return this.contributorRepository.getContributorBySubmissionUploadId(submissionUploadId);
+  }
+
+  /**
+   * Get the contributor linked to a submission.
+   *
+   * @param {number} submissionId
+   * @returns {Promise<Contributor>}
+   */
+  async getContributorBySubmissionId(submissionId: number): Promise<Contributor> {
+    return this.contributorRepository.getContributorBySubmissionId(submissionId);
+  }
+
+  /**
+   * Adds a new contributing system and associates it with system users.
    * Ensure contributor exists and ensure relationship with a system user.
    *
    * @param {string} clientId

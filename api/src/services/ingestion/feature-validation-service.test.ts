@@ -2,9 +2,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { FeatureProperty, FeatureTypeWithProperties } from '../../models/feature-type';
+import { FeatureTypeWithProperties } from '../../models/feature-type';
+import { FeatureTypeProperty } from '../../models/feature-type-property';
 import { IFlattenedBlock } from '../../models/submission-feature';
-import { IngestionRepository } from '../../repositories/ingestion/ingestion-repository';
+import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { FeatureValidationService } from './feature-validation-service';
 import { IValidationError, ValidationErrorType } from './feature-validation-service.interface';
@@ -33,12 +34,13 @@ describe('FeatureValidationService', () => {
 
     // Mock matches real dataset schema from database migration
     const mockFeatureTypeWithProperties: FeatureTypeWithProperties = {
-      featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
+      feature_type: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
       properties: [
         {
           name: 'name',
           display_name: 'Name',
           description: '',
+          feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
           calculated_value: false
@@ -47,6 +49,7 @@ describe('FeatureValidationService', () => {
           name: 'focal_species',
           display_name: 'Focal Species',
           description: '',
+          feature_type_property_id: 1,
           type_name: 'array',
           required_value: true,
           calculated_value: false
@@ -55,6 +58,7 @@ describe('FeatureValidationService', () => {
           name: 'start_date',
           display_name: 'Start Date',
           description: '',
+          feature_type_property_id: 1,
           type_name: 'datetime',
           required_value: true,
           calculated_value: false
@@ -63,6 +67,7 @@ describe('FeatureValidationService', () => {
           name: 'description',
           display_name: 'Description',
           description: '',
+          feature_type_property_id: 1,
           type_name: 'string',
           required_value: false,
           calculated_value: false
@@ -75,7 +80,7 @@ describe('FeatureValidationService', () => {
       const service = new FeatureValidationService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       const features: IFlattenedBlock[] = [createValidFeature()];
@@ -91,7 +96,7 @@ describe('FeatureValidationService', () => {
       const service = new FeatureValidationService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       const parentId = '14ebb420-4cfa-4be1-99db-8122253e3106';
@@ -113,7 +118,7 @@ describe('FeatureValidationService', () => {
       const service = new FeatureValidationService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       const duplicateId = '14ebb420-4cfa-4be1-99db-8122253e3106';
@@ -136,7 +141,7 @@ describe('FeatureValidationService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties').resolves(null);
+      sinon.stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties').resolves(null);
 
       const features: IFlattenedBlock[] = [createValidFeature({ type: 'unknown_type' })];
 
@@ -153,7 +158,7 @@ describe('FeatureValidationService', () => {
       const service = new FeatureValidationService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       const nonexistentParent = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
@@ -174,7 +179,7 @@ describe('FeatureValidationService', () => {
       const service = new FeatureValidationService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       const nonexistentChild = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
@@ -195,7 +200,7 @@ describe('FeatureValidationService', () => {
       const service = new FeatureValidationService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       const selfId = '14ebb420-4cfa-4be1-99db-8122253e3106';
@@ -215,7 +220,7 @@ describe('FeatureValidationService', () => {
       const service = new FeatureValidationService(mockDBConnection);
 
       sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockFeatureTypeWithProperties);
 
       const selfId = '14ebb420-4cfa-4be1-99db-8122253e3106';
@@ -235,7 +240,7 @@ describe('FeatureValidationService', () => {
       const service = new FeatureValidationService(mockDBConnection);
 
       // First call returns null (invalid type), second returns valid
-      const getFeatureTypeStub = sinon.stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties');
+      const getFeatureTypeStub = sinon.stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties');
       getFeatureTypeStub.onFirstCall().resolves(null);
       getFeatureTypeStub.onSecondCall().resolves(mockFeatureTypeWithProperties);
 
@@ -261,7 +266,7 @@ describe('FeatureValidationService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
-      sinon.stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties').resolves(null);
+      sinon.stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties').resolves(null);
 
       // Feature with invalid type - property validation should be skipped
       const features: IFlattenedBlock[] = [
@@ -431,11 +436,12 @@ describe('FeatureValidationService', () => {
   });
 
   describe('validateFeaturePropertyFlat', () => {
-    const mockAllowedProperties: FeatureProperty[] = [
+    const mockAllowedProperties: FeatureTypeProperty[] = [
       {
         name: 'name',
         display_name: 'Name',
         description: '',
+        feature_type_property_id: 1,
         type_name: 'string',
         required_value: true,
         calculated_value: false
@@ -444,6 +450,7 @@ describe('FeatureValidationService', () => {
         name: 'count',
         display_name: 'Count',
         description: '',
+        feature_type_property_id: 1,
         type_name: 'number',
         required_value: false,
         calculated_value: false
@@ -452,6 +459,7 @@ describe('FeatureValidationService', () => {
         name: 'active',
         display_name: 'Active',
         description: '',
+        feature_type_property_id: 1,
         type_name: 'boolean',
         required_value: false,
         calculated_value: false
@@ -576,11 +584,12 @@ describe('FeatureValidationService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
-      const propertiesWithCalculated: FeatureProperty[] = [
+      const propertiesWithCalculated: FeatureTypeProperty[] = [
         {
           name: 'name',
           display_name: 'Name',
           description: '',
+          feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
           calculated_value: false
@@ -589,6 +598,7 @@ describe('FeatureValidationService', () => {
           name: 'filename',
           display_name: 'Filename',
           description: '',
+          feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
           calculated_value: true
@@ -612,11 +622,12 @@ describe('FeatureValidationService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
-      const propertiesWithCalculated: FeatureProperty[] = [
+      const propertiesWithCalculated: FeatureTypeProperty[] = [
         {
           name: 'name',
           display_name: 'Name',
           description: '',
+          feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
           calculated_value: false
@@ -625,6 +636,7 @@ describe('FeatureValidationService', () => {
           name: 'calculated_required',
           display_name: 'Calculated Required',
           description: '',
+          feature_type_property_id: 1,
           type_name: 'string',
           required_value: true,
           calculated_value: true
@@ -633,6 +645,7 @@ describe('FeatureValidationService', () => {
           name: 'calculated_optional',
           display_name: 'Calculated Optional',
           description: '',
+          feature_type_property_id: 1,
           type_name: 'number',
           required_value: false,
           calculated_value: true
@@ -663,12 +676,13 @@ describe('FeatureValidationService', () => {
       const service = new FeatureValidationService(mockDBConnection);
 
       const mockResult: FeatureTypeWithProperties = {
-        featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
+        feature_type: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
         properties: [
           {
             name: 'name',
             display_name: 'Name',
             description: '',
+            feature_type_property_id: 1,
             type_name: 'string',
             required_value: true,
             calculated_value: false
@@ -677,7 +691,7 @@ describe('FeatureValidationService', () => {
       };
 
       const getFeatureTypeStub = sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockResult);
 
       const result = await service.findFeatureTypeWithPropertiesCached('dataset');
@@ -691,12 +705,12 @@ describe('FeatureValidationService', () => {
       const service = new FeatureValidationService(mockDBConnection);
 
       const mockResult: FeatureTypeWithProperties = {
-        featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
+        feature_type: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
         properties: []
       };
 
       const getFeatureTypeStub = sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(mockResult);
 
       // First call
@@ -714,7 +728,7 @@ describe('FeatureValidationService', () => {
       const service = new FeatureValidationService(mockDBConnection);
 
       const getFeatureTypeStub = sinon
-        .stub(IngestionRepository.prototype, 'findFeatureTypeWithProperties')
+        .stub(FeatureIngestionRepository.prototype, 'findFeatureTypeWithProperties')
         .resolves(null);
 
       // First call
