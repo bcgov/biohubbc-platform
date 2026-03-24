@@ -2,7 +2,7 @@ import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
 import { SubmissionFeatureForReview } from '../models/submission';
-import { IngestionRepository } from '../repositories/ingestion/ingestion-repository';
+import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
 import {
   ICreateSubmission,
   ISubmissionFeature,
@@ -32,13 +32,13 @@ const defaultLog = getLogger('submission-service');
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
-  ingestionRepository: IngestionRepository;
+  ingestionRepository: FeatureIngestionRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.submissionRepository = new SubmissionRepository(connection);
-    this.ingestionRepository = new IngestionRepository(connection);
+    this.ingestionRepository = new FeatureIngestionRepository(connection);
   }
 
   /**
@@ -131,15 +131,15 @@ export class SubmissionService extends DBService {
         const parentSubmissionFeatureId = parentSubmissionFeatureIdMap.get(parentJsonPath) || null;
 
         // Validate the submissionFeature object
-        const response = await this.ingestionRepository.insertSubmissionFeatureRecord(
+        const response = await this.ingestionRepository.insertSubmissionFeatureRecord({
           submissionId,
           submissionUploadId,
           parentSubmissionFeatureId,
-          featureNode.id,
-          featureNode.type,
-          featureNode.properties,
-          0 // Legacy tree path — byte size not computed
-        );
+          featureSourceId: featureNode.id,
+          featureTypeName: featureNode.type,
+          featureProperties: featureNode.properties,
+          dataByteSizeBytes: 0 // Legacy tree path — byte size not computed
+        });
 
         // Cache the submission_feature_id for the current jsonPath
         parentSubmissionFeatureIdMap.set(jsonPath, response.submission_feature_id);

@@ -31,12 +31,6 @@ describe('ContributorCodesetService', () => {
     external_id: 'v1'
   };
 
-  const normalizedCreatePayload: CreateContributorCodeset = {
-    ...createPayload,
-    label: 'life stage',
-    description: 'life stage codes'
-  };
-
   it('creates when identity does not exist', async () => {
     const service = new ContributorCodesetService(getMockDBConnection());
     const getStub = sinon
@@ -54,7 +48,7 @@ describe('ContributorCodesetService', () => {
         key: createPayload.key
       }
     ]);
-    expect(insertStub).to.have.been.calledOnceWith([normalizedCreatePayload]);
+    expect(insertStub).to.have.been.calledOnceWith([createPayload]);
     expect(result).to.eql(mockRow);
   });
 
@@ -79,33 +73,28 @@ describe('ContributorCodesetService', () => {
     expect(result).to.eql(mockRow);
   });
 
-  it('reuses existing when metadata differs only by case', async () => {
+  it('throws conflict when metadata differs only by case', async () => {
     const service = new ContributorCodesetService(getMockDBConnection());
-    const getStub = sinon.stub(ContributorCodesetRepository.prototype, 'getContributorCodesetsByIdentities').resolves([
-      {
-        ...mockRow,
-        label: 'LIFE STAGE',
-        description: 'LIFE STAGE CODES'
-      }
-    ]);
+    const getStub = sinon
+      .stub(ContributorCodesetRepository.prototype, 'getContributorCodesetsByIdentities')
+      .resolves([{ ...mockRow, label: 'LIFE STAGE', description: 'LIFE STAGE CODES' }]);
     const insertStub = sinon
       .stub(ContributorCodesetRepository.prototype, 'insertContributorCodesets')
       .resolves([mockRow]);
 
-    const result = await service.createCodeset(createPayload);
-
-    expect(getStub).to.have.been.calledOnceWith([
-      {
-        contributor_id: createPayload.contributor_id,
-        key: createPayload.key
-      }
-    ]);
-    expect(insertStub).to.not.have.been.called;
-    expect(result).to.eql({
-      ...mockRow,
-      label: 'LIFE STAGE',
-      description: 'LIFE STAGE CODES'
-    });
+    try {
+      await service.createCodeset(createPayload);
+      expect.fail('Expected error to be thrown');
+    } catch (error) {
+      expect(error).to.be.instanceOf(ApiConflictError);
+      expect(getStub).to.have.been.calledOnceWith([
+        {
+          contributor_id: createPayload.contributor_id,
+          key: createPayload.key
+        }
+      ]);
+      expect(insertStub).to.not.have.been.called;
+    }
   });
 
   it('throws conflict when identity exists with different metadata', async () => {
@@ -135,25 +124,24 @@ describe('ContributorCodesetService', () => {
     sinon.stub(ContributorCodesetRepository.prototype, 'getContributorCodesetsByIdentities').resolves([existingRow]);
     const insertStub = sinon.stub(ContributorCodesetRepository.prototype, 'insertContributorCodesets').resolves([]);
 
-    const result = await service.createCodesets([
-      createPayload,
-      { ...createPayload, label: 'LIFE STAGE', description: 'LIFE STAGE CODES' }
-    ]);
-
+    const result = await service.createCodesets([createPayload, { ...createPayload }]);
     expect(insertStub).to.not.have.been.called;
-    expect(result).to.eql([existingRow, existingRow]);
+    expect(result).to.eql([existingRow]);
   });
 
-  it('throws conflict for mixed metadata in same batch identity', async () => {
+  it('does not pre-validate mixed metadata in same batch identity', async () => {
     const service = new ContributorCodesetService(getMockDBConnection());
     sinon.stub(ContributorCodesetRepository.prototype, 'getContributorCodesetsByIdentities').resolves([]);
-    sinon.stub(ContributorCodesetRepository.prototype, 'insertContributorCodesets').resolves([]);
+    const insertStub = sinon
+      .stub(ContributorCodesetRepository.prototype, 'insertContributorCodesets')
+      .rejects(new Error('duplicate key value violates unique constraint'));
 
     try {
       await service.createCodesets([createPayload, { ...createPayload, description: 'different description' }]);
       expect.fail('Expected error to be thrown');
     } catch (error) {
-      expect(error).to.be.instanceOf(ApiConflictError);
+      expect(insertStub).to.have.been.calledOnce;
+      expect((error as Error).message).to.equal('duplicate key value violates unique constraint');
     }
   });
 

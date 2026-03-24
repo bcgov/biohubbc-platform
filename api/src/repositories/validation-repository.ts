@@ -1,6 +1,6 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { FeatureProperty } from '../models/feature-type';
+import { FeatureTypeProperty } from '../models/feature-type-property';
 import { BaseRepository } from './base-repository';
 
 export interface IInsertStyleSchema {
@@ -23,10 +23,10 @@ export class ValidationRepository extends BaseRepository {
    * Get feature properties for given feature type.
    *
    * @param {string} featureType
-   * @return {*}  {Promise<FeatureProperty[]>}
+   * @return {*}  {Promise<FeatureTypeProperty[]>}
    * @memberof ValidationRepository
    */
-  async getFeatureValidationProperties(featureType: string): Promise<FeatureProperty[]> {
+  async getFeatureValidationProperties(featureType: string): Promise<FeatureTypeProperty[]> {
     const sqlStatement = SQL`
       SELECT
         feature_property.name,
@@ -50,7 +50,7 @@ export class ValidationRepository extends BaseRepository {
         feature_property.calculated_value = false;
     `;
 
-    const response = await this.connection.sql(sqlStatement, FeatureProperty);
+    const response = await this.connection.sql(sqlStatement, FeatureTypeProperty);
 
     if (response.rowCount === 0) {
       throw new ApiExecuteSQLError(`Failed to get validation properties for feature type: ${featureType}`, [

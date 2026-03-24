@@ -2,5 +2,5 @@ export interface ICreateSubmissionForm {
   name: string;
   description: string;
   comment: string;
-  file: File; // raw .json file of features
+  file: File; // raw .tar submission archive
 }

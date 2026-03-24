@@ -132,6 +132,53 @@ export class ContributorCodesetCodeRepository extends BaseRepository {
   }
 
   /**
+   * Get contributor_codeset_code rows by contributor_codeset_id values.
+   *
+   * @param {number[]} contributorCodesetIds
+   * @return {Promise<ContributorCodesetCode[]>}
+   * @memberof ContributorCodesetCodeRepository
+   */
+  async getContributorCodesetCodesByContributorCodesetIds(
+    contributorCodesetIds: number[]
+  ): Promise<ContributorCodesetCode[]> {
+    if (!contributorCodesetIds.length) {
+      return [];
+    }
+
+    const knex = getKnex();
+    const query = knex('contributor_codeset_code')
+      .select(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'external_id'])
+      .whereIn('contributor_codeset_id', contributorCodesetIds)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query, ContributorCodesetCodeSchema);
+
+    return response.rows;
+  }
+
+  /**
+   * Get contributor_codeset_code rows by ids.
+   *
+   * @param {number[]} contributorCodesetCodeIds
+   * @return {Promise<ContributorCodesetCode[]>}
+   * @memberof ContributorCodesetCodeRepository
+   */
+  async getContributorCodesetCodesByIds(contributorCodesetCodeIds: number[]): Promise<ContributorCodesetCode[]> {
+    if (!contributorCodesetCodeIds.length) {
+      return [];
+    }
+
+    const knex = getKnex();
+    const query = knex('contributor_codeset_code')
+      .select(['contributor_codeset_code_id', 'contributor_codeset_id', 'key', 'label', 'description', 'external_id'])
+      .whereIn('contributor_codeset_code_id', contributorCodesetCodeIds)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query, ContributorCodesetCodeSchema);
+    return response.rows;
+  }
+
+  /**
    * Get a contributor_codeset_code row by identity fields.
    *
    * @param {ContributorCodesetCodeIdentity} identity

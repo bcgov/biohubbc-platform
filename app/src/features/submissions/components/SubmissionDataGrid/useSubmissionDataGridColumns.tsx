@@ -5,7 +5,7 @@ import { GridColDef, GridRenderCellParams, GridValueGetter } from '@mui/x-data-g
 import { useApi } from 'hooks/useApi';
 import { useCodesContext } from 'hooks/useContext';
 import useDownload from 'hooks/useDownload';
-import { FeaturePropertyCode } from 'interfaces/useCodesApi.interface';
+import { FeatureTypeProperty } from 'interfaces/useCodesApi.interface';
 
 /**
  * Hook to generate columns for SubmissionDataGrid
@@ -21,25 +21,24 @@ const useSubmissionDataGridColumns = (featureTypeName: string): GridColDef[] => 
   const featureTypesWithProperties = codesContext.codesDataLoader.data?.feature_type_with_properties;
 
   const featureTypeWithProperties =
-    featureTypesWithProperties?.find((item) => item.feature_type.feature_type_name === featureTypeName)
-      ?.feature_type_properties ?? [];
+    featureTypesWithProperties?.find((item) => item.feature_type.name === featureTypeName)?.properties ?? [];
 
-  const fieldColumns = featureTypeWithProperties.map((featureType: FeaturePropertyCode) => {
-    if (featureType.feature_property_type_name === 'artifact_key') {
+  const fieldColumns = featureTypeWithProperties.map((featureType: FeatureTypeProperty) => {
+    if (featureType.type_name === 'artifact_key') {
       return {
-        field: featureType.feature_property_name,
+        field: featureType.name,
         headerName: '',
         flex: 1,
         disableColumnMenu: true,
         disableReorder: true,
         hideSortIcons: true,
-        valueGetter: ((_, row) => row.data[featureType.feature_property_name] ?? null) as GridValueGetter,
+        valueGetter: ((_, row) => row.data[featureType.name] ?? null) as GridValueGetter,
         renderCell: (params: GridRenderCellParams) => {
           const download = async () => {
             const signedUrlPromise = api.submissions.getSubmissionFeatureSignedUrl({
               submissionId: params.row.submission_id,
               submissionFeatureId: params.row.submission_feature_id,
-              submissionFeatureKey: featureType.feature_property_name,
+              submissionFeatureKey: featureType.name,
               submissionFeatureValue: params.value
             });
             await downloadSignedUrl(signedUrlPromise);
@@ -53,11 +52,11 @@ const useSubmissionDataGridColumns = (featureTypeName: string): GridColDef[] => 
       };
     }
     return {
-      field: featureType.feature_property_name,
-      headerName: featureType.feature_property_display_name,
+      field: featureType.name,
+      headerName: featureType.display_name,
       flex: 1,
       disableColumnMenu: true,
-      valueGetter: ((_, row) => row.data[featureType.feature_property_name] ?? null) as GridValueGetter,
+      valueGetter: ((_, row) => row.data[featureType.name] ?? null) as GridValueGetter,
       renderCell: (params: GridRenderCellParams) => (
         <Box
           sx={{
