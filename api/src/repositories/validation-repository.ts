@@ -1,6 +1,6 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { FeatureTypeProperty } from '../models/feature-type';
+import { FeatureTypeProperty } from '../models/feature-type-property';
 import { BaseRepository } from './base-repository';
 
 export interface IInsertStyleSchema {

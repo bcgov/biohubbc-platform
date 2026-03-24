@@ -1,20 +1,22 @@
-export type FeatureTypeCode = {
+export type FeatureType = {
   feature_type_id: number;
-  feature_type_name: string;
-  feature_type_display_name: string;
+  name: string;
+  display_name: string;
 };
 
-export type FeatureTypeWithFeaturePropertiesCode = {
-  feature_type: FeatureTypeCode;
-  feature_type_properties: FeaturePropertyCode[];
+export type FeatureTypeWithProperties = {
+  feature_type: FeatureType;
+  properties: FeatureTypeProperty[];
 };
 
-export type FeaturePropertyCode = {
-  feature_property_id: number;
-  feature_property_name: string;
-  feature_property_display_name: string;
-  feature_property_type_id: number;
-  feature_property_type_name: string;
+export type FeatureTypeProperty = {
+  feature_type_property_id: number;
+  name: string;
+  display_name: string;
+  description: string;
+  type_name: string;
+  required_value: boolean;
+  calculated_value: boolean;
 };
 
 /**
@@ -24,5 +26,5 @@ export type FeaturePropertyCode = {
  * @interface IGetAllCodeSetsResponse
  */
 export interface IGetAllCodeSetsResponse {
-  feature_type_with_properties: FeatureTypeWithFeaturePropertiesCode[];
+  feature_type_with_properties: FeatureTypeWithProperties[];
 }

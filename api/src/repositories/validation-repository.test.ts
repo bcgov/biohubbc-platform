@@ -4,7 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../errors/api-error';
-import { FeatureTypeProperty } from '../models/feature-type';
+import { FeatureTypeProperty } from '../models/feature-type-property';
 import { getMockDBConnection } from '../__mocks__/db';
 import { IInsertStyleSchema, IStyleModel, ValidationRepository } from './validation-repository';
 

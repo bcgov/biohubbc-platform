@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { FeatureTypeProperty } from '../models/feature-type';
+import { FeatureTypeProperty } from '../models/feature-type-property';
 import { ISubmissionFeature } from '../repositories/submission-repository';
 import { IInsertStyleSchema, IStyleModel, ValidationRepository } from '../repositories/validation-repository';
 import { getMockDBConnection } from '../__mocks__/db';

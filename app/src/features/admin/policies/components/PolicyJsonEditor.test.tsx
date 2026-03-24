@@ -72,10 +72,10 @@ const mockPolicyAutocompleteContext = {
   },
   featureTypes: [
     {
-      feature_type: { feature_type_name: 'telemetry' },
-      feature_type_properties: [
-        { feature_property_name: 'sex', feature_property_type_name: 'string' },
-        { feature_property_name: 'count', feature_property_type_name: 'number' }
+      feature_type: { name: 'telemetry' },
+      properties: [
+        { name: 'sex', type_name: 'string' },
+        { name: 'count', type_name: 'number' }
       ]
     }
   ],

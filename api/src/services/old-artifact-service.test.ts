@@ -3,7 +3,8 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { FeatureTypeProperty, FEATURE_PROPERTY_TYPE } from '../models/feature-property';
+import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
+import { FeatureTypeProperty } from '../models/feature-type-property';
 import { Artifact, ArtifactRepository } from '../repositories/artifact-repository';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SecurityRepository } from '../repositories/security-repository';
@@ -74,11 +75,13 @@ describe('ArtifactService', () => {
       const uploadFileToS3Stub = sinon.stub(fileUtils, 'uploadFileToS3').resolves();
 
       const s3FeaturePropertyRecord: FeatureTypeProperty = {
-        feature_property_id: 1,
-        feature_property_name: 'artifact_key',
-        feature_property_display_name: 'S3 Key',
-        feature_property_type_id: 1,
-        feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
+        feature_type_property_id: 1,
+        name: 'artifact_key',
+        display_name: 'S3 Key',
+        description: 'S3 Key',
+        type_name: FEATURE_PROPERTY_TYPE.STRING,
+        required_value: true,
+        calculated_value: false
       };
 
       const getFeaturePropertyByNameStub = sinon
@@ -101,7 +104,7 @@ describe('ArtifactService', () => {
       expect(insertSearchableStringRecordsStub).to.have.been.calledOnceWith([
         {
           submission_feature_id: artifactSubmissionFeature.submission_feature_id,
-          feature_property_id: s3FeaturePropertyRecord.feature_property_id,
+          feature_property_id: s3FeaturePropertyRecord.feature_type_property_id,
           value: sinon.match.string
         }
       ]);

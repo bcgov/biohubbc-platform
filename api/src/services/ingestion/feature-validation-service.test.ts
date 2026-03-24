@@ -2,7 +2,8 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { FeatureTypeProperty, FeatureTypeWithProperties } from '../../models/feature-type';
+import { FeatureTypeWithProperties } from '../../models/feature-type';
+import { FeatureTypeProperty } from '../../models/feature-type-property';
 import { IFlattenedBlock } from '../../models/submission-feature';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -33,7 +34,7 @@ describe('FeatureValidationService', () => {
 
     // Mock matches real dataset schema from database migration
     const mockFeatureTypeWithProperties: FeatureTypeWithProperties = {
-      featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
+      feature_type: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
       properties: [
         {
           name: 'name',
@@ -675,7 +676,7 @@ describe('FeatureValidationService', () => {
       const service = new FeatureValidationService(mockDBConnection);
 
       const mockResult: FeatureTypeWithProperties = {
-        featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
+        feature_type: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
         properties: [
           {
             name: 'name',
@@ -704,7 +705,7 @@ describe('FeatureValidationService', () => {
       const service = new FeatureValidationService(mockDBConnection);
 
       const mockResult: FeatureTypeWithProperties = {
-        featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
+        feature_type: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
         properties: []
       };
 

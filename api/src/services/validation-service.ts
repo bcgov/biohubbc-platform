@@ -1,6 +1,6 @@
 import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
-import { FeatureTypeProperty } from '../models/feature-type';
+import { FeatureTypeProperty } from '../models/feature-type-property';
 import { ISubmissionFeature } from '../repositories/submission-repository';
 import { IInsertStyleSchema, IStyleModel, ValidationRepository } from '../repositories/validation-repository';
 import { getLogger } from '../utils/logger';

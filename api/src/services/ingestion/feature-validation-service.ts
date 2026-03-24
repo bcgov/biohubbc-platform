@@ -1,5 +1,6 @@
 import { IDBConnection } from '../../database/db';
-import { FeatureTypeProperty, FeatureTypeWithProperties } from '../../models/feature-type';
+import { FeatureTypeWithProperties } from '../../models/feature-type';
+import { FeatureTypeProperty } from '../../models/feature-type-property';
 import { IFlattenedBlock } from '../../models/submission-feature';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { GeoJSONFeatureCollectionZodSchema } from '../../zod-schema/geoJsonZodSchema';

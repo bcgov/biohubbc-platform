@@ -2,7 +2,7 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { IngestionValidationError } from '../../errors/submission-errors';
-import { FeatureTypeWithProperties, FeatureTypeWithPropertiesRow } from '../../models/feature-type';
+import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { CreateSubmissionFeatureIngestionRecord, InsertSubmissionFeatureRecord } from '../../models/submission-feature';
 import { BaseRepository } from '../base-repository';
 
@@ -241,9 +241,11 @@ export class FeatureIngestionRepository extends BaseRepository {
           ftp.record_end_date IS NULL
       )
       SELECT
-        ft.feature_type_id,
-        ft.name,
-        ft.display_name,
+        JSON_BUILD_OBJECT(
+          'feature_type_id', ft.feature_type_id,
+          'name', ft.name,
+          'display_name', ft.display_name
+        ) AS "feature_type",
         COALESCE(
           JSON_AGG(
             JSON_BUILD_OBJECT(
@@ -267,21 +269,8 @@ export class FeatureIngestionRepository extends BaseRepository {
         ft.display_name;
     `;
 
-    const response = await this.connection.sql(sqlStatement, FeatureTypeWithPropertiesRow);
+    const response = await this.connection.sql(sqlStatement, FeatureTypeWithProperties);
 
-    if (response.rowCount === 0) {
-      return null;
-    }
-
-    const row = response.rows[0];
-
-    return {
-      featureType: {
-        feature_type_id: row.feature_type_id,
-        name: row.name,
-        display_name: row.display_name
-      },
-      properties: row.properties
-    };
+    return response.rows[0] ?? null;
   }
 }

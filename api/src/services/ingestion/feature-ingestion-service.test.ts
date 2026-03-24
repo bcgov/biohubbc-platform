@@ -33,7 +33,7 @@ describe('FeatureIngestionService', () => {
 
     // Mock matches real dataset schema from database migration
     const mockFeatureTypeWithProperties: FeatureTypeWithProperties = {
-      featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
+      feature_type: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
       properties: [
         {
           feature_type_property_id: 1,
@@ -399,7 +399,7 @@ describe('FeatureIngestionService', () => {
 
       // Mock with multiple properties (matches real dataset schema + extra optional)
       const mockFeatureTypeWithMultipleProps: FeatureTypeWithProperties = {
-        featureType: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
+        feature_type: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
         properties: [
           {
             feature_type_property_id: 1,

@@ -1,6 +1,7 @@
 import { IDBConnection } from '../database/db';
 import { IAllCodeSets } from '../models/codes';
-import { FeatureType, FeatureTypeProperty, FeatureTypeWithFeatureProperties } from '../models/feature-property';
+import { FeatureType, FeatureTypeWithProperties } from '../models/feature-type';
+import { FeatureTypeProperty } from '../models/feature-type-property';
 import { CodeRepository } from '../repositories/code-repository';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
@@ -45,45 +46,13 @@ export class CodeService extends DBService {
   /**
    * Get all feature properties grouped by feature type.
    *
-   * @return {*}  {Promise<FeatureTypeWithFeatureProperties[]>}
+   * @return {*}  {Promise<FeatureTypeWithProperties[]>}
    * @memberof CodeService
    */
-  async getFeatureTypePropertyCodes(): Promise<FeatureTypeWithFeatureProperties[]> {
+  async getFeatureTypePropertyCodes(): Promise<FeatureTypeWithProperties[]> {
     defaultLog.debug({ message: 'getFeatureTypePropertyCodes' });
 
-    const featureTypePropertyCodes = await this.codeRepository.getFeatureTypePropertyCodes();
-
-    const groupedFeatureTypePropertyCodes: FeatureTypeWithFeatureProperties[] = [];
-
-    // Iterate over the raw array of feature type property codes and group them by feature type
-    for (const featureTypePropertyCode of featureTypePropertyCodes) {
-      const index = groupedFeatureTypePropertyCodes.findIndex(
-        (item) => item.feature_type.feature_type_id === featureTypePropertyCode.feature_type_id
-      );
-
-      const feature_type_properties = {
-        feature_property_id: featureTypePropertyCode.feature_property_id,
-        feature_property_name: featureTypePropertyCode.feature_property_name,
-        feature_property_display_name: featureTypePropertyCode.feature_property_display_name,
-        feature_property_type_id: featureTypePropertyCode.feature_property_type_id,
-        feature_property_type_name: featureTypePropertyCode.feature_property_type_name
-      };
-
-      if (index >= 0) {
-        groupedFeatureTypePropertyCodes[index].feature_type_properties.push(feature_type_properties);
-      } else {
-        groupedFeatureTypePropertyCodes.push({
-          feature_type: {
-            feature_type_id: featureTypePropertyCode.feature_type_id,
-            feature_type_name: featureTypePropertyCode.feature_type_name,
-            feature_type_display_name: featureTypePropertyCode.feature_type_display_name
-          },
-          feature_type_properties: [feature_type_properties]
-        });
-      }
-    }
-
-    return groupedFeatureTypePropertyCodes;
+    return this.codeRepository.getFeatureTypePropertyCodes();
   }
 
   /**

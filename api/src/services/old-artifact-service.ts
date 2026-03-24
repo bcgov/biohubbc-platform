@@ -72,7 +72,7 @@ export class ArtifactService extends DBService {
     await searchFeatureRepository.insertSearchableStringRecords([
       {
         submission_feature_id: artifactFeatureSubmission.submission_feature_id,
-        feature_property_id: artifactFeatureProperties.feature_property_id,
+        feature_property_id: artifactFeatureProperties.feature_type_property_id,
         value: artifactS3Key
       }
     ]);

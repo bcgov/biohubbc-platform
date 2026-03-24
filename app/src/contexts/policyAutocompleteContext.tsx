@@ -1,7 +1,7 @@
 import { useApi } from 'hooks/useApi';
 import { useCodesContext, useDialogContext } from 'hooks/useContext';
 import useDataLoader, { DataLoader } from 'hooks/useDataLoader';
-import { FeatureTypeWithFeaturePropertiesCode } from 'interfaces/useCodesApi.interface';
+import { FeatureTypeWithProperties } from 'interfaces/useCodesApi.interface';
 import {
   ISubmissionFeatureForReview,
   SubmissionRecordWithSecurityAndRootFeature
@@ -25,10 +25,10 @@ export interface IPolicyAutocompleteContext {
   /**
    * Feature types from codes context (already loaded globally).
    *
-   * @type {FeatureTypeWithFeaturePropertiesCode[]}
+   * @type {FeatureTypeWithProperties[]}
    * @memberof IPolicyAutocompleteContext
    */
-  featureTypes: FeatureTypeWithFeaturePropertiesCode[];
+  featureTypes: FeatureTypeWithProperties[];
   /**
    * Cache of submission features for autocomplete, keyed by submission ID.
    *

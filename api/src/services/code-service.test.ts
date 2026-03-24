@@ -2,7 +2,8 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { FeatureTypeWithFeatureProperties, FEATURE_PROPERTY_TYPE } from '../models/feature-property';
+import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
+import { FeatureType, FeatureTypeWithProperties } from '../models/feature-type';
 import { CodeRepository } from '../repositories/code-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CodeService } from './code-service';
@@ -18,20 +19,22 @@ describe('codeService', () => {
     it('should return id value', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      const mockFeatureTypePropertyCodes: FeatureTypeWithFeatureProperties[] = [
+      const mockFeatureTypePropertyCodes: FeatureTypeWithProperties[] = [
         {
           feature_type: {
             feature_type_id: 1,
-            feature_type_name: 'dataset',
-            feature_type_display_name: 'Dataset'
+            name: 'dataset',
+            display_name: 'Dataset'
           },
-          feature_type_properties: [
+          properties: [
             {
-              feature_property_id: 1,
-              feature_property_name: 'name',
-              feature_property_display_name: 'Name',
-              feature_property_type_id: 1,
-              feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
+              feature_type_property_id: 1,
+              name: 'name',
+              display_name: 'Name',
+              description: 'Name',
+              type_name: FEATURE_PROPERTY_TYPE.STRING,
+              required_value: true,
+              calculated_value: false
             }
           ]
         }
@@ -60,13 +63,13 @@ describe('codeService', () => {
 
       const mockFeatureTypeCode = {
         feature_type_id: 1,
-        feature_type_name: 'test',
-        feature_type_display_name: 'Test'
+        name: 'test',
+        display_name: 'Test'
       };
 
       const getFeatureTypesStub = sinon
         .stub(CodeRepository.prototype, 'getFeatureTypes')
-        .resolves([mockFeatureTypeCode]);
+        .resolves([mockFeatureTypeCode as FeatureType]);
 
       const codeService = new CodeService(dbConnectionObj);
 
@@ -85,43 +88,49 @@ describe('codeService', () => {
     it('should return id value', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      const expectedResult: FeatureTypeWithFeatureProperties[] = [
+      const expectedResult: FeatureTypeWithProperties[] = [
         {
           feature_type: {
             feature_type_id: 1,
-            feature_type_name: 'dataset',
-            feature_type_display_name: 'Dataset'
+            name: 'dataset',
+            display_name: 'Dataset'
           },
-          feature_type_properties: [
+          properties: [
             {
-              feature_property_id: 1,
-              feature_property_name: 'name',
-              feature_property_display_name: 'Name',
-              feature_property_type_id: 1,
-              feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
+              feature_type_property_id: 1,
+              name: 'name',
+              display_name: 'Name',
+              description: 'Name',
+              type_name: FEATURE_PROPERTY_TYPE.STRING,
+              required_value: true,
+              calculated_value: false
             },
             {
-              feature_property_id: 2,
-              feature_property_name: 'age',
-              feature_property_display_name: 'Age',
-              feature_property_type_id: 2,
-              feature_property_type_name: FEATURE_PROPERTY_TYPE.NUMBER
+              feature_type_property_id: 2,
+              name: 'age',
+              display_name: 'Age',
+              description: 'Age',
+              type_name: FEATURE_PROPERTY_TYPE.NUMBER,
+              required_value: false,
+              calculated_value: false
             }
           ]
         },
         {
           feature_type: {
             feature_type_id: 2,
-            feature_type_name: 'artifact',
-            feature_type_display_name: 'Artifact'
+            name: 'artifact',
+            display_name: 'Artifact'
           },
-          feature_type_properties: [
+          properties: [
             {
-              feature_property_id: 3,
-              feature_property_name: 'filename',
-              feature_property_display_name: 'Filename',
-              feature_property_type_id: 1,
-              feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
+              feature_type_property_id: 3,
+              name: 'filename',
+              display_name: 'Filename',
+              description: 'Filename',
+              type_name: FEATURE_PROPERTY_TYPE.STRING,
+              required_value: true,
+              calculated_value: false
             }
           ]
         }
@@ -129,38 +138,7 @@ describe('codeService', () => {
 
       const getFeatureTypePropertiesStub = sinon
         .stub(CodeRepository.prototype, 'getFeatureTypePropertyCodes')
-        .resolves([
-          {
-            feature_type_id: 1,
-            feature_type_name: 'dataset',
-            feature_type_display_name: 'Dataset',
-            feature_property_id: 1,
-            feature_property_name: 'name',
-            feature_property_display_name: 'Name',
-            feature_property_type_id: 1,
-            feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
-          },
-          {
-            feature_type_id: 1,
-            feature_type_name: 'dataset',
-            feature_type_display_name: 'Dataset',
-            feature_property_id: 2,
-            feature_property_name: 'age',
-            feature_property_display_name: 'Age',
-            feature_property_type_id: 2,
-            feature_property_type_name: FEATURE_PROPERTY_TYPE.NUMBER
-          },
-          {
-            feature_type_id: 2,
-            feature_type_name: 'artifact',
-            feature_type_display_name: 'Artifact',
-            feature_property_id: 3,
-            feature_property_name: 'filename',
-            feature_property_display_name: 'Filename',
-            feature_property_type_id: 1,
-            feature_property_type_name: FEATURE_PROPERTY_TYPE.STRING
-          }
-        ]);
+        .resolves(expectedResult);
 
       const codeService = new CodeService(dbConnectionObj);
 

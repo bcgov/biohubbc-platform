@@ -5,7 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../../errors/api-error';
 import { IngestionValidationError } from '../../errors/submission-errors';
-import { FeatureTypeWithProperties, FeatureTypeWithPropertiesRow } from '../../models/feature-type';
+import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { CreateSubmissionFeatureIngestionRecord } from '../../models/submission-feature';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { FeatureIngestionRepository } from './feature-ingestion-repository';
@@ -244,11 +244,13 @@ describe('FeatureIngestionRepository', () => {
 
   describe('findFeatureTypeWithProperties', () => {
     it('should return feature type with properties when valid', async () => {
-      const mockRows: FeatureTypeWithPropertiesRow[] = [
+      const mockRows: FeatureTypeWithProperties[] = [
         {
-          feature_type_id: 1,
-          name: 'dataset',
-          display_name: 'Dataset',
+          feature_type: {
+            feature_type_id: 1,
+            name: 'dataset',
+            display_name: 'Dataset'
+          },
           properties: [
             {
               feature_type_property_id: 11,
@@ -286,35 +288,7 @@ describe('FeatureIngestionRepository', () => {
       const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
       const response = await ingestionRepository.findFeatureTypeWithProperties('dataset');
 
-      const expectedResponse: FeatureTypeWithProperties = {
-        featureType: {
-          feature_type_id: 1,
-          name: 'dataset',
-          display_name: 'Dataset'
-        },
-        properties: [
-          {
-            feature_type_property_id: 11,
-            name: 'name',
-            display_name: 'Name',
-            description: 'The name of the dataset',
-            type_name: 'string',
-            required_value: true,
-            calculated_value: false
-          },
-          {
-            feature_type_property_id: 12,
-            name: 'description',
-            display_name: 'Description',
-            description: 'The description of the dataset',
-            type_name: 'string',
-            required_value: false,
-            calculated_value: false
-          }
-        ]
-      };
-
-      expect(response).to.eql(expectedResponse);
+      expect(response).to.eql(mockRows[0]);
     });
 
     it('should return null when feature type does not exist', async () => {
@@ -337,11 +311,13 @@ describe('FeatureIngestionRepository', () => {
     });
 
     it('should return empty properties array when type has no properties', async () => {
-      const mockRows: FeatureTypeWithPropertiesRow[] = [
+      const mockRows: FeatureTypeWithProperties[] = [
         {
-          feature_type_id: 99,
-          name: 'empty_type',
-          display_name: 'Empty Type',
+          feature_type: {
+            feature_type_id: 99,
+            name: 'empty_type',
+            display_name: 'Empty Type'
+          },
           properties: []
         }
       ];
@@ -360,16 +336,7 @@ describe('FeatureIngestionRepository', () => {
       const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
       const response = await ingestionRepository.findFeatureTypeWithProperties('empty_type');
 
-      const expectedResponse: FeatureTypeWithProperties = {
-        featureType: {
-          feature_type_id: 99,
-          name: 'empty_type',
-          display_name: 'Empty Type'
-        },
-        properties: []
-      };
-
-      expect(response).to.eql(expectedResponse);
+      expect(response).to.eql(mockRows[0]);
     });
   });
 });
