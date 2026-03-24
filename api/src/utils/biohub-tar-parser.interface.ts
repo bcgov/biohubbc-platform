@@ -10,3 +10,13 @@ export interface IUploadedMediaFile {
   /** SHA-256 checksum computed from streamed bytes */
   checksumSha256: string;
 }
+
+export type TarNext = () => void;
+
+export interface MediaUploadContext {
+  path: string;
+  fileName: string;
+  s3Key: string;
+  mimetype: string;
+  byteSize: number;
+}

@@ -4,7 +4,7 @@ import { z } from 'zod';
  * Schema for feature property definition.
  * Represents an allowed property for a feature type.
  */
-export const FeatureProperty = z.object({
+export const FeatureTypeProperty = z.object({
   feature_type_property_id: z.number(),
   name: z.string(),
   display_name: z.string(),
@@ -14,7 +14,7 @@ export const FeatureProperty = z.object({
   calculated_value: z.boolean()
 });
 
-export type FeatureProperty = z.infer<typeof FeatureProperty>;
+export type FeatureTypeProperty = z.infer<typeof FeatureTypeProperty>;
 
 /**
  * Schema for feature type basic info (minimal fields).
@@ -36,7 +36,7 @@ export const FeatureTypeWithPropertiesRow = z.object({
   feature_type_id: z.number(),
   name: z.string(),
   display_name: z.string(),
-  properties: z.array(FeatureProperty)
+  properties: z.array(FeatureTypeProperty)
 });
 
 export type FeatureTypeWithPropertiesRow = z.infer<typeof FeatureTypeWithPropertiesRow>;
@@ -46,7 +46,7 @@ export type FeatureTypeWithPropertiesRow = z.infer<typeof FeatureTypeWithPropert
  */
 export const FeatureTypeWithProperties = z.object({
   featureType: FeatureTypeSummary,
-  properties: z.array(FeatureProperty)
+  properties: z.array(FeatureTypeProperty)
 });
 
 export type FeatureTypeWithProperties = z.infer<typeof FeatureTypeWithProperties>;

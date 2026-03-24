@@ -1,5 +1,5 @@
 import { IDBConnection } from '../../database/db';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { IngestionValidationError } from '../../errors/submission-errors';
 import { CreateContributorCodeset } from '../../models/contributor-codeset';
 import { CreateContributorCodesetCode } from '../../models/contributor-codeset-code';
 import { streamCodesets } from '../../utils/biohub-tar-parser';
@@ -179,10 +179,9 @@ export class CodesetIngestionService extends DBService {
       return normalizedExistingLabel;
     }
 
-    throw new ApiExecuteSQLError('Missing required label for contributor code metadata', [
-      'CodesetIngestionService->resolveRequiredLabel',
-      context
-    ]);
+    throw new IngestionValidationError(
+      `Missing required label for contributor code metadata: CodesetIngestionService->resolveRequiredLabel; ${context}`
+    );
   }
 
   /**

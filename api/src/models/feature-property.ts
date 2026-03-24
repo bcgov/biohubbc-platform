@@ -34,7 +34,7 @@ export const FeatureType = z.object({
 
 export type FeatureType = z.infer<typeof FeatureType>;
 
-export const FeatureProperty = z.object({
+export const FeatureTypeProperty = z.object({
   feature_property_id: z.number(),
   feature_property_name: z.string(),
   feature_property_display_name: z.string(),
@@ -42,15 +42,15 @@ export const FeatureProperty = z.object({
   feature_property_type_name: FeaturePropertyTypeName
 });
 
-export type FeatureProperty = z.infer<typeof FeatureProperty>;
+export type FeatureTypeProperty = z.infer<typeof FeatureTypeProperty>;
 
-export const FeatureTypePropertyExtended = FeatureType.merge(FeatureProperty);
+export const FeatureTypePropertyExtended = FeatureType.merge(FeatureTypeProperty);
 
 export type FeatureTypePropertyExtended = z.infer<typeof FeatureTypePropertyExtended>;
 
 export const FeatureTypeWithFeatureProperties = z.object({
   feature_type: FeatureType,
-  feature_type_properties: z.array(FeatureProperty)
+  feature_type_properties: z.array(FeatureTypeProperty)
 });
 
 export type FeatureTypeWithFeatureProperties = z.infer<typeof FeatureTypeWithFeatureProperties>;

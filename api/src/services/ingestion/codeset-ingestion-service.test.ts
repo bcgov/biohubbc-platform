@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import { Readable } from 'node:stream';
 import sinon from 'sinon';
+import { IngestionValidationError } from '../../errors/submission-errors';
 import * as biohubTarParser from '../../utils/biohub-tar-parser';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { ContributorCodesetCodeService } from '../contributor-codeset-code-service';
@@ -216,7 +217,8 @@ describe('CodesetIngestionService', () => {
         await service.ingestCodesets('archive/key.tar', 'submission-upload-1');
         expect.fail();
       } catch (error) {
-        expect((error as Error).message).to.equal('Missing required label for contributor code metadata');
+        expect(error).to.be.instanceOf(IngestionValidationError);
+        expect((error as Error).message).to.include('Missing required label for contributor code metadata');
       }
 
       expect(createCodesetStub.called).to.be.false;

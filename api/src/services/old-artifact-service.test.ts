@@ -3,7 +3,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { FeatureProperty, FEATURE_PROPERTY_TYPE } from '../models/feature-property';
+import { FeatureTypeProperty, FEATURE_PROPERTY_TYPE } from '../models/feature-property';
 import { Artifact, ArtifactRepository } from '../repositories/artifact-repository';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SecurityRepository } from '../repositories/security-repository';
@@ -73,7 +73,7 @@ describe('ArtifactService', () => {
 
       const uploadFileToS3Stub = sinon.stub(fileUtils, 'uploadFileToS3').resolves();
 
-      const s3FeaturePropertyRecord: FeatureProperty = {
+      const s3FeaturePropertyRecord: FeatureTypeProperty = {
         feature_property_id: 1,
         feature_property_name: 'artifact_key',
         feature_property_display_name: 'S3 Key',

@@ -1,6 +1,6 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { FeatureProperty, FeatureType, FeatureTypePropertyExtended } from '../models/feature-property';
+import { FeatureType, FeatureTypeProperty, FeatureTypePropertyExtended } from '../models/feature-property';
 import { BaseRepository } from './base-repository';
 
 /**
@@ -79,10 +79,10 @@ export class CodeRepository extends BaseRepository {
    * Get a feature property record by name.
    *
    * @param {string} featurePropertyName
-   * @return {*}  {Promise<FeatureProperty>}
+   * @return {*}  {Promise<FeatureTypeProperty>}
    * @memberof CodeRepository
    */
-  async getFeaturePropertyByName(featurePropertyName: string): Promise<FeatureProperty> {
+  async getFeaturePropertyByName(featurePropertyName: string): Promise<FeatureTypeProperty> {
     const sqlStatement = SQL`
     SELECT
       fp.feature_property_id,
@@ -100,7 +100,7 @@ export class CodeRepository extends BaseRepository {
       AND fp.record_end_date IS NULL;
   `;
 
-    const response = await this.connection.sql(sqlStatement, FeatureProperty);
+    const response = await this.connection.sql(sqlStatement, FeatureTypeProperty);
 
     if (response.rowCount === 0) {
       throw new ApiNotFoundError('Feature property not found', [

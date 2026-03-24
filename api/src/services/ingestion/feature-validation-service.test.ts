@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { FeatureProperty, FeatureTypeWithProperties } from '../../models/feature-type';
+import { FeatureTypeProperty, FeatureTypeWithProperties } from '../../models/feature-type';
 import { IFlattenedBlock } from '../../models/submission-feature';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -435,7 +435,7 @@ describe('FeatureValidationService', () => {
   });
 
   describe('validateFeaturePropertyFlat', () => {
-    const mockAllowedProperties: FeatureProperty[] = [
+    const mockAllowedProperties: FeatureTypeProperty[] = [
       {
         name: 'name',
         display_name: 'Name',
@@ -583,7 +583,7 @@ describe('FeatureValidationService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
-      const propertiesWithCalculated: FeatureProperty[] = [
+      const propertiesWithCalculated: FeatureTypeProperty[] = [
         {
           name: 'name',
           display_name: 'Name',
@@ -621,7 +621,7 @@ describe('FeatureValidationService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new FeatureValidationService(mockDBConnection);
 
-      const propertiesWithCalculated: FeatureProperty[] = [
+      const propertiesWithCalculated: FeatureTypeProperty[] = [
         {
           name: 'name',
           display_name: 'Name',

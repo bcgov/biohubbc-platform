@@ -108,6 +108,7 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
 
       // Update ingestion status to completed; deep validation is handled by indexing.
       await submissionValidationService.updateSubmissionValidationStatus(job.id, 'completed');
+      await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'succeeded' });
       await connection.commit();
 
       // Publish indexing job (fire-and-forget — failure here doesn't affect validation).

@@ -49,7 +49,7 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX IF NOT EXISTS upload_artifact_path_idx
       ON upload_artifact(path);
 
-    CREATE UNIQUE INDEX IF NOT EXISTS upload_artifact_upload_path_uq
+    CREATE UNIQUE INDEX IF NOT EXISTS upload_artifact_upload_path_uk1
       ON upload_artifact(upload_id, path)
       WHERE path IS NOT NULL;
 
@@ -100,29 +100,12 @@ export async function down(knex: Knex): Promise<void> {
       );
 
     --------------------------------------------------------------------------------
-    -- 2) Remove upload_artifact_role value = codeset
-    --------------------------------------------------------------------------------
-
-    ALTER TYPE upload_artifact_role RENAME TO upload_artifact_role_old;
-
-    CREATE TYPE upload_artifact_role AS ENUM (
-      'feature',
-      'attachment'
-    );
-
-    ALTER TABLE upload_artifact
-      ALTER COLUMN role TYPE upload_artifact_role
-      USING role::text::upload_artifact_role;
-
-    DROP TYPE upload_artifact_role_old;
-
-    --------------------------------------------------------------------------------
-    -- 3) Remove upload_artifact.path and submission_upload.status changes
+    -- 2) Remove upload_artifact.path and submission_upload.status changes
     --------------------------------------------------------------------------------
     ALTER TABLE upload_artifact
       DROP CONSTRAINT IF EXISTS upload_artifact_archive_path_chk;
 
-    DROP INDEX IF EXISTS upload_artifact_upload_path_uq;
+    DROP INDEX IF EXISTS upload_artifact_upload_path_uk1;
     DROP INDEX IF EXISTS upload_artifact_path_idx;
 
     ALTER TABLE upload_artifact
@@ -136,7 +119,7 @@ export async function down(knex: Knex): Promise<void> {
     DROP TYPE IF EXISTS submission_upload_job_status;
 
     --------------------------------------------------------------------------------
-    -- 4) Restore legacy submission.record_end_date defaults/constraint
+    -- 3) Restore legacy submission.record_end_date defaults/constraint
     --------------------------------------------------------------------------------
     UPDATE submission
     SET record_end_date = NOW()

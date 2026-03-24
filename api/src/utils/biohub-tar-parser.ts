@@ -9,7 +9,7 @@ import { IngestionValidationError } from '../errors/submission-errors';
 import { IFlattenedBlock } from '../models/submission-feature';
 import { TarCodesets } from '../services/ingestion/submission-ingestion-codes-service.interface';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
-import { IUploadedMediaFile } from './biohub-tar-parser.interface';
+import { IUploadedMediaFile, MediaUploadContext, TarNext } from './biohub-tar-parser.interface';
 
 /**
  * TAR ingestion helpers for submission archives.
@@ -32,32 +32,6 @@ const FlattenedFeatureSchema: z.ZodType<IFlattenedBlock> = z.object({
   content: z.array(z.string()),
   parent: z.string().nullable()
 });
-
-/**
- * Strip the optional archive directory prefix added by SIMS.
- * Real SIMS archives wrap all entries under a UUID directory, e.g.:
- *   `6b916891-22d5-4c63-a972-33261b1f7c6b/.dataset-id`
- *   `6b916891-22d5-4c63-a972-33261b1f7c6b/dataset.json`
- *   `6b916891-22d5-4c63-a972-33261b1f7c6b/files/photo.jpg`
- *
- * This normalizes entry names so the parser works with both flat and prefixed archives.
- *
- * @param {string} entryName
- * @returns {string} Entry name without the archive root folder prefix.
- */
-function stripArchivePrefix(entryName: string): string {
-  const slashIndex = entryName.indexOf('/');
-  if (slashIndex === -1) {
-    return entryName;
-  }
-
-  const firstSegment = entryName.substring(0, slashIndex);
-  if (firstSegment === 'files') {
-    return entryName;
-  }
-
-  return entryName.substring(slashIndex + 1);
-}
 
 /**
  * Collect all bytes from a readable stream.
@@ -157,6 +131,143 @@ function extractFeatureFromTarballEntry(value: unknown, entryName: string): IFla
 }
 
 /**
+ * Build derived upload metadata for a media tar entry.
+ *
+ * @param {string} entryName - Normalized tar entry path (expected under `files/`).
+ * @param {string} s3KeyPrefix - Prefix prepended to object storage keys.
+ * @param {number} byteSize - Entry byte size from the tar header.
+ * @returns {MediaUploadContext} Context used to upload and persist media metadata.
+ */
+function buildMediaUploadContext(entryName: string, s3KeyPrefix: string, byteSize: number): MediaUploadContext {
+  const path = entryName.substring('files/'.length).replace(/^\/+/, '');
+  const fileName = nodePath.basename(path);
+  const s3Key = `${s3KeyPrefix}/${path}`;
+
+  return {
+    path,
+    fileName,
+    s3Key,
+    mimetype: mime.getType(fileName) ?? 'application/octet-stream',
+    byteSize
+  };
+}
+
+/**
+ * Create a pass-through transform that updates a running checksum per chunk.
+ *
+ * @param {ReturnType<typeof createHash>} checksum - Mutable hash state.
+ * @returns {Transform} Transform stream that forwards chunks unchanged.
+ */
+function createChecksumTransform(checksum: ReturnType<typeof createHash>): Transform {
+  return new Transform({
+    transform(chunk, _encoding, callback) {
+      checksum.update(chunk as Buffer);
+      callback(null, chunk);
+    }
+  });
+}
+
+/**
+ * Resolve with a hex digest when the checksum stream completes.
+ *
+ * @param {Transform} checksumStream - Stream producing checksum updates.
+ * @param {ReturnType<typeof createHash>} checksum - Hash state finalized on stream finish.
+ * @returns {Promise<string>} SHA-256 digest in hex format.
+ */
+function waitForChecksum(checksumStream: Transform, checksum: ReturnType<typeof createHash>): Promise<string> {
+  return new Promise((resolve, reject) => {
+    checksumStream.on('finish', () => resolve(checksum.digest('hex')));
+    checksumStream.on('error', reject);
+  });
+}
+
+/**
+ * Upload a single media entry to object storage while computing checksum metadata.
+ *
+ * @param {Readable} stream - Tar entry stream.
+ * @param {MediaUploadContext} context - Derived upload and metadata fields.
+ * @param {ObjectStorageService} objectStorageService - Storage client used for streaming upload.
+ * @param {((uploadedFile: IUploadedMediaFile) => Promise<void>) | undefined} ingestMediaFile - Optional callback invoked after upload.
+ * @param {() => void} onUploaded - Counter hook invoked after successful upload.
+ * @returns {Promise<void>}
+ */
+async function uploadMediaEntry(
+  stream: Readable,
+  context: MediaUploadContext,
+  objectStorageService: ObjectStorageService,
+  ingestMediaFile: ((uploadedFile: IUploadedMediaFile) => Promise<void>) | undefined,
+  onUploaded: () => void
+): Promise<void> {
+  const checksum = createHash('sha256');
+  const passThrough = new PassThrough();
+  const checksumStream = createChecksumTransform(checksum);
+  const checksumReady = waitForChecksum(checksumStream, checksum);
+
+  const uploadPromise = objectStorageService.uploadStream(
+    BucketType.MAIN,
+    passThrough,
+    context.mimetype,
+    context.s3Key
+  );
+
+  stream.pipe(checksumStream).pipe(passThrough);
+  await uploadPromise;
+
+  const checksumSha256 = await checksumReady;
+  const uploadedFile: IUploadedMediaFile = {
+    fileName: context.fileName,
+    s3Key: context.s3Key,
+    path: context.path,
+    byteSize: context.byteSize,
+    checksumSha256
+  };
+
+  onUploaded();
+
+  if (ingestMediaFile) {
+    await ingestMediaFile(uploadedFile);
+  }
+}
+
+/**
+ * Handle one tar entry for media ingestion.
+ *
+ * Non-media entries are drained and skipped. Media entries (`files/*`) are uploaded and
+ * `next` is called after upload completion so archive processing stays serialized.
+ *
+ * @param {{ name?: string | null; type?: string | null; size?: number }} header - Tar entry header.
+ * @param {Readable} stream - Tar entry data stream.
+ * @param {TarNext} next - Tar continuation callback.
+ * @param {(err: unknown) => void} reject - Error callback for entry processing failures.
+ * @param {ObjectStorageService} objectStorageService - Storage client used for uploads.
+ * @param {string} s3KeyPrefix - Prefix prepended to uploaded object keys.
+ * @param {((uploadedFile: IUploadedMediaFile) => Promise<void>) | undefined} ingestMediaFile - Optional callback invoked per uploaded file.
+ * @param {() => void} onUploaded - Counter hook invoked per successful upload.
+ * @returns {Promise<void>}
+ */
+async function processMediaEntry(
+  header: { name?: string | null; type?: string | null; size?: number },
+  stream: Readable,
+  next: TarNext,
+  reject: (err: unknown) => void,
+  objectStorageService: ObjectStorageService,
+  s3KeyPrefix: string,
+  ingestMediaFile: ((uploadedFile: IUploadedMediaFile) => Promise<void>) | undefined,
+  onUploaded: () => void
+): Promise<void> {
+  const entryName = header.name ?? '';
+  if (!(entryName.startsWith('files/') && header.type === 'file')) {
+    await drainStream(stream);
+    next();
+    return;
+  }
+
+  const context = buildMediaUploadContext(entryName, s3KeyPrefix, header.size ?? 0);
+
+  uploadMediaEntry(stream, context, objectStorageService, ingestMediaFile, onUploaded).then(next).catch(reject);
+}
+
+/**
  * Stream features from a TAR archive and emit fixed-size flattened batches.
  *
  * Processing rules:
@@ -212,7 +323,7 @@ export async function streamFeatures(
           return;
         }
 
-        const entryName = stripArchivePrefix(header.name);
+        const entryName = header.name ?? '';
         const isFeatureJson = entryName.startsWith('features/') && entryName.endsWith('.json');
 
         if (!isFeatureJson) {
@@ -299,7 +410,7 @@ export async function streamCodesets(
           return;
         }
 
-        const entryName = stripArchivePrefix(header.name);
+        const entryName = header.name ?? '';
         if (!(entryName.startsWith('codes/') && entryName.endsWith('.json') && header.type === 'file')) {
           await drainStream(stream);
           next();
@@ -372,62 +483,18 @@ export async function streamMedia(
 
     extract.on('entry', async (header, stream, next) => {
       try {
-        const entryName = stripArchivePrefix(header.name);
-
-        // Only process media files under files/
-        if (entryName.startsWith('files/') && header.type === 'file') {
-          const path = entryName.substring('files/'.length).replace(/^\/+/, '');
-          const fileName = nodePath.basename(path);
-          const s3Key = `${s3KeyPrefix}/${path}`;
-          const mimetype = mime.getType(fileName) ?? 'application/octet-stream';
-          const byteSize = header.size ?? 0;
-          const checksum = createHash('sha256');
-
-          // Create a PassThrough to pipe the tar entry to S3
-          const passThrough = new PassThrough();
-          const checksumStream = new Transform({
-            transform(chunk, _encoding, callback) {
-              checksum.update(chunk as Buffer);
-              callback(null, chunk);
-            }
-          });
-          const checksumReady = new Promise<string>((resolve, reject) => {
-            checksumStream.on('finish', () => resolve(checksum.digest('hex')));
-            checksumStream.on('error', reject);
-          });
-
-          // Start the upload (don't await — let data flow through the pipe)
-          const uploadPromise = objectStorageService
-            .uploadStream(BucketType.MAIN, passThrough, mimetype, s3Key)
-            .then(async () => {
-              const checksumSha256 = await checksumReady;
-              const uploadedFile: IUploadedMediaFile = {
-                fileName,
-                s3Key,
-                path,
-                byteSize,
-                checksumSha256
-              };
-              uploadedCount += 1;
-
-              if (ingestMediaFile) {
-                return ingestMediaFile(uploadedFile);
-              }
-
-              return Promise.resolve();
-            });
-
-          // Pipe the tar entry stream into the PassThrough
-          stream.pipe(checksumStream).pipe(passThrough);
-
-          // Wait for the S3 upload to finish before advancing to the next entry.
-          // This serializes uploads so only one PassThrough buffer exists at a time.
-          uploadPromise.then(() => next()).catch((err) => reject(err));
-        } else {
-          // Drain non-media entries
-          await drainStream(stream);
-          next();
-        }
+        await processMediaEntry(
+          header,
+          stream,
+          next,
+          reject,
+          objectStorageService,
+          s3KeyPrefix,
+          ingestMediaFile,
+          () => {
+            uploadedCount += 1;
+          }
+        );
       } catch (err) {
         reject(err);
       }
