@@ -25,9 +25,6 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     const deleteRelationshipsStub = sinon
       .stub(SubmissionRepository.prototype, 'deleteSubmissionFeatureRelationshipsBySubmissionUploadId')
       .resolves();
-    const deleteStagingStub = sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'deleteStagingRowsBySubmissionUploadId')
-      .resolves();
     const deleteErrorsStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'deleteIngestionErrorsBySubmissionUploadId')
       .resolves();
@@ -237,9 +234,8 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     sinon.assert.callOrder(
       deleteDerivedPropertiesStub,
       deleteRelationshipsStub,
-      deleteStagingStub,
-      stageStub,
       createTempErrorTableStub,
+      stageStub,
       deleteErrorsStub,
       requiredStub,
       primitiveStub,

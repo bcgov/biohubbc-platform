@@ -325,7 +325,8 @@ describe('process-submission-features-job', () => {
       expect(publishStub.calledOnce).to.be.true;
       expect(publishStub.firstCall.args[0]).to.equal(mockDBConnection);
       expect(publishStub.firstCall.args[1]).to.deep.equal({
-        submissionId: 123
+        submissionId: 123,
+        submissionUploadId: 'test-sub-upload-id'
       });
 
       // Publish must happen after 'completed' status update

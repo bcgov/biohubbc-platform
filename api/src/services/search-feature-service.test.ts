@@ -118,7 +118,8 @@ describe('SearchFeatureService', () => {
               description: 'Name',
               type_name: 'string',
               required_value: true,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             },
             {
               feature_type_property_id: 2,
@@ -127,7 +128,8 @@ describe('SearchFeatureService', () => {
               description: 'Description',
               type_name: 'string',
               required_value: false,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             }
           ]
         },
@@ -145,7 +147,8 @@ describe('SearchFeatureService', () => {
               description: 'Count',
               type_name: 'number',
               required_value: false,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             },
             {
               feature_type_property_id: 4,
@@ -154,7 +157,8 @@ describe('SearchFeatureService', () => {
               description: 'Date Range',
               type_name: 'object',
               required_value: false,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             },
             {
               feature_type_property_id: 5,
@@ -163,7 +167,8 @@ describe('SearchFeatureService', () => {
               description: 'Start Date',
               type_name: 'datetime',
               required_value: false,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             },
             {
               feature_type_property_id: 6,
@@ -172,7 +177,8 @@ describe('SearchFeatureService', () => {
               description: 'End Date',
               type_name: 'datetime',
               required_value: false,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             },
             {
               feature_type_property_id: 7,
@@ -181,7 +187,8 @@ describe('SearchFeatureService', () => {
               description: 'Latitude',
               type_name: 'number',
               required_value: false,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             },
             {
               feature_type_property_id: 8,
@@ -190,7 +197,8 @@ describe('SearchFeatureService', () => {
               description: 'Longitude',
               type_name: 'number',
               required_value: false,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             },
             {
               feature_type_property_id: 9,
@@ -199,7 +207,8 @@ describe('SearchFeatureService', () => {
               description: 'Geometry',
               type_name: 'spatial',
               required_value: false,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             }
           ]
         },
@@ -217,7 +226,8 @@ describe('SearchFeatureService', () => {
               description: 'Filename',
               type_name: 'string',
               required_value: false,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             },
             {
               feature_type_property_id: 2,
@@ -226,7 +236,8 @@ describe('SearchFeatureService', () => {
               description: 'Description',
               type_name: 'string',
               required_value: false,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             }
           ]
         }
@@ -396,7 +407,8 @@ describe('SearchFeatureService', () => {
               description: 'Name',
               type_name: 'string',
               required_value: true,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             },
             {
               feature_type_property_id: 2,
@@ -405,7 +417,8 @@ describe('SearchFeatureService', () => {
               description: 'Description',
               type_name: 'string',
               required_value: false,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             }
           ]
         }
@@ -464,7 +477,8 @@ describe('SearchFeatureService', () => {
               description: 'Name',
               type_name: 'string',
               required_value: true,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             }
           ]
         }

@@ -45,22 +45,24 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
     // Cleanup for idempotency.
     await Promise.all([
       this.submissionFeaturePropertyIngestionRepository.deletePropertyRecordsBySubmissionUploadId(submissionUploadId),
-      this.submissionRepository.deleteSubmissionFeatureRelationshipsBySubmissionUploadId(submissionUploadId),
-      this.submissionFeaturePropertyIngestionRepository.deleteStagingRowsBySubmissionUploadId(submissionUploadId)
+      this.submissionRepository.deleteSubmissionFeatureRelationshipsBySubmissionUploadId(submissionUploadId)
     ]);
 
-    // Phase 1: flatten raw `data.properties` into staging rows.
+    // Phase 1: initialize session-scoped temp staging/error tables.
+    await this.initializeSessionTempTables();
+
+    // Phase 2: flatten raw `data.properties` into staging rows.
     await this.submissionFeaturePropertyIngestionRepository.stageExpandedPropertiesBySubmissionUploadId(
       submissionUploadId
     );
 
-    // Phase 2: prepare upload-local temp working tables and temp error diagnostics table.
-    await this.prepareUploadWorkingTablesBySubmissionUploadId(submissionUploadId);
+    // Phase 3: prepare upload-local temp metadata and logical value working tables.
+    await this.prepareUploadPropertyWorkingSetBySubmissionUploadId(submissionUploadId);
     await this.submissionFeaturePropertyIngestionRepository.deleteIngestionErrorsBySubmissionUploadId(
       submissionUploadId
     );
 
-    // Phase 3: requiredness and primitive/cardinality validation.
+    // Phase 4: requiredness and primitive/cardinality validation.
     await this.submissionFeaturePropertyIngestionRepository.recordMissingRequiredPropertyErrorsBySubmissionUploadId(
       submissionUploadId
     );
@@ -68,7 +70,10 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       submissionUploadId
     );
 
-    // Phase 4: FK reference validation/resolution diagnostics.
+    // Phase 5: materialize complex candidates/resolution maps once for reuse.
+    await this.prepareComplexPropertyCandidatesBySubmissionUploadId(submissionUploadId, contributor.contributor_id);
+
+    // Phase 6: FK reference validation/resolution diagnostics.
     await this.submissionFeaturePropertyIngestionRepository.recordCodePropertyResolutionErrorsBySubmissionUploadId(
       submissionUploadId,
       contributor.contributor_id
@@ -80,13 +85,13 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       submissionUploadId
     );
 
-    // Phase 5: parent validation and update.
+    // Phase 7: parent validation and update.
     await this.submissionFeaturePropertyIngestionRepository.recordUnresolvedParentErrorsBySubmissionUploadId(
       submissionUploadId
     );
     await this.featureIngestionRepository.updateSubmissionFeatureParentsBySubmissionUploadId(submissionUploadId);
 
-    // Phase 6: SQL-native datetime/spatial normalization diagnostics.
+    // Phase 8: SQL-native datetime/spatial normalization diagnostics.
     await this.submissionFeaturePropertyIngestionRepository.recordDatetimeNormalizationErrorsBySubmissionUploadId(
       submissionUploadId
     );
@@ -94,7 +99,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       submissionUploadId
     );
 
-    // Phase 7: canonical inserts for primitive, datetime, spatial and FK-backed properties.
+    // Phase 9: canonical inserts for primitive, datetime, spatial and FK-backed properties.
     await Promise.all([
       this.submissionFeaturePropertyIngestionRepository.insertStringPropertiesBySubmissionUploadId(submissionUploadId),
       this.submissionFeaturePropertyIngestionRepository.insertNumberPropertiesBySubmissionUploadId(submissionUploadId),
@@ -115,7 +120,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
     );
     await this.submissionFeaturePropertyIngestionRepository.insertArtifactLinksBySubmissionUploadId(submissionUploadId);
 
-    // Phase 8: relationships from `data.content`.
+    // Phase 10: relationships from `data.content`.
     await Promise.all([
       this.submissionFeaturePropertyIngestionRepository.insertFeatureRelationshipsBySubmissionUploadId(
         submissionUploadId
@@ -123,7 +128,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       this.submissionFeaturePropertyIngestionRepository.recordReferenceErrorsBySubmissionUploadId(submissionUploadId)
     ]);
 
-    // Phase 9: fail-at-end with aggregated diagnostics after full-upload processing.
+    // Phase 11: fail-at-end with aggregated diagnostics after full-upload processing.
     const errorCount =
       await this.submissionFeaturePropertyIngestionRepository.getIngestionErrorCountBySubmissionUploadId(
         submissionUploadId
@@ -154,20 +159,33 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
   }
 
   /**
-   * Build all session-scoped temp working tables used by SQL ingestion phases.
+   * Initialize session-scoped temp staging and diagnostics tables.
    *
-   * Important: these temp objects are connection-scoped. This method is intentionally service-level so
-   * we can keep one await/one SQL-call granularity in repository methods while preserving strict
-   * serial execution order here.
+   * This orchestration remains in the service layer so repository methods can stay one-statement-per-call.
    */
-  private async prepareUploadWorkingTablesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  private async initializeSessionTempTables(): Promise<void> {
+    await this.submissionFeaturePropertyIngestionRepository.dropSubmissionFeaturePropertyStagingTempTable();
+    await this.submissionFeaturePropertyIngestionRepository.createSubmissionFeaturePropertyStagingTempTable();
+    await Promise.all([
+      this.submissionFeaturePropertyIngestionRepository.createSubmissionFeaturePropertyStagingTempUploadFeatureIndex(),
+      this.submissionFeaturePropertyIngestionRepository.createSubmissionFeaturePropertyStagingTempUploadPropertyIndex()
+    ]);
+
     await this.submissionFeaturePropertyIngestionRepository.createIngestionErrorTempTable();
     await Promise.all([
       this.submissionFeaturePropertyIngestionRepository.createIngestionErrorTempUploadIndex(),
       this.submissionFeaturePropertyIngestionRepository.createIngestionErrorTempErrorCodeIndex(),
       this.submissionFeaturePropertyIngestionRepository.createIngestionErrorTempFeatureIndex()
     ]);
+  }
 
+  /**
+   * Build upload-scoped metadata resolution and logical value temp working tables.
+   *
+   * This phase materializes the reusable relational state used by requiredness checks, primitive
+   * validation, and downstream typed inserts.
+   */
+  private async prepareUploadPropertyWorkingSetBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     await Promise.all([
       this.submissionFeaturePropertyIngestionRepository.dropTmpUploadPropertyValuesTable(),
       this.submissionFeaturePropertyIngestionRepository.dropTmpResolvedStagedPropertiesTable(),
@@ -210,5 +228,36 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       this.submissionFeaturePropertyIngestionRepository.createTmpUploadPropertyValuesFeatureTypePropertyIndex(),
       this.submissionFeaturePropertyIngestionRepository.createTmpUploadPropertyValuesSubmissionFeatureIndex()
     ]);
+  }
+
+  /**
+   * Materialize upload-scoped complex candidate/resolution tables once for reuse.
+   *
+   * Candidate tables are shared by both error-recording and final insert phases to avoid repeated
+   * parsing/normalization work for datetime, spatial, code, taxon, and artifact values.
+   */
+  private async prepareComplexPropertyCandidatesBySubmissionUploadId(
+    submissionUploadId: string,
+    contributorId: number
+  ): Promise<void> {
+    await Promise.all([
+      this.submissionFeaturePropertyIngestionRepository.dropTmpValidPropertyValuesTable(),
+      this.submissionFeaturePropertyIngestionRepository.dropTmpDatetimeCandidatesTable(),
+      this.submissionFeaturePropertyIngestionRepository.dropTmpSpatialCandidatesTable(),
+      this.submissionFeaturePropertyIngestionRepository.dropTmpCodeCandidatesTable(),
+      this.submissionFeaturePropertyIngestionRepository.dropTmpTaxonCandidatesTable(),
+      this.submissionFeaturePropertyIngestionRepository.dropTmpArtifactCandidatesTable()
+    ]);
+
+    await this.submissionFeaturePropertyIngestionRepository.createTmpValidPropertyValuesBySubmissionUploadId(
+      submissionUploadId
+    );
+    await this.submissionFeaturePropertyIngestionRepository.createTmpDatetimeCandidatesTable();
+    await this.submissionFeaturePropertyIngestionRepository.createTmpSpatialCandidatesTable();
+    await this.submissionFeaturePropertyIngestionRepository.createTmpCodeCandidatesByContributorId(contributorId);
+    await this.submissionFeaturePropertyIngestionRepository.createTmpTaxonCandidatesTable();
+    await this.submissionFeaturePropertyIngestionRepository.createTmpArtifactCandidatesBySubmissionUploadId(
+      submissionUploadId
+    );
   }
 }
