@@ -10,10 +10,10 @@ import { DBService } from '../db-service';
 const defaultLog = getLogger('services/ingestion/submission-feature-property-ingestion-service');
 
 export class SubmissionFeaturePropertyIngestionService extends DBService {
-  private submissionFeaturePropertyIngestionRepository: SubmissionFeaturePropertyIngestionRepository;
-  private submissionRepository: SubmissionRepository;
-  private featureIngestionRepository: FeatureIngestionRepository;
-  private contributorService: ContributorService;
+  submissionFeaturePropertyIngestionRepository: SubmissionFeaturePropertyIngestionRepository;
+  submissionRepository: SubmissionRepository;
+  featureIngestionRepository: FeatureIngestionRepository;
+  contributorService: ContributorService;
 
   constructor(connection: IDBConnection) {
     super(connection);
