@@ -1573,65 +1573,6 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('updateSubmissionFeatureParent', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should update the parent submission feature id successfully', async () => {
-      const mockQueryResponse: QueryResult<never> = {
-        rowCount: 1,
-        rows: [],
-        command: '',
-        oid: 0,
-        fields: []
-      };
-
-      const sqlStub = sinon.stub().resolves(mockQueryResponse);
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      await submissionRepository.updateSubmissionFeatureParent(10, 5);
-
-      expect(sqlStub).to.have.been.calledOnce;
-    });
-  });
-
-  describe('updateSubmissionFeatureParents', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should bulk update parent submission feature ids scoped by submission_upload_id', async () => {
-      const sqlStub = sinon.stub().resolves({ rowCount: 2, rows: [] });
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      await submissionRepository.updateSubmissionFeatureParents('123e4567-e89b-12d3-a456-426614174000', [
-        { submission_feature_id: 10, parent_submission_feature_id: 5 },
-        { submission_feature_id: 11, parent_submission_feature_id: 5 }
-      ]);
-
-      expect(sqlStub).to.have.been.calledOnce;
-      const calledSql = sqlStub.args[0][0];
-      expect(calledSql.text).to.include('FROM unnest');
-      expect(calledSql.text).to.include('sf.submission_upload_id');
-    });
-
-    it('should not execute SQL when pairs array is empty', async () => {
-      const sqlStub = sinon.stub().resolves({ rowCount: 0, rows: [] });
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      await submissionRepository.updateSubmissionFeatureParents('123e4567-e89b-12d3-a456-426614174000', []);
-
-      expect(sqlStub).not.to.have.been.called;
-    });
-  });
-
   describe('deleteSubmissionFeatures', () => {
     afterEach(() => {
       sinon.restore();

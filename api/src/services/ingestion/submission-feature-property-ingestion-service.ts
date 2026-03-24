@@ -1,26 +1,26 @@
 import { IDBConnection } from '../../database/db';
 import { IngestionValidationError } from '../../errors/submission-errors';
+import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { SubmissionFeaturePropertyIngestionRepository } from '../../repositories/submission-feature-property-ingestion-repository';
 import { SubmissionRepository } from '../../repositories/submission-repository';
 import { getLogger } from '../../utils/logger';
 import { ContributorService } from '../contributor-service';
 import { DBService } from '../db-service';
-import { SubmissionFeaturePropertyIndexService } from '../submission-feature-property-index-service';
 
 const defaultLog = getLogger('services/ingestion/submission-feature-property-ingestion-service');
 
 export class SubmissionFeaturePropertyIngestionService extends DBService {
-  private submissionFeaturePropertyIndexService: SubmissionFeaturePropertyIndexService;
   private submissionFeaturePropertyIngestionRepository: SubmissionFeaturePropertyIngestionRepository;
   private submissionRepository: SubmissionRepository;
+  private featureIngestionRepository: FeatureIngestionRepository;
   private contributorService: ContributorService;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
-    this.submissionFeaturePropertyIndexService = new SubmissionFeaturePropertyIndexService(connection);
     this.submissionFeaturePropertyIngestionRepository = new SubmissionFeaturePropertyIngestionRepository(connection);
     this.submissionRepository = new SubmissionRepository(connection);
+    this.featureIngestionRepository = new FeatureIngestionRepository(connection);
     this.contributorService = new ContributorService(connection);
   }
 
@@ -44,7 +44,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
 
     // Cleanup for idempotency.
     await Promise.all([
-      this.submissionFeaturePropertyIndexService.deletePropertyRecordsBySubmissionUploadId(submissionUploadId),
+      this.submissionFeaturePropertyIngestionRepository.deletePropertyRecordsBySubmissionUploadId(submissionUploadId),
       this.submissionRepository.deleteSubmissionFeatureRelationshipsBySubmissionUploadId(submissionUploadId),
       this.submissionFeaturePropertyIngestionRepository.deleteStagingRowsBySubmissionUploadId(submissionUploadId)
     ]);
@@ -84,7 +84,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
     await this.submissionFeaturePropertyIngestionRepository.recordUnresolvedParentErrorsBySubmissionUploadId(
       submissionUploadId
     );
-    await this.submissionRepository.updateSubmissionFeatureParentsFromDataBySubmissionUploadId(submissionUploadId);
+    await this.featureIngestionRepository.updateSubmissionFeatureParentsBySubmissionUploadId(submissionUploadId);
 
     // Phase 6: SQL-native datetime/spatial normalization diagnostics.
     await this.submissionFeaturePropertyIngestionRepository.recordDatetimeNormalizationErrorsBySubmissionUploadId(
@@ -96,15 +96,9 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
 
     // Phase 7: canonical inserts for primitive, datetime, spatial and FK-backed properties.
     await Promise.all([
-      this.submissionFeaturePropertyIngestionRepository.insertStringPropertiesBySubmissionUploadId(
-        submissionUploadId
-      ),
-      this.submissionFeaturePropertyIngestionRepository.insertNumberPropertiesBySubmissionUploadId(
-        submissionUploadId
-      ),
-      this.submissionFeaturePropertyIngestionRepository.insertBooleanPropertiesBySubmissionUploadId(
-        submissionUploadId
-      )
+      this.submissionFeaturePropertyIngestionRepository.insertStringPropertiesBySubmissionUploadId(submissionUploadId),
+      this.submissionFeaturePropertyIngestionRepository.insertNumberPropertiesBySubmissionUploadId(submissionUploadId),
+      this.submissionFeaturePropertyIngestionRepository.insertBooleanPropertiesBySubmissionUploadId(submissionUploadId)
     ]);
     await this.submissionFeaturePropertyIngestionRepository.insertTimestampPropertiesBySubmissionUploadId(
       submissionUploadId
@@ -126,9 +120,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       this.submissionFeaturePropertyIngestionRepository.insertFeatureRelationshipsBySubmissionUploadId(
         submissionUploadId
       ),
-      this.submissionFeaturePropertyIngestionRepository.recordReferenceErrorsBySubmissionUploadId(
-        submissionUploadId
-      )
+      this.submissionFeaturePropertyIngestionRepository.recordReferenceErrorsBySubmissionUploadId(submissionUploadId)
     ]);
 
     // Phase 9: fail-at-end with aggregated diagnostics after full-upload processing.

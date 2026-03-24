@@ -9,9 +9,6 @@ export async function up(knex: Knex): Promise<void> {
   await knex.raw(`--sql
     SET SEARCH_PATH = biohub, public;
 
-    --------------------------------------------------------------------------------
-    -- submission_feature_property_staging
-    --------------------------------------------------------------------------------
     CREATE TABLE IF NOT EXISTS submission_feature_property_staging (
       submission_feature_property_staging_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       submission_feature_id integer NOT NULL,
@@ -52,9 +49,6 @@ export async function down(knex: Knex): Promise<void> {
   await knex.raw(`--sql
     SET SEARCH_PATH = biohub, public;
 
-    --------------------------------------------------------------------------------
-    -- rollback ingestion staging + diagnostics tables
-    --------------------------------------------------------------------------------
     DROP TABLE IF EXISTS submission_feature_property_staging;
   `);
 }

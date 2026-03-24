@@ -2,7 +2,6 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { IngestionValidationError } from '../../errors/submission-errors';
-import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { CreateSubmissionFeatureIngestionRecord, InsertSubmissionFeatureRecord } from '../../models/submission-feature';
 import { BaseRepository } from '../base-repository';
 
@@ -143,18 +142,25 @@ export class FeatureIngestionRepository extends BaseRepository {
   }
 
   /**
-   * Update the parent reference for a submission feature.
+   * Set parent references from `submission_feature.data.parent` within the same upload scope.
    *
-   * @param {number} submissionFeatureId The ID of the feature to update.
-   * @param {number} parentSubmissionFeatureId The ID of the parent feature.
-   * @return {*}  {Promise<void>}
+   * @param {string} submissionUploadId The submission_upload_id scope.
+   * @return {Promise<void>}
    * @memberof FeatureIngestionRepository
    */
-  async updateSubmissionFeatureParent(submissionFeatureId: number, parentSubmissionFeatureId: number): Promise<void> {
+  async updateSubmissionFeatureParentsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sqlStatement = SQL`
-      UPDATE submission_feature
-      SET parent_submission_feature_id = ${parentSubmissionFeatureId}
-      WHERE submission_feature_id = ${submissionFeatureId};
+      UPDATE submission_feature AS child
+      SET parent_submission_feature_id = parent.submission_feature_id
+      FROM submission_feature AS parent
+      WHERE child.submission_upload_id = ${submissionUploadId}::uuid
+        AND parent.submission_upload_id = ${submissionUploadId}::uuid
+        AND child.record_end_date IS NULL
+        AND parent.record_end_date IS NULL
+        AND parent.source_id IS NOT NULL
+        AND jsonb_typeof(child.data -> 'parent') = 'string'
+        AND btrim(child.data ->> 'parent') <> ''
+        AND parent.source_id = btrim(child.data ->> 'parent');
     `;
 
     await this.connection.sql(sqlStatement);
@@ -178,99 +184,5 @@ export class FeatureIngestionRepository extends BaseRepository {
     `;
 
     await this.connection.sql(sqlStatement);
-  }
-
-  /**
-   * Delete all submission features for a submission (soft delete).
-   * Used for idempotency - allows job retries to start fresh.
-   *
-   * @param {number} submissionId The submission ID.
-   * @return {Promise<void>}
-   * @memberof FeatureIngestionRepository
-   */
-  async deleteSubmissionFeatures(submissionId: number): Promise<void> {
-    const sqlStatement = SQL`
-      UPDATE submission_feature
-      SET record_end_date = NOW()
-      WHERE submission_id = ${submissionId}
-        AND record_end_date IS NULL;
-    `;
-
-    await this.connection.sql(sqlStatement);
-  }
-
-  /**
-   * Get feature type with its associated properties.
-   * Returns null if the feature type does not exist.
-   * Returns empty properties array if the feature type exists but has no properties.
-   *
-   * @param {string} name - The feature type name to look up
-   * @return {Promise<FeatureTypeWithProperties | null>} The feature type with properties, or null if not found
-   * @memberof FeatureIngestionRepository
-   */
-  async findFeatureTypeWithProperties(name: string): Promise<FeatureTypeWithProperties | null> {
-    const sqlStatement = SQL`
-      WITH feature_type_cte AS (
-        SELECT
-          ft.feature_type_id,
-          ft.name,
-          ft.display_name
-        FROM feature_type ft
-        WHERE
-          ft.name = ${name}
-          AND ft.record_end_date IS NULL
-      ),
-      properties_cte AS (
-        SELECT
-          ftp.feature_type_id,
-          ftp.feature_type_property_id,
-          fp.name,
-          fp.display_name,
-          fp.description,
-          fpt.name AS type_name,
-          ftp.required_value,
-          fp.calculated_value
-        FROM feature_type_property ftp
-        JOIN feature_property fp
-          ON ftp.feature_property_id = fp.feature_property_id
-          AND fp.record_end_date IS NULL
-        JOIN feature_property_type fpt
-          ON fp.feature_property_type_id = fpt.feature_property_type_id
-          AND fpt.record_end_date IS NULL
-        WHERE
-          ftp.record_end_date IS NULL
-      )
-      SELECT
-        JSON_BUILD_OBJECT(
-          'feature_type_id', ft.feature_type_id,
-          'name', ft.name,
-          'display_name', ft.display_name
-        ) AS "feature_type",
-        COALESCE(
-          JSON_AGG(
-            JSON_BUILD_OBJECT(
-              'feature_type_property_id', p.feature_type_property_id,
-              'name', p.name,
-              'display_name', p.display_name,
-              'description', p.description,
-              'type_name', p.type_name,
-              'required_value', p.required_value,
-              'calculated_value', p.calculated_value
-            )
-          ) FILTER (WHERE p.name IS NOT NULL),
-          '[]'
-        ) AS properties
-      FROM feature_type_cte ft
-      LEFT JOIN properties_cte p
-        ON ft.feature_type_id = p.feature_type_id
-      GROUP BY
-        ft.feature_type_id,
-        ft.name,
-        ft.display_name;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, FeatureTypeWithProperties);
-
-    return response.rows[0] ?? null;
   }
 }

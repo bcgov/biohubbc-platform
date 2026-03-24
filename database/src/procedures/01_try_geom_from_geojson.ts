@@ -1,7 +1,8 @@
 import { Knex } from 'knex';
 
 /**
- * Create persistent GeoJSON parsing helper used by submission feature ingestion.
+ * Tries to transform GeoJSON to a postgis geom, and returns null upon failure.
+ * Used for validating that a value is valid GeoJSON.
  *
  * @export
  * @param {Knex} knex

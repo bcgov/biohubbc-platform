@@ -32,6 +32,77 @@ export type IngestionErrorCount = z.infer<typeof ErrorCountRow>;
  */
 export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository {
   /**
+   * Delete previously derived canonical property rows for one upload.
+   *
+   * This keeps reruns idempotent by removing all typed-property and artifact-link rows that
+   * were derived from `submission_feature.data.properties` for the upload.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
+   */
+  async deletePropertyRecordsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      WITH upload_features AS (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+          AND record_end_date IS NULL
+      ),
+      delete_artifact AS (
+        DELETE FROM submission_feature_artifact sfa
+        USING upload_features uf
+        WHERE sfa.submission_feature_id = uf.submission_feature_id
+        RETURNING 1
+      ),
+      delete_string AS (
+        DELETE FROM submission_feature_property_string sfps
+        USING upload_features uf
+        WHERE sfps.submission_feature_id = uf.submission_feature_id
+        RETURNING 1
+      ),
+      delete_number AS (
+        DELETE FROM submission_feature_property_number sfpn
+        USING upload_features uf
+        WHERE sfpn.submission_feature_id = uf.submission_feature_id
+        RETURNING 1
+      ),
+      delete_boolean AS (
+        DELETE FROM submission_feature_property_boolean sfpb
+        USING upload_features uf
+        WHERE sfpb.submission_feature_id = uf.submission_feature_id
+        RETURNING 1
+      ),
+      delete_timestamp AS (
+        DELETE FROM submission_feature_property_timestamp sfpt
+        USING upload_features uf
+        WHERE sfpt.submission_feature_id = uf.submission_feature_id
+        RETURNING 1
+      ),
+      delete_geometry AS (
+        DELETE FROM submission_feature_property_geometry sfpg
+        USING upload_features uf
+        WHERE sfpg.submission_feature_id = uf.submission_feature_id
+        RETURNING 1
+      ),
+      delete_code AS (
+        DELETE FROM submission_feature_property_code sfpc
+        USING upload_features uf
+        WHERE sfpc.submission_feature_id = uf.submission_feature_id
+        RETURNING 1
+      ),
+      delete_taxon AS (
+        DELETE FROM submission_feature_property_taxon sfptx
+        USING upload_features uf
+        WHERE sfptx.submission_feature_id = uf.submission_feature_id
+        RETURNING 1
+      )
+      SELECT 1;
+    `;
+
+    await this.connection.sql(sql);
+  }
+
+  /**
    * Delete all staged property rows for one upload from the persistent staging table.
    *
    * @param {string} submissionUploadId Upload scope.
@@ -426,6 +497,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Create `pg_temp.tmp_upload_property_values` with one logical value per row.
    *
+   * Note: `jsonb_typeof(...)= 'array'` here is checking JSON transport shape only.
+   * It is not a logical `feature_property_type` of `array`. Logical multiplicity is
+   * controlled by `allow_multiple` on `feature_type_property`.
+   *
    * @returns {Promise<void>}
    */
   async createTmpUploadPropertyValuesTable(): Promise<void> {
@@ -505,8 +580,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
+   * Record missing required-property errors for features in an upload.
    *
+   * Requiredness is evaluated by feature type against active metadata. A required property is
+   * considered present only when staging has a non-null value and, for arrays, at least one element.
    *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
    */
   async recordMissingRequiredPropertyErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -560,8 +640,15 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
+   * Record primitive/cardinality validation errors for staged property values.
    *
+   * This phase captures:
+   * - array cardinality violations when `allow_multiple = false`
+   * - JSON primitive type mismatches by logical property type
+   * - unsupported logical property types
    *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
    */
   async recordPrimitiveValidationErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -964,8 +1051,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
+   * Record invalid datetime normalization/parsing errors.
    *
+   * Datetime strings are parsed into split `date_value` and `time_value` semantics. Rows where both
+   * parsed components are null are flagged as invalid timestamp values.
    *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
    */
   async recordDatetimeNormalizationErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -1595,8 +1687,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
+   * Insert resolved feature-to-feature relationships for one upload.
    *
+   * Relationships are extracted from `submission_feature.data.content` string references, resolved
+   * within the same upload by `source_id`, filtered to exclude self-links, and inserted idempotently.
    *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
    */
   async insertFeatureRelationshipsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -1645,8 +1742,14 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
+   * Record unresolved or invalid feature-reference errors from `data.content`.
    *
+   * This phase captures:
+   * - unresolved target source-id references within the upload
+   * - self-reference violations
    *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
    */
   async recordReferenceErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
@@ -1806,5 +1909,4 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
     const response = await this.connection.sql(sql, IngestionErrorSampleRow);
     return response.rows;
   }
-
 }

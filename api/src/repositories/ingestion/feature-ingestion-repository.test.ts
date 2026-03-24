@@ -5,7 +5,6 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../../errors/api-error';
 import { IngestionValidationError } from '../../errors/submission-errors';
-import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { CreateSubmissionFeatureIngestionRecord } from '../../models/submission-feature';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { FeatureIngestionRepository } from './feature-ingestion-repository';
@@ -163,8 +162,8 @@ describe('FeatureIngestionRepository', () => {
     });
   });
 
-  describe('updateSubmissionFeatureParent', () => {
-    it('should update the parent submission feature id successfully', async () => {
+  describe('updateSubmissionFeatureParentsBySubmissionUploadId', () => {
+    it('should update parent submission feature ids from data.parent values', async () => {
       const mockQueryResponse: QueryResult<never> = {
         rowCount: 1,
         rows: [],
@@ -178,7 +177,9 @@ describe('FeatureIngestionRepository', () => {
 
       const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
 
-      await ingestionRepository.updateSubmissionFeatureParent(10, 5);
+      await ingestionRepository.updateSubmissionFeatureParentsBySubmissionUploadId(
+        '123e4567-e89b-12d3-a456-426614174000'
+      );
 
       expect(sqlStub).to.have.been.calledOnce;
     });
@@ -198,145 +199,6 @@ describe('FeatureIngestionRepository', () => {
       await ingestionRepository.deleteSubmissionFeaturesBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
 
       expect(sqlStub).to.have.been.calledOnce;
-    });
-  });
-
-  describe('deleteSubmissionFeatures', () => {
-    it('should soft delete all submission features for a submission', async () => {
-      const mockQueryResponse: QueryResult<never> = {
-        rowCount: 3,
-        rows: [],
-        command: '',
-        oid: 0,
-        fields: []
-      };
-
-      const sqlStub = sinon.stub().resolves(mockQueryResponse);
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
-
-      await ingestionRepository.deleteSubmissionFeatures(1);
-
-      expect(sqlStub).to.have.been.calledOnce;
-    });
-
-    it('should complete successfully even when no features exist to delete', async () => {
-      const mockQueryResponse: QueryResult<never> = {
-        rowCount: 0,
-        rows: [],
-        command: '',
-        oid: 0,
-        fields: []
-      };
-
-      const sqlStub = sinon.stub().resolves(mockQueryResponse);
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
-
-      // Should not throw even when rowCount is 0
-      await ingestionRepository.deleteSubmissionFeatures(999);
-
-      expect(sqlStub).to.have.been.calledOnce;
-    });
-  });
-
-  describe('findFeatureTypeWithProperties', () => {
-    it('should return feature type with properties when valid', async () => {
-      const mockRows: FeatureTypeWithProperties[] = [
-        {
-          feature_type: {
-            feature_type_id: 1,
-            name: 'dataset',
-            display_name: 'Dataset'
-          },
-          properties: [
-            {
-              feature_type_property_id: 11,
-              name: 'name',
-              display_name: 'Name',
-              description: 'The name of the dataset',
-              type_name: 'string',
-              required_value: true,
-              calculated_value: false
-            },
-            {
-              feature_type_property_id: 12,
-              name: 'description',
-              display_name: 'Description',
-              description: 'The description of the dataset',
-              type_name: 'string',
-              required_value: false,
-              calculated_value: false
-            }
-          ]
-        }
-      ];
-      const mockQueryResponse: QueryResult<any> = {
-        rowCount: mockRows.length,
-        rows: mockRows,
-        command: '',
-        oid: 0,
-        fields: []
-      };
-
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => mockQueryResponse
-      });
-
-      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
-      const response = await ingestionRepository.findFeatureTypeWithProperties('dataset');
-
-      expect(response).to.eql(mockRows[0]);
-    });
-
-    it('should return null when feature type does not exist', async () => {
-      const mockQueryResponse: QueryResult<any> = {
-        rowCount: 0,
-        rows: [],
-        command: '',
-        oid: 0,
-        fields: []
-      };
-
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => mockQueryResponse
-      });
-
-      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
-      const response = await ingestionRepository.findFeatureTypeWithProperties('nonexistent_type');
-
-      expect(response).to.be.null;
-    });
-
-    it('should return empty properties array when type has no properties', async () => {
-      const mockRows: FeatureTypeWithProperties[] = [
-        {
-          feature_type: {
-            feature_type_id: 99,
-            name: 'empty_type',
-            display_name: 'Empty Type'
-          },
-          properties: []
-        }
-      ];
-      const mockQueryResponse: QueryResult<any> = {
-        rowCount: mockRows.length,
-        rows: mockRows,
-        command: '',
-        oid: 0,
-        fields: []
-      };
-
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => mockQueryResponse
-      });
-
-      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
-      const response = await ingestionRepository.findFeatureTypeWithProperties('empty_type');
-
-      expect(response).to.eql(mockRows[0]);
     });
   });
 });

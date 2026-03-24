@@ -120,7 +120,10 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
       ]);
 
       // Publish indexing job. Status updates + enqueue happen in the same transaction/commit window.
-      const indexResult = await publishIndexSubmissionFeaturesJob(connection, { submissionId });
+      const indexResult = await publishIndexSubmissionFeaturesJob(connection, {
+        submissionId,
+        submissionUploadId
+      });
       if (indexResult.status !== 'published') {
         defaultLog.warn({
           label: 'processSubmissionFeaturesJobHandler',
