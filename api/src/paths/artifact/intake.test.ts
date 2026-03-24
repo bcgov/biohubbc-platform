@@ -5,9 +5,7 @@ import sinonChai from 'sinon-chai';
 import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
 import { SubmissionFeatureRecord } from '../../repositories/submission-repository';
-import { SystemUser } from '../../repositories/user-repository';
 import { ArtifactService } from '../../services/old-artifact-service';
-import * as keycloakUtils from '../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import { intakeArtifact } from './intake';
 
@@ -22,7 +20,6 @@ describe('intakeArtifact', () => {
     const dbConnectionObj = getMockDBConnection();
 
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-    sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -31,6 +28,7 @@ describe('intakeArtifact', () => {
       artifact_upload_key: '456-234-345',
       media: ''
     };
+    mockReq.contributor_id = 11;
 
     // Too few files
     mockReq.files = [];
@@ -50,7 +48,6 @@ describe('intakeArtifact', () => {
     const dbConnectionObj = getMockDBConnection();
 
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-    sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -59,6 +56,7 @@ describe('intakeArtifact', () => {
       artifact_upload_key: '456-234-345',
       media: ''
     };
+    mockReq.contributor_id = 11;
 
     // Too many files
     mockReq.files = [
@@ -93,7 +91,6 @@ describe('intakeArtifact', () => {
     const dbConnectionObj = getMockDBConnection();
 
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-    sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -112,6 +109,7 @@ describe('intakeArtifact', () => {
       artifact_upload_key: artifactUploadKey,
       media: ''
     };
+    mockReq.contributor_id = 11;
 
     mockReq.files = [artifactFile] as Express.Multer.File[];
 
@@ -136,7 +134,6 @@ describe('intakeArtifact', () => {
     const dbConnectionObj = getMockDBConnection();
 
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-    sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -155,6 +152,7 @@ describe('intakeArtifact', () => {
       artifact_upload_key: artifactUploadKey,
       media: ''
     };
+    mockReq.contributor_id = 11;
 
     mockReq.files = [artifactFile] as Express.Multer.File[];
 

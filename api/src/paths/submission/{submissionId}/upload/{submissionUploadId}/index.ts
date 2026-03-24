@@ -14,7 +14,7 @@ const defaultLog = getLogger('paths/submission/{submissionId}/upload/{submission
 export const DELETE: Operation = [
   authorizeRequestHandler(() => ({
     or: [
-      { discriminator: 'ServiceClient' },
+      { discriminator: 'Contributor' },
       { validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN], discriminator: 'SystemRole' }
     ]
   })),

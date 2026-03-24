@@ -44,9 +44,28 @@ describe('Cart checkout (integration)', function () {
   async function createTestSubmission(): Promise<number> {
     const systemUserId = connection.systemUserId();
 
+    await connection.sql(SQL`
+      INSERT INTO contributor (client_id, description)
+      SELECT 'SIMS', 'Integration test contributor'
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM contributor
+        WHERE client_id = 'SIMS'
+          AND record_end_date IS NULL
+      );
+    `);
+
     const result = await connection.sql(SQL`
-      INSERT INTO submission (uuid, system_user_id, source_system, name, description, comment, create_user)
-      VALUES (gen_random_uuid(), ${systemUserId}, 'SIMS', 'Cart Checkout Test', 'Test', 'Test', ${systemUserId})
+      INSERT INTO submission (uuid, system_user_id, contributor_id, name, description, comment, create_user)
+      VALUES (
+        gen_random_uuid(),
+        ${systemUserId},
+        (SELECT contributor_id FROM contributor WHERE client_id = 'SIMS' AND record_end_date IS NULL LIMIT 1),
+        'Cart Checkout Test',
+        'Test',
+        'Test',
+        ${systemUserId}
+      )
       RETURNING submission_id;
     `);
 

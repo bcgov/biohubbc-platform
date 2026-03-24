@@ -11,6 +11,7 @@
   "scripts": {
     "start": "ts-node src/app",
     "build": "tsc --project tsconfig.production.json",
+    "typecheck": "tsc --project tsconfig.production.json --noEmit",
     "start-reload": "nodemon --watch src --ext ts --exec ts-node --files src/app.ts",
     "queue": "ts-node src/queue",
     "queue-reload": "nodemon --watch src --ext ts --exec ts-node --files src/queue.ts",
