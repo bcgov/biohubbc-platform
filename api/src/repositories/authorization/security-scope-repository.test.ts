@@ -100,64 +100,74 @@ describe('SecurityScopeRepository', () => {
     it('declares cursor, fetches batches, inserts anchors, and closes cursor', async () => {
       const queryStub = sinon.stub();
 
-      // Call 1: DECLARE CURSOR — no rows needed
-      queryStub.onFirstCall().resolves({ rows: [], rowCount: 0 });
+      // Call 0: DECLARE CURSOR — no rows needed
+      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
 
-      // Call 2: FETCH — returns 2 features (less than batch size → last batch)
-      queryStub.onSecondCall().resolves({
+      // Call 1: FETCH — returns 2 features (less than batch size → last batch)
+      queryStub.onCall(1).resolves({
         rows: [{ submission_feature_id: 101 }, { submission_feature_id: 102 }],
         rowCount: 2
       });
 
-      // Call 3: CLOSE cursor
-      queryStub.onThirdCall().resolves({ rows: [], rowCount: 0 });
+      // Call 2: INSERT batch via query (unnest)
+      queryStub.onCall(2).resolves({ rows: [], rowCount: 2 });
 
-      const knexFake = sinon.fake.resolves(mockQueryResult([], 2));
-      const mockDBConnection = getMockDBConnection({ query: queryStub, knex: knexFake });
+      // Call 3: CLOSE cursor
+      queryStub.onCall(3).resolves({ rows: [], rowCount: 0 });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
       await repository.computeAnchorsForScope('scope-uuid-1');
 
       // DECLARE was called with the securityScopeId parameter
-      expect(queryStub.firstCall.args[0]).to.include('DECLARE');
-      expect(queryStub.firstCall.args[0]).to.include('CURSOR FOR');
-      expect(queryStub.firstCall.args[1]).to.eql(['scope-uuid-1']);
+      expect(queryStub.getCall(0).args[0]).to.include('DECLARE');
+      expect(queryStub.getCall(0).args[0]).to.include('CURSOR FOR');
+      expect(queryStub.getCall(0).args[1]).to.eql(['scope-uuid-1']);
 
       // FETCH was called
-      expect(queryStub.secondCall.args[0]).to.include('FETCH');
+      expect(queryStub.getCall(1).args[0]).to.include('FETCH');
 
-      // Batch INSERT via knex
-      expect(knexFake).to.have.been.calledOnce;
+      // Batch INSERT via query
+      expect(queryStub.getCall(2).args[0]).to.include('INSERT INTO security_scope_anchor');
 
       // CLOSE was called
-      expect(queryStub.thirdCall.args[0]).to.include('CLOSE');
+      expect(queryStub.getCall(3).args[0]).to.include('CLOSE');
     });
 
     it('processes multiple batches when results exceed batch size', async () => {
       const queryStub = sinon.stub();
 
-      // Call 1: DECLARE CURSOR
+      // Call 0: DECLARE CURSOR
       queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
 
-      // Call 2: FETCH — returns full batch (5000 rows → more to fetch)
+      // Call 1: FETCH — returns full batch (5000 rows → more to fetch)
       const fullBatch = Array.from({ length: 5000 }, (_, i) => ({ submission_feature_id: i + 1 }));
       queryStub.onCall(1).resolves({ rows: fullBatch, rowCount: 5000 });
 
+      // Call 2: INSERT batch 1 via query (unnest)
+      queryStub.onCall(2).resolves({ rows: [], rowCount: 5000 });
+
       // Call 3: FETCH — returns partial batch (200 rows → last batch)
       const partialBatch = Array.from({ length: 200 }, (_, i) => ({ submission_feature_id: 5001 + i }));
-      queryStub.onCall(2).resolves({ rows: partialBatch, rowCount: 200 });
+      queryStub.onCall(3).resolves({ rows: partialBatch, rowCount: 200 });
 
-      // Call 4: CLOSE cursor
-      queryStub.onCall(3).resolves({ rows: [], rowCount: 0 });
+      // Call 4: INSERT batch 2 via query (unnest)
+      queryStub.onCall(4).resolves({ rows: [], rowCount: 200 });
 
-      const knexFake = sinon.fake.resolves(mockQueryResult([]));
-      const mockDBConnection = getMockDBConnection({ query: queryStub, knex: knexFake });
+      // Call 5: CLOSE cursor
+      queryStub.onCall(5).resolves({ rows: [], rowCount: 0 });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
       await repository.computeAnchorsForScope('scope-uuid-2');
 
-      // Two batch INSERTs
-      expect(knexFake).to.have.been.calledTwice;
+      // Two batch INSERTs via query
+      const insertCalls = Array.from({ length: queryStub.callCount }, (_, i) => queryStub.getCall(i)).filter((call) =>
+        call.args[0].includes('INSERT INTO security_scope_anchor')
+      );
+      expect(insertCalls).to.have.length(2);
     });
 
     it('skips insert when cursor returns no rows', async () => {

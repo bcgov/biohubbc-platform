@@ -121,13 +121,18 @@ export class SecurityScopeRepository extends BaseRepository {
    * happens — the walk-up search strategy checks from the candidate up to the
    * anchor, not from the anchor down.
    *
-   * Only root-level secured features (features whose parent is NOT secured) are
-   * anchors. This prevents duplicate walk-up hits when both parent and child
-   * are secured by the same scope.
+   * Only the topmost secured features (those with no secured ancestor at any
+   * depth) are anchors. A secured feature whose parent or grandparent is also
+   * secured is not an anchor — only the highest secured node in each chain
+   * qualifies. This prevents duplicate walk-up hits when both an ancestor and
+   * descendant are secured by the same scope. Uses a recursive CTE to walk the
+   * full parent chain — submission_feature trees can be arbitrarily deep.
    *
    * Uses a server-side cursor to avoid materializing the full result set in
    * memory. Wildcard scopes (`urn:*:*:*`) can match millions of secured features;
    * batching prevents memory/WAL/lock pressure from a single massive INSERT.
+   * Each batch inserts via `unnest` (two parameters regardless of batch size)
+   * rather than a multi-row VALUES clause.
    *
    * @param securityScopeId UUID of the security scope to compute anchors for
    */
@@ -139,31 +144,58 @@ export class SecurityScopeRepository extends BaseRepository {
     // Follows the same pattern as DownloadFragmentRepository.streamFragmentFeaturesByType.
     await this.connection.query(
       `DECLARE ${cursorName} CURSOR FOR
-      WITH scope_urn AS (
+      WITH RECURSIVE scope_urn AS (
         SELECT ps.urn_submission_id, ps.urn_feature_type, ps.urn_feature_id
         FROM policy_statement_scope pss
         JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
         WHERE pss.security_scope_id = $1
           AND ps.record_end_date IS NULL
         LIMIT 1
+      ),
+      -- Candidates: secured features whose URN matches this scope
+      candidates AS (
+        SELECT sf.submission_feature_id,
+               sf.parent_submission_feature_id
+        FROM submission_feature sf
+        JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+        JOIN submission_feature_security sfs
+          ON sfs.submission_feature_id = sf.submission_feature_id
+          AND sfs.record_end_date IS NULL
+        CROSS JOIN scope_urn su
+        WHERE sf.record_end_date IS NULL
+          AND (su.urn_submission_id = sf.submission_id::text OR su.urn_submission_id = '*')
+          AND (su.urn_feature_type = ft.name OR su.urn_feature_type = '*')
+          AND (su.urn_feature_id = sf.submission_feature_id::text OR su.urn_feature_id = '*')
+      ),
+      -- Walk from each candidate up to the root, collecting ancestor IDs
+      ancestor_walk AS (
+        SELECT c.submission_feature_id AS candidate_id,
+               c.parent_submission_feature_id AS ancestor_id
+        FROM candidates c
+        WHERE c.parent_submission_feature_id IS NOT NULL
+
+        UNION ALL
+
+        SELECT aw.candidate_id,
+               sf.parent_submission_feature_id
+        FROM ancestor_walk aw
+        JOIN submission_feature sf ON sf.submission_feature_id = aw.ancestor_id
+        WHERE sf.parent_submission_feature_id IS NOT NULL
+          AND sf.record_end_date IS NULL
+      ),
+      -- Candidates where ANY ancestor is already secured — not root-level
+      has_secured_ancestor AS (
+        SELECT DISTINCT aw.candidate_id
+        FROM ancestor_walk aw
+        JOIN submission_feature_security sfs
+          ON sfs.submission_feature_id = aw.ancestor_id
+          AND sfs.record_end_date IS NULL
       )
-      SELECT sf.submission_feature_id
-      FROM submission_feature sf
-      JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-      JOIN submission_feature_security sfs
-        ON sfs.submission_feature_id = sf.submission_feature_id
-        AND sfs.record_end_date IS NULL
-      CROSS JOIN scope_urn su
-      WHERE sf.record_end_date IS NULL
-        AND (su.urn_submission_id = sf.submission_id::text OR su.urn_submission_id = '*')
-        AND (su.urn_feature_type = ft.name OR su.urn_feature_type = '*')
-        AND (su.urn_feature_id = sf.submission_feature_id::text OR su.urn_feature_id = '*')
-        AND NOT EXISTS (
-          SELECT 1
-          FROM submission_feature_security psfs
-          WHERE psfs.submission_feature_id = sf.parent_submission_feature_id
-            AND psfs.record_end_date IS NULL
-        )`,
+      SELECT c.submission_feature_id
+      FROM candidates c
+      WHERE c.submission_feature_id NOT IN (
+        SELECT candidate_id FROM has_secured_ancestor
+      )`,
       [securityScopeId]
     );
 
@@ -179,21 +211,13 @@ export class SecurityScopeRepository extends BaseRepository {
         }
 
         const featureIds = fetchResult.rows.map((row) => row.submission_feature_id);
-        const knex = getKnex();
 
-        const insertQuery = knex
-          .insert(
-            featureIds.map((id) => ({
-              security_scope_anchor_id: knex.raw('gen_random_uuid()'),
-              security_scope_id: securityScopeId,
-              anchor_submission_feature_id: id
-            }))
-          )
-          .into('security_scope_anchor')
-          .onConflict(['security_scope_id', 'anchor_submission_feature_id'])
-          .ignore();
-
-        await this.connection.knex(insertQuery);
+        await this.connection.query(
+          `INSERT INTO security_scope_anchor (security_scope_anchor_id, security_scope_id, anchor_submission_feature_id)
+           SELECT gen_random_uuid(), $1, unnest($2::INTEGER[])
+           ON CONFLICT (security_scope_id, anchor_submission_feature_id) DO NOTHING`,
+          [securityScopeId, featureIds]
+        );
 
         if (fetchResult.rows.length < BATCH_SIZE) {
           break;

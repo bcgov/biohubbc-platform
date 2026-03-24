@@ -419,6 +419,106 @@ describe('Security scope search (integration)', function () {
       expect(featureIds).to.not.include(securedFeature);
     });
 
+    it('should hide descendant from anonymous when only the grandparent is secured (deep hierarchy)', async () => {
+      // Hierarchy: dataset(secured) → sample_site(open) → species_observation(open)
+      // The ancestor walk in buildSecurityFilter must find dataset's security row
+      // two levels up from species_observation and hide it.
+      const submissionId = await createTestSubmission(connection);
+      const grandparent = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Root' });
+      const parent = await createTestFeature(
+        connection,
+        submissionId,
+        'sample_site',
+        { name: 'Open Mid' },
+        grandparent
+      );
+      const child = await createTestFeature(
+        connection,
+        submissionId,
+        'species_observation',
+        { name: 'Open Leaf' },
+        parent
+      );
+
+      // Only secure the root — descendants inherit security via ancestor walk
+      await secureFeature(grandparent);
+
+      const results = await searchInSubmission(submissionId, ['dataset', 'sample_site', 'species_observation'], null);
+      const featureIds = results.map((r) => r.submission_feature_id);
+
+      // All three should be hidden — grandparent is secured, and the ancestor walk
+      // makes its descendants invisible to anonymous users
+      expect(featureIds).to.not.include(grandparent);
+      expect(featureIds).to.not.include(parent);
+      expect(featureIds).to.not.include(child);
+    });
+
+    it('should grant authenticated user access to deep descendants via scope anchored at grandparent', async () => {
+      // Hierarchy: dataset(secured) → sample_site(open) → species_observation(open)
+      // Scope anchored at dataset. Authenticated user should see all three because
+      // the ancestor walk finds the anchor in each feature's ancestor chain.
+      const submissionId = await createTestSubmission(connection);
+      const grandparent = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Root' });
+      const parent = await createTestFeature(
+        connection,
+        submissionId,
+        'sample_site',
+        { name: 'Open Mid' },
+        grandparent
+      );
+      const child = await createTestFeature(
+        connection,
+        submissionId,
+        'species_observation',
+        { name: 'Open Leaf' },
+        parent
+      );
+
+      await secureFeature(grandparent);
+
+      const userId = connection.systemUserId();
+      await setupFullAccess(`urn:${submissionId}:*:*`, userId, 'Deep Access Team');
+
+      const results = await searchInSubmission(submissionId, ['dataset', 'sample_site', 'species_observation'], userId);
+      const featureIds = results.map((r) => r.submission_feature_id);
+
+      // All three visible — scope anchor at grandparent covers the entire subtree
+      expect(featureIds).to.include(grandparent);
+      expect(featureIds).to.include(parent);
+      expect(featureIds).to.include(child);
+    });
+
+    it('should hide deep descendants from authenticated user without matching scope (deep hierarchy)', async () => {
+      // Same hierarchy, but user has no scope — should behave like anonymous for secured subtree
+      const submissionId = await createTestSubmission(connection);
+      const grandparent = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Root' });
+      const parent = await createTestFeature(
+        connection,
+        submissionId,
+        'sample_site',
+        { name: 'Open Mid' },
+        grandparent
+      );
+      const child = await createTestFeature(
+        connection,
+        submissionId,
+        'species_observation',
+        { name: 'Open Leaf' },
+        parent
+      );
+
+      await secureFeature(grandparent);
+
+      const userId = await createOtherUser();
+
+      const results = await searchInSubmission(submissionId, ['dataset', 'sample_site', 'species_observation'], userId);
+      const featureIds = results.map((r) => r.submission_feature_id);
+
+      expect(featureIds).to.not.include(grandparent);
+      expect(featureIds).to.not.include(parent);
+      expect(featureIds).to.not.include(child);
+    });
+
     it('should grant access to all secured features via wildcard scope', async () => {
       const submissionId = await createTestSubmission(connection);
       const feat1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'DS 1' });
@@ -663,6 +763,103 @@ describe('Security scope search (integration)', function () {
         WHERE security_scope_id = ${scopeId} AND anchor_submission_feature_id = ${feat2};
       `);
       expect(result.rows[0].count).to.equal(1);
+    });
+
+    it('should exclude secured child when unsecured middle separates it from secured grandparent', async () => {
+      // Hierarchy: grandparent → parent → child
+      // Secured:   YES            NO        YES
+      //
+      // This is the key regression test for the recursive ancestor walk.
+      // A single-level parent check would see child's immediate parent (parent) is
+      // NOT secured and incorrectly make child an anchor. The recursive walk finds
+      // grandparent (secured) two levels up and correctly excludes child.
+      const submissionId = await createTestSubmission(connection);
+      const grandparent = await createTestFeature(connection, submissionId, 'dataset', { name: 'Grandparent' });
+      const parent = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Parent' }, grandparent);
+      const child = await createTestFeature(connection, submissionId, 'species_observation', { name: 'Child' }, parent);
+
+      // Secure grandparent and child, but NOT parent — gap in the chain
+      await secureFeature(grandparent);
+      await secureFeature(child);
+
+      const urn = `urn:${submissionId}:*:*`;
+      const policyId = await createPolicy('gap-hierarchy-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      const anchors = await connection.sql(SQL`
+        SELECT anchor_submission_feature_id FROM security_scope_anchor
+        WHERE security_scope_id = ${scopeId}
+        ORDER BY anchor_submission_feature_id;
+      `);
+
+      const anchorIds = anchors.rows.map(
+        (r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id
+      );
+      // Grandparent is the root secured feature — it IS an anchor
+      expect(anchorIds).to.include(grandparent);
+      // Child has a secured ancestor (grandparent) — it is NOT an anchor
+      expect(anchorIds).to.not.include(child);
+    });
+
+    it('should anchor a secured leaf when no ancestor is secured', async () => {
+      // Hierarchy: grandparent → parent → child
+      // Secured:   NO             NO       YES
+      const submissionId = await createTestSubmission(connection);
+      const grandparent = await createTestFeature(connection, submissionId, 'dataset', { name: 'Grandparent' });
+      const parent = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Parent' }, grandparent);
+      const child = await createTestFeature(connection, submissionId, 'species_observation', { name: 'Child' }, parent);
+
+      // Only the leaf is secured
+      await secureFeature(child);
+
+      const urn = `urn:${submissionId}:*:*`;
+      const policyId = await createPolicy('leaf-only-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      const anchors = await connection.sql(SQL`
+        SELECT anchor_submission_feature_id FROM security_scope_anchor
+        WHERE security_scope_id = ${scopeId}
+        ORDER BY anchor_submission_feature_id;
+      `);
+
+      const anchorIds = anchors.rows.map(
+        (r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id
+      );
+      // Child has no secured ancestors — it IS the anchor
+      expect(anchorIds).to.include(child);
+      expect(anchorIds).to.have.lengthOf(1);
+    });
+
+    it('should anchor only the mid-level feature when it alone is secured', async () => {
+      // Hierarchy: grandparent → parent → child
+      // Secured:   NO             YES      NO
+      const submissionId = await createTestSubmission(connection);
+      const grandparent = await createTestFeature(connection, submissionId, 'dataset', { name: 'Grandparent' });
+      const parent = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Parent' }, grandparent);
+      await createTestFeature(connection, submissionId, 'species_observation', { name: 'Child' }, parent);
+
+      // Only the middle level is secured
+      await secureFeature(parent);
+
+      const urn = `urn:${submissionId}:*:*`;
+      const policyId = await createPolicy('mid-only-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      const anchors = await connection.sql(SQL`
+        SELECT anchor_submission_feature_id FROM security_scope_anchor
+        WHERE security_scope_id = ${scopeId}
+        ORDER BY anchor_submission_feature_id;
+      `);
+
+      const anchorIds = anchors.rows.map(
+        (r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id
+      );
+      // Parent has no secured ancestors — it IS the anchor
+      expect(anchorIds).to.include(parent);
+      expect(anchorIds).to.have.lengthOf(1);
     });
 
     it('should delete anchors and make features publicly visible when security rules are removed', async () => {

@@ -335,6 +335,31 @@ export class SecurityService extends DBService {
   }
 
   /**
+   * Delete scope anchors for features that lost all security rules.
+   *
+   * After removing security rules, some features may still be secured by other rules.
+   * Only features with zero remaining rules should stop being scope roots — deleting
+   * anchors for still-secured features would create a coverage gap where the walk-up
+   * search can't find a matching anchor.
+   *
+   * @param {SecurityScopeService} securityScopeService - Scope service instance (reuses caller's connection)
+   * @param {number[]} featureIds - Feature IDs that had rules removed
+   * @return {Promise<void>}
+   */
+  private async deleteAnchorsForFullyUnsecuredFeatures(
+    securityScopeService: SecurityScopeService,
+    featureIds: number[]
+  ): Promise<void> {
+    const remainingRules = await this.securityRepository.getSecurityRulesForSubmissionFeatures(featureIds);
+    const stillSecuredIds = new Set(remainingRules.map((r) => r.submission_feature_id));
+    const fullyUnsecuredIds = featureIds.filter((id) => !stillSecuredIds.has(id));
+
+    if (fullyUnsecuredIds.length > 0) {
+      await securityScopeService.deleteAnchorsForFeatures(fullyUnsecuredIds);
+    }
+  }
+
+  /**
    * Patches security rules that are applied or removed to the given set of submission features. If a
    * particular rule happens to belong to both `applyRuleIds` and `removeRuleIds`, it will always be
    * added.
@@ -374,15 +399,7 @@ export class SecurityService extends DBService {
     const securityScopeService = new SecurityScopeService(this.connection);
 
     if (removeRuleIds.length > 0) {
-      // Only delete anchors for features that are now fully unsecured (no remaining rules).
-      // Features still secured by other rules must keep their anchors to avoid a coverage gap.
-      const remainingRules = await this.securityRepository.getSecurityRulesForSubmissionFeatures(submissionFeatureIds);
-      const stillSecuredIds = new Set(remainingRules.map((r) => r.submission_feature_id));
-      const fullyUnsecuredIds = submissionFeatureIds.filter((id) => !stillSecuredIds.has(id));
-
-      if (fullyUnsecuredIds.length > 0) {
-        await securityScopeService.deleteAnchorsForFeatures(fullyUnsecuredIds);
-      }
+      await this.deleteAnchorsForFullyUnsecuredFeatures(securityScopeService, submissionFeatureIds);
     }
 
     if (applyRuleIds.length > 0) {
@@ -438,15 +455,7 @@ export class SecurityService extends DBService {
     const securityScopeService = new SecurityScopeService(this.connection);
 
     if (removedFeatureIds.length > 0) {
-      // Only delete anchors for features that are now fully unsecured (no remaining rules).
-      // Features still secured by other rules must keep their anchors to avoid a coverage gap.
-      const remainingRules = await this.securityRepository.getSecurityRulesForSubmissionFeatures(removedFeatureIds);
-      const stillSecuredIds = new Set(remainingRules.map((r) => r.submission_feature_id));
-      const fullyUnsecuredIds = removedFeatureIds.filter((id) => !stillSecuredIds.has(id));
-
-      if (fullyUnsecuredIds.length > 0) {
-        await securityScopeService.deleteAnchorsForFeatures(fullyUnsecuredIds);
-      }
+      await this.deleteAnchorsForFullyUnsecuredFeatures(securityScopeService, removedFeatureIds);
     }
 
     if (applyRuleIds?.length) {
@@ -491,15 +500,7 @@ export class SecurityService extends DBService {
       removeRuleIds
     );
 
-    // Only delete anchors for features that are now fully unsecured (no remaining rules).
-    // Features still secured by other rules must keep their anchors to avoid a coverage gap.
-    const remainingRules = await this.securityRepository.getSecurityRulesForSubmissionFeatures(submissionFeatureIds);
-    const stillSecuredIds = new Set(remainingRules.map((r) => r.submission_feature_id));
-    const fullyUnsecuredIds = submissionFeatureIds.filter((id) => !stillSecuredIds.has(id));
-
-    if (fullyUnsecuredIds.length > 0) {
-      await securityScopeService.deleteAnchorsForFeatures(fullyUnsecuredIds);
-    }
+    await this.deleteAnchorsForFullyUnsecuredFeatures(securityScopeService, submissionFeatureIds);
 
     return result;
   }

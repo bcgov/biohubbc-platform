@@ -1,5 +1,4 @@
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
@@ -265,10 +264,10 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Returns all features linked to a download.
    *
-   * Authorization is enforced at creation time via filterAuthorizedFeatureIds —
-   * only authorized features are ever linked. At retrieval time we return
-   * everything that was linked, avoiding the download_team → policy_team hop
-   * that would let later team membership changes alter which features are visible.
+   * Authorization is enforced at creation time via buildSecurityFilter in the
+   * search query — only authorized features are ever linked. At retrieval time
+   * we return everything that was linked, avoiding the download_team → policy_team
+   * hop that would let later team membership changes alter which features are visible.
    *
    * @param {string} downloadId - The download ID.
    * @return {Promise<DownloadFeatureSummary[]>} All linked features.
@@ -291,108 +290,6 @@ export class DownloadRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, DownloadFeatureSummary);
     return response.rows;
-  }
-
-  /**
-   * Returns which of the given feature IDs are secured — directly or by
-   * inheriting security from an ancestor.
-   *
-   * Walks DOWN from secured roots to all descendants, the opposite direction
-   * of buildSecurityCheck() (which walks UP from a feature to its ancestors).
-   * Using a different traversal direction makes this a genuine cross-check:
-   * if the two methods disagree, there's a bug.
-   *
-   * Scoped to submissions containing the candidate features to avoid walking
-   * every secured tree in the system.
-   *
-   * @param {number[]} submissionFeatureIds - Feature IDs to check.
-   * @return {Promise<Set<number>>} Set of feature IDs that are secured.
-   * @memberof DownloadRepository
-   */
-  async getSecuredFeatureIds(submissionFeatureIds: number[]): Promise<Set<number>> {
-    if (submissionFeatureIds.length === 0) {
-      return new Set();
-    }
-
-    const sql = SQL`
-      WITH RECURSIVE secured_descendants AS (
-        -- Base: directly secured features, scoped to relevant submissions
-        SELECT sfs.submission_feature_id
-        FROM submission_feature_security sfs
-        INNER JOIN submission_feature sf ON sf.submission_feature_id = sfs.submission_feature_id
-        WHERE sfs.record_end_date IS NULL
-          AND sf.submission_id IN (
-            SELECT submission_id FROM submission_feature
-            WHERE submission_feature_id = ANY(${submissionFeatureIds}::int[])
-          )
-
-        UNION ALL
-
-        -- Walk down to children
-        SELECT child.submission_feature_id
-        FROM submission_feature child
-        INNER JOIN secured_descendants sd ON child.parent_submission_feature_id = sd.submission_feature_id
-      )
-      SELECT DISTINCT submission_feature_id
-      FROM secured_descendants
-      WHERE submission_feature_id = ANY(${submissionFeatureIds}::int[]);
-    `;
-
-    const response = await this.connection.sql(sql, z.object({ submission_feature_id: z.number() }));
-    return new Set(response.rows.map((r) => r.submission_feature_id));
-  }
-
-  /**
-   * Returns which of the given secured feature IDs the user has access to
-   * via scope-based walk-up.
-   *
-   * For each secured feature, walks UP the parent chain to check if any ancestor
-   * is a scope anchor for the user's teams. Same walk-up strategy as the search
-   * security filter — cost is O(input_size × tree_depth), bounded by the download's
-   * feature set (hundreds) and tree height (~5 levels), not by table size.
-   *
-   * Used at download creation time before the download_team link exists — unlike
-   * getSecuredAuthorizedFeatures which checks via the download's teams.
-   *
-   * @param {number[]} submissionFeatureIds - Secured feature IDs to check.
-   * @param {number} systemUserId - The user to check policies for.
-   * @return {Promise<Set<number>>} Feature IDs the user is authorized to access.
-   * @memberof DownloadRepository
-   */
-  async getUserAuthorizedSecuredFeatureIds(submissionFeatureIds: number[], systemUserId: number): Promise<Set<number>> {
-    if (submissionFeatureIds.length === 0) {
-      return new Set();
-    }
-
-    const knex = getKnex();
-
-    const query = knex
-      .select('sf.submission_feature_id')
-      .from('submission_feature as sf')
-      .whereIn('sf.submission_feature_id', submissionFeatureIds)
-      .andWhereRaw(
-        `EXISTS (
-          WITH RECURSIVE ancestors AS (
-            SELECT sf2.submission_feature_id, sf2.parent_submission_feature_id
-            FROM submission_feature sf2
-            WHERE sf2.submission_feature_id = sf.submission_feature_id
-            UNION ALL
-            SELECT p.submission_feature_id, p.parent_submission_feature_id
-            FROM submission_feature p
-            JOIN ancestors a ON a.parent_submission_feature_id = p.submission_feature_id
-          )
-          SELECT 1 FROM ancestors a
-          JOIN security_scope_anchor ssa ON ssa.anchor_submission_feature_id = a.submission_feature_id
-          JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
-          JOIN team_member tm ON tm.team_id = tss.team_id
-            AND tm.system_user_id = ?
-            AND tm.record_end_date IS NULL
-        )`,
-        [systemUserId]
-      );
-
-    const response = await this.connection.knex(query, z.object({ submission_feature_id: z.number() }));
-    return new Set(response.rows.map((r) => r.submission_feature_id));
   }
 
   /**

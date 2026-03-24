@@ -135,10 +135,11 @@ export class DownloadService extends DBService {
   /**
    * Returns all features linked to a download.
    *
-   * Authorization is enforced once at creation time via filterAuthorizedFeatureIds —
-   * only authorized features are ever linked to the download. Re-checking at
-   * retrieval time caused a bug: the download_team → policy_team hop meant
-   * adding a user to the download team could change which features were visible.
+   * Authorization is enforced once at creation time via buildSecurityFilter in
+   * the search query — only authorized features are ever linked to the download.
+   * Re-checking at retrieval time caused a bug: the download_team → policy_team
+   * hop meant adding a user to the download team could change which features
+   * were visible.
    *
    * @param {string} downloadId - The download ID.
    * @return {Promise<DownloadFeatureSummary[]>} All linked features.
@@ -146,52 +147,6 @@ export class DownloadService extends DBService {
    */
   async getDownloadFeatures(downloadId: string): Promise<DownloadFeatureSummary[]> {
     return this.downloadRepository.getDownloadFeatures(downloadId);
-  }
-
-  /**
-   * Filter feature IDs to only those the user is authorized to download.
-   *
-   * Unsecured features are always included. Secured features are included
-   * only if the authenticated user has an ALLOW policy via their team
-   * memberships. Anonymous users (null systemUserId) get unsecured only.
-   *
-   * Used at download creation time to prevent unauthorized features from
-   * being linked to the download. This is the sole authorization gate —
-   * at retrieval time, all linked features are returned without re-checking.
-   *
-   * @param {number[]} featureIds - All candidate feature IDs from search.
-   * @param {number | null} systemUserId - Authenticated user ID, or null for anonymous.
-   * @return {Promise<number[]>} Authorized feature IDs only.
-   * @memberof DownloadService
-   */
-  async filterAuthorizedFeatureIds(featureIds: number[], systemUserId: number | null): Promise<number[]> {
-    if (featureIds.length === 0) {
-      return [];
-    }
-
-    // Identify which features are secured
-    const securedIds = await this.downloadRepository.getSecuredFeatureIds(featureIds);
-
-    // No secured features — all are authorized
-    if (securedIds.size === 0) {
-      return featureIds;
-    }
-
-    // Unsecured features are always authorized
-    const unsecuredIds = featureIds.filter((id) => !securedIds.has(id));
-
-    // Anonymous users: unsecured only (no policies possible)
-    if (systemUserId === null) {
-      return unsecuredIds;
-    }
-
-    // Authenticated users: unsecured + secured with policy access
-    const authorizedSecuredIds = await this.downloadRepository.getUserAuthorizedSecuredFeatureIds(
-      [...securedIds],
-      systemUserId
-    );
-
-    return [...unsecuredIds, ...authorizedSecuredIds];
   }
 
   /**

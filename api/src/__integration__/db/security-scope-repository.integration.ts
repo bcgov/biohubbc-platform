@@ -34,7 +34,7 @@ describe('SecurityScopeRepository (integration)', function () {
 
   describe('insertSecurityScope', () => {
     it('should insert a new scope and return SecurityScope', async () => {
-      const scopeHash = computeScopeHash('urn:*:telemetry:*');
+      const scopeHash = computeScopeHash('urn:99999:test_integration:*');
 
       const result = await repo.insertSecurityScope(scopeHash);
 
