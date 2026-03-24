@@ -732,6 +732,107 @@ describe('Security scope search (integration)', function () {
       const after = await searchInSubmission(submissionId, ['dataset'], userId);
       expect(after.map((r) => r.submission_feature_id)).to.not.include(securedFeature);
     });
+
+    it('should preserve scopes from remaining policies when one team-policy is deleted', async () => {
+      // Team has Policy A (sub1 scope) and Policy B (sub2 scope).
+      // Deleting team-policy A should leave sub2's scope intact.
+      const sub1 = await createTestSubmission(connection);
+      const feat1 = await createTestFeature(connection, sub1, 'dataset', { name: 'Sub1 Secured' });
+      await secureFeature(feat1);
+
+      const sub2 = await createTestSubmission(connection);
+      const feat2 = await createTestFeature(connection, sub2, 'dataset', { name: 'Sub2 Secured' });
+      await secureFeature(feat2);
+
+      // Policy A covers sub1, Policy B covers sub2
+      const policyA = await createPolicy('multi-tp-A');
+      const stmtA = await createPolicyStatement(policyA, `urn:${sub1}:*:*`);
+      await setupScopeChain(stmtA, `urn:${sub1}:*:*`);
+
+      const policyB = await createPolicy('multi-tp-B');
+      const stmtB = await createPolicyStatement(policyB, `urn:${sub2}:*:*`);
+      await setupScopeChain(stmtB, `urn:${sub2}:*:*`);
+
+      const userId = connection.systemUserId();
+      const teamId = await createTeam('Multi-Policy Team');
+      await addTeamMember(teamId, userId);
+
+      const tpA = await createTeamPolicy(teamId, policyA);
+      await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyA);
+      await createTeamPolicy(teamId, policyB);
+      await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyB);
+
+      // Before: user sees both secured features, team has 2 scopes
+      expect(await countTeamScopes(teamId)).to.equal(2);
+      expect((await searchInSubmission(sub1, ['dataset'], userId)).map((r) => r.submission_feature_id)).to.include(
+        feat1
+      );
+      expect((await searchInSubmission(sub2, ['dataset'], userId)).map((r) => r.submission_feature_id)).to.include(
+        feat2
+      );
+
+      // Delete team-policy A, rebuild
+      await connection.sql(SQL`
+        UPDATE team_policy SET record_end_date = now()
+        WHERE team_policy_id = ${tpA};
+      `);
+      await scopeRepo.rebuildTeamSecurityScopes(teamId);
+
+      // After: team has 1 scope, sub2 still accessible, sub1 blocked
+      expect(await countTeamScopes(teamId)).to.equal(1);
+      expect((await searchInSubmission(sub2, ['dataset'], userId)).map((r) => r.submission_feature_id)).to.include(
+        feat2
+      );
+      expect((await searchInSubmission(sub1, ['dataset'], userId)).map((r) => r.submission_feature_id)).to.not.include(
+        feat1
+      );
+    });
+
+    it('should preserve overlapping scope when one of two team-policies sharing it is deleted', async () => {
+      // Policy A and Policy B both use same URN → same shared scope.
+      // Deleting team-policy A should leave the scope intact via Policy B.
+      const submissionId = await createTestSubmission(connection);
+      const securedFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Overlap' });
+      await secureFeature(securedFeature);
+
+      const urn = `urn:${submissionId}:*:*`;
+
+      const policyA = await createPolicy('overlap-tp-A');
+      const stmtA = await createPolicyStatement(policyA, urn);
+      await setupScopeChain(stmtA, urn);
+
+      const policyB = await createPolicy('overlap-tp-B');
+      const stmtB = await createPolicyStatement(policyB, urn);
+      await setupScopeChain(stmtB, urn); // Same scope reused
+
+      const userId = connection.systemUserId();
+      const teamId = await createTeam('Overlap TP Team');
+      await addTeamMember(teamId, userId);
+
+      const tpA = await createTeamPolicy(teamId, policyA);
+      await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyA);
+      await createTeamPolicy(teamId, policyB);
+      await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyB);
+
+      // Before: 1 scope (deduped), user sees secured feature
+      expect(await countTeamScopes(teamId)).to.equal(1);
+      expect(
+        (await searchInSubmission(submissionId, ['dataset'], userId)).map((r) => r.submission_feature_id)
+      ).to.include(securedFeature);
+
+      // Delete team-policy A, rebuild
+      await connection.sql(SQL`
+        UPDATE team_policy SET record_end_date = now()
+        WHERE team_policy_id = ${tpA};
+      `);
+      await scopeRepo.rebuildTeamSecurityScopes(teamId);
+
+      // After: still 1 scope (via Policy B), user still sees feature
+      expect(await countTeamScopes(teamId)).to.equal(1);
+      expect(
+        (await searchInSubmission(submissionId, ['dataset'], userId)).map((r) => r.submission_feature_id)
+      ).to.include(securedFeature);
+    });
   });
 
   // ── Security rule mutations → anchor updates ─────────────────────────
@@ -894,6 +995,40 @@ describe('Security scope search (integration)', function () {
       const feature = afterAnon.find((r) => r.submission_feature_id === featureId);
       expect(feature).to.not.be.undefined;
       expect(feature?.is_secured).to.be.false;
+    });
+
+    it('should delete anchors only for unsecured features, preserving anchors for still-secured features', async () => {
+      // 3 secured features → 3 anchors. Unsecure 2, delete their anchors.
+      // The remaining feature's anchor should be untouched.
+      const submissionId = await createTestSubmission(connection);
+      const feat1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Stay Secured' });
+      const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Going Public 1' });
+      const feat3 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Going Public 2' });
+      await secureFeature(feat1);
+      await secureFeature(feat2);
+      await secureFeature(feat3);
+
+      const urn = `urn:${submissionId}:*:*`;
+      const policyId = await createPolicy('selective-anchor-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      // All 3 features are anchors
+      expect(await countAnchors(scopeId)).to.equal(3);
+
+      // Unsecure feat2 and feat3, delete their anchors
+      await unsecureFeature(feat2);
+      await unsecureFeature(feat3);
+      await scopeRepo.deleteAnchorsForFeatures([feat2, feat3]);
+
+      // feat1's anchor remains, feat2 and feat3 are gone
+      expect(await countAnchors(scopeId)).to.equal(1);
+
+      const remaining = await connection.sql(SQL`
+        SELECT anchor_submission_feature_id FROM security_scope_anchor
+        WHERE security_scope_id = ${scopeId};
+      `);
+      expect(remaining.rows[0].anchor_submission_feature_id).to.equal(feat1);
     });
   });
 });
