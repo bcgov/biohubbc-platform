@@ -13,6 +13,8 @@ import { getPgBoss, initPgBoss, stopPgBoss } from '../../queue/pg-boss-service';
 import { publishProcessSubmissionFeaturesJob } from '../../queue/publisher';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
+import { getOrCreateIntegrationTicketId } from '../helpers/test-submission-helpers';
+import { getOrCreateTestTicketId } from '../helpers/test-ticket-helpers';
 
 const TEST_PREFIX = '__integration-test__';
 const SYSTEM_USER_ID = 2; // biohub_api system user
@@ -256,9 +258,10 @@ describe('Process Submission Features Worker', function () {
       archive_status: 'completed'
     });
 
-    // 5. submission_upload (links submission to upload)
-    const ticketId = await createTestTicketId(db);
-    createdTicketIds.push(ticketId);
+    // 5. ticket (required FK for submission_upload)
+    const ticketId = await getOrCreateTestTicketId(db, submission.submission_id, upload.upload_id, SYSTEM_USER_ID);
+
+    // 6. submission_upload (links submission to upload)
     const [submissionUpload] = await db('biohub.submission_upload')
       .insert({
         submission_id: submission.submission_id,
@@ -267,7 +270,7 @@ describe('Process Submission Features Worker', function () {
       })
       .returning('submission_upload_id');
 
-    // 6. upload_artifact (required for JOIN in getSubmissionUploadsBySubmissionId)
+    // 7. upload_artifact (required for JOIN in getSubmissionUploadsBySubmissionId)
     await db('biohub.upload_artifact').insert({
       upload_id: upload.upload_id,
       artifact_id: artifact.artifact_id,
@@ -520,8 +523,10 @@ describe('SubmissionIngestionService pipeline (system)', function () {
           VALUES (${uploadId}, ${artifactId}, 'completed')`
     );
 
-    // 5. submission_upload
-    const ticketId = await createTestTicketIdForConnection();
+    // 5. ticket (required FK for submission_upload)
+    const ticketId = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, SYSTEM_USER_ID);
+
+    // 6. submission_upload
     const submissionUploadResult = await connection.sql<{ submission_upload_id: string }>(
       SQL`INSERT INTO biohub.submission_upload (submission_id, upload_id, ticket_id)
           VALUES (${submissionId}, ${uploadId}, ${ticketId})

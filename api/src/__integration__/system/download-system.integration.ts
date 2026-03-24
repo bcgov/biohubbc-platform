@@ -19,6 +19,7 @@ import { DownloadPipelineService } from '../../services/download/download-pipeli
 import { DownloadService } from '../../services/download/download-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
+import { getOrCreateTestTicketId } from '../helpers/test-ticket-helpers';
 
 const TEST_PREFIX = 'dev-artifacts';
 const SYSTEM_USER_ID = 1;
@@ -207,8 +208,7 @@ describe('Download Worker', function () {
       })
       .returning('upload_id');
 
-    const ticketId = await createTestTicketId(db);
-    createdTicketIds.push(ticketId);
+    const ticketId = await getOrCreateTestTicketId(db, submissionId, upload.upload_id, SYSTEM_USER_ID);
 
     const [bridge] = await db('biohub.submission_upload')
       .insert({

@@ -15,9 +15,11 @@ import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { HTTP403, HTTP409 } from '../../errors/http-error';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadService } from '../../services/download/download-service';
+import { computeScopeHash } from '../../utils/scope-hash';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
 describe('Download services (integration)', function () {
@@ -65,9 +67,12 @@ describe('Download services (integration)', function () {
   }
 
   /**
-   * Helper: grant a team access to a specific feature via the RBAC chain.
-   * Creates policy → policy_statement (allow) → team_policy.
-   * The policy_statement trigger auto-decomposes the URN into indexed columns.
+   * Helper: grant a team access to a specific feature via the full RBAC + scope chain.
+   * Creates policy → policy_statement → security_scope → policy_statement_scope →
+   * security_scope_anchor → team_policy → team_security_scope.
+   *
+   * Scope tables are populated directly (bypassing pg-boss) to match the
+   * normalized security scope model introduced in SIMSBIOHUB-914.
    */
   async function grantTeamAccess(
     teamId: string,
@@ -85,15 +90,30 @@ describe('Download services (integration)', function () {
     `);
     const policyId = policy.rows[0].policy_id;
 
-    await connection.sql(SQL`
+    const stmt = await connection.sql(SQL`
       INSERT INTO policy_statement (policy_id, effect, submission_feature_urn, create_user)
-      VALUES (${policyId}, 'allow', ${urn}, ${userId});
+      VALUES (${policyId}, 'allow', ${urn}, ${userId})
+      RETURNING policy_statement_id;
     `);
+    const policyStatementId = stmt.rows[0].policy_statement_id;
+
+    // Set up scope chain: scope → policy_statement_scope → anchors → team_security_scope
+    const scopeRepo = new SecurityScopeRepository(connection);
+    const scopeHash = computeScopeHash(urn);
+    const inserted = await scopeRepo.insertSecurityScope(scopeHash);
+    const scopeId = inserted
+      ? inserted.security_scope_id
+      : (await scopeRepo.getSecurityScopeByScopeHash(scopeHash)).security_scope_id;
+
+    await scopeRepo.insertPolicyStatementScope(policyStatementId, scopeId);
+    await scopeRepo.computeAnchorsForScope(scopeId);
 
     await connection.sql(SQL`
       INSERT INTO team_policy (team_id, policy_id, create_user)
       VALUES (${teamId}, ${policyId}, ${userId});
     `);
+
+    await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyId);
   }
 
   describe('createDownloadRequest', () => {
