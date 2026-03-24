@@ -225,14 +225,15 @@ describe('biohub-tar-parser', () => {
         checksumSha256: string;
       }> = [];
 
-      const result = await streamMedia(
-        bufferToStream(tarBuffer),
-        new ObjectStorageService(),
-        'submissions/42/media',
-        async (uploadedFile) => {
-          uploaded.push(uploadedFile);
+      const result = await streamMedia(bufferToStream(tarBuffer), {
+        objectStorageService: new ObjectStorageService(),
+        s3KeyPrefix: 'submissions/42/media',
+        batchSize: 2,
+        maxBatchBytes: 1024,
+        ingestMediaBatch: async (uploadedFiles) => {
+          uploaded.push(...uploadedFiles);
         }
-      );
+      });
 
       expect(result.uploadedCount).to.equal(2);
       expect(uploadStreamStub.callCount).to.equal(2);
@@ -256,20 +257,69 @@ describe('biohub-tar-parser', () => {
         checksumSha256: string;
       }> = [];
 
-      const result = await streamMedia(
-        bufferToStream(tarBuffer),
-        new ObjectStorageService(),
-        'submissions/42/media',
-        async (uploadedFile) => {
-          uploaded.push(uploadedFile);
+      const result = await streamMedia(bufferToStream(tarBuffer), {
+        objectStorageService: new ObjectStorageService(),
+        s3KeyPrefix: 'submissions/42/media',
+        batchSize: 2,
+        maxBatchBytes: 1024,
+        ingestMediaBatch: async (uploadedFiles) => {
+          uploaded.push(...uploadedFiles);
         }
-      );
+      });
 
       expect(result.uploadedCount).to.equal(1);
       expect(uploadStreamStub.calledOnce).to.be.true;
       expect(uploaded[0].fileName).to.equal('report.pdf');
       expect(uploaded[0].s3Key).to.equal('submissions/42/media/nested/path/report.pdf');
       expect(uploaded[0].path).to.equal('nested/path/report.pdf');
+    });
+
+    it('flushes uploaded media in bounded batches', async () => {
+      const tarBuffer = await createTestTar([
+        { name: 'files/photo-1.jpg', content: 'one' },
+        { name: 'files/photo-2.jpg', content: 'two' },
+        { name: 'files/photo-3.jpg', content: 'three' }
+      ]);
+
+      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+
+      const batchSizes: number[] = [];
+      const result = await streamMedia(bufferToStream(tarBuffer), {
+        objectStorageService: new ObjectStorageService(),
+        s3KeyPrefix: 'submissions/42/media',
+        batchSize: 2,
+        maxBatchBytes: 1024,
+        ingestMediaBatch: async (uploadedFiles) => {
+          batchSizes.push(uploadedFiles.length);
+        }
+      });
+
+      expect(result.uploadedCount).to.equal(3);
+      expect(batchSizes).to.deep.equal([2, 1]);
+    });
+
+    it('flushes uploaded media when cumulative bytes exceed threshold', async () => {
+      const tarBuffer = await createTestTar([
+        { name: 'files/photo-1.jpg', content: 'aaaa' },
+        { name: 'files/photo-2.jpg', content: 'bbbb' },
+        { name: 'files/photo-3.jpg', content: 'cccc' }
+      ]);
+
+      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+
+      const batchSizes: number[] = [];
+      const result = await streamMedia(bufferToStream(tarBuffer), {
+        objectStorageService: new ObjectStorageService(),
+        s3KeyPrefix: 'submissions/42/media',
+        batchSize: 100,
+        maxBatchBytes: 8,
+        ingestMediaBatch: async (uploadedFiles) => {
+          batchSizes.push(uploadedFiles.length);
+        }
+      });
+
+      expect(result.uploadedCount).to.equal(3);
+      expect(batchSizes).to.deep.equal([2, 1]);
     });
   });
 });

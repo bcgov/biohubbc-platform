@@ -8,8 +8,15 @@ import { z, ZodError } from 'zod';
 import { IngestionValidationError } from '../errors/submission-errors';
 import { IFlattenedBlock } from '../models/submission-feature';
 import { TarCodesets } from '../services/ingestion/submission-ingestion-codes-service.interface';
-import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
-import { IUploadedMediaFile, MediaUploadContext, TarNext } from './biohub-tar-parser.interface';
+import { BucketType } from '../services/object-storage/object-storage-service';
+import {
+  IUploadedMediaFile,
+  MediaUploadContext,
+  ProcessMediaEntryOptions,
+  StreamMediaOptions,
+  TarNext,
+  UploadMediaEntryOptions
+} from './biohub-tar-parser.interface';
 
 /**
  * TAR ingestion helpers for submission archives.
@@ -232,18 +239,15 @@ function waitForChecksum(checksumStream: Transform, checksum: ReturnType<typeof 
  *
  * @param {Readable} stream - Tar entry stream.
  * @param {MediaUploadContext} context - Derived upload and metadata fields.
- * @param {ObjectStorageService} objectStorageService - Storage client used for streaming upload.
- * @param {((uploadedFile: IUploadedMediaFile) => Promise<void>) | undefined} ingestMediaFile - Optional callback invoked after upload.
- * @param {() => void} onUploaded - Counter hook invoked after successful upload.
+ * @param {UploadMediaEntryOptions} options - Storage dependency and post-upload callbacks.
  * @returns {Promise<void>}
  */
 async function uploadMediaEntry(
   stream: Readable,
   context: MediaUploadContext,
-  objectStorageService: ObjectStorageService,
-  ingestMediaFile: ((uploadedFile: IUploadedMediaFile) => Promise<void>) | undefined,
-  onUploaded: () => void
+  options: UploadMediaEntryOptions
 ): Promise<void> {
+  const { objectStorageService, ingestMediaFile, onUploaded } = options;
   const checksum = createHash('sha256');
   const passThrough = new PassThrough();
   const checksumStream = createChecksumTransform(checksum);
@@ -270,9 +274,7 @@ async function uploadMediaEntry(
 
   onUploaded();
 
-  if (ingestMediaFile) {
-    await ingestMediaFile(uploadedFile);
-  }
+  await ingestMediaFile(uploadedFile);
 }
 
 /**
@@ -285,10 +287,7 @@ async function uploadMediaEntry(
  * @param {Readable} stream - Tar entry data stream.
  * @param {TarNext} next - Tar continuation callback.
  * @param {(err: unknown) => void} reject - Error callback for entry processing failures.
- * @param {ObjectStorageService} objectStorageService - Storage client used for uploads.
- * @param {string} s3KeyPrefix - Prefix prepended to uploaded object keys.
- * @param {((uploadedFile: IUploadedMediaFile) => Promise<void>) | undefined} ingestMediaFile - Optional callback invoked per uploaded file.
- * @param {() => void} onUploaded - Counter hook invoked per successful upload.
+ * @param {ProcessMediaEntryOptions} options - Upload dependencies and callbacks.
  * @returns {Promise<void>}
  */
 async function processMediaEntry(
@@ -296,11 +295,9 @@ async function processMediaEntry(
   stream: Readable,
   next: TarNext,
   reject: (err: unknown) => void,
-  objectStorageService: ObjectStorageService,
-  s3KeyPrefix: string,
-  ingestMediaFile: ((uploadedFile: IUploadedMediaFile) => Promise<void>) | undefined,
-  onUploaded: () => void
+  options: ProcessMediaEntryOptions
 ): Promise<void> {
+  const { objectStorageService, s3KeyPrefix, ingestMediaFile, onUploaded } = options;
   const resolvedEntryName = resolveScopedEntryName(header.name ?? '', 'files');
   if (!(resolvedEntryName && header.type === 'file')) {
     await drainStream(stream);
@@ -310,7 +307,7 @@ async function processMediaEntry(
 
   const context = buildMediaUploadContext(resolvedEntryName, s3KeyPrefix, header.size ?? 0);
 
-  uploadMediaEntry(stream, context, objectStorageService, ingestMediaFile, onUploaded).then(next).catch(reject);
+  uploadMediaEntry(stream, context, { objectStorageService, ingestMediaFile, onUploaded }).then(next).catch(reject);
 }
 
 /**
@@ -343,10 +340,17 @@ export async function streamFeatures(
   batchSize: number,
   ingestFeatureBatch: (blocks: IFlattenedBlock[]) => Promise<void>
 ): Promise<{ featureCount: number }> {
+  if (batchSize < 1) {
+    throw new Error('batchSize must be greater than 0');
+  }
+
   const extract = tar.extract();
   let featureCount = 0;
   let pendingBlocks: IFlattenedBlock[] = [];
 
+  /**
+   * Flush buffered feature blocks through the caller callback.
+   */
   const flushPending = async (): Promise<void> => {
     if (!pendingBlocks.length) {
       return;
@@ -502,23 +506,67 @@ export async function streamCodesets(
  *
  * Error behavior:
  * - Upload failures reject the stream.
- * - Any error thrown by `ingestMediaFile` rejects the stream.
+ * - Any error thrown by `ingestMediaBatch` rejects the stream.
  *
  * @param {Readable} inputStream - Tar archive stream.
- * @param {ObjectStorageService} objectStorageService - Object storage client.
- * @param {string} s3KeyPrefix - Prefix prepended to uploaded media object keys.
- * @param {(uploadedFile: IUploadedMediaFile) => Promise<void>} [ingestMediaFile] - Optional callback after each upload.
+ * @param {StreamMediaOptions} options - Media stream dependencies and batching thresholds.
  * @returns {Promise<{ uploadedCount: number }>} Count of uploaded media files.
  * @throws {Error} When stream processing, upload, or callback processing fails.
  */
 export async function streamMedia(
   inputStream: Readable,
-  objectStorageService: ObjectStorageService,
-  s3KeyPrefix: string,
-  ingestMediaFile?: (uploadedFile: IUploadedMediaFile) => Promise<void>
+  options: StreamMediaOptions
 ): Promise<{ uploadedCount: number }> {
+  const { objectStorageService, s3KeyPrefix, batchSize, maxBatchBytes, ingestMediaBatch } = options;
+
+  if (batchSize < 1) {
+    throw new Error('batchSize must be greater than 0');
+  }
+  if (maxBatchBytes < 1) {
+    throw new Error('maxBatchBytes must be greater than 0');
+  }
+
   const extract = tar.extract();
   let uploadedCount = 0;
+  let pendingUploadedFiles: IUploadedMediaFile[] = [];
+  let pendingUploadedBytes = 0;
+
+  const onUploaded = (): void => {
+    uploadedCount += 1;
+  };
+
+  const shouldFlush = (): boolean => {
+    return pendingUploadedFiles.length >= batchSize || pendingUploadedBytes >= maxBatchBytes;
+  };
+
+  /**
+   * Flush buffered uploaded media records through the caller callback.
+   */
+  const flushPending = async (): Promise<void> => {
+    if (!pendingUploadedFiles.length) {
+      return;
+    }
+
+    const currentBatch = pendingUploadedFiles;
+    pendingUploadedFiles = [];
+    pendingUploadedBytes = 0;
+    await ingestMediaBatch(currentBatch);
+  };
+
+  /**
+   * Queue one uploaded media file and flush when thresholds are reached.
+   *
+   * @param {IUploadedMediaFile} uploadedFile
+   * @returns {Promise<void>}
+   */
+  const ingestMediaFile = async (uploadedFile: IUploadedMediaFile): Promise<void> => {
+    pendingUploadedFiles.push(uploadedFile);
+    pendingUploadedBytes += uploadedFile.byteSize;
+
+    if (shouldFlush()) {
+      await flushPending();
+    }
+  };
 
   let rejectEntryPromise: (err: unknown) => void;
 
@@ -527,24 +575,25 @@ export async function streamMedia(
 
     extract.on('entry', async (header, stream, next) => {
       try {
-        await processMediaEntry(
-          header,
-          stream,
-          next,
-          reject,
+        await processMediaEntry(header, stream, next, reject, {
           objectStorageService,
           s3KeyPrefix,
           ingestMediaFile,
-          () => {
-            uploadedCount += 1;
-          }
-        );
+          onUploaded
+        });
       } catch (err) {
         reject(err);
       }
     });
 
-    extract.on('finish', resolve);
+    extract.on('finish', async () => {
+      try {
+        await flushPending();
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
     extract.on('error', reject);
   });
 

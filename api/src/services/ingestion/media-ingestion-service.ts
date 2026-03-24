@@ -89,45 +89,53 @@ export class MediaIngestionService extends DBService {
     // - for each uploaded file we persist DB records in bounded batches
     const tarStream = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
 
-    await streamMedia(tarStream, this.objectStorageService, s3KeyPrefix, async (mediaFile) => {
-      // Step 1: create artifact stub first (pending status) so we have artifact_id
-      // for linkage and auditability even before post-upload metadata is flushed.
-      const artifact = await this.artifactService.insertArtifact({
-        bucket: getObjectStoreBucketName(),
-        object_key: mediaFile.s3Key,
-        byte_size: mediaFile.byteSize,
-        artifact_status: ArtifactStatusEnum.PENDING,
-        checksum_sha256: null,
-        uploaded_at: null
-      });
+    await streamMedia(tarStream, {
+      objectStorageService: this.objectStorageService,
+      s3KeyPrefix,
+      batchSize: MEDIA_INGEST_BATCH_FILES,
+      maxBatchBytes: MEDIA_INGEST_BATCH_BYTES,
+      ingestMediaBatch: async (mediaFiles) => {
+        for (const mediaFile of mediaFiles) {
+          // Step 1: create artifact stub first (pending status) so we have artifact_id
+          // for linkage and auditability even before post-upload metadata is flushed.
+          const artifact = await this.artifactService.insertArtifact({
+            bucket: getObjectStoreBucketName(),
+            object_key: mediaFile.s3Key,
+            byte_size: mediaFile.byteSize,
+            artifact_status: ArtifactStatusEnum.PENDING,
+            checksum_sha256: null,
+            uploaded_at: null
+          });
 
-      // Step 2: queue upload_artifact lineage row (path is archive-relative files/* path).
-      pendingUploadArtifacts.push({
-        upload_id: uploadId,
-        artifact_id: artifact.artifact_id,
-        role: UploadArtifactRoleEnum.ATTACHMENT,
-        upload_archive_id: uploadArchiveId,
-        path: mediaFile.path
-      });
-      pendingUploadArtifactBytes += mediaFile.byteSize;
+          // Step 2: queue upload_artifact lineage row (path is archive-relative files/* path).
+          pendingUploadArtifacts.push({
+            upload_id: uploadId,
+            artifact_id: artifact.artifact_id,
+            role: UploadArtifactRoleEnum.ATTACHMENT,
+            upload_archive_id: uploadArchiveId,
+            path: mediaFile.path
+          });
+          pendingUploadArtifactBytes += mediaFile.byteSize;
 
-      // Flush linkage rows when either threshold is reached.
-      if (shouldFlush(pendingUploadArtifacts.length, pendingUploadArtifactBytes)) {
-        await flushPendingUploadArtifacts();
-      }
+          // Flush linkage rows when either threshold is reached.
+          if (shouldFlush(pendingUploadArtifacts.length, pendingUploadArtifactBytes)) {
+            await flushPendingUploadArtifacts();
+          }
 
-      // Step 3: queue artifact transition to uploaded with checksum + uploaded_at.
-      pendingArtifactUpdates.push({
-        artifact_id: artifact.artifact_id,
-        artifact_status: ArtifactStatusEnum.UPLOADED,
-        checksum_sha256: mediaFile.checksumSha256,
-        uploaded_at: dayjs().toISOString()
-      });
-      pendingUpdateBytes += mediaFile.byteSize;
+          // Step 3: queue artifact transition to uploaded with checksum + uploaded_at.
+          pendingArtifactUpdates.push({
+            artifact_id: artifact.artifact_id,
+            artifact_status: ArtifactStatusEnum.UPLOADED,
+            checksum_sha256: mediaFile.checksumSha256,
+            uploaded_at: dayjs().toISOString()
+          });
+          pendingUpdateBytes += mediaFile.byteSize;
 
-      // Flush artifact updates under the same thresholds.
-      if (shouldFlush(pendingArtifactUpdates.length, pendingUpdateBytes)) {
-        await flushPendingArtifactUpdates();
+          // Flush artifact updates under the same thresholds.
+          if (shouldFlush(pendingArtifactUpdates.length, pendingUpdateBytes)) {
+            await flushPendingArtifactUpdates();
+          }
+        }
       }
     });
 

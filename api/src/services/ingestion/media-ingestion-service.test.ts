@@ -33,21 +33,23 @@ describe('MediaIngestionService', () => {
         .stub(ArtifactService.prototype, 'updateArtifactsByIds')
         .resolves([{ artifact_id: 'artifact-1' }, { artifact_id: 'artifact-2' }]);
 
-      sinon.stub(biohubTarParser, 'streamMedia').callsFake(async (_stream, _storage, _prefix, onUploaded) => {
-        await onUploaded?.({
-          fileName: 'key.pdf',
-          s3Key: 'submissions/123/uploads/submission-upload-1/media/path/to/key.pdf',
-          path: 'path/to/key.pdf',
-          byteSize: 10,
-          checksumSha256: '1'.repeat(64)
-        });
-        await onUploaded?.({
-          fileName: 'photo-2.jpg',
-          s3Key: 'submissions/123/uploads/submission-upload-1/media/photo-2.jpg',
-          path: 'photo-2.jpg',
-          byteSize: 20,
-          checksumSha256: '2'.repeat(64)
-        });
+      sinon.stub(biohubTarParser, 'streamMedia').callsFake(async (_stream, options) => {
+        await options.ingestMediaBatch([
+          {
+            fileName: 'key.pdf',
+            s3Key: 'submissions/123/uploads/submission-upload-1/media/path/to/key.pdf',
+            path: 'path/to/key.pdf',
+            byteSize: 10,
+            checksumSha256: '1'.repeat(64)
+          },
+          {
+            fileName: 'photo-2.jpg',
+            s3Key: 'submissions/123/uploads/submission-upload-1/media/photo-2.jpg',
+            path: 'photo-2.jpg',
+            byteSize: 20,
+            checksumSha256: '2'.repeat(64)
+          }
+        ]);
         return { uploadedCount: 2 };
       });
 
@@ -109,14 +111,16 @@ describe('MediaIngestionService', () => {
       sinon
         .stub(UploadArtifactService.prototype, 'insertUploadArtifacts')
         .rejects(new Error('insert upload_artifact failed'));
-      sinon.stub(biohubTarParser, 'streamMedia').callsFake(async (_stream, _storage, _prefix, onUploaded) => {
-        await onUploaded?.({
-          fileName: 'photo-1.jpg',
-          s3Key: 'submissions/123/uploads/submission-upload-1/media/photo-1.jpg',
-          path: 'photo-1.jpg',
-          byteSize: 10,
-          checksumSha256: '1'.repeat(64)
-        });
+      sinon.stub(biohubTarParser, 'streamMedia').callsFake(async (_stream, options) => {
+        await options.ingestMediaBatch([
+          {
+            fileName: 'photo-1.jpg',
+            s3Key: 'submissions/123/uploads/submission-upload-1/media/photo-1.jpg',
+            path: 'photo-1.jpg',
+            byteSize: 10,
+            checksumSha256: '1'.repeat(64)
+          }
+        ]);
         return { uploadedCount: 1 };
       });
 

@@ -1,3 +1,5 @@
+import { ObjectStorageService } from '../services/object-storage/object-storage-service';
+
 export interface IUploadedMediaFile {
   /** Original filename (e.g. "photo.jpg") */
   fileName: string;
@@ -19,4 +21,25 @@ export interface MediaUploadContext {
   s3Key: string;
   mimetype: string;
   byteSize: number;
+}
+
+export interface UploadMediaEntryOptions {
+  objectStorageService: ObjectStorageService;
+  ingestMediaFile: (uploadedFile: IUploadedMediaFile) => Promise<void>;
+  onUploaded: () => void;
+}
+
+export interface ProcessMediaEntryOptions {
+  objectStorageService: ObjectStorageService;
+  s3KeyPrefix: string;
+  ingestMediaFile: (uploadedFile: IUploadedMediaFile) => Promise<void>;
+  onUploaded: () => void;
+}
+
+export interface StreamMediaOptions {
+  objectStorageService: ObjectStorageService;
+  s3KeyPrefix: string;
+  batchSize: number;
+  maxBatchBytes: number;
+  ingestMediaBatch: (uploadedFiles: IUploadedMediaFile[]) => Promise<void>;
 }
