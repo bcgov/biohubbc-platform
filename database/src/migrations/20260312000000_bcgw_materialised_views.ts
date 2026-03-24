@@ -53,7 +53,7 @@ related_animals AS (
     JOIN biohub.feature_type ft_animal
       ON sf.feature_type_id = ft_animal.feature_type_id
     LEFT JOIN biohub.contributor_codeset_code ccc
-      ON (sf.data->>'sex_code_id')::int = ccc.contributor_codeset_code_id
+      ON (sf.data->>'sex')::int = ccc.contributor_codeset_code_id
     WHERE ft_animal.name = 'animal'
       AND sf.record_end_date IS NULL
 )
@@ -157,7 +157,7 @@ related_animals AS (
     JOIN biohub.feature_type ft_animal
       ON sf.feature_type_id = ft_animal.feature_type_id
     LEFT JOIN biohub.contributor_codeset_code ccc
-      ON (sf.data->>'sex_code_id')::int = ccc.contributor_codeset_code_id
+      ON (sf.data->>'sex')::int = ccc.contributor_codeset_code_id
     WHERE ft_animal.name = 'animal'
       AND sf.record_end_date IS NULL
 )
@@ -212,23 +212,6 @@ WHERE ft.name = 'telemetry'
 
   await knex.raw(`
 CREATE MATERIALIZED VIEW bcgw.observations_public AS
-WITH measurements AS (
-    SELECT
-        m.parent_submission_feature_id   AS observation_id,
-        COALESCE(ccc_sex.label, (m.data->>'sex')::text)           AS sex,
-        COALESCE(ccc_life_stage.label, (m.data->>'life_stage')::text)    AS life_stage,
-        (m.data->>'measurement_type')::text   AS measurement_type,
-        (m.data->>'measurement_value')::text  AS measurement_value
-    FROM biohub.submission_feature m
-    JOIN biohub.feature_type ft_m
-      ON m.feature_type_id = ft_m.feature_type_id
-    LEFT JOIN biohub.contributor_codeset_code ccc_sex
-      ON (m.data->>'sex_code_id')::int = ccc_sex.contributor_codeset_code_id
-    LEFT JOIN biohub.contributor_codeset_code ccc_life_stage
-      ON (m.data->>'life_stage_code_id')::int = ccc_life_stage.contributor_codeset_code_id
-    WHERE ft_m.name = 'measurement'
-      AND m.record_end_date IS NULL
-)
 SELECT
     sf.submission_feature_id AS Feature_ID,
     (sf.data->>'timestamp')::timestamptz AS DATETIME,
@@ -240,15 +223,17 @@ SELECT
     (sf.data->>'taxon_id')::int AS taxon_id,
     t.itis_scientific_name AS scientific_name,
     t.common_name AS common_name,
-    meas.sex,
-    meas.life_stage
+    COALESCE(ccc_sex.label, (sf.data->>'sex')::text) AS sex,
+    COALESCE(ccc_life_stage.label, (sf.data->>'life_stage')::text) AS life_stage
 FROM biohub.submission_feature sf
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
-LEFT JOIN measurements meas
-  ON meas.observation_id = sf.submission_feature_id
 LEFT JOIN biohub.taxon t
   ON t.itis_tsn = (sf.data->>'taxon_id')::int
+LEFT JOIN biohub.contributor_codeset_code ccc_sex
+  ON (sf.data->>'sex')::int = ccc_sex.contributor_codeset_code_id
+LEFT JOIN biohub.contributor_codeset_code ccc_life_stage
+  ON (sf.data->>'life_stage')::int = ccc_life_stage.contributor_codeset_code_id
 WHERE ft.name = 'species_observation'
   AND sf.record_end_date IS NULL
   AND sf.submission_feature_id NOT IN (
@@ -268,6 +253,8 @@ WHERE ft.name = 'species_observation'
     COMMENT ON COLUMN bcgw.observations_public.taxon_id IS 'Taxonomic identifier extracted from the observation payload';
     COMMENT ON COLUMN bcgw.observations_public.scientific_name IS 'Scientific name from taxon table linked via ITIS TSN';
     COMMENT ON COLUMN bcgw.observations_public.common_name IS 'Common name from taxon table linked via ITIS TSN';
+    COMMENT ON COLUMN bcgw.observations_public.sex IS 'Sex label from contributor codeset codes (male, female, unknown) matched by contributor_codeset_code_id';
+    COMMENT ON COLUMN bcgw.observations_public.life_stage IS 'Life stage label from contributor codeset codes (adult, juvenile, etc.) matched by contributor_codeset_code_id';
   `);
 }
 
