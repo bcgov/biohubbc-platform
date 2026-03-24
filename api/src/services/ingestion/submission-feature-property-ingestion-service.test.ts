@@ -48,12 +48,6 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpResolvedStagedPropertiesTable')
       .resolves();
     sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpResolvedFeatureTypePropertyKeysTable')
-      .resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpUploadFeatureTypePropertyKeysTable')
-      .resolves();
-    sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpUploadFeatureTypePropertyMapTable')
       .resolves();
     sinon
@@ -72,30 +66,6 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,
         'createTmpUploadFeatureTypePropertyMapFeatureTypePropertyIdIndex'
-      )
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpUploadFeatureTypePropertyKeysBySubmissionUploadId'
-      )
-      .resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createTmpUploadFeatureTypePropertyKeysIndex')
-      .resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createTmpResolvedFeatureTypePropertyKeysTable')
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpResolvedFeatureTypePropertyKeysFeatureTypePropertyNameIndex'
-      )
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpResolvedFeatureTypePropertyKeysFeatureTypePropertyIdIndex'
       )
       .resolves();
     sinon
@@ -286,12 +256,6 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpResolvedStagedPropertiesTable')
       .resolves();
     sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpResolvedFeatureTypePropertyKeysTable')
-      .resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpUploadFeatureTypePropertyKeysTable')
-      .resolves();
-    sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpUploadFeatureTypePropertyMapTable')
       .resolves();
     sinon
@@ -310,30 +274,6 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,
         'createTmpUploadFeatureTypePropertyMapFeatureTypePropertyIdIndex'
-      )
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpUploadFeatureTypePropertyKeysBySubmissionUploadId'
-      )
-      .resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createTmpUploadFeatureTypePropertyKeysIndex')
-      .resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createTmpResolvedFeatureTypePropertyKeysTable')
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpResolvedFeatureTypePropertyKeysFeatureTypePropertyNameIndex'
-      )
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpResolvedFeatureTypePropertyKeysFeatureTypePropertyIdIndex'
       )
       .resolves();
     sinon

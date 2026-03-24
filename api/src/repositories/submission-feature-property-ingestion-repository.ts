@@ -52,6 +52,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         submission_feature_property_staging_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         submission_feature_id integer NOT NULL,
         submission_upload_id uuid NOT NULL,
+        feature_type_id integer NOT NULL,
         property_name text NOT NULL,
         value jsonb NOT NULL,
         create_date timestamptz(6) DEFAULT now() NOT NULL
@@ -61,14 +62,14 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Create the staging upload/feature index used by upload-scoped joins.
+   * Create the staging upload/type/property index used by metadata resolution joins.
    *
    * @returns {Promise<void>}
    */
   async createSubmissionFeaturePropertyStagingTempUploadFeatureIndex(): Promise<void> {
     const sql = SQL`
       CREATE INDEX tmp_submission_feature_property_staging_idx1
-      ON pg_temp.submission_feature_property_staging (submission_upload_id, submission_feature_id);
+      ON pg_temp.submission_feature_property_staging (submission_upload_id, feature_type_id, property_name);
     `;
     await this.connection.sql(sql);
   }
@@ -198,12 +199,14 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       INSERT INTO pg_temp.submission_feature_property_staging (
         submission_feature_id,
         submission_upload_id,
+        feature_type_id,
         property_name,
         value
       )
       SELECT
         sf.submission_feature_id,
         sf.submission_upload_id,
+        sf.feature_type_id,
         props.key,
         props.value
       FROM submission_feature sf
@@ -303,26 +306,6 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Drop `pg_temp.tmp_resolved_feature_type_property_keys` if it exists.
-   *
-   * @returns {Promise<void>}
-   */
-  async dropTmpResolvedFeatureTypePropertyKeysTable(): Promise<void> {
-    const sql = SQL`DROP TABLE IF EXISTS pg_temp.tmp_resolved_feature_type_property_keys;`;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Drop `pg_temp.tmp_upload_feature_type_property_keys` if it exists.
-   *
-   * @returns {Promise<void>}
-   */
-  async dropTmpUploadFeatureTypePropertyKeysTable(): Promise<void> {
-    const sql = SQL`DROP TABLE IF EXISTS pg_temp.tmp_upload_feature_type_property_keys;`;
-    await this.connection.sql(sql);
-  }
-
-  /**
    * Drop `pg_temp.tmp_upload_feature_type_property_map` if it exists.
    *
    * @returns {Promise<void>}
@@ -357,9 +340,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
        AND fpt.record_end_date IS NULL
       JOIN (
         SELECT DISTINCT feature_type_id
-        FROM submission_feature
+        FROM pg_temp.submission_feature_property_staging
         WHERE submission_upload_id = ${submissionUploadId}::uuid
-          AND record_end_date IS NULL
       ) upload_types
         ON upload_types.feature_type_id = ftp.feature_type_id
       WHERE ftp.record_end_date IS NULL;
@@ -394,90 +376,6 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Create `pg_temp.tmp_upload_feature_type_property_keys` for an upload.
-   *
-   * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
-   */
-  async createTmpUploadFeatureTypePropertyKeysBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      CREATE TEMP TABLE pg_temp.tmp_upload_feature_type_property_keys ON COMMIT DROP AS
-      SELECT DISTINCT
-        sf.feature_type_id,
-        s.property_name
-      FROM pg_temp.submission_feature_property_staging s
-      JOIN submission_feature sf
-        ON sf.submission_feature_id = s.submission_feature_id
-       AND sf.submission_upload_id = ${submissionUploadId}::uuid
-       AND sf.record_end_date IS NULL
-      WHERE s.submission_upload_id = ${submissionUploadId}::uuid;
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Create `(feature_type_id, property_name)` index on `pg_temp.tmp_upload_feature_type_property_keys`.
-   *
-   * @returns {Promise<void>}
-   */
-  async createTmpUploadFeatureTypePropertyKeysIndex(): Promise<void> {
-    const sql = SQL`
-      CREATE INDEX tmp_upload_feature_type_property_keys_idx1
-      ON pg_temp.tmp_upload_feature_type_property_keys (feature_type_id, property_name);
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Create `pg_temp.tmp_resolved_feature_type_property_keys`.
-   *
-   * @returns {Promise<void>}
-   */
-  async createTmpResolvedFeatureTypePropertyKeysTable(): Promise<void> {
-    const sql = SQL`
-      CREATE TEMP TABLE pg_temp.tmp_resolved_feature_type_property_keys ON COMMIT DROP AS
-      SELECT
-        k.feature_type_id,
-        k.property_name,
-        m.feature_type_property_id,
-        m.allow_multiple,
-        m.required_value,
-        m.property_type_name
-      FROM pg_temp.tmp_upload_feature_type_property_keys k
-      LEFT JOIN pg_temp.tmp_upload_feature_type_property_map m
-        ON m.feature_type_id = k.feature_type_id
-       AND m.property_name = k.property_name;
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Create `(feature_type_id, property_name)` index on `pg_temp.tmp_resolved_feature_type_property_keys`.
-   *
-   * @returns {Promise<void>}
-   */
-  async createTmpResolvedFeatureTypePropertyKeysFeatureTypePropertyNameIndex(): Promise<void> {
-    const sql = SQL`
-      CREATE INDEX tmp_resolved_feature_type_property_keys_idx1
-      ON pg_temp.tmp_resolved_feature_type_property_keys (feature_type_id, property_name);
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Create `feature_type_property_id` index on `pg_temp.tmp_resolved_feature_type_property_keys`.
-   *
-   * @returns {Promise<void>}
-   */
-  async createTmpResolvedFeatureTypePropertyKeysFeatureTypePropertyIdIndex(): Promise<void> {
-    const sql = SQL`
-      CREATE INDEX tmp_resolved_feature_type_property_keys_idx2
-      ON pg_temp.tmp_resolved_feature_type_property_keys (feature_type_property_id);
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
    * Create `pg_temp.tmp_resolved_staged_properties` for an upload.
    *
    * @param {string} submissionUploadId Upload scope.
@@ -490,21 +388,17 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         s.submission_feature_property_staging_id,
         s.submission_feature_id,
         s.submission_upload_id,
-        sf.feature_type_id,
+        s.feature_type_id,
         s.property_name,
         s.value,
-        r.feature_type_property_id,
-        r.allow_multiple,
-        r.required_value,
-        r.property_type_name
+        m.feature_type_property_id,
+        m.allow_multiple,
+        m.required_value,
+        m.property_type_name
       FROM pg_temp.submission_feature_property_staging s
-      JOIN submission_feature sf
-        ON sf.submission_feature_id = s.submission_feature_id
-       AND sf.submission_upload_id = ${submissionUploadId}::uuid
-       AND sf.record_end_date IS NULL
-      LEFT JOIN pg_temp.tmp_resolved_feature_type_property_keys r
-        ON r.feature_type_id = sf.feature_type_id
-       AND r.property_name = s.property_name
+      LEFT JOIN pg_temp.tmp_upload_feature_type_property_map m
+        ON m.feature_type_id = s.feature_type_id
+       AND m.property_name = s.property_name
       WHERE s.submission_upload_id = ${submissionUploadId}::uuid;
     `;
     await this.connection.sql(sql);

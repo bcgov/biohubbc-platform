@@ -189,8 +189,6 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
     await Promise.all([
       this.submissionFeaturePropertyIngestionRepository.dropTmpUploadPropertyValuesTable(),
       this.submissionFeaturePropertyIngestionRepository.dropTmpResolvedStagedPropertiesTable(),
-      this.submissionFeaturePropertyIngestionRepository.dropTmpResolvedFeatureTypePropertyKeysTable(),
-      this.submissionFeaturePropertyIngestionRepository.dropTmpUploadFeatureTypePropertyKeysTable(),
       this.submissionFeaturePropertyIngestionRepository.dropTmpUploadFeatureTypePropertyMapTable()
     ]);
 
@@ -200,17 +198,6 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
     await Promise.all([
       this.submissionFeaturePropertyIngestionRepository.createTmpUploadFeatureTypePropertyMapFeatureTypePropertyNameIndex(),
       this.submissionFeaturePropertyIngestionRepository.createTmpUploadFeatureTypePropertyMapFeatureTypePropertyIdIndex()
-    ]);
-
-    await this.submissionFeaturePropertyIngestionRepository.createTmpUploadFeatureTypePropertyKeysBySubmissionUploadId(
-      submissionUploadId
-    );
-    await this.submissionFeaturePropertyIngestionRepository.createTmpUploadFeatureTypePropertyKeysIndex();
-
-    await this.submissionFeaturePropertyIngestionRepository.createTmpResolvedFeatureTypePropertyKeysTable();
-    await Promise.all([
-      this.submissionFeaturePropertyIngestionRepository.createTmpResolvedFeatureTypePropertyKeysFeatureTypePropertyNameIndex(),
-      this.submissionFeaturePropertyIngestionRepository.createTmpResolvedFeatureTypePropertyKeysFeatureTypePropertyIdIndex()
     ]);
 
     await this.submissionFeaturePropertyIngestionRepository.createTmpResolvedStagedPropertiesBySubmissionUploadId(
