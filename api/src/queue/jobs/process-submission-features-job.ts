@@ -5,8 +5,8 @@ import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
-import { UploadArchiveService } from '../../services/upload/upload-archive-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
+import { UploadArchiveService } from '../../services/upload/upload-archive-service';
 import { getLogger } from '../../utils/logger';
 import { publishIndexSubmissionFeaturesJob } from '../publisher';
 

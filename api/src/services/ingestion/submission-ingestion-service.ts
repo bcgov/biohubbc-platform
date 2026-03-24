@@ -1,3 +1,4 @@
+import { IngestionValidationError } from '../../errors/submission-errors';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { streamFeatures } from '../../utils/biohub-tar-parser';
 import { DBService } from '../db-service';
@@ -81,9 +82,13 @@ export class SubmissionIngestionService extends DBService {
   private async ingestFeatures(objectKey: string, submissionId: number, submissionUploadId: string): Promise<void> {
     const tarStream = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
 
-    await streamFeatures(tarStream, FEATURE_INSERT_BATCH_SIZE, async (featureBatch) => {
+    const { featureCount } = await streamFeatures(tarStream, FEATURE_INSERT_BATCH_SIZE, async (featureBatch) => {
       await this.featureIngestionService.ingestFeatureBatch(submissionId, submissionUploadId, featureBatch);
     });
+
+    if (featureCount === 0) {
+      throw new IngestionValidationError('No feature entries were found under features/ in the archive');
+    }
   }
 
   /**

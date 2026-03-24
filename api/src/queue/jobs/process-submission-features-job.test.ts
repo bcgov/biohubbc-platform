@@ -8,8 +8,8 @@ import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { ValidationErrorType } from '../../services/ingestion/submission-ingestion-service.interface';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
-import { UploadArchiveService } from '../../services/upload/upload-archive-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
+import { UploadArchiveService } from '../../services/upload/upload-archive-service';
 import { getMockDBConnection } from '../../__mocks__/db';
 import * as publisher from '../publisher';
 import {

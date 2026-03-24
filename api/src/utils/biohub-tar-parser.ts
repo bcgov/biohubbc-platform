@@ -49,6 +49,24 @@ function streamToBuffer(stream: Readable): Promise<Buffer> {
 }
 
 /**
+ * Normalize a tar entry name for stable folder matching.
+ *
+ * Normalization rules:
+ * - convert backslashes to forward slashes
+ * - strip leading "./" segments
+ * - collapse duplicate slashes
+ *
+ * @param {string} entryName
+ * @returns {string}
+ */
+function normalizeEntryName(entryName: string): string {
+  return entryName
+    .replace(/\\/g, '/')
+    .replace(/^(\.\/)+/, '')
+    .replace(/\/{2,}/g, '/');
+}
+
+/**
  * Drain a stream without buffering its content.
  *
  * Used for tar entries we intentionally skip so the extractor can continue.
@@ -153,28 +171,31 @@ function buildMediaUploadContext(entryName: string, s3KeyPrefix: string, byteSiz
 }
 
 /**
- * Resolve a tar entry path to a canonical media path rooted at `files/`.
+ * Resolve a tar entry path to a canonical scoped path rooted at `<scope>/`.
  *
  * Accepts either:
- * - `files/...`
- * - `<any-prefix>/files/...` (for archives wrapped in a root directory)
+ * - `<scope>/...`
+ * - `<any-prefix>/<scope>/...` (for archives wrapped in a root directory)
  *
- * Returns `null` when the entry is not a media path.
+ * Returns `null` when the entry is not under the requested scope.
  *
  * @param {string} entryName
+ * @param {'features' | 'codes' | 'files'} scope - Top-level archive folder to match.
  * @returns {string | null}
  */
-function resolveFilesEntryName(entryName: string): string | null {
-  if (entryName.startsWith('files/')) {
-    return entryName;
+function resolveScopedEntryName(entryName: string, scope: 'features' | 'codes' | 'files'): string | null {
+  const normalizedEntryName = normalizeEntryName(entryName);
+  const scopePrefix = `${scope}/`;
+  if (normalizedEntryName.startsWith(scopePrefix)) {
+    return normalizedEntryName;
   }
 
-  const nestedFilesIndex = entryName.indexOf('/files/');
-  if (nestedFilesIndex === -1) {
+  const nestedScopeIndex = normalizedEntryName.indexOf(`/${scopePrefix}`);
+  if (nestedScopeIndex === -1) {
     return null;
   }
 
-  return entryName.substring(nestedFilesIndex + 1);
+  return normalizedEntryName.substring(nestedScopeIndex + 1);
 }
 
 /**
@@ -280,7 +301,7 @@ async function processMediaEntry(
   ingestMediaFile: ((uploadedFile: IUploadedMediaFile) => Promise<void>) | undefined,
   onUploaded: () => void
 ): Promise<void> {
-  const resolvedEntryName = resolveFilesEntryName(header.name ?? '');
+  const resolvedEntryName = resolveScopedEntryName(header.name ?? '', 'files');
   if (!(resolvedEntryName && header.type === 'file')) {
     await drainStream(stream);
     next();
@@ -348,10 +369,8 @@ export async function streamFeatures(
           return;
         }
 
-        const entryName = header.name ?? '';
-        const isFeatureJson = entryName.startsWith('features/') && entryName.endsWith('.json');
-
-        if (!isFeatureJson) {
+        const resolvedEntryName = resolveScopedEntryName(header.name ?? '', 'features');
+        if (!(resolvedEntryName && resolvedEntryName.endsWith('.json') && header.type === 'file')) {
           await drainStream(stream);
           next();
           return;
@@ -362,7 +381,7 @@ export async function streamFeatures(
         const parsedEntries = Array.isArray(parsed) ? parsed : [parsed];
 
         for (const parsedEntry of parsedEntries) {
-          const block = extractFeatureFromTarballEntry(parsedEntry, entryName);
+          const block = extractFeatureFromTarballEntry(parsedEntry, resolvedEntryName);
           pendingBlocks.push(block);
           featureCount += 1;
 
@@ -435,8 +454,8 @@ export async function streamCodesets(
           return;
         }
 
-        const entryName = header.name ?? '';
-        if (!(entryName.startsWith('codes/') && entryName.endsWith('.json') && header.type === 'file')) {
+        const resolvedEntryName = resolveScopedEntryName(header.name ?? '', 'codes');
+        if (!(resolvedEntryName && resolvedEntryName.endsWith('.json') && header.type === 'file')) {
           await drainStream(stream);
           next();
           return;
@@ -444,7 +463,7 @@ export async function streamCodesets(
 
         const buffer = await streamToBuffer(stream);
         const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
-        const codesets = extractCodesetsFromTarballEntry(parsed, entryName);
+        const codesets = extractCodesetsFromTarballEntry(parsed, resolvedEntryName);
 
         await ingestCodesets(codesets);
         next();

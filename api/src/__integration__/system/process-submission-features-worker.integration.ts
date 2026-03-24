@@ -695,7 +695,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     });
 
     // Track S3 media upload for cleanup
-    s3KeysToCleanup.push(`submissions/${submissionId}/media/photo.jpg`);
+    s3KeysToCleanup.push(`submissions/${submissionId}/uploads/${submissionUploadId}/media/photo.jpg`);
 
     expect(result.valid).to.be.true;
     expect(result.errors).to.have.lengthOf(0);
@@ -724,7 +724,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
           FROM biohub.upload_artifact ua
           JOIN biohub.artifact a ON ua.artifact_id = a.artifact_id
           WHERE ua.upload_id = ${uploadId}
-            AND a.object_key LIKE ${'submissions/' + submissionId + '/media/%'}`
+            AND a.object_key LIKE ${'submissions/' + submissionId + '/uploads/' + submissionUploadId + '/media/%'}`
     );
     expect(mediaUploadArtifacts.rows).to.have.lengthOf(1);
     expect(mediaUploadArtifacts.rows[0].path).to.equal('photo.jpg');
