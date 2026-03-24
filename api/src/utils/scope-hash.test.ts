@@ -5,7 +5,9 @@ import { computeScopeHash } from './scope-hash';
 describe('computeScopeHash', () => {
   it('produces consistent output for the same input', () => {
     const urn = 'urn:10:telemetry:*';
-    expect(computeScopeHash(urn)).to.equal(computeScopeHash(urn));
+    const first = computeScopeHash(urn);
+    const second = computeScopeHash(urn);
+    expect(first).to.equal(second);
   });
 
   it('produces different output for different URNs', () => {
