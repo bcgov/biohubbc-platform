@@ -24,7 +24,7 @@ export default {
       directory: './migrations'
     },
     seeds: {
-      directory: ['./seeds']
+      directory: ['./seeds', './procedures']
     }
   },
   production: {
@@ -45,6 +45,9 @@ export default {
       tableName: 'migration',
       schemaName: 'public',
       directory: './migrations'
+    },
+    seeds: {
+      directory: ['./procedures']
     }
   }
 };
