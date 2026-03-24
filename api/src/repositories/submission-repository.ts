@@ -528,6 +528,80 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Bulk update parent references by child submission_feature_id pairs.
+   *
+   * @param {Array<{ child_submission_feature_id: number; parent_submission_feature_id: number }>} updates
+   * @return {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionFeatureParentsByChildIds(
+    updates: Array<{ child_submission_feature_id: number; parent_submission_feature_id: number }>
+  ): Promise<void> {
+    if (!updates.length) {
+      return;
+    }
+
+    const childIds = updates.map((update) => update.child_submission_feature_id);
+    const parentIds = updates.map((update) => update.parent_submission_feature_id);
+    const sqlStatement = SQL`
+      UPDATE submission_feature AS target
+      SET parent_submission_feature_id = source.parent_submission_feature_id
+      FROM (
+        SELECT
+          child_submission_feature_id,
+          parent_submission_feature_id
+        FROM unnest(
+          ${childIds}::integer[],
+          ${parentIds}::integer[]
+        ) AS updates(child_submission_feature_id, parent_submission_feature_id)
+      ) AS source
+      WHERE target.submission_feature_id = source.child_submission_feature_id;
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Sync parent references from raw feature payload (`data.parent`) for one upload.
+   *
+   * @param {string} submissionUploadId
+   * @return {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionFeatureParentsFromDataBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      WITH resolved AS (
+        SELECT
+          child.submission_feature_id AS child_submission_feature_id,
+          parent.submission_feature_id AS parent_submission_feature_id
+        FROM
+          submission_feature child
+        LEFT JOIN
+          submission_feature parent
+        ON
+          parent.submission_upload_id = child.submission_upload_id
+          AND parent.record_end_date IS NULL
+          AND parent.source_id = NULLIF(child.data ->> 'parent', '')
+        WHERE
+          child.submission_upload_id = ${submissionUploadId}
+          AND child.record_end_date IS NULL
+      )
+      UPDATE
+        submission_feature target
+      SET
+        parent_submission_feature_id = resolved.parent_submission_feature_id
+      FROM
+        resolved
+      WHERE
+        target.submission_feature_id = resolved.child_submission_feature_id
+        AND target.submission_upload_id = ${submissionUploadId}
+        AND target.record_end_date IS NULL;
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
    * Delete all submission features for a submission (soft delete).
    * Used for idempotency - allows job retries to start fresh.
    *
@@ -562,6 +636,63 @@ export class SubmissionRepository extends BaseRepository {
       )
       OR target_feature_id IN (
         SELECT submission_feature_id FROM submission_feature WHERE submission_id = ${submissionId}
+      );
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
+   * Resolve external feature source ids to internal submission_feature ids for one upload.
+   *
+   * @param {string} submissionUploadId
+   * @param {string[]} sourceIds
+   * @return {Promise<Array<{ source_id: string; submission_feature_id: number }>>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionFeatureIdMapBySourceIds(
+    submissionUploadId: string,
+    sourceIds: string[]
+  ): Promise<Array<{ source_id: string; submission_feature_id: number }>> {
+    if (!sourceIds.length) {
+      return [];
+    }
+
+    const sqlStatement = SQL`
+      SELECT
+        source_id,
+        submission_feature_id
+      FROM
+        submission_feature
+      WHERE
+        submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL
+        AND source_id = ANY(${sourceIds}::text[]);
+    `;
+
+    const response = await this.connection.sql<{ source_id: string; submission_feature_id: number }>(sqlStatement);
+    return response.rows;
+  }
+
+  /**
+   * Delete all feature relationships for one upload attempt.
+   *
+   * @param {string} submissionUploadId
+   * @return {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async deleteSubmissionFeatureRelationshipsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sqlStatement = SQL`
+      DELETE FROM submission_feature_feature
+      WHERE source_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
+      )
+      OR target_feature_id IN (
+        SELECT submission_feature_id
+        FROM submission_feature
+        WHERE submission_upload_id = ${submissionUploadId}
       );
     `;
 

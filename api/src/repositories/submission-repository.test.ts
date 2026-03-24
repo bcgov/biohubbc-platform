@@ -1632,6 +1632,27 @@ describe('SubmissionRepository', () => {
     });
   });
 
+  describe('updateSubmissionFeatureParentsFromDataBySubmissionUploadId', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should sync parent_submission_feature_id values from data.parent for one upload', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 2, rows: [] });
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      await submissionRepository.updateSubmissionFeatureParentsFromDataBySubmissionUploadId(
+        '123e4567-e89b-12d3-a456-426614174000'
+      );
+
+      expect(sqlStub).to.have.been.calledOnce;
+      expect(sqlStub.firstCall.args[0].text).to.include('SET');
+      expect(sqlStub.firstCall.args[0].text).to.include('parent_submission_feature_id');
+    });
+  });
+
   describe('deleteSubmissionFeatures', () => {
     afterEach(() => {
       sinon.restore();
