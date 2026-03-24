@@ -1,9 +1,11 @@
 import PgBoss from 'pg-boss';
 import { getAPIUserDBConnection } from '../../database/db';
 import { IngestionValidationError } from '../../errors/submission-errors';
+import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
+import { UploadArchiveService } from '../../services/upload/upload-archive-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
 import { publishIndexSubmissionFeaturesJob } from '../publisher';
@@ -107,12 +109,17 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
       }
 
       // Update ingestion status to completed; deep validation is handled by indexing.
-      await submissionValidationService.updateSubmissionValidationStatus(job.id, 'completed');
-      await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'succeeded' });
-      await connection.commit();
+      // These updates are independent and can run concurrently within the same transaction.
+      const uploadArchiveService = new UploadArchiveService(connection);
+      await Promise.all([
+        submissionValidationService.updateSubmissionValidationStatus(job.id, 'completed'),
+        submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'succeeded' }),
+        uploadArchiveService.updateUploadArchivesByUploadId(submissionUpload.upload_id, {
+          archive_status: ProcessStatusStatusEnum.COMPLETED
+        })
+      ]);
 
-      // Publish indexing job (fire-and-forget — failure here doesn't affect validation).
-      // Validation success is the critical path; indexing can be retried independently via admin endpoint.
+      // Publish indexing job. Status updates + enqueue happen in the same transaction/commit window.
       const indexResult = await publishIndexSubmissionFeaturesJob(connection, { submissionId });
       if (indexResult.status !== 'published') {
         defaultLog.warn({
@@ -122,6 +129,8 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
           indexResult
         });
       }
+
+      await connection.commit();
 
       defaultLog.info({
         label: 'processSubmissionFeaturesJobHandler',

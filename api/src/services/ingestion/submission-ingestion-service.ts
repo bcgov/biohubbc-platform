@@ -56,7 +56,13 @@ export class SubmissionIngestionService extends DBService {
 
     // Checkpointed streaming passes keep memory bounded while avoiding concurrent
     // full-archive scans against object storage for the same tarball.
-    await this.mediaIngestionService.ingestMediaFiles(objectKey, submissionId, uploadId, uploadArchiveId);
+    await this.mediaIngestionService.ingestMediaFiles(
+      objectKey,
+      submissionId,
+      submissionUploadId,
+      uploadId,
+      uploadArchiveId
+    );
     await this.codesetIngestionService.ingestCodesets(objectKey, submissionUploadId);
     await this.ingestFeatures(objectKey, submissionId, submissionUploadId);
 

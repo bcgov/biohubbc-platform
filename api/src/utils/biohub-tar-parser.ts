@@ -153,6 +153,31 @@ function buildMediaUploadContext(entryName: string, s3KeyPrefix: string, byteSiz
 }
 
 /**
+ * Resolve a tar entry path to a canonical media path rooted at `files/`.
+ *
+ * Accepts either:
+ * - `files/...`
+ * - `<any-prefix>/files/...` (for archives wrapped in a root directory)
+ *
+ * Returns `null` when the entry is not a media path.
+ *
+ * @param {string} entryName
+ * @returns {string | null}
+ */
+function resolveFilesEntryName(entryName: string): string | null {
+  if (entryName.startsWith('files/')) {
+    return entryName;
+  }
+
+  const nestedFilesIndex = entryName.indexOf('/files/');
+  if (nestedFilesIndex === -1) {
+    return null;
+  }
+
+  return entryName.substring(nestedFilesIndex + 1);
+}
+
+/**
  * Create a pass-through transform that updates a running checksum per chunk.
  *
  * @param {ReturnType<typeof createHash>} checksum - Mutable hash state.
@@ -255,14 +280,14 @@ async function processMediaEntry(
   ingestMediaFile: ((uploadedFile: IUploadedMediaFile) => Promise<void>) | undefined,
   onUploaded: () => void
 ): Promise<void> {
-  const entryName = header.name ?? '';
-  if (!(entryName.startsWith('files/') && header.type === 'file')) {
+  const resolvedEntryName = resolveFilesEntryName(header.name ?? '');
+  if (!(resolvedEntryName && header.type === 'file')) {
     await drainStream(stream);
     next();
     return;
   }
 
-  const context = buildMediaUploadContext(entryName, s3KeyPrefix, header.size ?? 0);
+  const context = buildMediaUploadContext(resolvedEntryName, s3KeyPrefix, header.size ?? 0);
 
   uploadMediaEntry(stream, context, objectStorageService, ingestMediaFile, onUploaded).then(next).catch(reject);
 }

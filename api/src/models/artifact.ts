@@ -49,3 +49,8 @@ export const UpdateArtifact = z.object({
   uploaded_at: z.string().nullable().optional()
 });
 export type UpdateArtifact = z.infer<typeof UpdateArtifact>;
+
+/**
+ * Payload for batch-updating artifacts by id.
+ */
+export type BatchUpdateArtifact = UpdateArtifact & { artifact_id: string };

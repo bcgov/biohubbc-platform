@@ -1,7 +1,7 @@
 import { SQL } from 'sql-template-strings';
 import z from 'zod';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
-import { Artifact, CreateArtifact, UpdateArtifact } from '../../models/artifact';
+import { Artifact, BatchUpdateArtifact, CreateArtifact, UpdateArtifact } from '../../models/artifact';
 import { BaseRepository } from '../base-repository';
 
 export class ArtifactRepository extends BaseRepository {
@@ -173,6 +173,54 @@ export class ArtifactRepository extends BaseRepository {
       throw new ApiExecuteSQLError('Failed to update artifact record', [
         'ArtifactRepository->updateArtifactsByUploadId',
         `rowCount was ${response.rowCount}, expected > 0`
+      ]);
+    }
+
+    return response.rows;
+  }
+
+  /**
+   * Update multiple artifacts by id in one statement.
+   *
+   * @param {BatchUpdateArtifact[]} artifacts - Row-level updates keyed by artifact id.
+   * @returns {Promise<{ artifact_id: string }[]>}
+   * @throws {ApiExecuteSQLError}
+   */
+  async updateArtifactsByIds(artifacts: BatchUpdateArtifact[]): Promise<{ artifact_id: string }[]> {
+    if (!artifacts.length) {
+      return [];
+    }
+
+    const artifactIds = artifacts.map((artifact) => artifact.artifact_id);
+    const artifactStatuses = artifacts.map((artifact) => artifact.artifact_status ?? null);
+    const checksums = artifacts.map((artifact) => artifact.checksum_sha256 ?? null);
+    const uploadedAts = artifacts.map((artifact) => artifact.uploaded_at ?? null);
+
+    const sqlStatement = SQL`
+      UPDATE artifact AS a
+      SET
+        artifact_status = COALESCE(u.artifact_status::artifact_status, a.artifact_status),
+        checksum_sha256 = COALESCE(u.checksum_sha256, a.checksum_sha256),
+        uploaded_at = COALESCE(u.uploaded_at::timestamptz, a.uploaded_at)
+      FROM (
+        SELECT *
+        FROM UNNEST(
+          ${artifactIds}::uuid[],
+          ${artifactStatuses}::text[],
+          ${checksums}::text[],
+          ${uploadedAts}::text[]
+        ) AS t(artifact_id, artifact_status, checksum_sha256, uploaded_at)
+      ) AS u
+      WHERE a.artifact_id = u.artifact_id
+      RETURNING a.artifact_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, z.object({ artifact_id: z.string().uuid() }));
+
+    if (response.rowCount !== artifacts.length) {
+      throw new ApiExecuteSQLError('Failed to update artifact records', [
+        'ArtifactRepository->updateArtifactsByIds',
+        `rowCount was ${response.rowCount}, expected ${artifacts.length}`
       ]);
     }
 

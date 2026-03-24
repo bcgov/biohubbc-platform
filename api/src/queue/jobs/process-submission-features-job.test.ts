@@ -8,6 +8,7 @@ import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { ValidationErrorType } from '../../services/ingestion/submission-ingestion-service.interface';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
+import { UploadArchiveService } from '../../services/upload/upload-archive-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getMockDBConnection } from '../../__mocks__/db';
 import * as publisher from '../publisher';
@@ -32,11 +33,15 @@ describe('process-submission-features-job', () => {
 
   describe('processSubmissionFeaturesJobHandler', () => {
     let updateSubmissionUploadStub: sinon.SinonStub;
+    let updateUploadArchivesByUploadIdStub: sinon.SinonStub;
 
     beforeEach(() => {
       updateSubmissionUploadStub = sinon
         .stub(SubmissionUploadService.prototype, 'updateSubmissionUpload')
         .resolves({ submission_upload_id: 'test-sub-upload-id' });
+      updateUploadArchivesByUploadIdStub = sinon
+        .stub(UploadArchiveService.prototype, 'updateUploadArchivesByUploadId')
+        .resolves([{ upload_archive_id: 'archive-1' }]);
     });
 
     const createMockJob = (data: Partial<SubmissionUpload> = {}, jobId = 'test-job-id') =>
@@ -72,7 +77,12 @@ describe('process-submission-features-job', () => {
       expect(updateStatusStub.calledWith('test-job-id', 'started')).to.be.true;
       expect(updateStatusStub.calledWith('test-job-id', 'completed')).to.be.true;
       expect(updateSubmissionUploadStub.calledWith('test-sub-upload-id', { status: 'in_progress' })).to.be.true;
-      expect(updateSubmissionUploadStub.calledWith('test-sub-upload-id', { status: 'succeeded' })).to.be.false;
+      expect(updateSubmissionUploadStub.calledWith('test-sub-upload-id', { status: 'succeeded' })).to.be.true;
+      expect(
+        updateUploadArchivesByUploadIdStub.calledWith('test-upload-id', {
+          archive_status: 'completed'
+        })
+      ).to.be.true;
     });
 
     it('calls ingestSubmissionUpload with the SubmissionUpload from job data', async () => {
