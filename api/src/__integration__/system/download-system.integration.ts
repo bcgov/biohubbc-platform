@@ -24,26 +24,6 @@ import { getOrCreateTestTicketId } from '../helpers/test-ticket-helpers';
 const TEST_PREFIX = 'dev-artifacts';
 const SYSTEM_USER_ID = 1;
 
-async function createTestTicketId(db: Knex): Promise<string> {
-  const [team] = await db('biohub.team').select('team_id').limit(1);
-  if (!team?.team_id) {
-    throw new Error('No team row found for ticket setup');
-  }
-
-  const ticketSlug = String(randomInt(0, 100_000_000)).padStart(8, '0');
-  const [ticket] = await db('biohub.ticket')
-    .insert({
-      ticket_slug: ticketSlug,
-      subject: `${TEST_PREFIX}-ticket`,
-      description: 'System integration test ticket',
-      team_id: team.team_id,
-      create_user: SYSTEM_USER_ID
-    })
-    .returning('ticket_id');
-
-  return ticket.ticket_id;
-}
-
 /** Parse CSV text into trimmed lines. */
 function parseCsvLines(csv: string): string[] {
   return csv.trim().split('\n');
