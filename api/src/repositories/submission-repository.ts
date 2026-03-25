@@ -1245,6 +1245,90 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Get all submissions accessible to the given system user via their submission team membership.
+   *
+   * @param {number} systemUserId - The system user ID to fetch submissions for.
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionsByUserId(systemUserId: number): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
+    const sqlStatement = SQL`
+      SELECT
+        s.submission_id,
+        s.uuid,
+        s.system_user_id,
+        s.contributor_id,
+        s.security_review_timestamp,
+        s.publish_timestamp,
+        s.submitted_timestamp,
+        s.name,
+        s.description,
+        s.comment,
+        s.record_end_date,
+        s.create_date,
+        s.create_user,
+        s.update_date,
+        s.update_user,
+        s.revision_count,
+        sf.feature_type_id AS root_feature_type_id,
+        ft.name            AS root_feature_type_name,
+        CASE
+          WHEN s.security_review_timestamp IS NULL THEN ${SECURITY_APPLIED_STATUS.PENDING}
+          WHEN s.publish_timestamp IS NULL          THEN ${SECURITY_APPLIED_STATUS.SECURED}
+          ELSE ${SECURITY_APPLIED_STATUS.UNSECURED}
+        END AS security,
+        COALESCE(ARRAY_REMOVE(ARRAY_AGG(DISTINCT rl.region_name), NULL), '{}') AS regions
+      FROM submission s
+      INNER JOIN submission_upload su
+        ON  su.submission_id = s.submission_id
+        AND su.record_end_date IS NULL
+      INNER JOIN ticket t
+        ON  t.ticket_id = su.ticket_id
+        AND t.record_end_date IS NULL
+      INNER JOIN team_member tm
+        ON  tm.team_id = t.team_id
+        AND tm.record_end_date IS NULL
+      INNER JOIN submission_feature sf
+        ON  sf.submission_id = s.submission_id
+        AND sf.parent_submission_feature_id IS NULL
+      INNER JOIN feature_type ft
+        ON  ft.feature_type_id = sf.feature_type_id
+      LEFT JOIN submission_regions sr
+        ON  sr.submission_id = s.submission_id
+      LEFT JOIN region_lookup rl
+        ON  rl.region_id = sr.region_id
+      WHERE
+        tm.system_user_id = ${systemUserId}
+        AND s.record_end_date IS NULL
+      GROUP BY
+        s.submission_id,
+        s.uuid,
+        s.system_user_id,
+        s.contributor_id,
+        s.security_review_timestamp,
+        s.publish_timestamp,
+        s.submitted_timestamp,
+        s.name,
+        s.description,
+        s.comment,
+        s.record_end_date,
+        s.create_date,
+        s.create_user,
+        s.update_date,
+        s.update_user,
+        s.revision_count,
+        sf.feature_type_id,
+        ft.name
+      ORDER BY
+        s.submitted_timestamp DESC;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
+
+    return response.rows;
+  }
+
+  /**
    * Get a submission record by id (with security status).
    *
    * @param {number} submissionId
