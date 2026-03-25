@@ -87,7 +87,6 @@ describe('UploadIngestionService', () => {
           { partNumber: 1, url: 'https://s3-url-1', partSizeBytes: 5_000_000 },
           { partNumber: 2, url: 'https://s3-url-2', partSizeBytes: 100_000 }
         ],
-        partSizeBytes: 5_000_000,
         partCount: 2
       };
       sinon.stub(submissionUploadUtils, 'generateMultipartUploadPresignedUrls').resolves(mockPresigned);
@@ -102,7 +101,7 @@ describe('UploadIngestionService', () => {
       expect(result.s3UploadId).to.equal(mockS3UploadId);
       expect(result.partCount).to.equal(mockPresigned.partCount);
       expect(result.presignedUrls).to.deep.equal(mockPresigned.presignedUrls);
-      expect(result.partSizeBytes).to.equal(mockPresigned.partSizeBytes);
+      expect(result.presignedUrls[0].partSizeBytes).to.equal(mockPresigned.presignedUrls[0].partSizeBytes);
     });
 
     it('should throw if submission creation fails', async () => {

@@ -30,7 +30,6 @@ describe('archive upload handler', () => {
       s3UploadId: 'mock-s3-upload-id',
       uploadArchiveId: 'mock-archive-id',
       key: 'mock-key',
-      partSizeBytes: 5242880,
       partCount: 2,
       presignedUrls: [
         { partNumber: 1, url: 'https://example.com/part1', partSizeBytes: 5242880 },
@@ -125,7 +124,6 @@ describe('archive upload handler', () => {
       s3UploadId: 'mock-s3-upload-id',
       uploadArchiveId: 'mock-archive-id',
       key: 'mock-key',
-      partSizeBytes: 5242880,
       partCount: 1,
       presignedUrls: [{ partNumber: 1, url: 'https://example.com/part1', partSizeBytes: 12345 }]
     } as PresignedUploadUrlResponse);

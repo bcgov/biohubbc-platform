@@ -7,6 +7,10 @@ export interface MultipartUploadParams {
 export interface MultipartUploadResult {
   uploadId: string;
   presignedUrls: Array<{ partNumber: number; url: string; partSizeBytes: number }>;
+  partCount: number;
+}
+
+export interface MultipartLayout {
   partSizeBytes: number;
   partCount: number;
 }

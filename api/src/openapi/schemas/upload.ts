@@ -36,7 +36,6 @@ export const CreateSubmissionUploadResponseSchema: OpenAPIV3.SchemaObject = {
     's3UploadId',
     'uploadArchiveId',
     'key',
-    'partSizeBytes',
     'partCount',
     'presignedUrls'
   ],
@@ -67,11 +66,6 @@ export const CreateSubmissionUploadResponseSchema: OpenAPIV3.SchemaObject = {
     key: {
       type: 'string',
       description: 'S3 object key where the upload will be stored.'
-    },
-    partSizeBytes: {
-      type: 'integer',
-      minimum: 1,
-      description: 'Size of each multipart upload chunk in bytes.'
     },
     partCount: {
       type: 'integer',

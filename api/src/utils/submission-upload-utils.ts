@@ -1,7 +1,7 @@
 import { CreateMultipartUploadCommand, UploadPartCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getSecurityObjectStoreBucketName, getSecurityS3Client, getSecurityS3ClientPublic } from './file-utils';
-import { MultipartUploadParams, MultipartUploadResult } from './submission-upload-utils.interface';
+import { MultipartLayout, MultipartUploadParams, MultipartUploadResult } from './submission-upload-utils.interface';
 
 const MIN_PART_SIZE = 5 * 1024 * 1024; // 5 MiB
 const MAX_PART_SIZE = 5 * 1024 * 1024 * 1024; // 5 GiB
@@ -12,13 +12,6 @@ const TARGET_PARTS = 10; // Heuristic: prefer ~10 or fewer part uploads
 const MAX_PARTS = 10000;
 const PRESIGNED_URL_BATCH_SIZE = 200;
 const PRESIGNED_URL_EXPIRY_SECONDS = 3600;
-
-type MultipartLayout = {
-  /** Size (bytes) each non-final part should use. */
-  partSizeBytes: number;
-  /** Number of presigned part URLs the client must upload. */
-  partCount: number;
-};
 
 /**
  * Validate and normalize upload byte-size input.
@@ -205,7 +198,6 @@ export async function generateMultipartUploadPresignedUrls(
   return {
     uploadId: UploadId,
     presignedUrls,
-    partSizeBytes,
     partCount
   };
 }

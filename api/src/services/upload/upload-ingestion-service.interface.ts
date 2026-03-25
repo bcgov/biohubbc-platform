@@ -16,7 +16,6 @@ export interface PresignedUploadUrlResponse {
   s3UploadId: string;
   uploadArchiveId: string;
   key: string;
-  partSizeBytes: number;
   partCount: number;
   presignedUrls: PresignedUrl[];
 }
