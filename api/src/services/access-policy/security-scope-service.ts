@@ -101,7 +101,6 @@ export class SecurityScopeService extends DBService {
    * reachability query and guaranteed correct.
    *
    * Synchronous because team_security_scope holds ~30 rows per team at scale.
-   * The old team_feature rebuild moved millions of rows and required an async pg-boss job.
    *
    * @param teamId UUID of the team to rebuild
    */

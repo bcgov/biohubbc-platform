@@ -471,46 +471,6 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Removes the given security rules from the given set of submission feature ids. If
-   * no security rules ID is provided, all security rules will be removed for the given set
-   * of submission features.
-   *
-   * After removal, deletes scope anchors for features that are fully unsecured (no remaining
-   * rules). Features still secured by other rules keep their anchors to avoid a coverage gap.
-   *
-   * @param {number[]} submissionFeatureIds
-   * @param {number[]} [removeRuleIds]
-   *
-   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
-   * @memberof SecurityService
-   */
-  async removeSecurityRulesFromSubmissionFeatures(
-    submissionFeatureIds: number[],
-    removeRuleIds?: number[]
-  ): Promise<SubmissionFeatureSecurityRecord[]> {
-    if (!submissionFeatureIds.length) {
-      return [];
-    }
-
-    if (!removeRuleIds) {
-      // Removing ALL rules — every feature is fully unsecured, delete all their anchors
-      const result = await this.securityRepository.removeAllSecurityRulesFromSubmissionFeatures(submissionFeatureIds);
-      await this.securityScopeService.deleteAnchorsForFeatures(submissionFeatureIds);
-      return result;
-    }
-
-    // Removing specific rules — some features may still be secured by other rules
-    const result = await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(
-      submissionFeatureIds,
-      removeRuleIds
-    );
-
-    await this.deleteAnchorsForFullyUnsecuredFeatures(submissionFeatureIds);
-
-    return result;
-  }
-
-  /**
    * Gets Submission Feature Security Records for a given set of submission feature ids
    *
    * @param {number[]} submissionFeatureIds
