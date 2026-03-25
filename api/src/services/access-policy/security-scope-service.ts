@@ -144,15 +144,25 @@ export class SecurityScopeService extends DBService {
   }
 
   /**
-   * Compute anchor features for a security scope.
+   * Compute anchor features for a security scope via delete-stale + insert-only rebuild.
    *
-   * Anchors are the root-level secured features whose URN matches the scope's
-   * originating policy statement. Called by the compute-scope-anchors background
-   * job after a new scope is created.
+   * Two repository calls in sequence — the service decides the strategy, the
+   * repository does individual operations:
+   * 1. Remove anchors whose features no longer meet candidate criteria (unsecured,
+   *    unapproved, soft-deleted, or URN mismatch)
+   * 2. Insert-only rebuild adds new anchors — ON CONFLICT DO NOTHING skips features
+   *    that are already anchored
+   *
+   * Valid anchors are never deleted, so there is no transient gap where the walk-up
+   * search strategy can't find a matching anchor.
+   *
+   * Called by the compute-scope-anchors background job after scope creation or
+   * when security rules change on a submission's features.
    *
    * @param securityScopeId UUID of the security scope to compute anchors for
    */
   async computeAnchorsForScope(securityScopeId: string): Promise<void> {
+    await this.securityScopeRepository.deleteStaleAnchorsForScope(securityScopeId);
     await this.securityScopeRepository.computeAnchorsForScope(securityScopeId);
   }
 

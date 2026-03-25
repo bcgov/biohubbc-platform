@@ -117,7 +117,9 @@ describe('SecurityScopeService', () => {
     });
 
     it('deletes mappings but skips rebuild when no affected teams', async () => {
-      sinon.stub(SecurityScopeRepository.prototype, 'findScopeIdsForStatements').resolves([{ security_scope_id: 'scope-1' }]);
+      sinon
+        .stub(SecurityScopeRepository.prototype, 'findScopeIdsForStatements')
+        .resolves([{ security_scope_id: 'scope-1' }]);
       const deleteStub = sinon.stub(SecurityScopeRepository.prototype, 'deletePolicyStatementScopes').resolves();
       sinon.stub(SecurityScopeRepository.prototype, 'deleteTeamSecurityScopes').resolves();
       sinon.stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesFromPolicyChain').resolves();
@@ -198,12 +200,15 @@ describe('SecurityScopeService', () => {
   });
 
   describe('computeAnchorsForScope', () => {
-    it('delegates to repository', async () => {
-      const stub = sinon.stub(SecurityScopeRepository.prototype, 'computeAnchorsForScope').resolves();
+    it('calls deleteStaleAnchorsForScope then computeAnchorsForScope on the repository in order', async () => {
+      const deleteStub = sinon.stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorsForScope').resolves();
+      const computeStub = sinon.stub(SecurityScopeRepository.prototype, 'computeAnchorsForScope').resolves();
 
       await service.computeAnchorsForScope('scope-1');
 
-      expect(stub).to.have.been.calledOnceWith('scope-1');
+      expect(deleteStub).to.have.been.calledOnceWith('scope-1');
+      expect(computeStub).to.have.been.calledOnceWith('scope-1');
+      expect(deleteStub).to.have.been.calledBefore(computeStub);
     });
   });
 

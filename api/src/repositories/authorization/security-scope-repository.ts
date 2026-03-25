@@ -113,9 +113,59 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
-   * Compute anchor features for a security scope using cursor-based batching.
+   * Delete stale anchors for a security scope — anchors whose features no longer
+   * meet candidate criteria.
    *
-   * Anchors are the root-level secured features whose URN matches the scope's
+   * An anchor becomes stale when its feature is unsecured (lost all security rules),
+   * unapproved (upload status changed), soft-deleted, or its URN no longer matches
+   * the scope's policy statement. This is the inverse of the candidate criteria used
+   * by `computeAnchorsForScope` — any feature that wouldn't be selected as a new
+   * candidate should not remain as an existing anchor.
+   *
+   * Called before `computeAnchorsForScope` so valid anchors are never deleted —
+   * no transient search gap where the walk-up strategy can't find a matching anchor.
+   *
+   * @param securityScopeId UUID of the security scope to clean stale anchors for
+   */
+  async deleteStaleAnchorsForScope(securityScopeId: string): Promise<void> {
+    await this.connection.query(
+      `DELETE FROM security_scope_anchor ssa
+       USING policy_statement_scope pss
+       JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
+       WHERE ssa.security_scope_id = $1
+         AND pss.security_scope_id = $1
+         AND ps.record_end_date IS NULL
+         AND NOT EXISTS (
+           -- Feature must still be a valid candidate: active, secured, approved, URN-matching.
+           -- This is the inverse of the candidate criteria in computeAnchorsForScope —
+           -- if ANY of these conditions fail, the anchor is stale.
+           SELECT 1
+           FROM submission_feature sf
+           JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+           WHERE sf.submission_feature_id = ssa.anchor_submission_feature_id
+             AND sf.record_end_date IS NULL
+             AND (ps.urn_submission_id = sf.submission_id::text OR ps.urn_submission_id = '*')
+             AND (ps.urn_feature_type = ft.name                OR ps.urn_feature_type = '*')
+             AND (ps.urn_feature_id = sf.submission_feature_id::text OR ps.urn_feature_id = '*')
+             AND EXISTS (
+               SELECT 1 FROM submission_feature_security sfs
+               WHERE sfs.submission_feature_id = sf.submission_feature_id
+                 AND sfs.record_end_date IS NULL
+             )
+             AND EXISTS (
+               SELECT 1 FROM submission_upload_status sus
+               WHERE sus.submission_upload_id = sf.submission_upload_id
+                 AND sus.status = 'approved'
+             )
+         )`,
+      [securityScopeId]
+    );
+  }
+
+  /**
+   * Compute anchor features for a security scope using keyset-paginated batching.
+   *
+   * Anchors are the topmost secured features whose URN matches the scope's
    * originating policy statement. A `urn:*:telemetry:*` scope anchors at ~200
    * dataset roots that expand to 10M telemetry features. The expansion never
    * happens — the walk-up search strategy checks from the candidate up to the
@@ -124,104 +174,141 @@ export class SecurityScopeRepository extends BaseRepository {
    * Only features from approved uploads are eligible — features still under
    * review (status = 'submitted') must not affect security scope anchors.
    *
-   * Only the topmost candidates — features with no ancestor that is also a
-   * candidate for the same scope — are anchors. A narrowed URN like
-   * `urn:10:*:55` won't be excluded by a secured ancestor of a different type
-   * that isn't a candidate for this scope. For wildcard scopes (`urn:*:*:*`)
-   * all secured features are candidates, so the behavior collapses to "no
-   * secured ancestor." Uses a recursive CTE to walk the full parent chain —
-   * submission_feature trees can be arbitrarily deep.
+   * **Why keyset instead of CTE + cursor:** The previous implementation used a
+   * monolithic recursive CTE wrapped in a server-side cursor. The cursor bounded
+   * the INSERT side (5K rows per FETCH), but the CTE materialized the entire
+   * candidate set + ancestor walk in work_mem *before* the cursor started
+   * iterating. For `*:*:*` at production scale (10M candidates x ~5 depth =
+   * ~50M ancestor rows), this is a memory bomb in OpenShift pods with cgroup
+   * limits. Keyset pagination bounds memory per batch at the cost of repeated
+   * index probes — trading time for OOM safety, acceptable for a background job.
    *
-   * Uses a server-side cursor to avoid materializing the full result set in
-   * memory. Wildcard scopes (`urn:*:*:*`) can match millions of secured features;
-   * batching prevents memory/WAL/lock pressure from a single massive INSERT.
-   * Each batch inserts via `unnest` (two parameters regardless of batch size)
-   * rather than a multi-row VALUES clause.
+   * **Why re-evaluate candidate criteria per ancestor instead of referencing a
+   * materialized candidate set:** Each batch's `has_candidate_ancestor` CTE checks
+   * ancestor candidacy via index lookups against the base tables, rather than
+   * joining to a materialized candidate set. This keeps memory bounded per batch.
+   * The cost is repeated index probes across batches.
+   *
+   * Insert-only with ON CONFLICT DO NOTHING — called after `deleteStaleAnchorsForScope`
+   * removes invalid anchors, so existing valid anchors are simply skipped.
    *
    * @param securityScopeId UUID of the security scope to compute anchors for
    */
   async computeAnchorsForScope(securityScopeId: string): Promise<void> {
     const BATCH_SIZE = 5000;
-    const cursorName = `scope_anchor_cursor_${securityScopeId.replace(/[^a-z0-9_]/gi, '_')}`;
 
-    // Declare a server-side cursor over matching root-level secured features.
-    await this.connection.query(
-      `DECLARE ${cursorName} CURSOR FOR
-      -- LIMIT 1 without ORDER BY is safe: scope_hash = SHA-256(urn), so all
-      -- policy statements sharing a scope have identical URN components.
-      WITH RECURSIVE scope_urn AS (
-        SELECT ps.urn_submission_id, ps.urn_feature_type, ps.urn_feature_id
-        FROM policy_statement_scope pss
-        JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
-        WHERE pss.security_scope_id = $1
-          AND ps.record_end_date IS NULL
-        LIMIT 1
-      ),
-      -- Candidates: secured features whose URN matches this scope
-      candidates AS (
-        SELECT sf.submission_feature_id,
-               sf.parent_submission_feature_id
-        FROM submission_feature sf
-        JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-        CROSS JOIN scope_urn su
-        WHERE sf.record_end_date IS NULL
-          AND (su.urn_submission_id = sf.submission_id::text OR su.urn_submission_id = '*')
-          AND (su.urn_feature_type = ft.name OR su.urn_feature_type = '*')
-          AND (su.urn_feature_id = sf.submission_feature_id::text OR su.urn_feature_id = '*')
-          AND EXISTS (
-            SELECT 1 FROM submission_feature_security sfs
-            WHERE sfs.submission_feature_id = sf.submission_feature_id
-              AND sfs.record_end_date IS NULL
-          )
-          AND EXISTS (
-            SELECT 1 FROM submission_upload_status sus
-            WHERE sus.submission_upload_id = sf.submission_upload_id
-              AND sus.status = 'approved'
-          )
-      ),
-      -- Walk from each candidate up to the root, collecting ancestor IDs
-      ancestor_walk AS (
-        SELECT c.submission_feature_id AS candidate_id,
-               c.parent_submission_feature_id AS ancestor_id
-        FROM candidates c
-        WHERE c.parent_submission_feature_id IS NOT NULL
-
-        UNION ALL
-
-        SELECT aw.candidate_id,
-               sf.parent_submission_feature_id
-        FROM ancestor_walk aw
-        JOIN submission_feature sf ON sf.submission_feature_id = aw.ancestor_id
-        WHERE sf.parent_submission_feature_id IS NOT NULL
-          AND sf.record_end_date IS NULL
-      ),
-      -- Candidates where an ancestor is also a candidate for this same scope
-      has_candidate_ancestor AS (
-        SELECT DISTINCT aw.candidate_id
-        FROM ancestor_walk aw
-        WHERE aw.ancestor_id IN (SELECT submission_feature_id FROM candidates)
-      )
-      SELECT c.submission_feature_id
-      FROM candidates c
-      WHERE NOT EXISTS (
-        SELECT 1 FROM has_candidate_ancestor hca
-        WHERE hca.candidate_id = c.submission_feature_id
-      )`,
+    // Resolve the URN pattern once. LIMIT 1 without ORDER BY is safe: scope_hash
+    // = SHA-256(urn), so all policy statements sharing a scope have identical URN components.
+    const urnResult = await this.connection.query<{
+      urn_submission_id: string;
+      urn_feature_type: string;
+      urn_feature_id: string;
+    }>(
+      `SELECT ps.urn_submission_id, ps.urn_feature_type, ps.urn_feature_id
+       FROM policy_statement_scope pss
+       JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
+       WHERE pss.security_scope_id = $1
+         AND ps.record_end_date IS NULL
+       LIMIT 1`,
       [securityScopeId]
     );
 
-    try {
-      // Fetch and insert in batches to bound memory and WAL usage
-      while (true) {
-        const fetchResult = await this.connection.query<{ submission_feature_id: number }>(
-          `FETCH ${BATCH_SIZE} FROM ${cursorName}`
-        );
+    if (urnResult.rows.length === 0) {
+      return;
+    }
 
-        if (fetchResult.rows.length === 0) {
-          break;
-        }
+    const { urn_submission_id, urn_feature_type, urn_feature_id } = urnResult.rows[0];
 
-        const featureIds = fetchResult.rows.map((row) => row.submission_feature_id);
+    // Keyset-paginate candidates. Each batch materializes at most BATCH_SIZE
+    // candidates + their ancestor walks (~25K rows at depth 5). This replaces
+    // the monolithic CTE that materialized ALL candidates in work_mem.
+    let lastId = 0;
+
+    while (true) {
+      const result = await this.connection.query<{
+        submission_feature_id: number;
+        page_last_id: number;
+      }>(
+        `WITH RECURSIVE
+         batch AS (
+           SELECT sf.submission_feature_id,
+                  sf.parent_submission_feature_id
+           FROM submission_feature sf
+           JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+           WHERE sf.record_end_date IS NULL
+             AND sf.submission_feature_id > $2
+             AND ($3 = sf.submission_id::text OR $3 = '*')
+             AND ($4 = ft.name                OR $4 = '*')
+             AND ($5 = sf.submission_feature_id::text OR $5 = '*')
+             AND EXISTS (
+               SELECT 1 FROM submission_feature_security sfs
+               WHERE sfs.submission_feature_id = sf.submission_feature_id
+                 AND sfs.record_end_date IS NULL
+             )
+             AND EXISTS (
+               SELECT 1 FROM submission_upload_status sus
+               WHERE sus.submission_upload_id = sf.submission_upload_id
+                 AND sus.status = 'approved'
+             )
+           ORDER BY sf.submission_feature_id
+           LIMIT $6
+         ),
+
+         ancestor_walk AS (
+           SELECT b.submission_feature_id AS candidate_id,
+                  b.parent_submission_feature_id AS ancestor_id
+           FROM batch b
+           WHERE b.parent_submission_feature_id IS NOT NULL
+
+           UNION ALL
+
+           SELECT aw.candidate_id,
+                  sf.parent_submission_feature_id
+           FROM ancestor_walk aw
+           JOIN submission_feature sf ON sf.submission_feature_id = aw.ancestor_id
+           WHERE sf.parent_submission_feature_id IS NOT NULL
+             AND sf.record_end_date IS NULL
+         ),
+
+         -- Re-evaluate candidate criteria per ancestor via index lookups.
+         -- Trades repeated index probes for bounded memory — acceptable for a bg job.
+         has_candidate_ancestor AS (
+           SELECT DISTINCT aw.candidate_id
+           FROM ancestor_walk aw
+           JOIN submission_feature sf ON sf.submission_feature_id = aw.ancestor_id
+           JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+           WHERE sf.record_end_date IS NULL
+             AND ($3 = sf.submission_id::text OR $3 = '*')
+             AND ($4 = ft.name               OR $4 = '*')
+             AND ($5 = sf.submission_feature_id::text OR $5 = '*')
+             AND EXISTS (
+               SELECT 1 FROM submission_feature_security sfs
+               WHERE sfs.submission_feature_id = sf.submission_feature_id
+                 AND sfs.record_end_date IS NULL
+             )
+             AND EXISTS (
+               SELECT 1 FROM submission_upload_status sus
+               WHERE sus.submission_upload_id = sf.submission_upload_id
+                 AND sus.status = 'approved'
+             )
+         )
+
+         -- Prune to topmost candidates only (anchors). A candidate with a candidate
+         -- ancestor is not a root — it's reachable via the walk-up search from the
+         -- ancestor anchor, so storing it would be redundant. page_last_id is the MAX
+         -- of the full pre-pruning batch so the keyset advances past the entire page.
+         SELECT b.submission_feature_id,
+                (SELECT MAX(submission_feature_id) FROM batch) AS page_last_id
+         FROM batch b
+         WHERE NOT EXISTS (
+           SELECT 1 FROM has_candidate_ancestor hca
+           WHERE hca.candidate_id = b.submission_feature_id
+         )`,
+        [securityScopeId, lastId, urn_submission_id, urn_feature_type, urn_feature_id, BATCH_SIZE]
+      );
+
+      if (result.rows.length > 0) {
+        const featureIds = result.rows.map((r) => r.submission_feature_id);
 
         await this.connection.query(
           `INSERT INTO security_scope_anchor (security_scope_id, anchor_submission_feature_id)
@@ -230,12 +317,48 @@ export class SecurityScopeRepository extends BaseRepository {
           [securityScopeId, featureIds]
         );
 
-        if (fetchResult.rows.length < BATCH_SIZE) {
+        // Advance keyset using page_last_id from the batch (not the filtered result).
+        // page_last_id = MAX(submission_feature_id) from the batch CTE, so it's the
+        // same value on every result row.
+        lastId = result.rows[0].page_last_id;
+      } else {
+        // All candidates in this batch were pruned (every candidate had a candidate
+        // ancestor). Re-query for just the page boundary to advance the keyset.
+        // This boundary query uses the same candidate criteria as the batch CTE above —
+        // they MUST stay in sync or the keyset will skip/repeat candidates.
+        const boundaryResult = await this.connection.query<{ last_id: number }>(
+          `SELECT MAX(sf.submission_feature_id) AS last_id
+           FROM (
+             SELECT sf.submission_feature_id
+             FROM submission_feature sf
+             JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+             WHERE sf.record_end_date IS NULL
+               AND sf.submission_feature_id > $1
+               AND ($2 = sf.submission_id::text OR $2 = '*')
+               AND ($3 = ft.name               OR $3 = '*')
+               AND ($4 = sf.submission_feature_id::text OR $4 = '*')
+               AND EXISTS (
+                 SELECT 1 FROM submission_feature_security sfs
+                 WHERE sfs.submission_feature_id = sf.submission_feature_id
+                   AND sfs.record_end_date IS NULL
+               )
+               AND EXISTS (
+                 SELECT 1 FROM submission_upload_status sus
+                 WHERE sus.submission_upload_id = sf.submission_upload_id
+                   AND sus.status = 'approved'
+               )
+             ORDER BY sf.submission_feature_id
+             LIMIT $5
+           ) sf`,
+          [lastId, urn_submission_id, urn_feature_type, urn_feature_id, BATCH_SIZE]
+        );
+
+        if (!boundaryResult.rows[0]?.last_id) {
           break;
         }
+
+        lastId = boundaryResult.rows[0].last_id;
       }
-    } finally {
-      await this.connection.query(`CLOSE ${cursorName}`);
     }
   }
 
