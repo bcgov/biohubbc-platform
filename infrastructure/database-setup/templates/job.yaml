@@ -89,6 +89,8 @@ spec:
               value: {{ .Values.environment.name }}-{{ .Chart.AppVersion }}-{{ .Values.environment.changeId }}
             - name: DB_SCHEMA
               value: {{ .Values.app.dbSchema }}
+            - name: KEYCLOAK_CLIENT_ID
+              value: {{ .Values.app.keycloak.clientId }}
           image: "{{ .Values.image.registry }}/{{ .Values.image.image }}:{{ include "app.imageTag" . }}"
           imagePullPolicy: Always
           {{- if .Values.app.database.useCrunchy }}

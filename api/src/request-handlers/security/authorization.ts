@@ -62,9 +62,10 @@ export const authorizeRequest = async (req: Request): Promise<boolean> => {
       keycloakToken: req.keycloak_token
     });
 
-    const isAuthorized =
-      (await authorizationService.authorizeSystemAdministrator()) ||
-      (await authorizationService.executeAuthorizationScheme(authorizationScheme));
+    // Execute both auth pathways because `authorizationService.executeAuthorizationScheme` has side effects that mutate the `req`, which may be required by endpoints
+    const isSystemAdministrator = await authorizationService.authorizeSystemAdministrator();
+    const isSchemeAuthorized = await authorizationService.executeAuthorizationScheme(authorizationScheme);
+    const isAuthorized = isSystemAdministrator || isSchemeAuthorized;
 
     // Add the system_user to the request for future use, if needed
     req.system_user = authorizationService.systemUser;

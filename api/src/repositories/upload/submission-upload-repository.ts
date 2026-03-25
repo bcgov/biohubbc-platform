@@ -25,6 +25,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_upload_id,
         submission_id,
         upload_id,
+        status,
         ticket_id
       FROM
         submission_upload
@@ -71,6 +72,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         su.submission_upload_id,
         su.submission_id,
         su.upload_id,
+        su.status,
         su.ticket_id,
         su.record_end_date
       FROM
@@ -120,6 +122,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         'submission_upload.submission_upload_id',
         'submission_upload.submission_id',
         'submission_upload.upload_id',
+        'submission_upload.status',
         'submission_upload.ticket_id'
       )
       .from('submission_upload')
@@ -232,6 +235,7 @@ export class SubmissionUploadRepository extends BaseRepository {
       SET
         submission_id = COALESCE(${submissionUpload.submission_id}, submission_id),
         upload_id = COALESCE(${submissionUpload.upload_id}, upload_id),
+        status = COALESCE(${submissionUpload.status}, status),
         ticket_id = COALESCE(${submissionUpload.ticket_id}, ticket_id)
       WHERE
         submission_upload_id = ${submissionUploadId}
@@ -264,6 +268,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         submission_upload_id,
         submission_id,
         upload_id,
+        status,
         ticket_id
       FROM
         submission_upload
@@ -335,21 +340,23 @@ export class SubmissionUploadRepository extends BaseRepository {
   }
 
   /**
-   * Hard-delete a submission_upload record by ID.
+   * Soft-delete a single active submission_upload record by ID.
    *
-   * @param {string} submissionUploadId - The ID of the submission_upload record to delete.
-   * @throws {ApiExecuteSQLError} - If the deletion fails.
+   * @param {string} submissionUploadId - The ID of the submission_upload record to soft-delete.
+   * @throws {ApiExecuteSQLError} - If the soft-delete fails.
    */
   async deleteSubmissionUpload(submissionUploadId: string): Promise<void> {
     const sqlStatement = SQL`
-      DELETE FROM submission_upload
-      WHERE submission_upload_id = ${submissionUploadId};
+      UPDATE submission_upload
+      SET record_end_date = NOW()
+      WHERE submission_upload_id = ${submissionUploadId}
+        AND record_end_date IS NULL;
     `;
 
     const response = await this.connection.sql(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to delete submission_upload record', [
+      throw new ApiExecuteSQLError('Failed to soft-delete submission_upload record', [
         'SubmissionUploadRepository->deleteSubmissionUpload',
         `rowCount was ${response.rowCount}, expected 1`
       ]);

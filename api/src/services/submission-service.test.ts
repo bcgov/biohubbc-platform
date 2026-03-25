@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../errors/api-error';
-import { IngestionRepository } from '../repositories/ingestion/ingestion-repository';
+import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
 import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
   ISubmissionFeature,
@@ -103,7 +103,7 @@ describe('SubmissionService', () => {
       const parentSubmissionFeatureId = 2;
 
       const insertSubmissionFeatureRecordStub = sinon
-        .stub(IngestionRepository.prototype, 'insertSubmissionFeatureRecord')
+        .stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecord')
         .resolves({ submission_feature_id: parentSubmissionFeatureId });
 
       const submissionFeatures: ISubmissionFeature[] = [
@@ -207,33 +207,35 @@ describe('SubmissionService', () => {
       expect(response).to.be.undefined;
 
       expect(insertSubmissionFeatureRecordStub.callCount).to.equal(9);
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
-        null,
-        '1-1',
-        'dataset',
-        {
+        submissionUploadId: 'some-uuid',
+        parentSubmissionFeatureId: null,
+        featureSourceId: '1-1',
+        featureTypeName: 'dataset',
+        featureProperties: {
           name: 'Dataset1'
-        }
-      );
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        },
+        dataByteSizeBytes: 0
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
+        submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId,
-        '2-1',
-        'sample_site',
-        {
+        featureSourceId: '2-1',
+        featureTypeName: 'sample_site',
+        featureProperties: {
           name: 'SampleSite1'
-        }
-      );
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        },
+        dataByteSizeBytes: 0
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
+        submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId,
-        '3-1',
-        'observation',
-        {
+        featureSourceId: '3-1',
+        featureTypeName: 'observation',
+        featureProperties: {
           count: 11,
           geometry: {
             type: 'Feature',
@@ -243,72 +245,79 @@ describe('SubmissionService', () => {
               type: 'Point'
             }
           }
-        }
-      );
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        },
+        dataByteSizeBytes: 0
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
+        submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId,
-        '3-2',
-        'observation',
-        {
+        featureSourceId: '3-2',
+        featureTypeName: 'observation',
+        featureProperties: {
           count: 12
-        }
-      );
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        },
+        dataByteSizeBytes: 0
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
+        submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId,
-        '2-2',
-        'sample_site',
-        {
+        featureSourceId: '2-2',
+        featureTypeName: 'sample_site',
+        featureProperties: {
           name: 'SampleSite2',
           dateRange: {
             start_date: '2024-01-01',
             end_date: '2024-02-01'
           }
-        }
-      );
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        },
+        dataByteSizeBytes: 0
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
+        submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId,
-        '3-3',
-        'observation',
-        {
+        featureSourceId: '3-3',
+        featureTypeName: 'observation',
+        featureProperties: {
           count: 13
-        }
-      );
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        },
+        dataByteSizeBytes: 0
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
+        submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId,
-        '3-4',
-        'observation',
-        {
+        featureSourceId: '3-4',
+        featureTypeName: 'observation',
+        featureProperties: {
           count: 14
-        }
-      );
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        },
+        dataByteSizeBytes: 0
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
+        submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId,
-        '2-3',
-        'artifact',
-        {
+        featureSourceId: '2-3',
+        featureTypeName: 'artifact',
+        featureProperties: {
           filename: 'Artifact1.txt'
-        }
-      );
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        },
+        dataByteSizeBytes: 0
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith({
         submissionId,
-        'some-uuid',
+        submissionUploadId: 'some-uuid',
         parentSubmissionFeatureId,
-        '2-4',
-        'artifact',
-        {
+        featureSourceId: '2-4',
+        featureTypeName: 'artifact',
+        featureProperties: {
           filename: 'Artifact2.txt'
-        }
-      );
+        },
+        dataByteSizeBytes: 0
+      });
     });
   });
 

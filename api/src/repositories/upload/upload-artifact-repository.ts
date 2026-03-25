@@ -1,4 +1,5 @@
 import { SQL } from 'sql-template-strings';
+import z from 'zod';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CreateUploadArtifact, UpdateUploadArtifact, UploadArtifact } from '../../models/upload-artifact';
 import { BaseRepository } from '../base-repository';
@@ -19,7 +20,8 @@ export class UploadArtifactRepository extends BaseRepository {
         upload_id,
         artifact_id,
         role,
-        upload_archive_id
+        upload_archive_id,
+        path
       FROM
         upload_artifact
       WHERE
@@ -57,7 +59,8 @@ export class UploadArtifactRepository extends BaseRepository {
         upload_id,
         artifact_id,
         role,
-        upload_archive_id
+        upload_archive_id,
+        path
       FROM
         upload_artifact;
     `;
@@ -79,12 +82,14 @@ export class UploadArtifactRepository extends BaseRepository {
         upload_id,
         artifact_id,
         role,
-        upload_archive_id
+        upload_archive_id,
+        path
       ) VALUES (
         ${uploadArtifact.upload_id},
         ${uploadArtifact.artifact_id},
         ${uploadArtifact.role},
-        ${uploadArtifact.upload_archive_id}
+        ${uploadArtifact.upload_archive_id},
+        ${uploadArtifact.path ?? null}
       )
       RETURNING upload_artifact_id;
     `;
@@ -99,6 +104,55 @@ export class UploadArtifactRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Insert upload artifact records in bulk.
+   *
+   * @param {CreateUploadArtifact[]} uploadArtifacts
+   * @returns {Promise<{ upload_artifact_id: string }[]>}
+   * @throws {ApiExecuteSQLError}
+   */
+  async insertUploadArtifacts(uploadArtifacts: CreateUploadArtifact[]): Promise<{ upload_artifact_id: string }[]> {
+    if (!uploadArtifacts.length) {
+      return [];
+    }
+
+    const uploadIds = uploadArtifacts.map((item) => item.upload_id);
+    const artifactIds = uploadArtifacts.map((item) => item.artifact_id);
+    const roles = uploadArtifacts.map((item) => item.role);
+    const uploadArchiveIds = uploadArtifacts.map((item) => item.upload_archive_id);
+    const paths = uploadArtifacts.map((item) => item.path ?? null);
+
+    const sqlStatement = SQL`
+      INSERT INTO upload_artifact (
+        upload_id,
+        artifact_id,
+        role,
+        upload_archive_id,
+        path
+      )
+      SELECT *
+      FROM UNNEST(
+        ${uploadIds}::uuid[],
+        ${artifactIds}::uuid[],
+        ${roles}::upload_artifact_role[],
+        ${uploadArchiveIds}::uuid[],
+        ${paths}::text[]
+      )
+      RETURNING upload_artifact_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, z.object({ upload_artifact_id: z.string().uuid() }));
+
+    if (response.rowCount !== uploadArtifacts.length) {
+      throw new ApiExecuteSQLError('Failed to insert upload artifact records', [
+        'UploadArtifactRepository->insertUploadArtifacts',
+        `rowCount was ${response.rowCount}, expected ${uploadArtifacts.length}`
+      ]);
+    }
+
+    return response.rows;
   }
 
   /**
@@ -119,7 +173,8 @@ export class UploadArtifactRepository extends BaseRepository {
         upload_id = COALESCE(${uploadArtifact.upload_id}, upload_id),
         artifact_id = COALESCE(${uploadArtifact.artifact_id}, artifact_id),
         role = COALESCE(${uploadArtifact.role}, role),
-        upload_archive_id = COALESCE(${uploadArtifact.upload_archive_id}, upload_archive_id)
+        upload_archive_id = COALESCE(${uploadArtifact.upload_archive_id}, upload_archive_id),
+        path = COALESCE(${uploadArtifact.path ?? null}, path)
       WHERE
         upload_artifact_id = ${uploadArtifactId}
       RETURNING upload_artifact_id;

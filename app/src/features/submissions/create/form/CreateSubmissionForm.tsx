@@ -21,10 +21,10 @@ export const CreateSubmissionForm = () => {
       return;
     }
 
-    const isJson = file.name.toLowerCase().endsWith('.json');
+    const isTar = file.name.toLowerCase().endsWith('.tar');
 
-    if (!isJson) {
-      setFieldError('file', 'Only .json files are supported');
+    if (!isTar) {
+      setFieldError('file', 'Only .tar files are supported');
       return;
     }
 
@@ -54,7 +54,7 @@ export const CreateSubmissionForm = () => {
       <FileUpload
         uploadHandler={uploadHandler}
         dropZoneProps={{
-          acceptedFileExtensions: [AttachmentValidExtensions.JSON]
+          acceptedFileExtensions: [AttachmentValidExtensions.TAR]
         }}
       />
     </Box>

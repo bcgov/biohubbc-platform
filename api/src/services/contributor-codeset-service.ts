@@ -2,8 +2,7 @@ import { IDBConnection } from '../database/db';
 import { ApiConflictError } from '../errors/api-error';
 import { ContributorCodeset, CreateContributorCodeset } from '../models/contributor-codeset';
 import { ContributorCodesetRepository } from '../repositories/contributor-codeset-repository';
-import { makeIdentityKey } from '../utils/contributor-codeset';
-import { ContributorCodesetDefinition, ContributorCodesetIdentity } from './contributor-codeset-service.interface';
+import { hasSameContributorCodeDefinition, makeSlug } from '../utils/contributor-codeset';
 import { DBService } from './db-service';
 
 export class ContributorCodesetService extends DBService {
@@ -36,9 +35,9 @@ export class ContributorCodesetService extends DBService {
    * Create contributor_codeset rows in bulk.
    *
    * Rules:
-   * - identity: (contributor_id, key)
-   * - same identity + same metadata => reuse existing
-   * - same identity + different metadata => conflict
+   * - slug identity: `code::<contributor_id>::<key>`
+   * - same slug + same metadata => reuse existing
+   * - same slug + different metadata => conflict
    *
    * @param {CreateContributorCodeset[]} payloads
    * @return {Promise<ContributorCodeset[]>}
@@ -49,27 +48,52 @@ export class ContributorCodesetService extends DBService {
       return [];
     }
 
-    const normalizedPayloads = payloads.map((payload) => this.normalizeContributorCodesetDefinition(payload));
-    const uniquePayloadsByIdentity = this.assertNoBatchConflicts(normalizedPayloads);
-    const uniquePayloads = Array.from(uniquePayloadsByIdentity.values());
+    const payloadEntries = payloads.map((payload) => ({
+      payload,
+      slug: makeSlug(payload.contributor_id, payload.key)
+    }));
+    const payloadBySlug = new Map(payloadEntries.map((entry) => [entry.slug, entry.payload]));
+    const requestedSlugs = new Set(payloadEntries.map((entry) => entry.slug));
+
+    // Fetch all active rows for the touched contributor codeset identities.
     const existingRows = await this.contributorCodesetRepository.getContributorCodesetsByIdentities(
-      uniquePayloads.map((payload) => this.toIdentity(payload))
+      payloads.map((payload) => ({
+        contributor_id: payload.contributor_id,
+        key: payload.key
+      }))
     );
-    const resolvedByIdentity = this.assertNoDatabaseConflicts(existingRows, uniquePayloadsByIdentity);
+    const existingEntries = existingRows.map((existingRow) => ({
+      existingRow,
+      slug: makeSlug(existingRow.contributor_id, existingRow.key)
+    }));
 
-    const payloadsToInsert = uniquePayloads.filter(
-      (payload) => !resolvedByIdentity.has(this.toContributorCodesetIdentityKey(payload))
-    );
+    // Enforce immutable definitions for slugs that already exist in the database.
+    this.assertNoDatabaseConflicts(existingEntries, payloadBySlug);
+    const existingSlugs = new Set(existingEntries.map((entry) => entry.slug));
 
+    // Keep only payloads that are not already persisted.
+    const payloadsToInsert = payloadEntries
+      .filter((entry) => !existingSlugs.has(entry.slug))
+      .map((entry) => entry.payload);
+
+    // Insert only new slugs. Existing rows are reused.
     const insertedRows = payloadsToInsert.length
       ? await this.contributorCodesetRepository.insertContributorCodesets(payloadsToInsert)
       : [];
 
-    for (const inserted of insertedRows) {
-      resolvedByIdentity.set(this.toContributorCodesetIdentityKey(inserted), inserted);
-    }
+    // Return only rows relevant to requested slugs.
+    const requestedExistingRows = existingEntries
+      .filter((entry) => requestedSlugs.has(entry.slug))
+      .map((entry) => entry.existingRow);
 
-    return this.resolveRowsByIdentity(normalizedPayloads, resolvedByIdentity);
+    const insertedRowsBySlug = new Map(
+      insertedRows.map((insertedRow) => [makeSlug(insertedRow.contributor_id, insertedRow.key), insertedRow])
+    );
+    const deduplicatedInsertedRows = payloadEntries
+      .map((entry) => insertedRowsBySlug.get(entry.slug))
+      .filter((row): row is ContributorCodeset => !!row);
+
+    return [...requestedExistingRows, ...deduplicatedInsertedRows];
   }
 
   /**
@@ -95,140 +119,44 @@ export class ContributorCodesetService extends DBService {
   }
 
   /**
-   * Compare two contributor codeset definitions for semantic equality.
+   * Get contributor_codeset rows by contributor id and codeset keys.
    *
-   * This is used to enforce immutability for an identity by verifying that
-   * repeated submissions with the same `(contributor_id, key)` do not
-   * change `external_id`, `label` or `description`.
+   * @param {number} contributorId
+   * @param {string[]} codesetKeys
+   * @return {Promise<ContributorCodeset[]>}
+   * @memberof ContributorCodesetService
    */
-  private hasSameContributorCodesetDefinition(
-    a: ContributorCodesetDefinition,
-    b: ContributorCodesetDefinition
-  ): boolean {
-    return (
-      a.external_id === b.external_id &&
-      a.label.toLowerCase() === b.label.toLowerCase() &&
-      (a.description?.toLowerCase() ?? null) === (b.description?.toLowerCase() ?? null)
-    );
-  }
-
-  /**
-   * Convert a payload into its identity tuple object.
-   *
-   * Keeping this in one place avoids duplicated identity mapping logic and
-   * ensures repository lookups always use the same identity fields.
-   */
-  private toIdentity(payload: Pick<CreateContributorCodeset, 'contributor_id' | 'key'>): ContributorCodesetIdentity {
-    return {
-      contributor_id: payload.contributor_id,
-      key: payload.key
-    };
-  }
-
-  /**
-   * Validate and deduplicate incoming payloads by identity.
-   *
-   * This catches conflicting definitions within the same batch before any
-   * database calls, which prevents partial work and yields deterministic errors.
-   */
-  private assertNoBatchConflicts(payloads: CreateContributorCodeset[]): Map<string, CreateContributorCodeset> {
-    const byIdentity = new Map<string, CreateContributorCodeset>();
-
-    for (const payload of payloads) {
-      const identityKey = this.toContributorCodesetIdentityKey(payload);
-      const existing = byIdentity.get(identityKey);
-
-      if (existing && !this.hasSameContributorCodesetDefinition(existing, payload)) {
-        throw new ApiConflictError('Contributor codeset definition conflict', [
-          'ContributorCodesetService->createCodesets',
-          `Conflicting definitions in batch for contributor codeset (${payload.contributor_id}, ${payload.key}). If metadata changed, provide a new unique key.`
-        ]);
-      }
-
-      byIdentity.set(identityKey, payload);
-    }
-
-    return byIdentity;
+  getContributorCodesetsByContributorIdAndKeys(
+    contributorId: number,
+    codesetKeys: string[]
+  ): Promise<ContributorCodeset[]> {
+    return this.contributorCodesetRepository.getContributorCodesetsByContributorIdAndKeys(contributorId, codesetKeys);
   }
 
   /**
    * Validate that existing database rows match expected incoming definitions.
    *
-   * If an existing row for an identity has different metadata, this throws a
+   * If an existing row for a slug has different metadata, this throws a
    * conflict to preserve the immutable definition rule.
    */
   private assertNoDatabaseConflicts(
-    existingRows: ContributorCodeset[],
-    expectedByIdentity: Map<string, CreateContributorCodeset>
-  ): Map<string, ContributorCodeset> {
-    const resolved = new Map<string, ContributorCodeset>();
-
-    for (const existing of existingRows) {
-      const identityKey = this.toContributorCodesetIdentityKey(existing);
-      const expected = expectedByIdentity.get(identityKey);
+    existingEntries: Array<{ existingRow: ContributorCodeset; slug: string }>,
+    payloadBySlug: Map<string, CreateContributorCodeset>
+  ): void {
+    for (const existingEntry of existingEntries) {
+      const expected = payloadBySlug.get(existingEntry.slug);
+      const existing = existingEntry.existingRow;
 
       if (!expected) {
         continue;
       }
 
-      if (!this.hasSameContributorCodesetDefinition(existing, expected)) {
+      if (!hasSameContributorCodeDefinition(existing, expected)) {
         throw new ApiConflictError('Contributor codeset definition conflict', [
           'ContributorCodesetService->createCodesets',
           `The contributor codeset (${existing.contributor_id}, ${existing.key}) already exists with different metadata. If metadata changed, provide a new unique key.`
         ]);
       }
-
-      resolved.set(identityKey, existing);
     }
-
-    return resolved;
-  }
-
-  /**
-   * Resolve normalized payloads to persisted rows in original input order.
-   *
-   * Returning rows in request order keeps upstream processing deterministic while
-   * still allowing internal deduplication and bulk operations.
-   */
-  private resolveRowsByIdentity(
-    payloads: CreateContributorCodeset[],
-    resolvedByIdentity: Map<string, ContributorCodeset>
-  ): ContributorCodeset[] {
-    return payloads.map((payload) => {
-      const resolved = resolvedByIdentity.get(this.toContributorCodesetIdentityKey(payload));
-
-      if (!resolved) {
-        throw new ApiConflictError('Contributor codeset definition conflict', [
-          'ContributorCodesetService->createCodesets',
-          `Failed to resolve contributor codeset (${payload.contributor_id}, ${payload.key})`
-        ]);
-      }
-
-      return resolved;
-    });
-  }
-
-  /**
-   * Normalize contributor codeset metadata to canonical lowercase values.
-   *
-   * Canonical normalization ensures deterministic comparisons and storage for
-   * immutable `(contributor_id, key)` definitions.
-   */
-  private normalizeContributorCodesetDefinition(payload: CreateContributorCodeset): CreateContributorCodeset {
-    return {
-      ...payload,
-      label: payload.label.toLowerCase(),
-      description: payload.description?.toLowerCase() ?? null
-    };
-  }
-
-  /**
-   * Build a deterministic identity cache key for contributor codesets.
-   *
-   * Identity-key generation stays in this service so identity semantics remain
-   * local while delegating string composition to a shared util.
-   */
-  private toContributorCodesetIdentityKey(payload: Pick<CreateContributorCodeset, 'contributor_id' | 'key'>): string {
-    return makeIdentityKey(payload.contributor_id, payload.key);
   }
 }
