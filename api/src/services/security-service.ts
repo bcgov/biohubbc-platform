@@ -358,6 +358,31 @@ export class SecurityService extends DBService {
   }
 
   /**
+   * Refreshes security scope anchors after rule mutations on a submission.
+   *
+   * Encapsulates the two-step pattern that follows every rule add/remove:
+   * 1. Features that lost all rules → delete their anchors (they're no longer scope roots)
+   * 2. Features that gained rules → trigger anchor computation so scopes pick them up
+   *
+   * @param {number} submissionId - Submission whose scopes need refreshing
+   * @param {number[]} removedFeatureIds - Feature IDs that had rules removed (may now be unsecured)
+   * @param {boolean} hasAppliedRules - Whether any rules were applied (triggers recomputation)
+   */
+  private async refreshSecurityScopeAnchors(
+    submissionId: number,
+    removedFeatureIds: number[],
+    hasAppliedRules: boolean
+  ): Promise<void> {
+    if (removedFeatureIds.length > 0) {
+      await this.deleteAnchorsForFullyUnsecuredFeatures(removedFeatureIds);
+    }
+
+    if (hasAppliedRules) {
+      await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
+    }
+  }
+
+  /**
    * Patches security rules that are applied or removed to the given set of submission features. If a
    * particular rule happens to belong to both `applyRuleIds` and `removeRuleIds`, it will always be
    * added.
@@ -394,13 +419,7 @@ export class SecurityService extends DBService {
     }
 
     // Update security scope anchors after rule mutations
-    if (removeRuleIds.length > 0) {
-      await this.deleteAnchorsForFullyUnsecuredFeatures(submissionFeatureIds);
-    }
-
-    if (applyRuleIds.length > 0) {
-      await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
-    }
+    await this.refreshSecurityScopeAnchors(submissionId, removeRuleIds.length > 0 ? submissionFeatureIds : [], applyRuleIds.length > 0);
   }
 
   /**
@@ -448,13 +467,7 @@ export class SecurityService extends DBService {
     }
 
     // Update security scope anchors after rule mutations
-    if (removedFeatureIds.length > 0) {
-      await this.deleteAnchorsForFullyUnsecuredFeatures(removedFeatureIds);
-    }
-
-    if (applyRuleIds?.length) {
-      await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
-    }
+    await this.refreshSecurityScopeAnchors(submissionId, removedFeatureIds, !!applyRuleIds?.length);
   }
 
   /**
