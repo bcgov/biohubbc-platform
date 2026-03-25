@@ -1,5 +1,7 @@
 import { AxiosInstance } from 'axios';
-import { ISubmissionFeatureResponse } from 'interfaces/useFeaturesApi.interface';
+import { ISubmissionFeaturePropertiesResponse, ISubmissionFeatureResponse } from 'interfaces/useFeaturesApi.interface';
+import qs from 'qs';
+import { ApiPaginationRequestOptions } from 'types/pagination';
 
 /**
  * Returns a set of supported CRUD api methods submissions.
@@ -25,7 +27,29 @@ export const useFeaturesApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Get paginated submission feature properties by feature id.
+   *
+   * @param {string} submissionId
+   * @param {string} submissionFeatureId
+   * @param {ApiPaginationRequestOptions & { search?: string }} params
+   * @return {Promise<ISubmissionFeaturePropertiesResponse>}
+   */
+  const getSubmissionFeatureProperties = async (
+    submissionId: string,
+    submissionFeatureId: string,
+    params: ApiPaginationRequestOptions & { search?: string }
+  ): Promise<ISubmissionFeaturePropertiesResponse> => {
+    const { data } = await axios.get(`api/submission/${submissionId}/features/${submissionFeatureId}/properties`, {
+      params,
+      paramsSerializer: (queryParams) => qs.stringify(queryParams)
+    });
+
+    return data;
+  };
+
   return {
-    getSubmissionFeatureById
+    getSubmissionFeatureById,
+    getSubmissionFeatureProperties
   };
 };

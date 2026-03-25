@@ -2,7 +2,6 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiGeneralError } from '../errors/api-error';
 import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
 import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
@@ -12,7 +11,6 @@ import {
   SubmissionFeatureDownloadRecord,
   SubmissionFeatureRecord,
   SubmissionFeatureRecordWithTypeAndSecurity,
-  SubmissionFeatureSignedUrlPayload,
   SubmissionRecord,
   SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
@@ -21,7 +19,6 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
-import * as fileUtils from '../utils/file-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionService } from './submission-service';
 
@@ -948,42 +945,6 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('getSubmissionFeatureByUuid', () => {
-    it('finds and returns submission features', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const submissionFeature: SubmissionFeatureRecord = {
-        submission_feature_id: 2,
-        uuid: '234-456-234',
-        urn: 'urn:3:dataset:2',
-        submission_id: 3,
-        feature_type_id: 1,
-        source_id: 'source-id',
-        data: {},
-        parent_submission_feature_id: 1,
-        record_effective_date: '2024-01-01',
-        record_end_date: null,
-        create_date: '2024-01-01',
-        create_user: 3,
-        update_date: null,
-        update_user: null,
-        revision_count: 0
-      };
-
-      const getSubmissionFeatureByUuidStub = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionFeatureByUuid')
-        .resolves(submissionFeature);
-
-      const submissionFeatureUuid = '123-456-789';
-
-      const response = await submissionService.getSubmissionFeatureByUuid(submissionFeatureUuid);
-
-      expect(getSubmissionFeatureByUuidStub).to.be.calledOnceWith(submissionFeatureUuid);
-      expect(response).to.be.eql(submissionFeature);
-    });
-  });
-
   describe('getSubmissionRootFeature', () => {
     it('finds and returns submission features', async () => {
       const mockDBConnection = getMockDBConnection();
@@ -1098,96 +1059,6 @@ describe('SubmissionService', () => {
 
       expect(downloadPublishedSubmissionStub).to.be.calledOnceWith(submissionId);
       expect(response).to.be.eql(mockResponse);
-    });
-  });
-
-  describe('getSubmissionFeatureSignedUrl', () => {
-    const payload: SubmissionFeatureSignedUrlPayload = {
-      isAdmin: true,
-      submissionFeatureId: 1,
-      submissionFeatureObj: { key: 'a', value: 'b' }
-    };
-
-    it('should call admin repository when isAdmin == true', async () => {
-      const mockDBConnection = getMockDBConnection();
-
-      const getAdminSubmissionFeatureSignedUrlStub = sinon
-        .stub(SubmissionRepository.prototype, 'getAdminSubmissionFeatureArtifactKey')
-        .resolves('KEY');
-
-      const getSubmissionFeatureSignedUrlStub = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionFeatureArtifactKey')
-        .resolves('KEY');
-
-      const getS3SignedURLStub = sinon.stub(fileUtils, 'getS3SignedURL').resolves('signed-url');
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      await submissionService.getSubmissionFeatureSignedUrl(payload);
-
-      expect(getAdminSubmissionFeatureSignedUrlStub).to.be.calledOnceWith(payload);
-      expect(getSubmissionFeatureSignedUrlStub).to.not.be.called;
-      expect(getS3SignedURLStub).to.be.calledOnceWith('KEY');
-    });
-
-    it('should call regular user repository when isAdmin == false', async () => {
-      const mockDBConnection = getMockDBConnection();
-
-      const getSubmissionFeatureSignedUrlStub = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionFeatureArtifactKey')
-        .resolves('KEY');
-
-      const getAdminSubmissionFeatureSignedUrlStub = sinon
-        .stub(SubmissionRepository.prototype, 'getAdminSubmissionFeatureArtifactKey')
-        .resolves('KEY');
-
-      const getS3SignedURLStub = sinon.stub(fileUtils, 'getS3SignedURL').resolves('signed-url');
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      await submissionService.getSubmissionFeatureSignedUrl({ ...payload, isAdmin: false });
-
-      expect(getSubmissionFeatureSignedUrlStub).to.be.calledOnceWith({ ...payload, isAdmin: false });
-      expect(getAdminSubmissionFeatureSignedUrlStub).to.not.be.called;
-      expect(getS3SignedURLStub).to.be.calledOnceWith('KEY');
-    });
-
-    it('should return signed url if no error', async () => {
-      const mockDBConnection = getMockDBConnection();
-
-      const getSubmissionFeatureSignedUrlStub = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionFeatureArtifactKey')
-        .resolves('KEY');
-
-      const getS3SignedUrlStub = sinon.stub(fileUtils, 'getS3SignedURL').resolves('S3KEY');
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const response = await submissionService.getSubmissionFeatureSignedUrl({ ...payload, isAdmin: false });
-
-      expect(getS3SignedUrlStub).to.be.calledOnceWith('KEY');
-      expect(getSubmissionFeatureSignedUrlStub).to.be.calledOnceWith({ ...payload, isAdmin: false });
-      expect(response).to.be.eql('S3KEY');
-    });
-
-    it('should throw error if getS3SignedURL fails to generate (null)', async () => {
-      const mockDBConnection = getMockDBConnection();
-
-      const getSubmissionFeatureSignedUrlStub = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionFeatureArtifactKey')
-        .resolves('KEY');
-
-      const getS3SignedUrlStub = sinon.stub(fileUtils, 'getS3SignedURL').resolves(null);
-
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      try {
-        await submissionService.getSubmissionFeatureSignedUrl({ ...payload, isAdmin: false });
-      } catch (err) {
-        expect(getS3SignedUrlStub).to.be.calledOnceWith('KEY');
-        expect(getSubmissionFeatureSignedUrlStub).to.be.calledOnceWith({ ...payload, isAdmin: false });
-        expect((err as ApiGeneralError).message).to.equal(`Failed to generate signed URL for "a":"b"`);
-      }
     });
   });
 });

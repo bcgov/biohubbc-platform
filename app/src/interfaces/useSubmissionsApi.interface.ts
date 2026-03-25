@@ -105,6 +105,11 @@ export interface ISubmissionFeatureForReviewResponse {
   pagination: ApiPaginationResponseParams;
 }
 
+export interface IGetSubmissionsForUserResponse {
+  submissions: SubmissionRecordWithSecurityAndRootFeature[];
+  pagination: ApiPaginationResponseParams;
+}
+
 export interface IGetDownloadSubmissionResponse {
   submission_feature_id: number;
   parent_submission_feature_id: number;

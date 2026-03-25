@@ -4,7 +4,7 @@ import { getDBConnection } from '../../../../../database/db';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
 import { GetSubmissionFeatureSchema } from '../../../../../schemas/submission-feature';
-import { SubmissionService } from '../../../../../services/submission-service';
+import { SubmissionFeatureService } from '../../../../../services/submission-feature-service';
 import { getLogger } from '../../../../../utils/logger';
 
 const defaultLog = getLogger('paths/submission/{submissionId}/features/{submissionFeatureId}');
@@ -82,11 +82,11 @@ export function getSubmissionFeatureById(): RequestHandler {
     try {
       await connection.open();
 
-      const submissionService = new SubmissionService(connection);
+      const submissionFeatureService = new SubmissionFeatureService(connection);
 
       const [feature, relatedFeatures] = await Promise.all([
-        submissionService.getSubmissionFeatureById(submissionFeatureId),
-        submissionService.getRelatedSubmissionFeatures(submissionFeatureId)
+        submissionFeatureService.getSubmissionFeatureById(submissionFeatureId),
+        submissionFeatureService.getRelatedSubmissionFeatures(submissionFeatureId)
       ]);
 
       await connection.commit();

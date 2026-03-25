@@ -8,6 +8,7 @@ import { grey } from '@mui/material/colors';
 import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { SECURITY_LABEL } from 'constants/security';
 import dayjs from 'dayjs';
 import { SubmissionRecordWithSecurityAndRootFeature } from 'interfaces/useSubmissionsApi.interface';
 import { Link as RouterLink } from 'react-router-dom';
@@ -19,10 +20,18 @@ const SECURITY_LABEL: Record<string, string> = {
   UNSECURED: 'Published'
 };
 
+const RESPONSIVE_ROW_DIRECTION = { xs: 'column', sm: 'row' } as const;
+
 export interface PortalSubmissionCardProps {
   submission: SubmissionRecordWithSecurityAndRootFeature;
 }
 
+/**
+ * Summary card for a portal submission with metadata and detail navigation.
+ *
+ * @param {PortalSubmissionCardProps} props - Component props.
+ * @returns {JSX.Element}
+ */
 export const PortalSubmissionCard = ({ submission }: PortalSubmissionCardProps) => {
   const sortedRegions = submission.regions.toSorted((a, b) => a.localeCompare(b));
 
@@ -86,13 +95,13 @@ export const PortalSubmissionCard = ({ submission }: PortalSubmissionCardProps) 
         }}>
         <Stack
           width="100%"
-          flexDirection={{ xs: 'column', sm: 'row' }}
+          flexDirection={RESPONSIVE_ROW_DIRECTION}
           flexWrap="wrap"
           gap={1}
           justifyContent="space-between">
           <Stack
             flex="1 1 auto"
-            flexDirection={{ xs: 'column', sm: 'row' }}
+            flexDirection={RESPONSIVE_ROW_DIRECTION}
             gap={{ xs: 0, sm: 1 }}
             my={1}
             component="dl"
@@ -122,7 +131,7 @@ export const PortalSubmissionCard = ({ submission }: PortalSubmissionCardProps) 
             <Button
               component={RouterLink}
               variant="contained"
-              to={`/`}
+              to={`/portal/submission/${submission.submission_id}`}
               sx={{
                 flex: '0 0 auto',
                 minWidth: '7rem'

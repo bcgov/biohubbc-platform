@@ -7,6 +7,7 @@ import sinonChai from 'sinon-chai';
 import { ApiExecuteSQLError, ApiGeneralError, ApiNotFoundError } from '../errors/api-error';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
+import { SubmissionFeatureRepository } from './submission-feature-repository';
 import {
   ISourceTransformModel,
   ISpatialComponentCount,
@@ -1153,9 +1154,9 @@ describe('SubmissionRepository', () => {
 
       const submissionUuid = '123-456-789';
 
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
+      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
 
-      const response = await submissionRepository.getSubmissionFeatureByUuid(submissionUuid);
+      const response = await submissionFeatureRepository.getSubmissionFeatureByUuid(submissionUuid);
 
       expect(response).to.eql(submissionFeatureRecord);
     });
@@ -1385,10 +1386,10 @@ describe('SubmissionRepository', () => {
 
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
 
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
+      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
 
       try {
-        await submissionRepository.getAdminSubmissionFeatureArtifactKey({
+        await submissionFeatureRepository.getAdminSubmissionFeatureArtifactKey({
           isAdmin: true,
           submissionFeatureId: 0,
           submissionFeatureObj: { key: 'a', value: 'b' }
@@ -1404,10 +1405,10 @@ describe('SubmissionRepository', () => {
 
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
 
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
+      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
 
       try {
-        await submissionRepository.getAdminSubmissionFeatureArtifactKey({
+        await submissionFeatureRepository.getAdminSubmissionFeatureArtifactKey({
           isAdmin: true,
           submissionFeatureId: 0,
           submissionFeatureObj: { key: 'a', value: 'b' }
@@ -1427,9 +1428,9 @@ describe('SubmissionRepository', () => {
 
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
 
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
+      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
 
-      const response = await submissionRepository.getAdminSubmissionFeatureArtifactKey({
+      const response = await submissionFeatureRepository.getAdminSubmissionFeatureArtifactKey({
         isAdmin: true,
         submissionFeatureId: 0,
         submissionFeatureObj: { key: 'a', value: 'b' }
@@ -1449,10 +1450,10 @@ describe('SubmissionRepository', () => {
 
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
 
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
+      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
 
       try {
-        await submissionRepository.getSubmissionFeatureArtifactKey({
+        await submissionFeatureRepository.getSubmissionFeatureArtifactKey({
           isAdmin: false,
           submissionFeatureId: 0,
           submissionFeatureObj: { key: 'a', value: 'b' }
@@ -1468,10 +1469,10 @@ describe('SubmissionRepository', () => {
 
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
 
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
+      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
 
       try {
-        await submissionRepository.getSubmissionFeatureArtifactKey({
+        await submissionFeatureRepository.getSubmissionFeatureArtifactKey({
           isAdmin: false,
           submissionFeatureId: 0,
           submissionFeatureObj: { key: 'a', value: 'b' }
@@ -1491,9 +1492,9 @@ describe('SubmissionRepository', () => {
 
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
 
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
+      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
 
-      const response = await submissionRepository.getSubmissionFeatureArtifactKey({
+      const response = await submissionFeatureRepository.getSubmissionFeatureArtifactKey({
         isAdmin: false,
         submissionFeatureId: 0,
         submissionFeatureObj: { key: 'a', value: 'b' }
@@ -1764,9 +1765,9 @@ describe('SubmissionRepository', () => {
 
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
+      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
 
-      const result = await submissionRepository.getRelatedSubmissionFeatureIds(1);
+      const result = await submissionFeatureRepository.getRelatedSubmissionFeatureIds(1);
 
       expect(result.sourceIds).to.deep.equal([10]);
       expect(result.targetIds).to.deep.equal([2, 3]);

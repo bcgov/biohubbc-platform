@@ -1,24 +1,13 @@
-import { mdiCheck, mdiLock, mdiPlus } from '@mdi/js';
+import { mdiCheck, mdiPlus } from '@mdi/js';
 import Icon from '@mdi/react';
-import Box from '@mui/material/Box';
-import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
-import Container from '@mui/material/Container';
-import Link from '@mui/material/Link';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
-import { PageHeader } from 'components/header/PageHeader';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useCartContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { useEffect, useMemo, useState } from 'react';
-import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { SkeletonTable } from 'components/loading/SkeletonLoaders';
-import { SubmissionFeatureProperties } from './components/SubmissionFeatureProperties';
-import { SubmissionFeatureRelated } from './components/SubmissionFeatureRelated';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { SubmissionFeatureDetailContent } from './components/SubmissionFeatureDetailContent';
 
 export const SubmissionFeaturePage = () => {
   const navigate = useNavigate();
@@ -97,61 +86,24 @@ export const SubmissionFeaturePage = () => {
   };
 
   return (
-    <Box>
-      <LoadingGuard
-        isLoading={isLoading}
-        isLoadingFallback={<SkeletonTable numberOfLines={6} />}
-        hasNoData={!feature}
-        hasNoDataFallback={
-          <Box display="flex" justifyContent="center" alignItems="center" minHeight={300} p={2}>
-            <Typography color="text.secondary">No data available</Typography>
-          </Box>
-        }>
-        <PageHeader
-          buttons={
-            <Button
-              variant={isInCart ? 'outlined' : 'contained'}
-              startIcon={<Icon path={isInCart ? mdiCheck : mdiPlus} size={0.875} />}
-              onClick={handleCartToggle}>
-              {isInCart ? 'In Cart' : 'Add to Cart'}
-            </Button>
-          }
-          breadcrumbs={
-            <Breadcrumbs aria-label="breadcrumb">
-              <Link component={RouterLink} to={`/search/list${location.search}`} underline="hover" color="inherit">
-                Search
-              </Link>
-              <Link
-                component={RouterLink}
-                to={`/submission/${feature?.submission_id}${location.search}`}
-                underline="hover"
-                color="inherit">
-                {feature?.submission_name}
-              </Link>
-              <Typography color="text.primary">{feature?.feature_type_display_name}</Typography>
-            </Breadcrumbs>
-          }
-          label={
-            <Box display="flex" alignItems="center" gap={1.5}>
-              <Typography variant="h1" sx={{ ml: '-2px' }}>
-                {feature?.feature_type_display_name}
-              </Typography>
-            </Box>
-          }
-          subheader={
-            <Box display="flex" gap={1}>
-              <Chip label={feature?.feature_type_name} size="small" />
-              {feature?.secured && <Chip icon={<Icon path={mdiLock} size={0.625} />} label="Secured" size="small" />}
-            </Box>
-          }
-        />
-        <Container maxWidth="xl">
-          <Stack spacing={3} py={4}>
-            <SubmissionFeatureProperties data={feature?.data ?? {}} />
-            <SubmissionFeatureRelated submissionId={submissionId} relatedFeatures={relatedFeatures ?? []} />
-          </Stack>
-        </Container>
-      </LoadingGuard>
-    </Box>
+    <SubmissionFeatureDetailContent
+      isLoading={isLoading}
+      feature={feature}
+      relatedFeatures={relatedFeatures ?? []}
+      submissionId={submissionId}
+      rootBreadcrumbLabel="Search"
+      rootBreadcrumbTo={`/search/list${location.search}`}
+      submissionDetailBasePath="/submission"
+      featureRouteBasePath="/submission"
+      queryString={location.search}
+      buttons={
+        <Button
+          variant={isInCart ? 'outlined' : 'contained'}
+          startIcon={<Icon path={isInCart ? mdiCheck : mdiPlus} size={0.875} />}
+          onClick={handleCartToggle}>
+          {isInCart ? 'In Cart' : 'Add to Cart'}
+        </Button>
+      }
+    />
   );
 };

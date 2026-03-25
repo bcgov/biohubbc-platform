@@ -1,8 +1,18 @@
 import { UserTicketContextProvider } from 'contexts/ticketContext';
+import PortalPage from 'features/portal/PortalPage';
 import { PortalTicketDetailPage } from 'features/portal/PortalTicketDetailPage';
-import { PortalTicketsPage } from 'features/portal/PortalTicketsPage';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
+
+const LegacyPortalTicketDetailRedirect = () => {
+  const { ticketId } = useParams<{ ticketId: string }>();
+
+  if (!ticketId) {
+    return <Navigate to="/portal/ticket" replace />;
+  }
+
+  return <Navigate to={`/portal/ticket/${ticketId}`} replace />;
+};
 
 /**
  * Router for all `/portal/` pages.
@@ -16,17 +26,18 @@ export const PortalRouter = () => {
       <Route path="/" element={<Navigate to="/portal/tickets" replace />} />
 
       <Route
-        path="/tickets"
+        path="/ticket"
         element={
           <>
             <PageTitle title="My Tickets" description="View tickets assigned to you" />
-            <PortalTicketsPage />
+            <PortalPage initialTab="tickets" />
           </>
         }
       />
+      <Route path="/tickets" element={<Navigate to="/portal/ticket" replace />} />
 
       <Route
-        path="/tickets/:ticketId"
+        path="/ticket/:ticketId"
         element={
           <UserTicketContextProvider>
             <PageTitle title="Ticket Details" description="View ticket details" />
@@ -34,6 +45,7 @@ export const PortalRouter = () => {
           </UserTicketContextProvider>
         }
       />
+      <Route path="/tickets/:ticketId" element={<LegacyPortalTicketDetailRedirect />} />
 
       <Route path="*" element={<Navigate to="/page-not-found" replace />} />
     </Routes>
