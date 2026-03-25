@@ -245,7 +245,7 @@ describe('SecurityScopeRepository', () => {
     });
   });
 
-  describe('getScopeIdsForStatements', () => {
+  describe('findScopeIdsForStatements', () => {
     it('returns distinct scope IDs for the given policy statement IDs', async () => {
       const knexFake = sinon.fake.resolves(
         mockQueryResult([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }])
@@ -253,9 +253,9 @@ describe('SecurityScopeRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexFake });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      const result = await repository.getScopeIdsForStatements(['ps-1', 'ps-2']);
+      const result = await repository.findScopeIdsForStatements(['ps-1', 'ps-2']);
 
-      expect(result).to.eql(['scope-1', 'scope-2']);
+      expect(result).to.eql([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }]);
       expect(knexFake).to.have.been.calledOnce;
     });
 
@@ -264,7 +264,7 @@ describe('SecurityScopeRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: knexFake });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      const result = await repository.getScopeIdsForStatements([]);
+      const result = await repository.findScopeIdsForStatements([]);
 
       expect(result).to.eql([]);
       expect(knexFake).not.to.have.been.called;

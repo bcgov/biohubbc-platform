@@ -49,3 +49,9 @@ export const TeamSecurityScope = z.object({
 });
 
 export type TeamSecurityScope = z.infer<typeof TeamSecurityScope>;
+
+/**
+ * Picked shape for queries that return only the scope ID (e.g. findScopeIdsForStatements).
+ */
+export const SecurityScopeId = SecurityScope.pick({ security_scope_id: true });
+export type SecurityScopeId = z.infer<typeof SecurityScopeId>;

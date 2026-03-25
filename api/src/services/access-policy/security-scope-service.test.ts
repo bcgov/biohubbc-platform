@@ -88,8 +88,8 @@ describe('SecurityScopeService', () => {
   describe('cleanupScopesForDeletedStatements', () => {
     it('gathers scope IDs, deletes mappings, rebuilds teams, and cleans up orphaned anchors', async () => {
       const getScopeIdsStub = sinon
-        .stub(SecurityScopeRepository.prototype, 'getScopeIdsForStatements')
-        .resolves(['scope-1', 'scope-2']);
+        .stub(SecurityScopeRepository.prototype, 'findScopeIdsForStatements')
+        .resolves([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }]);
       const deleteStub = sinon.stub(SecurityScopeRepository.prototype, 'deletePolicyStatementScopes').resolves();
       const rebuildStub = sinon.stub(SecurityScopeRepository.prototype, 'rebuildTeamSecurityScopes').resolves();
       const orphanStub = sinon.stub(SecurityScopeRepository.prototype, 'deleteAnchorsForOrphanedScopes').resolves();
@@ -111,7 +111,7 @@ describe('SecurityScopeService', () => {
     });
 
     it('deletes mappings but skips rebuild when no affected teams', async () => {
-      sinon.stub(SecurityScopeRepository.prototype, 'getScopeIdsForStatements').resolves(['scope-1']);
+      sinon.stub(SecurityScopeRepository.prototype, 'findScopeIdsForStatements').resolves([{ security_scope_id: 'scope-1' }]);
       const deleteStub = sinon.stub(SecurityScopeRepository.prototype, 'deletePolicyStatementScopes').resolves();
       const rebuildStub = sinon.stub(SecurityScopeRepository.prototype, 'rebuildTeamSecurityScopes').resolves();
       const orphanStub = sinon.stub(SecurityScopeRepository.prototype, 'deleteAnchorsForOrphanedScopes').resolves();
@@ -124,7 +124,7 @@ describe('SecurityScopeService', () => {
     });
 
     it('skips orphan cleanup when no scopes were affected', async () => {
-      sinon.stub(SecurityScopeRepository.prototype, 'getScopeIdsForStatements').resolves([]);
+      sinon.stub(SecurityScopeRepository.prototype, 'findScopeIdsForStatements').resolves([]);
       sinon.stub(SecurityScopeRepository.prototype, 'deletePolicyStatementScopes').resolves();
       sinon.stub(SecurityScopeRepository.prototype, 'rebuildTeamSecurityScopes').resolves();
       const orphanStub = sinon.stub(SecurityScopeRepository.prototype, 'deleteAnchorsForOrphanedScopes').resolves();

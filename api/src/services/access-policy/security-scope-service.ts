@@ -75,7 +75,7 @@ export class SecurityScopeService extends DBService {
    */
   async cleanupScopesForDeletedStatements(policyStatementIds: string[], affectedTeamIds: string[]): Promise<void> {
     // Gather scope IDs BEFORE deleting mappings — need to know which scopes may become orphaned
-    const affectedScopeIds = await this.securityScopeRepository.getScopeIdsForStatements(policyStatementIds);
+    const affectedScopes = await this.securityScopeRepository.findScopeIdsForStatements(policyStatementIds);
 
     await this.securityScopeRepository.deletePolicyStatementScopes(policyStatementIds);
 
@@ -85,8 +85,9 @@ export class SecurityScopeService extends DBService {
 
     // Clean up anchors for scopes that lost all policy_statement_scope references.
     // Shared scopes (still referenced by other statements) are left intact.
-    if (affectedScopeIds.length > 0) {
-      await this.securityScopeRepository.deleteAnchorsForOrphanedScopes(affectedScopeIds);
+    if (affectedScopes.length > 0) {
+      const scopeIds = affectedScopes.map((s) => s.security_scope_id);
+      await this.securityScopeRepository.deleteAnchorsForOrphanedScopes(scopeIds);
     }
   }
 

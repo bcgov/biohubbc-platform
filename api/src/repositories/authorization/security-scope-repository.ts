@@ -1,7 +1,7 @@
 import SQL from 'sql-template-strings';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { SecurityScope } from '../../models/security-scope';
+import { SecurityScope, SecurityScopeId } from '../../models/security-scope';
 import { BaseRepository } from '../base-repository';
 
 /**
@@ -263,7 +263,7 @@ export class SecurityScopeRepository extends BaseRepository {
    * @param policyStatementIds UUIDs of the policy statements
    * @returns Distinct security_scope_id values referenced by those statements
    */
-  async getScopeIdsForStatements(policyStatementIds: string[]): Promise<string[]> {
+  async findScopeIdsForStatements(policyStatementIds: string[]): Promise<SecurityScopeId[]> {
     if (policyStatementIds.length === 0) {
       return [];
     }
@@ -274,9 +274,9 @@ export class SecurityScopeRepository extends BaseRepository {
       .from('policy_statement_scope')
       .whereIn('policy_statement_id', policyStatementIds);
 
-    const response = await this.connection.knex<{ security_scope_id: string }>(query);
+    const response = await this.connection.knex(query, SecurityScopeId);
 
-    return response.rows.map((row) => row.security_scope_id);
+    return response.rows;
   }
 
   /**
