@@ -29,8 +29,8 @@ export class SecurityScopeRepository extends BaseRepository {
    */
   async insertSecurityScope(scopeHash: string): Promise<SecurityScope | null> {
     const sqlStatement = SQL`
-      INSERT INTO security_scope (security_scope_id, scope_hash)
-      VALUES (gen_random_uuid(), ${scopeHash})
+      INSERT INTO security_scope (scope_hash)
+      VALUES (${scopeHash})
       ON CONFLICT (scope_hash) DO NOTHING
       RETURNING security_scope_id, scope_hash;
     `;
@@ -84,8 +84,8 @@ export class SecurityScopeRepository extends BaseRepository {
    */
   async insertPolicyStatementScope(policyStatementId: string, securityScopeId: string): Promise<void> {
     const sqlStatement = SQL`
-      INSERT INTO policy_statement_scope (policy_statement_scope_id, policy_statement_id, security_scope_id)
-      VALUES (gen_random_uuid(), ${policyStatementId}, ${securityScopeId})
+      INSERT INTO policy_statement_scope (policy_statement_id, security_scope_id)
+      VALUES (${policyStatementId}, ${securityScopeId})
       ON CONFLICT (policy_statement_id) DO NOTHING;
     `;
 
@@ -213,8 +213,8 @@ export class SecurityScopeRepository extends BaseRepository {
         const featureIds = fetchResult.rows.map((row) => row.submission_feature_id);
 
         await this.connection.query(
-          `INSERT INTO security_scope_anchor (security_scope_anchor_id, security_scope_id, anchor_submission_feature_id)
-           SELECT gen_random_uuid(), $1, unnest($2::INTEGER[])
+          `INSERT INTO security_scope_anchor (security_scope_id, anchor_submission_feature_id)
+           SELECT $1, unnest($2::INTEGER[])
            ON CONFLICT (security_scope_id, anchor_submission_feature_id) DO NOTHING`,
           [securityScopeId, featureIds]
         );
@@ -320,8 +320,8 @@ export class SecurityScopeRepository extends BaseRepository {
    */
   async insertTeamSecurityScopesForPolicy(teamId: string, policyId: string): Promise<void> {
     const sqlStatement = SQL`
-      INSERT INTO team_security_scope (team_security_scope_id, team_id, security_scope_id)
-      SELECT gen_random_uuid(), ${teamId}, pss.security_scope_id
+      INSERT INTO team_security_scope (team_id, security_scope_id)
+      SELECT ${teamId}, pss.security_scope_id
       FROM policy_statement ps
       JOIN policy_statement_scope pss ON pss.policy_statement_id = ps.policy_statement_id
       WHERE ps.policy_id = ${policyId}
@@ -354,8 +354,8 @@ export class SecurityScopeRepository extends BaseRepository {
     await this.connection.sql(deleteSql);
 
     const insertSql = SQL`
-      INSERT INTO team_security_scope (team_security_scope_id, team_id, security_scope_id)
-      SELECT gen_random_uuid(), tp.team_id, pss.security_scope_id
+      INSERT INTO team_security_scope (team_id, security_scope_id)
+      SELECT tp.team_id, pss.security_scope_id
       FROM team_policy tp
       JOIN policy_statement ps
         ON ps.policy_id = tp.policy_id
