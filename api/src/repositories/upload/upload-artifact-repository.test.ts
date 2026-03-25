@@ -41,7 +41,8 @@ describe('UploadArtifactRepository', () => {
         upload_id: 'upload-id-1',
         artifact_id: 'artifact-id-1',
         role: UploadArtifactRoleEnum.FEATURE,
-        upload_archive_id: null
+        upload_archive_id: null,
+        path: null
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
@@ -60,7 +61,8 @@ describe('UploadArtifactRepository', () => {
           upload_id: 'upload-id-1',
           artifact_id: 'artifact-id-1',
           role: UploadArtifactRoleEnum.FEATURE,
-          upload_archive_id: null
+          upload_archive_id: null,
+          path: null
         }
       ];
       const mockQueryResponse = { rowCount: 1, rows: mockRows } as any as Promise<QueryResult<any>>;

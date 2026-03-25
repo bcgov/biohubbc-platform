@@ -53,7 +53,8 @@ describe('archive upload handler', () => {
       comment: 'comment'
     };
     mockReq.system_user = { system_user_id: 42 };
-    mockReq.keycloak_token = 'mock-token';
+    mockReq.keycloak_token = { clientId: 'sims-service-client' };
+    mockReq.contributor_id = 11;
 
     await requestHandler(mockReq, mockRes, mockNext);
 
@@ -63,7 +64,8 @@ describe('archive upload handler', () => {
       name: 'name',
       description: 'description',
       comment: 'comment',
-      system_user_id: 42
+      system_user_id: 42,
+      contributor_id: 11
     });
 
     expect(mockRes.statusValue).to.equal(201);
@@ -95,44 +97,14 @@ describe('archive upload handler', () => {
       comment: 'comment'
     };
     mockReq.system_user = { system_user_id: 42 };
-    mockReq.keycloak_token = 'mock-token';
+    mockReq.keycloak_token = { clientId: 'sims-service-client' };
+    mockReq.contributor_id = 11;
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
       expect.fail('Expected error to be thrown');
     } catch (err) {
       expect(err).to.equal(error);
-      expect(dbConnectionObj.rollback).to.have.been.calledOnce;
-      expect(dbConnectionObj.release).to.have.been.calledOnce;
-    }
-  });
-
-  it('should throw error if system_user is missing', async () => {
-    const dbConnectionObj = getMockDBConnection({
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
-    });
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-
-    const requestHandler = startUpload();
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    mockReq.body = {
-      bytes: 12345,
-      name: 'name',
-      description: 'description',
-      comment: 'comment'
-    };
-    mockReq.system_user = undefined;
-    mockReq.keycloak_token = 'mock-token';
-
-    try {
-      await requestHandler(mockReq, mockRes, mockNext);
-      expect.fail('Expected error due to missing system_user');
-    } catch (err) {
-      expect(err).to.be.instanceOf(Error);
       expect(dbConnectionObj.rollback).to.have.been.calledOnce;
       expect(dbConnectionObj.release).to.have.been.calledOnce;
     }
@@ -169,7 +141,8 @@ describe('archive upload handler', () => {
       comment: 'comment'
     };
     mockReq.system_user = { system_user_id: 42 };
-    mockReq.keycloak_token = 'mock-token';
+    mockReq.keycloak_token = { clientId: 'biohub-web' };
+    mockReq.contributor_id = 11;
 
     await requestHandler(mockReq, mockRes, mockNext);
 
@@ -179,7 +152,8 @@ describe('archive upload handler', () => {
       name: 'name',
       description: 'description',
       comment: 'comment',
-      system_user_id: 42
+      system_user_id: 42,
+      contributor_id: 11
     });
   });
 });

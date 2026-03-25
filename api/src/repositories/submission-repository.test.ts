@@ -107,7 +107,7 @@ describe('SubmissionRepository', () => {
           comment: 'comment',
           description: 'description',
           name: 'name',
-          source_system: 'SIMS',
+          contributor_id: 1,
           system_user_id: 1
         });
         expect.fail();
@@ -130,7 +130,7 @@ describe('SubmissionRepository', () => {
         comment: 'comment',
         description: 'description',
         name: 'name',
-        source_system: 'SIMS',
+        contributor_id: 1,
         system_user_id: 1
       });
 
@@ -422,7 +422,7 @@ describe('SubmissionRepository', () => {
         'submission desc',
         'submission comment',
         3,
-        'source system'
+        1
       );
 
       expect(response).to.eql({ submission_id: 20 });
@@ -442,7 +442,7 @@ describe('SubmissionRepository', () => {
           'submission desc',
           'submission comment',
           3,
-          'source system'
+          1
         );
         expect.fail();
       } catch (actualError) {
@@ -464,7 +464,7 @@ describe('SubmissionRepository', () => {
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
-          source_system: 'SIMS',
+          contributor_id: 1,
           name: 'name',
           description: 'description',
           comment: 'comment',
@@ -482,7 +482,7 @@ describe('SubmissionRepository', () => {
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
-          source_system: 'SIMS',
+          contributor_id: 1,
           name: 'name',
           description: 'description',
           comment: 'comment',
@@ -521,7 +521,7 @@ describe('SubmissionRepository', () => {
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
-          source_system: 'SIMS',
+          contributor_id: 1,
           name: 'name',
           description: 'description',
           comment: 'comment',
@@ -539,7 +539,7 @@ describe('SubmissionRepository', () => {
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
-          source_system: 'SIMS',
+          contributor_id: 1,
           name: 'name',
           description: 'description',
           comment: 'comment',
@@ -578,7 +578,7 @@ describe('SubmissionRepository', () => {
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
-          source_system: 'SIMS',
+          contributor_id: 1,
           name: 'name',
           description: 'description',
           comment: 'comment',
@@ -596,7 +596,7 @@ describe('SubmissionRepository', () => {
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
-          source_system: 'SIMS',
+          contributor_id: 1,
           name: 'name',
           description: 'description',
           comment: 'comment',
@@ -634,7 +634,7 @@ describe('SubmissionRepository', () => {
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
-          source_system: 'SIMS',
+          contributor_id: 1,
           name: 'name',
           description: 'description',
           comment: 'comment',
@@ -653,7 +653,7 @@ describe('SubmissionRepository', () => {
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
-          source_system: 'SIMS',
+          contributor_id: 1,
           name: 'name',
           description: 'description',
           comment: 'comment',
@@ -672,7 +672,7 @@ describe('SubmissionRepository', () => {
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
-          source_system: 'SIMS',
+          contributor_id: 1,
           name: 'name',
           description: 'description',
           comment: 'comment',
@@ -937,7 +937,7 @@ describe('SubmissionRepository', () => {
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
-          source_system: 'SIMS',
+          contributor_id: 1,
           name: 'name',
           description: 'description',
           comment: 'comment',
@@ -964,7 +964,7 @@ describe('SubmissionRepository', () => {
     });
 
     describe('if the patch results in no changes to the record', () => {
-      it('should patch the record (having no effect) and return the unchanged record', async () => {
+      it('should throw when no rows are updated', async () => {
         const submissionId = 1;
 
         const patch: PatchSubmissionRecord = { security_reviewed: false };
@@ -975,7 +975,7 @@ describe('SubmissionRepository', () => {
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
-          source_system: 'SIMS',
+          contributor_id: 1,
           name: 'name',
           description: 'description',
           comment: 'comment',
@@ -995,9 +995,12 @@ describe('SubmissionRepository', () => {
 
         const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-        const response = await submissionRepository.patchSubmissionRecord(submissionId, patch);
-
-        expect(response).to.eql(mockSubmissionRecord);
+        try {
+          await submissionRepository.patchSubmissionRecord(submissionId, patch);
+          expect.fail();
+        } catch (actualError) {
+          expect((actualError as ApiExecuteSQLError).message).to.equal('Failed to patch submission record');
+        }
       });
     });
   });
@@ -1214,7 +1217,7 @@ describe('SubmissionRepository', () => {
         publish_timestamp: 'string',
         submitted_timestamp: 'string',
         system_user_id: 3,
-        source_system: 'string',
+        contributor_id: 1,
         name: 'string',
         description: null,
         record_end_date: 'string',
@@ -1267,7 +1270,7 @@ describe('SubmissionRepository', () => {
         uuid: 'string',
         security_review_timestamp: null,
         submitted_timestamp: 'string',
-        source_system: 'string',
+        contributor_id: 1,
         name: 'string',
         description: null,
         create_date: 'string',
@@ -1592,6 +1595,40 @@ describe('SubmissionRepository', () => {
       await submissionRepository.updateSubmissionFeatureParent(10, 5);
 
       expect(sqlStub).to.have.been.calledOnce;
+    });
+  });
+
+  describe('updateSubmissionFeatureParents', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should bulk update parent submission feature ids scoped by submission_upload_id', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 2, rows: [] });
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      await submissionRepository.updateSubmissionFeatureParents('123e4567-e89b-12d3-a456-426614174000', [
+        { submission_feature_id: 10, parent_submission_feature_id: 5 },
+        { submission_feature_id: 11, parent_submission_feature_id: 5 }
+      ]);
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const calledSql = sqlStub.args[0][0];
+      expect(calledSql.text).to.include('FROM unnest');
+      expect(calledSql.text).to.include('sf.submission_upload_id');
+    });
+
+    it('should not execute SQL when pairs array is empty', async () => {
+      const sqlStub = sinon.stub().resolves({ rowCount: 0, rows: [] });
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      await submissionRepository.updateSubmissionFeatureParents('123e4567-e89b-12d3-a456-426614174000', []);
+
+      expect(sqlStub).not.to.have.been.called;
     });
   });
 

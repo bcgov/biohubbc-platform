@@ -1,7 +1,6 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { SystemUserWithRoles } from '../models/system-user-view';
 import { AuthorizationScheme } from '../services/authorization-service';
-import { KeycloakUserInformation } from '../utils/keycloak-utils';
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -13,7 +12,7 @@ declare module 'express-serve-static-core' {
     /**
      * Keycloak user JWT token object.
      */
-    keycloak_token?: KeycloakUserInformation;
+    keycloak_token?: any;
 
     /**
      * SIMS system user details object.
@@ -24,6 +23,11 @@ declare module 'express-serve-static-core' {
      * Authorization Scheme object.
      */
     authorization_scheme?: AuthorizationScheme;
+
+    /**
+     * Contributor id resolved during contributor authorization.
+     */
+    contributor_id?: number;
 
     /**
      * OpenAPI operation object injected by express-openapi.

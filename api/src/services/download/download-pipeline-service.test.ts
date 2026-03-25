@@ -11,7 +11,8 @@ import {
 } from '../../models/download';
 import { DownloadFragmentId, DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { FeatureTypeWithFeaturePropertiesCode } from '../../repositories/code-repository';
+import { FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
+import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -172,16 +173,18 @@ describe('DownloadPipelineService', () => {
         );
 
       sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
-      const mockCodes: FeatureTypeWithFeaturePropertiesCode[] = [
+      const mockCodes: FeatureTypeWithProperties[] = [
         {
-          feature_type: { feature_type_id: 1, feature_type_name: 'file', feature_type_display_name: 'File' },
-          feature_type_properties: [
+          feature_type: { feature_type_id: 1, name: 'file', display_name: 'File' },
+          properties: [
             {
-              feature_property_id: 1,
-              feature_property_name: 'artifact_key',
-              feature_property_display_name: 'Artifact Key',
-              feature_property_type_id: 1,
-              feature_property_type_name: 'artifact_key'
+              feature_type_property_id: 1,
+              name: 'artifact_key',
+              display_name: 'Artifact Key',
+              description: 'Artifact Key',
+              type_name: FEATURE_PROPERTY_TYPE.ARTIFACT_KEY,
+              required_value: true,
+              calculated_value: false
             }
           ]
         }
@@ -233,20 +236,22 @@ describe('DownloadPipelineService', () => {
       sinon
         .stub(DownloadRepository.prototype, 'findDownloadById')
         .resolves(createMockDownloadRecord({ total_fragments: 3 }));
-      const mockCodes: FeatureTypeWithFeaturePropertiesCode[] = [
+      const mockCodes: FeatureTypeWithProperties[] = [
         {
           feature_type: {
             feature_type_id: 2,
-            feature_type_name: 'observation',
-            feature_type_display_name: 'Observation'
+            name: 'observation',
+            display_name: 'Observation'
           },
-          feature_type_properties: [
+          properties: [
             {
-              feature_property_id: 1,
-              feature_property_name: 'species',
-              feature_property_display_name: 'Species',
-              feature_property_type_id: 1,
-              feature_property_type_name: 'string'
+              feature_type_property_id: 1,
+              name: 'species',
+              display_name: 'Species',
+              description: 'Species',
+              type_name: FEATURE_PROPERTY_TYPE.STRING,
+              required_value: false,
+              calculated_value: false
             }
           ]
         }

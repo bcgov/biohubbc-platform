@@ -25,23 +25,23 @@ GET.apiDoc = {
                 type: 'array',
                 items: {
                   type: 'object',
-                  required: ['feature_type', 'feature_type_properties'],
+                  required: ['feature_type', 'properties'],
                   properties: {
                     feature_type: {
                       type: 'object',
-                      required: ['feature_type_id', 'feature_type_name', 'feature_type_display_name'],
+                      required: ['feature_type_id', 'name', 'display_name'],
                       properties: {
                         feature_type_id: {
                           type: 'integer',
                           description: 'The feature type id.',
                           minimum: 1
                         },
-                        feature_type_name: {
+                        name: {
                           type: 'string',
                           description: 'The feature type name.',
                           example: 'dataset'
                         },
-                        feature_type_display_name: {
+                        display_name: {
                           type: 'string',
                           description: 'The feature type display name.',
                           example: 'Dataset'
@@ -49,42 +49,52 @@ GET.apiDoc = {
                       },
                       additionalProperties: false
                     },
-                    feature_type_properties: {
+                    properties: {
                       type: 'array',
                       items: {
                         type: 'object',
                         required: [
-                          'feature_property_id',
-                          'feature_property_name',
-                          'feature_property_display_name',
-                          'feature_property_type_id',
-                          'feature_property_type_name'
+                          'feature_type_property_id',
+                          'name',
+                          'display_name',
+                          'description',
+                          'type_name',
+                          'required_value',
+                          'calculated_value'
                         ],
                         properties: {
-                          feature_property_id: {
+                          feature_type_property_id: {
                             type: 'integer',
-                            description: 'The feature property id.',
+                            description: 'The feature type property id.',
                             minimum: 1
                           },
-                          feature_property_name: {
+                          name: {
                             type: 'string',
                             description: 'The feature property name.',
                             example: 'description'
                           },
-                          feature_property_display_name: {
+                          display_name: {
                             type: 'string',
                             description: 'The feature property display name.',
                             example: 'Description'
                           },
-                          feature_property_type_id: {
-                            type: 'integer',
-                            description: 'The feature property type id.',
-                            minimum: 1
+                          description: {
+                            type: 'string',
+                            description: 'The feature property description.',
+                            example: 'Description text'
                           },
-                          feature_property_type_name: {
+                          type_name: {
                             type: 'string',
                             description: 'The feature property type name.',
                             example: 'string'
+                          },
+                          required_value: {
+                            type: 'boolean',
+                            description: 'Whether the property value is required.'
+                          },
+                          calculated_value: {
+                            type: 'boolean',
+                            description: 'Whether the property value is calculated.'
                           }
                         },
                         additionalProperties: false

@@ -112,6 +112,33 @@ export class ContributorCodesetRepository extends BaseRepository {
   }
 
   /**
+   * Get contributor_codeset rows by contributor id and codeset keys.
+   *
+   * @param {number} contributorId
+   * @param {string[]} codesetKeys
+   * @return {Promise<ContributorCodeset[]>}
+   * @memberof ContributorCodesetRepository
+   */
+  async getContributorCodesetsByContributorIdAndKeys(
+    contributorId: number,
+    codesetKeys: string[]
+  ): Promise<ContributorCodeset[]> {
+    if (!codesetKeys.length) {
+      return [];
+    }
+
+    const knex = getKnex();
+    const query = knex('contributor_codeset')
+      .select(['contributor_codeset_id', 'contributor_id', 'key', 'label', 'description', 'external_id'])
+      .where('contributor_id', contributorId)
+      .whereIn('key', codesetKeys)
+      .whereNull('record_end_date');
+
+    const response = await this.connection.knex(query, ContributorCodesetSchema);
+    return response.rows;
+  }
+
+  /**
    * Get a contributor_codeset row by identity fields.
    *
    * @param {number} contributorId

@@ -128,9 +128,9 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
-   * Hard-deletes a submission_upload record by ID.
+   * Soft-deletes a submission_upload record by ID.
    *
-   * @param {string} submissionUploadId The ID of the artifact to delete
+   * @param {string} submissionUploadId The ID of the record to soft-delete
    * @return {Promise<void>}
    * @memberof SubmissionUploadService
    */

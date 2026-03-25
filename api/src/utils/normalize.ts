@@ -4,7 +4,7 @@ import { ISearchFeaturePropertyCondition } from '../services/search-feature-serv
  * Normalizes a property condition value for consistent handling in search queries.
  *
  * @remarks
- * This function is necessary because `ISearchFeaturePropertyCondition.value` can be:
+ * This function is necessary because `SearchFeaturePropertyCondition.value` can be:
  * - a single `string`, `number`, or `boolean`
  * - an array of strings and/or numbers (`(string | number)[]`)
  *
@@ -26,7 +26,7 @@ import { ISearchFeaturePropertyCondition } from '../services/search-feature-serv
  * normalizeSearchValue([1, "2", 3]); // ["1", "2", "3"]
  * normalizeSearchValue(true); // true
  *
- * @param val - The raw value from a `ISearchFeaturePropertyCondition`
+ * @param val - The raw value from a `SearchFeaturePropertyCondition`
  * @returns The normalized value suitable for query builders:
  *          `string | number | boolean | string[] | number[]`
  */
@@ -45,4 +45,23 @@ export const normalizeSearchValue = (
   }
   // Scalars returned as-is
   return val;
+};
+
+/**
+ * Normalize optional text values for persistence.
+ *
+ * Trims surrounding whitespace and optionally lowercases the result.
+ * Returns null when value is undefined, null, non-string, or empty after trim.
+ *
+ * @param {unknown} value
+ * @param {boolean} [toLowerCase=false]
+ * @returns {(string | null)}
+ */
+export const normalizeOptionalText = (value: unknown, toLowerCase = false): string | null => {
+  if (typeof value !== 'string' || !value.trim()) {
+    return null;
+  }
+
+  const normalizedValue = value.trim();
+  return toLowerCase ? normalizedValue.toLowerCase() : normalizedValue;
 };

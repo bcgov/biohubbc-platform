@@ -1,11 +1,8 @@
 import { IDBConnection } from '../database/db';
-import {
-  CodeRepository,
-  FeaturePropertyCode,
-  FeatureTypeCode,
-  FeatureTypeWithFeaturePropertiesCode,
-  IAllCodeSets
-} from '../repositories/code-repository';
+import { IAllCodeSets } from '../models/codes';
+import { FeatureType, FeatureTypeWithProperties } from '../models/feature-type';
+import { FeatureTypeProperty } from '../models/feature-type-property';
+import { CodeRepository } from '../repositories/code-repository';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
 
@@ -39,65 +36,33 @@ export class CodeService extends DBService {
   /**
    * Get all feature types.
    *
-   * @return {*}  {Promise<FeatureTypeCode[]>}
+   * @return {*}  {Promise<FeatureType[]>}
    * @memberof CodeService
    */
-  async getFeatureTypes(): Promise<FeatureTypeCode[]> {
+  async getFeatureTypes(): Promise<FeatureType[]> {
     return this.codeRepository.getFeatureTypes();
   }
 
   /**
    * Get all feature properties grouped by feature type.
    *
-   * @return {*}  {Promise<FeatureTypeWithFeaturePropertiesCode[]>}
+   * @return {*}  {Promise<FeatureTypeWithProperties[]>}
    * @memberof CodeService
    */
-  async getFeatureTypePropertyCodes(): Promise<FeatureTypeWithFeaturePropertiesCode[]> {
+  async getFeatureTypePropertyCodes(): Promise<FeatureTypeWithProperties[]> {
     defaultLog.debug({ message: 'getFeatureTypePropertyCodes' });
 
-    const featureTypePropertyCodes = await this.codeRepository.getFeatureTypePropertyCodes();
-
-    const groupedFeatureTypePropertyCodes: FeatureTypeWithFeaturePropertiesCode[] = [];
-
-    // Iterate over the raw array of feature type property codes and group them by feature type
-    for (const featureTypePropertyCode of featureTypePropertyCodes) {
-      const index = groupedFeatureTypePropertyCodes.findIndex(
-        (item) => item.feature_type.feature_type_id === featureTypePropertyCode.feature_type_id
-      );
-
-      const feature_type_properties = {
-        feature_property_id: featureTypePropertyCode.feature_property_id,
-        feature_property_name: featureTypePropertyCode.feature_property_name,
-        feature_property_display_name: featureTypePropertyCode.feature_property_display_name,
-        feature_property_type_id: featureTypePropertyCode.feature_property_type_id,
-        feature_property_type_name: featureTypePropertyCode.feature_property_type_name
-      };
-
-      if (index >= 0) {
-        groupedFeatureTypePropertyCodes[index].feature_type_properties.push(feature_type_properties);
-      } else {
-        groupedFeatureTypePropertyCodes.push({
-          feature_type: {
-            feature_type_id: featureTypePropertyCode.feature_type_id,
-            feature_type_name: featureTypePropertyCode.feature_type_name,
-            feature_type_display_name: featureTypePropertyCode.feature_type_display_name
-          },
-          feature_type_properties: [feature_type_properties]
-        });
-      }
-    }
-
-    return groupedFeatureTypePropertyCodes;
+    return this.codeRepository.getFeatureTypePropertyCodes();
   }
 
   /**
    * Get a feature property record by name.
    *
    * @param {string} featurePropertyName
-   * @return {*}  {Promise<FeaturePropertyCode>}
+   * @return {*}  {Promise<FeatureTypeProperty>}
    * @memberof CodeService
    */
-  async getFeaturePropertyByName(featurePropertyName: string): Promise<FeaturePropertyCode> {
+  async getFeaturePropertyByName(featurePropertyName: string): Promise<FeatureTypeProperty> {
     defaultLog.debug({ message: 'getFeaturePropertyByName' });
 
     return this.codeRepository.getFeaturePropertyByName(featurePropertyName);

@@ -1,6 +1,6 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { GetContributor } from '../paths/contributor/index.interface';
+import { Contributor } from '../models/contributor';
 import { BaseRepository } from './base-repository';
 
 /**
@@ -12,29 +12,26 @@ import { BaseRepository } from './base-repository';
  */
 export class ContributorRepository extends BaseRepository {
   /**
-   * Get the contributor record for a clientId
+   * Find the contributor record for a clientId.
    *
    * @param {string} clientId
-   * @return {Promise<GetContributor>}
+   * @return {(Promise<Contributor | null>)}
    * @memberof ContributorRepository
    */
-  async getContributorByClientId(clientId: string): Promise<GetContributor> {
+  async findContributorByClientId(clientId: string): Promise<Contributor | null> {
     const sql = SQL`
       SELECT contributor_id, client_id FROM contributor WHERE client_id = ${clientId} AND record_end_date IS NULL;
     `;
 
-    const response = await this.connection.sql(sql, GetContributor);
+    const response = await this.connection.sql(sql, Contributor);
 
     if (response.rowCount === 0) {
-      throw new ApiNotFoundError('Contributor not found', [
-        'ContributorRepository->getContributorByClientId',
-        { clientId }
-      ]);
+      return null;
     }
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Unexpected row count', [
-        'ContributorRepository->getContributorByClientId',
+        'ContributorRepository->findContributorByClientId',
         `expected rowCount=1, actual rowCount=${response.rowCount}`
       ]);
     }
@@ -43,20 +40,95 @@ export class ContributorRepository extends BaseRepository {
   }
 
   /**
-   * Check if a contributor exists for a given clientId (active records only)
+   * Get the contributor linked to a submission upload.
    *
-   * @param {string} clientId
-   * @return {Promise<boolean>}
+   * @param {string} submissionUploadId
+   * @return {Promise<Contributor>}
    * @memberof ContributorRepository
    */
-  async contributorExists(clientId: string): Promise<boolean> {
+  async getContributorBySubmissionUploadId(submissionUploadId: string): Promise<Contributor> {
     const sql = SQL`
-      SELECT contributor_id FROM contributor WHERE client_id = ${clientId} AND record_end_date IS NULL;
+      WITH w_submission_upload AS (
+        SELECT
+          submission_id
+        FROM submission_upload
+        WHERE submission_upload_id = ${submissionUploadId}
+      ),
+      w_submission AS (
+        SELECT
+          s.contributor_id
+        FROM w_submission_upload wsu
+        INNER JOIN submission s ON s.submission_id = wsu.submission_id
+        WHERE (s.record_end_date IS NULL OR s.record_end_date > NOW())
+      )
+      SELECT
+        c.contributor_id,
+        c.client_id
+      FROM w_submission ws
+      INNER JOIN contributor c ON c.contributor_id = ws.contributor_id
+      WHERE c.record_end_date IS NULL;
     `;
 
-    const response = await this.connection.sql(sql);
+    const response = await this.connection.sql(sql, Contributor);
 
-    return (response.rowCount ?? 0) > 0;
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Contributor not found for submission upload', [
+        'ContributorRepository->getContributorBySubmissionUploadId',
+        { submissionUploadId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'ContributorRepository->getContributorBySubmissionUploadId',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get the contributor linked to a submission.
+   *
+   * @param {number} submissionId
+   * @return {Promise<Contributor>}
+   * @memberof ContributorRepository
+   */
+  async getContributorBySubmissionId(submissionId: number): Promise<Contributor> {
+    const sql = SQL`
+      WITH w_submission AS (
+        SELECT
+          contributor_id
+        FROM submission
+        WHERE submission_id = ${submissionId}
+          AND (record_end_date IS NULL OR record_end_date > NOW())
+      )
+      SELECT
+        c.contributor_id,
+        c.client_id
+      FROM w_submission ws
+      INNER JOIN contributor c ON c.contributor_id = ws.contributor_id
+      WHERE c.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sql, Contributor);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Contributor not found for submission', [
+        'ContributorRepository->getContributorBySubmissionId',
+        { submissionId }
+      ]);
+    }
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Unexpected row count', [
+        'ContributorRepository->getContributorBySubmissionId',
+        `expected rowCount=1, actual rowCount=${response.rowCount}`
+      ]);
+    }
+
+    return response.rows[0];
   }
 
   /**
@@ -83,51 +155,5 @@ export class ContributorRepository extends BaseRepository {
     }
 
     return response.rows[0].contributor_id;
-  }
-
-  /**
-   * Check if a contributor_system_user relationship exists (active records only)
-   *
-   * @param {number} contributorId
-   * @param {number} systemUserId
-   * @return {Promise<boolean>}
-   * @memberof ContributorRepository
-   */
-  async contributorMemberExists(contributorId: number, systemUserId: number): Promise<boolean> {
-    const sql = SQL`
-      SELECT contributor_system_user_id 
-      FROM contributor_system_user 
-      WHERE contributor_id = ${contributorId} 
-        AND system_user_id = ${systemUserId} 
-        AND record_end_date IS NULL;
-    `;
-
-    const response = await this.connection.sql(sql);
-
-    return (response.rowCount ?? 0) > 0;
-  }
-
-  /**
-   * Create a new contributor system user.
-   * If the relationship already exists, this is a no-op (idempotent).
-   *
-   * @param {number} contributorId
-   * @param {number} systemUserId
-   * @return {Promise<void>}
-   * @memberof ContributorRepository
-   */
-  async createContributorMember(contributorId: number, systemUserId: number): Promise<void> {
-    // Check if relationship already exists (idempotent)
-    const exists = await this.contributorMemberExists(contributorId, systemUserId);
-    if (exists) {
-      return; // Already exists, no-op
-    }
-
-    const sql = SQL`
-      INSERT INTO contributor_system_user (contributor_id, system_user_id)
-      VALUES (${contributorId}, ${systemUserId});
-    `;
-
-    await this.connection.sql(sql);
   }
 }

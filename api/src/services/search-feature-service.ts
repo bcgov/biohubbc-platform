@@ -119,19 +119,19 @@ export class SearchFeatureService extends DBService {
       }
 
       for (const [currentFeaturePropertyName, currentFeaturePropertyValue] of currentFeatureProperties) {
-        const matchingFeatureProperty = applicableFeatureTypePropertyCodes.feature_type_properties.find(
-          (item) => item.feature_property_name === currentFeaturePropertyName
+        const matchingFeatureProperty = applicableFeatureTypePropertyCodes.properties.find(
+          (item) => item.name === currentFeaturePropertyName
         );
 
         if (!matchingFeatureProperty || !currentFeaturePropertyValue) {
           continue;
         }
 
-        switch (matchingFeatureProperty.feature_property_type_name) {
+        switch (matchingFeatureProperty.type_name) {
           case 'datetime':
             datetimeRecords.push({
               submission_feature_id: currentFeature.submission_feature_id,
-              feature_property_id: matchingFeatureProperty.feature_property_id,
+              feature_property_id: matchingFeatureProperty.feature_type_property_id,
               value: currentFeaturePropertyValue as string
             });
             break;
@@ -139,7 +139,7 @@ export class SearchFeatureService extends DBService {
           case 'number':
             numberRecords.push({
               submission_feature_id: currentFeature.submission_feature_id,
-              feature_property_id: matchingFeatureProperty.feature_property_id,
+              feature_property_id: matchingFeatureProperty.feature_type_property_id,
               value: currentFeaturePropertyValue as number
             });
             break;
@@ -147,7 +147,7 @@ export class SearchFeatureService extends DBService {
           case 'spatial':
             spatialRecords.push({
               submission_feature_id: currentFeature.submission_feature_id,
-              feature_property_id: matchingFeatureProperty.feature_property_id,
+              feature_property_id: matchingFeatureProperty.feature_type_property_id,
               value: currentFeaturePropertyValue as FeatureCollection
             });
             break;
@@ -155,7 +155,7 @@ export class SearchFeatureService extends DBService {
           case 'string':
             stringRecords.push({
               submission_feature_id: currentFeature.submission_feature_id,
-              feature_property_id: matchingFeatureProperty.feature_property_id,
+              feature_property_id: matchingFeatureProperty.feature_type_property_id,
               value: currentFeaturePropertyValue as string
             });
             break;

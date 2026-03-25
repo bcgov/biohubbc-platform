@@ -1,9 +1,9 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
-import { DownloadRecord } from '../models/download';
-import { SubmissionUpload } from '../models/submission-upload';
-import { SubmissionValidationRecord } from '../models/submission-validation';
+import type { DownloadRecord } from '../models/download';
+import type { SubmissionUpload } from '../models/submission-upload';
+import type { SubmissionValidationRecord } from '../models/submission-validation';
 import { DownloadService } from '../services/download/download-service';
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getMockDBConnection } from '../__mocks__/db';
@@ -26,6 +26,7 @@ describe('publisher', () => {
     submission_upload_id: 'sub-upload-uuid-1',
     submission_id: 123,
     upload_id: 'upload-uuid-1',
+    status: 'pending',
     ticket_id: '11111111-1111-1111-1111-111111111111'
   };
 

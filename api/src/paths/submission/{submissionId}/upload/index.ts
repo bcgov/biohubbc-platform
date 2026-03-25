@@ -14,7 +14,7 @@ const defaultLog = getLogger('paths/submission/{submissionId}/upload');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ discriminator: 'ServiceClient' }]
+    and: [{ discriminator: 'Contributor' }]
   })),
   createSubmissionUpload()
 ];
