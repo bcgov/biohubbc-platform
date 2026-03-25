@@ -33,6 +33,7 @@ export class SecurityService extends DBService {
   securityRepository: SecurityRepository;
   artifactService: ArtifactService;
   userService: UserService;
+  securityScopeService: SecurityScopeService;
 
   constructor(connection: IDBConnection) {
     super(connection);
@@ -40,6 +41,7 @@ export class SecurityService extends DBService {
     this.securityRepository = new SecurityRepository(connection);
     this.artifactService = new ArtifactService(connection);
     this.userService = new UserService(connection);
+    this.securityScopeService = new SecurityScopeService(connection);
   }
 
   /**
@@ -342,20 +344,16 @@ export class SecurityService extends DBService {
    * anchors for still-secured features would create a coverage gap where the walk-up
    * search can't find a matching anchor.
    *
-   * @param {SecurityScopeService} securityScopeService - Scope service instance (reuses caller's connection)
    * @param {number[]} featureIds - Feature IDs that had rules removed
    * @return {Promise<void>}
    */
-  private async deleteAnchorsForFullyUnsecuredFeatures(
-    securityScopeService: SecurityScopeService,
-    featureIds: number[]
-  ): Promise<void> {
+  private async deleteAnchorsForFullyUnsecuredFeatures(featureIds: number[]): Promise<void> {
     const remainingRules = await this.securityRepository.getSecurityRulesForSubmissionFeatures(featureIds);
     const stillSecuredIds = new Set(remainingRules.map((r) => r.submission_feature_id));
     const fullyUnsecuredIds = featureIds.filter((id) => !stillSecuredIds.has(id));
 
     if (fullyUnsecuredIds.length > 0) {
-      await securityScopeService.deleteAnchorsForFeatures(fullyUnsecuredIds);
+      await this.securityScopeService.deleteAnchorsForFeatures(fullyUnsecuredIds);
     }
   }
 
@@ -396,14 +394,12 @@ export class SecurityService extends DBService {
     }
 
     // Update security scope anchors after rule mutations
-    const securityScopeService = new SecurityScopeService(this.connection);
-
     if (removeRuleIds.length > 0) {
-      await this.deleteAnchorsForFullyUnsecuredFeatures(securityScopeService, submissionFeatureIds);
+      await this.deleteAnchorsForFullyUnsecuredFeatures(submissionFeatureIds);
     }
 
     if (applyRuleIds.length > 0) {
-      await securityScopeService.triggerAnchorComputationForSubmission(submissionId);
+      await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
     }
   }
 
@@ -452,14 +448,12 @@ export class SecurityService extends DBService {
     }
 
     // Update security scope anchors after rule mutations
-    const securityScopeService = new SecurityScopeService(this.connection);
-
     if (removedFeatureIds.length > 0) {
-      await this.deleteAnchorsForFullyUnsecuredFeatures(securityScopeService, removedFeatureIds);
+      await this.deleteAnchorsForFullyUnsecuredFeatures(removedFeatureIds);
     }
 
     if (applyRuleIds?.length) {
-      await securityScopeService.triggerAnchorComputationForSubmission(submissionId);
+      await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
     }
   }
 
@@ -485,12 +479,10 @@ export class SecurityService extends DBService {
       return [];
     }
 
-    const securityScopeService = new SecurityScopeService(this.connection);
-
     if (!removeRuleIds) {
       // Removing ALL rules — every feature is fully unsecured, delete all their anchors
       const result = await this.securityRepository.removeAllSecurityRulesFromSubmissionFeatures(submissionFeatureIds);
-      await securityScopeService.deleteAnchorsForFeatures(submissionFeatureIds);
+      await this.securityScopeService.deleteAnchorsForFeatures(submissionFeatureIds);
       return result;
     }
 
@@ -500,7 +492,7 @@ export class SecurityService extends DBService {
       removeRuleIds
     );
 
-    await this.deleteAnchorsForFullyUnsecuredFeatures(securityScopeService, submissionFeatureIds);
+    await this.deleteAnchorsForFullyUnsecuredFeatures(submissionFeatureIds);
 
     return result;
   }
