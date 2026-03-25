@@ -145,9 +145,10 @@ export class SecurityScopeRepository extends BaseRepository {
     const cursorName = `scope_anchor_cursor_${securityScopeId.replace(/[^a-z0-9_]/gi, '_')}`;
 
     // Declare a server-side cursor over matching root-level secured features.
-    // Follows the same pattern as DownloadFragmentRepository.streamFragmentFeaturesByType.
     await this.connection.query(
       `DECLARE ${cursorName} CURSOR FOR
+      -- LIMIT 1 without ORDER BY is safe: scope_hash = SHA-256(urn), so all
+      -- policy statements sharing a scope have identical URN components.
       WITH RECURSIVE scope_urn AS (
         SELECT ps.urn_submission_id, ps.urn_feature_type, ps.urn_feature_id
         FROM policy_statement_scope pss
@@ -162,17 +163,21 @@ export class SecurityScopeRepository extends BaseRepository {
                sf.parent_submission_feature_id
         FROM submission_feature sf
         JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-        JOIN submission_feature_security sfs
-          ON sfs.submission_feature_id = sf.submission_feature_id
-          AND sfs.record_end_date IS NULL
-        JOIN submission_upload_status sus
-          ON sus.submission_upload_id = sf.submission_upload_id
-          AND sus.status = 'approved'
         CROSS JOIN scope_urn su
         WHERE sf.record_end_date IS NULL
           AND (su.urn_submission_id = sf.submission_id::text OR su.urn_submission_id = '*')
           AND (su.urn_feature_type = ft.name OR su.urn_feature_type = '*')
           AND (su.urn_feature_id = sf.submission_feature_id::text OR su.urn_feature_id = '*')
+          AND EXISTS (
+            SELECT 1 FROM submission_feature_security sfs
+            WHERE sfs.submission_feature_id = sf.submission_feature_id
+              AND sfs.record_end_date IS NULL
+          )
+          AND EXISTS (
+            SELECT 1 FROM submission_upload_status sus
+            WHERE sus.submission_upload_id = sf.submission_upload_id
+              AND sus.status = 'approved'
+          )
       ),
       -- Walk from each candidate up to the root, collecting ancestor IDs
       ancestor_walk AS (
@@ -198,8 +203,9 @@ export class SecurityScopeRepository extends BaseRepository {
       )
       SELECT c.submission_feature_id
       FROM candidates c
-      WHERE c.submission_feature_id NOT IN (
-        SELECT candidate_id FROM has_candidate_ancestor
+      WHERE NOT EXISTS (
+        SELECT 1 FROM has_candidate_ancestor hca
+        WHERE hca.candidate_id = c.submission_feature_id
       )`,
       [securityScopeId]
     );
