@@ -1031,4 +1031,168 @@ describe('Security scope search (integration)', function () {
       expect(remaining.rows[0].anchor_submission_feature_id).to.equal(feat1);
     });
   });
+
+  describe('Upload status → anchor eligibility', () => {
+    /**
+     * Override the submission_upload_status for a feature's upload.
+     * createTestFeature defaults to 'approved'; this lets tests flip to other states.
+     */
+    async function setUploadStatus(submissionFeatureId: number, status: string): Promise<void> {
+      await connection.sql(SQL`
+        UPDATE submission_upload_status
+        SET status = ${status}::submission_upload_status_type
+        WHERE submission_upload_id = (
+          SELECT submission_upload_id
+          FROM submission_feature
+          WHERE submission_feature_id = ${submissionFeatureId}
+        );
+      `);
+    }
+
+    it('should exclude features from denied uploads when computing anchors', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Denied Dataset' });
+
+      await secureFeature(dataset);
+      await setUploadStatus(dataset, 'denied');
+
+      const urn = `urn:${submissionId}:*:*`;
+      const policyId = await createPolicy('denied-upload-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      expect(await countAnchors(scopeId)).to.equal(0);
+    });
+
+    it('should exclude features from unreviewed uploads when computing anchors', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Unreviewed Dataset' });
+
+      await secureFeature(dataset);
+      await setUploadStatus(dataset, 'submitted');
+
+      const urn = `urn:${submissionId}:*:*`;
+      const policyId = await createPolicy('unreviewed-upload-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      expect(await countAnchors(scopeId)).to.equal(0);
+    });
+
+    it('should include features from approved uploads when computing anchors', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Approved Dataset' });
+
+      await secureFeature(dataset);
+      // createTestFeature already sets status = 'approved', no override needed
+
+      const urn = `urn:${submissionId}:*:*`;
+      const policyId = await createPolicy('approved-upload-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      expect(await countAnchors(scopeId)).to.equal(1);
+    });
+  });
+
+  describe('Narrowed URN anchor computation', () => {
+    it('should anchor a specific feature by ID even when its ancestor is secured', async () => {
+      // Hierarchy: dataset → observation → telemetry
+      // Secured:   YES        NO            YES
+      // URN:       urn:{submissionId}:*:{telemetryId}  (targets telemetry by ID)
+      //
+      // Bug: the ancestor walk finds dataset (secured) and excludes telemetry
+      // from being an anchor. But the URN explicitly names telemetry — it must
+      // be the anchor regardless of what's above it.
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
+      const observation = await createTestFeature(connection, submissionId, 'species_observation', { name: 'Obs' }, dataset);
+      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Telem' }, observation);
+
+      await secureFeature(dataset);
+      await secureFeature(telemetry);
+
+      const urn = `urn:${submissionId}:*:${telemetry}`;
+      const policyId = await createPolicy('specific-feature-urn-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      const anchors = await connection.sql(SQL`
+        SELECT anchor_submission_feature_id FROM security_scope_anchor
+        WHERE security_scope_id = ${scopeId};
+      `);
+
+      const anchorIds = anchors.rows.map(
+        (r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id
+      );
+      // The URN names this feature directly — it MUST be an anchor
+      expect(anchorIds).to.include(telemetry);
+      expect(anchorIds).to.have.lengthOf(1);
+    });
+
+    it('should anchor type-scoped features even when a different-type ancestor is secured', async () => {
+      // Hierarchy: dataset → observation → telemetry
+      // Secured:   YES        YES           YES
+      // URN:       urn:{submissionId}:telemetry:*  (targets only telemetry type)
+      //
+      // Bug: the ancestor walk finds observation (secured) and excludes telemetry.
+      // But observation is not a telemetry feature — it shouldn't affect anchoring
+      // for a telemetry-scoped URN.
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
+      const observation = await createTestFeature(connection, submissionId, 'species_observation', { name: 'Obs' }, dataset);
+      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Telem' }, observation);
+
+      await secureFeature(dataset);
+      await secureFeature(observation);
+      await secureFeature(telemetry);
+
+      const urn = `urn:${submissionId}:telemetry:*`;
+      const policyId = await createPolicy('type-scoped-urn-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      const anchors = await connection.sql(SQL`
+        SELECT anchor_submission_feature_id FROM security_scope_anchor
+        WHERE security_scope_id = ${scopeId};
+      `);
+
+      const anchorIds = anchors.rows.map(
+        (r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id
+      );
+      // Telemetry is the only candidate for this scope — secured ancestors of
+      // different types should not prevent it from being an anchor
+      expect(anchorIds).to.include(telemetry);
+      expect(anchorIds).to.have.lengthOf(1);
+    });
+
+    it('should anchor a specific feature by ID with wildcard submission', async () => {
+      // Hierarchy: dataset → observation → telemetry
+      // Secured:   YES        NO            YES
+      // URN:       urn:*:*:{telemetryId}  (wildcard submission, targets feature by ID)
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
+      const observation = await createTestFeature(connection, submissionId, 'species_observation', { name: 'Obs' }, dataset);
+      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Telem' }, observation);
+
+      await secureFeature(dataset);
+      await secureFeature(telemetry);
+
+      const urn = `urn:*:*:${telemetry}`;
+      const policyId = await createPolicy('wildcard-sub-specific-feature-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      const anchors = await connection.sql(SQL`
+        SELECT anchor_submission_feature_id FROM security_scope_anchor
+        WHERE security_scope_id = ${scopeId};
+      `);
+
+      const anchorIds = anchors.rows.map(
+        (r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id
+      );
+      expect(anchorIds).to.include(telemetry);
+      expect(anchorIds).to.have.lengthOf(1);
+    });
+  });
 });

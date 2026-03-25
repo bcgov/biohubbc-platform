@@ -72,6 +72,12 @@ export async function createTestFeature(
   `);
   const submissionUploadId = bridgeResult.rows[0].submission_upload_id;
 
+  // Mark the upload as approved so features are eligible for security scope anchors
+  await connection.sql(SQL`
+    INSERT INTO submission_upload_status (submission_upload_id, status, create_user)
+    VALUES (${submissionUploadId}, 'approved', ${systemUserId});
+  `);
+
   const result = await connection.sql(SQL`
     INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, create_user)
     VALUES (

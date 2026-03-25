@@ -121,6 +121,9 @@ export class SecurityScopeRepository extends BaseRepository {
    * happens — the walk-up search strategy checks from the candidate up to the
    * anchor, not from the anchor down.
    *
+   * Only features from approved uploads are eligible — features still under
+   * review (status = 'submitted') must not affect security scope anchors.
+   *
    * Only the topmost secured features (those with no secured ancestor at any
    * depth) are anchors. A secured feature whose parent or grandparent is also
    * secured is not an anchor — only the highest secured node in each chain
@@ -161,6 +164,9 @@ export class SecurityScopeRepository extends BaseRepository {
         JOIN submission_feature_security sfs
           ON sfs.submission_feature_id = sf.submission_feature_id
           AND sfs.record_end_date IS NULL
+        JOIN submission_upload_status sus
+          ON sus.submission_upload_id = sf.submission_upload_id
+          AND sus.status = 'approved'
         CROSS JOIN scope_urn su
         WHERE sf.record_end_date IS NULL
           AND (su.urn_submission_id = sf.submission_id::text OR su.urn_submission_id = '*')
@@ -183,18 +189,16 @@ export class SecurityScopeRepository extends BaseRepository {
         WHERE sf.parent_submission_feature_id IS NOT NULL
           AND sf.record_end_date IS NULL
       ),
-      -- Candidates where ANY ancestor is already secured — not root-level
-      has_secured_ancestor AS (
+      -- Candidates where an ancestor is also a candidate for this same scope
+      has_candidate_ancestor AS (
         SELECT DISTINCT aw.candidate_id
         FROM ancestor_walk aw
-        JOIN submission_feature_security sfs
-          ON sfs.submission_feature_id = aw.ancestor_id
-          AND sfs.record_end_date IS NULL
+        WHERE aw.ancestor_id IN (SELECT submission_feature_id FROM candidates)
       )
       SELECT c.submission_feature_id
       FROM candidates c
       WHERE c.submission_feature_id NOT IN (
-        SELECT candidate_id FROM has_secured_ancestor
+        SELECT candidate_id FROM has_candidate_ancestor
       )`,
       [securityScopeId]
     );
