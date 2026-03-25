@@ -21,6 +21,7 @@ describe('Header', () => {
     expect(getByTestId('submissions-header-item')).toBeVisible();
     expect(getByTestId('tickets-header-item')).toBeVisible();
     expect(getByTestId('manage-users-header-item')).toBeVisible();
+    expect(getByTestId('security-header-item')).toBeVisible();
   });
 
   it('renders correctly with system admin role (BCeID Business)', () => {
@@ -40,6 +41,7 @@ describe('Header', () => {
     expect(getByTestId('submissions-header-item')).toBeVisible();
     expect(getByTestId('tickets-header-item')).toBeVisible();
     expect(getByTestId('manage-users-header-item')).toBeVisible();
+    expect(getByTestId('security-header-item')).toBeVisible();
   });
 
   it('renders correctly with system admin role (BCeID Basic)', () => {
@@ -59,6 +61,7 @@ describe('Header', () => {
     expect(getByTestId('submissions-header-item')).toBeVisible();
     expect(getByTestId('tickets-header-item')).toBeVisible();
     expect(getByTestId('manage-users-header-item')).toBeVisible();
+    expect(getByTestId('security-header-item')).toBeVisible();
   });
 
   it('renders the username and logout button', () => {

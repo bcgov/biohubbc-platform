@@ -201,6 +201,16 @@ const Header = () => {
                     Policies
                   </MenuItem>
                 </SystemRoleGuard>
+                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}>
+                  <MenuItem
+                    id="menu_admin_security_sm"
+                    component={RouterLink}
+                    to="/admin/security"
+                    onClick={hideMobileMenu}
+                    data-testid="collapsed_security-header-item">
+                    Security
+                  </MenuItem>
+                </SystemRoleGuard>
                 <MenuItem
                   component="button"
                   onClick={showSupportDialog}
@@ -278,6 +288,11 @@ const Header = () => {
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}>
                   <RouterLink to="/admin/policies" id="menu_admin_policies" data-testid="policies-header-item">
                     Policies
+                  </RouterLink>
+                </SystemRoleGuard>
+                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}>
+                  <RouterLink to="/admin/security" id="menu_admin_security" data-testid="security-header-item">
+                    Security
                   </RouterLink>
                 </SystemRoleGuard>
                 <Button
