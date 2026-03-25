@@ -33,8 +33,8 @@ describe('archive upload handler', () => {
       partSizeBytes: 5242880,
       partCount: 2,
       presignedUrls: [
-        { partNumber: 1, url: 'https://example.com/part1' },
-        { partNumber: 2, url: 'https://example.com/part2' }
+        { partNumber: 1, url: 'https://example.com/part1', partSizeBytes: 5242880 },
+        { partNumber: 2, url: 'https://example.com/part2', partSizeBytes: 1234 }
       ]
     };
 
@@ -127,7 +127,7 @@ describe('archive upload handler', () => {
       key: 'mock-key',
       partSizeBytes: 5242880,
       partCount: 1,
-      presignedUrls: [{ partNumber: 1, url: 'https://example.com/part1' }]
+      presignedUrls: [{ partNumber: 1, url: 'https://example.com/part1', partSizeBytes: 12345 }]
     } as PresignedUploadUrlResponse);
 
     const requestHandler = startUpload();

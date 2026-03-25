@@ -47,6 +47,8 @@ export const CreateSubmissionPage = () => {
     const { file, ...submission } = values;
 
     try {
+      // Read the selected tarball bytes once; the backend uses this exact size
+      // to compute part layout and presigned URL count.
       const tarData = await fileToUint8Array(file);
 
       // Request pre-signed upload URLs for multipart upload
@@ -54,10 +56,12 @@ export const CreateSubmissionPage = () => {
         ...submission,
         bytes: tarData.length
       });
-      const uploadUrls = uploadResponse.presignedUrls.map((presigned) => presigned.url);
 
+      // Client follows backend-provided multipart instructions:
+      // - `presignedUrls` already include server-assigned part numbers.
+      // - each part includes an exact `partSizeBytes` instruction.
       // Upload TAR file in multiple parts
-      const parts = await uploadMultipartTar(uploadUrls, tarData);
+      const parts = await uploadMultipartTar(uploadResponse.presignedUrls, tarData);
 
       // Mark upload as complete
       await bioHubApi.submissions.completeSubmissionUpload(

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { PresignedUrl } from 'interfaces/useSubmissionsApi.interface';
 
 /**
  * TAR file constants
@@ -196,31 +197,40 @@ const concatenateChunks = (chunks: Uint8Array[]): Uint8Array => {
 };
 
 /**
- * Splits TAR data into equal-sized chunks for multipart upload operations.
- * Each chunk (except possibly the last) will be approximately the same size,
- * calculated by dividing the total data length by the number of desired chunks.
+ * Splits TAR data into chunks using exact backend per-part byte instructions.
+ *
+ * Example:
+ * - backend parts: [{part:1,size:5MiB}, {part:2,size:5MiB}, {part:3,size:3MiB}]
+ * - client slices the tarball as [0..5MiB), [5..10MiB), [10..13MiB)
  *
  * @param tarData - The complete TAR archive data to split
- * @param numChunks - Number of chunks to create (must be positive)
- * @returns Array of Uint8Array chunks ready for parallel upload
- * @throws {Error} When numChunks is zero or negative
+ * @param orderedPresignedParts - Presigned parts sorted by part number
+ * @returns Array of Uint8Array chunks ready for upload
+ * @throws {Error} When instructions are invalid or do not match file size
  */
-const splitTarDataIntoChunks = (tarData: Uint8Array, numChunks: number): Uint8Array[] => {
-  if (numChunks <= 0) {
-    throw new Error('Number of chunks must be positive');
+const splitTarDataIntoChunks = (tarData: Uint8Array, orderedPresignedParts: PresignedUrl[]): Uint8Array[] => {
+  if (!orderedPresignedParts.length) {
+    throw new Error('Part count must be positive');
   }
 
-  if (numChunks === 1) {
-    return [tarData];
+  const expectedBytes = orderedPresignedParts.reduce((sum, part) => sum + part.partSizeBytes, 0);
+  if (expectedBytes !== tarData.length) {
+    // Defensive check: prevents uploading malformed part payloads when
+    // backend instructions and client file size do not line up.
+    throw new Error('Part instructions do not match file size.');
   }
 
-  const chunkSize = Math.ceil(tarData.length / numChunks);
   const chunks: Uint8Array[] = [];
+  let start = 0;
 
-  for (let i = 0; i < numChunks; i++) {
-    const start = i * chunkSize;
-    const end = Math.min(start + chunkSize, tarData.length);
+  for (const part of orderedPresignedParts) {
+    if (!Number.isFinite(part.partSizeBytes) || part.partSizeBytes <= 0) {
+      throw new Error(`Invalid part size for part ${part.partNumber}.`);
+    }
+
+    const end = start + part.partSizeBytes;
     chunks.push(tarData.slice(start, end));
+    start = end;
   }
 
   return chunks;
@@ -264,7 +274,7 @@ const uploadChunk = async (url: string, chunk: Uint8Array, partNumber: number): 
  * then uploads chunks in parallel batches to respect concurrency limits.
  * Progress can be tracked via optional callback function.
  *
- * @param presignedUrls - Array of presigned URLs for multipart upload (must not be empty)
+ * @param presignedParts - Array of presigned part instructions for multipart upload
  * @param tarData - The complete TAR archive data to upload (must not be empty)
  * @param options - Configuration options for upload behavior
  * @param options.concurrencyLimit - Maximum number of simultaneous uploads (default: 4)
@@ -273,7 +283,7 @@ const uploadChunk = async (url: string, chunk: Uint8Array, partNumber: number): 
  * @throws {Error} When URLs/data are invalid, upload fails, or concurrency limit is invalid
  */
 export const uploadMultipartTar = async (
-  presignedUrls: string[],
+  presignedParts: PresignedUrl[],
   tarData: Uint8Array,
   options: {
     concurrencyLimit?: number;
@@ -282,8 +292,8 @@ export const uploadMultipartTar = async (
 ): Promise<UploadResult[]> => {
   const { concurrencyLimit = 4, onProgress } = options;
 
-  if (!presignedUrls.length) {
-    throw new Error('Presigned URLs are required');
+  if (!presignedParts.length) {
+    throw new Error('Presigned parts are required');
   }
 
   if (!tarData.length) {
@@ -294,19 +304,23 @@ export const uploadMultipartTar = async (
     throw new Error('Concurrency limit must be positive');
   }
 
-  const chunks = splitTarDataIntoChunks(tarData, presignedUrls.length);
+  // Apply backend-provided ordering so PartNumber values line up exactly with
+  // what was signed during URL provisioning.
+  const orderedPresignedParts = [...presignedParts].sort((a, b) => a.partNumber - b.partNumber);
+  const chunks = splitTarDataIntoChunks(tarData, orderedPresignedParts);
   const results: UploadResult[] = [];
 
-  for (let i = 0; i < presignedUrls.length; i += concurrencyLimit) {
-    const urlBatch = presignedUrls.slice(i, i + concurrencyLimit);
+  for (let i = 0; i < orderedPresignedParts.length; i += concurrencyLimit) {
+    const partBatch = orderedPresignedParts.slice(i, i + concurrencyLimit);
     const dataBatch = chunks.slice(i, i + concurrencyLimit);
 
+    // Upload each batch in parallel while preserving deterministic part numbers.
     const batchResults = await Promise.all(
-      urlBatch.map((url, index) => uploadChunk(url, dataBatch[index], i + index + 1))
+      partBatch.map((part, index) => uploadChunk(part.url, dataBatch[index], part.partNumber))
     );
 
     results.push(...batchResults);
-    onProgress?.(results.length, presignedUrls.length);
+    onProgress?.(results.length, orderedPresignedParts.length);
   }
 
   return results.sort((a, b) => a.PartNumber - b.PartNumber);

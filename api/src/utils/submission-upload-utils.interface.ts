@@ -6,7 +6,7 @@ export interface MultipartUploadParams {
 
 export interface MultipartUploadResult {
   uploadId: string;
-  presignedUrls: Array<{ partNumber: number; url: string }>;
+  presignedUrls: Array<{ partNumber: number; url: string; partSizeBytes: number }>;
   partSizeBytes: number;
   partCount: number;
 }

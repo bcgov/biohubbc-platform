@@ -42,7 +42,8 @@ import { fileURLToPath } from 'url';
       },
       SITEMINDER_LOGOUT_URL: process.env.VITE_SITEMINDER_LOGOUT_URL,
       MAX_UPLOAD_NUM_FILES: Number(process.env.VITE_MAX_UPLOAD_NUM_FILES),
-      MAX_UPLOAD_FILE_SIZE: Number(process.env.VITE_MAX_UPLOAD_FILE_SIZE)
+      MAX_UPLOAD_FILE_SIZE: Number(process.env.VITE_MAX_UPLOAD_FILE_SIZE),
+      MAX_UPLOAD_TARBALL_SIZE: Number(process.env.VITE_MAX_UPLOAD_TARBALL_SIZE)
     };
     resp.status(200).json(config);
   });

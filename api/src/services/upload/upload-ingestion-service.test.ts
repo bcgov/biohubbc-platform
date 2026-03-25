@@ -84,8 +84,8 @@ describe('UploadIngestionService', () => {
       const mockPresigned = {
         uploadId: mockS3UploadId,
         presignedUrls: [
-          { partNumber: 1, url: 'https://s3-url-1' },
-          { partNumber: 2, url: 'https://s3-url-2' }
+          { partNumber: 1, url: 'https://s3-url-1', partSizeBytes: 5_000_000 },
+          { partNumber: 2, url: 'https://s3-url-2', partSizeBytes: 100_000 }
         ],
         partSizeBytes: 5_000_000,
         partCount: 2

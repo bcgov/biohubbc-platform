@@ -8,8 +8,8 @@ export const CreateSubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     bytes: {
       type: 'integer',
       minimum: 1,
-      maximum: 1073741824,
-      description: 'The expected size of the file to be uploaded in bytes (max 1 GB).'
+      maximum: 10737418240,
+      description: 'The expected size of the file to be uploaded in bytes (max 10 GB).'
     },
     name: {
       type: 'string',
@@ -84,7 +84,7 @@ export const CreateSubmissionUploadResponseSchema: OpenAPIV3.SchemaObject = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['partNumber', 'url'],
+        required: ['partNumber', 'url', 'partSizeBytes'],
         properties: {
           partNumber: {
             type: 'integer',
@@ -93,6 +93,11 @@ export const CreateSubmissionUploadResponseSchema: OpenAPIV3.SchemaObject = {
           url: {
             type: 'string',
             format: 'uri'
+          },
+          partSizeBytes: {
+            type: 'integer',
+            minimum: 1,
+            description: 'Exact byte size for this part upload.'
           }
         }
       }
@@ -111,8 +116,8 @@ export const SubmissionUploadRequestSchema: OpenAPIV3.SchemaObject = {
     bytes: {
       type: 'integer',
       minimum: 1,
-      maximum: 1073741824,
-      description: 'The expected size of the file to be uploaded in bytes (max 1 GB).'
+      maximum: 10737418240,
+      description: 'The expected size of the file to be uploaded in bytes (max 10 GB).'
     },
     name: {
       type: 'string',

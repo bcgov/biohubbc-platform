@@ -123,6 +123,7 @@ export type SubmissionFeatureSignedUrlPayload = {
 export interface PresignedUrl {
   partNumber: number;
   url: string;
+  partSizeBytes: number;
 }
 export interface PresignedUploadUrlResponse {
   submissionId: number;

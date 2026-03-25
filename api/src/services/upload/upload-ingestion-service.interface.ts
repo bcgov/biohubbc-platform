@@ -6,6 +6,7 @@ export interface UploadPart {
 interface PresignedUrl {
   partNumber: number;
   url: string;
+  partSizeBytes: number;
 }
 
 export interface PresignedUploadUrlResponse {
