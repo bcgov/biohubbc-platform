@@ -124,12 +124,13 @@ export class SecurityScopeRepository extends BaseRepository {
    * Only features from approved uploads are eligible — features still under
    * review (status = 'submitted') must not affect security scope anchors.
    *
-   * Only the topmost secured features (those with no secured ancestor at any
-   * depth) are anchors. A secured feature whose parent or grandparent is also
-   * secured is not an anchor — only the highest secured node in each chain
-   * qualifies. This prevents duplicate walk-up hits when both an ancestor and
-   * descendant are secured by the same scope. Uses a recursive CTE to walk the
-   * full parent chain — submission_feature trees can be arbitrarily deep.
+   * Only the topmost candidates — features with no ancestor that is also a
+   * candidate for the same scope — are anchors. A narrowed URN like
+   * `urn:10:*:55` won't be excluded by a secured ancestor of a different type
+   * that isn't a candidate for this scope. For wildcard scopes (`urn:*:*:*`)
+   * all secured features are candidates, so the behavior collapses to "no
+   * secured ancestor." Uses a recursive CTE to walk the full parent chain —
+   * submission_feature trees can be arbitrarily deep.
    *
    * Uses a server-side cursor to avoid materializing the full result set in
    * memory. Wildcard scopes (`urn:*:*:*`) can match millions of secured features;
@@ -337,27 +338,29 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
-   * Wipe and re-derive team_security_scope for a team.
+   * Delete all team_security_scope rows for a team.
    *
-   * Walks the full team_policy → policy_statement → policy_statement_scope chain
-   * to rebuild the team's scope grants from scratch.
-   *
-   * Why wipe-and-re-derive instead of surgical removal: a team can reach the same
-   * scope through multiple policies. Removing scopes from a deleted policy requires
-   * a graph reachability check (is the scope still reachable through another policy?).
-   * At ~30 rows per team, DELETE + INSERT completes in < 1ms — faster than the
-   * reachability query and guaranteed correct.
-   *
-   * @param teamId UUID of the team to rebuild scopes for
+   * @param teamId UUID of the team
    */
-  async rebuildTeamSecurityScopes(teamId: string): Promise<void> {
-    const deleteSql = SQL`
+  async deleteTeamSecurityScopes(teamId: string): Promise<void> {
+    const sqlStatement = SQL`
       DELETE FROM team_security_scope WHERE team_id = ${teamId};
     `;
 
-    await this.connection.sql(deleteSql);
+    await this.connection.sql(sqlStatement);
+  }
 
-    const insertSql = SQL`
+  /**
+   * Re-derive team_security_scope rows for a team from the active policy chain.
+   *
+   * Walks team_policy → policy_statement → policy_statement_scope to find all
+   * scopes the team should have access to. ON CONFLICT DO NOTHING handles
+   * duplicate scopes reached through multiple policies.
+   *
+   * @param teamId UUID of the team
+   */
+  async insertTeamSecurityScopesFromPolicyChain(teamId: string): Promise<void> {
+    const sqlStatement = SQL`
       INSERT INTO team_security_scope (team_id, security_scope_id)
       SELECT tp.team_id, pss.security_scope_id
       FROM team_policy tp
@@ -371,7 +374,7 @@ export class SecurityScopeRepository extends BaseRepository {
       ON CONFLICT (team_id, security_scope_id) DO NOTHING;
     `;
 
-    await this.connection.sql(insertSql);
+    await this.connection.sql(sqlStatement);
   }
 
   /**
@@ -381,9 +384,9 @@ export class SecurityScopeRepository extends BaseRepository {
    * finds scopes that may need new anchors computed for the affected submission.
    *
    * @param submissionId The submission ID to match against scope URNs
-   * @returns Array of security_scope_id strings for matching scopes
+   * @returns Array of SecurityScopeId rows for matching scopes
    */
-  async findScopeIdsMatchingSubmission(submissionId: number): Promise<string[]> {
+  async findScopeIdsMatchingSubmission(submissionId: number): Promise<SecurityScopeId[]> {
     const sqlStatement = SQL`
       SELECT DISTINCT pss.security_scope_id
       FROM policy_statement ps
@@ -392,8 +395,8 @@ export class SecurityScopeRepository extends BaseRepository {
         AND (ps.urn_submission_id = ${String(submissionId)} OR ps.urn_submission_id = '*');
     `;
 
-    const response = await this.connection.sql(sqlStatement, SecurityScope);
+    const response = await this.connection.sql(sqlStatement, SecurityScopeId);
 
-    return response.rows.map((row) => row.security_scope_id);
+    return response.rows;
   }
 }

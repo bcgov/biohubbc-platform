@@ -294,11 +294,8 @@ describe('SecurityScopeRepository', () => {
   });
 
   describe('findScopeIdsMatchingSubmission', () => {
-    it('returns an array of security_scope_id strings', async () => {
-      const mockRows = [
-        { security_scope_id: 'scope-1', scope_hash: 'hash-1' },
-        { security_scope_id: 'scope-2', scope_hash: 'hash-2' }
-      ];
+    it('returns an array of SecurityScopeId objects', async () => {
+      const mockRows = [{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }];
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => mockQueryResult(mockRows)
@@ -307,7 +304,7 @@ describe('SecurityScopeRepository', () => {
       const repository = new SecurityScopeRepository(mockDBConnection);
       const result = await repository.findScopeIdsMatchingSubmission(42);
 
-      expect(result).to.eql(['scope-1', 'scope-2']);
+      expect(result).to.eql([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }]);
     });
 
     it('returns an empty array when no scopes match', async () => {

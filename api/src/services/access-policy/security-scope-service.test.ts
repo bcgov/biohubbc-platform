@@ -91,7 +91,10 @@ describe('SecurityScopeService', () => {
         .stub(SecurityScopeRepository.prototype, 'findScopeIdsForStatements')
         .resolves([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }]);
       const deleteStub = sinon.stub(SecurityScopeRepository.prototype, 'deletePolicyStatementScopes').resolves();
-      const rebuildStub = sinon.stub(SecurityScopeRepository.prototype, 'rebuildTeamSecurityScopes').resolves();
+      const deleteTeamScopesStub = sinon.stub(SecurityScopeRepository.prototype, 'deleteTeamSecurityScopes').resolves();
+      const insertFromChainStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesFromPolicyChain')
+        .resolves();
       const orphanStub = sinon.stub(SecurityScopeRepository.prototype, 'deleteAnchorsForOrphanedScopes').resolves();
 
       await service.cleanupScopesForDeletedStatements(['ps-1', 'ps-2'], ['team-a', 'team-b']);
@@ -101,9 +104,12 @@ describe('SecurityScopeService', () => {
       expect(getScopeIdsStub).to.have.been.calledBefore(deleteStub);
 
       expect(deleteStub).to.have.been.calledOnceWith(['ps-1', 'ps-2']);
-      expect(rebuildStub).to.have.been.calledTwice;
-      expect(rebuildStub.firstCall).to.have.been.calledWith('team-a');
-      expect(rebuildStub.secondCall).to.have.been.calledWith('team-b');
+      expect(deleteTeamScopesStub).to.have.been.calledTwice;
+      expect(deleteTeamScopesStub.firstCall).to.have.been.calledWith('team-a');
+      expect(deleteTeamScopesStub.secondCall).to.have.been.calledWith('team-b');
+      expect(insertFromChainStub).to.have.been.calledTwice;
+      expect(insertFromChainStub.firstCall).to.have.been.calledWith('team-a');
+      expect(insertFromChainStub.secondCall).to.have.been.calledWith('team-b');
 
       // Orphaned anchor cleanup happens after mappings are deleted
       expect(orphanStub).to.have.been.calledOnceWith(['scope-1', 'scope-2']);
@@ -113,20 +119,21 @@ describe('SecurityScopeService', () => {
     it('deletes mappings but skips rebuild when no affected teams', async () => {
       sinon.stub(SecurityScopeRepository.prototype, 'findScopeIdsForStatements').resolves([{ security_scope_id: 'scope-1' }]);
       const deleteStub = sinon.stub(SecurityScopeRepository.prototype, 'deletePolicyStatementScopes').resolves();
-      const rebuildStub = sinon.stub(SecurityScopeRepository.prototype, 'rebuildTeamSecurityScopes').resolves();
+      sinon.stub(SecurityScopeRepository.prototype, 'deleteTeamSecurityScopes').resolves();
+      sinon.stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesFromPolicyChain').resolves();
       const orphanStub = sinon.stub(SecurityScopeRepository.prototype, 'deleteAnchorsForOrphanedScopes').resolves();
 
       await service.cleanupScopesForDeletedStatements(['ps-1'], []);
 
       expect(deleteStub).to.have.been.calledOnceWith(['ps-1']);
-      expect(rebuildStub).not.to.have.been.called;
       expect(orphanStub).to.have.been.calledOnceWith(['scope-1']);
     });
 
     it('skips orphan cleanup when no scopes were affected', async () => {
       sinon.stub(SecurityScopeRepository.prototype, 'findScopeIdsForStatements').resolves([]);
       sinon.stub(SecurityScopeRepository.prototype, 'deletePolicyStatementScopes').resolves();
-      sinon.stub(SecurityScopeRepository.prototype, 'rebuildTeamSecurityScopes').resolves();
+      sinon.stub(SecurityScopeRepository.prototype, 'deleteTeamSecurityScopes').resolves();
+      sinon.stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesFromPolicyChain').resolves();
       const orphanStub = sinon.stub(SecurityScopeRepository.prototype, 'deleteAnchorsForOrphanedScopes').resolves();
 
       await service.cleanupScopesForDeletedStatements(['ps-1'], ['team-a']);
@@ -136,12 +143,17 @@ describe('SecurityScopeService', () => {
   });
 
   describe('rebuildTeamSecurityScopes', () => {
-    it('delegates to repository', async () => {
-      const stub = sinon.stub(SecurityScopeRepository.prototype, 'rebuildTeamSecurityScopes').resolves();
+    it('deletes then re-derives team scopes from the policy chain', async () => {
+      const deleteStub = sinon.stub(SecurityScopeRepository.prototype, 'deleteTeamSecurityScopes').resolves();
+      const insertStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesFromPolicyChain')
+        .resolves();
 
       await service.rebuildTeamSecurityScopes('team-1');
 
-      expect(stub).to.have.been.calledOnceWith('team-1');
+      expect(deleteStub).to.have.been.calledOnceWith('team-1');
+      expect(insertStub).to.have.been.calledOnceWith('team-1');
+      expect(deleteStub).to.have.been.calledBefore(insertStub);
     });
   });
 
@@ -159,7 +171,7 @@ describe('SecurityScopeService', () => {
     it('publishes anchor computation jobs for each matching scope', async () => {
       const findStub = sinon
         .stub(SecurityScopeRepository.prototype, 'findScopeIdsMatchingSubmission')
-        .resolves(['scope-1', 'scope-2']);
+        .resolves([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }]);
       const publishStub = sinon
         .stub(publisher, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });

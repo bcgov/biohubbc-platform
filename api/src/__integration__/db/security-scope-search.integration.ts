@@ -683,7 +683,8 @@ describe('Security scope search (integration)', function () {
       // Create new statement and scope chain for sub2
       const newStmtId = await createPolicyStatement(policyId, `urn:${sub2}:*:*`);
       await setupScopeChain(newStmtId, `urn:${sub2}:*:*`);
-      await scopeRepo.rebuildTeamSecurityScopes(teamId);
+      await scopeRepo.deleteTeamSecurityScopes(teamId);
+      await scopeRepo.insertTeamSecurityScopesFromPolicyChain(teamId);
 
       // After: sub2 accessible, sub1 not
       expect((await searchInSubmission(sub1, ['dataset'], userId)).map((r) => r.submission_feature_id)).to.not.include(
@@ -723,7 +724,8 @@ describe('Security scope search (integration)', function () {
         UPDATE team_policy SET record_end_date = now()
         WHERE team_policy_id = ${teamPolicyId};
       `);
-      await scopeRepo.rebuildTeamSecurityScopes(teamId);
+      await scopeRepo.deleteTeamSecurityScopes(teamId);
+      await scopeRepo.insertTeamSecurityScopesFromPolicyChain(teamId);
 
       // team_security_scope rows removed
       expect(await countTeamScopes(teamId)).to.equal(0);
@@ -776,7 +778,8 @@ describe('Security scope search (integration)', function () {
         UPDATE team_policy SET record_end_date = now()
         WHERE team_policy_id = ${tpA};
       `);
-      await scopeRepo.rebuildTeamSecurityScopes(teamId);
+      await scopeRepo.deleteTeamSecurityScopes(teamId);
+      await scopeRepo.insertTeamSecurityScopesFromPolicyChain(teamId);
 
       // After: team has 1 scope, sub2 still accessible, sub1 blocked
       expect(await countTeamScopes(teamId)).to.equal(1);
@@ -825,7 +828,8 @@ describe('Security scope search (integration)', function () {
         UPDATE team_policy SET record_end_date = now()
         WHERE team_policy_id = ${tpA};
       `);
-      await scopeRepo.rebuildTeamSecurityScopes(teamId);
+      await scopeRepo.deleteTeamSecurityScopes(teamId);
+      await scopeRepo.insertTeamSecurityScopesFromPolicyChain(teamId);
 
       // After: still 1 scope (via Policy B), user still sees feature
       expect(await countTeamScopes(teamId)).to.equal(1);

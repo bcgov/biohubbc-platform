@@ -80,7 +80,7 @@ export class SecurityScopeService extends DBService {
     await this.securityScopeRepository.deletePolicyStatementScopes(policyStatementIds);
 
     for (const teamId of affectedTeamIds) {
-      await this.securityScopeRepository.rebuildTeamSecurityScopes(teamId);
+      await this.rebuildTeamSecurityScopes(teamId);
     }
 
     // Clean up anchors for scopes that lost all policy_statement_scope references.
@@ -92,16 +92,22 @@ export class SecurityScopeService extends DBService {
   }
 
   /**
-   * Rebuild team_security_scope for a team by re-deriving from the full policy chain.
+   * Wipe and re-derive team_security_scope for a team from the full policy chain.
+   *
+   * Why wipe-and-re-derive instead of surgical removal: a team can reach the same
+   * scope through multiple policies. Removing scopes from a deleted policy requires
+   * a graph reachability check (is the scope still reachable through another policy?).
+   * At ~30 rows per team, DELETE + INSERT completes in < 1ms — faster than the
+   * reachability query and guaranteed correct.
    *
    * Synchronous because team_security_scope holds ~30 rows per team at scale.
-   * DELETE + INSERT of 30 rows completes in < 1ms. The old team_feature rebuild
-   * moved millions of rows and required an async pg-boss job.
+   * The old team_feature rebuild moved millions of rows and required an async pg-boss job.
    *
    * @param teamId UUID of the team to rebuild
    */
   async rebuildTeamSecurityScopes(teamId: string): Promise<void> {
-    await this.securityScopeRepository.rebuildTeamSecurityScopes(teamId);
+    await this.securityScopeRepository.deleteTeamSecurityScopes(teamId);
+    await this.securityScopeRepository.insertTeamSecurityScopesFromPolicyChain(teamId);
   }
 
   /**
@@ -127,14 +133,14 @@ export class SecurityScopeService extends DBService {
    * @param submissionId The submission whose features gained security rules
    */
   async triggerAnchorComputationForSubmission(submissionId: number): Promise<void> {
-    const scopeIds = await this.securityScopeRepository.findScopeIdsMatchingSubmission(submissionId);
+    const scopes = await this.securityScopeRepository.findScopeIdsMatchingSubmission(submissionId);
 
-    if (scopeIds.length === 0) {
+    if (scopes.length === 0) {
       return;
     }
 
-    for (const securityScopeId of scopeIds) {
-      await publishComputeScopeAnchorsJob(this.connection, { securityScopeId });
+    for (const scope of scopes) {
+      await publishComputeScopeAnchorsJob(this.connection, { securityScopeId: scope.security_scope_id });
     }
   }
 
