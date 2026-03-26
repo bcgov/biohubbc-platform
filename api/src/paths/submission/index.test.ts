@@ -74,9 +74,7 @@ describe('submission index', () => {
       });
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-      const stub = sinon
-        .stub(SubmissionService.prototype, 'getSubmissionsByUserId')
-        .resolves([mockSubmission]);
+      const stub = sinon.stub(SubmissionService.prototype, 'getSubmissionsByUserId').resolves([mockSubmission]);
 
       const requestHandler = getSubmissions();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();

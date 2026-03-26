@@ -214,7 +214,9 @@ describe('UploadIngestionService', () => {
       const mockS3UploadId = 's3-append-1';
       const mockBytes = 3_000_000;
 
-      sinon.stub(SubmissionService.prototype, 'getSubmissionIdByUUID').resolves({ submission_id: existingSubmissionId });
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
+        .resolves({ submission_id: existingSubmissionId });
       sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
         uuid: submissionUuid,
         system_user_id: ownerSystemUserId
