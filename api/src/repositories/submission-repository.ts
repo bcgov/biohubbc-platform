@@ -1257,8 +1257,9 @@ export class SubmissionRepository extends BaseRepository {
         ft.name            AS root_feature_type_name,
         CASE
           WHEN s.security_review_timestamp IS NULL THEN ${SECURITY_APPLIED_STATUS.PENDING}
-          WHEN s.publish_timestamp IS NULL          THEN ${SECURITY_APPLIED_STATUS.SECURED}
-          ELSE ${SECURITY_APPLIED_STATUS.UNSECURED}
+          WHEN COUNT(sfs.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
+          WHEN COUNT(sfs.submission_feature_security_id) = COUNT(sf.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
+          ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
         END AS security,
         COALESCE(ARRAY_REMOVE(ARRAY_AGG(DISTINCT rl.region_name), NULL), '{}') AS regions
       FROM submission s
@@ -1276,6 +1277,8 @@ export class SubmissionRepository extends BaseRepository {
         AND sf.parent_submission_feature_id IS NULL
       INNER JOIN feature_type ft
         ON  ft.feature_type_id = sf.feature_type_id
+      LEFT JOIN submission_feature_security sfs
+        ON  sfs.submission_feature_id = sf.submission_feature_id
       LEFT JOIN submission_regions sr
         ON  sr.submission_id = s.submission_id
       LEFT JOIN region_lookup rl
