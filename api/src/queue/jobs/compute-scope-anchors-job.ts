@@ -1,7 +1,7 @@
 import PgBoss from 'pg-boss';
-import { getAPIUserDBConnection } from '../../database/db';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { getLogger } from '../../utils/logger';
+import { withConnection } from '../with-connection';
 
 const defaultLog = getLogger('queue/jobs/compute-scope-anchors-job');
 
@@ -22,6 +22,12 @@ export interface IComputeScopeAnchorsJobData {
  * once per scope, not per team — if 10 teams share the same policy, anchors
  * are computed once for the shared scope.
  *
+ * Each phase (stale delete, URN resolve, each insert batch) runs in its own
+ * transaction via `runPhase`. This bounds WAL retention to one batch's worth
+ * of writes instead of pinning WAL for the entire multi-minute loop.
+ * ON CONFLICT DO NOTHING makes each batch idempotent — safe to retry on
+ * partial failure.
+ *
  * @param {PgBoss.Job<IComputeScopeAnchorsJobData>[]} jobs The jobs to process
  * @return {*}  {Promise<void>}
  */
@@ -36,23 +42,38 @@ export const computeScopeAnchorsJobHandler: PgBoss.WorkHandler<IComputeScopeAnch
       securityScopeId
     });
 
-    const connection = getAPIUserDBConnection();
-
     try {
-      await connection.open();
+      // Phase 1: Delete stale anchors
+      await withConnection((conn) => new SecurityScopeService(conn).deleteStaleAnchorsForScope(securityScopeId));
 
-      const securityScopeService = new SecurityScopeService(connection);
+      // Phase 2: Resolve URN pattern
+      const urn = await withConnection((conn) => new SecurityScopeService(conn).resolveUrnForScope(securityScopeId));
 
-      // Commit-per-batch: each phase (stale delete, each insert batch) gets its
-      // own transaction. Bounds WAL retention to one batch's worth of writes
-      // instead of pinning WAL for the entire multi-minute loop. ON CONFLICT
-      // DO NOTHING makes each batch idempotent — safe to retry on partial failure.
-      await securityScopeService.computeAnchorsForScope(securityScopeId, async () => {
-        await connection.commit();
-        await connection.query('BEGIN');
-      });
+      if (!urn) {
+        // No active policy statements — stale check already deleted all anchors.
+        defaultLog.info({
+          label: 'computeScopeAnchorsJobHandler',
+          message: 'No active URN for scope, stale anchors cleaned',
+          jobId: job.id,
+          securityScopeId
+        });
+        continue;
+      }
 
-      await connection.commit();
+      // Phase 3: Insert new anchors in keyset-paginated batches
+      let lastId = 0;
+
+      while (true) {
+        const batch = await withConnection((conn) =>
+          new SecurityScopeService(conn).computeAnchorBatch(securityScopeId, urn, lastId)
+        );
+
+        if (!batch) {
+          break;
+        }
+
+        lastId = batch.pageLastId;
+      }
 
       defaultLog.info({
         label: 'computeScopeAnchorsJobHandler',
@@ -61,11 +82,6 @@ export const computeScopeAnchorsJobHandler: PgBoss.WorkHandler<IComputeScopeAnch
         securityScopeId
       });
     } catch (error) {
-      // Roll back whatever transaction may be in progress (e.g., a batch that
-      // failed mid-way). Previously committed batches are safe — ON CONFLICT
-      // DO NOTHING makes retry idempotent.
-      await connection.rollback();
-
       defaultLog.error({
         label: 'computeScopeAnchorsJobHandler',
         message: 'Compute scope anchors job failed',
@@ -75,8 +91,6 @@ export const computeScopeAnchorsJobHandler: PgBoss.WorkHandler<IComputeScopeAnch
       });
 
       throw error; // pg-boss will handle retry based on configuration
-    } finally {
-      connection.release();
     }
   }
 };

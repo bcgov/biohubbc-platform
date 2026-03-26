@@ -4,6 +4,7 @@ import { SecurityScopeRepository } from '../../repositories/authorization/securi
 import { getLogger } from '../../utils/logger';
 import { computeScopeHash } from '../../utils/scope-hash';
 import { DBService } from '../db-service';
+import { AnchorBatchResult, SecurityScopeUrn } from './security-scope-service.interface';
 
 const defaultLog = getLogger('security-scope-service');
 
@@ -148,63 +149,45 @@ export class SecurityScopeService extends DBService {
   }
 
   /**
-   * Compute anchor features for a security scope via delete-stale + batched insert.
+   * Delete stale anchors for a security scope.
    *
-   * Three phases:
-   * 1. Remove stale anchors — features that no longer meet candidate criteria
-   *    (unsecured, unapproved, soft-deleted, or URN mismatch)
-   * 2. Resolve URN pattern for this scope
-   * 3. Insert new anchors in keyset-paginated batches — ON CONFLICT DO NOTHING
-   *    skips features that are already anchored
+   * Removes anchors for features that no longer meet candidate criteria
+   * (unsecured, unapproved, soft-deleted, or URN mismatch). Also handles
+   * orphaned scopes (no policy_statement_scope rows) — all anchors are stale
+   * when no policy statement validates them.
    *
-   * Valid anchors are never deleted, so there is no transient gap where the walk-up
-   * search strategy can't find a matching anchor.
-   *
-   * **Why `onPhaseComplete`:** For broad scopes (`*:*:*`) the batch loop can run
-   * thousands of iterations. A single wrapping transaction pins WAL segments and
-   * blocks VACUUM for the entire duration — minutes at production scale. The job
-   * handler passes a callback that commits and re-begins between phases, bounding
-   * WAL retention to one batch's worth of writes. ON CONFLICT DO NOTHING makes
-   * each batch idempotent, so partial completion + retry is safe.
-   *
-   * Without the callback (e.g., integration tests), all phases run in a single
-   * transaction — safe for rollback-based test isolation.
-   *
-   * Called by the compute-scope-anchors background job after scope creation or
-   * when security rules change on a submission's features.
-   *
-   * @param securityScopeId UUID of the security scope to compute anchors for
-   * @param onPhaseComplete Optional callback invoked between phases — the job handler
-   *   uses this to commit + BEGIN, bounding WAL retention per batch
+   * @param securityScopeId UUID of the security scope
    */
-  async computeAnchorsForScope(securityScopeId: string, onPhaseComplete?: () => Promise<void>): Promise<void> {
-    // Phase 1: Remove stale anchors — features that no longer meet candidate criteria.
-    // Also handles orphaned scopes (no policy_statement_scope rows) — all anchors are
-    // stale when no policy statement validates them.
+  async deleteStaleAnchorsForScope(securityScopeId: string): Promise<void> {
     await this.securityScopeRepository.deleteStaleAnchorsForScope(securityScopeId);
-    await onPhaseComplete?.();
+  }
 
-    // Phase 2: Resolve URN pattern for the insert loop
-    const urn = await this.securityScopeRepository.resolveUrnForScope(securityScopeId);
+  /**
+   * Resolve the URN pattern for a security scope.
+   *
+   * @param securityScopeId UUID of the security scope
+   * @returns URN components, or null if no active policy statements reference this scope
+   */
+  async resolveUrnForScope(securityScopeId: string): Promise<SecurityScopeUrn | null> {
+    return this.securityScopeRepository.resolveUrnForScope(securityScopeId);
+  }
 
-    if (!urn) {
-      // No active policy statements — stale check already deleted all anchors.
-      // If new statements are created later, their scope mapping triggers a fresh job.
-      return;
-    }
-
-    // Phase 3: Insert new anchors in keyset-paginated batches
-    let lastId = 0;
-
-    while (true) {
-      const batch = await this.securityScopeRepository.computeAnchorBatch(securityScopeId, urn, lastId);
-
-      if (!batch) {
-        break;
-      }
-
-      await onPhaseComplete?.();
-      lastId = batch.pageLastId;
-    }
+  /**
+   * Insert one keyset-paginated batch of anchor rows.
+   *
+   * ON CONFLICT DO NOTHING skips features that are already anchored, making each
+   * batch idempotent and safe for partial completion + retry.
+   *
+   * @param securityScopeId UUID of the security scope
+   * @param urn URN components resolved via `resolveUrnForScope`
+   * @param afterId Keyset cursor — pass 0 to start from the beginning
+   * @returns Next cursor position, or null when no more candidates exist
+   */
+  async computeAnchorBatch(
+    securityScopeId: string,
+    urn: SecurityScopeUrn,
+    afterId: number
+  ): Promise<AnchorBatchResult | null> {
+    return this.securityScopeRepository.computeAnchorBatch(securityScopeId, urn, afterId);
   }
 }

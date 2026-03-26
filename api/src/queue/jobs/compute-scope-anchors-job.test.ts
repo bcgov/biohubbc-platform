@@ -26,7 +26,7 @@ describe('computeScopeAnchorsJobHandler', () => {
       data: { securityScopeId }
     } as PgBoss.Job<IComputeScopeAnchorsJobData>);
 
-  it('should compute anchors for scope successfully with commit callback', async () => {
+  it('should compute anchors using one connection per phase', async () => {
     const mockDBConnection = getMockDBConnection();
     const openStub = sinon.stub().resolves();
     const commitStub = sinon.stub().resolves();
@@ -37,18 +37,50 @@ describe('computeScopeAnchorsJobHandler', () => {
 
     sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
-    const computeStub = sinon.stub(SecurityScopeService.prototype, 'computeAnchorsForScope').resolves();
+    const deleteStaleStub = sinon.stub(SecurityScopeService.prototype, 'deleteStaleAnchorsForScope').resolves();
+    const resolveUrnStub = sinon
+      .stub(SecurityScopeService.prototype, 'resolveUrnForScope')
+      .resolves({ urn_submission_id: '*', urn_feature_type: '*', urn_feature_id: '*' });
+    const batchStub = sinon.stub(SecurityScopeService.prototype, 'computeAnchorBatch');
+    batchStub.onFirstCall().resolves({ pageLastId: 100 });
+    batchStub.onSecondCall().resolves(null);
 
     await computeScopeAnchorsJobHandler([createMockJob('scope-uuid-1')]);
 
-    // Service called with scope ID and an onPhaseComplete callback
-    expect(computeStub).to.have.been.calledOnce;
-    expect(computeStub.firstCall.args[0]).to.equal('scope-uuid-1');
-    expect(computeStub.firstCall.args[1]).to.be.a('function');
+    // Phase 1: delete stale
+    expect(deleteStaleStub).to.have.been.calledOnceWith('scope-uuid-1');
 
-    // Final commit after service returns
-    expect(commitStub).to.have.been.calledOnce;
-    expect(releaseStub).to.have.been.calledOnce;
+    // Phase 2: resolve URN
+    expect(resolveUrnStub).to.have.been.calledOnceWith('scope-uuid-1');
+
+    // Phase 3: two batches (one with data, one null to stop)
+    expect(batchStub).to.have.been.calledTwice;
+
+    // 4 phases total (delete stale, resolve URN, batch 1, batch 2) = 4 connections
+    expect(openStub.callCount).to.equal(4);
+    expect(commitStub.callCount).to.equal(4);
+    expect(releaseStub.callCount).to.equal(4);
+  });
+
+  it('should stop after URN resolve when no active policy statements', async () => {
+    const mockDBConnection = getMockDBConnection();
+    mockDBConnection.open = sinon.stub().resolves();
+    mockDBConnection.commit = sinon.stub().resolves();
+    mockDBConnection.release = sinon.stub();
+
+    sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+
+    sinon.stub(SecurityScopeService.prototype, 'deleteStaleAnchorsForScope').resolves();
+    sinon.stub(SecurityScopeService.prototype, 'resolveUrnForScope').resolves(null);
+    const batchStub = sinon.stub(SecurityScopeService.prototype, 'computeAnchorBatch');
+
+    await computeScopeAnchorsJobHandler([createMockJob('scope-uuid-1')]);
+
+    // Batch phase should never be reached
+    expect(batchStub).not.to.have.been.called;
+
+    // 2 connections: delete stale + resolve URN
+    expect(mockDBConnection.open).to.have.been.calledTwice;
   });
 
   it('should roll back and throw on computation failure', async () => {
@@ -56,13 +88,14 @@ describe('computeScopeAnchorsJobHandler', () => {
     const rollbackStub = sinon.stub().resolves();
     const releaseStub = sinon.stub();
     mockDBConnection.open = sinon.stub().resolves();
+    mockDBConnection.commit = sinon.stub().resolves();
     mockDBConnection.rollback = rollbackStub;
     mockDBConnection.release = releaseStub;
 
     sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     const testError = new Error('Anchor computation failed');
-    sinon.stub(SecurityScopeService.prototype, 'computeAnchorsForScope').rejects(testError);
+    sinon.stub(SecurityScopeService.prototype, 'deleteStaleAnchorsForScope').rejects(testError);
 
     try {
       await computeScopeAnchorsJobHandler([createMockJob('scope-uuid-1')]);
@@ -75,26 +108,57 @@ describe('computeScopeAnchorsJobHandler', () => {
     expect(releaseStub).to.have.been.calledOnce;
   });
 
+  it('should roll back only the failed batch on mid-batch failure', async () => {
+    const mockDBConnection = getMockDBConnection();
+    const commitStub = sinon.stub().resolves();
+    const rollbackStub = sinon.stub().resolves();
+    const releaseStub = sinon.stub();
+    mockDBConnection.open = sinon.stub().resolves();
+    mockDBConnection.commit = commitStub;
+    mockDBConnection.rollback = rollbackStub;
+    mockDBConnection.release = releaseStub;
+
+    sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+
+    sinon.stub(SecurityScopeService.prototype, 'deleteStaleAnchorsForScope').resolves();
+    sinon
+      .stub(SecurityScopeService.prototype, 'resolveUrnForScope')
+      .resolves({ urn_submission_id: '*', urn_feature_type: '*', urn_feature_id: '*' });
+
+    const batchStub = sinon.stub(SecurityScopeService.prototype, 'computeAnchorBatch');
+    batchStub.onFirstCall().resolves({ pageLastId: 100 });
+    batchStub.onSecondCall().rejects(new Error('Batch 2 failed'));
+
+    try {
+      await computeScopeAnchorsJobHandler([createMockJob('scope-uuid-1')]);
+      expect.fail('Should have thrown an error');
+    } catch (error) {
+      expect((error as Error).message).to.equal('Batch 2 failed');
+    }
+
+    // 3 committed phases (delete stale, resolve URN, batch 1), 1 rolled back (batch 2)
+    expect(commitStub.callCount).to.equal(3);
+    expect(rollbackStub.callCount).to.equal(1);
+  });
+
   it('should process multiple jobs in sequence', async () => {
+    const mockDBConnection = getMockDBConnection();
     const openStub = sinon.stub().resolves();
     const commitStub = sinon.stub().resolves();
     const releaseStub = sinon.stub();
-
-    const mockDBConnection = getMockDBConnection();
     mockDBConnection.open = openStub;
     mockDBConnection.commit = commitStub;
     mockDBConnection.release = releaseStub;
 
     sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
-    const computeStub = sinon.stub(SecurityScopeService.prototype, 'computeAnchorsForScope').resolves();
+    sinon.stub(SecurityScopeService.prototype, 'deleteStaleAnchorsForScope').resolves();
+    sinon.stub(SecurityScopeService.prototype, 'resolveUrnForScope').resolves(null);
 
     await computeScopeAnchorsJobHandler([createMockJob('scope-1', 'job-1'), createMockJob('scope-2', 'job-2')]);
 
-    expect(computeStub.callCount).to.equal(2);
-    expect(openStub.callCount).to.equal(2);
-    expect(commitStub.callCount).to.equal(2);
-    expect(releaseStub.callCount).to.equal(2);
+    // Each job: delete stale + resolve URN (null → no batches) = 2 connections per job
+    expect(openStub.callCount).to.equal(4);
   });
 
   it('should handle empty jobs array', async () => {

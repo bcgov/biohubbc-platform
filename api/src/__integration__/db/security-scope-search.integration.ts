@@ -627,9 +627,20 @@ describe('Security scope search (integration)', function () {
       `);
       await scopeService.cleanupScopesForDeletedStatements([stmtId], []);
 
-      // In prod the cleanup publishes a pg-boss job that calls computeAnchorsForScope.
+      // In prod the cleanup publishes a pg-boss job that calls the service phase methods.
       // pg-boss is not running in make test-db, so invoke the service directly.
-      await scopeService.computeAnchorsForScope(scopeId);
+      await scopeService.deleteStaleAnchorsForScope(scopeId);
+      const urn = await scopeService.resolveUrnForScope(scopeId);
+      if (urn) {
+        let lastId = 0;
+        while (true) {
+          const batch = await scopeService.computeAnchorBatch(scopeId, urn, lastId);
+          if (!batch) {
+            break;
+          }
+          lastId = batch.pageLastId;
+        }
+      }
 
       // Anchors deleted because scope has no remaining policy_statement_scope references
       expect(await countAnchors(scopeId)).to.equal(0);
@@ -729,9 +740,20 @@ describe('Security scope search (integration)', function () {
       `);
       await scopeService.cleanupScopesForDeletedStatements([oldStmtId], [teamId]);
 
-      // In prod the cleanup publishes a pg-boss job that calls computeAnchorsForScope.
+      // In prod the cleanup publishes a pg-boss job that calls the service phase methods.
       // pg-boss is not running in make test-db, so invoke the service directly.
-      await scopeService.computeAnchorsForScope(oldScopeId);
+      await scopeService.deleteStaleAnchorsForScope(oldScopeId);
+      const oldUrn = await scopeService.resolveUrnForScope(oldScopeId);
+      if (oldUrn) {
+        let lastId = 0;
+        while (true) {
+          const batch = await scopeService.computeAnchorBatch(oldScopeId, oldUrn, lastId);
+          if (!batch) {
+            break;
+          }
+          lastId = batch.pageLastId;
+        }
+      }
 
       // Old scope's anchors cleaned up (orphaned)
       expect(await countAnchors(oldScopeId)).to.equal(0);
@@ -1444,9 +1466,20 @@ describe('Security scope search (integration)', function () {
       // Unsecure the root — it no longer meets candidate criteria
       await unsecureFeature(root);
 
-      // Recompute via the service method (first integration test coverage for
-      // the service-level orchestration: deleteStaleAnchorsForScope → computeAnchorsForScope)
-      await scopeService.computeAnchorsForScope(scopeId);
+      // Recompute via the service phase methods (integration test coverage for
+      // the service-level orchestration: deleteStaleAnchorsForScope → resolveUrnForScope → computeAnchorBatch)
+      await scopeService.deleteStaleAnchorsForScope(scopeId);
+      const recomputeUrn = await scopeService.resolveUrnForScope(scopeId);
+      if (recomputeUrn) {
+        let lastId = 0;
+        while (true) {
+          const batch = await scopeService.computeAnchorBatch(scopeId, recomputeUrn, lastId);
+          if (!batch) {
+            break;
+          }
+          lastId = batch.pageLastId;
+        }
+      }
 
       // After: root anchor deleted (stale — unsecured), children promoted to anchors
       // (they are now the topmost candidates with no candidate ancestor above them)
@@ -1465,7 +1498,7 @@ describe('Security scope search (integration)', function () {
     });
 
     it('should process all candidates across multiple keyset batches', async function () {
-      // BATCH_SIZE in computeAnchorsForScope is 5000. Creating a root + 5001
+      // BATCH_SIZE in computeAnchorBatch is 5000. Creating a root + 5001
       // children exercises both the normal multi-batch path AND the boundary-query
       // fallback:
       //

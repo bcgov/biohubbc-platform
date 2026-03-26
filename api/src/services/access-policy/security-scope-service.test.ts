@@ -212,102 +212,53 @@ describe('SecurityScopeService', () => {
     });
   });
 
-  describe('computeAnchorsForScope', () => {
+  describe('deleteStaleAnchorsForScope', () => {
+    it('delegates to repository', async () => {
+      const stub = sinon.stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorsForScope').resolves();
+
+      await service.deleteStaleAnchorsForScope('scope-1');
+
+      expect(stub).to.have.been.calledOnceWith('scope-1');
+    });
+  });
+
+  describe('resolveUrnForScope', () => {
+    it('returns URN from repository', async () => {
+      const urn = { urn_submission_id: '*', urn_feature_type: 'telemetry', urn_feature_id: '*' };
+      sinon.stub(SecurityScopeRepository.prototype, 'resolveUrnForScope').resolves(urn);
+
+      const result = await service.resolveUrnForScope('scope-1');
+
+      expect(result).to.deep.equal(urn);
+    });
+
+    it('returns null when no active policy statements', async () => {
+      sinon.stub(SecurityScopeRepository.prototype, 'resolveUrnForScope').resolves(null);
+
+      const result = await service.resolveUrnForScope('scope-1');
+
+      expect(result).to.be.null;
+    });
+  });
+
+  describe('computeAnchorBatch', () => {
     const urn = { urn_submission_id: '*', urn_feature_type: 'telemetry', urn_feature_id: '*' };
 
-    it('calls delete stale, resolve, then batch loop in order', async () => {
-      const deleteStub = sinon.stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorsForScope').resolves();
-      const resolveStub = sinon.stub(SecurityScopeRepository.prototype, 'resolveUrnForScope').resolves(urn);
-      const batchStub = sinon.stub(SecurityScopeRepository.prototype, 'computeAnchorBatch');
+    it('delegates to repository and returns batch result', async () => {
+      const stub = sinon.stub(SecurityScopeRepository.prototype, 'computeAnchorBatch').resolves({ pageLastId: 5000 });
 
-      batchStub.onCall(0).resolves({ pageLastId: 5000 });
-      batchStub.onCall(1).resolves(null);
+      const result = await service.computeAnchorBatch('scope-1', urn, 0);
 
-      await service.computeAnchorsForScope('scope-1');
-
-      expect(deleteStub).to.have.been.calledOnceWith('scope-1');
-      expect(resolveStub).to.have.been.calledOnceWith('scope-1');
-      expect(deleteStub).to.have.been.calledBefore(resolveStub);
-      expect(batchStub).to.have.been.calledTwice;
-      expect(batchStub.firstCall).to.have.been.calledWith('scope-1', urn, 0);
-      expect(batchStub.secondCall).to.have.been.calledWith('scope-1', urn, 5000);
+      expect(stub).to.have.been.calledOnceWith('scope-1', urn, 0);
+      expect(result).to.deep.equal({ pageLastId: 5000 });
     });
 
-    it('deletes stale anchors and skips insert loop when URN is null (orphaned scope)', async () => {
-      const deleteStub = sinon.stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorsForScope').resolves();
-      sinon.stub(SecurityScopeRepository.prototype, 'resolveUrnForScope').resolves(null);
-      const batchStub = sinon.stub(SecurityScopeRepository.prototype, 'computeAnchorBatch');
+    it('returns null when no more candidates', async () => {
+      sinon.stub(SecurityScopeRepository.prototype, 'computeAnchorBatch').resolves(null);
 
-      await service.computeAnchorsForScope('scope-1');
+      const result = await service.computeAnchorBatch('scope-1', urn, 5000);
 
-      expect(deleteStub).to.have.been.calledOnceWith('scope-1');
-      expect(batchStub).not.to.have.been.called;
-    });
-
-    it('advances keyset cursor across batches', async () => {
-      sinon.stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorsForScope').resolves();
-      sinon.stub(SecurityScopeRepository.prototype, 'resolveUrnForScope').resolves(urn);
-      const batchStub = sinon.stub(SecurityScopeRepository.prototype, 'computeAnchorBatch');
-
-      batchStub.onCall(0).resolves({ pageLastId: 5000 });
-      batchStub.onCall(1).resolves({ pageLastId: 10000 });
-      batchStub.onCall(2).resolves(null);
-
-      await service.computeAnchorsForScope('scope-1');
-
-      expect(batchStub.getCall(0)).to.have.been.calledWith('scope-1', urn, 0);
-      expect(batchStub.getCall(1)).to.have.been.calledWith('scope-1', urn, 5000);
-      expect(batchStub.getCall(2)).to.have.been.calledWith('scope-1', urn, 10000);
-    });
-
-    it('invokes onPhaseComplete after delete and after each non-null batch', async () => {
-      sinon.stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorsForScope').resolves();
-      sinon.stub(SecurityScopeRepository.prototype, 'resolveUrnForScope').resolves(urn);
-      const batchStub = sinon.stub(SecurityScopeRepository.prototype, 'computeAnchorBatch');
-
-      batchStub.onCall(0).resolves({ pageLastId: 5000 });
-      batchStub.onCall(1).resolves({ pageLastId: 10000 });
-      batchStub.onCall(2).resolves(null);
-
-      const phaseCompleteSpy = sinon.stub().resolves();
-
-      await service.computeAnchorsForScope('scope-1', phaseCompleteSpy);
-
-      // 1 (after delete) + 2 (after batch 0 and batch 1) = 3
-      // Batch 2 returned null so no callback
-      expect(phaseCompleteSpy.callCount).to.equal(3);
-    });
-
-    it('does not invoke onPhaseComplete for null batch (terminal iteration)', async () => {
-      sinon.stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorsForScope').resolves();
-      sinon.stub(SecurityScopeRepository.prototype, 'resolveUrnForScope').resolves(urn);
-      const batchStub = sinon.stub(SecurityScopeRepository.prototype, 'computeAnchorBatch');
-
-      // First batch returns null — no candidates at all
-      batchStub.onCall(0).resolves(null);
-
-      const phaseCompleteSpy = sinon.stub().resolves();
-
-      await service.computeAnchorsForScope('scope-1', phaseCompleteSpy);
-
-      // Only 1 call: after delete. No batch produced results.
-      expect(phaseCompleteSpy.callCount).to.equal(1);
-    });
-
-    it('runs in a single transaction when no callback is provided (integration test path)', async () => {
-      sinon.stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorsForScope').resolves();
-      sinon.stub(SecurityScopeRepository.prototype, 'resolveUrnForScope').resolves(urn);
-      const batchStub = sinon.stub(SecurityScopeRepository.prototype, 'computeAnchorBatch');
-
-      batchStub.onCall(0).resolves({ pageLastId: 5000 });
-      batchStub.onCall(1).resolves(null);
-
-      // No callback — verifies no commit/BEGIN calls are made
-      await service.computeAnchorsForScope('scope-1');
-
-      // connection.commit and connection.query should not have been called
-      // (mockDBConnection has no-op stubs — if we got here without error, no commit was attempted)
-      expect(batchStub).to.have.been.calledTwice;
+      expect(result).to.be.null;
     });
   });
 });

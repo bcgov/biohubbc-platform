@@ -120,7 +120,7 @@ export class SecurityScopeRepository extends BaseRepository {
    * An anchor becomes stale when its feature is unsecured (lost all security rules),
    * unapproved (upload status changed), soft-deleted, or its URN no longer matches
    * the scope's policy statement. This is the inverse of the candidate criteria used
-   * by `computeAnchorsForScope` — any feature that wouldn't be selected as a new
+   * by `computeAnchorBatch` — any feature that wouldn't be selected as a new
    * candidate should not remain as an existing anchor.
    *
    * Called before the keyset insert loop so valid anchors are never deleted —
