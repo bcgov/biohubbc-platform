@@ -2,6 +2,7 @@ import { Knex } from 'knex';
 
 const DB_SCHEMA = process.env.DB_SCHEMA;
 const DB_ADMIN = process.env.DB_ADMIN;
+const SERVICE_ACCOUNT_PREFIX = 'service-account-';
 
 enum SYSTEM_IDENTITY_SOURCE {
   IDIR = 'IDIR',
@@ -81,10 +82,8 @@ const systemUsers: SystemUserSeed[] = [
  */
 export async function seed(knex: Knex): Promise<void> {
   const contributorClientId = process.env.KEYCLOAK_CLIENT_ID;
-
-  if (!contributorClientId) {
-    throw new Error('KEYCLOAK_CLIENT_ID is required to seed contributor system users');
-  }
+  const contributorSystemUserGuidSuffix = process.env.CONTRIBUTOR_SYSTEM_USER_GUID;
+  const contributorSystemUserGuid = `${SERVICE_ACCOUNT_PREFIX}${contributorSystemUserGuidSuffix}`;
 
   await knex.raw(`
     set schema '${DB_SCHEMA}';
@@ -111,13 +110,23 @@ export async function seed(knex: Knex): Promise<void> {
     }
   }
 
-  await knex.raw(`
-    ${insertContributorSQL(contributorClientId)}
-  `);
+  if (contributorClientId) {
+    await knex.raw(`
+      ${insertContributorSQL(contributorClientId)}
+    `);
+  }
 
-  await knex.raw(`
-    ${insertContributorSystemUserSQL(contributorClientId)}
-  `);
+  if (contributorSystemUserGuid) {
+    await knex.raw(`
+      ${insertSystemServiceAccountUserSQL(contributorSystemUserGuid)}
+    `);
+
+    if (contributorClientId) {
+      await knex.raw(`
+        ${insertContributorSystemUserSQL(contributorClientId, contributorSystemUserGuid)}
+      `);
+    }
+  }
 }
 
 /**
@@ -164,6 +173,46 @@ const insertSystemUserSQL = (systemUser: SystemUserSeed) => `
 `;
 
 /**
+ * SQL to insert a contributor system user by GUID if it does not already exist.
+ *
+ * @param {string} contributorSystemUserGuid
+ */
+const insertSystemServiceAccountUserSQL = (contributorSystemUserGuid: string) => `
+  INSERT INTO "system_user" (
+    user_identity_source_id,
+    user_identifier,
+    user_guid,
+    record_effective_date,
+    create_date,
+    create_user
+  )
+  SELECT
+    user_identity_source_id,
+    '${contributorSystemUserGuid}',
+    LOWER('${contributorSystemUserGuid}'),
+    now(),
+    now(),
+    1
+  FROM
+    user_identity_source
+  WHERE
+    LOWER(name) = LOWER('${SYSTEM_IDENTITY_SOURCE.SYSTEM}')
+  AND
+    record_end_date is null
+  AND
+    NOT EXISTS (
+      SELECT 1
+      FROM "system_user" su
+      WHERE
+        (
+          LOWER(su.user_identifier) = LOWER('${contributorSystemUserGuid}')
+          OR LOWER(su.user_guid) = LOWER('${contributorSystemUserGuid}')
+        )
+      AND su.record_end_date is null
+    );
+`;
+
+/**
  * SQL to insert a system user role row.
  *
  * @param {SystemUserSeed} systemUser
@@ -194,19 +243,20 @@ const insertContributorSQL = (contributorClientId: string) => `
     'Seeded contributor for system users',
     1
   WHERE NOT EXISTS (
-    SELECT 1
-    FROM contributor
-    WHERE LOWER(client_id) = LOWER('${contributorClientId}')
-      AND record_end_date IS NULL
-  );
+      SELECT 1
+      FROM contributor
+      WHERE LOWER(client_id) = LOWER('${contributorClientId}')
+        AND record_end_date IS NULL
+    );
 `;
 
 /**
- * SQL to join all active system users to the contributor.
+ * SQL to join the Keycloak service account system user to the contributor.
  *
  * @param {string} contributorClientId
+ * @param {string} contributorSystemUserGuid
  */
-const insertContributorSystemUserSQL = (contributorClientId: string) => `
+const insertContributorSystemUserSQL = (contributorClientId: string, contributorSystemUserGuid: string) => `
   INSERT INTO contributor_system_user (
     contributor_id,
     system_user_id,
@@ -215,12 +265,17 @@ const insertContributorSystemUserSQL = (contributorClientId: string) => `
   SELECT
     c.contributor_id,
     su.system_user_id,
-    1
+    su.system_user_id
   FROM contributor c
-  CROSS JOIN "system_user" su
+  INNER JOIN "system_user" su
+    ON LOWER(su.user_guid) = LOWER('${contributorSystemUserGuid}')
+   AND su.record_end_date IS NULL
+  INNER JOIN user_identity_source uis
+    ON su.user_identity_source_id = uis.user_identity_source_id
+   AND LOWER(uis.name) = LOWER('${SYSTEM_IDENTITY_SOURCE.SYSTEM}')
+   AND uis.record_end_date IS NULL
   WHERE LOWER(c.client_id) = LOWER('${contributorClientId}')
     AND c.record_end_date IS NULL
-    AND su.record_end_date IS NULL
     AND NOT EXISTS (
       SELECT 1
       FROM contributor_system_user csu
