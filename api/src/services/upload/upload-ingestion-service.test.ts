@@ -239,8 +239,7 @@ describe('UploadIngestionService', () => {
         .resolves({ upload_archive_id: mockUploadArchiveId });
       sinon.stub(submissionUploadUtils, 'generateMultipartUploadPresignedUrls').resolves({
         uploadId: mockS3UploadId,
-        presignedUrls: [{ partNumber: 1, url: 'https://s3-url-append' }],
-        partSizeBytes: mockBytes,
+        presignedUrls: [{ partNumber: 1, url: 'https://s3-url-append', partSizeBytes: mockBytes }],
         partCount: 1
       });
       sinon.stub(UploadService.prototype, 'updateUpload').resolves({ upload_id: mockUploadId });
