@@ -252,7 +252,13 @@ export const SubmissionRecordWithSecurity = SubmissionRecord.extend({
 
 export type SubmissionRecordWithSecurity = z.infer<typeof SubmissionRecordWithSecurity>;
 
-export const SubmissionRecordWithSecurityAndRootFeatureType = SubmissionRecord.extend({
+export const SubmissionRecordWithSecurityAndRootFeatureType = SubmissionRecord.omit({
+  revision_count: true,
+  create_date: true,
+  update_date: true,
+  security_review_timestamp: true,
+  record_end_date: true
+}).extend({
   security: z.nativeEnum(SECURITY_APPLIED_STATUS),
   root_feature_type_id: z.number(),
   root_feature_type_name: z.string(),
@@ -963,18 +969,13 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.uuid,
         FilteredRows.system_user_id,
         FilteredRows.contributor_id,
-        FilteredRows.security_review_timestamp,
         FilteredRows.publish_timestamp,
         FilteredRows.submitted_timestamp,
         FilteredRows.name,
         FilteredRows.description,
         FilteredRows.comment,
-        FilteredRows.record_end_date,
-        FilteredRows.create_date,
         FilteredRows.create_user,
-        FilteredRows.update_date,
         FilteredRows.update_user,
-        FilteredRows.revision_count,
         submission_feature.feature_type_id AS root_feature_type_id,
         feature_type.name AS root_feature_type_name,
         ${SECURITY_APPLIED_STATUS.PENDING} AS security,
@@ -1003,23 +1004,18 @@ export class SubmissionRepository extends BaseRepository {
         region_lookup.region_id = submission_regions.region_id
       WHERE
         submission_feature.parent_submission_feature_id IS NULL
-      group by 
+      group by
         FilteredRows.submission_id,
         FilteredRows.uuid,
         FilteredRows.system_user_id,
         FilteredRows.contributor_id,
-        FilteredRows.security_review_timestamp,
         FilteredRows.publish_timestamp,
         FilteredRows.submitted_timestamp,
         FilteredRows.name,
         FilteredRows.description,
         FilteredRows.comment,
-        FilteredRows.record_end_date,
-        FilteredRows.create_date,
         FilteredRows.create_user,
-        FilteredRows.update_date,
         FilteredRows.update_user,
-        FilteredRows.revision_count,
         submission_feature.feature_type_id,
         feature_type.name;
     `;
@@ -1068,18 +1064,13 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.uuid,
         FilteredRows.system_user_id,
         FilteredRows.contributor_id,
-        FilteredRows.security_review_timestamp,
         FilteredRows.publish_timestamp,
         FilteredRows.submitted_timestamp,
         FilteredRows.name,
         FilteredRows.description,
         FilteredRows.comment,
-        FilteredRows.record_end_date,
-        FilteredRows.create_date,
         FilteredRows.create_user,
-        FilteredRows.update_date,
         FilteredRows.update_user,
-        FilteredRows.revision_count,
         submission_feature.feature_type_id AS root_feature_type_id,
         feature_type.name AS root_feature_type_name,
         CASE
@@ -1124,12 +1115,8 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.name,
         FilteredRows.description,
         FilteredRows.comment,
-        FilteredRows.record_end_date,
-        FilteredRows.create_date,
         FilteredRows.create_user,
-        FilteredRows.update_date,
         FilteredRows.update_user,
-        FilteredRows.revision_count,
         submission_feature.feature_type_id,
         feature_type.name;
     `;
@@ -1259,18 +1246,13 @@ export class SubmissionRepository extends BaseRepository {
         s.uuid,
         s.system_user_id,
         s.contributor_id,
-        s.security_review_timestamp,
         s.publish_timestamp,
         s.submitted_timestamp,
         s.name,
         s.description,
         s.comment,
-        s.record_end_date,
-        s.create_date,
         s.create_user,
-        s.update_date,
         s.update_user,
-        s.revision_count,
         sf.feature_type_id AS root_feature_type_id,
         ft.name            AS root_feature_type_name,
         CASE
@@ -1312,12 +1294,8 @@ export class SubmissionRepository extends BaseRepository {
         s.name,
         s.description,
         s.comment,
-        s.record_end_date,
-        s.create_date,
         s.create_user,
-        s.update_date,
         s.update_user,
-        s.revision_count,
         sf.feature_type_id,
         ft.name
       ORDER BY

@@ -6,7 +6,6 @@ export const SubmissionResponseSchema: OpenAPIV3.SchemaObject = {
   required: [
     'submission_id',
     'uuid',
-    'security_review_timestamp',
     'publish_timestamp',
     'submitted_timestamp',
     'system_user_id',
@@ -14,11 +13,8 @@ export const SubmissionResponseSchema: OpenAPIV3.SchemaObject = {
     'name',
     'description',
     'comment',
-    'create_date',
     'create_user',
-    'update_date',
     'update_user',
-    'revision_count',
     'security',
     'root_feature_type_id',
     'root_feature_type_name',
@@ -35,11 +31,6 @@ export const SubmissionResponseSchema: OpenAPIV3.SchemaObject = {
       type: 'string',
       format: 'uuid',
       description: 'UUID of the submission'
-    },
-    security_review_timestamp: {
-      type: 'string',
-      nullable: true,
-      description: 'Timestamp of the security review'
     },
     publish_timestamp: {
       type: 'string',
@@ -75,35 +66,16 @@ export const SubmissionResponseSchema: OpenAPIV3.SchemaObject = {
       maxLength: 3000,
       description: 'Comment on the submission'
     },
-    record_end_date: {
-      type: 'string',
-      nullable: true,
-      description: 'End date of the record'
-    },
-    create_date: {
-      type: 'string',
-      description: 'Date the submission was created'
-    },
     create_user: {
       type: 'integer',
       minimum: 1,
       description: 'System user ID of the creator'
-    },
-    update_date: {
-      type: 'string',
-      nullable: true,
-      description: 'Date the submission was last updated'
     },
     update_user: {
       type: 'integer',
       minimum: 1,
       nullable: true,
       description: 'System user ID of the last updater'
-    },
-    revision_count: {
-      type: 'integer',
-      minimum: 0,
-      description: 'Number of revisions'
     },
     security: {
       type: 'string',
