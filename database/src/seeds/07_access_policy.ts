@@ -203,9 +203,17 @@ export async function seed(knex: Knex): Promise<void> {
    * Pattern mirrors docs/SIMSBIOHUB-914/sql/scale-data-scopes.sql
    * ------------------------------------------------------------------ */
 
-  // 3a. Mark the first 3 datasets as secured (submission_feature_ids 1, 4, 7)
-  //     These are the parent datasets whose children (sample_site, telemetry) inherit security.
-  const securedDatasetIds = [1, 4, 7];
+  // 3a. Mark the first 3 dataset features as secured.
+  //     Resolve IDs dynamically instead of hardcoding (IDs are not stable across environments).
+  const securedDatasetRows = await knex('submission_feature as sf')
+    .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
+    .where('ft.name', 'dataset')
+    .whereNull('sf.record_end_date')
+    .orderBy('sf.submission_feature_id', 'asc')
+    .select('sf.submission_feature_id')
+    .limit(3);
+
+  const securedDatasetIds = securedDatasetRows.map((row) => row.submission_feature_id);
 
   // Use first security rule available
   const firstRule = await knex('security_rule').whereNull('record_end_date').select('security_rule_id').first();
