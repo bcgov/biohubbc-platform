@@ -421,10 +421,7 @@ export class SecurityScopeRepository extends BaseRepository {
     const query = knex
       .select('s.security_scope_id')
       .from(knex.raw('unnest(?::UUID[]) AS s(security_scope_id)', [scopeIds]))
-      .whereNotIn(
-        's.security_scope_id',
-        knex.select('security_scope_id').from('policy_statement_scope')
-      );
+      .whereNotIn('s.security_scope_id', knex.select('security_scope_id').from('policy_statement_scope'));
 
     const response = await this.connection.knex(query, SecurityScopeId);
 
