@@ -169,11 +169,14 @@ export function submissionIntake(): RequestHandler {
       });
 
       const ticketService = new TicketService(connection);
-      const ticket = await ticketService.createTicket({
-        subject: 'New Submission',
-        description: `Submission ID: ${submissionRecord.submission_id}. Submission UUID: ${submissionRecord.uuid}. Upload UUID: ${upload_id}`,
-        priority: 'medium'
-      });
+      const ticket = await ticketService.createTicket(
+        {
+          subject: 'New Submission',
+          description: `Submission ID: ${submissionRecord.submission_id}. Submission UUID: ${submissionRecord.uuid}. Upload UUID: ${upload_id}`,
+          priority: 'medium'
+        },
+        [system_user_id]
+      );
 
       // Create submission_upload bridge record (required for submission_upload_id FK on features)
       const submissionUploadService = new SubmissionUploadService(connection);
