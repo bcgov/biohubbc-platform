@@ -1,5 +1,5 @@
 import { GridColDef } from '@mui/x-data-grid';
-import { cleanup } from '@testing-library/react';
+import { cleanup, within } from '@testing-library/react';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { createMockSearchFeature } from 'test-helpers/cart-helpers';
 import { render } from 'test-helpers/test-utils';
@@ -34,10 +34,10 @@ describe('SearchResultTableLayout', () => {
     vi.clearAllMocks();
   });
 
-  it('renders secured label for secured rows', () => {
+  it('renders secured icon for secured rows', () => {
     const securedResult = createMockSearchFeature(1, 'Dataset', true);
 
-    const { getByText } = render(
+    const { getByTestId } = render(
       <SearchResultTableLayout
         results={[securedResult]}
         cartFeatureIds={new Set()}
@@ -45,13 +45,15 @@ describe('SearchResultTableLayout', () => {
       />
     );
 
-    expect(getByText('Secured')).toBeVisible();
+    const securedRow = getByTestId('row-1');
+    const securedCell = within(securedRow).getByTestId('cell-is_secured');
+    expect(securedCell.querySelector('svg')).toBeInTheDocument();
   });
 
-  it('does not render secured label for unsecured rows', () => {
+  it('does not render secured icon for unsecured rows', () => {
     const unsecuredResult = createMockSearchFeature(2, 'Observation', false);
 
-    const { queryByText } = render(
+    const { getByTestId } = render(
       <SearchResultTableLayout
         results={[unsecuredResult]}
         cartFeatureIds={new Set()}
@@ -59,14 +61,17 @@ describe('SearchResultTableLayout', () => {
       />
     );
 
-    expect(queryByText('Secured')).not.toBeInTheDocument();
+    const unsecuredRow = getByTestId('row-2');
+    const unsecuredCell = within(unsecuredRow).getByTestId('cell-is_secured');
+    expect(unsecuredCell).toBeEmptyDOMElement();
+    expect(unsecuredCell.querySelector('svg')).not.toBeInTheDocument();
   });
 
   it('renders mixed secured and unsecured rows correctly', () => {
     const securedResult = createMockSearchFeature(1, 'Dataset', true);
     const unsecuredResult = createMockSearchFeature(2, 'Observation', false);
 
-    const { getByTestId, getAllByText } = render(
+    const { getByTestId } = render(
       <SearchResultTableLayout
         results={[securedResult, unsecuredResult]}
         cartFeatureIds={new Set()}
@@ -74,8 +79,12 @@ describe('SearchResultTableLayout', () => {
       />
     );
 
-    expect(getByTestId('row-1')).toBeVisible();
-    expect(getByTestId('row-2')).toBeVisible();
-    expect(getAllByText('Secured')).toHaveLength(1);
+    const securedRow = getByTestId('row-1');
+    const unsecuredRow = getByTestId('row-2');
+
+    expect(securedRow).toBeVisible();
+    expect(unsecuredRow).toBeVisible();
+    expect(within(securedRow).getByTestId('cell-is_secured').querySelector('svg')).toBeInTheDocument();
+    expect(within(unsecuredRow).getByTestId('cell-is_secured').querySelector('svg')).not.toBeInTheDocument();
   });
 });
