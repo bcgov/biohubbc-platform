@@ -27,7 +27,7 @@ export const SearchPage = () => {
     () =>
       featureTypesDataLoader.data?.feature_type_with_properties
         .map((featureType) => {
-          const typeName = featureType.feature_type.feature_type_name;
+          const typeName = featureType.feature_type.name;
 
           // Only include types that are in the priority enum
           if (!Object.values(PRIORITY_FEATURE_TYPE).includes(typeName as PRIORITY_FEATURE_TYPE)) {

@@ -1,4 +1,4 @@
-import { FeaturePropertyCode, FeatureTypeWithFeaturePropertiesCode } from 'interfaces/useCodesApi.interface';
+import { FeatureTypeProperty, FeatureTypeWithProperties } from 'interfaces/useCodesApi.interface';
 import {
   ISubmissionFeatureForReview,
   SubmissionRecordWithSecurityAndRootFeature
@@ -38,7 +38,7 @@ export interface IValidationMarker {
  */
 export interface IValidationContext {
   submissions: SubmissionRecordWithSecurityAndRootFeature[];
-  featureTypes: FeatureTypeWithFeaturePropertiesCode[];
+  featureTypes: FeatureTypeWithProperties[];
   submissionFeaturesCache: Map<number, ISubmissionFeatureForReview[]>;
 }
 
@@ -273,7 +273,7 @@ const validateUrn = (
 
   // Validate feature type exists
   if (featureType !== '*') {
-    const exists = context.featureTypes.some((ft) => ft.feature_type.feature_type_name === featureType);
+    const exists = context.featureTypes.some((ft) => ft.feature_type.name === featureType);
     if (!exists) {
       markers.push(
         createMarker(`Statement ${statementIndex + 1}: Feature type "${featureType}" does not exist`, line, start, end)
@@ -309,19 +309,19 @@ const validateUrn = (
  *
  * @param {string} key - The property key to find
  * @param {string} featureType - The feature type name
- * @param {FeatureTypeWithFeaturePropertiesCode[]} featureTypes - Available feature types
- * @returns {FeaturePropertyCode | undefined} The property definition if found
+ * @param {FeatureTypeWithProperties[]} featureTypes - Available feature types
+ * @returns {FeatureTypeProperty | undefined} The property definition if found
  */
 const findPropertyForKey = (
   key: string,
   featureType: string,
-  featureTypes: FeatureTypeWithFeaturePropertiesCode[]
-): FeaturePropertyCode | undefined => {
-  const featureTypeDef = featureTypes.find((ft) => ft.feature_type.feature_type_name === featureType);
+  featureTypes: FeatureTypeWithProperties[]
+): FeatureTypeProperty | undefined => {
+  const featureTypeDef = featureTypes.find((ft) => ft.feature_type.name === featureType);
   if (!featureTypeDef) {
     return undefined;
   }
-  return featureTypeDef.feature_type_properties.find((p) => p.feature_property_name === key);
+  return featureTypeDef.properties.find((p) => p.name === key);
 };
 
 /** Pattern for date portion: YYYY-MM-DD */
@@ -664,7 +664,7 @@ const validateCondition = (
     const property = findPropertyForKey(condition.Key, featureType, context.featureTypes);
 
     if (property) {
-      propertyType = property.feature_property_type_name;
+      propertyType = property.type_name;
 
       // Validate operator is valid for property type
       const allowedTypes = OPERATOR_TYPE_MAP[condition.Operator];

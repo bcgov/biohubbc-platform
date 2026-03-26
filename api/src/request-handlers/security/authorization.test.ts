@@ -6,6 +6,7 @@ import sinonChai from 'sinon-chai';
 import { HTTPError } from '../../errors/http-error';
 import { SystemUserExtended } from '../../repositories/user-repository';
 import { AuthorizationService } from '../../services/authorization/authorization-service';
+import { ContributorSystemUserService } from '../../services/contributor-system-user-service';
 import { getRequestHandlerMocks, registerMockDBConnection } from '../../__mocks__/db';
 import * as authorization from './authorization';
 
@@ -83,11 +84,30 @@ describe('authorizeRequest', function () {
     sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(mockSystemUserObject);
 
     sinon.stub(AuthorizationService.prototype, 'authorizeSystemAdministrator').resolves(true);
+    sinon.stub(AuthorizationService.prototype, 'executeAuthorizationScheme').resolves(false);
 
     const mockReq = { authorization_scheme: {} } as unknown as Request;
     const isAuthorized = await authorization.authorizeRequest(mockReq);
 
     expect(isAuthorized).to.equal(true);
+  });
+
+  it('calls executeAuthorizationScheme even if the user is a system administrator', async function () {
+    registerMockDBConnection();
+
+    const mockSystemUserObject = { role_names: [] } as unknown as SystemUserExtended;
+    sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(mockSystemUserObject);
+
+    sinon.stub(AuthorizationService.prototype, 'authorizeSystemAdministrator').resolves(true);
+    const executeAuthorizationSchemeStub = sinon
+      .stub(AuthorizationService.prototype, 'executeAuthorizationScheme')
+      .resolves(false);
+
+    const mockReq = { authorization_scheme: {} } as unknown as Request;
+    const isAuthorized = await authorization.authorizeRequest(mockReq);
+
+    expect(isAuthorized).to.equal(true);
+    expect(executeAuthorizationSchemeStub).to.have.been.calledOnce;
   });
 
   it('returns true if the authorization_scheme is undefined', async function () {
@@ -171,5 +191,52 @@ describe('authorizeRequest', function () {
     const isAuthorized = await authorization.authorizeRequest(mockReq);
 
     expect(isAuthorized).to.equal(true);
+  });
+
+  it('populates contributor_id for system admins when contributor authorization runs', async function () {
+    registerMockDBConnection();
+
+    sinon.stub(AuthorizationService.prototype, 'authorizeSystemAdministrator').resolves(true);
+    const executeAuthorizationSchemeStub = sinon
+      .stub(AuthorizationService.prototype, 'executeAuthorizationScheme')
+      .callsFake(async function (this: AuthorizationService) {
+        this['_contributorId'] = 77;
+        return false;
+      });
+
+    const mockReq = { authorization_scheme: { and: [{ discriminator: 'Contributor' }] } } as unknown as Request;
+    const isAuthorized = await authorization.authorizeRequest(mockReq);
+
+    expect(isAuthorized).to.equal(true);
+    expect(executeAuthorizationSchemeStub).to.have.been.calledOnce;
+    expect(mockReq.contributor_id).to.equal(77);
+  });
+
+  it('uses req.system_user.system_user_id for Contributor authorization (not DB connection system user id)', async function () {
+    registerMockDBConnection({
+      systemUserId: () => 999
+    });
+
+    sinon.stub(AuthorizationService.prototype, 'authorizeSystemAdministrator').resolves(false);
+
+    const findContributorSystemUserStub = sinon
+      .stub(ContributorSystemUserService.prototype, 'findContributorSystemUser')
+      .resolves({
+        contributor_system_user_id: 1,
+        contributor_id: 77,
+        system_user_id: 12
+      });
+
+    const mockReq = {
+      authorization_scheme: { and: [{ discriminator: 'Contributor' }] },
+      keycloak_token: { sub: 'some-guid' },
+      system_user: { system_user_id: 12 }
+    } as unknown as Request;
+
+    const isAuthorized = await authorization.authorizeRequest(mockReq);
+
+    expect(isAuthorized).to.equal(true);
+    expect(findContributorSystemUserStub).to.have.been.calledOnceWith(12);
+    expect(mockReq.contributor_id).to.equal(77);
   });
 });

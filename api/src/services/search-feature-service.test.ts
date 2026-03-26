@@ -107,104 +107,126 @@ describe('SearchFeatureService', () => {
         {
           feature_type: {
             feature_type_id: 1,
-            feature_type_name: 'dataset',
-            feature_type_display_name: 'Dataset'
+            name: 'dataset',
+            display_name: 'Dataset'
           },
-          feature_type_properties: [
+          properties: [
             {
-              feature_property_id: 1,
-              feature_property_name: 'name',
-              feature_property_display_name: 'Name',
-              feature_property_type_id: 1,
-              feature_property_type_name: 'string'
+              feature_type_property_id: 1,
+              name: 'name',
+              display_name: 'Name',
+              description: 'Name',
+              type_name: 'string',
+              required_value: true,
+              calculated_value: false
             },
             {
-              feature_property_id: 2,
-              feature_property_name: 'description',
-              feature_property_display_name: 'Description',
-              feature_property_type_id: 1,
-              feature_property_type_name: 'string'
+              feature_type_property_id: 2,
+              name: 'description',
+              display_name: 'Description',
+              description: 'Description',
+              type_name: 'string',
+              required_value: false,
+              calculated_value: false
             }
           ]
         },
         {
           feature_type: {
             feature_type_id: 2,
-            feature_type_name: 'observation',
-            feature_type_display_name: 'Observation'
+            name: 'observation',
+            display_name: 'Observation'
           },
-          feature_type_properties: [
+          properties: [
             {
-              feature_property_id: 3,
-              feature_property_name: 'count',
-              feature_property_display_name: 'Count',
-              feature_property_type_id: 2,
-              feature_property_type_name: 'number'
+              feature_type_property_id: 3,
+              name: 'count',
+              display_name: 'Count',
+              description: 'Count',
+              type_name: 'number',
+              required_value: false,
+              calculated_value: false
             },
             {
-              feature_property_id: 4,
-              feature_property_name: 'date_range',
-              feature_property_display_name: 'Date Range',
-              feature_property_type_id: 3,
-              feature_property_type_name: 'object'
+              feature_type_property_id: 4,
+              name: 'date_range',
+              display_name: 'Date Range',
+              description: 'Date Range',
+              type_name: 'object',
+              required_value: false,
+              calculated_value: false
             },
             {
-              feature_property_id: 5,
-              feature_property_name: 'start_date',
-              feature_property_display_name: 'Start Date',
-              feature_property_type_id: 4,
-              feature_property_type_name: 'datetime'
+              feature_type_property_id: 5,
+              name: 'start_date',
+              display_name: 'Start Date',
+              description: 'Start Date',
+              type_name: 'datetime',
+              required_value: false,
+              calculated_value: false
             },
             {
-              feature_property_id: 6,
-              feature_property_name: 'end_date',
-              feature_property_display_name: 'End Date',
-              feature_property_type_id: 4,
-              feature_property_type_name: 'datetime'
+              feature_type_property_id: 6,
+              name: 'end_date',
+              display_name: 'End Date',
+              description: 'End Date',
+              type_name: 'datetime',
+              required_value: false,
+              calculated_value: false
             },
             {
-              feature_property_id: 7,
-              feature_property_name: 'latitude',
-              feature_property_display_name: 'Latitude',
-              feature_property_type_id: 2,
-              feature_property_type_name: 'number'
+              feature_type_property_id: 7,
+              name: 'latitude',
+              display_name: 'Latitude',
+              description: 'Latitude',
+              type_name: 'number',
+              required_value: false,
+              calculated_value: false
             },
             {
-              feature_property_id: 8,
-              feature_property_name: 'longitude',
-              feature_property_display_name: 'Longitude',
-              feature_property_type_id: 2,
-              feature_property_type_name: 'number'
+              feature_type_property_id: 8,
+              name: 'longitude',
+              display_name: 'Longitude',
+              description: 'Longitude',
+              type_name: 'number',
+              required_value: false,
+              calculated_value: false
             },
             {
-              feature_property_id: 9,
-              feature_property_name: 'geometry',
-              feature_property_display_name: 'Geometry',
-              feature_property_type_id: 5,
-              feature_property_type_name: 'spatial'
+              feature_type_property_id: 9,
+              name: 'geometry',
+              display_name: 'Geometry',
+              description: 'Geometry',
+              type_name: 'spatial',
+              required_value: false,
+              calculated_value: false
             }
           ]
         },
         {
           feature_type: {
             feature_type_id: 3,
-            feature_type_name: 'artifact',
-            feature_type_display_name: 'Artifact'
+            name: 'artifact',
+            display_name: 'Artifact'
           },
-          feature_type_properties: [
+          properties: [
             {
-              feature_property_id: 10,
-              feature_property_name: 'filename',
-              feature_property_display_name: 'Filename',
-              feature_property_type_id: 1,
-              feature_property_type_name: 'string'
+              feature_type_property_id: 10,
+              name: 'filename',
+              display_name: 'Filename',
+              description: 'Filename',
+              type_name: 'string',
+              required_value: false,
+              calculated_value: false
             },
             {
-              feature_property_id: 2,
-              feature_property_name: 'description',
-              feature_property_display_name: 'Description',
-              feature_property_type_id: 1,
-              feature_property_type_name: 'string'
+              feature_type_property_id: 2,
+              name: 'description',
+              display_name: 'Description',
+              description: 'Description',
+              type_name: 'string',
+              required_value: false,
+              calculated_value: false
             }
           ]
         }
@@ -363,23 +385,27 @@ describe('SearchFeatureService', () => {
         {
           feature_type: {
             feature_type_id: 1,
-            feature_type_name: 'dataset',
-            feature_type_display_name: 'Dataset'
+            name: 'dataset',
+            display_name: 'Dataset'
           },
-          feature_type_properties: [
+          properties: [
             {
-              feature_property_id: 1,
-              feature_property_name: 'name',
-              feature_property_display_name: 'Name',
-              feature_property_type_id: 1,
-              feature_property_type_name: 'string'
+              feature_type_property_id: 1,
+              name: 'name',
+              display_name: 'Name',
+              description: 'Name',
+              type_name: 'string',
+              required_value: true,
+              calculated_value: false
             },
             {
-              feature_property_id: 2,
-              feature_property_name: 'description',
-              feature_property_display_name: 'Description',
-              feature_property_type_id: 1,
-              feature_property_type_name: 'string'
+              feature_type_property_id: 2,
+              name: 'description',
+              display_name: 'Description',
+              description: 'Description',
+              type_name: 'string',
+              required_value: false,
+              calculated_value: false
             }
           ]
         }
@@ -429,14 +455,16 @@ describe('SearchFeatureService', () => {
 
       sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([
         {
-          feature_type: { feature_type_id: 1, feature_type_name: 'dataset', feature_type_display_name: 'Dataset' },
-          feature_type_properties: [
+          feature_type: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
+          properties: [
             {
-              feature_property_id: 1,
-              feature_property_name: 'name',
-              feature_property_display_name: 'Name',
-              feature_property_type_id: 1,
-              feature_property_type_name: 'string'
+              feature_type_property_id: 1,
+              name: 'name',
+              display_name: 'Name',
+              description: 'Name',
+              type_name: 'string',
+              required_value: true,
+              calculated_value: false
             }
           ]
         }
@@ -620,7 +648,7 @@ describe('SearchFeatureService', () => {
 
       await searchFeatureService.searchFeatures({ keyword: 'data' }, { page: 1, limit: 10 });
 
-      expect(searchStub).to.be.calledOnceWith({ keyword: 'data' }, { page: 1, limit: 10 });
+      expect(searchStub).to.be.calledOnceWith({ keyword: 'data' }, { page: 1, limit: 10 }, undefined);
     });
 
     it('should return empty array for no matches', async () => {
@@ -700,6 +728,52 @@ describe('SearchFeatureService', () => {
       const result = await searchFeatureService.getSearchFeaturesCount({ keyword: 'nonexistent' });
 
       expect(result).to.equal(0);
+    });
+  });
+
+  describe('systemUserId threading', () => {
+    it('searchFeatures should pass systemUserId through to repository', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+
+      const searchStub = sinon.stub(SearchFeatureRepository.prototype, 'searchFeaturesByFilters').resolves([]);
+
+      await searchFeatureService.searchFeatures({ keyword: 'moose' }, undefined, 42);
+
+      expect(searchStub).to.be.calledOnceWith({ keyword: 'moose' }, undefined, 42);
+    });
+
+    it('searchFeatures should pass null systemUserId through to repository', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+
+      const searchStub = sinon.stub(SearchFeatureRepository.prototype, 'searchFeaturesByFilters').resolves([]);
+
+      await searchFeatureService.searchFeatures({ keyword: 'moose' }, undefined, null);
+
+      expect(searchStub).to.be.calledOnceWith({ keyword: 'moose' }, undefined, null);
+    });
+
+    it('getSearchFeaturesCount should pass systemUserId through to repository', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+
+      const countStub = sinon.stub(SearchFeatureRepository.prototype, 'searchFeaturesByFiltersCount').resolves(5);
+
+      await searchFeatureService.getSearchFeaturesCount({ keyword: 'moose' }, 42);
+
+      expect(countStub).to.be.calledOnceWith({ keyword: 'moose' }, 42);
+    });
+
+    it('getSearchFeaturesCount should pass null systemUserId through to repository', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const searchFeatureService = new SearchFeatureService(mockDBConnection);
+
+      const countStub = sinon.stub(SearchFeatureRepository.prototype, 'searchFeaturesByFiltersCount').resolves(0);
+
+      await searchFeatureService.getSearchFeaturesCount({ keyword: 'moose' }, null);
+
+      expect(countStub).to.be.calledOnceWith({ keyword: 'moose' }, null);
     });
   });
 });

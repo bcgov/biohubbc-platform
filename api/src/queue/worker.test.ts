@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import { JobQueues } from './jobs';
+import * as computeScopeAnchorsJob from './jobs/compute-scope-anchors-job';
 import * as indexSubmissionFeaturesJob from './jobs/index-submission-features-job';
 import * as malwareScanJob from './jobs/malware-scan-job';
 import * as processSubmissionFeaturesJob from './jobs/process-submission-features-job';
@@ -52,8 +53,8 @@ describe('worker', () => {
       await registerWorkers();
 
       // createQueue is called for all queues (including dead letter queues)
-      // 8 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, INDEX_SUBMISSION_FEATURES + FAILED
-      expect(createQueueStub.callCount).to.equal(8);
+      // 10 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, COMPUTE_SCOPE_ANCHORS + FAILED
+      expect(createQueueStub.callCount).to.equal(10);
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
       expect(createQueueStub.thirdCall.args[0]).to.equal(JobQueues.MALWARE_SCAN_FAILED);
@@ -62,6 +63,8 @@ describe('worker', () => {
       expect(createQueueStub.getCall(5).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD);
       expect(createQueueStub.getCall(6).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.getCall(7).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
+      expect(createQueueStub.getCall(8).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
+      expect(createQueueStub.getCall(9).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS);
     });
 
     it('configures dead letter queue for process-submission-features', async () => {
@@ -125,6 +128,39 @@ describe('worker', () => {
       // 8th createQueue call (INDEX_SUBMISSION_FEATURES) should have DLQ config
       const queueConfig = createQueueStub.getCall(7).args[1];
       expect(queueConfig.deadLetter).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
+      expect(queueConfig.retryLimit).to.equal(3);
+      expect(queueConfig.retryBackoff).to.equal(true);
+    });
+
+    it('registers the compute scope anchors job handler with pg-boss', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      // Compute scope anchors handlers are registered after index submission features handlers
+      expect(workStub.getCall(8).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS);
+      expect(workStub.getCall(8).args[1]).to.equal(computeScopeAnchorsJob.computeScopeAnchorsJobHandler);
+
+      expect(workStub.getCall(9).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
+      expect(workStub.getCall(9).args[1]).to.equal(computeScopeAnchorsJob.computeScopeAnchorsFailedHandler);
+    });
+
+    it('configures dead letter queue for compute-scope-anchors', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      // 10th createQueue call (COMPUTE_SCOPE_ANCHORS) should have DLQ config
+      const queueConfig = createQueueStub.getCall(9).args[1];
+      expect(queueConfig.deadLetter).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
       expect(queueConfig.retryLimit).to.equal(3);
       expect(queueConfig.retryBackoff).to.equal(true);
     });

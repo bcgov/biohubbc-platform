@@ -1,43 +1,111 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { FeatureTypeWithProperties, FeatureTypeWithPropertiesRow } from '../../models/feature-type';
+import { IngestionValidationError } from '../../errors/submission-errors';
+import { FeatureTypeWithProperties } from '../../models/feature-type';
+import { CreateSubmissionFeatureIngestionRecord, InsertSubmissionFeatureRecord } from '../../models/submission-feature';
 import { BaseRepository } from '../base-repository';
-import { ISubmissionFeature } from '../submission-repository';
 
 /**
  * A repository class for ingestion-related data access.
  *
  * @export
- * @class IngestionRepository
+ * @class FeatureIngestionRepository
  * @extends {BaseRepository}
  */
-export class IngestionRepository extends BaseRepository {
+export class FeatureIngestionRepository extends BaseRepository {
+  /**
+   * Bulk insert submission feature rows (raw payload persisted in `data`).
+   *
+   * @param {CreateSubmissionFeatureIngestionRecord[]} records
+   * @return {Promise<void>}
+   * @memberof FeatureIngestionRepository
+   */
+  async insertSubmissionFeatureRecords(records: CreateSubmissionFeatureIngestionRecord[]): Promise<void> {
+    if (!records.length) {
+      return;
+    }
+
+    const submissionIds = records.map((record) => record.submissionId);
+    const submissionUploadIds = records.map((record) => record.submissionUploadId);
+    const sourceIds = records.map((record) => record.sourceId);
+    const featureTypeNames = records.map((record) => record.featureTypeName);
+    const dataValues = records.map((record) => JSON.stringify(record.data));
+    const dataByteSizes = records.map((record) => record.dataByteSize);
+
+    const sqlStatement = SQL`
+      INSERT INTO submission_feature (
+        submission_id,
+        submission_upload_id,
+        parent_submission_feature_id,
+        source_id,
+        feature_type_id,
+        data,
+        data_byte_size,
+        record_effective_date
+      )
+      SELECT
+        staged.submission_id,
+        staged.submission_upload_id,
+        NULL,
+        staged.source_id,
+        ft.feature_type_id,
+        parsed.data,
+        staged.data_byte_size,
+        now()
+      FROM unnest(
+        ${submissionIds}::integer[],
+        ${submissionUploadIds}::uuid[],
+        ${sourceIds}::text[],
+        ${featureTypeNames}::text[],
+        ${dataValues}::text[],
+        ${dataByteSizes}::bigint[]
+      ) AS staged(
+        submission_id,
+        submission_upload_id,
+        source_id,
+        feature_type_name,
+        data_text,
+        data_byte_size
+      )
+      INNER JOIN feature_type ft ON ft.name = staged.feature_type_name AND ft.record_end_date IS NULL
+      CROSS JOIN LATERAL (SELECT staged.data_text::jsonb AS data) parsed;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+    const insertedCount = response.rowCount ?? 0;
+    const expectedCount = records.length;
+
+    if (insertedCount !== expectedCount) {
+      throw new IngestionValidationError(
+        `Failed to insert all submission feature records: inserted ${insertedCount} of ${expectedCount}`
+      );
+    }
+  }
+
   /**
    * Insert a new submission feature record.
    * Features belong to a submission (submission_id) but are produced by a specific
    * upload event (submission_upload_id). This distinction enables multi-upload-per-submission
    * (append, replace).
    *
-   * @param {number} submissionId The ID of the submission.
-   * @param {string} submissionUploadId The submission_upload_id that produced these features.
-   * @param {(number | null)} parentSubmissionFeatureId The ID of the parent submission feature, or null.
-   * @param {(string | null)} featureSourceId The source ID of the feature, or null.
-   * @param {string} featureTypeName The name of the feature type.
-   * @param {ISubmissionFeature['properties']} featureProperties The properties of the submission feature.
-   * @param {number} dataByteSizeBytes The byte size of the data.
+   * @param {InsertSubmissionFeatureRecord} record The submission feature insert payload.
    * @return {*}  {Promise<{ submission_feature_id: number }>}
-   * @memberof IngestionRepository
+   * @memberof FeatureIngestionRepository
    */
   async insertSubmissionFeatureRecord(
-    submissionId: number,
-    submissionUploadId: string,
-    parentSubmissionFeatureId: number | null,
-    featureSourceId: string | null,
-    featureTypeName: string,
-    featureProperties: ISubmissionFeature['properties'],
-    dataByteSizeBytes: number
+    record: InsertSubmissionFeatureRecord
   ): Promise<{ submission_feature_id: number }> {
+    const {
+      submissionId,
+      submissionUploadId,
+      parentSubmissionFeatureId,
+      featureSourceId,
+      featureTypeName,
+      featureProperties,
+      dataByteSizeBytes
+    } = record;
+
     const sqlStatement = SQL`
       INSERT INTO submission_feature (
         submission_id,
@@ -66,7 +134,7 @@ export class IngestionRepository extends BaseRepository {
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission feature record', [
-        'IngestionRepository->insertSubmissionFeatureRecord',
+        'FeatureIngestionRepository->insertSubmissionFeatureRecord',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
@@ -80,7 +148,7 @@ export class IngestionRepository extends BaseRepository {
    * @param {number} submissionFeatureId The ID of the feature to update.
    * @param {number} parentSubmissionFeatureId The ID of the parent feature.
    * @return {*}  {Promise<void>}
-   * @memberof IngestionRepository
+   * @memberof FeatureIngestionRepository
    */
   async updateSubmissionFeatureParent(submissionFeatureId: number, parentSubmissionFeatureId: number): Promise<void> {
     const sqlStatement = SQL`
@@ -99,7 +167,7 @@ export class IngestionRepository extends BaseRepository {
    *
    * @param {string} submissionUploadId The submission_upload_id (UUID).
    * @return {Promise<void>}
-   * @memberof IngestionRepository
+   * @memberof FeatureIngestionRepository
    */
   async deleteSubmissionFeaturesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sqlStatement = SQL`
@@ -118,7 +186,7 @@ export class IngestionRepository extends BaseRepository {
    *
    * @param {number} submissionId The submission ID.
    * @return {Promise<void>}
-   * @memberof IngestionRepository
+   * @memberof FeatureIngestionRepository
    */
   async deleteSubmissionFeatures(submissionId: number): Promise<void> {
     const sqlStatement = SQL`
@@ -138,7 +206,7 @@ export class IngestionRepository extends BaseRepository {
    *
    * @param {string} name - The feature type name to look up
    * @return {Promise<FeatureTypeWithProperties | null>} The feature type with properties, or null if not found
-   * @memberof IngestionRepository
+   * @memberof FeatureIngestionRepository
    */
   async findFeatureTypeWithProperties(name: string): Promise<FeatureTypeWithProperties | null> {
     const sqlStatement = SQL`
@@ -155,6 +223,7 @@ export class IngestionRepository extends BaseRepository {
       properties_cte AS (
         SELECT
           ftp.feature_type_id,
+          ftp.feature_type_property_id,
           fp.name,
           fp.display_name,
           fp.description,
@@ -172,12 +241,15 @@ export class IngestionRepository extends BaseRepository {
           ftp.record_end_date IS NULL
       )
       SELECT
-        ft.feature_type_id,
-        ft.name,
-        ft.display_name,
+        JSON_BUILD_OBJECT(
+          'feature_type_id', ft.feature_type_id,
+          'name', ft.name,
+          'display_name', ft.display_name
+        ) AS "feature_type",
         COALESCE(
           JSON_AGG(
             JSON_BUILD_OBJECT(
+              'feature_type_property_id', p.feature_type_property_id,
               'name', p.name,
               'display_name', p.display_name,
               'description', p.description,
@@ -197,21 +269,8 @@ export class IngestionRepository extends BaseRepository {
         ft.display_name;
     `;
 
-    const response = await this.connection.sql(sqlStatement, FeatureTypeWithPropertiesRow);
+    const response = await this.connection.sql(sqlStatement, FeatureTypeWithProperties);
 
-    if (response.rowCount === 0) {
-      return null;
-    }
-
-    const row = response.rows[0];
-
-    return {
-      featureType: {
-        feature_type_id: row.feature_type_id,
-        name: row.name,
-        display_name: row.display_name
-      },
-      properties: row.properties
-    };
+    return response.rows[0] ?? null;
   }
 }

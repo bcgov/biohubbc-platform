@@ -50,6 +50,17 @@ export class UploadArtifactService extends DBService {
   }
 
   /**
+   * Inserts upload artifact records in bulk.
+   *
+   * @param {CreateUploadArtifact[]} uploadArtifacts
+   * @returns {Promise<{ upload_artifact_id: string }[]>}
+   * @memberof UploadArtifactService
+   */
+  async insertUploadArtifacts(uploadArtifacts: CreateUploadArtifact[]): Promise<{ upload_artifact_id: string }[]> {
+    return this.uploadArtifactServiceRepository.insertUploadArtifacts(uploadArtifacts);
+  }
+
+  /**
    * Updates an existing upload artifact record by ID.
    *
    * @param {string} uploadArtifactId The ID of the upload artifact to update

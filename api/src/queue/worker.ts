@@ -2,6 +2,11 @@ import { SubmissionUpload } from '../models/submission-upload';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
 import {
+  computeScopeAnchorsFailedHandler,
+  computeScopeAnchorsJobHandler,
+  IComputeScopeAnchorsJobData
+} from './jobs/compute-scope-anchors-job';
+import {
   IIndexSubmissionFeaturesJobData,
   indexSubmissionFeaturesFailedHandler,
   indexSubmissionFeaturesJobHandler
@@ -107,6 +112,26 @@ export const registerWorkers = async (): Promise<void> => {
   await boss.work<IIndexSubmissionFeaturesJobData>(
     JobQueues.INDEX_SUBMISSION_FEATURES_FAILED,
     indexSubmissionFeaturesFailedHandler
+  );
+
+  // Create dead letter queue first (must exist before main queue references it)
+  await boss.createQueue(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
+
+  // Create main queue with dead letter queue and retry configuration
+  await boss.createQueue(JobQueues.COMPUTE_SCOPE_ANCHORS, {
+    deadLetter: JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED,
+    retryLimit: 3,
+    retryDelay: 60,
+    retryBackoff: true
+  });
+
+  // Register compute scope anchors job handler
+  await boss.work<IComputeScopeAnchorsJobData>(JobQueues.COMPUTE_SCOPE_ANCHORS, computeScopeAnchorsJobHandler);
+
+  // Register dead letter queue handler for failed compute scope anchors jobs
+  await boss.work<IComputeScopeAnchorsJobData>(
+    JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED,
+    computeScopeAnchorsFailedHandler
   );
 
   defaultLog.info({

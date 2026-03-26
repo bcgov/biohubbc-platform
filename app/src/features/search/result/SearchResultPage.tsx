@@ -22,7 +22,7 @@ import {
   RecommendedFiltersInput,
   useRecommendedFilters
 } from './sidebar/search/hooks/useRecommendedFilters';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 
 export enum SEARCH_RESULT_OPTION_VIEW {
   LIST = 'list',
@@ -31,6 +31,8 @@ export enum SEARCH_RESULT_OPTION_VIEW {
 
 export const SearchResultPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const { rows, isLoading, searchParams, setSearchParams, removeSearchParam, pagination, filters } = useSearchResults();
   const api = useApi();
   const { auth } = useAuthStateContext();
@@ -54,22 +56,21 @@ export const SearchResultPage = () => {
 
     return {
       tabs: types.map((t) => ({
-        value: t.feature_type.feature_type_name,
-        label: t.feature_type.feature_type_name
+        value: t.feature_type.name,
+        label: t.feature_type.name
       })),
       options: types.map((t) => ({
-        label: t.feature_type.feature_type_name,
-        value: t.feature_type.feature_type_name
+        label: t.feature_type.name,
+        value: t.feature_type.name
       })),
-      allNames: types.map((t) => t.feature_type.feature_type_display_name)
+      allNames: types.map((t) => t.feature_type.display_name)
     };
   }, [codesDataLoader.data]);
 
   const searchQuery = searchParams.get(URL_PARAMS.SEARCH_QUERY) || undefined;
   const featureType = searchParams.get(URL_PARAMS.FEATURE_TYPE) || undefined;
   const allFeatureTypes = useMemo(
-    () =>
-      codesDataLoader.data?.feature_type_with_properties.map((ft) => ft.feature_type.feature_type_display_name) ?? [],
+    () => codesDataLoader.data?.feature_type_with_properties.map((ft) => ft.feature_type.display_name) ?? [],
     [codesDataLoader.data]
   );
 
@@ -319,7 +320,11 @@ export const SearchResultPage = () => {
               rows={rows}
               isLoading={isLoading}
               view={view}
-              onClick={(result) => navigate(`/search/${result.submission_id}/feature/${result.submission_feature_id}`)}
+              onClick={(result) =>
+                navigate(
+                  `/submission/${result.submission_id}/feature/${result.submission_feature_id}${location.search}`
+                )
+              }
             />
           </Box>
 

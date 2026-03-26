@@ -137,10 +137,10 @@ const sharedContextRef: {
   current: {
     submissions: { submission_id: number; name: string }[];
     featureTypes: {
-      feature_type: { feature_type_name: string };
-      feature_type_properties?: {
-        feature_property_name: string;
-        feature_property_type_name: string;
+      feature_type: { name: string };
+      properties?: {
+        name: string;
+        type_name: string;
       }[];
     }[];
     submissionFeaturesCache: Map<number, ISubmissionFeatureForReview[]>;
@@ -425,8 +425,8 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
         return [
           { display: '*', insert: '*' },
           ...sharedContextRef.current.featureTypes.map((ft) => ({
-            display: ft.feature_type.feature_type_name,
-            insert: ft.feature_type.feature_type_name
+            display: ft.feature_type.name,
+            insert: ft.feature_type.name
           }))
         ];
 
@@ -554,10 +554,10 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
     }
 
     // Find the feature type and collect its property types
-    const ft = sharedContextRef.current.featureTypes.find((f) => f.feature_type.feature_type_name === featureType);
-    if (ft?.feature_type_properties) {
-      for (const prop of ft.feature_type_properties) {
-        propertyTypes.add(prop.feature_property_type_name);
+    const ft = sharedContextRef.current.featureTypes.find((f) => f.feature_type.name === featureType);
+    if (ft?.properties) {
+      for (const prop of ft.properties) {
+        propertyTypes.add(prop.type_name);
       }
     }
 
@@ -579,22 +579,22 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
 
     // If specific feature type, look only in that one
     if (featureType && featureType !== '*') {
-      const ft = sharedContextRef.current.featureTypes.find((f) => f.feature_type.feature_type_name === featureType);
-      if (!ft?.feature_type_properties) {
+      const ft = sharedContextRef.current.featureTypes.find((f) => f.feature_type.name === featureType);
+      if (!ft?.properties) {
         return null;
       }
-      const prop = ft.feature_type_properties.find((p) => p.feature_property_name === key);
-      return prop?.feature_property_type_name || null;
+      const prop = ft.properties.find((p) => p.name === key);
+      return prop?.type_name || null;
     }
 
     // If wildcard or no feature type, search all feature types for this property
     for (const ft of sharedContextRef.current.featureTypes) {
-      if (!ft.feature_type_properties) {
+      if (!ft.properties) {
         continue;
       }
-      const prop = ft.feature_type_properties.find((p) => p.feature_property_name === key);
+      const prop = ft.properties.find((p) => p.name === key);
       if (prop) {
-        return prop.feature_property_type_name;
+        return prop.type_name;
       }
     }
 
@@ -721,19 +721,19 @@ export const PolicyJsonEditor: React.FC<PolicyJsonEditorProps> = ({ value, onCha
     // Filter to specific feature type if provided and not wildcard
     const featureTypesToSearch =
       featureType && featureType !== '*'
-        ? sharedContextRef.current.featureTypes.filter((ft) => ft.feature_type.feature_type_name === featureType)
+        ? sharedContextRef.current.featureTypes.filter((ft) => ft.feature_type.name === featureType)
         : sharedContextRef.current.featureTypes;
 
     let index = 0;
     for (const ft of featureTypesToSearch) {
-      const properties = ft.feature_type_properties;
+      const properties = ft.properties;
       if (!properties || !Array.isArray(properties)) {
         continue;
       }
 
       for (const prop of properties) {
-        const propName = prop.feature_property_name;
-        const propType = prop.feature_property_type_name;
+        const propName = prop.name;
+        const propType = prop.type_name;
 
         if (!shouldIncludeProperty(propType, propName, currentText, compatibleTypes, seenProperties)) {
           continue;

@@ -1,5 +1,5 @@
 import { IDBConnection } from '../../database/db';
-import { Artifact, CreateArtifact, UpdateArtifact } from '../../models/artifact';
+import { Artifact, BatchUpdateArtifact, CreateArtifact, UpdateArtifact } from '../../models/artifact';
 import { ArtifactRepository } from '../../repositories/upload/artifact-repository';
 import { DBService } from '../db-service';
 
@@ -71,6 +71,17 @@ export class ArtifactService extends DBService {
    */
   async updateArtifactsByUploadId(uploadId: string, artifact: UpdateArtifact): Promise<{ artifact_id: string }[]> {
     return this.artifactRepository.updateArtifactsByUploadId(uploadId, artifact);
+  }
+
+  /**
+   * Updates multiple artifacts by id.
+   *
+   * @param {BatchUpdateArtifact[]} artifacts Row-level updates keyed by artifact id
+   * @return {Promise<{ artifact_id: string }[]>} Updated artifact IDs
+   * @memberof ArtifactService
+   */
+  async updateArtifactsByIds(artifacts: BatchUpdateArtifact[]): Promise<{ artifact_id: string }[]> {
+    return this.artifactRepository.updateArtifactsByIds(artifacts);
   }
 
   /**

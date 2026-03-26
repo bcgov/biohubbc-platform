@@ -495,6 +495,39 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Bulk update parent references for features belonging to a submission upload.
+   *
+   * @param {string} submissionUploadId The submission_upload_id scope.
+   * @param {{ submission_feature_id: number; parent_submission_feature_id: number }[]} pairs The child-parent pairs.
+   * @return {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionFeatureParents(
+    submissionUploadId: string,
+    pairs: { submission_feature_id: number; parent_submission_feature_id: number }[]
+  ): Promise<void> {
+    if (!pairs.length) {
+      return;
+    }
+
+    const submissionFeatureIds = pairs.map((pair) => pair.submission_feature_id);
+    const parentSubmissionFeatureIds = pairs.map((pair) => pair.parent_submission_feature_id);
+
+    const sqlStatement = SQL`
+      UPDATE submission_feature AS sf
+      SET parent_submission_feature_id = mappings.parent_submission_feature_id
+      FROM unnest(
+        ${submissionFeatureIds}::integer[],
+        ${parentSubmissionFeatureIds}::integer[]
+      ) AS mappings(submission_feature_id, parent_submission_feature_id)
+      WHERE sf.submission_feature_id = mappings.submission_feature_id
+        AND sf.submission_upload_id = ${submissionUploadId};
+    `;
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
    * Delete all submission features for a submission (soft delete).
    * Used for idempotency - allows job retries to start fresh.
    *

@@ -57,10 +57,6 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload, onClick
     [removeFromCart, dialogContext]
   );
 
-  const handleDataRequest = () => {
-    navigate(`/data-request?${searchParams.toString()}`);
-  };
-
   return (
     <LoadingGuard
       isLoading={isLoading}
@@ -78,7 +74,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload, onClick
           <AlertBanner
             icon={<Icon path={mdiLock} size={0.875} />}
             action={
-              <Button color="inherit" size="small" onClick={handleDataRequest}>
+              <Button color="inherit" size="small" onClick={() => navigate(`/data-request?${searchParams.toString()}`)}>
                 Request Access
               </Button>
             }

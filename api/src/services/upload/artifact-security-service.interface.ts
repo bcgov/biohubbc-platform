@@ -1,5 +1,6 @@
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SecurityStatusEnum } from '../../models/security-status';
+import { JsonValue } from '../../zod-schema/json';
 
 /**
  * Result of executing a malware scan.
@@ -18,5 +19,5 @@ export interface ScanOutcome {
   securityStatus: SecurityStatusEnum;
   scannedAt: string | null;
   scannerVersion: string | null;
-  results: Record<string, unknown> | null;
+  results: JsonValue | null;
 }

@@ -18,6 +18,7 @@ import { DownloadPipelineService } from '../../services/download/download-pipeli
 import { DownloadService } from '../../services/download/download-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
+import { getOrCreateTestTicketId } from '../helpers/test-ticket-helpers';
 
 const TEST_PREFIX = 'dev-artifacts';
 const SYSTEM_USER_ID = 1;
@@ -78,6 +79,7 @@ describe('Download Worker', function () {
   const createdDownloadIds: number[] = [];
   const createdSubmissionFeatureIds: number[] = [];
   const createdSubmissionIds: number[] = [];
+  const createdTicketIds: string[] = [];
   const createdS3Keys: string[] = [];
   const createdArtifactIds: string[] = [];
 
@@ -119,6 +121,10 @@ describe('Download Worker', function () {
       // 3. Delete submissions
       if (createdSubmissionIds.length > 0) {
         await db('biohub.submission').whereIn('submission_id', createdSubmissionIds).del();
+      }
+
+      if (createdTicketIds.length > 0) {
+        await db('biohub.ticket').whereIn('ticket_id', createdTicketIds).del();
       }
 
       // 4. Delete S3 objects
@@ -181,10 +187,13 @@ describe('Download Worker', function () {
       })
       .returning('upload_id');
 
+    const ticketId = await getOrCreateTestTicketId(db, submissionId, upload.upload_id, SYSTEM_USER_ID);
+
     const [bridge] = await db('biohub.submission_upload')
       .insert({
         submission_id: submissionId,
         upload_id: upload.upload_id,
+        ticket_id: ticketId,
         create_user: SYSTEM_USER_ID
       })
       .returning('submission_upload_id');

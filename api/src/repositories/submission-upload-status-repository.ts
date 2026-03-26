@@ -168,8 +168,8 @@ export class SubmissionUploadStatusRepository extends BaseRepository {
             ) AS distinct_archives
           ) AS upload_archives
         `),
-        'scans_and_files.scans',
-        'scans_and_files.scan_files'
+        knex.raw(`COALESCE(scans_and_files.scans, '[]'::jsonb) AS scans`),
+        knex.raw(`COALESCE(scans_and_files.scan_files, '[]'::jsonb) AS scan_files`)
       )
       .from('submission_uploads')
       .leftJoin('scans_and_files', 'scans_and_files.upload_id', 'submission_uploads.upload_id');

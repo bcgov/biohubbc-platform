@@ -142,6 +142,7 @@ export const insertDatasetRecord = async (
       feature_type: 'dataset',
       data: {
         name: `Survey ${faker.animal.type()} ${faker.commerce.department()}`,
+        description: faker.lorem.sentence({ min: 5, max: 15 }),
         start_date: faker.date.past().toISOString(),
         end_date: faker.date.future().toISOString(),
         geometry: random.point(

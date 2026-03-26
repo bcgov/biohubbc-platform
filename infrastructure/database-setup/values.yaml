@@ -18,6 +18,8 @@ app:
   # Keycloak
   keycloak:
     clientId: bio-hub-browser-4230 # Client ID for seed contributors
+    serviceClient:
+      name: biohub-svc-4466 # Keycloak service-client username (used as contributor system-user guid seed value)
 
   dbSchema: biohub # Database schema
 

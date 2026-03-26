@@ -6,12 +6,12 @@ import useSubmissionDataGridColumns from './useSubmissionDataGridColumns';
 // Mock CodesContext Provider
 const mockFeatureTypes = [
   {
-    feature_type: { feature_type_name: 'test' },
-    feature_type_properties: [
+    feature_type: { name: 'test' },
+    properties: [
       {
-        feature_property_name: 'mock_property',
-        feature_property_display_name: 'Mock Property',
-        feature_property_type_name: 'text'
+        name: 'mock_property',
+        display_name: 'Mock Property',
+        type_name: 'text'
       }
     ]
   }

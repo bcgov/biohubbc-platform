@@ -1,38 +1,8 @@
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
+import { FeatureType, FeatureTypeWithProperties } from '../models/feature-type';
+import { FeatureTypeProperty } from '../models/feature-type-property';
 import { BaseRepository } from './base-repository';
-
-const FeatureTypeCode = z.object({
-  feature_type_id: z.number(),
-  feature_type_name: z.string(),
-  feature_type_display_name: z.string()
-});
-
-export type FeatureTypeCode = z.infer<typeof FeatureTypeCode>;
-
-const FeaturePropertyCode = z.object({
-  feature_property_id: z.number(),
-  feature_property_name: z.string(),
-  feature_property_display_name: z.string(),
-  feature_property_type_id: z.number(),
-  feature_property_type_name: z.string()
-});
-
-export type FeaturePropertyCode = z.infer<typeof FeaturePropertyCode>;
-
-const FeatureTypeWithFeaturePropertiesCode = z.object({
-  feature_type: FeatureTypeCode,
-  feature_type_properties: z.array(FeaturePropertyCode)
-});
-
-export type FeatureTypeWithFeaturePropertiesCode = z.infer<typeof FeatureTypeWithFeaturePropertiesCode>;
-
-export const IAllCodeSets = z.object({
-  feature_type_with_properties: z.array(FeatureTypeWithFeaturePropertiesCode)
-});
-
-export type IAllCodeSets = z.infer<typeof IAllCodeSets>;
 
 /**
  * Code repository class.
@@ -45,22 +15,22 @@ export class CodeRepository extends BaseRepository {
   /**
    * Get all feature types.
    *
-   * @return {*}  {Promise<FeatureTypeCode[]>}
+   * @return {*}  {Promise<FeatureType[]>}
    * @memberof CodeRepository
    */
-  async getFeatureTypes(): Promise<FeatureTypeCode[]> {
+  async getFeatureTypes(): Promise<FeatureType[]> {
     const sql = SQL`
       SELECT 
         feature_type_id, 
-        name as feature_type_name,
-        display_name as feature_type_display_name
+        name,
+        display_name
       FROM 
         feature_type
       WHERE
         feature_type.record_end_date IS NULL;
     `;
 
-    const response = await this.connection.sql(sql, FeatureTypeCode);
+    const response = await this.connection.sql(sql, FeatureType);
 
     return response.rows;
   }
@@ -68,40 +38,54 @@ export class CodeRepository extends BaseRepository {
   /**
    * Get all feature type property codes for all feature types.
    *
-   * @return {*}  {(Promise<(FeatureTypeCode & FeaturePropertyCode)[]>)}
+   * @return {*}  {Promise<FeatureTypeWithProperties[]>}
    * @memberof CodeRepository
    */
-  async getFeatureTypePropertyCodes(): Promise<(FeatureTypeCode & FeaturePropertyCode)[]> {
+  async getFeatureTypePropertyCodes(): Promise<FeatureTypeWithProperties[]> {
     const sql = SQL`
       SELECT
-        ft.feature_type_id,
-        ft.name as feature_type_name,
-        ft.display_name as feature_type_display_name,
-        fp.feature_property_id,
-        fp.name as feature_property_name,
-        fp.display_name as feature_property_display_name,
-        fpt.feature_property_type_id,
-        fpt.name as feature_property_type_name
+        JSON_BUILD_OBJECT(
+          'feature_type_id', ft.feature_type_id,
+          'name', ft.name,
+          'display_name', ft.display_name
+        ) AS "feature_type",
+        COALESCE(
+          JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'feature_type_property_id', ftp.feature_type_property_id,
+              'name', fp.name,
+              'display_name', fp.display_name,
+              'description', fp.description,
+              'type_name', fpt.name,
+              'required_value', ftp.required_value,
+              'calculated_value', fp.calculated_value
+            )
+            ORDER BY ftp.sort
+          ) FILTER (WHERE ftp.feature_type_property_id IS NOT NULL),
+          '[]'
+        ) AS properties
       FROM
         feature_type ft
-      INNER JOIN
+      LEFT JOIN
         feature_type_property ftp on ft.feature_type_id = ftp.feature_type_id
         AND ftp.record_end_date IS NULL
-      INNER JOIN
+      LEFT JOIN
         feature_property fp ON fp.feature_property_id = ftp.feature_property_id
         AND fp.record_end_date IS NULL
-      INNER JOIN
+      LEFT JOIN
         feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
         AND fpt.record_end_date IS NULL
       WHERE
         ft.record_end_date IS NULL
+      GROUP BY
+        ft.feature_type_id,
+        ft.name,
+        ft.display_name
       ORDER BY
-        ft.sort,
-        ftp.sort
-      ASC;
+        ft.sort ASC;
     `;
 
-    const response = await this.connection.sql(sql, FeatureTypeCode.merge(FeaturePropertyCode));
+    const response = await this.connection.sql(sql, FeatureTypeWithProperties);
 
     return response.rows;
   }
@@ -110,28 +94,37 @@ export class CodeRepository extends BaseRepository {
    * Get a feature property record by name.
    *
    * @param {string} featurePropertyName
-   * @return {*}  {Promise<FeaturePropertyCode>}
+   * @return {*}  {Promise<FeatureTypeProperty>}
    * @memberof CodeRepository
    */
-  async getFeaturePropertyByName(featurePropertyName: string): Promise<FeaturePropertyCode> {
+  async getFeaturePropertyByName(featurePropertyName: string): Promise<FeatureTypeProperty> {
     const sqlStatement = SQL`
     SELECT
-      fp.feature_property_id,
-      fp.name as feature_property_name,
-      fp.display_name as feature_property_display_name,
-      fpt.feature_property_type_id,
-      fpt.name as feature_property_type_name
+      ftp.feature_type_property_id,
+      fp.name,
+      fp.display_name,
+      fp.description,
+      fpt.name as type_name,
+      ftp.required_value,
+      fp.calculated_value
     FROM
+      feature_type_property ftp
+    INNER JOIN
       feature_property fp
+      ON fp.feature_property_id = ftp.feature_property_id
+      AND fp.record_end_date IS NULL
     INNER JOIN
       feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
       AND fpt.record_end_date IS NULL
     WHERE
       fp.name = ${featurePropertyName}
-      AND fp.record_end_date IS NULL;
+      AND ftp.record_end_date IS NULL
+    ORDER BY
+      ftp.feature_type_property_id
+    LIMIT 1;
   `;
 
-    const response = await this.connection.sql(sqlStatement, FeaturePropertyCode);
+    const response = await this.connection.sql(sqlStatement, FeatureTypeProperty);
 
     if (response.rowCount === 0) {
       throw new ApiNotFoundError('Feature property not found', [

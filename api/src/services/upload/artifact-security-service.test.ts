@@ -235,6 +235,8 @@ describe('ArtifactSecurityService', () => {
     beforeEach(() => {
       process.env.QUARANTINE_OBJECT_STORE_BUCKET_NAME = 'security-bucket';
       process.env.OBJECT_STORE_BUCKET_NAME = 'main-bucket';
+      process.env.CLAMAV_MAX_SCAN_SIZE = '2000';
+      sinon.stub(ObjectStorageService.prototype, 'getMetadata').resolves({ ContentLength: 1000 } as any);
     });
 
     it('should return early if already processed (idempotent)', async () => {
@@ -371,6 +373,7 @@ describe('ArtifactSecurityService', () => {
         submission_upload_id: 'su-1',
         submission_id: 123,
         upload_id: 'upload-1',
+        status: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       });
       const publishStub = sinon
@@ -386,6 +389,7 @@ describe('ArtifactSecurityService', () => {
         submission_upload_id: 'su-1',
         submission_id: 123,
         upload_id: 'upload-1',
+        status: 'pending',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       });
     });
@@ -413,6 +417,53 @@ describe('ArtifactSecurityService', () => {
         expect(updateScanStub.calledWith('scan-1', sinon.match({ scan_status: ProcessStatusStatusEnum.FAILED }))).to.be
           .true;
         expect(updateScanStub.lastCall.args[1].results).to.deep.include({ error: 'ClamAV connection failed' });
+      }
+    });
+
+    it('should fail scan when object exceeds CLAMAV_MAX_SCAN_SIZE', async () => {
+      sinon.stub(ArtifactSecurityRepository.prototype, 'getArtifactSecurity').resolves(mockSecurityRecord);
+      sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
+      sinon
+        .stub(ArtifactSecurityScanService.prototype, 'insertArtifactSecurityScan')
+        .resolves({ artifact_security_scan_id: 'scan-1' });
+      const updateScanStub = sinon
+        .stub(ArtifactSecurityScanService.prototype, 'updateArtifactSecurityScan')
+        .resolves({ artifact_security_scan_id: 'scan-1' });
+      (ObjectStorageService.prototype.getMetadata as sinon.SinonStub).resolves({ ContentLength: 3000 } as any);
+
+      try {
+        await service.executeScan('security-1');
+        expect.fail('Expected error not thrown');
+      } catch (err) {
+        expect((err as Error).message).to.equal('File size 3000 exceeds CLAMAV_MAX_SCAN_SIZE 2000');
+        expect(updateScanStub.calledWith('scan-1', sinon.match({ scan_status: ProcessStatusStatusEnum.FAILED }))).to.be
+          .true;
+      }
+    });
+
+    it('should strip null bytes from failed scan error results', async () => {
+      const testError = new Error('INSTREAM size limit exceeded. ERROR\u0000');
+
+      sinon.stub(ArtifactSecurityRepository.prototype, 'getArtifactSecurity').resolves(mockSecurityRecord);
+      sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
+      sinon
+        .stub(ArtifactSecurityScanService.prototype, 'insertArtifactSecurityScan')
+        .resolves({ artifact_security_scan_id: 'scan-1' });
+      const updateScanStub = sinon
+        .stub(ArtifactSecurityScanService.prototype, 'updateArtifactSecurityScan')
+        .resolves({ artifact_security_scan_id: 'scan-1' });
+
+      sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from('test-data'));
+      sinon.stub(fileUtils, '_getClamAvScanner').rejects(testError);
+
+      try {
+        await service.executeScan('security-1');
+        expect.fail('Expected error not thrown');
+      } catch (err) {
+        expect(err).to.equal(testError);
+        expect(updateScanStub.lastCall.args[1].results).to.deep.include({
+          error: 'INSTREAM size limit exceeded. ERROR'
+        });
       }
     });
   });
@@ -477,6 +528,7 @@ describe('ArtifactSecurityService', () => {
         submission_upload_id: 'su-1',
         submission_id: 999,
         upload_id: 'upload-1',
+        status: 'pending',
         ticket_id: '22222222-2222-2222-2222-222222222222'
       });
       const publishStub = sinon
@@ -491,6 +543,7 @@ describe('ArtifactSecurityService', () => {
         submission_upload_id: 'su-1',
         submission_id: 999,
         upload_id: 'upload-1',
+        status: 'pending',
         ticket_id: '22222222-2222-2222-2222-222222222222'
       });
     });
