@@ -1,4 +1,6 @@
+import { HeadObjectCommandOutput } from '@aws-sdk/client-s3';
 import { IDBConnection } from '../../database/db';
+import { ClamAvScanValidationError } from '../../errors/clamav-errors';
 import { ArtifactStatusEnum } from '../../models/artifact';
 import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
@@ -7,6 +9,7 @@ import { UploadArchive } from '../../models/upload-archive';
 import { publishProcessSubmissionFeaturesJob } from '../../queue/publisher';
 import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
 import { getObjectStoreBucketName, getSecurityObjectStoreBucketName, _getClamAvScanner } from '../../utils/file-utils';
+import { sanitizeJsonbValue } from '../../utils/jsonb';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactSecurityScanService } from './artifact-security-scan-service';
@@ -19,10 +22,10 @@ export class ArtifactSecurityService extends DBService {
   uploadArtifactSecurityRepository: ArtifactSecurityRepository;
 
   /**
-   * Creates an instance of ArtifactSecurityService.
+   * Initialize the artifact security service and its repository dependency.
    *
-   * @param {IDBConnection} connection Database connection object
-   * @memberof ArtifactSecurityService
+   * @param {IDBConnection} connection - Active database connection for service operations.
+   * @returns {void}
    */
   constructor(connection: IDBConnection) {
     super(connection);
@@ -30,34 +33,31 @@ export class ArtifactSecurityService extends DBService {
   }
 
   /**
-   * Retrieves a single upload artifact security record by its ID.
+   * Fetch a single artifact security record by id.
    *
-   * @param {string} securityId The ID of the security record
-   * @return {Promise<ArtifactSecurity>} The upload artifact security record
-   * @memberof ArtifactSecurityService
+   * @param {string} securityId - Artifact security identifier.
+   * @returns {Promise<ArtifactSecurity>} Resolved artifact security record.
    */
   async getArtifactSecurity(securityId: string): Promise<ArtifactSecurity> {
     return this.uploadArtifactSecurityRepository.getArtifactSecurity(securityId);
   }
 
   /**
-   * Inserts a new upload artifact security record.
+   * Create a new artifact security record.
    *
-   * @param {CreateArtifactSecurity} security The data for the new security record
-   * @return {Promise<ArtifactSecurity>} The newly created security record ID
-   * @memberof ArtifactSecurityService
+   * @param {CreateArtifactSecurity} security - Payload for the new security record.
+   * @returns {Promise<ArtifactSecurity>} Created artifact security record.
    */
   async insertArtifactSecurity(security: CreateArtifactSecurity): Promise<ArtifactSecurity> {
     return this.uploadArtifactSecurityRepository.insertArtifactSecurity(security);
   }
 
   /**
-   * Inserts artifact security records for all artifacts associated with an upload.
+   * Create artifact security records for all artifacts linked to an upload.
    *
-   * @param {string} uploadId The upload session ID
-   * @param {Omit<CreateArtifactSecurity, 'artifact_id'>} security The security data (artifact_id is derived from upload)
-   * @return {Promise<ArtifactSecurity[]>} The newly created security records
-   * @memberof ArtifactSecurityService
+   * @param {string} uploadId - Upload session id.
+   * @param {Omit<CreateArtifactSecurity, 'artifact_id'>} security - Security payload shared across derived artifact records.
+   * @returns {Promise<ArtifactSecurity[]>} Created artifact security records.
    */
   async insertArtifactSecurityByUploadId(
     uploadId: string,
@@ -67,24 +67,24 @@ export class ArtifactSecurityService extends DBService {
   }
 
   /**
-   * Updates an existing upload artifact security record by ID.
+   * Update a single artifact security record by id.
    *
-   * @param {string} securityId The ID of the security record to update
-   * @param {UpdateArtifactSecurity} security The fields to update
-   * @return {Promise<ArtifactSecurity>} The updated security record ID
-   * @memberof ArtifactSecurityService
+   * @param {string} securityId - Artifact security identifier to update.
+   * @param {UpdateArtifactSecurity} security - Partial security update payload.
+   * @returns {Promise<ArtifactSecurity>} Updated artifact security record.
    */
   async updateArtifactSecurity(securityId: string, security: UpdateArtifactSecurity): Promise<ArtifactSecurity> {
     return this.uploadArtifactSecurityRepository.updateArtifactSecurity(securityId, security);
   }
 
   /**
-   * Handles post-scan actions for a clean scan result.
-   * Promotes the file from security bucket to main bucket and unblocks the upload archive for extraction.
+   * Handle post-scan actions for a clean artifact.
    *
-   * @param {string} artifactId The ID of the artifact
-   * @param {string} objectKey The S3 object key
-   * @memberof ArtifactSecurityService
+   * Promotes the object from quarantine to main storage and unblocks the corresponding upload archive.
+   *
+   * @param {string} artifactId - Artifact identifier.
+   * @param {string} objectKey - S3 object key for the artifact.
+   * @returns {Promise<UploadArchive>} Updated upload archive record after unblocking.
    */
   async handleCleanScanResult(artifactId: string, objectKey: string): Promise<UploadArchive> {
     const uploadArchiveService = new UploadArchiveService(this.connection);
@@ -103,13 +103,10 @@ export class ArtifactSecurityService extends DBService {
   }
 
   /**
-   * Publishes the downstream processing job after a clean scan.
+   * Publish the downstream processing job for a clean scan result.
    *
-   * submission_upload is created atomically in completeArchiveUpload before the scan
-   * job is published — a missing record means data corruption, not a valid state.
-   *
-   * @param {UploadArchive} uploadArchive The upload archive record from handleCleanScanResult
-   * @memberof ArtifactSecurityService
+   * @param {UploadArchive} uploadArchive - Upload archive returned from clean scan handling.
+   * @returns {Promise<void>} Resolves once the downstream job is published.
    */
   async publishNextPipelineStep(uploadArchive: UploadArchive): Promise<void> {
     const submissionUploadService = new SubmissionUploadService(this.connection);
@@ -119,12 +116,13 @@ export class ArtifactSecurityService extends DBService {
   }
 
   /**
-   * Executes a malware scan for an artifact.
-   * Validates the artifact, runs ClamAV scan, records results, and handles post-scan actions.
+   * Execute end-to-end malware scanning for one artifact security record.
    *
-   * @param {string} artifactSecurityId The ID of the artifact security record
-   * @return {Promise<ScanExecutionResult>} The scan result with artifact info and security status
-   * @memberof ArtifactSecurityService
+   * This method validates artifact readiness, inserts a scan record, runs ClamAV, persists results,
+   * updates security status, and triggers the next pipeline step when clean.
+   *
+   * @param {string} artifactSecurityId - Artifact security record identifier.
+   * @returns {Promise<ScanExecutionResult>} Final scan execution result summary.
    */
   async executeScan(artifactSecurityId: string): Promise<ScanExecutionResult> {
     const artifactService = new ArtifactService(this.connection);
@@ -174,7 +172,7 @@ export class ArtifactSecurityService extends DBService {
         scan_status: scanOutcome.scanStatus,
         scanner_version: scanOutcome.scannerVersion,
         scanned_at: scanOutcome.scannedAt,
-        results: scanOutcome.results
+        results: sanitizeJsonbValue(scanOutcome.results)
       });
 
       // 5. Update artifact security status
@@ -194,11 +192,13 @@ export class ArtifactSecurityService extends DBService {
         securityStatus: scanOutcome.securityStatus
       };
     } catch (error) {
+      const results = error instanceof Error ? sanitizeJsonbValue({ error: error.message }) : 'Unknown error';
+
       // Update scan record to FAILED
       await artifactSecurityScanService.updateArtifactSecurityScan(artifact_security_scan_id, {
         scan_status: ProcessStatusStatusEnum.FAILED,
         scanned_at: new Date().toISOString(),
-        results: { error: error instanceof Error ? error.message : 'Unknown error' }
+        results
       });
 
       // Commit the FAILED scan record to preserve the audit trail
@@ -209,7 +209,10 @@ export class ArtifactSecurityService extends DBService {
   }
 
   /**
-   * Determines the bucket type based on bucket name.
+   * Map a persisted bucket name to an internal bucket type enum.
+   *
+   * @param {string} bucketName - Bucket name stored with the artifact record.
+   * @returns {BucketType} Bucket type used by object storage service operations.
    */
   private getBucketTypeForArtifact(bucketName: string): BucketType {
     if (bucketName === getSecurityObjectStoreBucketName()) {
@@ -224,13 +227,75 @@ export class ArtifactSecurityService extends DBService {
   }
 
   /**
-   * Scans an artifact object using ClamAV.
+   * Resolve the configured maximum scan size in bytes.
+   *
+   * Falls back to 20MB when `CLAMAV_MAX_SCAN_SIZE` is not set.
+   *
+   * ClamAV has two related limits:
+   * - `MaxFileSize`: maximum size of any single file ClamAV will inspect (including files extracted from archives).
+   * - `MaxScanSize`: maximum total bytes ClamAV will process while scanning one input (including recursive archive extraction).
+   *
+   * Files over these limits may be skipped/truncated by ClamAV instead of being fully scanned. We pre-check
+   * the object size against this application limit so oversized files fail validation before scan submission.
+   *
+   * @see https://github.com/Cisco-Talos/clamav/issues/1274
+   *
+   * @returns {number} Maximum allowed scan size in bytes.
+   */
+  private getClamAvMaxScanSize(): number {
+    const maxScanSize = Number(process.env.CLAMAV_MAX_SCAN_SIZE ?? 20 * 1024 * 1024);
+
+    if (!Number.isFinite(maxScanSize) || maxScanSize <= 0) {
+      throw new ClamAvScanValidationError('CLAMAV_MAX_SCAN_SIZE must be a positive number of bytes');
+    }
+
+    return maxScanSize;
+  }
+
+  /**
+   * Validate object metadata before attempting ClamAV scan.
+   *
+   * This is a fail-fast guardrail so we do not send objects to ClamAV that are known to be unscannable under our configured
+   * limits. It validates:
+   * - file size is present and numeric (`ContentLength` from S3 HEAD metadata)
+   * - file size does not exceed `CLAMAV_MAX_SCAN_SIZE`
+   *
+   * Rejecting here provides a deterministic validation error instead of relying on ClamAV's limit handling (which may skip or
+   * partially process oversized content depending on daemon configuration).
+   *
+   * @param {string} objectKey - S3 key used for error context.
+   * @param {HeadObjectCommandOutput} metadata - Object metadata returned by S3 HEAD request.
+   * @throws {ClamAvScanValidationError} When file size is missing/non-numeric or exceeds `CLAMAV_MAX_SCAN_SIZE`.
+   * @returns {void}
+   */
+  private validateObjectBeforeScan(objectKey: string, metadata: HeadObjectCommandOutput): void {
+    const maxScanSize = this.getClamAvMaxScanSize();
+    const fileSize = metadata.ContentLength;
+
+    if (!Number.isFinite(fileSize)) {
+      throw new ClamAvScanValidationError(`Cannot determine file size for ClamAV scan: ${objectKey}`);
+    }
+
+    if (Number(fileSize) > maxScanSize) {
+      throw new ClamAvScanValidationError(`File size ${Number(fileSize)} exceeds CLAMAV_MAX_SCAN_SIZE ${maxScanSize}`);
+    }
+  }
+
+  /**
+   * Scan a stored artifact object with ClamAV and map result to scan outcome.
+   *
+   * @param {string} bucketName - Bucket name containing the artifact.
+   * @param {string} objectKey - Object key for the artifact.
+   * @returns {Promise<ScanOutcome>} Scan status and security outcome payload.
    */
   private async scanArtifactObject(bucketName: string, objectKey: string): Promise<ScanOutcome> {
     const scannedAt = new Date().toISOString();
 
     const storageService = new ObjectStorageService();
     const bucketType = this.getBucketTypeForArtifact(bucketName);
+    const metadata = await storageService.getMetadata(bucketType, objectKey);
+    this.validateObjectBeforeScan(objectKey, metadata);
+
     const fileStream = await storageService.getFileStream(bucketType, objectKey);
 
     const clamAvScanner = await _getClamAvScanner();

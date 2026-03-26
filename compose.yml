@@ -98,6 +98,7 @@ services:
       - CLAMAV_PORT=${CLAMAV_PORT}
       - CLAMAV_HOST=${CLAMAV_HOST}
       - ENABLE_FILE_VIRUS_SCAN=${ENABLE_FILE_VIRUS_SCAN}
+      - CLAMAV_MAX_SCAN_SIZE=${CLAMAV_MAX_SCAN_SIZE}
       # GCNotify
       - GCNOTIFY_SECRET_API_KEY=${GCNOTIFY_SECRET_API_KEY}
       - GCNOTIFY_ADMIN_EMAIL=${GCNOTIFY_ADMIN_EMAIL}
@@ -132,6 +133,7 @@ services:
       # Clamav
       - CLAMAV_HOST=${CLAMAV_HOST}
       - CLAMAV_PORT=${CLAMAV_PORT}
+      - CLAMAV_MAX_SCAN_SIZE=${CLAMAV_MAX_SCAN_SIZE}
       # Database
       - DB_HOST=${DB_HOST}
       - DB_USER_API=${DB_USER_API}
@@ -171,8 +173,13 @@ services:
   clamav:
     image: clamav/clamav-debian:latest
     container_name: ${DOCKER_PROJECT_NAME}-clamav-${DOCKER_NAMESPACE}-container
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - 'conf="/etc/clamav/clamd.conf"; max_scan_size="$${CLAMAV_MAX_SCAN_SIZE:-2147483648}"; set_conf_value() { key="$$1"; value="$$2"; if grep -Eq "^#?$${key}[[:space:]]+" "$$conf"; then sed -i -E "s|^#?$${key}[[:space:]].*|$${key} $${value}|" "$$conf"; else echo "$${key} $${value}" >> "$$conf"; fi; }; set_conf_value "StreamMaxLength" "$$max_scan_size"; set_conf_value "MaxFileSize" "$$max_scan_size"; set_conf_value "MaxScanSize" "$$max_scan_size"; freshclam || true; exec clamd -F;'
     ports:
       - ${CLAMAV_PORT}:3310
+    environment:
+      - CLAMAV_MAX_SCAN_SIZE=${CLAMAV_MAX_SCAN_SIZE}
     volumes:
       - clamav_db:/var/lib/clamav
     networks:
