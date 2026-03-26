@@ -76,7 +76,6 @@ export const PortalSubmissionCard = ({ submission }: PortalSubmissionCardProps) 
       />
       <CardContent sx={{ pt: 0 }}>
         <Typography
-          variant="body1"
           color="textSecondary"
           sx={{
             display: '-webkit-box',
@@ -133,7 +132,6 @@ export const PortalSubmissionCard = ({ submission }: PortalSubmissionCardProps) 
             <Button
               component={RouterLink}
               variant="contained"
-              color="primary"
               to={`/`}
               sx={{
                 flex: '0 0 auto',
