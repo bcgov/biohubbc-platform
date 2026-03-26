@@ -603,6 +603,10 @@ describe('Security scope search (integration)', function () {
       `);
       await scopeService.cleanupScopesForDeletedStatements([stmtId], []);
 
+      // In prod the cleanup publishes a pg-boss job that calls computeAnchorsForScope.
+      // pg-boss is not running in make test-db, so invoke the service directly.
+      await scopeService.computeAnchorsForScope(scopeId);
+
       // Anchors deleted because scope has no remaining policy_statement_scope references
       expect(await countAnchors(scopeId)).to.equal(0);
     });
@@ -700,6 +704,10 @@ describe('Security scope search (integration)', function () {
         WHERE policy_statement_id = ${oldStmtId};
       `);
       await scopeService.cleanupScopesForDeletedStatements([oldStmtId], [teamId]);
+
+      // In prod the cleanup publishes a pg-boss job that calls computeAnchorsForScope.
+      // pg-boss is not running in make test-db, so invoke the service directly.
+      await scopeService.computeAnchorsForScope(oldScopeId);
 
       // Old scope's anchors cleaned up (orphaned)
       expect(await countAnchors(oldScopeId)).to.equal(0);

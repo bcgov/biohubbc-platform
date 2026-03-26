@@ -199,39 +199,7 @@ export class PolicyService extends DBService {
     statements: CreatePolicyStatementInput[]
   ): Promise<PolicyWithStatements> {
     const policy = await this.createPolicy(policyData);
-
-    const createdStatements = await Promise.all(
-      statements.map(async (stmt) => {
-        const statement = await this.policyStatementService.createPolicyStatement({
-          policy_id: policy.policy_id,
-          effect: stmt.effect,
-          submission_feature_urn: stmt.submission_feature_urn
-        });
-
-        const conditions = await Promise.all(
-          (stmt.conditions || []).map((cond) =>
-            this.policyStatementConditionService.createPolicyStatementCondition({
-              policy_statement_id: statement.policy_statement_id,
-              operator: cond.operator,
-              key: cond.key,
-              value: cond.value
-            })
-          )
-        );
-
-        return { ...statement, conditions };
-      })
-    );
-
-    // Create security scopes for each statement — a new policy has no teams yet,
-    // so no team scope grants are needed. Anchor computation is triggered for new scopes.
-    for (const stmt of createdStatements) {
-      await this.securityScopeService.createScopeForPolicyStatement(
-        stmt.policy_statement_id,
-        stmt.submission_feature_urn
-      );
-    }
-
+    const createdStatements = await this.createStatementsWithScopes(policy.policy_id, statements);
     return { ...policy, statements: createdStatements };
   }
 
@@ -272,6 +240,24 @@ export class PolicyService extends DBService {
     );
 
     // Create new statements
+    const createdStatements = await this.createStatementsWithScopes(policyId, statements);
+
+    // Clean up old scope mappings and rebuild affected teams' scope grants
+    if (oldStatementIds.length > 0) {
+      await this.securityScopeService.cleanupScopesForDeletedStatements(oldStatementIds, affectedTeamIds);
+    }
+
+    return { ...policy, statements: createdStatements };
+  }
+
+  /**
+   * Create statements with conditions and register security scopes for each.
+   * Shared by createPolicyWithStatements and updatePolicyWithStatements.
+   */
+  private async createStatementsWithScopes(
+    policyId: string,
+    statements: CreatePolicyStatementInput[]
+  ): Promise<PolicyStatementWithConditions[]> {
     const createdStatements = await Promise.all(
       statements.map(async (stmt) => {
         const statement = await this.policyStatementService.createPolicyStatement({
@@ -295,7 +281,6 @@ export class PolicyService extends DBService {
       })
     );
 
-    // Create scopes for new statements (triggers anchor computation for new scopes)
     for (const stmt of createdStatements) {
       await this.securityScopeService.createScopeForPolicyStatement(
         stmt.policy_statement_id,
@@ -303,11 +288,6 @@ export class PolicyService extends DBService {
       );
     }
 
-    // Clean up old scope mappings and rebuild affected teams' scope grants
-    if (oldStatementIds.length > 0) {
-      await this.securityScopeService.cleanupScopesForDeletedStatements(oldStatementIds, affectedTeamIds);
-    }
-
-    return { ...policy, statements: createdStatements };
+    return createdStatements;
   }
 }
