@@ -577,7 +577,7 @@ describe('SecurityService', () => {
       sinon.restore();
     });
 
-    it('should succeed with valid data and update scope anchors', async () => {
+    it('removes rules, applies rules, and triggers scope recomputation', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SecurityService(mockDBConnection);
 
@@ -593,40 +593,11 @@ describe('SecurityService', () => {
           update_date: '',
           update_user: 1,
           revision_count: 1
-        },
-        {
-          submission_feature_security_id: 2,
-          submission_feature_id: 20,
-          security_rule_id: 7,
-          record_effective_date: '',
-          record_end_date: null,
-          create_date: '',
-          create_user: 1,
-          update_date: '',
-          update_user: 1,
-          revision_count: 1
         }
       ]);
 
       const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityToSubmission').resolves([]);
 
-      // Feature 20 still secured by another rule; feature 10 is fully unsecured
-      sinon.stub(SecurityRepository.prototype, 'getSecurityRulesForSubmissionFeatures').resolves([
-        {
-          submission_feature_security_id: 3,
-          submission_feature_id: 20,
-          security_rule_id: 9,
-          record_effective_date: '',
-          record_end_date: null,
-          create_date: '',
-          create_user: 1,
-          update_date: '',
-          update_user: 1,
-          revision_count: 1
-        }
-      ]);
-
-      const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
       const triggerAnchorsStub = sinon
         .stub(SecurityScopeService.prototype, 'triggerAnchorComputationForSubmission')
         .resolves();
@@ -635,19 +606,15 @@ describe('SecurityService', () => {
 
       expect(removeStub).to.be.calledWith(1, [6, 7]);
       expect(applyStub).to.be.calledWith(1, [4, 5]);
-      expect(deleteAnchorsStub).to.be.calledOnceWith([10]);
       expect(triggerAnchorsStub).to.be.calledOnceWith(1);
     });
 
-    it('should succeed when no remove rule IDs are provided', async () => {
+    it('skips remove when no remove rule IDs are provided', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SecurityService(mockDBConnection);
 
       const removeStub = sinon.stub(SecurityRepository.prototype, 'removeSecurityFromSubmission').resolves([]);
-
       const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityToSubmission').resolves([]);
-
-      const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
       const triggerAnchorsStub = sinon
         .stub(SecurityScopeService.prototype, 'triggerAnchorComputationForSubmission')
         .resolves();
@@ -656,11 +623,10 @@ describe('SecurityService', () => {
 
       expect(removeStub).to.not.be.called;
       expect(applyStub).to.be.calledWith(1, [4, 5]);
-      expect(deleteAnchorsStub).to.not.be.called;
       expect(triggerAnchorsStub).to.be.calledOnceWith(1);
     });
 
-    it('should succeed when no apply rule IDs are provided', async () => {
+    it('skips apply when no apply rule IDs are provided', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SecurityService(mockDBConnection);
 
@@ -680,11 +646,6 @@ describe('SecurityService', () => {
       ]);
 
       const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityToSubmission').resolves([]);
-
-      // Feature 10 fully unsecured after removal
-      sinon.stub(SecurityRepository.prototype, 'getSecurityRulesForSubmissionFeatures').resolves([]);
-
-      const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
       const triggerAnchorsStub = sinon
         .stub(SecurityScopeService.prototype, 'triggerAnchorComputationForSubmission')
         .resolves();
@@ -693,98 +654,22 @@ describe('SecurityService', () => {
 
       expect(applyStub).to.not.be.called;
       expect(removeStub).to.be.calledWith(1, [6, 7]);
-      expect(deleteAnchorsStub).to.be.calledOnceWith([10]);
-      expect(triggerAnchorsStub).to.not.be.called;
+      expect(triggerAnchorsStub).to.be.calledOnceWith(1);
     });
 
-    it('should succeed when both apply and remove rule IDs are empty', async () => {
+    it('always triggers scope recomputation even when both arrays are empty', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SecurityService(mockDBConnection);
 
-      const removeStub = sinon.stub(SecurityRepository.prototype, 'removeSecurityFromSubmission').resolves([]);
-
-      const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityToSubmission').resolves([]);
-
-      const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
+      sinon.stub(SecurityRepository.prototype, 'removeSecurityFromSubmission').resolves([]);
+      sinon.stub(SecurityRepository.prototype, 'applySecurityToSubmission').resolves([]);
       const triggerAnchorsStub = sinon
         .stub(SecurityScopeService.prototype, 'triggerAnchorComputationForSubmission')
         .resolves();
 
       await service.patchSecurityRulesOnSubmission(1, [], []);
 
-      expect(removeStub).to.not.be.called;
-      expect(applyStub).to.not.be.called;
-      expect(deleteAnchorsStub).to.not.be.called;
-      expect(triggerAnchorsStub).to.not.be.called;
-    });
-
-    it('should not delete anchors when removed features still have other security rules', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new SecurityService(mockDBConnection);
-
-      sinon.stub(SecurityRepository.prototype, 'removeSecurityFromSubmission').resolves([
-        {
-          submission_feature_security_id: 1,
-          submission_feature_id: 10,
-          security_rule_id: 6,
-          record_effective_date: '',
-          record_end_date: null,
-          create_date: '',
-          create_user: 1,
-          update_date: '',
-          update_user: 1,
-          revision_count: 1
-        },
-        {
-          submission_feature_security_id: 2,
-          submission_feature_id: 20,
-          security_rule_id: 6,
-          record_effective_date: '',
-          record_end_date: null,
-          create_date: '',
-          create_user: 1,
-          update_date: '',
-          update_user: 1,
-          revision_count: 1
-        }
-      ]);
-
-      sinon.stub(SecurityRepository.prototype, 'applySecurityToSubmission').resolves([]);
-
-      // Both features still secured by another rule
-      sinon.stub(SecurityRepository.prototype, 'getSecurityRulesForSubmissionFeatures').resolves([
-        {
-          submission_feature_security_id: 3,
-          submission_feature_id: 10,
-          security_rule_id: 9,
-          record_effective_date: '',
-          record_end_date: null,
-          create_date: '',
-          create_user: 1,
-          update_date: '',
-          update_user: 1,
-          revision_count: 1
-        },
-        {
-          submission_feature_security_id: 4,
-          submission_feature_id: 20,
-          security_rule_id: 9,
-          record_effective_date: '',
-          record_end_date: null,
-          create_date: '',
-          create_user: 1,
-          update_date: '',
-          update_user: 1,
-          revision_count: 1
-        }
-      ]);
-
-      const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
-      sinon.stub(SecurityScopeService.prototype, 'triggerAnchorComputationForSubmission').resolves();
-
-      await service.patchSecurityRulesOnSubmission(1, [], [6]);
-
-      expect(deleteAnchorsStub).to.not.be.called;
+      expect(triggerAnchorsStub).to.be.calledOnceWith(1);
     });
   });
 
@@ -793,7 +678,7 @@ describe('SecurityService', () => {
       sinon.restore();
     });
 
-    it('should succeed with valid data and update scope anchors', async () => {
+    it('removes rules, applies rules, and triggers scope recomputation', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SecurityService(mockDBConnection);
 
@@ -803,23 +688,6 @@ describe('SecurityService', () => {
 
       const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityRulesToSubmissionFeatures').resolves([]);
 
-      // Feature 2 still secured, features 1 and 3 fully unsecured
-      sinon.stub(SecurityRepository.prototype, 'getSecurityRulesForSubmissionFeatures').resolves([
-        {
-          submission_feature_security_id: 2,
-          submission_feature_id: 2,
-          security_rule_id: 9,
-          record_effective_date: '',
-          record_end_date: null,
-          create_date: '',
-          create_user: 1,
-          update_date: '',
-          update_user: 1,
-          revision_count: 1
-        }
-      ]);
-
-      const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
       const triggerAnchorsStub = sinon
         .stub(SecurityScopeService.prototype, 'triggerAnchorComputationForSubmission')
         .resolves();
@@ -828,11 +696,10 @@ describe('SecurityService', () => {
 
       expect(removeStub).to.be.calledWith([1, 2, 3], [6, 7]);
       expect(applyStub).to.be.calledWith([1, 2, 3], [4, 5]);
-      expect(deleteAnchorsStub).to.be.calledOnceWith([1, 3]);
       expect(triggerAnchorsStub).to.be.calledOnceWith(1);
     });
 
-    it('should succeed when no submissionFeatureIds are called', async () => {
+    it('returns early when no submissionFeatureIds are provided', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SecurityService(mockDBConnection);
 
@@ -840,9 +707,6 @@ describe('SecurityService', () => {
         .stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures')
         .resolves([]);
 
-      const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityRulesToSubmissionFeatures').resolves([]);
-
-      const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
       const triggerAnchorsStub = sinon
         .stub(SecurityScopeService.prototype, 'triggerAnchorComputationForSubmission')
         .resolves();
@@ -850,12 +714,10 @@ describe('SecurityService', () => {
       await service.patchSecurityRulesOnSubmissionFeatures(1, [], [4, 5], [6, 7]);
 
       expect(removeStub).to.not.be.called;
-      expect(applyStub).to.not.be.called;
-      expect(deleteAnchorsStub).to.not.be.called;
       expect(triggerAnchorsStub).to.not.be.called;
     });
 
-    it('should succeed when no remove rule IDs are called', async () => {
+    it('skips remove when no remove rule IDs are provided', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SecurityService(mockDBConnection);
 
@@ -865,7 +727,6 @@ describe('SecurityService', () => {
 
       const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityRulesToSubmissionFeatures').resolves([]);
 
-      const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
       const triggerAnchorsStub = sinon
         .stub(SecurityScopeService.prototype, 'triggerAnchorComputationForSubmission')
         .resolves();
@@ -874,11 +735,10 @@ describe('SecurityService', () => {
 
       expect(removeStub).to.not.be.called;
       expect(applyStub).to.be.calledWith([1, 2, 3], [4, 5]);
-      expect(deleteAnchorsStub).to.not.be.called;
       expect(triggerAnchorsStub).to.be.calledOnceWith(1);
     });
 
-    it('should succeed when no apply rule IDs are called', async () => {
+    it('skips apply when no apply rule IDs are provided', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SecurityService(mockDBConnection);
 
@@ -888,10 +748,6 @@ describe('SecurityService', () => {
 
       const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityRulesToSubmissionFeatures').resolves([]);
 
-      // All features fully unsecured after removal
-      sinon.stub(SecurityRepository.prototype, 'getSecurityRulesForSubmissionFeatures').resolves([]);
-
-      const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
       const triggerAnchorsStub = sinon
         .stub(SecurityScopeService.prototype, 'triggerAnchorComputationForSubmission')
         .resolves();
@@ -900,64 +756,7 @@ describe('SecurityService', () => {
 
       expect(applyStub).to.not.be.called;
       expect(removeStub).to.be.calledWith([1, 2, 3], [6, 7]);
-      expect(deleteAnchorsStub).to.be.calledOnceWith([1, 2, 3]);
-      expect(triggerAnchorsStub).to.not.be.called;
-    });
-
-    it('should not delete anchors when removed features still have other security rules', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new SecurityService(mockDBConnection);
-
-      sinon.stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures').resolves([]);
-
-      sinon.stub(SecurityRepository.prototype, 'applySecurityRulesToSubmissionFeatures').resolves([]);
-
-      // All features still secured by another rule
-      sinon.stub(SecurityRepository.prototype, 'getSecurityRulesForSubmissionFeatures').resolves([
-        {
-          submission_feature_security_id: 1,
-          submission_feature_id: 1,
-          security_rule_id: 9,
-          record_effective_date: '',
-          record_end_date: null,
-          create_date: '',
-          create_user: 1,
-          update_date: '',
-          update_user: 1,
-          revision_count: 1
-        },
-        {
-          submission_feature_security_id: 2,
-          submission_feature_id: 2,
-          security_rule_id: 9,
-          record_effective_date: '',
-          record_end_date: null,
-          create_date: '',
-          create_user: 1,
-          update_date: '',
-          update_user: 1,
-          revision_count: 1
-        },
-        {
-          submission_feature_security_id: 3,
-          submission_feature_id: 3,
-          security_rule_id: 9,
-          record_effective_date: '',
-          record_end_date: null,
-          create_date: '',
-          create_user: 1,
-          update_date: '',
-          update_user: 1,
-          revision_count: 1
-        }
-      ]);
-
-      const deleteAnchorsStub = sinon.stub(SecurityScopeService.prototype, 'deleteAnchorsForFeatures').resolves();
-      sinon.stub(SecurityScopeService.prototype, 'triggerAnchorComputationForSubmission').resolves();
-
-      await service.patchSecurityRulesOnSubmissionFeatures(1, [1, 2, 3], [], [6, 7]);
-
-      expect(deleteAnchorsStub).to.not.be.called;
+      expect(triggerAnchorsStub).to.be.calledOnceWith(1);
     });
   });
 

@@ -211,14 +211,4 @@ describe('SecurityScopeService', () => {
       expect(deleteStub).to.have.been.calledBefore(computeStub);
     });
   });
-
-  describe('deleteAnchorsForFeatures', () => {
-    it('delegates to repository', async () => {
-      const stub = sinon.stub(SecurityScopeRepository.prototype, 'deleteAnchorsForFeatures').resolves();
-
-      await service.deleteAnchorsForFeatures([1, 2, 3]);
-
-      expect(stub).to.have.been.calledOnceWith([1, 2, 3]);
-    });
-  });
 });

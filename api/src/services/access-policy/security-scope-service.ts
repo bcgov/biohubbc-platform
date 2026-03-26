@@ -165,16 +165,4 @@ export class SecurityScopeService extends DBService {
     await this.securityScopeRepository.deleteStaleAnchorsForScope(securityScopeId);
     await this.securityScopeRepository.computeAnchorsForScope(securityScopeId);
   }
-
-  /**
-   * Delete anchors for specific features.
-   *
-   * Called when security rules are removed from features — those features
-   * are no longer secured roots and should not be referenced as anchors.
-   *
-   * @param submissionFeatureIds IDs of the features being unsecured
-   */
-  async deleteAnchorsForFeatures(submissionFeatureIds: number[]): Promise<void> {
-    await this.securityScopeRepository.deleteAnchorsForFeatures(submissionFeatureIds);
-  }
 }

@@ -337,59 +337,13 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Delete scope anchors for features that lost all security rules.
-   *
-   * After removing security rules, some features may still be secured by other rules.
-   * Only features with zero remaining rules should stop being scope roots — deleting
-   * anchors for still-secured features would create a coverage gap where the walk-up
-   * search can't find a matching anchor.
-   *
-   * @param {number[]} featureIds - Feature IDs that had rules removed
-   * @return {Promise<void>}
-   */
-  private async deleteAnchorsForFullyUnsecuredFeatures(featureIds: number[]): Promise<void> {
-    const remainingRules = await this.securityRepository.getSecurityRulesForSubmissionFeatures(featureIds);
-    const stillSecuredIds = new Set(remainingRules.map((r) => r.submission_feature_id));
-    const fullyUnsecuredIds = featureIds.filter((id) => !stillSecuredIds.has(id));
-
-    if (fullyUnsecuredIds.length > 0) {
-      await this.securityScopeService.deleteAnchorsForFeatures(fullyUnsecuredIds);
-    }
-  }
-
-  /**
-   * Refreshes security scope anchors after rule mutations on a submission.
-   *
-   * Encapsulates the two-step pattern that follows every rule add/remove:
-   * 1. Features that lost all rules → delete their anchors (they're no longer scope roots)
-   * 2. Features that gained rules → trigger anchor computation so scopes pick them up
-   *
-   * @param {number} submissionId - Submission whose scopes need refreshing
-   * @param {number[]} removedFeatureIds - Feature IDs that had rules removed (may now be unsecured)
-   * @param {boolean} hasAppliedRules - Whether any rules were applied (triggers recomputation)
-   */
-  private async refreshSecurityScopeAnchors(
-    submissionId: number,
-    removedFeatureIds: number[],
-    hasAppliedRules: boolean
-  ): Promise<void> {
-    if (removedFeatureIds.length > 0) {
-      await this.deleteAnchorsForFullyUnsecuredFeatures(removedFeatureIds);
-    }
-
-    if (hasAppliedRules) {
-      await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
-    }
-  }
-
-  /**
    * Patches security rules that are applied or removed to the given set of submission features. If a
    * particular rule happens to belong to both `applyRuleIds` and `removeRuleIds`, it will always be
    * added.
    *
-   * After mutations, updates the security scope model:
-   * - Removed rules: deletes scope anchors for affected features (unsecured features should not be anchors).
-   * - Applied rules: triggers anchor computation so newly-secured features are picked up by existing scopes.
+   * After mutations, triggers scope recomputation for all scopes covering the submission.
+   * The recompute job (deleteStaleAnchorsForScope + computeAnchorsForScope) handles both
+   * added and removed rules idempotently.
    *
    * @param {number} submissionId ID of the submission the features belong to.
    * @param {number[]} submissionFeatureIds IDs of the submission features whose security will be updated.
@@ -418,19 +372,17 @@ export class SecurityService extends DBService {
       await this.securityRepository.applySecurityRulesToSubmissionFeatures(submissionFeatureIds, applyRuleIds);
     }
 
-    // Update security scope anchors after rule mutations
-    await this.refreshSecurityScopeAnchors(submissionId, removeRuleIds.length > 0 ? submissionFeatureIds : [], applyRuleIds.length > 0);
+    // Trigger scope recomputation — the recompute job handles both added and removed rules
+    await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
   }
 
   /**
    * Patches security rules applied or removed for all features of a submission.
    * If a rule exists in both applyRuleIds and removeRuleIds, it will always be applied.
    *
-   * After mutations, updates the security scope model:
-   * - Removed rules: deletes scope anchors for features that lost security rules, so unsecured
-   *   features are no longer treated as scope anchors.
-   * - Applied rules: triggers anchor computation so newly-secured features are picked up by
-   *   existing scopes whose URN covers this submission.
+   * After mutations, triggers scope recomputation for all scopes covering the submission.
+   * The recompute job (deleteStaleAnchorsForScope + computeAnchorsForScope) handles both
+   * added and removed rules idempotently.
    *
    * @param {number} submissionId
    * @param {number[]} applyRuleIds IDs of rules to apply
@@ -450,24 +402,18 @@ export class SecurityService extends DBService {
       removeRuleIds
     });
 
-    // Remove rules first — capture deleted records to identify affected feature IDs
-    const removedFeatureIds = removeRuleIds?.length
-      ? [
-          ...new Set(
-            (await this.securityRepository.removeSecurityFromSubmission(submissionId, removeRuleIds)).map(
-              (r) => r.submission_feature_id
-            )
-          )
-        ]
-      : [];
+    // Remove rules first
+    if (removeRuleIds?.length) {
+      await this.securityRepository.removeSecurityFromSubmission(submissionId, removeRuleIds);
+    }
 
     // Apply rules last (wins if overlap exists)
     if (applyRuleIds?.length) {
       await this.securityRepository.applySecurityToSubmission(submissionId, applyRuleIds);
     }
 
-    // Update security scope anchors after rule mutations
-    await this.refreshSecurityScopeAnchors(submissionId, removedFeatureIds, !!applyRuleIds?.length);
+    // Trigger scope recomputation — the recompute job handles both added and removed rules
+    await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
   }
 
   /**

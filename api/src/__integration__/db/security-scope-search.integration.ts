@@ -983,9 +983,10 @@ describe('Security scope search (integration)', function () {
       const beforeAnon = await searchInSubmission(submissionId, ['dataset'], null);
       expect(beforeAnon.map((r) => r.submission_feature_id)).to.not.include(featureId);
 
-      // Remove security + delete anchors
+      // Remove security + recompute anchors (stale anchor gets cleaned up)
       await unsecureFeature(featureId);
-      await scopeRepo.deleteAnchorsForFeatures([featureId]);
+      await scopeRepo.deleteStaleAnchorsForScope(scopeId);
+      await scopeRepo.computeAnchorsForScope(scopeId);
 
       // Anchor deleted
       const anchorResult = await connection.sql(SQL`
@@ -1020,10 +1021,11 @@ describe('Security scope search (integration)', function () {
       // All 3 features are anchors
       expect(await countAnchors(scopeId)).to.equal(3);
 
-      // Unsecure feat2 and feat3, delete their anchors
+      // Unsecure feat2 and feat3, recompute anchors (stale anchors get cleaned up)
       await unsecureFeature(feat2);
       await unsecureFeature(feat3);
-      await scopeRepo.deleteAnchorsForFeatures([feat2, feat3]);
+      await scopeRepo.deleteStaleAnchorsForScope(scopeId);
+      await scopeRepo.computeAnchorsForScope(scopeId);
 
       // feat1's anchor remains, feat2 and feat3 are gone
       expect(await countAnchors(scopeId)).to.equal(1);
@@ -1110,7 +1112,13 @@ describe('Security scope search (integration)', function () {
       // be the anchor regardless of what's above it.
       const submissionId = await createTestSubmission(connection);
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
-      const observation = await createTestFeature(connection, submissionId, 'species_observation', { name: 'Obs' }, dataset);
+      const observation = await createTestFeature(
+        connection,
+        submissionId,
+        'species_observation',
+        { name: 'Obs' },
+        dataset
+      );
       const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Telem' }, observation);
 
       await secureFeature(dataset);
@@ -1144,7 +1152,13 @@ describe('Security scope search (integration)', function () {
       // for a telemetry-scoped URN.
       const submissionId = await createTestSubmission(connection);
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
-      const observation = await createTestFeature(connection, submissionId, 'species_observation', { name: 'Obs' }, dataset);
+      const observation = await createTestFeature(
+        connection,
+        submissionId,
+        'species_observation',
+        { name: 'Obs' },
+        dataset
+      );
       const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Telem' }, observation);
 
       await secureFeature(dataset);
@@ -1176,7 +1190,13 @@ describe('Security scope search (integration)', function () {
       // URN:       urn:*:*:{telemetryId}  (wildcard submission, targets feature by ID)
       const submissionId = await createTestSubmission(connection);
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
-      const observation = await createTestFeature(connection, submissionId, 'species_observation', { name: 'Obs' }, dataset);
+      const observation = await createTestFeature(
+        connection,
+        submissionId,
+        'species_observation',
+        { name: 'Obs' },
+        dataset
+      );
       const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Telem' }, observation);
 
       await secureFeature(dataset);

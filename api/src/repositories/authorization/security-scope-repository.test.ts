@@ -295,28 +295,6 @@ describe('SecurityScopeRepository', () => {
     });
   });
 
-  describe('deleteAnchorsForFeatures', () => {
-    it('deletes anchor rows for the given submission feature IDs', async () => {
-      const knexFake = sinon.fake.resolves(mockQueryResult([], 3));
-      const mockDBConnection = getMockDBConnection({ knex: knexFake });
-
-      const repository = new SecurityScopeRepository(mockDBConnection);
-      await repository.deleteAnchorsForFeatures([1, 2, 3]);
-
-      expect(knexFake).to.have.been.calledOnce;
-    });
-
-    it('skips the query when given an empty array', async () => {
-      const knexFake = sinon.fake.resolves(mockQueryResult([]));
-      const mockDBConnection = getMockDBConnection({ knex: knexFake });
-
-      const repository = new SecurityScopeRepository(mockDBConnection);
-      await repository.deleteAnchorsForFeatures([]);
-
-      expect(knexFake).not.to.have.been.called;
-    });
-  });
-
   describe('findScopeIdsForStatements', () => {
     it('returns distinct scope IDs for the given policy statement IDs', async () => {
       const knexFake = sinon.fake.resolves(

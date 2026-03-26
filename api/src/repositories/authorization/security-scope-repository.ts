@@ -363,28 +363,6 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
-   * Delete anchor rows for specific submission features.
-   *
-   * Called when security rules are removed from features — those features
-   * are no longer secured roots and should not be anchors.
-   *
-   * @param submissionFeatureIds IDs of the features being unsecured
-   */
-  async deleteAnchorsForFeatures(submissionFeatureIds: number[]): Promise<void> {
-    if (submissionFeatureIds.length === 0) {
-      return;
-    }
-
-    const knex = getKnex();
-    const query = knex
-      .table('security_scope_anchor')
-      .whereIn('anchor_submission_feature_id', submissionFeatureIds)
-      .del();
-
-    await this.connection.knex(query);
-  }
-
-  /**
    * Get the security_scope_id for each of the given policy statement IDs.
    *
    * Called before deleting policy_statement_scope rows so the service can
