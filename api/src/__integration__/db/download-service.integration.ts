@@ -64,38 +64,6 @@ describe('Download services (integration)', function () {
     }
   }
 
-  /**
-   * Helper: grant a team access to a specific feature via the RBAC chain.
-   * Creates policy → policy_statement (allow) → team_policy.
-   * The policy_statement trigger auto-decomposes the URN into indexed columns.
-   */
-  async function grantTeamAccess(
-    teamId: string,
-    submissionId: number,
-    featureTypeName: string,
-    featureId: number
-  ): Promise<void> {
-    const userId = connection.systemUserId();
-    const urn = `urn:${submissionId}:${featureTypeName}:${featureId}`;
-
-    const policy = await connection.sql(SQL`
-      INSERT INTO policy (name, create_user)
-      VALUES (${`test-policy-${Date.now()}`}, ${userId})
-      RETURNING policy_id;
-    `);
-    const policyId = policy.rows[0].policy_id;
-
-    await connection.sql(SQL`
-      INSERT INTO policy_statement (policy_id, effect, submission_feature_urn, create_user)
-      VALUES (${policyId}, 'allow', ${urn}, ${userId});
-    `);
-
-    await connection.sql(SQL`
-      INSERT INTO team_policy (team_id, policy_id, create_user)
-      VALUES (${teamId}, ${policyId}, ${userId});
-    `);
-  }
-
   describe('createDownloadRequest', () => {
     it('should create a download record and link submission features', async () => {
       const submissionId = await createTestSubmission(connection);
@@ -244,7 +212,7 @@ describe('Download services (integration)', function () {
     });
 
     it('should return all linked features regardless of security status', async () => {
-      // Authorization is enforced at creation time via filterAuthorizedFeatureIds.
+      // Authorization is enforced at creation time via buildSecurityFilter in the search query.
       // At retrieval time, getDownloadFeatures returns everything that was linked.
       const submissionId = await createTestSubmission(connection);
       const openFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
@@ -393,33 +361,6 @@ describe('Download services (integration)', function () {
     `);
 
     return result.rows[0].system_user_id;
-  }
-
-  /**
-   * Helper: create a team and return its UUID.
-   */
-  async function createTeam(name: string): Promise<string> {
-    const apiUserId = connection.systemUserId();
-
-    const result = await connection.sql(SQL`
-      INSERT INTO team (name, create_user)
-      VALUES (${name}, ${apiUserId})
-      RETURNING team_id;
-    `);
-
-    return result.rows[0].team_id;
-  }
-
-  /**
-   * Helper: add a user to a team.
-   */
-  async function addTeamMember(teamId: string, systemUserId: number): Promise<void> {
-    const apiUserId = connection.systemUserId();
-
-    await connection.sql(SQL`
-      INSERT INTO team_member (team_id, system_user_id, create_user)
-      VALUES (${teamId}, ${systemUserId}, ${apiUserId});
-    `);
   }
 
   /**
@@ -583,43 +524,6 @@ describe('Download services (integration)', function () {
       const { downloads } = await crudService.getDownloadsByTeamMembership(otherUserId);
       const ids = downloads.map((d) => d.download_id);
       expect(ids).to.not.include(download_id);
-    });
-  });
-
-  // ── filterAuthorizedFeatureIds (creation-time auth) ────────────────
-
-  describe('filterAuthorizedFeatureIds', () => {
-    it('should include secured features when user has matching ALLOW policy via team membership', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const openFeat = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
-      const securedFeat = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
-      await secureFeature(securedFeat);
-
-      const userId = connection.systemUserId();
-      const policyTeamId = await createTeam('CreationAuth Policy');
-      await addTeamMember(policyTeamId, userId);
-      await grantTeamAccess(policyTeamId, submissionId, 'dataset', securedFeat);
-
-      const result = await crudService.filterAuthorizedFeatureIds([openFeat, securedFeat], userId);
-
-      expect(result).to.have.length(2);
-      expect(result).to.include(openFeat);
-      expect(result).to.include(securedFeat);
-    });
-
-    it('should exclude secured features when user has no matching policy', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const openFeat = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
-      const securedFeat = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
-      await secureFeature(securedFeat);
-
-      const userId = connection.systemUserId();
-
-      const result = await crudService.filterAuthorizedFeatureIds([openFeat, securedFeat], userId);
-
-      expect(result).to.have.length(1);
-      expect(result).to.include(openFeat);
-      expect(result).to.not.include(securedFeat);
     });
   });
 });

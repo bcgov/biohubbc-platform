@@ -1,4 +1,6 @@
-import { Button, Stack } from '@mui/material';
+import { mdiLock } from '@mdi/js';
+import Icon from '@mdi/react';
+import { Box, Button, Stack } from '@mui/material';
 import { GridCellParams, GridRowSelectionModel } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
@@ -8,7 +10,7 @@ interface SearchResultTableLayoutProps {
   results: SearchFeatureResultWithRelevancy[];
   cartFeatureIds: Set<number>;
   onRowSelectionModelChange: (rowSelectionModel: GridRowSelectionModel) => void;
-  onClick: (result: SearchFeatureResultWithRelevancy) => void;
+  onClick?: (result: SearchFeatureResultWithRelevancy) => void;
   onDownload?: (result: SearchFeatureResultWithRelevancy) => void;
   onAddToCart?: (result: SearchFeatureResultWithRelevancy) => void;
   onRemoveFromCart?: (featureId: number) => void;
@@ -28,6 +30,24 @@ export const SearchResultTableLayout = ({
     }
 
     return [
+      {
+        field: 'is_secured',
+        headerName: '',
+        width: 50,
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        renderCell: (params: GridCellParams) => {
+          if (!params.value) {
+            return null;
+          }
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', color: 'error.main', flexShrink: 0 }}>
+              <Icon path={mdiLock} size={0.75} />
+            </Box>
+          );
+        }
+      },
       {
         field: 'feature_type_name',
         headerName: 'Feature Type',
@@ -67,7 +87,7 @@ export const SearchResultTableLayout = ({
                 size="small"
                 variant="outlined"
                 onClick={() => {
-                  onClick(result);
+                  onClick?.(result);
                 }}>
                 View
               </Button>

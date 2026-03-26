@@ -200,21 +200,14 @@ export function createDownload(): RequestHandler {
       const searchFeatureService = new SearchFeatureService(connection);
       const downloadService = new DownloadService(connection);
 
-      // Resolve filters to all matching feature IDs
-      const allFeatureIds = await searchFeatureService.getSearchFeatureIds(filters);
-
-      if (allFeatureIds.length === 0) {
-        throw new HTTP400('No features match the filter criteria');
-      }
-
-      // Filter to only features the user is authorized to download.
-      // Unsecured features pass through. Secured features require an ALLOW policy
-      // via the user's team memberships. Anonymous users get unsecured only.
+      // Security filtering happens in SQL via buildSecurityFilter:
+      // - systemUserId === null → anonymous, exclude secured features
+      // - systemUserId === number → authenticated, include unsecured + scope-granted
       const systemUserId = isAuthenticated ? connection.systemUserId() : null;
-      const submissionFeatureIds = await downloadService.filterAuthorizedFeatureIds(allFeatureIds, systemUserId);
+      const submissionFeatureIds = await searchFeatureService.getSearchFeatureIds(filters, systemUserId);
 
       if (submissionFeatureIds.length === 0) {
-        throw new HTTP400('No authorized features match the filter criteria');
+        throw new HTTP400('No features match the filter criteria');
       }
 
       // Create download with search filters stored for traceability

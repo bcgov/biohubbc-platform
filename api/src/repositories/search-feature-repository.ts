@@ -155,7 +155,8 @@ export class SearchFeatureRepository extends BaseRepository {
    */
   async searchFeaturesByFilters(
     filters: ISearchFeaturesFilters,
-    pagination?: ApiPaginationOptions
+    pagination?: ApiPaginationOptions,
+    systemUserId?: number | null
   ): Promise<SearchFeatureResultWithRelevancy[]> {
     defaultLog.debug({ label: 'searchFeaturesByFilters', filters, pagination });
 
@@ -165,7 +166,7 @@ export class SearchFeatureRepository extends BaseRepository {
     }
 
     const knex = getKnex();
-    let query = this.buildSearchQuery(knex, filters);
+    let query = this.buildSearchQuery(knex, filters, systemUserId);
 
     // Apply pagination and sorting using base repository method
     query = this.applyPagination(query, pagination);
@@ -180,10 +181,10 @@ export class SearchFeatureRepository extends BaseRepository {
    * @param {ISearchFeaturesFilters} filters - Search filters to count results for
    * @returns {Promise<number>} Promise resolving to the count of matching features
    */
-  async searchFeaturesByFiltersCount(filters: ISearchFeaturesFilters): Promise<number> {
+  async searchFeaturesByFiltersCount(filters: ISearchFeaturesFilters, systemUserId?: number | null): Promise<number> {
     defaultLog.debug({ label: 'searchFeaturesByFiltersCount', filters });
     const knex = getKnex();
-    const query = this.buildSearchQuery(knex, filters);
+    const query = this.buildSearchQuery(knex, filters, systemUserId);
     const countQuery = knex.from(query.as('sf_filtered')).select(knex.raw('count(*)::integer as count'));
     const response = await this.connection.knex(countQuery);
     return response.rows[0]?.count ?? 0;
@@ -198,7 +199,10 @@ export class SearchFeatureRepository extends BaseRepository {
    * @param {ISearchFeaturesFilters} filters - Search filters (keyword, feature_types, species, properties)
    * @returns {Promise<{ submission_feature_id: number }[]>} Raw rows with submission_feature_id
    */
-  async searchFeatureIdsByFilters(filters: ISearchFeaturesFilters): Promise<{ submission_feature_id: number }[]> {
+  async searchFeatureIdsByFilters(
+    filters: ISearchFeaturesFilters,
+    systemUserId?: number | null
+  ): Promise<{ submission_feature_id: number }[]> {
     defaultLog.debug({ label: 'searchFeatureIdsByFilters', filters });
 
     if (!filters || Object.keys(filters).length === 0) {
@@ -206,7 +210,7 @@ export class SearchFeatureRepository extends BaseRepository {
     }
 
     const knex = getKnex();
-    const query = this.buildSearchQuery(knex, filters);
+    const query = this.buildSearchQuery(knex, filters, systemUserId);
     const idsQuery = knex.from(query.as('sf_filtered')).select('submission_feature_id');
     const response = await this.connection.knex(idsQuery);
 
@@ -219,12 +223,16 @@ export class SearchFeatureRepository extends BaseRepository {
    * @param {ISearchFeaturesFilters} filters - Search filters to apply
    * @returns {Knex.QueryBuilder} Knex query builder with all filters applied
    */
-  private buildSearchQuery(knex: Knex, filters: ISearchFeaturesFilters): Knex.QueryBuilder {
+  private buildSearchQuery(
+    knex: Knex,
+    filters: ISearchFeaturesFilters,
+    systemUserId?: number | null
+  ): Knex.QueryBuilder {
     const keyword = filters.keyword ?? '';
     const featureTypes = filters.feature_types ?? [];
     const speciesFilters = filters.species ?? [];
     const propertyGroups = filters.properties ?? [];
-    return this.buildQueryWithCTEs(knex, keyword, featureTypes, speciesFilters, propertyGroups);
+    return this.buildQueryWithCTEs(knex, keyword, featureTypes, speciesFilters, propertyGroups, systemUserId);
   }
 
   /**
@@ -241,7 +249,8 @@ export class SearchFeatureRepository extends BaseRepository {
     keyword: string,
     featureTypes: string[],
     speciesFilters: string[],
-    propertyGroups: ISearchFeaturePropertyGroup[]
+    propertyGroups: ISearchFeaturePropertyGroup[],
+    systemUserId?: number | null
   ): Knex.QueryBuilder {
     const activeCteCount = [keyword.trim(), featureTypes.length, speciesFilters.length, propertyGroups.length].filter(
       (v) => {
@@ -304,7 +313,6 @@ export class SearchFeatureRepository extends BaseRepository {
             knex.raw('null::text as feature_name'),
             knex.raw('null::text as feature_description'),
             knex.raw('null::text as submission_name'),
-            knex.raw('null::boolean as is_secured'),
             knex.raw('0::integer as relevancy_score'),
             knex.raw('null::text as create_date')
           ).whereRaw('false');
@@ -331,7 +339,6 @@ export class SearchFeatureRepository extends BaseRepository {
           'feature_name',
           'feature_description',
           'submission_name',
-          'is_secured',
           'create_date',
           knex.raw('SUM(relevancy_score) as total_relevancy_score')
         )
@@ -346,12 +353,11 @@ export class SearchFeatureRepository extends BaseRepository {
             'feature_name',
             'feature_description',
             'submission_name',
-            'is_secured',
             'create_date'
           );
       });
 
-    return query
+    const finalQuery = query
       .select(
         'submission_feature_id',
         'submission_id',
@@ -361,11 +367,39 @@ export class SearchFeatureRepository extends BaseRepository {
         'feature_name',
         'feature_description',
         'submission_name',
-        'is_secured',
+        knex.raw(`(
+          WITH RECURSIVE ancestors AS (
+            SELECT sf_inner.submission_feature_id AS ancestor_id, sf_inner.parent_submission_feature_id
+            FROM submission_feature sf_inner
+            WHERE sf_inner.submission_feature_id = aggregated_results.submission_feature_id
+            UNION ALL
+            SELECT p.submission_feature_id, p.parent_submission_feature_id
+            FROM submission_feature p
+            JOIN ancestors a ON p.submission_feature_id = a.parent_submission_feature_id
+          )
+          SELECT EXISTS (
+            SELECT 1
+            FROM ancestors a
+            INNER JOIN submission_feature_security sfs ON sfs.submission_feature_id = a.ancestor_id
+            INNER JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = a.ancestor_id
+            WHERE sfs.record_end_date IS NULL
+              AND sf_sec.record_effective_date <= now()
+          )
+        ) AS is_secured`),
         'total_relevancy_score as relevancy_score',
         'create_date'
       )
       .from('aggregated_results');
+
+    if (systemUserId !== undefined) {
+      const securityFilter = this.buildSecurityFilter(knex, systemUserId);
+
+      if (securityFilter) {
+        finalQuery.whereRaw(securityFilter);
+      }
+    }
+
+    return finalQuery;
   }
 
   /**
@@ -399,14 +433,12 @@ export class SearchFeatureRepository extends BaseRepository {
         knex.raw(`sf.data->>'name' as feature_name`),
         knex.raw(`sf.data->>'description' as feature_description`),
         's.name as submission_name',
-        'security_check.is_secured',
         'sf.create_date',
         knex.raw(`ts_rank(${tsVector}, ${tsQuery}) as relevancy_score`)
       )
       .join('submission_feature as sf', 'ss.submission_feature_id', 'sf.submission_feature_id')
       .join('submission as s', 'sf.submission_id', 's.submission_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
-      .crossJoin(knex.raw('LATERAL (?) as security_check', [this.buildSecurityCheck(knex)]))
       .whereRaw(`${tsVector} @@ ${tsQuery}`);
   }
 
@@ -428,13 +460,11 @@ export class SearchFeatureRepository extends BaseRepository {
         knex.raw(`sf.data->>'name' as feature_name`),
         knex.raw(`sf.data->>'description' as feature_description`),
         's.name as submission_name',
-        'security_check.is_secured',
         'sf.create_date',
         knex.raw('1.0 as relevancy_score')
       )
       .join('submission as s', 'sf.submission_id', 's.submission_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
-      .crossJoin(knex.raw('LATERAL (?) as security_check', [this.buildSecurityCheck(knex)]))
       .whereIn('ft.name', featureTypes);
   }
 
@@ -457,7 +487,6 @@ export class SearchFeatureRepository extends BaseRepository {
         knex.raw(`sf.data->>'name' as feature_name`),
         knex.raw(`sf.data->>'description' as feature_description`),
         's.name as submission_name',
-        'security_check.is_secured',
         'sf.create_date',
         knex.raw('1.0 as relevancy_score')
       )
@@ -465,7 +494,6 @@ export class SearchFeatureRepository extends BaseRepository {
       .join('submission as s', 'sf.submission_id', 's.submission_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .join('feature_property as fp', 'ss.feature_property_id', 'fp.feature_property_id')
-      .crossJoin(knex.raw('LATERAL (?) as security_check', [this.buildSecurityCheck(knex)]))
       .where('fp.name', 'species')
       .whereIn('ss.value', speciesFilters);
   }
@@ -496,7 +524,6 @@ export class SearchFeatureRepository extends BaseRepository {
         'feature_name',
         'feature_description',
         'submission_name',
-        'is_secured',
         'create_date',
         knex.raw('SUM(relevancy_score) as relevancy_score')
       )
@@ -509,7 +536,6 @@ export class SearchFeatureRepository extends BaseRepository {
         'feature_name',
         'feature_description',
         'submission_name',
-        'is_secured',
         'create_date'
       );
   }
@@ -578,7 +604,6 @@ export class SearchFeatureRepository extends BaseRepository {
         knex.raw(`sf.data->>'name' as feature_name`),
         knex.raw(`sf.data->>'description' as feature_description`),
         's.name as submission_name',
-        'security_check.is_secured',
         'sf.create_date',
         knex.raw('1.0 as relevancy_score')
       )
@@ -586,7 +611,6 @@ export class SearchFeatureRepository extends BaseRepository {
       .join('submission as s', 'sf.submission_id', 's.submission_id')
       .join('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
       .join('feature_property as fp', 'ss.feature_property_id', 'fp.feature_property_id')
-      .crossJoin(knex.raw('LATERAL (?) as security_check', [this.buildSecurityCheck(knex)]))
       .where('fp.name', propertyName);
   }
 
@@ -652,28 +676,87 @@ export class SearchFeatureRepository extends BaseRepository {
   }
 
   /**
-   * Builds the security check subquery to determine if a feature or its ancestors are secured.
-   * Uses recursive CTE to traverse up the feature hierarchy.
+   * Builds a single security filter that walks ancestors once per candidate feature and checks:
+   *   1. Unsecured — no ancestor has a submission_feature_security row → visible
+   *   2. Secured + granted — any ancestor is a scope anchor the user's team can reach → visible
+   *   3. Secured + denied — secured but no matching scope anchor → filtered out
+   *
+   * For anonymous users (systemUserId is null), only unsecured features pass.
+   *
+   * Uses the shared-ancestor-walk pattern from scale-query-scopes-v2: one recursive CTE
+   * produces ancestor_ids, then both the security check and grant check use = ANY(ancestor_ids)
+   * against that same array. This avoids the double-walk penalty of separate security + grant queries.
+   *
+   * Walk-up (not expand-down) strategy: search filters have already narrowed features
+   * to a small candidate set. For each candidate, walk UP the parent chain (~3-5 levels)
+   * to check scope anchors. Cost is O(candidates × depth), not O(features in scope).
+   *
    * @param knex - Knex instance
-   * @returns Knex raw query for lateral security check
+   * @param systemUserId - The authenticated user's ID, or null for anonymous.
+   * @returns Raw SQL fragment for WHERE clause, or null if no filtering needed.
    */
-  private buildSecurityCheck(knex: Knex): Knex.Raw {
-    return knex.raw(`
-      WITH RECURSIVE ancestors AS (
-        SELECT sf.submission_feature_id as ancestor_id, sf.parent_submission_feature_id
-        FROM submission_feature sf
-        WHERE sf.submission_feature_id = sf.submission_feature_id
-        UNION ALL
-        SELECT sf2.submission_feature_id, sf2.parent_submission_feature_id
-        FROM submission_feature sf2
-        INNER JOIN ancestors a ON sf2.submission_feature_id = a.parent_submission_feature_id
-      )
-      SELECT EXISTS (
+  private buildSecurityFilter(knex: Knex, systemUserId: number | null | undefined): Knex.Raw | null {
+    if (systemUserId === undefined) {
+      return null;
+    }
+
+    if (!systemUserId) {
+      // Anonymous: only unsecured features
+      return knex.raw(`
+        NOT EXISTS (
+          WITH RECURSIVE ancestors AS (
+            SELECT sf_inner.submission_feature_id AS ancestor_id, sf_inner.parent_submission_feature_id
+            FROM submission_feature sf_inner
+            WHERE sf_inner.submission_feature_id = aggregated_results.submission_feature_id
+            UNION ALL
+            SELECT p.submission_feature_id, p.parent_submission_feature_id
+            FROM submission_feature p
+            JOIN ancestors a ON p.submission_feature_id = a.parent_submission_feature_id
+          )
+          SELECT 1
+          FROM ancestors a
+          INNER JOIN submission_feature_security sfs ON sfs.submission_feature_id = a.ancestor_id
+          WHERE sfs.record_end_date IS NULL
+        )
+      `);
+    }
+
+    // Authenticated: walk ancestors once, check unsecured OR scope grant
+    return knex.raw(
+      `
+      EXISTS (
         SELECT 1
-        FROM ancestors a
-        INNER JOIN submission_feature_security sfs ON a.ancestor_id = sfs.submission_feature_id
-        WHERE sfs.record_end_date IS NULL
-      ) as is_secured
-    `);
+        FROM (
+          WITH RECURSIVE ancestors AS (
+            SELECT sf_inner.submission_feature_id AS ancestor_id, sf_inner.parent_submission_feature_id
+            FROM submission_feature sf_inner
+            WHERE sf_inner.submission_feature_id = aggregated_results.submission_feature_id
+            UNION ALL
+            SELECT p.submission_feature_id, p.parent_submission_feature_id
+            FROM submission_feature p
+            JOIN ancestors a ON p.submission_feature_id = a.parent_submission_feature_id
+          )
+          SELECT array_agg(ancestor_id) AS ancestor_ids
+          FROM ancestors
+        ) anc
+        WHERE
+          NOT EXISTS (
+            SELECT 1 FROM submission_feature_security sfs
+            WHERE sfs.record_end_date IS NULL
+              AND sfs.submission_feature_id = ANY(anc.ancestor_ids)
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM security_scope_anchor ssa
+              JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
+              JOIN team_member tm ON tm.team_id = tss.team_id
+                AND tm.system_user_id = ?
+                AND tm.record_end_date IS NULL
+            WHERE ssa.anchor_submission_feature_id = ANY(anc.ancestor_ids)
+          )
+      )
+    `,
+      [systemUserId]
+    );
   }
 }

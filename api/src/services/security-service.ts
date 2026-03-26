@@ -16,6 +16,7 @@ import {
 import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { SecurityScopeService } from './access-policy/security-scope-service';
 import { DBService } from './db-service';
 import { ArtifactService } from './old-artifact-service';
 import { UserService } from './user-service';
@@ -32,6 +33,7 @@ export class SecurityService extends DBService {
   securityRepository: SecurityRepository;
   artifactService: ArtifactService;
   userService: UserService;
+  securityScopeService: SecurityScopeService;
 
   constructor(connection: IDBConnection) {
     super(connection);
@@ -39,6 +41,7 @@ export class SecurityService extends DBService {
     this.securityRepository = new SecurityRepository(connection);
     this.artifactService = new ArtifactService(connection);
     this.userService = new UserService(connection);
+    this.securityScopeService = new SecurityScopeService(connection);
   }
 
   /**
@@ -338,6 +341,11 @@ export class SecurityService extends DBService {
    * particular rule happens to belong to both `applyRuleIds` and `removeRuleIds`, it will always be
    * added.
    *
+   * After mutations, triggers scope recomputation for all scopes covering the submission.
+   * The recompute job (deleteStaleAnchorsForScope + resolveUrnForScope + computeAnchorBatch) handles both
+   * added and removed rules idempotently.
+   *
+   * @param {number} submissionId ID of the submission the features belong to.
    * @param {number[]} submissionFeatureIds IDs of the submission features whose security will be updated.
    * @param {number[]} applyRuleIds IDs of the rules which will be applied after the patch operation
    * @param {number[]} removeRuleIds IDs of the rules which will be removed after the patch operation
@@ -345,6 +353,7 @@ export class SecurityService extends DBService {
    * @memberof SecurityService
    */
   async patchSecurityRulesOnSubmissionFeatures(
+    submissionId: number,
     submissionFeatureIds: number[],
     applyRuleIds: number[],
     removeRuleIds: number[]
@@ -362,11 +371,18 @@ export class SecurityService extends DBService {
     if (applyRuleIds.length > 0) {
       await this.securityRepository.applySecurityRulesToSubmissionFeatures(submissionFeatureIds, applyRuleIds);
     }
+
+    // Trigger scope recomputation — the recompute job handles both added and removed rules
+    await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
   }
 
   /**
    * Patches security rules applied or removed for all features of a submission.
    * If a rule exists in both applyRuleIds and removeRuleIds, it will always be applied.
+   *
+   * After mutations, triggers scope recomputation for all scopes covering the submission.
+   * The recompute job (deleteStaleAnchorsForScope + resolveUrnForScope + computeAnchorBatch) handles both
+   * added and removed rules idempotently.
    *
    * @param {number} submissionId
    * @param {number[]} applyRuleIds IDs of rules to apply
@@ -395,32 +411,9 @@ export class SecurityService extends DBService {
     if (applyRuleIds?.length) {
       await this.securityRepository.applySecurityToSubmission(submissionId, applyRuleIds);
     }
-  }
 
-  /**
-   * Removes the given security rules from the given set of submission feature ids. If
-   * no security rules ID is provided, all security rules will be removed for the given set
-   * of subission features.
-   *
-   * @param {number[]} submissionFeatureIds
-   * @param {number[]} [removeRuleIds]
-   *
-   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
-   * @memberof SecurityService
-   */
-  async removeSecurityRulesFromSubmissionFeatures(
-    submissionFeatureIds: number[],
-    removeRuleIds?: number[]
-  ): Promise<SubmissionFeatureSecurityRecord[]> {
-    if (!submissionFeatureIds.length) {
-      return [];
-    }
-
-    if (!removeRuleIds) {
-      return this.securityRepository.removeAllSecurityRulesFromSubmissionFeatures(submissionFeatureIds);
-    }
-
-    return this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds, removeRuleIds);
+    // Trigger scope recomputation — the recompute job handles both added and removed rules
+    await this.securityScopeService.triggerAnchorComputationForSubmission(submissionId);
   }
 
   /**

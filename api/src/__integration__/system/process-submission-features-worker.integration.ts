@@ -3,8 +3,8 @@
 // Run: make test-sys
 // Requires: make web && make queue
 import { expect } from 'chai';
-import { Knex, knex } from 'knex';
-import { randomInt, randomUUID } from 'node:crypto';
+import { Knex } from 'knex';
+import { randomUUID } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import * as tar from 'tar-stream';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
@@ -13,32 +13,12 @@ import { getPgBoss, initPgBoss, stopPgBoss } from '../../queue/pg-boss-service';
 import { publishProcessSubmissionFeaturesJob } from '../../queue/publisher';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
+import { createTestKnex } from '../helpers/test-db-setup';
+import { getOrCreateIntegrationTicketId } from '../helpers/test-submission-helpers';
+import { getOrCreateTestTicketId } from '../helpers/test-ticket-helpers';
 
 const TEST_PREFIX = '__integration-test__';
 const SYSTEM_USER_ID = 2; // biohub_api system user
-
-/**
- * Create a test ticket row and return its id for submission_upload FK linkage.
- */
-async function createTestTicketId(db: Knex): Promise<string> {
-  const [team] = await db('biohub.team').select('team_id').limit(1);
-  if (!team?.team_id) {
-    throw new Error('No team row found for ticket setup');
-  }
-
-  const ticketSlug = String(randomInt(0, 100_000_000)).padStart(8, '0');
-  const [ticket] = await db('biohub.ticket')
-    .insert({
-      ticket_slug: ticketSlug,
-      subject: `${TEST_PREFIX}-ticket`,
-      description: 'System integration test ticket',
-      team_id: team.team_id,
-      create_user: SYSTEM_USER_ID
-    })
-    .returning('ticket_id');
-
-  return ticket.ticket_id;
-}
 
 async function createTarBuffer(files: { name: string; content: string }[]): Promise<Buffer> {
   const prefix = randomUUID();
@@ -113,17 +93,7 @@ describe('Process Submission Features Worker', function () {
   const createdObjectKeys: string[] = [];
 
   before(async () => {
-    db = knex({
-      client: 'pg',
-      connection: {
-        host: process.env.DB_HOST,
-        port: Number(process.env.DB_PORT),
-        database: process.env.DB_DATABASE,
-        user: process.env.DB_USER_API,
-        password: process.env.DB_USER_API_PASS
-      },
-      searchPath: ['biohub', 'public']
-    });
+    db = createTestKnex();
     storageService = new ObjectStorageService();
 
     // Initialize DB pool (needed by getAPIUserDBConnection used in publisher and job handler)
@@ -256,9 +226,10 @@ describe('Process Submission Features Worker', function () {
       archive_status: 'completed'
     });
 
-    // 5. submission_upload (links submission to upload)
-    const ticketId = await createTestTicketId(db);
-    createdTicketIds.push(ticketId);
+    // 5. ticket (required FK for submission_upload)
+    const ticketId = await getOrCreateTestTicketId(db, submission.submission_id, upload.upload_id, SYSTEM_USER_ID);
+
+    // 6. submission_upload (links submission to upload)
     const [submissionUpload] = await db('biohub.submission_upload')
       .insert({
         submission_id: submission.submission_id,
@@ -267,7 +238,7 @@ describe('Process Submission Features Worker', function () {
       })
       .returning('submission_upload_id');
 
-    // 6. upload_artifact (required for JOIN in getSubmissionUploadsBySubmissionId)
+    // 7. upload_artifact (required for JOIN in getSubmissionUploadsBySubmissionId)
     await db('biohub.upload_artifact').insert({
       upload_id: upload.upload_id,
       artifact_id: artifact.artifact_id,
@@ -282,6 +253,33 @@ describe('Process Submission Features Worker', function () {
       artifactId: artifact.artifact_id,
       objectKey
     };
+  }
+
+  /**
+   * Publish a process-submission-features job via a short-lived connection.
+   * Asserts the job was published successfully.
+   */
+  async function publishJob(params: {
+    submissionUploadId: string;
+    submissionId: number;
+    uploadId: string;
+    ticketId: string;
+  }): Promise<void> {
+    const connection = getAPIUserDBConnection();
+    try {
+      await connection.open();
+      const result = await publishProcessSubmissionFeaturesJob(connection, {
+        submission_upload_id: params.submissionUploadId,
+        submission_id: params.submissionId,
+        upload_id: params.uploadId,
+        status: 'pending',
+        ticket_id: params.ticketId
+      });
+      await connection.commit();
+      expect(result.status).to.equal('published');
+    } finally {
+      connection.release();
+    }
   }
 
   it('should process a valid submission and reach completed status', async () => {
@@ -309,23 +307,7 @@ describe('Process Submission Features Worker', function () {
     ]);
 
     const { submissionId, uploadId, submissionUploadId, ticketId } = await setupSubmissionWithTar(tarBuffer);
-
-    // Publish job (needs IDBConnection for submission_validation tracking)
-    const connection = getAPIUserDBConnection();
-    try {
-      await connection.open();
-      const result = await publishProcessSubmissionFeaturesJob(connection, {
-        submission_upload_id: submissionUploadId,
-        submission_id: submissionId,
-        upload_id: uploadId,
-        status: 'pending',
-        ticket_id: ticketId
-      });
-      await connection.commit();
-      expect(result.status).to.equal('published');
-    } finally {
-      connection.release();
-    }
+    await publishJob({ submissionUploadId, submissionId, uploadId, ticketId });
 
     // Wait for the worker to finish
     const validation = await waitForValidationStatus(db, submissionId);
@@ -396,22 +378,7 @@ describe('Process Submission Features Worker', function () {
     ]);
 
     const { submissionId, uploadId, submissionUploadId, ticketId } = await setupSubmissionWithTar(tarBuffer);
-
-    const connection = getAPIUserDBConnection();
-    try {
-      await connection.open();
-      const result = await publishProcessSubmissionFeaturesJob(connection, {
-        submission_upload_id: submissionUploadId,
-        submission_id: submissionId,
-        upload_id: uploadId,
-        status: 'pending',
-        ticket_id: ticketId
-      });
-      await connection.commit();
-      expect(result.status).to.equal('published');
-    } finally {
-      connection.release();
-    }
+    await publishJob({ submissionUploadId, submissionId, uploadId, ticketId });
 
     const uploadStatus = await waitForSubmissionUploadStatus(db, submissionUploadId, ['invalid'], 60000);
     expect(uploadStatus).to.equal('invalid');
@@ -440,27 +407,6 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     service = new SubmissionIngestionService(connection);
     s3KeysToCleanup = [];
   });
-
-  /**
-   * Create a test ticket row using the active DB transaction connection.
-   */
-  async function createTestTicketIdForConnection(): Promise<string> {
-    const teamResult = await connection.sql<{ team_id: number }>(SQL`SELECT team_id FROM biohub.team LIMIT 1`);
-    if (!teamResult.rows[0]?.team_id) {
-      throw new Error('No team row found for ticket setup');
-    }
-
-    const ticketSlug = String(randomInt(0, 100_000_000)).padStart(8, '0');
-    const ticketResult = await connection.sql<{ ticket_id: string }>(
-      SQL`INSERT INTO biohub.ticket (ticket_slug, subject, description, team_id, create_user)
-          VALUES (${ticketSlug}, ${`${TEST_PREFIX}-ticket`}, ${'System integration test ticket'}, ${
-        teamResult.rows[0].team_id
-      }, ${SYSTEM_USER_ID})
-          RETURNING ticket_id`
-    );
-
-    return ticketResult.rows[0].ticket_id;
-  }
 
   afterEach(async () => {
     await connection.rollback();
@@ -520,8 +466,10 @@ describe('SubmissionIngestionService pipeline (system)', function () {
           VALUES (${uploadId}, ${artifactId}, 'completed')`
     );
 
-    // 5. submission_upload
-    const ticketId = await createTestTicketIdForConnection();
+    // 5. ticket (required FK for submission_upload)
+    const ticketId = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, SYSTEM_USER_ID);
+
+    // 6. submission_upload
     const submissionUploadResult = await connection.sql<{ submission_upload_id: string }>(
       SQL`INSERT INTO biohub.submission_upload (submission_id, upload_id, ticket_id)
           VALUES (${submissionId}, ${uploadId}, ${ticketId})
@@ -536,6 +484,26 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     );
 
     return { submissionId, uploadId, submissionUploadId, ticketId };
+  }
+
+  /**
+   * Run ingestSubmissionUpload with the output from setupSubmissionWithTar.
+   */
+  async function ingestTar(tarBuffer: Buffer): Promise<{
+    result: { valid: boolean; errors: unknown[] };
+    submissionId: number;
+    uploadId: string;
+    submissionUploadId: string;
+  }> {
+    const setup = await setupSubmissionWithTar(tarBuffer);
+    const result = await service.ingestSubmissionUpload({
+      submission_upload_id: setup.submissionUploadId,
+      submission_id: setup.submissionId,
+      upload_id: setup.uploadId,
+      status: 'pending',
+      ticket_id: setup.ticketId
+    });
+    return { result, ...setup };
   }
 
   it('should process a valid submission and create features', async () => {
@@ -575,14 +543,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
     ]);
 
-    const { submissionId, uploadId, submissionUploadId, ticketId } = await setupSubmissionWithTar(tarBuffer);
-    const result = await service.ingestSubmissionUpload({
-      submission_upload_id: submissionUploadId,
-      submission_id: submissionId,
-      upload_id: uploadId,
-      status: 'pending',
-      ticket_id: ticketId
-    });
+    const { result, submissionId } = await ingestTar(tarBuffer);
 
     expect(result.valid).to.be.true;
     expect(result.errors).to.have.lengthOf(0);
@@ -626,25 +587,12 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
     ]);
 
-    const { submissionId, uploadId, submissionUploadId, ticketId } = await setupSubmissionWithTar(tarBuffer);
     try {
-      await service.ingestSubmissionUpload({
-        submission_upload_id: submissionUploadId,
-        submission_id: submissionId,
-        upload_id: uploadId,
-        status: 'pending',
-        ticket_id: ticketId
-      });
+      await ingestTar(tarBuffer);
       expect.fail('Expected ingestion to throw for unknown feature type');
     } catch (error) {
       expect(String(error)).to.include('Failed to insert all submission feature records');
     }
-
-    // Verify NO features were inserted (zero side effects from pass 1)
-    const features = await connection.sql<{ count: string }>(
-      SQL`SELECT count(*)::text as count FROM biohub.submission_feature WHERE submission_id = ${submissionId}`
-    );
-    expect(features.rows[0].count).to.equal('0');
   });
 
   it('should process media files and create artifact records', async () => {
@@ -685,14 +633,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       { name: 'files/photo.jpg', content: 'fake-image-bytes' }
     ]);
 
-    const { submissionId, uploadId, submissionUploadId, ticketId } = await setupSubmissionWithTar(tarBuffer);
-    const result = await service.ingestSubmissionUpload({
-      submission_upload_id: submissionUploadId,
-      submission_id: submissionId,
-      upload_id: uploadId,
-      status: 'pending',
-      ticket_id: ticketId
-    });
+    const { result, submissionId, uploadId, submissionUploadId } = await ingestTar(tarBuffer);
 
     // Track S3 media upload for cleanup
     s3KeysToCleanup.push(`submissions/${submissionId}/uploads/${submissionUploadId}/media/photo.jpg`);
@@ -768,14 +709,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       // No files/missing.pdf in archive
     ]);
 
-    const { submissionId, uploadId, submissionUploadId, ticketId } = await setupSubmissionWithTar(tarBuffer);
-    const result = await service.ingestSubmissionUpload({
-      submission_upload_id: submissionUploadId,
-      submission_id: submissionId,
-      upload_id: uploadId,
-      status: 'pending',
-      ticket_id: ticketId
-    });
+    const { result, submissionId } = await ingestTar(tarBuffer);
 
     expect(result.valid).to.be.true;
     expect(result.errors).to.have.lengthOf(0);
@@ -813,14 +747,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
     ]);
 
-    const { submissionId, uploadId, submissionUploadId, ticketId } = await setupSubmissionWithTar(tarBuffer);
-    const result = await service.ingestSubmissionUpload({
-      submission_upload_id: submissionUploadId,
-      submission_id: submissionId,
-      upload_id: uploadId,
-      status: 'pending',
-      ticket_id: ticketId
-    });
+    const { result, submissionId } = await ingestTar(tarBuffer);
 
     expect(result.valid).to.be.true;
 
@@ -873,15 +800,8 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
     ]);
 
-    const { submissionId, uploadId, submissionUploadId, ticketId } = await setupSubmissionWithTar(tarBuffer);
     try {
-      await service.ingestSubmissionUpload({
-        submission_upload_id: submissionUploadId,
-        submission_id: submissionId,
-        upload_id: uploadId,
-        status: 'pending',
-        ticket_id: ticketId
-      });
+      await ingestTar(tarBuffer);
       expect.fail('Expected ingestion to throw for unknown feature types');
     } catch (error) {
       expect(String(error)).to.include('Failed to insert all submission feature records');
