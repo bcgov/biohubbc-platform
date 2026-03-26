@@ -236,10 +236,10 @@ export class SecurityScopeRepository extends BaseRepository {
            FROM submission_feature sf
            JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
            WHERE sf.record_end_date IS NULL
-             AND sf.submission_feature_id > $2
-             AND ($3 = sf.submission_id::text OR $3 = '*')
-             AND ($4 = ft.name                OR $4 = '*')
-             AND ($5 = sf.submission_feature_id::text OR $5 = '*')
+             AND sf.submission_feature_id > $1
+             AND ($2 = sf.submission_id::text OR $2 = '*')
+             AND ($3 = ft.name                OR $3 = '*')
+             AND ($4 = sf.submission_feature_id::text OR $4 = '*')
              AND EXISTS (
                SELECT 1 FROM submission_feature_security sfs
                WHERE sfs.submission_feature_id = sf.submission_feature_id
@@ -251,7 +251,7 @@ export class SecurityScopeRepository extends BaseRepository {
                  AND sus.status = 'approved'
              )
            ORDER BY sf.submission_feature_id
-           LIMIT $6
+           LIMIT $5
          ),
 
          ancestor_walk AS (
@@ -278,9 +278,9 @@ export class SecurityScopeRepository extends BaseRepository {
            JOIN submission_feature sf ON sf.submission_feature_id = aw.ancestor_id
            JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
            WHERE sf.record_end_date IS NULL
-             AND ($3 = sf.submission_id::text OR $3 = '*')
-             AND ($4 = ft.name               OR $4 = '*')
-             AND ($5 = sf.submission_feature_id::text OR $5 = '*')
+             AND ($2 = sf.submission_id::text OR $2 = '*')
+             AND ($3 = ft.name               OR $3 = '*')
+             AND ($4 = sf.submission_feature_id::text OR $4 = '*')
              AND EXISTS (
                SELECT 1 FROM submission_feature_security sfs
                WHERE sfs.submission_feature_id = sf.submission_feature_id
@@ -304,7 +304,7 @@ export class SecurityScopeRepository extends BaseRepository {
            SELECT 1 FROM has_candidate_ancestor hca
            WHERE hca.candidate_id = b.submission_feature_id
          )`,
-        [securityScopeId, lastId, urn_submission_id, urn_feature_type, urn_feature_id, BATCH_SIZE]
+        [lastId, urn_submission_id, urn_feature_type, urn_feature_id, BATCH_SIZE]
       );
 
       if (result.rows.length > 0) {

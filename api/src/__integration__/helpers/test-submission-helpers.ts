@@ -96,6 +96,73 @@ export async function createTestFeature(
 }
 
 /**
+ * Bulk-insert N submission_features sharing a single upload record.
+ *
+ * Uses generate_series for efficient insertion — ~5 queries regardless of N.
+ * Designed for integration tests that need large candidate sets (e.g., testing
+ * keyset-paginated anchor computation across multiple batches).
+ *
+ * All features share one upload record marked 'approved', so they are immediately
+ * eligible for security scope anchor computation.
+ *
+ * @param connection Active database connection (transaction-scoped)
+ * @param submissionId The submission to attach features to
+ * @param featureTypeName Feature type name (must exist in seed data)
+ * @param count Number of features to create
+ * @param parentFeatureId Optional parent for all features (creates a flat tree under one root)
+ * @returns submission_feature_ids in ascending order
+ */
+export async function createTestFeaturesInBulk(
+  connection: IDBConnection,
+  submissionId: number,
+  featureTypeName: string,
+  count: number,
+  parentFeatureId?: number
+): Promise<number[]> {
+  const systemUserId = connection.systemUserId();
+
+  // One upload record for the entire batch
+  const uploadResult = await connection.sql(SQL`
+    INSERT INTO upload (upload_status, record_end_date, create_user)
+    VALUES ('completed', now(), ${systemUserId})
+    RETURNING upload_id;
+  `);
+  const uploadId = uploadResult.rows[0].upload_id;
+
+  const ticketId = await getOrCreateIntegrationTicketId(connection, submissionId, uploadId, systemUserId);
+
+  const bridgeResult = await connection.sql(SQL`
+    INSERT INTO submission_upload (submission_id, upload_id, ticket_id, create_user)
+    VALUES (${submissionId}, ${uploadId}, ${ticketId}, ${systemUserId})
+    RETURNING submission_upload_id;
+  `);
+  const submissionUploadId = bridgeResult.rows[0].submission_upload_id;
+
+  await connection.sql(SQL`
+    INSERT INTO submission_upload_status (submission_upload_id, status, create_user)
+    VALUES (${submissionUploadId}, 'approved', ${systemUserId});
+  `);
+
+  // Bulk insert using generate_series — one query creates all N features
+  const result = await connection.query<{ submission_feature_id: number }>(
+    `INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, create_user)
+     SELECT
+       $1::INTEGER,
+       $2::UUID,
+       (SELECT feature_type_id FROM feature_type WHERE name = $3 LIMIT 1),
+       $4::INTEGER,
+       ('{"name": "bulk-' || gs || '"}')::jsonb,
+       520,
+       $5::INTEGER
+     FROM generate_series(1, $6) AS gs
+     RETURNING submission_feature_id`,
+    [submissionId, submissionUploadId, featureTypeName, parentFeatureId ?? null, systemUserId, count]
+  );
+
+  return result.rows.map((r) => r.submission_feature_id);
+}
+
+/**
  * Get an existing integration ticket for a submission or create one if missing.
  *
  * This helper supports integration tests that insert into `submission_upload` directly now that

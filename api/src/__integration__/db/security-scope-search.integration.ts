@@ -17,7 +17,7 @@ import { SecurityScopeRepository } from '../../repositories/authorization/securi
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { computeScopeHash } from '../../utils/scope-hash';
-import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
+import { createTestFeature, createTestFeaturesInBulk, createTestSubmission } from '../helpers/test-submission-helpers';
 
 describe('Security scope search (integration)', function () {
   this.timeout(15000);
@@ -1217,6 +1217,130 @@ describe('Security scope search (integration)', function () {
       );
       expect(anchorIds).to.include(telemetry);
       expect(anchorIds).to.have.lengthOf(1);
+    });
+  });
+
+  // ── Keyset pagination → anchor computation correctness ──────────────
+
+  describe('Keyset pagination → anchor computation correctness', () => {
+    /**
+     * Secure multiple features in bulk using a single INSERT with unnest.
+     * More efficient than calling secureFeature() in a loop for large sets.
+     */
+    async function secureFeaturesInBulk(featureIds: number[]): Promise<void> {
+      if (featureIds.length === 0) {
+        return;
+      }
+      const systemUserId = connection.systemUserId();
+      await connection.query(
+        `INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, create_user)
+         SELECT unnest($1::INTEGER[]), 1, $2`,
+        [featureIds, systemUserId]
+      );
+    }
+
+    it('should promote children to anchors when root is unsecured and scope is recomputed', async () => {
+      // Hierarchy: root → childA, root → childB
+      // All secured. Root is the only anchor (children pruned by ancestor walk).
+      //
+      // This is the key scenario that the old deleteAnchorsForFeatures approach
+      // could not handle: deleting the root anchor left children orphaned because
+      // nothing promoted them. The delete-stale + recompute strategy handles it
+      // automatically — the recompute sees children as candidates with no
+      // candidate ancestor, so they become anchors.
+      const submissionId = await createTestSubmission(connection);
+      const root = await createTestFeature(connection, submissionId, 'dataset', { name: 'Root' });
+      const childA = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Child A' }, root);
+      const childB = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Child B' }, root);
+
+      await secureFeature(root);
+      await secureFeature(childA);
+      await secureFeature(childB);
+
+      const urn = `urn:${submissionId}:*:*`;
+      const policyId = await createPolicy('child-promotion-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      // Before: only root is the anchor (children pruned — root is their candidate ancestor)
+      const anchorsBefore = await connection.sql(SQL`
+        SELECT anchor_submission_feature_id FROM security_scope_anchor
+        WHERE security_scope_id = ${scopeId}
+        ORDER BY anchor_submission_feature_id;
+      `);
+      const anchorIdsBefore = anchorsBefore.rows.map(
+        (r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id
+      );
+      expect(anchorIdsBefore).to.include(root);
+      expect(anchorIdsBefore).to.not.include(childA);
+      expect(anchorIdsBefore).to.not.include(childB);
+      expect(anchorIdsBefore).to.have.lengthOf(1);
+
+      // Unsecure the root — it no longer meets candidate criteria
+      await unsecureFeature(root);
+
+      // Recompute via the service method (first integration test coverage for
+      // the service-level orchestration: deleteStaleAnchorsForScope → computeAnchorsForScope)
+      await scopeService.computeAnchorsForScope(scopeId);
+
+      // After: root anchor deleted (stale — unsecured), children promoted to anchors
+      // (they are now the topmost candidates with no candidate ancestor above them)
+      const anchorsAfter = await connection.sql(SQL`
+        SELECT anchor_submission_feature_id FROM security_scope_anchor
+        WHERE security_scope_id = ${scopeId}
+        ORDER BY anchor_submission_feature_id;
+      `);
+      const anchorIdsAfter = anchorsAfter.rows.map(
+        (r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id
+      );
+      expect(anchorIdsAfter).to.not.include(root);
+      expect(anchorIdsAfter).to.include(childA);
+      expect(anchorIdsAfter).to.include(childB);
+      expect(anchorIdsAfter).to.have.lengthOf(2);
+    });
+
+    it('should process all candidates across multiple keyset batches', async function () {
+      // BATCH_SIZE in computeAnchorsForScope is 5000. Creating a root + 5001
+      // children exercises both the normal multi-batch path AND the boundary-query
+      // fallback:
+      //
+      // Batch 1 (IDs root..root+4999): root is an anchor (no candidate ancestor),
+      //   ~4999 children are pruned (root is their ancestor). result.rows = [root].
+      //   lastId advances to max of batch.
+      //
+      // Batch 2 (IDs root+5000..root+5001): remaining ~2 children, all pruned
+      //   (root is their ancestor). result.rows is EMPTY → triggers the boundary-
+      //   query fallback to advance lastId without producing anchors.
+      //
+      // Final state: exactly 1 anchor (the root). If the keyset loop or fallback
+      // is broken, candidates are lost or the loop hangs.
+      this.timeout(120000);
+
+      const submissionId = await createTestSubmission(connection);
+      const root = await createTestFeature(connection, submissionId, 'dataset', { name: 'Root' });
+
+      // Bulk-insert 5001 children under root — enough to span two keyset batches
+      const childIds = await createTestFeaturesInBulk(connection, submissionId, 'sample_site', 5001, root);
+
+      // Secure root + all children in bulk
+      await secureFeaturesInBulk([root, ...childIds]);
+
+      const urn = `urn:${submissionId}:*:*`;
+      const policyId = await createPolicy('multi-batch-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      // Exactly 1 anchor: the root. All 5001 children are pruned because root
+      // is their candidate ancestor. This proves the keyset loop processed all
+      // candidates across both batches and the boundary-query fallback advanced
+      // the cursor correctly for the all-pruned second batch.
+      expect(await countAnchors(scopeId)).to.equal(1);
+
+      const anchors = await connection.sql(SQL`
+        SELECT anchor_submission_feature_id FROM security_scope_anchor
+        WHERE security_scope_id = ${scopeId};
+      `);
+      expect(anchors.rows[0].anchor_submission_feature_id).to.equal(root);
     });
   });
 });
