@@ -24,7 +24,7 @@ export default {
       directory: './migrations'
     },
     seeds: {
-      directory: ['./seeds']
+      directory: ['./seeds', './procedures']
     }
   },
   production: {
@@ -45,6 +45,10 @@ export default {
       tableName: 'migration',
       schemaName: 'public',
       directory: './migrations'
+    },
+    seeds: {
+      // In production, only scripts in the `procedures` directory should run.
+      directory: ['./procedures']
     }
   }
 };
