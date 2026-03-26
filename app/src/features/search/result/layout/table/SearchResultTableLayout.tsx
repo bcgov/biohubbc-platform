@@ -90,7 +90,7 @@ export const SearchResultTableLayout = ({
                 size="small"
                 variant="outlined"
                 onClick={() => {
-                  onClick(result);
+                  onClick?.(result);
                 }}>
                 View
               </Button>
