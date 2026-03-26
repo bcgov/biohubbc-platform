@@ -381,7 +381,9 @@ export class SearchFeatureRepository extends BaseRepository {
             SELECT 1
             FROM ancestors a
             INNER JOIN submission_feature_security sfs ON sfs.submission_feature_id = a.ancestor_id
+            INNER JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = a.ancestor_id
             WHERE sfs.record_end_date IS NULL
+              AND sf_sec.record_effective_date <= now()
           )
         ) AS is_secured`),
         'total_relevancy_score as relevancy_score',

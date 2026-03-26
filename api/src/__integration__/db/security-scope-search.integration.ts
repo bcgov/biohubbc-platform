@@ -1087,35 +1087,34 @@ describe('Security scope search (integration)', function () {
 
   describe('Upload status → anchor eligibility', () => {
     /**
-     * Override the submission_upload_status for a feature's upload.
-     * createTestFeature defaults to 'approved'; this lets tests flip to other states.
+     * Simulate a non-approved upload by nulling record_effective_date.
+     *
+     * The anchor computation filter uses `sf.record_effective_date <= now()` to exclude
+     * features from uploads that haven't been approved yet. NULL evaluates as falsy
+     * in the comparison, correctly excluding the feature.
      */
-    async function setUploadStatus(submissionFeatureId: number, status: string): Promise<void> {
+    async function markFeatureNotYetApproved(submissionFeatureId: number): Promise<void> {
       await connection.sql(SQL`
-        UPDATE submission_upload_status
-        SET status = ${status}::submission_upload_status_type
-        WHERE submission_upload_id = (
-          SELECT submission_upload_id
-          FROM submission_feature
-          WHERE submission_feature_id = ${submissionFeatureId}
-        );
+        UPDATE submission_feature
+        SET record_effective_date = NULL
+        WHERE submission_feature_id = ${submissionFeatureId};
       `);
     }
 
     /**
-     * Create a secured feature, optionally override its upload status, then compute anchors.
+     * Create a secured feature, optionally mark it as not-yet-approved, then compute anchors.
      */
-    async function setupUploadStatusTest(
+    async function setupApprovalTest(
       featureName: string,
       policyName: string,
-      uploadStatus?: string
+      options?: { approved: boolean }
     ): Promise<string> {
       const submissionId = await createTestSubmission(connection);
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: featureName });
 
       await secureFeature(dataset);
-      if (uploadStatus) {
-        await setUploadStatus(dataset, uploadStatus);
+      if (options?.approved === false) {
+        await markFeatureNotYetApproved(dataset);
       }
 
       const urn = `urn:${submissionId}:*:*`;
@@ -1125,18 +1124,18 @@ describe('Security scope search (integration)', function () {
     }
 
     it('should exclude features from denied uploads when computing anchors', async () => {
-      const scopeId = await setupUploadStatusTest('Denied Dataset', 'denied-upload-test', 'denied');
+      const scopeId = await setupApprovalTest('Denied Dataset', 'denied-upload-test', { approved: false });
       expect(await countAnchors(scopeId)).to.equal(0);
     });
 
     it('should exclude features from unreviewed uploads when computing anchors', async () => {
-      const scopeId = await setupUploadStatusTest('Unreviewed Dataset', 'unreviewed-upload-test', 'submitted');
+      const scopeId = await setupApprovalTest('Unreviewed Dataset', 'unreviewed-upload-test', { approved: false });
       expect(await countAnchors(scopeId)).to.equal(0);
     });
 
     it('should include features from approved uploads when computing anchors', async () => {
-      // createTestFeature already sets status = 'approved', no override needed
-      const scopeId = await setupUploadStatusTest('Approved Dataset', 'approved-upload-test');
+      // createTestFeature defaults record_effective_date = now(), simulating an approved upload
+      const scopeId = await setupApprovalTest('Approved Dataset', 'approved-upload-test');
 
       expect(await countAnchors(scopeId)).to.equal(1);
     });

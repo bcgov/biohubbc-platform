@@ -1,6 +1,6 @@
 import { mdiLock } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Button, Stack, Typography } from '@mui/material';
+import { Box, Button, Stack } from '@mui/material';
 import { GridCellParams, GridRowSelectionModel } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
@@ -42,12 +42,9 @@ export const SearchResultTableLayout = ({
             return null;
           }
           return (
-            <Stack flexDirection="row" alignItems="center" color="error.main" height="100%" gap={1}>
+            <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', color: 'error.main', flexShrink: 0 }}>
               <Icon path={mdiLock} size={0.75} />
-              <Typography variant="body2" component="span" fontWeight={700} textTransform="uppercase">
-                Secured
-              </Typography>
-            </Stack>
+            </Box>
           );
         }
       },

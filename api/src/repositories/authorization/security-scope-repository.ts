@@ -162,12 +162,8 @@ export class SecurityScopeRepository extends BaseRepository {
                WHERE sfs.submission_feature_id = sf.submission_feature_id
                  AND sfs.record_end_date IS NULL
              )
-             -- Feature's upload must be approved
-             AND EXISTS (
-               SELECT 1 FROM submission_upload_status sus
-               WHERE sus.submission_upload_id = sf.submission_upload_id
-                 AND sus.status = 'approved'
-             )
+             -- Feature must be from an approved upload
+             AND sf.record_effective_date <= now()
          )`,
       [securityScopeId]
     );
@@ -266,11 +262,7 @@ export class SecurityScopeRepository extends BaseRepository {
              WHERE sfs.submission_feature_id = sf.submission_feature_id
                AND sfs.record_end_date IS NULL
            )
-           AND EXISTS (
-             SELECT 1 FROM submission_upload_status sus
-             WHERE sus.submission_upload_id = sf.submission_upload_id
-               AND sus.status = 'approved'
-           )
+           AND sf.record_effective_date <= now()
          ORDER BY sf.submission_feature_id
          LIMIT $5
        ),
@@ -307,11 +299,7 @@ export class SecurityScopeRepository extends BaseRepository {
              WHERE sfs.submission_feature_id = sf.submission_feature_id
                AND sfs.record_end_date IS NULL
            )
-           AND EXISTS (
-             SELECT 1 FROM submission_upload_status sus
-             WHERE sus.submission_upload_id = sf.submission_upload_id
-               AND sus.status = 'approved'
-           )
+           AND sf.record_effective_date <= now()
        )
 
        -- Prune to topmost candidates only (anchors). A candidate with a candidate
@@ -361,11 +349,7 @@ export class SecurityScopeRepository extends BaseRepository {
              WHERE sfs.submission_feature_id = sf.submission_feature_id
                AND sfs.record_end_date IS NULL
            )
-           AND EXISTS (
-             SELECT 1 FROM submission_upload_status sus
-             WHERE sus.submission_upload_id = sf.submission_upload_id
-               AND sus.status = 'approved'
-           )
+           AND sf.record_effective_date <= now()
          ORDER BY sf.submission_feature_id
          LIMIT $5
        ) sf`,

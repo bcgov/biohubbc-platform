@@ -79,7 +79,7 @@ export async function createTestFeature(
   `);
 
   const result = await connection.sql(SQL`
-    INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, create_user)
+    INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, record_effective_date, create_user)
     VALUES (
       ${submissionId},
       ${submissionUploadId},
@@ -87,6 +87,7 @@ export async function createTestFeature(
       ${parentFeatureId ?? null},
       ${dataJson}::jsonb,
       octet_length(${dataJson}::jsonb::text) + 500,
+      now(),
       ${systemUserId}
     )
     RETURNING submission_feature_id;
@@ -145,7 +146,7 @@ export async function createTestFeaturesInBulk(
 
   // Bulk insert using generate_series — one query creates all N features
   const result = await connection.query<{ submission_feature_id: number }>(
-    `INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, create_user)
+    `INSERT INTO submission_feature (submission_id, submission_upload_id, feature_type_id, parent_submission_feature_id, data, data_byte_size, record_effective_date, create_user)
      SELECT
        $1::INTEGER,
        $2::UUID,
@@ -153,6 +154,7 @@ export async function createTestFeaturesInBulk(
        $4::INTEGER,
        ('{"name": "bulk-' || gs || '"}')::jsonb,
        520,
+       now(),
        $5::INTEGER
      FROM generate_series(1, $6) AS gs
      RETURNING submission_feature_id`,
