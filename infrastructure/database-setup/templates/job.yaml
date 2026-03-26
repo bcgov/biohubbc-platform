@@ -91,6 +91,8 @@ spec:
               value: {{ .Values.app.dbSchema }}
             - name: KEYCLOAK_CLIENT_ID
               value: {{ .Values.app.keycloak.clientId }}
+            - name: CONTRIBUTOR_SYSTEM_USER_GUID
+              value: {{ .Values.app.keycloak.serviceClient.name }}
           image: "{{ .Values.image.registry }}/{{ .Values.image.image }}:{{ include "app.imageTag" . }}"
           imagePullPolicy: Always
           {{- if .Values.app.database.useCrunchy }}
