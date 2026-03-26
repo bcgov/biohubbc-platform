@@ -105,40 +105,6 @@ const calculateChecksum = (header: Uint8Array): number => {
 };
 
 /**
- * Converts a File object to a Uint8Array by reading it as an ArrayBuffer.
- * This is useful for processing files selected via HTML file input elements
- * before creating TAR archives or performing other binary operations.
- *
- * @param file - The File object to convert (cannot be null/undefined)
- * @returns Promise that resolves to the file content as Uint8Array
- * @throws {Error} When file is null/undefined or reading fails
- */
-export const fileToUint8Array = (file: File): Promise<Uint8Array> => {
-  return new Promise((resolve, reject) => {
-    if (!file) {
-      reject(new Error('File is required'));
-      return;
-    }
-
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      if (reader.result instanceof ArrayBuffer) {
-        resolve(new Uint8Array(reader.result));
-      } else {
-        reject(new Error('Failed to read file as ArrayBuffer'));
-      }
-    };
-
-    reader.onerror = () => {
-      reject(new Error(`Failed to read file: ${reader.error?.message || 'Unknown error'}`));
-    };
-
-    reader.readAsArrayBuffer(file);
-  });
-};
-
-/**
  * Creates a complete TAR archive from multiple files according to POSIX TAR format.
  * Each file gets a 512-byte header followed by its content, padded to 512-byte boundaries.
  * The archive is terminated with two 512-byte zero blocks as per TAR specification.
@@ -197,30 +163,33 @@ const concatenateChunks = (chunks: Uint8Array[]): Uint8Array => {
 };
 
 /**
- * Splits TAR data into chunks using exact backend per-part byte instructions.
+ * Splits a TAR file into byte ranges using exact backend per-part byte instructions.
  *
  * Example:
  * - backend parts: [{part:1,size:5MiB}, {part:2,size:5MiB}, {part:3,size:3MiB}]
  * - client slices the tarball as [0..5MiB), [5..10MiB), [10..13MiB)
  *
- * @param tarData - The complete TAR archive data to split
+ * @param fileSize - The total TAR archive size in bytes
  * @param orderedPresignedParts - Presigned parts sorted by part number
- * @returns Array of Uint8Array chunks ready for upload
+ * @returns Array of byte ranges ready for slicing from a File
  * @throws {Error} When instructions are invalid or do not match file size
  */
-const splitTarDataIntoChunks = (tarData: Uint8Array, orderedPresignedParts: PresignedUrl[]): Uint8Array[] => {
+const splitTarFileIntoRanges = (
+  fileSize: number,
+  orderedPresignedParts: PresignedUrl[]
+): Array<{ partNumber: number; url: string; start: number; end: number }> => {
   if (!orderedPresignedParts.length) {
     throw new Error('Part count must be positive');
   }
 
   const expectedBytes = orderedPresignedParts.reduce((sum, part) => sum + part.partSizeBytes, 0);
-  if (expectedBytes !== tarData.length) {
+  if (expectedBytes !== fileSize) {
     // Defensive check: prevents uploading malformed part payloads when
     // backend instructions and client file size do not line up.
     throw new Error('Part instructions do not match file size.');
   }
 
-  const chunks: Uint8Array[] = [];
+  const ranges: Array<{ partNumber: number; url: string; start: number; end: number }> = [];
   let start = 0;
 
   for (const part of orderedPresignedParts) {
@@ -229,11 +198,11 @@ const splitTarDataIntoChunks = (tarData: Uint8Array, orderedPresignedParts: Pres
     }
 
     const end = start + part.partSizeBytes;
-    chunks.push(tarData.slice(start, end));
+    ranges.push({ partNumber: part.partNumber, url: part.url, start, end });
     start = end;
   }
 
-  return chunks;
+  return ranges;
 };
 
 /**
@@ -242,12 +211,12 @@ const splitTarDataIntoChunks = (tarData: Uint8Array, orderedPresignedParts: Pres
  * The ETag from the response is cleaned (quotes removed) for easier handling.
  *
  * @param url - The presigned URL to upload to
- * @param chunk - The data chunk to upload
+ * @param chunk - The Blob slice chunk to upload
  * @param partNumber - The part number for this chunk in the multipart sequence
  * @returns Promise resolving to upload result with part number and ETag
  * @throws {Error} When upload fails, times out, or ETag is missing
  */
-const uploadChunk = async (url: string, chunk: Uint8Array, partNumber: number): Promise<UploadResult> => {
+const uploadChunk = async (url: string, chunk: Blob, partNumber: number): Promise<UploadResult> => {
   const response = await axios.put(url, chunk, {
     headers: { 'Content-Type': 'application/x-tar' },
     timeout: 30000
@@ -270,12 +239,12 @@ const uploadChunk = async (url: string, chunk: Uint8Array, partNumber: number): 
 
 /**
  * Uploads a TAR archive using multipart upload with presigned URLs.
- * Splits the TAR data into chunks matching the number of URLs provided,
+ * Slices the TAR file into Blob chunks matching backend byte instructions,
  * then uploads chunks in parallel batches to respect concurrency limits.
  * Progress can be tracked via optional callback function.
  *
  * @param presignedParts - Array of presigned part instructions for multipart upload
- * @param tarData - The complete TAR archive data to upload (must not be empty)
+ * @param tarFile - The complete TAR archive file to upload (must not be empty)
  * @param options - Configuration options for upload behavior
  * @param options.concurrencyLimit - Maximum number of simultaneous uploads (default: 4)
  * @param options.onProgress - Callback function called after each batch completion
@@ -284,7 +253,7 @@ const uploadChunk = async (url: string, chunk: Uint8Array, partNumber: number): 
  */
 export const uploadMultipartTar = async (
   presignedParts: PresignedUrl[],
-  tarData: Uint8Array,
+  tarFile: File,
   options: {
     concurrencyLimit?: number;
     onProgress?: (completedParts: number, totalParts: number) => void;
@@ -296,7 +265,7 @@ export const uploadMultipartTar = async (
     throw new Error('Presigned parts are required');
   }
 
-  if (!tarData.length) {
+  if (!tarFile || tarFile.size <= 0) {
     throw new Error('TAR data is required');
   }
 
@@ -307,20 +276,19 @@ export const uploadMultipartTar = async (
   // Apply backend-provided ordering so PartNumber values line up exactly with
   // what was signed during URL provisioning.
   const orderedPresignedParts = [...presignedParts].sort((a, b) => a.partNumber - b.partNumber);
-  const chunks = splitTarDataIntoChunks(tarData, orderedPresignedParts);
+  const ranges = splitTarFileIntoRanges(tarFile.size, orderedPresignedParts);
   const results: UploadResult[] = [];
 
-  for (let i = 0; i < orderedPresignedParts.length; i += concurrencyLimit) {
-    const partBatch = orderedPresignedParts.slice(i, i + concurrencyLimit);
-    const dataBatch = chunks.slice(i, i + concurrencyLimit);
+  for (let i = 0; i < ranges.length; i += concurrencyLimit) {
+    const batch = ranges.slice(i, i + concurrencyLimit);
 
     // Upload each batch in parallel while preserving deterministic part numbers.
     const batchResults = await Promise.all(
-      partBatch.map((part, index) => uploadChunk(part.url, dataBatch[index], part.partNumber))
+      batch.map((part) => uploadChunk(part.url, tarFile.slice(part.start, part.end), part.partNumber))
     );
 
     results.push(...batchResults);
-    onProgress?.(results.length, orderedPresignedParts.length);
+    onProgress?.(results.length, ranges.length);
   }
 
   return results.sort((a, b) => a.PartNumber - b.PartNumber);
