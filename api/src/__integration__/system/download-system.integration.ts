@@ -10,7 +10,6 @@
 import AdmZip from 'adm-zip';
 import { expect } from 'chai';
 import { Knex, knex } from 'knex';
-import { randomInt } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';

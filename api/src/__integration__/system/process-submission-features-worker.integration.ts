@@ -4,7 +4,7 @@
 // Requires: make web && make queue
 import { expect } from 'chai';
 import { Knex, knex } from 'knex';
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import * as tar from 'tar-stream';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
@@ -18,29 +18,6 @@ import { getOrCreateTestTicketId } from '../helpers/test-ticket-helpers';
 
 const TEST_PREFIX = '__integration-test__';
 const SYSTEM_USER_ID = 2; // biohub_api system user
-
-/**
- * Create a test ticket row and return its id for submission_upload FK linkage.
- */
-async function createTestTicketId(db: Knex): Promise<string> {
-  const [team] = await db('biohub.team').select('team_id').limit(1);
-  if (!team?.team_id) {
-    throw new Error('No team row found for ticket setup');
-  }
-
-  const ticketSlug = String(randomInt(0, 100_000_000)).padStart(8, '0');
-  const [ticket] = await db('biohub.ticket')
-    .insert({
-      ticket_slug: ticketSlug,
-      subject: `${TEST_PREFIX}-ticket`,
-      description: 'System integration test ticket',
-      team_id: team.team_id,
-      create_user: SYSTEM_USER_ID
-    })
-    .returning('ticket_id');
-
-  return ticket.ticket_id;
-}
 
 async function createTarBuffer(files: { name: string; content: string }[]): Promise<Buffer> {
   const prefix = randomUUID();
@@ -443,27 +420,6 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     service = new SubmissionIngestionService(connection);
     s3KeysToCleanup = [];
   });
-
-  /**
-   * Create a test ticket row using the active DB transaction connection.
-   */
-  async function createTestTicketIdForConnection(): Promise<string> {
-    const teamResult = await connection.sql<{ team_id: number }>(SQL`SELECT team_id FROM biohub.team LIMIT 1`);
-    if (!teamResult.rows[0]?.team_id) {
-      throw new Error('No team row found for ticket setup');
-    }
-
-    const ticketSlug = String(randomInt(0, 100_000_000)).padStart(8, '0');
-    const ticketResult = await connection.sql<{ ticket_id: string }>(
-      SQL`INSERT INTO biohub.ticket (ticket_slug, subject, description, team_id, create_user)
-          VALUES (${ticketSlug}, ${`${TEST_PREFIX}-ticket`}, ${'System integration test ticket'}, ${
-        teamResult.rows[0].team_id
-      }, ${SYSTEM_USER_ID})
-          RETURNING ticket_id`
-    );
-
-    return ticketResult.rows[0].ticket_id;
-  }
 
   afterEach(async () => {
     await connection.rollback();
