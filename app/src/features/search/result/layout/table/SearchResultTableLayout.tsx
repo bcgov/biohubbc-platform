@@ -8,7 +8,7 @@ interface SearchResultTableLayoutProps {
   results: SearchFeatureResultWithRelevancy[];
   cartFeatureIds: Set<number>;
   onRowSelectionModelChange: (rowSelectionModel: GridRowSelectionModel) => void;
-  onClick?: (result: SearchFeatureResultWithRelevancy) => void;
+  onClick: (result: SearchFeatureResultWithRelevancy) => void;
   onDownload?: (result: SearchFeatureResultWithRelevancy) => void;
   onAddToCart?: (result: SearchFeatureResultWithRelevancy) => void;
   onRemoveFromCart?: (featureId: number) => void;
@@ -67,7 +67,7 @@ export const SearchResultTableLayout = ({
                 size="small"
                 variant="outlined"
                 onClick={() => {
-                  onClick?.(result);
+                  onClick(result);
                 }}>
                 View
               </Button>
