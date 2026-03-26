@@ -26,7 +26,7 @@ describe('computeScopeAnchorsJobHandler', () => {
       data: { securityScopeId }
     } as PgBoss.Job<IComputeScopeAnchorsJobData>);
 
-  it('should compute anchors for scope successfully', async () => {
+  it('should compute anchors for scope successfully with commit callback', async () => {
     const mockDBConnection = getMockDBConnection();
     const openStub = sinon.stub().resolves();
     const commitStub = sinon.stub().resolves();
@@ -41,7 +41,12 @@ describe('computeScopeAnchorsJobHandler', () => {
 
     await computeScopeAnchorsJobHandler([createMockJob('scope-uuid-1')]);
 
-    expect(computeStub).to.have.been.calledOnceWith('scope-uuid-1');
+    // Service called with scope ID and an onPhaseComplete callback
+    expect(computeStub).to.have.been.calledOnce;
+    expect(computeStub.firstCall.args[0]).to.equal('scope-uuid-1');
+    expect(computeStub.firstCall.args[1]).to.be.a('function');
+
+    // Final commit after service returns
     expect(commitStub).to.have.been.calledOnce;
     expect(releaseStub).to.have.been.calledOnce;
   });

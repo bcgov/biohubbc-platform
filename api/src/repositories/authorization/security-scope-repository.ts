@@ -2,6 +2,7 @@ import SQL from 'sql-template-strings';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { SecurityScope, SecurityScopeId } from '../../models/security-scope';
+import { AnchorBatchResult, SecurityScopeUrn } from '../../services/access-policy/security-scope-service.interface';
 import { BaseRepository } from '../base-repository';
 
 /**
@@ -163,7 +164,31 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
-   * Compute anchor features for a security scope using keyset-paginated batching.
+   * Resolve the URN pattern for a security scope.
+   *
+   * Returns the URN components (submission_id, feature_type, feature_id) from the
+   * scope's originating policy statement. LIMIT 1 without ORDER BY is safe: scope_hash
+   * = SHA-256(urn), so all policy statements sharing a scope have identical URN components.
+   *
+   * @param securityScopeId UUID of the security scope
+   * @returns URN components, or null if the scope has no active policy statements
+   */
+  async resolveUrnForScope(securityScopeId: string): Promise<SecurityScopeUrn | null> {
+    const result = await this.connection.query<SecurityScopeUrn>(
+      `SELECT ps.urn_submission_id, ps.urn_feature_type, ps.urn_feature_id
+       FROM policy_statement_scope pss
+       JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
+       WHERE pss.security_scope_id = $1
+         AND ps.record_end_date IS NULL
+       LIMIT 1`,
+      [securityScopeId]
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  /**
+   * Compute one keyset-paginated batch of anchor features for a security scope.
    *
    * Anchors are the topmost secured features whose URN matches the scope's
    * originating policy statement. A `urn:*:telemetry:*` scope anchors at ~200
@@ -174,192 +199,169 @@ export class SecurityScopeRepository extends BaseRepository {
    * Only features from approved uploads are eligible — features still under
    * review (status = 'submitted') must not affect security scope anchors.
    *
-   * **Why keyset instead of CTE + cursor:** The previous implementation used a
-   * monolithic recursive CTE wrapped in a server-side cursor. The cursor bounded
-   * the INSERT side (5K rows per FETCH), but the CTE materialized the entire
-   * candidate set + ancestor walk in work_mem *before* the cursor started
-   * iterating. For `*:*:*` at production scale (10M candidates x ~5 depth =
-   * ~50M ancestor rows), this is a memory bomb in OpenShift pods with cgroup
-   * limits. Keyset pagination bounds memory per batch at the cost of repeated
-   * index probes — trading time for OOM safety, acceptable for a background job.
+   * **Why keyset instead of CTE + cursor:** A monolithic recursive CTE materializes
+   * the entire candidate set + ancestor walk in work_mem before a cursor can iterate.
+   * For `*:*:*` at production scale (10M candidates x ~5 depth = ~50M ancestor rows),
+   * this is a memory bomb in OpenShift pods with cgroup limits. Keyset pagination
+   * bounds memory per batch at the cost of repeated index probes — trading time for
+   * OOM safety, acceptable for a background job.
    *
    * **Why re-evaluate candidate criteria per ancestor instead of referencing a
    * materialized candidate set:** Each batch's `has_candidate_ancestor` CTE checks
    * ancestor candidacy via index lookups against the base tables, rather than
    * joining to a materialized candidate set. This keeps memory bounded per batch.
-   * The cost is repeated index probes across batches.
    *
    * Insert-only with ON CONFLICT DO NOTHING — called after `deleteStaleAnchorsForScope`
    * removes invalid anchors, so existing valid anchors are simply skipped.
    *
+   * The caller (service) manages transaction boundaries — each batch call runs
+   * inside its own BEGIN/COMMIT to bound WAL retention and allow VACUUM between batches.
+   * ON CONFLICT DO NOTHING makes each batch idempotent, so partial completion
+   * followed by retry is safe.
+   *
    * @param securityScopeId UUID of the security scope to compute anchors for
+   * @param urn URN components resolved via `resolveUrnForScope`
+   * @param afterId Keyset cursor — process candidates with submission_feature_id > afterId
+   * @returns Next cursor position, or null when no more candidates exist
    */
-  async computeAnchorsForScope(securityScopeId: string): Promise<void> {
+  async computeAnchorBatch(
+    securityScopeId: string,
+    urn: SecurityScopeUrn,
+    afterId: number
+  ): Promise<AnchorBatchResult | null> {
     const BATCH_SIZE = 5000;
 
-    // Resolve the URN pattern once. LIMIT 1 without ORDER BY is safe: scope_hash
-    // = SHA-256(urn), so all policy statements sharing a scope have identical URN components.
-    const urnResult = await this.connection.query<{
-      urn_submission_id: string;
-      urn_feature_type: string;
-      urn_feature_id: string;
+    const result = await this.connection.query<{
+      submission_feature_id: number;
+      page_last_id: number;
     }>(
-      `SELECT ps.urn_submission_id, ps.urn_feature_type, ps.urn_feature_id
-       FROM policy_statement_scope pss
-       JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
-       WHERE pss.security_scope_id = $1
-         AND ps.record_end_date IS NULL
-       LIMIT 1`,
-      [securityScopeId]
+      `WITH RECURSIVE
+       batch AS (
+         SELECT sf.submission_feature_id,
+                sf.parent_submission_feature_id
+         FROM submission_feature sf
+         JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+         WHERE sf.record_end_date IS NULL
+           AND sf.submission_feature_id > $1
+           AND ($2 = sf.submission_id::text OR $2 = '*')
+           AND ($3 = ft.name                OR $3 = '*')
+           AND ($4 = sf.submission_feature_id::text OR $4 = '*')
+           AND EXISTS (
+             SELECT 1 FROM submission_feature_security sfs
+             WHERE sfs.submission_feature_id = sf.submission_feature_id
+               AND sfs.record_end_date IS NULL
+           )
+           AND EXISTS (
+             SELECT 1 FROM submission_upload_status sus
+             WHERE sus.submission_upload_id = sf.submission_upload_id
+               AND sus.status = 'approved'
+           )
+         ORDER BY sf.submission_feature_id
+         LIMIT $5
+       ),
+
+       ancestor_walk AS (
+         SELECT b.submission_feature_id AS candidate_id,
+                b.parent_submission_feature_id AS ancestor_id
+         FROM batch b
+         WHERE b.parent_submission_feature_id IS NOT NULL
+
+         UNION ALL
+
+         SELECT aw.candidate_id,
+                sf.parent_submission_feature_id
+         FROM ancestor_walk aw
+         JOIN submission_feature sf ON sf.submission_feature_id = aw.ancestor_id
+         WHERE sf.parent_submission_feature_id IS NOT NULL
+           AND sf.record_end_date IS NULL
+       ),
+
+       -- Re-evaluate candidate criteria per ancestor via index lookups.
+       -- Trades repeated index probes for bounded memory — acceptable for a bg job.
+       has_candidate_ancestor AS (
+         SELECT DISTINCT aw.candidate_id
+         FROM ancestor_walk aw
+         JOIN submission_feature sf ON sf.submission_feature_id = aw.ancestor_id
+         JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+         WHERE sf.record_end_date IS NULL
+           AND ($2 = sf.submission_id::text OR $2 = '*')
+           AND ($3 = ft.name               OR $3 = '*')
+           AND ($4 = sf.submission_feature_id::text OR $4 = '*')
+           AND EXISTS (
+             SELECT 1 FROM submission_feature_security sfs
+             WHERE sfs.submission_feature_id = sf.submission_feature_id
+               AND sfs.record_end_date IS NULL
+           )
+           AND EXISTS (
+             SELECT 1 FROM submission_upload_status sus
+             WHERE sus.submission_upload_id = sf.submission_upload_id
+               AND sus.status = 'approved'
+           )
+       )
+
+       -- Prune to topmost candidates only (anchors). A candidate with a candidate
+       -- ancestor is not a root — it's reachable via the walk-up search from the
+       -- ancestor anchor, so storing it would be redundant. page_last_id is the MAX
+       -- of the full pre-pruning batch so the keyset advances past the entire page.
+       SELECT b.submission_feature_id,
+              (SELECT MAX(submission_feature_id) FROM batch) AS page_last_id
+       FROM batch b
+       WHERE NOT EXISTS (
+         SELECT 1 FROM has_candidate_ancestor hca
+         WHERE hca.candidate_id = b.submission_feature_id
+       )`,
+      [afterId, urn.urn_submission_id, urn.urn_feature_type, urn.urn_feature_id, BATCH_SIZE]
     );
 
-    if (urnResult.rows.length === 0) {
-      return;
-    }
+    if (result.rows.length > 0) {
+      const featureIds = result.rows.map((r) => r.submission_feature_id);
 
-    const { urn_submission_id, urn_feature_type, urn_feature_id } = urnResult.rows[0];
-
-    // Keyset-paginate candidates. Each batch materializes at most BATCH_SIZE
-    // candidates + their ancestor walks (~25K rows at depth 5). This replaces
-    // the monolithic CTE that materialized ALL candidates in work_mem.
-    let lastId = 0;
-
-    while (true) {
-      const result = await this.connection.query<{
-        submission_feature_id: number;
-        page_last_id: number;
-      }>(
-        `WITH RECURSIVE
-         batch AS (
-           SELECT sf.submission_feature_id,
-                  sf.parent_submission_feature_id
-           FROM submission_feature sf
-           JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-           WHERE sf.record_end_date IS NULL
-             AND sf.submission_feature_id > $1
-             AND ($2 = sf.submission_id::text OR $2 = '*')
-             AND ($3 = ft.name                OR $3 = '*')
-             AND ($4 = sf.submission_feature_id::text OR $4 = '*')
-             AND EXISTS (
-               SELECT 1 FROM submission_feature_security sfs
-               WHERE sfs.submission_feature_id = sf.submission_feature_id
-                 AND sfs.record_end_date IS NULL
-             )
-             AND EXISTS (
-               SELECT 1 FROM submission_upload_status sus
-               WHERE sus.submission_upload_id = sf.submission_upload_id
-                 AND sus.status = 'approved'
-             )
-           ORDER BY sf.submission_feature_id
-           LIMIT $5
-         ),
-
-         ancestor_walk AS (
-           SELECT b.submission_feature_id AS candidate_id,
-                  b.parent_submission_feature_id AS ancestor_id
-           FROM batch b
-           WHERE b.parent_submission_feature_id IS NOT NULL
-
-           UNION ALL
-
-           SELECT aw.candidate_id,
-                  sf.parent_submission_feature_id
-           FROM ancestor_walk aw
-           JOIN submission_feature sf ON sf.submission_feature_id = aw.ancestor_id
-           WHERE sf.parent_submission_feature_id IS NOT NULL
-             AND sf.record_end_date IS NULL
-         ),
-
-         -- Re-evaluate candidate criteria per ancestor via index lookups.
-         -- Trades repeated index probes for bounded memory — acceptable for a bg job.
-         has_candidate_ancestor AS (
-           SELECT DISTINCT aw.candidate_id
-           FROM ancestor_walk aw
-           JOIN submission_feature sf ON sf.submission_feature_id = aw.ancestor_id
-           JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-           WHERE sf.record_end_date IS NULL
-             AND ($2 = sf.submission_id::text OR $2 = '*')
-             AND ($3 = ft.name               OR $3 = '*')
-             AND ($4 = sf.submission_feature_id::text OR $4 = '*')
-             AND EXISTS (
-               SELECT 1 FROM submission_feature_security sfs
-               WHERE sfs.submission_feature_id = sf.submission_feature_id
-                 AND sfs.record_end_date IS NULL
-             )
-             AND EXISTS (
-               SELECT 1 FROM submission_upload_status sus
-               WHERE sus.submission_upload_id = sf.submission_upload_id
-                 AND sus.status = 'approved'
-             )
-         )
-
-         -- Prune to topmost candidates only (anchors). A candidate with a candidate
-         -- ancestor is not a root — it's reachable via the walk-up search from the
-         -- ancestor anchor, so storing it would be redundant. page_last_id is the MAX
-         -- of the full pre-pruning batch so the keyset advances past the entire page.
-         SELECT b.submission_feature_id,
-                (SELECT MAX(submission_feature_id) FROM batch) AS page_last_id
-         FROM batch b
-         WHERE NOT EXISTS (
-           SELECT 1 FROM has_candidate_ancestor hca
-           WHERE hca.candidate_id = b.submission_feature_id
-         )`,
-        [lastId, urn_submission_id, urn_feature_type, urn_feature_id, BATCH_SIZE]
+      await this.connection.query(
+        `INSERT INTO security_scope_anchor (security_scope_id, anchor_submission_feature_id)
+         SELECT $1, unnest($2::INTEGER[])
+         ON CONFLICT (security_scope_id, anchor_submission_feature_id) DO NOTHING`,
+        [securityScopeId, featureIds]
       );
 
-      if (result.rows.length > 0) {
-        const featureIds = result.rows.map((r) => r.submission_feature_id);
-
-        await this.connection.query(
-          `INSERT INTO security_scope_anchor (security_scope_id, anchor_submission_feature_id)
-           SELECT $1, unnest($2::INTEGER[])
-           ON CONFLICT (security_scope_id, anchor_submission_feature_id) DO NOTHING`,
-          [securityScopeId, featureIds]
-        );
-
-        // Advance keyset using page_last_id from the batch (not the filtered result).
-        // page_last_id = MAX(submission_feature_id) from the batch CTE, so it's the
-        // same value on every result row.
-        lastId = result.rows[0].page_last_id;
-      } else {
-        // All candidates in this batch were pruned (every candidate had a candidate
-        // ancestor). Re-query for just the page boundary to advance the keyset.
-        // This boundary query uses the same candidate criteria as the batch CTE above —
-        // they MUST stay in sync or the keyset will skip/repeat candidates.
-        const boundaryResult = await this.connection.query<{ last_id: number }>(
-          `SELECT MAX(sf.submission_feature_id) AS last_id
-           FROM (
-             SELECT sf.submission_feature_id
-             FROM submission_feature sf
-             JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-             WHERE sf.record_end_date IS NULL
-               AND sf.submission_feature_id > $1
-               AND ($2 = sf.submission_id::text OR $2 = '*')
-               AND ($3 = ft.name               OR $3 = '*')
-               AND ($4 = sf.submission_feature_id::text OR $4 = '*')
-               AND EXISTS (
-                 SELECT 1 FROM submission_feature_security sfs
-                 WHERE sfs.submission_feature_id = sf.submission_feature_id
-                   AND sfs.record_end_date IS NULL
-               )
-               AND EXISTS (
-                 SELECT 1 FROM submission_upload_status sus
-                 WHERE sus.submission_upload_id = sf.submission_upload_id
-                   AND sus.status = 'approved'
-               )
-             ORDER BY sf.submission_feature_id
-             LIMIT $5
-           ) sf`,
-          [lastId, urn_submission_id, urn_feature_type, urn_feature_id, BATCH_SIZE]
-        );
-
-        if (!boundaryResult.rows[0]?.last_id) {
-          break;
-        }
-
-        lastId = boundaryResult.rows[0].last_id;
-      }
+      return { pageLastId: result.rows[0].page_last_id };
     }
+
+    // All candidates in this batch were pruned (every candidate had a candidate
+    // ancestor). Re-query for just the page boundary to advance the keyset.
+    // This boundary query uses the same candidate criteria as the batch CTE above —
+    // they MUST stay in sync or the keyset will skip/repeat candidates.
+    const boundaryResult = await this.connection.query<{ last_id: number }>(
+      `SELECT MAX(sf.submission_feature_id) AS last_id
+       FROM (
+         SELECT sf.submission_feature_id
+         FROM submission_feature sf
+         JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
+         WHERE sf.record_end_date IS NULL
+           AND sf.submission_feature_id > $1
+           AND ($2 = sf.submission_id::text OR $2 = '*')
+           AND ($3 = ft.name               OR $3 = '*')
+           AND ($4 = sf.submission_feature_id::text OR $4 = '*')
+           AND EXISTS (
+             SELECT 1 FROM submission_feature_security sfs
+             WHERE sfs.submission_feature_id = sf.submission_feature_id
+               AND sfs.record_end_date IS NULL
+           )
+           AND EXISTS (
+             SELECT 1 FROM submission_upload_status sus
+             WHERE sus.submission_upload_id = sf.submission_upload_id
+               AND sus.status = 'approved'
+           )
+         ORDER BY sf.submission_feature_id
+         LIMIT $5
+       ) sf`,
+      [afterId, urn.urn_submission_id, urn.urn_feature_type, urn.urn_feature_id, BATCH_SIZE]
+    );
+
+    if (!boundaryResult.rows[0]?.last_id) {
+      return null;
+    }
+
+    return { pageLastId: boundaryResult.rows[0].last_id };
   }
 
   /**

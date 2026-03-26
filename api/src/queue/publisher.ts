@@ -466,7 +466,7 @@ export const publishComputeScopeAnchorsJob = async (
     await boss.createQueue(JobQueues.COMPUTE_SCOPE_ANCHORS);
 
     // Global singleton key — only one anchor computation job runs at a time.
-    // Anchor computation does cursor-based scans of submission_feature (100M+ rows).
+    // Anchor computation does keyset-paginated scans of submission_feature (100M+ rows).
     // Without serialization, N concurrent jobs = N concurrent full-table scans.
     // Queued jobs wait until the active one completes, then run in order.
     const jobId = await boss.send(JobQueues.COMPUTE_SCOPE_ANCHORS, data, {

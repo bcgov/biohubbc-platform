@@ -123,6 +123,30 @@ describe('Security scope search (integration)', function () {
   }
 
   /**
+   * Compute anchors for a scope using the split repo API (resolveUrn + batch loop).
+   * No commits between batches — stays in the test's wrapping transaction for rollback isolation.
+   */
+  async function computeAnchors(scopeId: string): Promise<void> {
+    const urn = await scopeRepo.resolveUrnForScope(scopeId);
+
+    if (!urn) {
+      return;
+    }
+
+    let lastId = 0;
+
+    while (true) {
+      const batch = await scopeRepo.computeAnchorBatch(scopeId, urn, lastId);
+
+      if (!batch) {
+        break;
+      }
+
+      lastId = batch.pageLastId;
+    }
+  }
+
+  /**
    * Set up the full scope chain for a policy statement, bypassing pg-boss:
    * 1. Create or get security_scope (deduped by scope_hash)
    * 2. Map policy_statement → security_scope
@@ -138,7 +162,7 @@ describe('Security scope search (integration)', function () {
       : (await scopeRepo.getSecurityScopeByScopeHash(scopeHash)).security_scope_id;
 
     await scopeRepo.insertPolicyStatementScope(policyStatementId, scopeId);
-    await scopeRepo.computeAnchorsForScope(scopeId);
+    await computeAnchors(scopeId);
 
     return scopeId;
   }
@@ -859,7 +883,7 @@ describe('Security scope search (integration)', function () {
       await secureFeature(feat2);
 
       // Recompute anchors — new secured feature should become an anchor
-      await scopeRepo.computeAnchorsForScope(scopeId);
+      await computeAnchors(scopeId);
 
       expect(await countAnchors(scopeId)).to.be.greaterThan(anchorsBefore);
 
@@ -986,7 +1010,7 @@ describe('Security scope search (integration)', function () {
       // Remove security + recompute anchors (stale anchor gets cleaned up)
       await unsecureFeature(featureId);
       await scopeRepo.deleteStaleAnchorsForScope(scopeId);
-      await scopeRepo.computeAnchorsForScope(scopeId);
+      await computeAnchors(scopeId);
 
       // Anchor deleted
       const anchorResult = await connection.sql(SQL`
@@ -1025,7 +1049,7 @@ describe('Security scope search (integration)', function () {
       await unsecureFeature(feat2);
       await unsecureFeature(feat3);
       await scopeRepo.deleteStaleAnchorsForScope(scopeId);
-      await scopeRepo.computeAnchorsForScope(scopeId);
+      await computeAnchors(scopeId);
 
       // feat1's anchor remains, feat2 and feat3 are gone
       expect(await countAnchors(scopeId)).to.equal(1);
@@ -1217,6 +1241,181 @@ describe('Security scope search (integration)', function () {
       );
       expect(anchorIds).to.include(telemetry);
       expect(anchorIds).to.have.lengthOf(1);
+    });
+
+    it('should anchor all matching features for wildcard-submission type-scoped URN (urn:*:telemetry:*)', async () => {
+      // Two submissions, each with a secured telemetry feature.
+      // URN: urn:*:telemetry:* — wildcard submission, type = telemetry.
+      // Both telemetry features should become anchors (no nesting → no pruning).
+      // Note: seed data may contain additional secured telemetry features that also
+      // become anchors — assert on inclusion of test features, not exact count.
+      const sub1 = await createTestSubmission(connection);
+      const telem1 = await createTestFeature(connection, sub1, 'telemetry', { name: 'Telem 1' });
+      await secureFeature(telem1);
+
+      const sub2 = await createTestSubmission(connection);
+      const telem2 = await createTestFeature(connection, sub2, 'telemetry', { name: 'Telem 2' });
+      await secureFeature(telem2);
+
+      // Also create a secured dataset feature — it should NOT match the telemetry scope
+      const dataset = await createTestFeature(connection, sub1, 'dataset', { name: 'Dataset' });
+      await secureFeature(dataset);
+
+      const urn = 'urn:*:telemetry:*';
+      const policyId = await createPolicy('wildcard-sub-type-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      const anchors = await connection.sql(SQL`
+        SELECT anchor_submission_feature_id FROM security_scope_anchor
+        WHERE security_scope_id = ${scopeId}
+        ORDER BY anchor_submission_feature_id;
+      `);
+
+      const anchorIds = anchors.rows.map(
+        (r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id
+      );
+      // Both telemetry features are anchors (cross-submission wildcard match)
+      expect(anchorIds).to.include(telem1);
+      expect(anchorIds).to.include(telem2);
+      // Dataset feature excluded — wrong feature type for this scope
+      expect(anchorIds).to.not.include(dataset);
+    });
+  });
+
+  // ── findScopeIdsMatchingSubmission → URN pattern matching ───────────
+
+  describe('findScopeIdsMatchingSubmission → URN pattern matching', () => {
+    // Seed data may include policy_statements with wildcard URNs (urn_submission_id = '*')
+    // that match any submission. Tests use a baseline snapshot to isolate assertions
+    // to scopes created within the test.
+
+    it('should match a submission-scoped URN (urn:{subId}:*:*)', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const baseline = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
+
+      const policyId = await createPolicy('sub-scope-match');
+      const stmtId = await createPolicyStatement(policyId, `urn:${submissionId}:*:*`);
+      const scopeId = await setupScopeChain(stmtId, `urn:${submissionId}:*:*`);
+
+      const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
+      const scopeIds = result.map((r) => r.security_scope_id);
+
+      expect(scopeIds).to.include(scopeId);
+      expect(result).to.have.lengthOf(baseline.length + 1);
+    });
+
+    it('should match a wildcard URN (urn:*:*:*) for any submission', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const baseline = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
+
+      const policyId = await createPolicy('wildcard-match');
+      const stmtId = await createPolicyStatement(policyId, 'urn:*:*:*');
+      const scopeId = await setupScopeChain(stmtId, 'urn:*:*:*');
+
+      const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
+      const scopeIds = result.map((r) => r.security_scope_id);
+
+      expect(scopeIds).to.include(scopeId);
+      expect(result).to.have.lengthOf(baseline.length + 1);
+    });
+
+    it('should match a type-scoped wildcard URN (urn:*:telemetry:*) for any submission', async () => {
+      const submissionId = await createTestSubmission(connection);
+
+      const policyId = await createPolicy('type-wildcard-match');
+      const stmtId = await createPolicyStatement(policyId, 'urn:*:telemetry:*');
+      const scopeId = await setupScopeChain(stmtId, 'urn:*:telemetry:*');
+
+      const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
+      const scopeIds = result.map((r) => r.security_scope_id);
+
+      // urn_submission_id = '*' matches any submission
+      expect(scopeIds).to.include(scopeId);
+    });
+
+    it('should not match a submission-scoped URN for a different submission', async () => {
+      const sub1 = await createTestSubmission(connection);
+      const sub2 = await createTestSubmission(connection);
+      const baseline = await scopeRepo.findScopeIdsMatchingSubmission(sub2);
+
+      const policyId = await createPolicy('no-match');
+      const stmtId = await createPolicyStatement(policyId, `urn:${sub1}:*:*`);
+      const scopeId = await setupScopeChain(stmtId, `urn:${sub1}:*:*`);
+
+      const result = await scopeRepo.findScopeIdsMatchingSubmission(sub2);
+      const scopeIds = result.map((r) => r.security_scope_id);
+
+      // sub1-scoped scope should NOT appear in sub2's results
+      expect(scopeIds).to.not.include(scopeId);
+      expect(result).to.have.lengthOf(baseline.length);
+    });
+
+    it('should return both specific and wildcard scopes for same submission', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const baseline = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
+
+      // Submission-scoped scope
+      const policyA = await createPolicy('specific-match');
+      const stmtA = await createPolicyStatement(policyA, `urn:${submissionId}:*:*`);
+      const scopeIdA = await setupScopeChain(stmtA, `urn:${submissionId}:*:*`);
+
+      // Wildcard scope (different hash → different scope row)
+      const policyB = await createPolicy('wildcard-also-match');
+      const stmtB = await createPolicyStatement(policyB, 'urn:*:*:*');
+      const scopeIdB = await setupScopeChain(stmtB, 'urn:*:*:*');
+
+      const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
+      const scopeIds = result.map((r) => r.security_scope_id);
+
+      expect(scopeIds).to.include(scopeIdA);
+      expect(scopeIds).to.include(scopeIdB);
+      expect(result).to.have.lengthOf(baseline.length + 2);
+    });
+
+    it('should not match soft-deleted policy statements', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const baseline = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
+
+      const policyId = await createPolicy('soft-deleted-match');
+      const stmtId = await createPolicyStatement(policyId, `urn:${submissionId}:*:*`);
+      const scopeId = await setupScopeChain(stmtId, `urn:${submissionId}:*:*`);
+
+      // Soft-delete the statement
+      await connection.sql(SQL`
+        UPDATE policy_statement SET record_end_date = now()
+        WHERE policy_statement_id = ${stmtId};
+      `);
+
+      const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
+      const scopeIds = result.map((r) => r.security_scope_id);
+
+      // Scope exists but its statement is soft-deleted — should not match
+      expect(scopeIds).to.not.include(scopeId);
+      expect(result).to.have.lengthOf(baseline.length);
+    });
+
+    it('should deduplicate when two statements share the same scope', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const baseline = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
+      const urn = `urn:${submissionId}:*:*`;
+
+      // Two policies with the same URN → same scope (shared by hash)
+      const policyA = await createPolicy('dedup-A');
+      const stmtA = await createPolicyStatement(policyA, urn);
+      const scopeIdA = await setupScopeChain(stmtA, urn);
+
+      const policyB = await createPolicy('dedup-B');
+      const stmtB = await createPolicyStatement(policyB, urn);
+      const scopeIdB = await setupScopeChain(stmtB, urn);
+
+      // Same scope_hash → same scope row
+      expect(scopeIdA).to.equal(scopeIdB);
+
+      const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
+
+      // DISTINCT in the query → only 1 new scope despite 2 statements
+      expect(result).to.have.lengthOf(baseline.length + 1);
     });
   });
 

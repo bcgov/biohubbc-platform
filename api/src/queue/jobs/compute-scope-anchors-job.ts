@@ -42,7 +42,15 @@ export const computeScopeAnchorsJobHandler: PgBoss.WorkHandler<IComputeScopeAnch
       await connection.open();
 
       const securityScopeService = new SecurityScopeService(connection);
-      await securityScopeService.computeAnchorsForScope(securityScopeId);
+
+      // Commit-per-batch: each phase (stale delete, each insert batch) gets its
+      // own transaction. Bounds WAL retention to one batch's worth of writes
+      // instead of pinning WAL for the entire multi-minute loop. ON CONFLICT
+      // DO NOTHING makes each batch idempotent — safe to retry on partial failure.
+      await securityScopeService.computeAnchorsForScope(securityScopeId, async () => {
+        await connection.commit();
+        await connection.query('BEGIN');
+      });
 
       await connection.commit();
 
@@ -53,6 +61,9 @@ export const computeScopeAnchorsJobHandler: PgBoss.WorkHandler<IComputeScopeAnch
         securityScopeId
       });
     } catch (error) {
+      // Roll back whatever transaction may be in progress (e.g., a batch that
+      // failed mid-way). Previously committed batches are safe — ON CONFLICT
+      // DO NOTHING makes retry idempotent.
       await connection.rollback();
 
       defaultLog.error({

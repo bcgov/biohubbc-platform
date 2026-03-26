@@ -144,25 +144,59 @@ export class SecurityScopeService extends DBService {
   }
 
   /**
-   * Compute anchor features for a security scope via delete-stale + insert-only rebuild.
+   * Compute anchor features for a security scope via delete-stale + batched insert.
    *
-   * Two repository calls in sequence — the service decides the strategy, the
-   * repository does individual operations:
-   * 1. Remove anchors whose features no longer meet candidate criteria (unsecured,
-   *    unapproved, soft-deleted, or URN mismatch)
-   * 2. Insert-only rebuild adds new anchors — ON CONFLICT DO NOTHING skips features
-   *    that are already anchored
+   * Three phases:
+   * 1. Remove stale anchors — features that no longer meet candidate criteria
+   *    (unsecured, unapproved, soft-deleted, or URN mismatch)
+   * 2. Resolve URN pattern for this scope
+   * 3. Insert new anchors in keyset-paginated batches — ON CONFLICT DO NOTHING
+   *    skips features that are already anchored
    *
    * Valid anchors are never deleted, so there is no transient gap where the walk-up
    * search strategy can't find a matching anchor.
+   *
+   * **Why `onPhaseComplete`:** For broad scopes (`*:*:*`) the batch loop can run
+   * thousands of iterations. A single wrapping transaction pins WAL segments and
+   * blocks VACUUM for the entire duration — minutes at production scale. The job
+   * handler passes a callback that commits and re-begins between phases, bounding
+   * WAL retention to one batch's worth of writes. ON CONFLICT DO NOTHING makes
+   * each batch idempotent, so partial completion + retry is safe.
+   *
+   * Without the callback (e.g., integration tests), all phases run in a single
+   * transaction — safe for rollback-based test isolation.
    *
    * Called by the compute-scope-anchors background job after scope creation or
    * when security rules change on a submission's features.
    *
    * @param securityScopeId UUID of the security scope to compute anchors for
+   * @param onPhaseComplete Optional callback invoked between phases — the job handler
+   *   uses this to commit + BEGIN, bounding WAL retention per batch
    */
-  async computeAnchorsForScope(securityScopeId: string): Promise<void> {
+  async computeAnchorsForScope(securityScopeId: string, onPhaseComplete?: () => Promise<void>): Promise<void> {
+    // Phase 1: Remove stale anchors
     await this.securityScopeRepository.deleteStaleAnchorsForScope(securityScopeId);
-    await this.securityScopeRepository.computeAnchorsForScope(securityScopeId);
+    await onPhaseComplete?.();
+
+    // Phase 2: Resolve URN pattern (read-only — no WAL concern regardless of txn boundary)
+    const urn = await this.securityScopeRepository.resolveUrnForScope(securityScopeId);
+
+    if (!urn) {
+      return;
+    }
+
+    // Phase 3: Insert new anchors in keyset-paginated batches
+    let lastId = 0;
+
+    while (true) {
+      const batch = await this.securityScopeRepository.computeAnchorBatch(securityScopeId, urn, lastId);
+
+      if (!batch) {
+        break;
+      }
+
+      await onPhaseComplete?.();
+      lastId = batch.pageLastId;
+    }
   }
 }
