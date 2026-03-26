@@ -196,6 +196,37 @@ describe('Security scope search (integration)', function () {
     return result.rows[0].count;
   }
 
+  /**
+   * Create a submission with a single secured feature and a scope chain for it.
+   * Covers the common "one feature, one policy, one scope" setup pattern.
+   */
+  async function setupSecuredScope(
+    featureName: string,
+    policyName: string
+  ): Promise<{ submissionId: number; featureId: number; scopeId: string; policyId: string; stmtId: string }> {
+    const submissionId = await createTestSubmission(connection);
+    const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: featureName });
+    await secureFeature(featureId);
+
+    const urn = `urn:${submissionId}:*:*`;
+    const policyId = await createPolicy(policyName);
+    const stmtId = await createPolicyStatement(policyId, urn);
+    const scopeId = await setupScopeChain(stmtId, urn);
+
+    return { submissionId, featureId, scopeId, policyId, stmtId };
+  }
+
+  /**
+   * Query anchor feature IDs for a scope.
+   */
+  async function getAnchorIds(scopeId: string): Promise<number[]> {
+    const anchors = await connection.sql(SQL`
+      SELECT anchor_submission_feature_id FROM security_scope_anchor
+      WHERE security_scope_id = ${scopeId};
+    `);
+    return anchors.rows.map((r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id);
+  }
+
   async function countTeamScopes(teamId: string): Promise<number> {
     const result = await connection.sql(SQL`
       SELECT count(*)::integer as count FROM team_security_scope
@@ -585,14 +616,7 @@ describe('Security scope search (integration)', function () {
     });
 
     it('should delete orphaned security_scope_anchor rows when last reference is removed', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Orphan Anchor' });
-      await secureFeature(featureId);
-
-      const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('orphan-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const { stmtId, scopeId } = await setupSecuredScope('Orphan Anchor', 'orphan-test');
 
       expect(await countAnchors(scopeId)).to.be.greaterThan(0);
 
@@ -924,15 +948,7 @@ describe('Security scope search (integration)', function () {
       const stmtId = await createPolicyStatement(policyId, urn);
       const scopeId = await setupScopeChain(stmtId, urn);
 
-      const anchors = await connection.sql(SQL`
-        SELECT anchor_submission_feature_id FROM security_scope_anchor
-        WHERE security_scope_id = ${scopeId}
-        ORDER BY anchor_submission_feature_id;
-      `);
-
-      const anchorIds = anchors.rows.map(
-        (r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id
-      );
+      const anchorIds = await getAnchorIds(scopeId);
       // Grandparent is the root secured feature — it IS an anchor
       expect(anchorIds).to.include(grandparent);
       // Child has a secured ancestor (grandparent) — it is NOT an anchor
@@ -955,16 +971,8 @@ describe('Security scope search (integration)', function () {
       const stmtId = await createPolicyStatement(policyId, urn);
       const scopeId = await setupScopeChain(stmtId, urn);
 
-      const anchors = await connection.sql(SQL`
-        SELECT anchor_submission_feature_id FROM security_scope_anchor
-        WHERE security_scope_id = ${scopeId}
-        ORDER BY anchor_submission_feature_id;
-      `);
-
-      const anchorIds = anchors.rows.map(
-        (r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id
-      );
       // Child has no secured ancestors — it IS the anchor
+      const anchorIds = await getAnchorIds(scopeId);
       expect(anchorIds).to.include(child);
       expect(anchorIds).to.have.lengthOf(1);
     });
@@ -985,29 +993,14 @@ describe('Security scope search (integration)', function () {
       const stmtId = await createPolicyStatement(policyId, urn);
       const scopeId = await setupScopeChain(stmtId, urn);
 
-      const anchors = await connection.sql(SQL`
-        SELECT anchor_submission_feature_id FROM security_scope_anchor
-        WHERE security_scope_id = ${scopeId}
-        ORDER BY anchor_submission_feature_id;
-      `);
-
-      const anchorIds = anchors.rows.map(
-        (r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id
-      );
       // Parent has no secured ancestors — it IS the anchor
+      const anchorIds = await getAnchorIds(scopeId);
       expect(anchorIds).to.include(parent);
       expect(anchorIds).to.have.lengthOf(1);
     });
 
     it('should delete anchors and make features publicly visible when security rules are removed', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Going Public' });
-      await secureFeature(featureId);
-
-      const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('unsecure-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const { submissionId, featureId, scopeId } = await setupSecuredScope('Going Public', 'unsecure-test');
 
       expect(await countAnchors(scopeId)).to.be.greaterThan(0);
 
@@ -1087,47 +1080,41 @@ describe('Security scope search (integration)', function () {
       `);
     }
 
-    it('should exclude features from denied uploads when computing anchors', async () => {
+    /**
+     * Create a secured feature, optionally override its upload status, then compute anchors.
+     */
+    async function setupUploadStatusTest(
+      featureName: string,
+      policyName: string,
+      uploadStatus?: string
+    ): Promise<string> {
       const submissionId = await createTestSubmission(connection);
-      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Denied Dataset' });
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: featureName });
 
       await secureFeature(dataset);
-      await setUploadStatus(dataset, 'denied');
+      if (uploadStatus) {
+        await setUploadStatus(dataset, uploadStatus);
+      }
 
       const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('denied-upload-test');
+      const policyId = await createPolicy(policyName);
       const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      return setupScopeChain(stmtId, urn);
+    }
 
+    it('should exclude features from denied uploads when computing anchors', async () => {
+      const scopeId = await setupUploadStatusTest('Denied Dataset', 'denied-upload-test', 'denied');
       expect(await countAnchors(scopeId)).to.equal(0);
     });
 
     it('should exclude features from unreviewed uploads when computing anchors', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Unreviewed Dataset' });
-
-      await secureFeature(dataset);
-      await setUploadStatus(dataset, 'submitted');
-
-      const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('unreviewed-upload-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
-
+      const scopeId = await setupUploadStatusTest('Unreviewed Dataset', 'unreviewed-upload-test', 'submitted');
       expect(await countAnchors(scopeId)).to.equal(0);
     });
 
     it('should include features from approved uploads when computing anchors', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Approved Dataset' });
-
-      await secureFeature(dataset);
       // createTestFeature already sets status = 'approved', no override needed
-
-      const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('approved-upload-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const scopeId = await setupUploadStatusTest('Approved Dataset', 'approved-upload-test');
 
       expect(await countAnchors(scopeId)).to.equal(1);
     });
@@ -1161,15 +1148,8 @@ describe('Security scope search (integration)', function () {
       const stmtId = await createPolicyStatement(policyId, urn);
       const scopeId = await setupScopeChain(stmtId, urn);
 
-      const anchors = await connection.sql(SQL`
-        SELECT anchor_submission_feature_id FROM security_scope_anchor
-        WHERE security_scope_id = ${scopeId};
-      `);
-
-      const anchorIds = anchors.rows.map(
-        (r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id
-      );
       // The URN names this feature directly — it MUST be an anchor
+      const anchorIds = await getAnchorIds(scopeId);
       expect(anchorIds).to.include(telemetry);
       expect(anchorIds).to.have.lengthOf(1);
     });
@@ -1202,16 +1182,9 @@ describe('Security scope search (integration)', function () {
       const stmtId = await createPolicyStatement(policyId, urn);
       const scopeId = await setupScopeChain(stmtId, urn);
 
-      const anchors = await connection.sql(SQL`
-        SELECT anchor_submission_feature_id FROM security_scope_anchor
-        WHERE security_scope_id = ${scopeId};
-      `);
-
-      const anchorIds = anchors.rows.map(
-        (r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id
-      );
       // Telemetry is the only candidate for this scope — secured ancestors of
       // different types should not prevent it from being an anchor
+      const anchorIds = await getAnchorIds(scopeId);
       expect(anchorIds).to.include(telemetry);
       expect(anchorIds).to.have.lengthOf(1);
     });
@@ -1239,14 +1212,7 @@ describe('Security scope search (integration)', function () {
       const stmtId = await createPolicyStatement(policyId, urn);
       const scopeId = await setupScopeChain(stmtId, urn);
 
-      const anchors = await connection.sql(SQL`
-        SELECT anchor_submission_feature_id FROM security_scope_anchor
-        WHERE security_scope_id = ${scopeId};
-      `);
-
-      const anchorIds = anchors.rows.map(
-        (r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id
-      );
+      const anchorIds = await getAnchorIds(scopeId);
       expect(anchorIds).to.include(telemetry);
       expect(anchorIds).to.have.lengthOf(1);
     });
@@ -1274,15 +1240,7 @@ describe('Security scope search (integration)', function () {
       const stmtId = await createPolicyStatement(policyId, urn);
       const scopeId = await setupScopeChain(stmtId, urn);
 
-      const anchors = await connection.sql(SQL`
-        SELECT anchor_submission_feature_id FROM security_scope_anchor
-        WHERE security_scope_id = ${scopeId}
-        ORDER BY anchor_submission_feature_id;
-      `);
-
-      const anchorIds = anchors.rows.map(
-        (r: { anchor_submission_feature_id: number }) => r.anchor_submission_feature_id
-      );
+      const anchorIds = await getAnchorIds(scopeId);
       // Both telemetry features are anchors (cross-submission wildcard match)
       expect(anchorIds).to.include(telem1);
       expect(anchorIds).to.include(telem2);
