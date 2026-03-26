@@ -86,7 +86,7 @@ describe('SecurityScopeService', () => {
   });
 
   describe('cleanupScopesForDeletedStatements', () => {
-    it('gathers scope IDs, deletes mappings, rebuilds teams, and cleans up orphaned anchors', async () => {
+    it('gathers scope IDs, deletes mappings, rebuilds teams, and enqueues jobs for orphaned scopes', async () => {
       const getScopeIdsStub = sinon
         .stub(SecurityScopeRepository.prototype, 'findScopeIdsForStatements')
         .resolves([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }]);
@@ -95,7 +95,13 @@ describe('SecurityScopeService', () => {
       const insertFromChainStub = sinon
         .stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesFromPolicyChain')
         .resolves();
-      const orphanStub = sinon.stub(SecurityScopeRepository.prototype, 'deleteAnchorsForOrphanedScopes').resolves();
+      // scope-1 is orphaned, scope-2 is still referenced by another statement
+      const orphanStub = sinon
+        .stub(SecurityScopeRepository.prototype, 'findOrphanedScopeIds')
+        .resolves([{ security_scope_id: 'scope-1' }]);
+      const publishStub = sinon
+        .stub(publisher, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
 
       await service.cleanupScopesForDeletedStatements(['ps-1', 'ps-2'], ['team-a', 'team-b']);
 
@@ -111,36 +117,43 @@ describe('SecurityScopeService', () => {
       expect(insertFromChainStub.firstCall).to.have.been.calledWith('team-a');
       expect(insertFromChainStub.secondCall).to.have.been.calledWith('team-b');
 
-      // Orphaned anchor cleanup happens after mappings are deleted
+      // Only orphaned scopes get anchor cleanup jobs (shared scopes are skipped)
       expect(orphanStub).to.have.been.calledOnceWith(['scope-1', 'scope-2']);
-      expect(orphanStub).to.have.been.calledAfter(deleteStub);
+      expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, { securityScopeId: 'scope-1' });
     });
 
-    it('deletes mappings but skips rebuild when no affected teams', async () => {
+    it('publishes jobs only for orphaned scopes, not shared ones', async () => {
       sinon
         .stub(SecurityScopeRepository.prototype, 'findScopeIdsForStatements')
-        .resolves([{ security_scope_id: 'scope-1' }]);
-      const deleteStub = sinon.stub(SecurityScopeRepository.prototype, 'deletePolicyStatementScopes').resolves();
+        .resolves([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }]);
+      sinon.stub(SecurityScopeRepository.prototype, 'deletePolicyStatementScopes').resolves();
       sinon.stub(SecurityScopeRepository.prototype, 'deleteTeamSecurityScopes').resolves();
       sinon.stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesFromPolicyChain').resolves();
-      const orphanStub = sinon.stub(SecurityScopeRepository.prototype, 'deleteAnchorsForOrphanedScopes').resolves();
+      // No scopes are orphaned — all still referenced by other statements
+      sinon.stub(SecurityScopeRepository.prototype, 'findOrphanedScopeIds').resolves([]);
+      const publishStub = sinon
+        .stub(publisher, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
 
-      await service.cleanupScopesForDeletedStatements(['ps-1'], []);
+      await service.cleanupScopesForDeletedStatements(['ps-1'], ['team-a']);
 
-      expect(deleteStub).to.have.been.calledOnceWith(['ps-1']);
-      expect(orphanStub).to.have.been.calledOnceWith(['scope-1']);
+      expect(publishStub).not.to.have.been.called;
     });
 
-    it('skips orphan cleanup when no scopes were affected', async () => {
+    it('skips orphan check when no scopes were affected', async () => {
       sinon.stub(SecurityScopeRepository.prototype, 'findScopeIdsForStatements').resolves([]);
       sinon.stub(SecurityScopeRepository.prototype, 'deletePolicyStatementScopes').resolves();
       sinon.stub(SecurityScopeRepository.prototype, 'deleteTeamSecurityScopes').resolves();
       sinon.stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesFromPolicyChain').resolves();
-      const orphanStub = sinon.stub(SecurityScopeRepository.prototype, 'deleteAnchorsForOrphanedScopes').resolves();
+      const orphanStub = sinon.stub(SecurityScopeRepository.prototype, 'findOrphanedScopeIds');
+      const publishStub = sinon
+        .stub(publisher, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
 
       await service.cleanupScopesForDeletedStatements(['ps-1'], ['team-a']);
 
       expect(orphanStub).not.to.have.been.called;
+      expect(publishStub).not.to.have.been.called;
     });
   });
 
@@ -202,7 +215,7 @@ describe('SecurityScopeService', () => {
   describe('computeAnchorsForScope', () => {
     const urn = { urn_submission_id: '*', urn_feature_type: 'telemetry', urn_feature_id: '*' };
 
-    it('calls delete, resolve, then batch loop in order', async () => {
+    it('calls delete stale, resolve, then batch loop in order', async () => {
       const deleteStub = sinon.stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorsForScope').resolves();
       const resolveStub = sinon.stub(SecurityScopeRepository.prototype, 'resolveUrnForScope').resolves(urn);
       const batchStub = sinon.stub(SecurityScopeRepository.prototype, 'computeAnchorBatch');
@@ -214,18 +227,20 @@ describe('SecurityScopeService', () => {
 
       expect(deleteStub).to.have.been.calledOnceWith('scope-1');
       expect(resolveStub).to.have.been.calledOnceWith('scope-1');
+      expect(deleteStub).to.have.been.calledBefore(resolveStub);
       expect(batchStub).to.have.been.calledTwice;
       expect(batchStub.firstCall).to.have.been.calledWith('scope-1', urn, 0);
       expect(batchStub.secondCall).to.have.been.calledWith('scope-1', urn, 5000);
     });
 
-    it('returns early when URN is null (no active policy statements)', async () => {
-      sinon.stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorsForScope').resolves();
+    it('deletes stale anchors and skips insert loop when URN is null (orphaned scope)', async () => {
+      const deleteStub = sinon.stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorsForScope').resolves();
       sinon.stub(SecurityScopeRepository.prototype, 'resolveUrnForScope').resolves(null);
       const batchStub = sinon.stub(SecurityScopeRepository.prototype, 'computeAnchorBatch');
 
       await service.computeAnchorsForScope('scope-1');
 
+      expect(deleteStub).to.have.been.calledOnceWith('scope-1');
       expect(batchStub).not.to.have.been.called;
     });
 

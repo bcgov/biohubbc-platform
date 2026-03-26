@@ -83,24 +83,28 @@ export class SecurityScopeService extends DBService {
       await this.rebuildTeamSecurityScopes(teamId);
     }
 
-    // Clean up anchors for scopes that lost all policy_statement_scope references.
-    // Shared scopes (still referenced by other statements) are left intact.
+    // Trigger anchor cleanup for scopes that lost all policy_statement_scope
+    // references. The job owns the security_scope_anchor table — it will resolve
+    // URN to null for orphaned scopes and delete their anchors.
+    // Shared scopes (still referenced by other statements) are skipped — their
+    // anchors are unchanged because the scope's URN hasn't changed.
     if (affectedScopes.length > 0) {
       const scopeIds = affectedScopes.map((s) => s.security_scope_id);
-      await this.securityScopeRepository.deleteAnchorsForOrphanedScopes(scopeIds);
+      const orphaned = await this.securityScopeRepository.findOrphanedScopeIds(scopeIds);
+
+      for (const scope of orphaned) {
+        await publishComputeScopeAnchorsJob(this.connection, { securityScopeId: scope.security_scope_id });
+      }
     }
   }
 
   /**
    * Wipe and re-derive team_security_scope for a team from the full policy chain.
    *
-   * Why wipe-and-re-derive instead of surgical removal: a team can reach the same
-   * scope through multiple policies. Removing scopes from a deleted policy requires
-   * a graph reachability check (is the scope still reachable through another policy?).
-   * At ~30 rows per team, DELETE + INSERT completes in < 1ms — faster than the
-   * reachability query and guaranteed correct.
-   *
-   * Synchronous because team_security_scope holds ~30 rows per team at scale.
+   * A team can reach the same scope through multiple policies. Surgically removing
+   * one policy's scopes requires checking whether each scope is still reachable
+   * through another policy — a graph reachability problem. At ~30 rows per team,
+   * DELETE + INSERT is faster than the reachability query and guaranteed correct.
    *
    * @param teamId UUID of the team to rebuild
    */
@@ -174,14 +178,18 @@ export class SecurityScopeService extends DBService {
    *   uses this to commit + BEGIN, bounding WAL retention per batch
    */
   async computeAnchorsForScope(securityScopeId: string, onPhaseComplete?: () => Promise<void>): Promise<void> {
-    // Phase 1: Remove stale anchors
+    // Phase 1: Remove stale anchors — features that no longer meet candidate criteria.
+    // Also handles orphaned scopes (no policy_statement_scope rows) — all anchors are
+    // stale when no policy statement validates them.
     await this.securityScopeRepository.deleteStaleAnchorsForScope(securityScopeId);
     await onPhaseComplete?.();
 
-    // Phase 2: Resolve URN pattern (read-only — no WAL concern regardless of txn boundary)
+    // Phase 2: Resolve URN pattern for the insert loop
     const urn = await this.securityScopeRepository.resolveUrnForScope(securityScopeId);
 
     if (!urn) {
+      // No active policy statements — stale check already deleted all anchors.
+      // If new statements are created later, their scope mapping triggers a fresh job.
       return;
     }
 

@@ -123,36 +123,46 @@ export class SecurityScopeRepository extends BaseRepository {
    * by `computeAnchorsForScope` — any feature that wouldn't be selected as a new
    * candidate should not remain as an existing anchor.
    *
-   * Called before `computeAnchorsForScope` so valid anchors are never deleted —
+   * Called before the keyset insert loop so valid anchors are never deleted —
    * no transient search gap where the walk-up strategy can't find a matching anchor.
+   *
+   * Handles both live and orphaned scopes: an anchor is stale if NO active policy
+   * statement validates it. For orphaned scopes (zero policy_statement_scope rows),
+   * the NOT EXISTS subquery finds nothing, so all anchors are deleted.
    *
    * @param securityScopeId UUID of the security scope to clean stale anchors for
    */
   async deleteStaleAnchorsForScope(securityScopeId: string): Promise<void> {
     await this.connection.query(
-      `DELETE FROM security_scope_anchor ssa
-       USING policy_statement_scope pss
-       JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
+      `-- Delete anchors that no active policy statement validates.
+       -- For orphaned scopes (no policy_statement_scope rows), every anchor
+       -- fails the NOT EXISTS check and gets deleted.
+       DELETE FROM security_scope_anchor ssa
        WHERE ssa.security_scope_id = $1
-         AND pss.security_scope_id = $1
-         AND ps.record_end_date IS NULL
          AND NOT EXISTS (
-           -- Feature must still be a valid candidate: active, secured, approved, URN-matching.
-           -- This is the inverse of the candidate criteria in computeAnchorsForScope —
-           -- if ANY of these conditions fail, the anchor is stale.
            SELECT 1
-           FROM submission_feature sf
+           -- Walk the scope → policy statement chain to find the URN pattern
+           FROM policy_statement_scope pss
+           JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
+           -- Look up the anchored feature and its type
+           JOIN submission_feature sf ON sf.submission_feature_id = ssa.anchor_submission_feature_id
            JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-           WHERE sf.submission_feature_id = ssa.anchor_submission_feature_id
+           WHERE pss.security_scope_id = $1
+             -- Policy statement must be active (not soft-deleted)
+             AND ps.record_end_date IS NULL
+             -- Feature must be active (not soft-deleted)
              AND sf.record_end_date IS NULL
+             -- Feature must match the scope's URN pattern
              AND (ps.urn_submission_id = sf.submission_id::text OR ps.urn_submission_id = '*')
              AND (ps.urn_feature_type = ft.name                OR ps.urn_feature_type = '*')
              AND (ps.urn_feature_id = sf.submission_feature_id::text OR ps.urn_feature_id = '*')
+             -- Feature must have at least one active security rule
              AND EXISTS (
                SELECT 1 FROM submission_feature_security sfs
                WHERE sfs.submission_feature_id = sf.submission_feature_id
                  AND sfs.record_end_date IS NULL
              )
+             -- Feature's upload must be approved
              AND EXISTS (
                SELECT 1 FROM submission_upload_status sus
                WHERE sus.submission_upload_id = sf.submission_upload_id
@@ -188,28 +198,33 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
-   * Compute one keyset-paginated batch of anchor features for a security scope.
+   * Insert one keyset-paginated batch of anchor rows into `security_scope_anchor`.
    *
-   * Anchors are the topmost secured features whose URN matches the scope's
-   * originating policy statement. A `urn:*:telemetry:*` scope anchors at ~200
-   * dataset roots that expand to 10M telemetry features. The expansion never
-   * happens — the walk-up search strategy checks from the candidate up to the
-   * anchor, not from the anchor down.
+   * Anchors mark the highest point in each feature hierarchy that satisfies the
+   * scope's URN pattern with no qualifying ancestor above it. A `urn:*:telemetry:*`
+   * scope anchors at ~200 dataset roots rather than the 10M telemetry features
+   * beneath them — authorization checks walk up from a candidate feature to an
+   * anchor, so the full subtree is never materialized.
    *
    * Only features from approved uploads are eligible — features still under
    * review (status = 'submitted') must not affect security scope anchors.
    *
-   * **Why keyset instead of CTE + cursor:** A monolithic recursive CTE materializes
-   * the entire candidate set + ancestor walk in work_mem before a cursor can iterate.
-   * For `*:*:*` at production scale (10M candidates x ~5 depth = ~50M ancestor rows),
-   * this is a memory bomb in OpenShift pods with cgroup limits. Keyset pagination
-   * bounds memory per batch at the cost of repeated index probes — trading time for
-   * OOM safety, acceptable for a background job.
+   * **Why keyset pagination:** Even though `*:*:*` scopes are not supported,
+   * a single submission-scoped URN (`urn:{subId}:*:*`) can still match 1M+
+   * features. A monolithic recursive CTE would materialize the entire candidate
+   * set + ancestor walk in work_mem before results can be consumed. Keyset
+   * pagination bounds memory per batch at the cost of repeated index probes —
+   * trading time for OOM safety, acceptable for a background job.
    *
    * **Why re-evaluate candidate criteria per ancestor instead of referencing a
    * materialized candidate set:** Each batch's `has_candidate_ancestor` CTE checks
    * ancestor candidacy via index lookups against the base tables, rather than
    * joining to a materialized candidate set. This keeps memory bounded per batch.
+   *
+   * **All-pruned-batch fallback:** When every candidate in a batch is pruned (each
+   * has a candidate ancestor), no rows are inserted but the batch is not exhausted.
+   * A separate boundary query re-runs the same candidate criteria to find the page
+   * maximum and advance the cursor past the fully-pruned page.
    *
    * Insert-only with ON CONFLICT DO NOTHING — called after `deleteStaleAnchorsForScope`
    * removes invalid anchors, so existing valid anchors are simply skipped.
@@ -221,7 +236,7 @@ export class SecurityScopeRepository extends BaseRepository {
    *
    * @param securityScopeId UUID of the security scope to compute anchors for
    * @param urn URN components resolved via `resolveUrnForScope`
-   * @param afterId Keyset cursor — process candidates with submission_feature_id > afterId
+   * @param afterId Keyset cursor — process candidates with submission_feature_id > afterId (pass 0 to start from the beginning)
    * @returns Next cursor position, or null when no more candidates exist
    */
   async computeAnchorBatch(
@@ -390,35 +405,30 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
-   * Delete security_scope_anchor rows for scopes that have no remaining
-   * policy_statement_scope references (orphaned scopes).
+   * Filter a list of scope IDs to those with no remaining policy_statement_scope
+   * references. Called after deleting policy_statement_scope rows to identify
+   * which scopes became orphaned and need anchor cleanup via the background job.
    *
-   * When a policy is deleted, its policy_statement_scope rows are removed.
-   * If the scope was only referenced by that policy's statements, the scope
-   * becomes orphaned — no team can reach it via the policy chain, so its
-   * anchors are dead weight. This method cleans them up.
-   *
-   * Scopes shared by other policy statements are left intact — their anchors
-   * are still needed.
-   *
-   * @param scopeIds Candidate scope IDs to check for orphan status
+   * @param scopeIds Candidate scope IDs to check
+   * @returns Scope IDs that have zero policy_statement_scope references
    */
-  async deleteAnchorsForOrphanedScopes(scopeIds: string[]): Promise<void> {
+  async findOrphanedScopeIds(scopeIds: string[]): Promise<SecurityScopeId[]> {
     if (scopeIds.length === 0) {
-      return;
+      return [];
     }
 
     const knex = getKnex();
-
-    // Delete anchors only for scopes with zero remaining policy_statement_scope references.
-    // The subquery finds scopes that still have at least one mapping — those are excluded.
     const query = knex
-      .table('security_scope_anchor')
-      .whereIn('security_scope_id', scopeIds)
-      .whereNotIn('security_scope_id', knex.select('security_scope_id').from('policy_statement_scope'))
-      .del();
+      .select('s.security_scope_id')
+      .from(knex.raw('unnest(?::UUID[]) AS s(security_scope_id)', [scopeIds]))
+      .whereNotIn(
+        's.security_scope_id',
+        knex.select('security_scope_id').from('policy_statement_scope')
+      );
 
-    await this.connection.knex(query);
+    const response = await this.connection.knex(query, SecurityScopeId);
+
+    return response.rows;
   }
 
   /**

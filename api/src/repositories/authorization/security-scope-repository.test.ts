@@ -255,25 +255,27 @@ describe('SecurityScopeRepository', () => {
     });
   });
 
-  describe('deleteAnchorsForOrphanedScopes', () => {
-    it('deletes anchors for scopes with no remaining policy_statement_scope references', async () => {
-      const knexFake = sinon.fake.resolves(mockQueryResult([], 5));
+  describe('findOrphanedScopeIds', () => {
+    it('returns scope IDs that have no remaining policy_statement_scope references', async () => {
+      const knexFake = sinon.fake.resolves(mockQueryResult([{ security_scope_id: 'scope-2' }]));
       const mockDBConnection = getMockDBConnection({ knex: knexFake });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      await repository.deleteAnchorsForOrphanedScopes(['scope-1', 'scope-2']);
+      const result = await repository.findOrphanedScopeIds(['scope-1', 'scope-2']);
 
       expect(knexFake).to.have.been.calledOnce;
+      expect(result).to.eql([{ security_scope_id: 'scope-2' }]);
     });
 
-    it('skips the query when given an empty array', async () => {
+    it('returns empty array when given empty input', async () => {
       const knexFake = sinon.fake.resolves(mockQueryResult([]));
       const mockDBConnection = getMockDBConnection({ knex: knexFake });
 
       const repository = new SecurityScopeRepository(mockDBConnection);
-      await repository.deleteAnchorsForOrphanedScopes([]);
+      const result = await repository.findOrphanedScopeIds([]);
 
       expect(knexFake).not.to.have.been.called;
+      expect(result).to.eql([]);
     });
   });
 
