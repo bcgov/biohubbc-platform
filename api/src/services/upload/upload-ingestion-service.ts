@@ -139,7 +139,6 @@ export class UploadIngestionService extends DBService {
     const {
       uploadId: s3UploadId,
       presignedUrls,
-      partSizeBytes,
       partCount
     } = await generateMultipartUploadPresignedUrls({
       key,
@@ -158,7 +157,6 @@ export class UploadIngestionService extends DBService {
       uploadArchiveId: upload_archive_id,
       s3UploadId,
       key,
-      partSizeBytes,
       partCount,
       presignedUrls
     };
