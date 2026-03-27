@@ -51,7 +51,7 @@ describe('SecurityScopeService', () => {
       expect(result).to.equal(securityScopeId);
     });
 
-    it('looks up existing scope and creates mapping without publishing when scope_hash already exists', async () => {
+    it('looks up existing scope, creates mapping, and publishes anchor job when scope_hash already exists', async () => {
       const existingScope: SecurityScope = { security_scope_id: securityScopeId, scope_hash: scopeHash };
       const insertStub = sinon.stub(SecurityScopeRepository.prototype, 'insertSecurityScope').resolves(null);
       const getStub = sinon
@@ -67,7 +67,7 @@ describe('SecurityScopeService', () => {
       expect(insertStub).to.have.been.calledWith(scopeHash);
       expect(getStub).to.have.been.calledWith(scopeHash);
       expect(mappingStub).to.have.been.calledWith(policyStatementId, securityScopeId);
-      expect(publishStub).not.to.have.been.called;
+      expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, { securityScopeId });
       expect(result).to.equal(securityScopeId);
     });
 

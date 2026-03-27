@@ -27,10 +27,12 @@ export class SecurityScopeService extends DBService {
   /**
    * Create a security scope and policy_statement_scope mapping for a policy statement.
    *
-   * If the scope is new (not previously seen for this URN), publishes a background
-   * job to compute anchors — the secured subtree roots that the walk-up search
-   * strategy checks against. If the scope already exists, anchors are already
-   * computed and no job is needed.
+   * Always publishes a background job to compute anchors — the secured subtree
+   * roots that the walk-up search strategy checks against. For new scopes this
+   * populates anchors from scratch; for existing scopes this covers the case
+   * where a URN was changed away and reverted back (orphan cleanup deletes
+   * anchors but leaves the scope row). Anchor computation is idempotent
+   * (ON CONFLICT DO NOTHING), so re-queuing an already-populated scope is safe.
    *
    * @param policyStatementId UUID of the policy statement
    * @param urn The submission_feature_urn (e.g., 'urn:10:telemetry:*')
@@ -57,9 +59,21 @@ export class SecurityScopeService extends DBService {
       return inserted.security_scope_id;
     }
 
-    // Existing scope — look up the ID and create the mapping only
+    // Existing scope — look up the ID, create the mapping, and re-queue anchor
+    // computation. The scope may have been orphaned and had its anchors cleaned
+    // up (e.g., URN changed away then reverted back). Anchor computation is
+    // idempotent (ON CONFLICT DO NOTHING), so re-queuing is always safe.
     const existing = await this.securityScopeRepository.getSecurityScopeByScopeHash(scopeHash);
     await this.securityScopeRepository.insertPolicyStatementScope(policyStatementId, existing.security_scope_id);
+
+    await publishComputeScopeAnchorsJob(this.connection, { securityScopeId: existing.security_scope_id });
+
+    defaultLog.info({
+      label: 'createScopeForPolicyStatement',
+      message: 'Existing security scope reused, anchor computation job published',
+      securityScopeId: existing.security_scope_id,
+      scopeHash
+    });
 
     return existing.security_scope_id;
   }

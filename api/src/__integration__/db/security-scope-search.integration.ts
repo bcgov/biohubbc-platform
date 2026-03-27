@@ -168,6 +168,29 @@ describe('Security scope search (integration)', function () {
   }
 
   /**
+   * Set up scope chain mirroring the REAL service behavior: computes anchors for
+   * both new AND existing scopes. The service always publishes an anchor job
+   * because a reused scope may have had its anchors cleaned up during orphan
+   * cleanup (URN changed away then reverted back).
+   *
+   * This is functionally identical to setupScopeChain but exists to make the
+   * test intent explicit — it mirrors createScopeForPolicyStatement's reuse path.
+   */
+  async function setupScopeChainLikeService(policyStatementId: string, urn: string): Promise<string> {
+    const scopeHash = computeScopeHash(urn);
+    const inserted = await scopeRepo.insertSecurityScope(scopeHash);
+
+    const scopeId = inserted
+      ? inserted.security_scope_id
+      : (await scopeRepo.getSecurityScopeByScopeHash(scopeHash)).security_scope_id;
+
+    await scopeRepo.insertPolicyStatementScope(policyStatementId, scopeId);
+    await computeAnchors(scopeId);
+
+    return scopeId;
+  }
+
+  /**
    * Full RBAC setup: policy → statement → scope chain → team → member → team-policy → team scopes.
    * Returns all created IDs for assertions.
    */
@@ -1267,6 +1290,97 @@ describe('Security scope search (integration)', function () {
       expect(anchorIds).to.include(telem2);
       // Dataset feature excluded — wrong feature type for this scope
       expect(anchorIds).to.not.include(dataset);
+    });
+  });
+
+  // ── URN revert → orphaned scope reuse loses anchors ─────────────────
+
+  describe('URN revert → orphaned scope reuse loses anchors', () => {
+    it('should have anchors after changing URN away and back to the original (BUG: anchors lost)', async () => {
+      // Reproduces: policy starts as urn:{sub}:*:*, changed to urn:{sub}:*:{id},
+      // then changed back to urn:{sub}:*:*. The revert finds the existing
+      // security_scope row (scope_hash match) but its anchors were deleted
+      // during the orphan cleanup from the first change.
+      //
+      // setupScopeChain mirrors createScopeForPolicyStatement: it checks
+      // insertSecurityScope (ON CONFLICT DO NOTHING) — if null, reuses the
+      // existing scope WITHOUT recomputing anchors.
+      //
+      // Uses submission-scoped URNs to avoid collisions with seed data policies.
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
+      const child = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Child' }, dataset);
+
+      await secureFeature(dataset);
+      await secureFeature(child);
+
+      // ── Step 1: Policy with urn:{sub}:*:* (broad) ──
+      const broadUrn = `urn:${submissionId}:*:*`;
+      const policyId = await createPolicy('revert-test');
+      const stmt1 = await createPolicyStatement(policyId, broadUrn);
+      const broadScopeId = await setupScopeChain(stmt1, broadUrn);
+
+      const userId = connection.systemUserId();
+      const teamId = await createTeam('Revert Team');
+      await addTeamMember(teamId, userId);
+      await createTeamPolicy(teamId, policyId);
+      await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyId);
+
+      // Anchors exist (dataset is the root anchor)
+      expect(await countAnchors(broadScopeId)).to.be.greaterThan(0);
+
+      // ── Step 2: Change URN to urn:{sub}:*:{childId} (narrow) ──
+      // Soft-delete old statement
+      await connection.sql(SQL`
+        UPDATE policy_statement SET record_end_date = now()
+        WHERE policy_statement_id = ${stmt1};
+      `);
+      // Cleanup: remove old pss mapping, rebuild team scopes
+      await scopeService.cleanupScopesForDeletedStatements([stmt1], [teamId]);
+      // Simulate the orphan cleanup job
+      await scopeService.deleteStaleAnchorsForScope(broadScopeId);
+
+      // Broad scope anchors are now gone (orphaned — no pss references)
+      expect(await countAnchors(broadScopeId)).to.equal(0);
+
+      // Create new narrow statement
+      const narrowUrn = `urn:${submissionId}:*:${child}`;
+      const stmt2 = await createPolicyStatement(policyId, narrowUrn);
+      const narrowScopeId = await setupScopeChain(stmt2, narrowUrn);
+      await scopeRepo.deleteTeamSecurityScopes(teamId);
+      await scopeRepo.insertTeamSecurityScopesFromPolicyChain(teamId);
+
+      expect(await countAnchors(narrowScopeId)).to.be.greaterThan(0);
+
+      // ── Step 3: Revert back to urn:{sub}:*:* (broad again) ──
+      // Soft-delete narrow statement
+      await connection.sql(SQL`
+        UPDATE policy_statement SET record_end_date = now()
+        WHERE policy_statement_id = ${stmt2};
+      `);
+      await scopeService.cleanupScopesForDeletedStatements([stmt2], [teamId]);
+      await scopeService.deleteStaleAnchorsForScope(narrowScopeId);
+
+      // Re-create the original broad statement
+      const stmt3 = await createPolicyStatement(policyId, broadUrn);
+      // setupScopeChainLikeService mirrors the real service: insertSecurityScope
+      // returns null (scope_hash already exists from Step 1), so it reuses the
+      // existing scope WITHOUT recomputing anchors — this is the bug.
+      const reusedScopeId = await setupScopeChainLikeService(stmt3, broadUrn);
+      await scopeRepo.deleteTeamSecurityScopes(teamId);
+      await scopeRepo.insertTeamSecurityScopesFromPolicyChain(teamId);
+
+      // Same scope reused (same hash)
+      expect(reusedScopeId).to.equal(broadScopeId);
+
+      // Team has the scope mapped
+      expect(await countTeamScopes(teamId)).to.be.greaterThan(0);
+
+      // BUG: anchors are 0 because orphan cleanup deleted them in Step 2 and
+      // the reuse path in Step 3 skipped recomputation.
+      // After fix, this should be greaterThan(0).
+      const anchorCount = await countAnchors(reusedScopeId);
+      expect(anchorCount).to.be.greaterThan(0);
     });
   });
 
