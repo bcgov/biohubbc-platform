@@ -4,7 +4,7 @@ import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
 import { type CreateTicketReferenceRequest } from '../../../../../models/ticket-reference';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
-import { CreateTicketReferenceRequestSchema, TicketReferenceSchema } from '../../../../../openapi/schemas/ticket';
+import { CreateTicketReferenceRequestSchema, TicketReferenceSchema } from '../../../../../openapi/schemas/admin-ticket';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
 import { TicketService } from '../../../../../services/ticket-service';
 import { getLogger } from '../../../../../utils/logger';

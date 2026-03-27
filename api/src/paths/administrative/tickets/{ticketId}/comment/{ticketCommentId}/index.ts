@@ -4,7 +4,7 @@ import { SYSTEM_ROLE } from '../../../../../../constants/roles';
 import { getDBConnection } from '../../../../../../database/db';
 import { type UpdateTicketCommentRequest } from '../../../../../../models/ticket';
 import { defaultErrorResponses } from '../../../../../../openapi/schemas/http-responses';
-import { TicketCommentSchema, UpdateTicketCommentRequestSchema } from '../../../../../../openapi/schemas/ticket';
+import { TicketCommentSchema, UpdateTicketCommentRequestSchema } from '../../../../../../openapi/schemas/admin-ticket';
 import { authorizeRequestHandler } from '../../../../../../request-handlers/security/authorization';
 import { TicketCommentService } from '../../../../../../services/ticket-comment-service';
 import { getLogger } from '../../../../../../utils/logger';
