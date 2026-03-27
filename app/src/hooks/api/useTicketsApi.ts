@@ -28,7 +28,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * @return {*} {Promise<IGetTicketsResponse>}
    */
   const getTicketsForAdmin = async (params?: IGetTicketsParams): Promise<IGetTicketsResponse> => {
-    const { data } = await axios.get('/api/tickets', {
+    const { data } = await axios.get('/api/administrative/tickets', {
       params,
       paramsSerializer: (params) => qs.stringify(params)
     });
@@ -43,7 +43,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * @return {*} {Promise<ITicketWithHistory>}
    */
   const getTicket = async (ticketId: string): Promise<ITicketWithHistory> => {
-    const { data } = await axios.get<ITicketWithHistory>(`/api/tickets/${ticketId}`);
+    const { data } = await axios.get<ITicketWithHistory>(`/api/administrative/tickets/${ticketId}`);
 
     return data;
   };
@@ -55,7 +55,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * @return {*} {Promise<ITicket>}
    */
   const createTicket = async (payload: ICreateTicketRequest): Promise<ITicket> => {
-    const { data } = await axios.post('/api/tickets', payload);
+    const { data } = await axios.post('/api/administrative/tickets', payload);
 
     return data;
   };
@@ -68,7 +68,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * @return {*} {Promise<ITicket>}
    */
   const updateTicket = async (ticketId: string, payload: IUpdateTicketRequest): Promise<ITicket> => {
-    const { data } = await axios.put(`/api/tickets/${ticketId}`, payload);
+    const { data } = await axios.put(`/api/administrative/tickets/${ticketId}`, payload);
 
     return data;
   };
@@ -80,7 +80,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * @return {*} {Promise<void>}
    */
   const deleteTicket = async (ticketId: string): Promise<void> => {
-    await axios.delete(`/api/tickets/${ticketId}`);
+    await axios.delete(`/api/administrative/tickets/${ticketId}`);
   };
 
   /**
@@ -91,7 +91,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * @return {*} {Promise<ITicket>}
    */
   const updateTicketStatus = async (ticketId: string, status: TicketStatus): Promise<ITicket> => {
-    const { data } = await axios.put(`/api/tickets/${ticketId}/status`, { status });
+    const { data } = await axios.put(`/api/administrative/tickets/${ticketId}/status`, { status });
 
     return data;
   };
@@ -107,7 +107,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     ticketId: string,
     payload: ICreateTicketCommentRequest
   ): Promise<ITicketCommentLog> => {
-    const { data } = await axios.post(`/api/tickets/${ticketId}/comment`, payload);
+    const { data } = await axios.post(`/api/administrative/tickets/${ticketId}/comment`, payload);
 
     return data;
   };
@@ -123,7 +123,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     ticketId: string,
     payload: ICreateTicketReferenceRequest
   ): Promise<ITicketReference[]> => {
-    const { data } = await axios.post(`/api/tickets/${ticketId}/reference`, payload);
+    const { data } = await axios.post(`/api/administrative/tickets/${ticketId}/reference`, payload);
 
     return data;
   };
@@ -136,7 +136,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * @return {*} {Promise<void>}
    */
   const deleteTicketReference = async (ticketId: string, ticketReferenceId: string): Promise<void> => {
-    await axios.delete(`/api/tickets/${ticketId}/reference/${ticketReferenceId}`);
+    await axios.delete(`/api/administrative/tickets/${ticketId}/reference/${ticketReferenceId}`);
   };
 
   return {

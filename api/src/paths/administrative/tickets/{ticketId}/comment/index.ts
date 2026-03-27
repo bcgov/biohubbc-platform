@@ -1,15 +1,15 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../constants/roles';
-import { getDBConnection } from '../../../../database/db';
-import { type CreateTicketCommentRequest } from '../../../../models/ticket-comment';
-import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { CreateTicketCommentRequestSchema, TicketCommentSchema } from '../../../../openapi/schemas/ticket';
-import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { TicketCommentService } from '../../../../services/ticket-comment-service';
-import { getLogger } from '../../../../utils/logger';
+import { SYSTEM_ROLE } from '../../../../../constants/roles';
+import { getDBConnection } from '../../../../../database/db';
+import { type CreateTicketCommentRequest } from '../../../../../models/ticket-comment';
+import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
+import { CreateTicketCommentRequestSchema, TicketCommentSchema } from '../../../../../openapi/schemas/ticket';
+import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
+import { TicketCommentService } from '../../../../../services/ticket-comment-service';
+import { getLogger } from '../../../../../utils/logger';
 
-const defaultLog = getLogger('paths/tickets/{ticketId}/comment');
+const defaultLog = getLogger('paths/administrative/tickets/{ticketId}/comment');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({

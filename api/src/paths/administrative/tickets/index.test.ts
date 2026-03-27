@@ -1,15 +1,15 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import * as db from '../../database/db';
-import { Ticket } from '../../models/ticket';
-import { TicketService } from '../../services/ticket-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
+import * as db from '../../../database/db';
+import { Ticket } from '../../../models/ticket';
+import { TicketService } from '../../../services/ticket-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import { createTicket, getTickets } from './index';
 
 chai.use(sinonChai);
 
-describe('paths/tickets', () => {
+describe('paths/administrative/tickets', () => {
   const mockTicket: Ticket = {
     ticket_id: '11111111-1111-1111-1111-111111111111',
     ticket_slug: '04900001',

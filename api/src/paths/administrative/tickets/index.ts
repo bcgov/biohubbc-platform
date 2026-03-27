@@ -1,20 +1,20 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../constants/roles';
-import { getDBConnection } from '../../database/db';
-import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
-import { paginationRequestQueryParamSchema } from '../../openapi/schemas/pagination';
-import { CreateTicketRequestSchema, TicketListResponseSchema, TicketSchema } from '../../openapi/schemas/ticket';
-import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
-import { TicketService } from '../../services/ticket-service';
-import { getLogger } from '../../utils/logger';
+import { SYSTEM_ROLE } from '../../../constants/roles';
+import { getDBConnection } from '../../../database/db';
+import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { paginationRequestQueryParamSchema } from '../../../openapi/schemas/pagination';
+import { CreateTicketRequestSchema, TicketListResponseSchema, TicketSchema } from '../../../openapi/schemas/ticket';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
+import { TicketService } from '../../../services/ticket-service';
+import { getLogger } from '../../../utils/logger';
 import {
   ensureCompletePaginationOptions,
   makePaginationOptionsFromRequest,
   makePaginationResponse
-} from '../../utils/pagination';
+} from '../../../utils/pagination';
 
-const defaultLog = getLogger('paths/tickets');
+const defaultLog = getLogger('paths/administrative/tickets');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({
