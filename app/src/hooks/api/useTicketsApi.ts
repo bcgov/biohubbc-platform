@@ -5,6 +5,7 @@ import {
   ICreateTicketRequest,
   IGetTicketsParams,
   IGetTicketsResponse,
+  IGetUserTicketsParams,
   ITicket,
   ITicketCommentLog,
   ITicketReference,
@@ -139,6 +140,21 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     await axios.delete(`/api/administrative/tickets/${ticketId}/reference/${ticketReferenceId}`);
   };
 
+  /**
+   * Get tickets accessible to the current user via team membership.
+   *
+   * @param {IGetUserTicketsParams} [params]
+   * @return {*} {Promise<IGetTicketsResponse>}
+   */
+  const getTicketsForUser = async (params?: IGetUserTicketsParams): Promise<IGetTicketsResponse> => {
+    const { data } = await axios.get('/api/tickets', {
+      params,
+      paramsSerializer: (params) => qs.stringify(params)
+    });
+
+    return data;
+  };
+
   return {
     getTicketsForAdmin,
     getTicket,
@@ -148,6 +164,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     updateTicketStatus,
     createTicketComment,
     createTicketReference,
-    deleteTicketReference
+    deleteTicketReference,
+    getTicketsForUser
   };
 };

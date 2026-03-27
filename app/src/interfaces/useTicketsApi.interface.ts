@@ -103,3 +103,8 @@ export interface IGetTicketsParams extends Partial<ApiPaginationRequestOptions> 
   status?: TicketStatus;
   search?: string;
 }
+
+export interface IGetUserTicketsParams extends Partial<ApiPaginationRequestOptions> {
+  status?: TicketStatus;
+  search?: string;
+}
