@@ -1,11 +1,13 @@
 import { CartContextProvider } from 'contexts/cartContext';
 import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
+import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import BaseLayout from 'layouts/BaseLayout';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
 import { AdminRouter } from './admin/AdminRouter';
 import { DataRequestRouter } from './data-request/DataRequestRouter';
+import { PortalRouter } from './portal/PortalRouter';
 import { SearchRouter } from './search/SearchRouter';
 import { SubmissionRouter } from './submission/SubmissionRouter';
 
@@ -53,6 +55,19 @@ export const AppRouter = () => {
             <PageTitle title="Admin Panel" description="Administrative interface" />
             <AdminRouter />
           </>
+        }
+      />
+
+      {/* Portal Routes */}
+      <Route
+        path="/portal/*"
+        element={
+          <BaseLayout>
+            <PageTitle title="My Portal" description="View your tickets and submissions" />
+            <AuthenticatedRouteGuard>
+              <PortalRouter />
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
         }
       />
 
