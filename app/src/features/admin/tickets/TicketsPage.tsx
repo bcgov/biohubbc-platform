@@ -37,7 +37,7 @@ export const TicketsPage = () => {
     refresh,
     setData
   } = useServerPaginatedDataGrid({
-    fetcher: (search, pagination) => api.tickets.getTickets({ search, ...pagination }),
+    fetcher: (search, pagination) => api.tickets.getTicketsForAdmin({ search, ...pagination }),
     extractData: (response) => response.tickets,
     extractTotal: (response) => response.pagination.total,
     defaultSort: { field: 'create_date', sort: 'desc' },

@@ -22,7 +22,7 @@ describe('useTicketsApi', () => {
 
     mock.onGet('/api/tickets').reply(200, response);
 
-    const result = await useTicketsApi(axios).getTickets({ status: 'open', page: 1, limit: 10 });
+    const result = await useTicketsApi(axios).getTicketsForAdmin({ status: 'open', page: 1, limit: 10 });
 
     expect(result).toEqual(response);
   });

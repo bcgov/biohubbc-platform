@@ -27,7 +27,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * @param {IGetTicketsParams} [params]
    * @return {*} {Promise<IGetTicketsResponse>}
    */
-  const getTickets = async (params?: IGetTicketsParams): Promise<IGetTicketsResponse> => {
+  const getTicketsForAdmin = async (params?: IGetTicketsParams): Promise<IGetTicketsResponse> => {
     const { data } = await axios.get('/api/tickets', {
       params,
       paramsSerializer: (params) => qs.stringify(params)
@@ -140,7 +140,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   };
 
   return {
-    getTickets,
+    getTicketsForAdmin,
     getTicket,
     createTicket,
     updateTicket,
