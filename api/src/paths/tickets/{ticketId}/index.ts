@@ -1,8 +1,8 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../database/db';
-import { TicketWithHistorySchema } from '../../../openapi/schemas/ticket';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { TicketWithHistorySchema } from '../../../openapi/schemas/ticket';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { TicketService } from '../../../services/ticket-service';
 import { getLogger } from '../../../utils/logger';
