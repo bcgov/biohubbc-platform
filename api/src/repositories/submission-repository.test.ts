@@ -162,7 +162,8 @@ describe('SubmissionRepository', () => {
 
     it('should succeed with valid data', async () => {
       const mockResponse: ISubmissionModel = {
-        uuid: '123-456-789'
+        uuid: '123-456-789',
+        system_user_id: 1
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 

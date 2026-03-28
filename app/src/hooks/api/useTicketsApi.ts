@@ -155,17 +155,17 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     return data;
   };
 
-    /**
+  /**
    * Get a single ticket by ID.
    *
    * @param {string} ticketId
    * @return {*} {Promise<ITicketWithHistory>}
    */
-    const getTicketForUser = async (ticketId: string): Promise<ITicketWithHistory> => {
-      const { data } = await axios.get<ITicketWithHistory>(`/api/tickets/${ticketId}`);
-  
-      return data;
-    };
+  const getTicketForUser = async (ticketId: string): Promise<ITicketWithHistory> => {
+    const { data } = await axios.get<ITicketWithHistory>(`/api/tickets/${ticketId}`);
+
+    return data;
+  };
 
   return {
     getTicketsForAdmin,
