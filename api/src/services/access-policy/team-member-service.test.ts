@@ -130,7 +130,7 @@ describe('TeamMemberService', () => {
   });
 
   describe('getTeamIdsBySystemUserId', () => {
-    it('returns team IDs derived from the user\'s active team memberships', async () => {
+    it("returns team IDs derived from the user's active team memberships", async () => {
       const mockMembers: TeamMember[] = [
         { team_member_id: '11111111-1111-1111-1111-111111111111', system_user_id: 5, team_id: 'team-a' },
         { team_member_id: '22222222-2222-2222-2222-222222222222', system_user_id: 5, team_id: 'team-b' }

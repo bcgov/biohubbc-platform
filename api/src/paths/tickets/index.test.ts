@@ -39,9 +39,7 @@ describe('paths/tickets', () => {
       });
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-      const getTeamIdsStub = sinon
-        .stub(TeamMemberService.prototype, 'getTeamIdsBySystemUserId')
-        .resolves(teamIds);
+      const getTeamIdsStub = sinon.stub(TeamMemberService.prototype, 'getTeamIdsBySystemUserId').resolves(teamIds);
       const listStub = sinon.stub(TicketService.prototype, 'getTickets').resolves([mockTicket]);
       const countStub = sinon.stub(TicketService.prototype, 'getTicketsCount').resolves(1);
 

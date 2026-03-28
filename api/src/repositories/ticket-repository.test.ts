@@ -47,8 +47,8 @@ describe('TicketRepository', () => {
 
       repo.applyFilters(query, { team_ids: [] });
 
-      expect((query.whereRaw as sinon.SinonStub)).to.have.been.calledWith('false');
-      expect((query.whereIn as sinon.SinonStub)).to.not.have.been.called;
+      expect(query.whereRaw as sinon.SinonStub).to.have.been.calledWith('false');
+      expect(query.whereIn as sinon.SinonStub).to.not.have.been.called;
     });
 
     it('calls whereIn when team_ids has entries', () => {
@@ -58,8 +58,8 @@ describe('TicketRepository', () => {
 
       repo.applyFilters(query, { team_ids: teamIds });
 
-      expect((query.whereIn as sinon.SinonStub)).to.have.been.calledWith('team_id', teamIds);
-      expect((query.whereRaw as sinon.SinonStub)).to.not.have.been.called;
+      expect(query.whereIn as sinon.SinonStub).to.have.been.calledWith('team_id', teamIds);
+      expect(query.whereRaw as sinon.SinonStub).to.not.have.been.called;
     });
 
     it('applies no team filter when team_ids is undefined', () => {
@@ -68,8 +68,8 @@ describe('TicketRepository', () => {
 
       repo.applyFilters(query, { team_ids: undefined });
 
-      expect((query.whereRaw as sinon.SinonStub)).to.not.have.been.called;
-      expect((query.whereIn as sinon.SinonStub)).to.not.have.been.called;
+      expect(query.whereRaw as sinon.SinonStub).to.not.have.been.called;
+      expect(query.whereIn as sinon.SinonStub).to.not.have.been.called;
     });
   });
 
