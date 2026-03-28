@@ -43,7 +43,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * @param {string} ticketId
    * @return {*} {Promise<ITicketWithHistory>}
    */
-  const getTicket = async (ticketId: string): Promise<ITicketWithHistory> => {
+  const getTicketForAdmin = async (ticketId: string): Promise<ITicketWithHistory> => {
     const { data } = await axios.get<ITicketWithHistory>(`/api/administrative/tickets/${ticketId}`);
 
     return data;
@@ -155,9 +155,21 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     return data;
   };
 
+    /**
+   * Get a single ticket by ID.
+   *
+   * @param {string} ticketId
+   * @return {*} {Promise<ITicketWithHistory>}
+   */
+    const getTicketForUser = async (ticketId: string): Promise<ITicketWithHistory> => {
+      const { data } = await axios.get<ITicketWithHistory>(`/api/tickets/${ticketId}`);
+  
+      return data;
+    };
+
   return {
     getTicketsForAdmin,
-    getTicket,
+    getTicketForAdmin,
     createTicket,
     updateTicket,
     deleteTicket,
@@ -165,6 +177,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     createTicketComment,
     createTicketReference,
     deleteTicketReference,
-    getTicketsForUser
+    getTicketsForUser,
+    getTicketForUser
   };
 };

@@ -56,7 +56,7 @@ describe('useTicketsApi', () => {
 
     mock.onGet(`/api/administrative/tickets/${apiTicket.ticket_id}`).reply(200, apiTicket);
 
-    const result = await useTicketsApi(axios).getTicket(apiTicket.ticket_id);
+    const result = await useTicketsApi(axios).getTicketForAdmin(apiTicket.ticket_id);
 
     expect(result).toEqual(apiTicket);
   });
