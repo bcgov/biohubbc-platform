@@ -209,4 +209,40 @@ describe('useTicketsApi', () => {
 
     await expect(useTicketsApi(axios).deleteTicketReference(ticketId, ticketReferenceId)).resolves.toBeUndefined();
   });
+
+  it('getTicketsForUser fetches from /api/tickets with optional params', async () => {
+    const response = {
+      tickets: [],
+      pagination: { total: 0, current_page: 1, last_page: 1, per_page: 10 }
+    };
+
+    mock.onGet('/api/tickets').reply(200, response);
+
+    const result = await useTicketsApi(axios).getTicketsForUser({ status: 'open', page: 1, limit: 10 });
+
+    expect(result).toEqual(response);
+  });
+
+  it('getTicketForUser fetches ticket from /api/tickets/:ticketId', async () => {
+    const ticketId = '11111111-1111-1111-1111-111111111111';
+    const apiTicket = {
+      ticket_id: ticketId,
+      ticket_slug: '04900001',
+      subject: 'Test ticket',
+      description: null,
+      team_id: '22222222-2222-2222-2222-222222222222',
+      create_date: '2026-02-25T00:00:00.000Z',
+      priority: 'medium',
+      status: 'open',
+      statuses: [],
+      comments: [],
+      references: []
+    };
+
+    mock.onGet(`/api/tickets/${ticketId}`).reply(200, apiTicket);
+
+    const result = await useTicketsApi(axios).getTicketForUser(ticketId);
+
+    expect(result).toEqual(apiTicket);
+  });
 });
