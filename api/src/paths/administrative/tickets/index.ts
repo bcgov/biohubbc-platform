@@ -6,7 +6,7 @@ import {
   CreateTicketRequestSchema,
   TicketListResponseSchema,
   TicketSchema
-} from '../../../openapi/schemas/admin-ticket';
+} from '../../../openapi/schemas/ticket';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../../openapi/schemas/pagination';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';

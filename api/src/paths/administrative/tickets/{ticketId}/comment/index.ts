@@ -3,7 +3,7 @@ import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
 import { type CreateTicketCommentRequest } from '../../../../../models/ticket-comment';
-import { CreateTicketCommentRequestSchema, TicketCommentSchema } from '../../../../../openapi/schemas/admin-ticket';
+import { CreateTicketCommentRequestSchema, TicketCommentSchema } from '../../../../../openapi/schemas/ticket';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
 import { TicketCommentService } from '../../../../../services/ticket-comment-service';

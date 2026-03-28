@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../database/db';
-import { TicketListResponseSchema } from '../../openapi/schemas/admin-ticket';
+import { TicketListResponseSchema } from '../../openapi/schemas/ticket';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../openapi/schemas/pagination';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';

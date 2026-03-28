@@ -6,7 +6,7 @@ import {
   TicketSchema,
   TicketWithHistorySchema,
   UpdateTicketRequestSchema
-} from '../../../../openapi/schemas/admin-ticket';
+} from '../../../../openapi/schemas/ticket';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { TicketService } from '../../../../services/ticket-service';
