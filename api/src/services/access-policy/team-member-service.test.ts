@@ -129,6 +129,29 @@ describe('TeamMemberService', () => {
     });
   });
 
+  describe('getTeamIdsBySystemUserId', () => {
+    it('returns team IDs derived from the user\'s active team memberships', async () => {
+      const mockMembers: TeamMember[] = [
+        { team_member_id: '11111111-1111-1111-1111-111111111111', system_user_id: 5, team_id: 'team-a' },
+        { team_member_id: '22222222-2222-2222-2222-222222222222', system_user_id: 5, team_id: 'team-b' }
+      ];
+      const stub = sinon.stub(TeamMemberRepository.prototype, 'getTeamMembersBySystemUserId').resolves(mockMembers);
+
+      const result = await service.getTeamIdsBySystemUserId(5);
+
+      expect(stub).to.have.been.calledWith(5);
+      expect(result).to.eql(['team-a', 'team-b']);
+    });
+
+    it('returns empty array when user has no active team memberships', async () => {
+      sinon.stub(TeamMemberRepository.prototype, 'getTeamMembersBySystemUserId').resolves([]);
+
+      const result = await service.getTeamIdsBySystemUserId(99);
+
+      expect(result).to.eql([]);
+    });
+  });
+
   describe('updateTeamMember', () => {
     it('should call repository.updateTeamMember and return the updated record', async () => {
       const mockTeamMember: TeamMember = {
