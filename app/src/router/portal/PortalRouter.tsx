@@ -1,5 +1,5 @@
-import { TicketContextProvider } from 'contexts/ticketContext';
-import { TicketDetailPage } from 'features/admin/tickets/TicketDetailPage';
+import { UserTicketContextProvider } from 'contexts/ticketContext';
+import { PortalTicketDetailPage } from 'features/portal/PortalTicketDetailPage';
 import { PortalTicketsPage } from 'features/portal/PortalTicketsPage';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
@@ -28,10 +28,10 @@ export const PortalRouter = () => {
       <Route
         path="/tickets/:ticketId"
         element={
-          <TicketContextProvider>
+          <UserTicketContextProvider>
             <PageTitle title="Ticket Details" description="View ticket details" />
-            <TicketDetailPage />
-          </TicketContextProvider>
+            <PortalTicketDetailPage />
+          </UserTicketContextProvider>
         }
       />
 

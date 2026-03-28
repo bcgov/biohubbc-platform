@@ -12,33 +12,56 @@ export interface ITicketContext {
 export const TicketContext = React.createContext<ITicketContext | undefined>(undefined);
 
 /**
- * Provides ticket route context for ticket detail pages.
- *
- * @param {PropsWithChildren} props
- * @return {*}
+ * Shared hook that derives the ITicketContext value for a given fetch function.
+ * Not exported — consumed only by the named provider variants below.
  */
-export const TicketContextProvider = ({ children }: PropsWithChildren) => {
-  const api = useApi();
+const useTicketContextValue = (fetchTicket: (ticketId: string) => Promise<ITicketWithHistory>): ITicketContext => {
   const { ticketId } = useParams<{ ticketId: string }>();
 
   if (!ticketId) {
     throw new Error('Missing ticketId route parameter');
   }
 
-  const ticketDataLoader = useDataLoader((currentTicketId: string) => api.tickets.getTicket(currentTicketId));
+  const ticketDataLoader = useDataLoader(fetchTicket);
 
   useEffect(() => {
     ticketDataLoader.refresh(ticketId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId]);
 
-  const value: ITicketContext = useMemo(
+  return useMemo(
     () => ({
       ticketId,
       ticketDataLoader
     }),
     [ticketId, ticketDataLoader]
   );
+};
+
+/**
+ * Provides ticket route context for admin ticket detail pages.
+ * Fetches ticket data using the administrative API endpoint.
+ *
+ * @param {PropsWithChildren} props
+ * @return {*}
+ */
+export const AdminTicketContextProvider = ({ children }: PropsWithChildren) => {
+  const api = useApi();
+  const value = useTicketContextValue(api.tickets.getTicketForAdmin);
+
+  return <TicketContext.Provider value={value}>{children}</TicketContext.Provider>;
+};
+
+/**
+ * Provides ticket route context for portal (user-facing) ticket detail pages.
+ * Fetches ticket data using the user API endpoint.
+ *
+ * @param {PropsWithChildren} props
+ * @return {*}
+ */
+export const UserTicketContextProvider = ({ children }: PropsWithChildren) => {
+  const api = useApi();
+  const value = useTicketContextValue(api.tickets.getTicketForUser);
 
   return <TicketContext.Provider value={value}>{children}</TicketContext.Provider>;
 };
