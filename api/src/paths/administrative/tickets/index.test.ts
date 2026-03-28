@@ -59,7 +59,7 @@ describe('paths/administrative/tickets', () => {
     await getTickets()(mockReq, mockRes, mockNext);
 
     expect(listStub).to.have.been.calledWith(
-      { team_id: mockTicket.team_id, status: 'open', search: 'ticket' },
+      { team_ids: [mockTicket.team_id], status: 'open', search: 'ticket' },
       {
         page: 2,
         limit: 10,
@@ -67,7 +67,7 @@ describe('paths/administrative/tickets', () => {
         order: undefined
       }
     );
-    expect(countStub).to.have.been.calledWith({ team_id: mockTicket.team_id, status: 'open', search: 'ticket' });
+    expect(countStub).to.have.been.calledWith({ team_ids: [mockTicket.team_id], status: 'open', search: 'ticket' });
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql({
       tickets: [mockTicket],
@@ -94,7 +94,7 @@ describe('paths/administrative/tickets', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { page: '1', limit: '10' };
-    const noFilters = { team_id: undefined, status: undefined, search: undefined };
+    const noFilters = { team_ids: undefined, status: undefined, search: undefined };
 
     await getTickets()(mockReq, mockRes, mockNext);
 

@@ -126,7 +126,7 @@ describe('TicketRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
       const repo = new TicketRepository(mockDBConnection);
 
-      const result = await repo.getTickets({ team_id: mockTicket.team_id, status: 'open' }, { page: 1, limit: 10 });
+      const result = await repo.getTickets({ team_ids: [mockTicket.team_id], status: 'open' }, { page: 1, limit: 10 });
       expect(result).to.eql([mockTicket]);
     });
   });
@@ -137,7 +137,7 @@ describe('TicketRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
       const repo = new TicketRepository(mockDBConnection);
 
-      const result = await repo.getTicketsCount({ team_id: mockTicket.team_id, status: 'open' });
+      const result = await repo.getTicketsCount({ team_ids: [mockTicket.team_id], status: 'open' });
       expect(result).to.equal(7);
     });
   });

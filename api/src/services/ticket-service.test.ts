@@ -106,7 +106,7 @@ describe('TicketService', () => {
       const listStub = sinon.stub(TicketRepository.prototype, 'getTickets').resolves([mockTicket]);
       const countStub = sinon.stub(TicketRepository.prototype, 'getTicketsCount').resolves(1);
 
-      const filters: TicketFilters = { team_id: mockTicket.team_id, status: 'open' };
+      const filters: TicketFilters = { team_ids: [mockTicket.team_id], status: 'open' };
       const list = await service.getTickets(filters, { page: 1, limit: 10 });
       const count = await service.getTicketsCount(filters);
 

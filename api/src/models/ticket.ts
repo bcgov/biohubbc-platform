@@ -10,7 +10,7 @@ export const TicketStatus = z.enum(['open', 'closed']);
 export type TicketStatus = z.infer<typeof TicketStatus>;
 
 export interface TicketFilters {
-  team_id?: string;
+  team_ids?: string[];
   status?: TicketStatus;
   search?: string;
 }

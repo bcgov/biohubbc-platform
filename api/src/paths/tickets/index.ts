@@ -83,7 +83,7 @@ export function getTicketsForUser(): RequestHandler {
       const teamMemberService = new TeamMemberService(connection);
       const teamIds = await teamMemberService.getTeamIdsBySystemUserId(systemUserId);
 
-      const filters = { status, search, team_ids: teamIds };
+      const filters = { team_ids: teamIds, status, search };
 
       const ticketService = new TicketService(connection);
       const [tickets, count] = await Promise.all([
