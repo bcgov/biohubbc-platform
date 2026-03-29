@@ -33,7 +33,7 @@ export interface PortalSubmissionCardProps {
 }
 
 export const PortalSubmissionCard = ({ submission }: PortalSubmissionCardProps) => {
-  const sortedRegions = [...submission.regions].sort();
+  const sortedRegions = submission.regions.toSorted((a, b) => a.localeCompare(b));
 
   return (
     <Card elevation={0}>
