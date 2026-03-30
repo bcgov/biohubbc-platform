@@ -13,7 +13,7 @@ import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import { ITeam } from 'interfaces/useTeamsApi.interface';
+import { IAvailableUser, ITeam } from 'interfaces/useTeamsApi.interface';
 import { IServerPaginationProps } from 'types/pagination';
 import { useState } from 'react';
 import { AddTeamForm, AddTeamFormInitialValues, AddTeamFormYupSchema, IAddTeamFormValues } from './AddTeamForm';
@@ -64,6 +64,7 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
   const [openAddTeamDialog, setOpenAddTeamDialog] = useState(false);
   const [openEditTeamDialog, setOpenEditTeamDialog] = useState(false);
   const [editingTeam, setEditingTeam] = useState<ITeam | null>(null);
+  const [editingTeamMembers, setEditingTeamMembers] = useState<IAvailableUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   /**
@@ -149,8 +150,18 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
    *
    * @param {ITeam} team - The team to edit
    */
-  const handleEditTeamClick = (team: ITeam) => {
+  const handleEditTeamClick = async (team: ITeam) => {
     setEditingTeam(team);
+
+    try {
+      const { members } = await biohubApi.teams.getTeamMembers(team.team_id);
+      setEditingTeamMembers(
+        members.map((m) => ({ system_user_id: m.system_user_id, user_identifier: m.user_identifier }))
+      );
+    } catch {
+      setEditingTeamMembers([]);
+    }
+
     setOpenEditTeamDialog(true);
   };
 
@@ -219,6 +230,7 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
 
       setOpenEditTeamDialog(false);
       setEditingTeam(null);
+      setEditingTeamMembers([]);
       refresh();
 
       showSnackBar({
@@ -257,7 +269,7 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
     return {
       name: editingTeam.name,
       description: editingTeam.description || '',
-      system_user_ids: []
+      system_user_ids: editingTeamMembers.map((m) => m.system_user_id)
     };
   };
 
@@ -377,13 +389,14 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
         open={openEditTeamDialog}
         dialogSaveButtonLabel="Save"
         component={{
-          element: <AddTeamForm />,
+          element: <AddTeamForm initialUsers={editingTeamMembers} />,
           initialValues: getEditTeamInitialValues(),
           validationSchema: AddTeamFormYupSchema
         }}
         onCancel={() => {
           setOpenEditTeamDialog(false);
           setEditingTeam(null);
+          setEditingTeamMembers([]);
         }}
         onSave={handleEditTeamSave}
       />
