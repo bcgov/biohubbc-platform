@@ -168,29 +168,6 @@ describe('Security scope search (integration)', function () {
   }
 
   /**
-   * Set up scope chain mirroring the REAL service behavior: computes anchors for
-   * both new AND existing scopes. The service always publishes an anchor job
-   * because a reused scope may have had its anchors cleaned up during orphan
-   * cleanup (URN changed away then reverted back).
-   *
-   * This is functionally identical to setupScopeChain but exists to make the
-   * test intent explicit — it mirrors createScopeForPolicyStatement's reuse path.
-   */
-  async function setupScopeChainLikeService(policyStatementId: string, urn: string): Promise<string> {
-    const scopeHash = computeScopeHash(urn);
-    const inserted = await scopeRepo.insertSecurityScope(scopeHash);
-
-    const scopeId = inserted
-      ? inserted.security_scope_id
-      : (await scopeRepo.getSecurityScopeByScopeHash(scopeHash)).security_scope_id;
-
-    await scopeRepo.insertPolicyStatementScope(policyStatementId, scopeId);
-    await computeAnchors(scopeId);
-
-    return scopeId;
-  }
-
-  /**
    * Full RBAC setup: policy → statement → scope chain → team → member → team-policy → team scopes.
    * Returns all created IDs for assertions.
    */
@@ -1522,10 +1499,10 @@ describe('Security scope search (integration)', function () {
 
       // Re-create the original broad statement
       const stmt3 = await createPolicyStatement(policyId, broadUrn);
-      // setupScopeChainLikeService mirrors the real service: insertSecurityScope
-      // returns null (scope_hash already exists from Step 1), so it reuses the
-      // existing scope WITHOUT recomputing anchors — this is the bug.
-      const reusedScopeId = await setupScopeChainLikeService(stmt3, broadUrn);
+      // setupScopeChain mirrors the real service: insertSecurityScope returns null
+      // (scope_hash already exists from Step 1), so it reuses the existing scope
+      // and recomputes anchors — verifying the fix for the reuse path.
+      const reusedScopeId = await setupScopeChain(stmt3, broadUrn);
       await scopeRepo.deleteTeamSecurityScopes(teamId);
       await scopeRepo.insertTeamSecurityScopesFromPolicyChain(teamId);
 
