@@ -1183,7 +1183,13 @@ describe('Security scope search (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Root' });
       const sampleSite = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Mid' }, dataset);
-      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Deep Leaf' }, sampleSite);
+      const telemetry = await createTestFeature(
+        connection,
+        submissionId,
+        'telemetry',
+        { name: 'Deep Leaf' },
+        sampleSite
+      );
 
       await secureFeature(dataset);
 
@@ -1203,7 +1209,13 @@ describe('Security scope search (integration)', function () {
       // the scope should see the telemetry feature in search; anonymous should not.
       const submissionId = await createTestSubmission(connection);
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
-      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Secured Child' }, dataset);
+      const telemetry = await createTestFeature(
+        connection,
+        submissionId,
+        'telemetry',
+        { name: 'Secured Child' },
+        dataset
+      );
 
       await secureFeature(dataset);
 

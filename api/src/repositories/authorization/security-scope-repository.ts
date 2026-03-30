@@ -6,6 +6,25 @@ import { AnchorBatchResult, SecurityScopeUrn } from '../../services/access-polic
 import { BaseRepository } from '../base-repository';
 
 /**
+ * Recursive CTE fragment: computes all features that are "effectively secured" —
+ * directly secured via submission_feature_security or inheriting security from an
+ * ancestor. Security rules on a parent cascade to all descendants.
+ *
+ * Used as a WITH RECURSIVE preamble in anchor computation and stale-anchor cleanup.
+ * UNION (not UNION ALL) deduplicates and prevents re-walking already-visited subtrees.
+ */
+const EFFECTIVELY_SECURED_CTE = `effectively_secured(submission_feature_id) AS (
+         SELECT sfs.submission_feature_id
+         FROM submission_feature_security sfs
+         WHERE sfs.record_end_date IS NULL
+         UNION
+         SELECT child.submission_feature_id
+         FROM submission_feature child
+         JOIN effectively_secured es ON child.parent_submission_feature_id = es.submission_feature_id
+         WHERE child.record_end_date IS NULL
+       )`;
+
+/**
  * Repository for security scope tables — the normalized access model that replaces
  * the materialized team_feature cache.
  *
@@ -139,18 +158,7 @@ export class SecurityScopeRepository extends BaseRepository {
        -- For orphaned scopes (no policy_statement_scope rows), every anchor
        -- fails the NOT EXISTS check and gets deleted.
        WITH RECURSIVE
-       -- Security cascades: a feature is effectively secured if it or any ancestor
-       -- has an active security rule. Walk down from directly-secured features.
-       effectively_secured(submission_feature_id) AS (
-         SELECT sfs.submission_feature_id
-         FROM submission_feature_security sfs
-         WHERE sfs.record_end_date IS NULL
-         UNION
-         SELECT child.submission_feature_id
-         FROM submission_feature child
-         JOIN effectively_secured es ON child.parent_submission_feature_id = es.submission_feature_id
-         WHERE child.record_end_date IS NULL
-       )
+       ${EFFECTIVELY_SECURED_CTE}
        DELETE FROM security_scope_anchor ssa
        WHERE ssa.security_scope_id = $1
          AND NOT EXISTS (
@@ -263,18 +271,7 @@ export class SecurityScopeRepository extends BaseRepository {
       page_last_id: number;
     }>(
       `WITH RECURSIVE
-       -- Security cascades: a feature is effectively secured if it or any ancestor
-       -- has an active security rule. Walk down from directly-secured features.
-       effectively_secured(submission_feature_id) AS (
-         SELECT sfs.submission_feature_id
-         FROM submission_feature_security sfs
-         WHERE sfs.record_end_date IS NULL
-         UNION
-         SELECT child.submission_feature_id
-         FROM submission_feature child
-         JOIN effectively_secured es ON child.parent_submission_feature_id = es.submission_feature_id
-         WHERE child.record_end_date IS NULL
-       ),
+       ${EFFECTIVELY_SECURED_CTE},
 
        batch AS (
          SELECT sf.submission_feature_id,
@@ -362,16 +359,7 @@ export class SecurityScopeRepository extends BaseRepository {
     // they MUST stay in sync or the keyset will skip/repeat candidates.
     const boundaryResult = await this.connection.query<{ last_id: number }>(
       `WITH RECURSIVE
-       effectively_secured(submission_feature_id) AS (
-         SELECT sfs.submission_feature_id
-         FROM submission_feature_security sfs
-         WHERE sfs.record_end_date IS NULL
-         UNION
-         SELECT child.submission_feature_id
-         FROM submission_feature child
-         JOIN effectively_secured es ON child.parent_submission_feature_id = es.submission_feature_id
-         WHERE child.record_end_date IS NULL
-       )
+       ${EFFECTIVELY_SECURED_CTE}
        SELECT MAX(sf.submission_feature_id) AS last_id
        FROM (
          SELECT sf.submission_feature_id
