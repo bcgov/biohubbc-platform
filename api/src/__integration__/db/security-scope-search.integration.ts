@@ -1072,6 +1072,153 @@ describe('Security scope search (integration)', function () {
       expect(feature?.is_secured).to.be.false;
     });
 
+    it('should anchor child feature via inherited security from parent (type-scoped URN)', async () => {
+      // Hierarchy: dataset → telemetry
+      // Secured:   YES        NO (inherits from parent)
+      // URN:       urn:{subId}:telemetry:*
+      //
+      // The telemetry feature has no direct security rule, but its parent dataset
+      // does. The effectively_secured CTE walks security down the hierarchy, so the
+      // telemetry feature is a valid anchor candidate for a telemetry-scoped URN.
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
+      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Inherited' }, dataset);
+
+      // Only the parent dataset is secured — telemetry inherits
+      await secureFeature(dataset);
+
+      const urn = `urn:${submissionId}:telemetry:*`;
+      const policyId = await createPolicy('inherited-security-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      // Telemetry feature should be anchored despite having no direct security rule
+      const anchorIds = await getAnchorIds(scopeId);
+      expect(anchorIds).to.include(telemetry);
+      expect(anchorIds).to.have.lengthOf(1);
+    });
+
+    it('should anchor specific child feature via inherited security (feature-scoped URN)', async () => {
+      // Hierarchy: dataset → telemetry1, telemetry2
+      // Secured:   YES        NO            NO
+      // URN:       urn:{subId}:telemetry:{telemetry1}
+      //
+      // Only telemetry1 matches the URN. Both inherit security from the dataset,
+      // but only the URN-matched feature should be anchored.
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
+      const telemetry1 = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Target' }, dataset);
+      const telemetry2 = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Other' }, dataset);
+
+      await secureFeature(dataset);
+
+      const urn = `urn:${submissionId}:telemetry:${telemetry1}`;
+      const policyId = await createPolicy('feature-scoped-inherited-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      const anchorIds = await getAnchorIds(scopeId);
+      expect(anchorIds).to.include(telemetry1);
+      expect(anchorIds).to.not.include(telemetry2);
+      expect(anchorIds).to.have.lengthOf(1);
+    });
+
+    it('should not anchor child when parent is unsecured (no inherited security)', async () => {
+      // Hierarchy: dataset → telemetry
+      // Secured:   NO         NO
+      // URN:       urn:{subId}:telemetry:*
+      //
+      // Neither feature is secured — no anchors should be created.
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Public Dataset' });
+      await createTestFeature(connection, submissionId, 'telemetry', { name: 'Public Telemetry' }, dataset);
+
+      const urn = `urn:${submissionId}:telemetry:*`;
+      const policyId = await createPolicy('no-security-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      expect(await countAnchors(scopeId)).to.equal(0);
+    });
+
+    it('should remove inherited anchor when parent is unsecured (stale cleanup)', async () => {
+      // Hierarchy: dataset → telemetry
+      // Secured:   YES        NO (inherits)
+      // URN:       urn:{subId}:telemetry:*
+      //
+      // Create anchor via inherited security, then unsecure the parent.
+      // deleteStaleAnchorsForScope should remove the telemetry anchor because
+      // it is no longer effectively secured.
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
+      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Inherited' }, dataset);
+
+      await secureFeature(dataset);
+
+      const urn = `urn:${submissionId}:telemetry:*`;
+      const policyId = await createPolicy('stale-inherited-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      // Anchor exists on the telemetry feature via inherited security
+      expect(await getAnchorIds(scopeId)).to.include(telemetry);
+
+      // Unsecure the parent — telemetry loses inherited security
+      await unsecureFeature(dataset);
+      await scopeRepo.deleteStaleAnchorsForScope(scopeId);
+      await computeAnchors(scopeId);
+
+      // Anchor should be gone
+      expect(await countAnchors(scopeId)).to.equal(0);
+    });
+
+    it('should anchor deep descendant via multi-level inherited security', async () => {
+      // Hierarchy: dataset → sample_site → telemetry
+      // Secured:   YES        NO             NO
+      // URN:       urn:{subId}:telemetry:*
+      //
+      // Telemetry is 2 levels below the secured dataset. The effectively_secured
+      // CTE must walk through sample_site (unsecured but child of secured) to reach
+      // telemetry and include it as a candidate.
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Root' });
+      const sampleSite = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Mid' }, dataset);
+      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Deep Leaf' }, sampleSite);
+
+      await secureFeature(dataset);
+
+      const urn = `urn:${submissionId}:telemetry:*`;
+      const policyId = await createPolicy('deep-inherited-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      const anchorIds = await getAnchorIds(scopeId);
+      expect(anchorIds).to.include(telemetry);
+      expect(anchorIds).to.have.lengthOf(1);
+    });
+
+    it('should grant search access to child feature via inherited anchor (end-to-end)', async () => {
+      // Full end-to-end: secured dataset → telemetry (inherits security).
+      // Type-scoped URN anchors the telemetry feature. Authenticated user with
+      // the scope should see the telemetry feature in search; anonymous should not.
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
+      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Secured Child' }, dataset);
+
+      await secureFeature(dataset);
+
+      const userId = connection.systemUserId();
+      await setupFullAccess(`urn:${submissionId}:telemetry:*`, userId, 'Inherited Access Team');
+
+      // Anonymous: telemetry should be hidden (parent is secured)
+      const anonResults = await searchInSubmission(submissionId, ['telemetry'], null);
+      expect(anonResults.map((r) => r.submission_feature_id)).to.not.include(telemetry);
+
+      // Authenticated with scope: telemetry should be visible
+      const authResults = await searchInSubmission(submissionId, ['telemetry'], userId);
+      expect(authResults.map((r) => r.submission_feature_id)).to.include(telemetry);
+    });
+
     it('should delete anchors only for unsecured features, preserving anchors for still-secured features', async () => {
       // 3 secured features → 3 anchors. Unsecure 2, delete their anchors.
       // The remaining feature's anchor should be untouched.

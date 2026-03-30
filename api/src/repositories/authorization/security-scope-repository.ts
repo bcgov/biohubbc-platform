@@ -117,10 +117,11 @@ export class SecurityScopeRepository extends BaseRepository {
    * Delete stale anchors for a security scope — anchors whose features no longer
    * meet candidate criteria.
    *
-   * An anchor becomes stale when its feature is unsecured (lost all security rules),
-   * unapproved (upload status changed), soft-deleted, or its URN no longer matches
-   * the scope's policy statement. This is the inverse of the candidate criteria used
-   * by `computeAnchorBatch` — any feature that wouldn't be selected as a new
+   * An anchor becomes stale when its feature is no longer effectively secured
+   * (neither it nor any ancestor has active security rules), unapproved (upload
+   * status changed), soft-deleted, or its URN no longer matches the scope's
+   * policy statement. This is the inverse of the candidate criteria used by
+   * `computeAnchorBatch` — any feature that wouldn't be selected as a new
    * candidate should not remain as an existing anchor.
    *
    * Called before the keyset insert loop so valid anchors are never deleted —
@@ -137,6 +138,19 @@ export class SecurityScopeRepository extends BaseRepository {
       `-- Delete anchors that no active policy statement validates.
        -- For orphaned scopes (no policy_statement_scope rows), every anchor
        -- fails the NOT EXISTS check and gets deleted.
+       WITH RECURSIVE
+       -- Security cascades: a feature is effectively secured if it or any ancestor
+       -- has an active security rule. Walk down from directly-secured features.
+       effectively_secured(submission_feature_id) AS (
+         SELECT sfs.submission_feature_id
+         FROM submission_feature_security sfs
+         WHERE sfs.record_end_date IS NULL
+         UNION
+         SELECT child.submission_feature_id
+         FROM submission_feature child
+         JOIN effectively_secured es ON child.parent_submission_feature_id = es.submission_feature_id
+         WHERE child.record_end_date IS NULL
+       )
        DELETE FROM security_scope_anchor ssa
        WHERE ssa.security_scope_id = $1
          AND NOT EXISTS (
@@ -156,11 +170,10 @@ export class SecurityScopeRepository extends BaseRepository {
              AND (ps.urn_submission_id = sf.submission_id::text OR ps.urn_submission_id = '*')
              AND (ps.urn_feature_type = ft.name                OR ps.urn_feature_type = '*')
              AND (ps.urn_feature_id = sf.submission_feature_id::text OR ps.urn_feature_id = '*')
-             -- Feature must have at least one active security rule
+             -- Feature must be effectively secured (directly or via ancestor)
              AND EXISTS (
-               SELECT 1 FROM submission_feature_security sfs
-               WHERE sfs.submission_feature_id = sf.submission_feature_id
-                 AND sfs.record_end_date IS NULL
+               SELECT 1 FROM effectively_secured es
+               WHERE es.submission_feature_id = sf.submission_feature_id
              )
              -- Feature must be from an approved upload
              AND sf.record_effective_date <= now()
@@ -197,10 +210,13 @@ export class SecurityScopeRepository extends BaseRepository {
    * Insert one keyset-paginated batch of anchor rows into `security_scope_anchor`.
    *
    * Anchors mark the highest point in each feature hierarchy that satisfies the
-   * scope's URN pattern with no qualifying ancestor above it. A `urn:*:telemetry:*`
-   * scope anchors at ~200 dataset roots rather than the 10M telemetry features
-   * beneath them — authorization checks walk up from a candidate feature to an
-   * anchor, so the full subtree is never materialized.
+   * scope's URN pattern with no qualifying ancestor above it.
+   *
+   * A feature is "effectively secured" if it or any ancestor has an active
+   * security rule — security cascades down the hierarchy. For example,
+   * `urn:*:telemetry:*` anchors telemetry features whose parent dataset is
+   * secured, even though the telemetry features themselves have no direct
+   * security rule.
    *
    * Only features from approved uploads are eligible — features still under
    * review (status = 'submitted') must not affect security scope anchors.
@@ -247,6 +263,19 @@ export class SecurityScopeRepository extends BaseRepository {
       page_last_id: number;
     }>(
       `WITH RECURSIVE
+       -- Security cascades: a feature is effectively secured if it or any ancestor
+       -- has an active security rule. Walk down from directly-secured features.
+       effectively_secured(submission_feature_id) AS (
+         SELECT sfs.submission_feature_id
+         FROM submission_feature_security sfs
+         WHERE sfs.record_end_date IS NULL
+         UNION
+         SELECT child.submission_feature_id
+         FROM submission_feature child
+         JOIN effectively_secured es ON child.parent_submission_feature_id = es.submission_feature_id
+         WHERE child.record_end_date IS NULL
+       ),
+
        batch AS (
          SELECT sf.submission_feature_id,
                 sf.parent_submission_feature_id
@@ -258,9 +287,8 @@ export class SecurityScopeRepository extends BaseRepository {
            AND ($3 = ft.name                OR $3 = '*')
            AND ($4 = sf.submission_feature_id::text OR $4 = '*')
            AND EXISTS (
-             SELECT 1 FROM submission_feature_security sfs
-             WHERE sfs.submission_feature_id = sf.submission_feature_id
-               AND sfs.record_end_date IS NULL
+             SELECT 1 FROM effectively_secured es
+             WHERE es.submission_feature_id = sf.submission_feature_id
            )
            AND sf.record_effective_date <= now()
          ORDER BY sf.submission_feature_id
@@ -295,9 +323,8 @@ export class SecurityScopeRepository extends BaseRepository {
            AND ($3 = ft.name               OR $3 = '*')
            AND ($4 = sf.submission_feature_id::text OR $4 = '*')
            AND EXISTS (
-             SELECT 1 FROM submission_feature_security sfs
-             WHERE sfs.submission_feature_id = sf.submission_feature_id
-               AND sfs.record_end_date IS NULL
+             SELECT 1 FROM effectively_secured es
+             WHERE es.submission_feature_id = sf.submission_feature_id
            )
            AND sf.record_effective_date <= now()
        )
@@ -334,7 +361,18 @@ export class SecurityScopeRepository extends BaseRepository {
     // This boundary query uses the same candidate criteria as the batch CTE above —
     // they MUST stay in sync or the keyset will skip/repeat candidates.
     const boundaryResult = await this.connection.query<{ last_id: number }>(
-      `SELECT MAX(sf.submission_feature_id) AS last_id
+      `WITH RECURSIVE
+       effectively_secured(submission_feature_id) AS (
+         SELECT sfs.submission_feature_id
+         FROM submission_feature_security sfs
+         WHERE sfs.record_end_date IS NULL
+         UNION
+         SELECT child.submission_feature_id
+         FROM submission_feature child
+         JOIN effectively_secured es ON child.parent_submission_feature_id = es.submission_feature_id
+         WHERE child.record_end_date IS NULL
+       )
+       SELECT MAX(sf.submission_feature_id) AS last_id
        FROM (
          SELECT sf.submission_feature_id
          FROM submission_feature sf
@@ -345,9 +383,8 @@ export class SecurityScopeRepository extends BaseRepository {
            AND ($3 = ft.name               OR $3 = '*')
            AND ($4 = sf.submission_feature_id::text OR $4 = '*')
            AND EXISTS (
-             SELECT 1 FROM submission_feature_security sfs
-             WHERE sfs.submission_feature_id = sf.submission_feature_id
-               AND sfs.record_end_date IS NULL
+             SELECT 1 FROM effectively_secured es
+             WHERE es.submission_feature_id = sf.submission_feature_id
            )
            AND sf.record_effective_date <= now()
          ORDER BY sf.submission_feature_id
