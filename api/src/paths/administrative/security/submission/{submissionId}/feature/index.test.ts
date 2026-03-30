@@ -1,11 +1,14 @@
-import { expect } from 'chai';
+import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
+import sinonChai from 'sinon-chai';
 import { patchSecurityRulesOnSubmissionFeatures } from '.';
 import * as db from '../../../../../../database/db';
 import { HTTPError } from '../../../../../../errors/http-error';
 import { SecurityService } from '../../../../../../services/security-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../__mocks__/db';
+
+chai.use(sinonChai);
 
 describe('patchSecurityRulesOnSubmissionFeatures', () => {
   afterEach(() => {
@@ -48,6 +51,7 @@ describe('patchSecurityRulesOnSubmissionFeatures', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
+    mockReq.params = { submissionId: '10' };
     mockReq.body = {
       submissionFeatureIds: [1, 2, 3],
       applyRuleIds: [4, 5],
@@ -58,7 +62,7 @@ describe('patchSecurityRulesOnSubmissionFeatures', () => {
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(patchSecurityStub).to.have.been.calledOnceWith([1, 2, 3], [4, 5], [6, 7]);
+    expect(patchSecurityStub).to.have.been.calledOnceWith(10, [1, 2, 3], [4, 5], [6, 7]);
     expect(mockRes.statusValue).to.equal(204);
   });
 
@@ -77,6 +81,7 @@ describe('patchSecurityRulesOnSubmissionFeatures', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
+    mockReq.params = { submissionId: '10' };
     mockReq.body = {
       submissionFeatureIds: [1, 2, 3],
       applyRuleIds: [4, 5],
@@ -87,7 +92,7 @@ describe('patchSecurityRulesOnSubmissionFeatures', () => {
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(patchSecurityStub).to.have.been.calledOnceWith([1, 2, 3], [4, 5], []);
+    expect(patchSecurityStub).to.have.been.calledOnceWith(10, [1, 2, 3], [4, 5], []);
     expect(mockRes.statusValue).to.equal(204);
   });
 
@@ -106,6 +111,7 @@ describe('patchSecurityRulesOnSubmissionFeatures', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
+    mockReq.params = { submissionId: '10' };
     mockReq.body = {
       submissionFeatureIds: [1, 2, 3],
       applyRuleIds: [],
@@ -116,7 +122,7 @@ describe('patchSecurityRulesOnSubmissionFeatures', () => {
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(patchSecurityStub).to.have.been.calledOnceWith([1, 2, 3], [], [6, 7]);
+    expect(patchSecurityStub).to.have.been.calledOnceWith(10, [1, 2, 3], [], [6, 7]);
     expect(mockRes.statusValue).to.equal(204);
   });
 
@@ -135,6 +141,7 @@ describe('patchSecurityRulesOnSubmissionFeatures', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
+    mockReq.params = { submissionId: '10' };
     mockReq.body = {
       submissionFeatureIds: [],
       applyRuleIds: [4, 5],
@@ -145,7 +152,7 @@ describe('patchSecurityRulesOnSubmissionFeatures', () => {
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(patchSecurityStub).to.have.been.calledOnceWith([], [4, 5], [6, 7]);
+    expect(patchSecurityStub).to.have.been.calledOnceWith(10, [], [4, 5], [6, 7]);
     expect(mockRes.statusValue).to.equal(204);
   });
 });

@@ -5,6 +5,7 @@ import { DownloadService } from '../services/download/download-service';
 import { SubmissionValidationService } from '../services/submission-validation-service';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
+import { IComputeScopeAnchorsJobData } from './jobs/compute-scope-anchors-job';
 import { IIndexSubmissionFeaturesJobData } from './jobs/index-submission-features-job';
 import { IMalwareScanJobData } from './jobs/malware-scan-job';
 import { IProcessDownloadJobData } from './jobs/process-download-job';
@@ -422,6 +423,83 @@ export const publishIndexSubmissionFeaturesJob = async (
       label: 'publishIndexSubmissionFeaturesJob',
       message: 'Failed to publish job',
       submissionId: data.submissionId,
+      error
+    });
+
+    return { status: 'error', message: errorMessage };
+  }
+};
+
+/**
+ * Options for compute scope anchors jobs.
+ * Anchor computation is a single SQL INSERT ... SELECT — typically completes in seconds.
+ * Retry with backoff handles transient lock contention on high-write tables.
+ */
+const COMPUTE_SCOPE_ANCHORS_OPTIONS: IPublishOptions = {
+  retryLimit: 3,
+  retryDelay: 60,
+  retryBackoff: true,
+  expireInSeconds: 60 * 30 // 30 minutes
+};
+
+/**
+ * Publish a compute scope anchors job to the queue.
+ *
+ * Queues async anchor computation for a security scope. Each scope gets its
+ * own job — different scopes can compute concurrently. No singleton key is
+ * needed because anchor computation is idempotent (ON CONFLICT DO NOTHING).
+ *
+ * @param {IDBConnection} connection Database connection for transactional job insert
+ * @param {IComputeScopeAnchorsJobData} data Job data containing securityScopeId
+ * @param {IPublishOptions} [options={}] Job options
+ * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
+ */
+export const publishComputeScopeAnchorsJob = async (
+  connection: IDBConnection,
+  data: IComputeScopeAnchorsJobData,
+  options: IPublishOptions = {}
+): Promise<PublishJobResult> => {
+  try {
+    const boss = getPgBoss();
+    const mergedOptions = { ...COMPUTE_SCOPE_ANCHORS_OPTIONS, ...options };
+
+    await boss.createQueue(JobQueues.COMPUTE_SCOPE_ANCHORS);
+
+    // Global singleton key — only one anchor computation job runs at a time.
+    // Anchor computation does keyset-paginated scans of submission_feature (100M+ rows).
+    // Without serialization, N concurrent jobs = N concurrent full-table scans.
+    // Queued jobs wait until the active one completes, then run in order.
+    const jobId = await boss.send(JobQueues.COMPUTE_SCOPE_ANCHORS, data, {
+      ...mergedOptions,
+      singletonKey: 'scope-anchors',
+      db: { executeSql: (text: string, values: any[]) => connection.query(text, values) }
+    });
+
+    if (jobId) {
+      defaultLog.info({
+        label: 'publishComputeScopeAnchorsJob',
+        message: 'Compute scope anchors job published',
+        jobId,
+        securityScopeId: data.securityScopeId
+      });
+
+      return { status: 'published', jobId };
+    }
+
+    defaultLog.warn({
+      label: 'publishComputeScopeAnchorsJob',
+      message: 'Job not published (duplicate or throttled)',
+      securityScopeId: data.securityScopeId
+    });
+
+    return { status: 'duplicate', message: 'Job already exists for this security scope' };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    defaultLog.error({
+      label: 'publishComputeScopeAnchorsJob',
+      message: 'Failed to publish job',
+      securityScopeId: data.securityScopeId,
       error
     });
 

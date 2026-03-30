@@ -76,6 +76,7 @@ export function patchSecurityRulesOnSubmissionFeatures(): RequestHandler {
     const connection = getDBConnection(req['keycloak_token']);
     const service = new SecurityService(connection);
 
+    const submissionId = Number(req.params.submissionId);
     const submissionFeatureIds: number[] = req.body.submissionFeatureIds;
     const applyRuleIds: number[] = req.body.applyRuleIds;
     const removeRuleIds: number[] = req.body.removeRuleIds;
@@ -83,7 +84,12 @@ export function patchSecurityRulesOnSubmissionFeatures(): RequestHandler {
     try {
       await connection.open();
 
-      await service.patchSecurityRulesOnSubmissionFeatures(submissionFeatureIds, applyRuleIds, removeRuleIds);
+      await service.patchSecurityRulesOnSubmissionFeatures(
+        submissionId,
+        submissionFeatureIds,
+        applyRuleIds,
+        removeRuleIds
+      );
 
       await connection.commit();
 

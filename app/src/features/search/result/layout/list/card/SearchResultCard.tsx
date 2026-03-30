@@ -1,4 +1,4 @@
-import { mdiCheck, mdiPlus } from '@mdi/js';
+import { mdiCheck, mdiLock, mdiPlus } from '@mdi/js';
 import Icon from '@mdi/react';
 import {
   Card,
@@ -8,6 +8,7 @@ import {
   CardHeader,
   Chip,
   IconButton,
+  Stack,
   Typography
 } from '@mui/material';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
@@ -47,16 +48,19 @@ export const SearchResultCard = ({
             </Typography>
           }
           action={
-            <Chip
-              label={result.feature_type_name}
-              size="small"
-              sx={{
-                my: '-2px',
-                fontSize: '12px',
-                borderRadius: '4px',
-                textTransform: 'uppercase'
-              }}
-            />
+            <Stack direction="row" alignItems="center" gap={0.75}>
+              {result.is_secured && <Icon path={mdiLock} size={0.75} color="#d32f2f" data-testid="secured-icon" />}
+              <Chip
+                label={result.feature_type_name}
+                size="small"
+                sx={{
+                  my: '-2px',
+                  fontSize: '12px',
+                  borderRadius: '4px',
+                  textTransform: 'uppercase'
+                }}
+              />
+            </Stack>
           }
           sx={{
             pb: 1,
