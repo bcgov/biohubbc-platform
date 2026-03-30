@@ -217,6 +217,32 @@ describe('Security scope search (integration)', function () {
   }
 
   /**
+   * Create a secured dataset with a child feature that inherits security,
+   * then wire a type-scoped URN and scope chain. Covers the common
+   * "parent secured, child inherits, URN targets child type" pattern.
+   */
+  async function setupInheritedSecurityScope(
+    childType: string,
+    policyName: string,
+    urnOverride?: (submissionId: number, childId: number) => string
+  ): Promise<{ submissionId: number; datasetId: number; childId: number; scopeId: string; policyId: string }> {
+    const submissionId = await createTestSubmission(connection);
+    const datasetId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
+    const childId = await createTestFeature(connection, submissionId, childType, { name: 'Child' }, datasetId);
+
+    await secureFeature(datasetId);
+
+    const urn = urnOverride
+      ? urnOverride(submissionId, childId)
+      : `urn:${submissionId}:${childType}:*`;
+    const policyId = await createPolicy(policyName);
+    const stmtId = await createPolicyStatement(policyId, urn);
+    const scopeId = await setupScopeChain(stmtId, urn);
+
+    return { submissionId, datasetId, childId, scopeId, policyId };
+  }
+
+  /**
    * Query anchor feature IDs for a scope.
    */
   async function getAnchorIds(scopeId: string): Promise<number[]> {
@@ -1050,43 +1076,19 @@ describe('Security scope search (integration)', function () {
     });
 
     it('should anchor child feature via inherited security from parent (type-scoped URN)', async () => {
-      // Hierarchy: dataset → telemetry
-      // Secured:   YES        NO (inherits from parent)
-      // URN:       urn:{subId}:telemetry:*
-      //
-      // The telemetry feature has no direct security rule, but its parent dataset
-      // does. The effectively_secured CTE walks security down the hierarchy, so the
-      // telemetry feature is a valid anchor candidate for a telemetry-scoped URN.
-      const submissionId = await createTestSubmission(connection);
-      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
-      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Inherited' }, dataset);
+      const { childId, scopeId } = await setupInheritedSecurityScope('telemetry', 'inherited-security-test');
 
-      // Only the parent dataset is secured — telemetry inherits
-      await secureFeature(dataset);
-
-      const urn = `urn:${submissionId}:telemetry:*`;
-      const policyId = await createPolicy('inherited-security-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
-
-      // Telemetry feature should be anchored despite having no direct security rule
       const anchorIds = await getAnchorIds(scopeId);
-      expect(anchorIds).to.include(telemetry);
+      expect(anchorIds).to.include(childId);
       expect(anchorIds).to.have.lengthOf(1);
     });
 
     it('should anchor specific child feature via inherited security (feature-scoped URN)', async () => {
-      // Hierarchy: dataset → telemetry1, telemetry2
-      // Secured:   YES        NO            NO
-      // URN:       urn:{subId}:telemetry:{telemetry1}
-      //
-      // Only telemetry1 matches the URN. Both inherit security from the dataset,
-      // but only the URN-matched feature should be anchored.
+      // Two telemetry children — only the one named in the URN should be anchored
       const submissionId = await createTestSubmission(connection);
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
       const telemetry1 = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Target' }, dataset);
       const telemetry2 = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Other' }, dataset);
-
       await secureFeature(dataset);
 
       const urn = `urn:${submissionId}:telemetry:${telemetry1}`;
@@ -1101,11 +1103,7 @@ describe('Security scope search (integration)', function () {
     });
 
     it('should not anchor child when parent is unsecured (no inherited security)', async () => {
-      // Hierarchy: dataset → telemetry
-      // Secured:   NO         NO
-      // URN:       urn:{subId}:telemetry:*
-      //
-      // Neither feature is secured — no anchors should be created.
+      // Neither feature is secured — no anchors should be created
       const submissionId = await createTestSubmission(connection);
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Public Dataset' });
       await createTestFeature(connection, submissionId, 'telemetry', { name: 'Public Telemetry' }, dataset);
@@ -1119,55 +1117,24 @@ describe('Security scope search (integration)', function () {
     });
 
     it('should remove inherited anchor when parent is unsecured (stale cleanup)', async () => {
-      // Hierarchy: dataset → telemetry
-      // Secured:   YES        NO (inherits)
-      // URN:       urn:{subId}:telemetry:*
-      //
-      // Create anchor via inherited security, then unsecure the parent.
-      // deleteStaleAnchorsForScope should remove the telemetry anchor because
-      // it is no longer effectively secured.
-      const submissionId = await createTestSubmission(connection);
-      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
-      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Inherited' }, dataset);
+      const { datasetId, childId, scopeId } = await setupInheritedSecurityScope('telemetry', 'stale-inherited-test');
 
-      await secureFeature(dataset);
+      expect(await getAnchorIds(scopeId)).to.include(childId);
 
-      const urn = `urn:${submissionId}:telemetry:*`;
-      const policyId = await createPolicy('stale-inherited-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
-
-      // Anchor exists on the telemetry feature via inherited security
-      expect(await getAnchorIds(scopeId)).to.include(telemetry);
-
-      // Unsecure the parent — telemetry loses inherited security
-      await unsecureFeature(dataset);
+      // Unsecure the parent — child loses inherited security
+      await unsecureFeature(datasetId);
       await scopeRepo.deleteStaleAnchorsForScope(scopeId);
       await computeAnchors(scopeId);
 
-      // Anchor should be gone
       expect(await countAnchors(scopeId)).to.equal(0);
     });
 
     it('should anchor deep descendant via multi-level inherited security', async () => {
-      // Hierarchy: dataset → sample_site → telemetry
-      // Secured:   YES        NO             NO
-      // URN:       urn:{subId}:telemetry:*
-      //
-      // Telemetry is 2 levels below the secured dataset. The effectively_secured
-      // CTE must walk through sample_site (unsecured but child of secured) to reach
-      // telemetry and include it as a candidate.
+      // dataset → sample_site → telemetry (2 levels deep)
       const submissionId = await createTestSubmission(connection);
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Root' });
       const sampleSite = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Mid' }, dataset);
-      const telemetry = await createTestFeature(
-        connection,
-        submissionId,
-        'telemetry',
-        { name: 'Deep Leaf' },
-        sampleSite
-      );
-
+      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Deep Leaf' }, sampleSite);
       await secureFeature(dataset);
 
       const urn = `urn:${submissionId}:telemetry:*`;
@@ -1181,20 +1148,10 @@ describe('Security scope search (integration)', function () {
     });
 
     it('should grant search access to child feature via inherited anchor (end-to-end)', async () => {
-      // Full end-to-end: secured dataset → telemetry (inherits security).
-      // Type-scoped URN anchors the telemetry feature. Authenticated user with
-      // the scope should see the telemetry feature in search; anonymous should not.
-      const submissionId = await createTestSubmission(connection);
-      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
-      const telemetry = await createTestFeature(
-        connection,
-        submissionId,
+      const { submissionId, childId: telemetry } = await setupInheritedSecurityScope(
         'telemetry',
-        { name: 'Secured Child' },
-        dataset
+        'e2e-inherited-test'
       );
-
-      await secureFeature(dataset);
 
       const userId = connection.systemUserId();
       await setupFullAccess(`urn:${submissionId}:telemetry:*`, userId, 'Inherited Access Team');
@@ -1301,14 +1258,15 @@ describe('Security scope search (integration)', function () {
   });
 
   describe('Narrowed URN anchor computation', () => {
-    it('should anchor a specific feature by ID even when its ancestor is secured', async () => {
-      // Hierarchy: dataset → observation → telemetry
-      // Secured:   YES        NO            YES
-      // URN:       urn:{submissionId}:*:{telemetryId}  (targets telemetry by ID)
-      //
-      // Bug: the ancestor walk finds dataset (secured) and excludes telemetry
-      // from being an anchor. But the URN explicitly names telemetry — it must
-      // be the anchor regardless of what's above it.
+    /**
+     * Create a 3-level hierarchy (dataset → observation → telemetry), secure
+     * the specified features, wire a scope chain, and return all IDs.
+     */
+    async function setupDeepHierarchyScope(
+      securedFeatures: ('dataset' | 'observation' | 'telemetry')[],
+      urn: (ids: { submissionId: number; dataset: number; observation: number; telemetry: number }) => string,
+      policyName: string
+    ) {
       const submissionId = await createTestSubmission(connection);
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
       const observation = await createTestFeature(
@@ -1320,77 +1278,50 @@ describe('Security scope search (integration)', function () {
       );
       const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Telem' }, observation);
 
-      await secureFeature(dataset);
-      await secureFeature(telemetry);
+      const ids = { submissionId, dataset, observation, telemetry };
+      const featureMap = { dataset, observation, telemetry };
+      for (const f of securedFeatures) {
+        await secureFeature(featureMap[f]);
+      }
 
-      const urn = `urn:${submissionId}:*:${telemetry}`;
-      const policyId = await createPolicy('specific-feature-urn-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const urnStr = urn(ids);
+      const policyId = await createPolicy(policyName);
+      const stmtId = await createPolicyStatement(policyId, urnStr);
+      const scopeId = await setupScopeChain(stmtId, urnStr);
 
-      // The URN names this feature directly — it MUST be an anchor
+      return { ...ids, scopeId };
+    }
+
+    it('should anchor a specific feature by ID even when its ancestor is secured', async () => {
+      const { telemetry, scopeId } = await setupDeepHierarchyScope(
+        ['dataset', 'telemetry'],
+        (ids) => `urn:${ids.submissionId}:*:${ids.telemetry}`,
+        'specific-feature-urn-test'
+      );
+
       const anchorIds = await getAnchorIds(scopeId);
       expect(anchorIds).to.include(telemetry);
       expect(anchorIds).to.have.lengthOf(1);
     });
 
     it('should anchor type-scoped features even when a different-type ancestor is secured', async () => {
-      // Hierarchy: dataset → observation → telemetry
-      // Secured:   YES        YES           YES
-      // URN:       urn:{submissionId}:telemetry:*  (targets only telemetry type)
-      //
-      // Bug: the ancestor walk finds observation (secured) and excludes telemetry.
-      // But observation is not a telemetry feature — it shouldn't affect anchoring
-      // for a telemetry-scoped URN.
-      const submissionId = await createTestSubmission(connection);
-      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
-      const observation = await createTestFeature(
-        connection,
-        submissionId,
-        'species_observation',
-        { name: 'Obs' },
-        dataset
+      const { telemetry, scopeId } = await setupDeepHierarchyScope(
+        ['dataset', 'observation', 'telemetry'],
+        (ids) => `urn:${ids.submissionId}:telemetry:*`,
+        'type-scoped-urn-test'
       );
-      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Telem' }, observation);
 
-      await secureFeature(dataset);
-      await secureFeature(observation);
-      await secureFeature(telemetry);
-
-      const urn = `urn:${submissionId}:telemetry:*`;
-      const policyId = await createPolicy('type-scoped-urn-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
-
-      // Telemetry is the only candidate for this scope — secured ancestors of
-      // different types should not prevent it from being an anchor
       const anchorIds = await getAnchorIds(scopeId);
       expect(anchorIds).to.include(telemetry);
       expect(anchorIds).to.have.lengthOf(1);
     });
 
     it('should anchor a specific feature by ID with wildcard submission', async () => {
-      // Hierarchy: dataset → observation → telemetry
-      // Secured:   YES        NO            YES
-      // URN:       urn:*:*:{telemetryId}  (wildcard submission, targets feature by ID)
-      const submissionId = await createTestSubmission(connection);
-      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
-      const observation = await createTestFeature(
-        connection,
-        submissionId,
-        'species_observation',
-        { name: 'Obs' },
-        dataset
+      const { telemetry, scopeId } = await setupDeepHierarchyScope(
+        ['dataset', 'telemetry'],
+        (ids) => `urn:*:*:${ids.telemetry}`,
+        'wildcard-sub-specific-feature-test'
       );
-      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Telem' }, observation);
-
-      await secureFeature(dataset);
-      await secureFeature(telemetry);
-
-      const urn = `urn:*:*:${telemetry}`;
-      const policyId = await createPolicy('wildcard-sub-specific-feature-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
 
       const anchorIds = await getAnchorIds(scopeId);
       expect(anchorIds).to.include(telemetry);
