@@ -158,8 +158,22 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
       setEditingTeamMembers(
         members.map((m) => ({ system_user_id: m.system_user_id, user_identifier: m.user_identifier }))
       );
-    } catch {
-      setEditingTeamMembers([]);
+    } catch (error) {
+      const apiError = error as APIError;
+
+      setEditingTeam(null);
+
+      dialogContext.setErrorDialog({
+        open: true,
+        dialogTitle: 'Error Loading Team Members',
+        dialogText: 'An error occurred while loading team members.',
+        dialogError: apiError.message,
+        dialogErrorDetails: apiError.errors,
+        onClose: () => dialogContext.setErrorDialog({ open: false }),
+        onOk: () => dialogContext.setErrorDialog({ open: false })
+      });
+
+      return;
     }
 
     setOpenEditTeamDialog(true);
