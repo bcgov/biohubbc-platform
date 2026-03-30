@@ -232,9 +232,7 @@ describe('Security scope search (integration)', function () {
 
     await secureFeature(datasetId);
 
-    const urn = urnOverride
-      ? urnOverride(submissionId, childId)
-      : `urn:${submissionId}:${childType}:*`;
+    const urn = urnOverride ? urnOverride(submissionId, childId) : `urn:${submissionId}:${childType}:*`;
     const policyId = await createPolicy(policyName);
     const stmtId = await createPolicyStatement(policyId, urn);
     const scopeId = await setupScopeChain(stmtId, urn);
@@ -1134,7 +1132,13 @@ describe('Security scope search (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Root' });
       const sampleSite = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Mid' }, dataset);
-      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Deep Leaf' }, sampleSite);
+      const telemetry = await createTestFeature(
+        connection,
+        submissionId,
+        'telemetry',
+        { name: 'Deep Leaf' },
+        sampleSite
+      );
       await secureFeature(dataset);
 
       const urn = `urn:${submissionId}:telemetry:*`;
@@ -1148,10 +1152,7 @@ describe('Security scope search (integration)', function () {
     });
 
     it('should grant search access to child feature via inherited anchor (end-to-end)', async () => {
-      const { submissionId, childId: telemetry } = await setupInheritedSecurityScope(
-        'telemetry',
-        'e2e-inherited-test'
-      );
+      const { submissionId, childId: telemetry } = await setupInheritedSecurityScope('telemetry', 'e2e-inherited-test');
 
       const userId = connection.systemUserId();
       await setupFullAccess(`urn:${submissionId}:telemetry:*`, userId, 'Inherited Access Team');
