@@ -580,6 +580,43 @@ describe('SubmissionService', () => {
     });
   });
 
+  describe('getSubmissionsByUserId', () => {
+    it('should return submissions accessible to the given user', async () => {
+      const mockSubmissionRecords: SubmissionRecordWithSecurityAndRootFeatureType[] = [
+        {
+          submission_id: 1,
+          uuid: '123-456-789',
+          submitted_timestamp: '2023-12-12',
+          contributor_id: 1,
+          system_user_id: 3,
+          name: 'name',
+          description: 'description',
+          comment: 'comment',
+          publish_timestamp: null,
+          create_user: 1,
+          update_user: null,
+          security: SECURITY_APPLIED_STATUS.UNSECURED,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'dataset',
+          regions: []
+        }
+      ];
+
+      const mockDBConnection = getMockDBConnection();
+
+      const getSubmissionsByUserIdStub = sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionsByUserId')
+        .resolves(mockSubmissionRecords);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const response = await submissionService.getSubmissionsByUserId(3);
+
+      expect(getSubmissionsByUserIdStub).to.be.calledOnceWith(3);
+      expect(response).to.be.eql(mockSubmissionRecords);
+    });
+  });
+
   describe('getSubmissionRecordBySubmissionIdWithSecurity', () => {
     it('should return a submission observation record', async () => {
       const mockDBConnection = getMockDBConnection();
