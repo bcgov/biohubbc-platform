@@ -13,6 +13,16 @@ interface DownloadSidebarCartProps {
 export const DownloadSidebarCart = ({ features, itemCount }: DownloadSidebarCartProps) => {
   const { clearCart, removeFromCart } = useCartContext();
 
+  // Optimistic cart items keep the search-result shape until the cart reloads from the API.
+  // Normalize the secure flag because search results use `is_secured` while cart rows use `secured`.
+  const isFeatureSecured = (feature: CartContextFeature) => {
+    if ('secured' in feature) {
+      return feature.secured;
+    }
+
+    return feature.is_secured;
+  };
+
   return (
     <>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ pb: 1 }}>
@@ -34,7 +44,7 @@ export const DownloadSidebarCart = ({ features, itemCount }: DownloadSidebarCart
             <ListItem key={`${feature.submission_feature_id}-${idx}`} disableGutters sx={{ width: 1 }}>
               <CartFeatureCard
                 label={feature.feature_type_name}
-                secured={'secured' in feature ? feature.secured : false}
+                secured={isFeatureSecured(feature)}
                 onRemove={() => void removeFromCart([feature.submission_feature_id])}
               />
             </ListItem>

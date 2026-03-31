@@ -50,7 +50,7 @@ describe('DownloadSidebarCart', () => {
     expect(queryByTestId('secured-icon')).not.toBeInTheDocument();
   });
 
-  it('does not show lock icon for SearchFeatureResultWithRelevancy (no secured property)', () => {
+  it('shows lock icon for secured SearchFeatureResultWithRelevancy optimistic cart items', () => {
     const features: SearchFeatureResultWithRelevancy[] = [
       {
         submission_feature_id: 1,
@@ -66,9 +66,8 @@ describe('DownloadSidebarCart', () => {
       }
     ];
 
-    const { queryByTestId } = render(<DownloadSidebarCart features={features} itemCount={1} />);
+    const { getByTestId } = render(<DownloadSidebarCart features={features} itemCount={1} />);
 
-    // SearchFeatureResultWithRelevancy has is_secured, not secured — the guard falls back to false
-    expect(queryByTestId('secured-icon')).not.toBeInTheDocument();
+    expect(getByTestId('secured-icon')).toBeVisible();
   });
 });
