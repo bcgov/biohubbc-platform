@@ -13,8 +13,8 @@
 import { expect } from 'chai';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
-import { CartRepository } from '../../repositories/cart-repository';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
+import { CartRepository } from '../../repositories/cart-repository';
 import { CartSubmissionFeatureService } from '../../services/cart-submission-feature-service';
 import { computeScopeHash } from '../../utils/scope-hash';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
@@ -238,7 +238,13 @@ describe('Cart submission feature security (integration)', function () {
     it('should exclude a feature with inherited security from a secured parent', async () => {
       const submissionId = await createTestSubmission(connection);
       const parentId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Parent' });
-      const childId = await createTestFeature(connection, submissionId, 'species_observation', { name: 'Child' }, parentId);
+      const childId = await createTestFeature(
+        connection,
+        submissionId,
+        'species_observation',
+        { name: 'Child' },
+        parentId
+      );
       await secureFeature(parentId);
 
       const cartId = await createActiveCart(null);
@@ -328,11 +334,7 @@ describe('Cart submission feature security (integration)', function () {
       await setupFullAccess(`urn:${submissionId}:*:*`, userId, 'mixed-batch-team');
 
       const cartId = await createActiveCart(userId);
-      await cartFeatureService.addSubmissionFeaturesToCart(
-        cartId,
-        [unsecuredId, securedId, inheritedChildId],
-        userId
-      );
+      await cartFeatureService.addSubmissionFeaturesToCart(cartId, [unsecuredId, securedId, inheritedChildId], userId);
 
       const ids = await getCartFeatureIds(cartId);
       // All three should be added: unsecured passes through, secured + inherited pass via scope access
