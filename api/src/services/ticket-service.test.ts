@@ -93,7 +93,7 @@ describe('TicketService', () => {
       sinon.stub(TicketStatusService.prototype, 'insertTicketStatus').resolves();
 
       const systemUserIds = [7, 8];
-      await service.createTicket({ subject: 'A ticket', description: null, priority: 'medium' }, systemUserIds);
+      await service.createTicket({ subject: 'A ticket', description: null, priority: 'medium', systemUserIds });
 
       expect(createTeamStub).to.have.been.calledWith(
         sinon.match({
