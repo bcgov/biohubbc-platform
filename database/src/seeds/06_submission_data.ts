@@ -41,8 +41,29 @@ export async function seed(knex: Knex): Promise<void> {
     { level: 'UNSECURE', reviewed: false, withArchive: false }
   ];
 
+  const seedContexts: SeedContext[] = [];
+
   for (const scenario of scenarios) {
-    await createSubmissionWithUploads(knex, scenario.level, scenario.reviewed, scenario.withArchive);
+    const ctx = await createSubmissionWithUploads(knex, scenario.level, scenario.reviewed, scenario.withArchive);
+    seedContexts.push(ctx);
+  }
+
+  // Cross-join every seeded system_user with every seeded submission via submission_team
+  const systemUsers = await knex('system_user').select('system_user_id');
+  const [{ team_id: seedTeamId }] = await knex('team')
+    .insert({
+      name: 'Seed Submission Team',
+      description: 'Auto-generated team for seeded submissions.',
+      create_user: 1
+    })
+    .returning('team_id');
+
+  for (const { system_user_id } of systemUsers) {
+    await knex('team_member').insert({ team_id: seedTeamId, system_user_id, create_user: 1 });
+  }
+
+  for (const { submission_id } of seedContexts) {
+    await knex('submission_team').insert({ submission_id, team_id: seedTeamId, create_user: 1 });
   }
 
   // Backfill data_byte_size for seeded rows — migration runs before seeds,
