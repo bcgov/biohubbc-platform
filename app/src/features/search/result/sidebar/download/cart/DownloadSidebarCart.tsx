@@ -34,6 +34,7 @@ export const DownloadSidebarCart = ({ features, itemCount }: DownloadSidebarCart
             <ListItem key={`${feature.submission_feature_id}-${idx}`} disableGutters sx={{ width: 1 }}>
               <CartFeatureCard
                 label={feature.feature_type_name}
+                secured={'secured' in feature ? feature.secured : false}
                 onRemove={() => void removeFromCart([feature.submission_feature_id])}
               />
             </ListItem>
