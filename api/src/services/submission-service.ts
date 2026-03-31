@@ -292,6 +292,17 @@ export class SubmissionService extends DBService {
   }
 
   /**
+   * Get all submissions accessible to the given system user via their submission team membership.
+   *
+   * @param {number} systemUserId - The system user ID to fetch submissions for.
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @memberof SubmissionService
+   */
+  async getSubmissionsByUserId(systemUserId: number): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
+    return this.submissionRepository.getSubmissionsByUserId(systemUserId);
+  }
+
+  /**
    * Get a submission record by id (with security status).
    *
    * @param {number} submissionId
