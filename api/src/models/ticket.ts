@@ -34,7 +34,8 @@ export type TicketSlug = z.infer<typeof TicketSlug>;
 export const CreateTicketRequest = z.object({
   subject: z.string(),
   description: z.string().nullable(),
-  priority: TicketPriority
+  priority: TicketPriority,
+  systemUserIds: z.array(z.number()).optional()
 });
 
 export type CreateTicketRequest = z.infer<typeof CreateTicketRequest>;

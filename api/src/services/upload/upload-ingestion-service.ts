@@ -93,7 +93,7 @@ export class UploadIngestionService extends DBService {
     bytes: number,
     submissionId: number,
     submissionUuid: string,
-    systemUserIds: number[] = []
+    systemUserIds: number[]
   ): Promise<PresignedUploadUrlResponse> {
     // 1. Create upload session
     const { upload_id } = await this.uploadService.insertUpload({
@@ -103,14 +103,12 @@ export class UploadIngestionService extends DBService {
     });
 
     // 2. Create ticket for admin visibility into this upload
-    const ticket = await this.ticketService.createTicket(
-      {
-        subject: 'New Submission',
-        description: `Submission ID: ${submissionId}. Submission UUID: ${submissionUuid}. Upload UUID: ${upload_id}`,
-        priority: 'medium'
-      },
+    const ticket = await this.ticketService.createTicket({
+      subject: 'New Submission',
+      description: `Submission ID: ${submissionId}. Submission UUID: ${submissionUuid}. Upload UUID: ${upload_id}`,
+      priority: 'medium',
       systemUserIds
-    );
+    });
 
     // 3. Bind submission → upload
     const { submission_upload_id } = await this.submissionUploadService.insertSubmissionUpload({

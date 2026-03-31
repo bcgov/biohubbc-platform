@@ -38,18 +38,19 @@ export class TicketService extends DBService {
    * Create a new ticket and write its initial status entry.
    *
    * @param {CreateTicketRequest} ticket - Ticket payload to create.
-   * @param {number[]} [systemUserIds=[]] - System user IDs to add as members of the ticket's team.
    * @return {Promise<Ticket>} The newly created ticket.
    * @memberof TicketService
    */
-  async createTicket(ticket: CreateTicketRequest, systemUserIds: number[] = []): Promise<Ticket> {
+  async createTicket(ticket: CreateTicketRequest): Promise<Ticket> {
+    const { systemUserIds, ...ticketData } = ticket;
+
     const [team, slug] = await Promise.all([
-      this.createTicketTeam(systemUserIds),
+      this.createTicketTeam({ systemUserIds: systemUserIds ?? [] }),
       this.ticketRepository.getNextTicketSlug()
     ]);
 
     const createdTicket = await this.ticketRepository.insertTicket({
-      ...ticket,
+      ...ticketData,
       team_id: team.team_id,
       ticket_slug: slug
     });
@@ -62,11 +63,11 @@ export class TicketService extends DBService {
   /**
    * Create an internal team record for ticket ownership.
    *
-   * @param {number[]} [systemUserIds=[]] - System user IDs to add as initial team members.
+   * @param {{ systemUserIds: number[] }} params - System user IDs to add as initial team members.
    * @return {*} {Promise<Team>}
    * @memberof TicketService
    */
-  private async createTicketTeam(systemUserIds: number[] = []): Promise<Team> {
+  private async createTicketTeam({ systemUserIds }: { systemUserIds: number[] }): Promise<Team> {
     const team = await this.teamService.createTeam({
       name: `Ticket Team ${v4()}`,
       description: 'Auto-generated team for ticket assignees.',
