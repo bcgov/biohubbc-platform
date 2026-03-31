@@ -1262,16 +1262,13 @@ export class SubmissionRepository extends BaseRepository {
           ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
         END AS security,
         COALESCE(ARRAY_REMOVE(ARRAY_AGG(DISTINCT rl.region_name), NULL), '{}') AS regions
-      FROM submission s
-      INNER JOIN submission_upload su
-        ON  su.submission_id = s.submission_id
-        AND su.record_end_date IS NULL
-      INNER JOIN ticket t
-        ON  t.ticket_id = su.ticket_id
-        AND t.record_end_date IS NULL
-      INNER JOIN team_member tm
-        ON  tm.team_id = t.team_id
-        AND tm.record_end_date IS NULL
+      FROM team_member tm
+      INNER JOIN submission_team st
+        ON  st.team_id = tm.team_id
+        AND st.record_end_date IS NULL
+      INNER JOIN submission s
+        ON  s.submission_id = st.submission_id
+        AND s.record_end_date IS NULL
       INNER JOIN submission_feature sf
         ON  sf.submission_id = s.submission_id
         AND sf.parent_submission_feature_id IS NULL
@@ -1285,7 +1282,7 @@ export class SubmissionRepository extends BaseRepository {
         ON  rl.region_id = sr.region_id
       WHERE
         tm.system_user_id = ${systemUserId}
-        AND s.record_end_date IS NULL
+        AND tm.record_end_date IS NULL
       GROUP BY
         s.submission_id,
         s.uuid,
