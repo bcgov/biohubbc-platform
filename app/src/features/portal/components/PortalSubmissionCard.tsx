@@ -19,15 +19,6 @@ const SECURITY_LABEL: Record<string, string> = {
   UNSECURED: 'Published'
 };
 
-const CHIP_SX = {
-  my: '-2px',
-  fontSize: '12px',
-  borderRadius: '4px',
-  textTransform: 'uppercase'
-};
-
-const RESPONSIVE_ROW_DIRECTION = { xs: 'column', sm: 'row' } as const;
-
 export interface PortalSubmissionCardProps {
   submission: SubmissionRecordWithSecurityAndRootFeature;
 }
@@ -60,8 +51,16 @@ export const PortalSubmissionCard = ({ submission }: PortalSubmissionCardProps) 
         }
         action={
           <Stack direction="row" gap={1}>
-            <Chip label={submission.root_feature_type_name} size="small" sx={CHIP_SX} />
-            <Chip label={SECURITY_LABEL[submission.security] ?? submission.security} size="small" sx={CHIP_SX} />
+            <Chip
+              label={submission.root_feature_type_name}
+              size="small"
+              sx={{ fontSize: '12px', borderRadius: '4px', textTransform: 'uppercase' }}
+            />
+            <Chip
+              label={SECURITY_LABEL[submission.security] ?? submission.security}
+              size="small"
+              sx={{ fontSize: '12px', borderRadius: '4px', textTransform: 'uppercase' }}
+            />
           </Stack>
         }
       />
@@ -87,13 +86,13 @@ export const PortalSubmissionCard = ({ submission }: PortalSubmissionCardProps) 
         }}>
         <Stack
           width="100%"
-          flexDirection={RESPONSIVE_ROW_DIRECTION}
+          flexDirection={{ xs: 'column', sm: 'row' }}
           flexWrap="wrap"
           gap={1}
           justifyContent="space-between">
           <Stack
             flex="1 1 auto"
-            flexDirection={RESPONSIVE_ROW_DIRECTION}
+            flexDirection={{ xs: 'column', sm: 'row' }}
             gap={{ xs: 0, sm: 1 }}
             my={1}
             component="dl"

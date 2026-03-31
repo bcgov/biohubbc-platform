@@ -1,14 +1,12 @@
-import { mdiTextBoxOutline } from '@mdi/js';
-import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
-import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { PageHeader } from 'components/header/PageHeader';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import RecordsFoundSkeletonLoader from 'components/skeleton/submission-card/RecordsFoundSkeletonLoader';
 import SubmissionCardSkeletonLoader from 'components/skeleton/submission-card/SubmissionCardSkeletonLoader';
+import { PortalPageNoDataFallback } from 'features/portal/components/PortalPageNoDataFallback';
 import { PortalSubmissionCard } from 'features/portal/components/PortalSubmissionCard';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
@@ -16,33 +14,11 @@ import { SubmissionRecordWithSecurityAndRootFeature } from 'interfaces/useSubmis
 import { useEffect, useMemo } from 'react';
 import { pluralize as p } from 'utils/Utils';
 
-/** Empty state when the user has no submissions. */
-const PortalPageNoDataFallback = () => (
-  <>
-    <Box pb={4}>
-      <Typography variant="h4" component="h2">
-        No records found
-      </Typography>
-    </Box>
-    <Stack alignItems="center" justifyContent="center" p={3} component={Paper} elevation={0} minHeight={168}>
-      <Box
-        sx={{
-          '& svg': {
-            color: 'text.secondary'
-          }
-        }}>
-        <Icon path={mdiTextBoxOutline} size={2} />
-      </Box>
-      <Typography component="h2" variant="h4" fontWeight={700} sx={{ mb: 1 }}>
-        No submissions found
-      </Typography>
-      <Typography variant="body2" color="textSecondary">
-        You have not submitted any data to BioHub yet.
-      </Typography>
-    </Stack>
-  </>
-);
-
+/**
+ * Portal page displaying the list of submissions accessible to the current user.
+ * Shows a skeleton loader while data is fetching, and an empty-state fallback when
+ * no submissions are found.
+ */
 const PortalPage = () => {
   const biohubApi = useApi();
 
