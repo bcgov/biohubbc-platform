@@ -99,9 +99,9 @@ describe('UploadIngestionService', () => {
         sinon.match({
           subject: 'New Submission',
           priority: 'medium',
-          description: `Submission ID: ${mockSubmissionId}. Submission UUID: ${mockSubmission.uuid}. Upload UUID: ${mockUploadId}`
-        }),
-        [mockSubmission.system_user_id]
+          description: `Submission ID: ${mockSubmissionId}. Submission UUID: ${mockSubmission.uuid}. Upload UUID: ${mockUploadId}`,
+          systemUserIds: [mockSubmission.system_user_id]
+        })
       );
       expect(result.submissionId).to.equal(mockSubmission.uuid);
       expect(result.uploadId).to.equal(mockUploadId);
@@ -250,9 +250,9 @@ describe('UploadIngestionService', () => {
         sinon.match({
           subject: 'New Submission',
           priority: 'medium',
-          description: `Submission ID: ${existingSubmissionId}. Submission UUID: ${submissionUuid}. Upload UUID: ${mockUploadId}`
-        }),
-        [ownerSystemUserId]
+          description: `Submission ID: ${existingSubmissionId}. Submission UUID: ${submissionUuid}. Upload UUID: ${mockUploadId}`,
+          systemUserIds: [ownerSystemUserId]
+        })
       );
       expect(result.submissionId).to.equal(submissionUuid);
       expect(result.uploadId).to.equal(mockUploadId);
