@@ -171,10 +171,11 @@ export function addSubmissionFeaturesToCart(): RequestHandler {
       const features = req.body.features.map(Number);
       const cartId = req.params.cartId;
       const pagination = makePaginationOptionsFromRequest(req);
+      const systemUserId = isAuthenticated ? connection.systemUserId() : null;
 
       const cartSubmissionFeatureService = new CartSubmissionFeatureService(connection);
 
-      await cartSubmissionFeatureService.addSubmissionFeaturesToCart(cartId, features);
+      await cartSubmissionFeatureService.addSubmissionFeaturesToCart(cartId, features, systemUserId);
       const response = await cartSubmissionFeatureService.getPaginatedCartFeaturesResponse(cartId, pagination);
 
       await connection.commit();

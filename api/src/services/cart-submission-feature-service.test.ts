@@ -17,16 +17,28 @@ describe('CartSubmissionFeatureService', () => {
   });
 
   describe('addSubmissionFeaturesToCart', () => {
-    it('should call repository with correct parameters', async () => {
+    it('should pass systemUserId to repository for authenticated user', async () => {
       const mockDB = getMockDBConnection();
       const service = new CartSubmissionFeatureService(mockDB);
 
       const stub = sinon.stub(CartSubmissionFeatureRepository.prototype, 'addSubmissionFeaturesToCart').resolves();
 
       const features: number[] = [1, 2, 3];
-      await service.addSubmissionFeaturesToCart('cart-1', features);
+      await service.addSubmissionFeaturesToCart('cart-1', features, 42);
 
-      expect(stub).to.have.been.calledOnceWith('cart-1', features);
+      expect(stub).to.have.been.calledOnceWith('cart-1', features, 42);
+    });
+
+    it('should pass null systemUserId to repository for anonymous user', async () => {
+      const mockDB = getMockDBConnection();
+      const service = new CartSubmissionFeatureService(mockDB);
+
+      const stub = sinon.stub(CartSubmissionFeatureRepository.prototype, 'addSubmissionFeaturesToCart').resolves();
+
+      const features: number[] = [1, 2, 3];
+      await service.addSubmissionFeaturesToCart('cart-1', features, null);
+
+      expect(stub).to.have.been.calledOnceWith('cart-1', features, null);
     });
 
     it('should propagate repository errors', async () => {
@@ -38,7 +50,7 @@ describe('CartSubmissionFeatureService', () => {
         .rejects(new Error('DB error'));
 
       try {
-        await service.addSubmissionFeaturesToCart('cart-1', [1, 2]);
+        await service.addSubmissionFeaturesToCart('cart-1', [1, 2], 42);
         throw new Error('Expected to throw');
       } catch (err) {
         expect(err).to.be.instanceOf(Error);
@@ -52,7 +64,7 @@ describe('CartSubmissionFeatureService', () => {
 
       const stub = sinon.stub(CartSubmissionFeatureRepository.prototype, 'addSubmissionFeaturesToCart').resolves();
 
-      await service.addSubmissionFeaturesToCart('cart-1', []);
+      await service.addSubmissionFeaturesToCart('cart-1', [], null);
 
       expect(stub).not.to.have.been.called;
     });

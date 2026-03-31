@@ -25,12 +25,12 @@ describe('CartSubmissionFeatureRepository', () => {
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
-      const result = await repo.addSubmissionFeaturesToCart('cart-1', [1, 2, 3]);
+      const result = await repo.addSubmissionFeaturesToCart('cart-1', [1, 2, 3], null);
 
       expect(result).to.be.undefined;
     });
 
-    it('should exclude actively secured features in the insert SQL', async () => {
+    it('should use anonymous SQL with recursive ancestor walk-up when systemUserId is null', async () => {
       const sqlStub = sinon.stub().resolves({
         rowCount: 1,
         rows: []
@@ -40,15 +40,40 @@ describe('CartSubmissionFeatureRepository', () => {
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
-      await repo.addSubmissionFeaturesToCart('cart-1', [1, 2, 3]);
+      await repo.addSubmissionFeaturesToCart('cart-1', [1, 2, 3], null);
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlArg = sqlStub.firstCall.args[0] as { text?: string };
       const sqlText = sqlArg.text || '';
 
-      expect(sqlText).to.contain('WHERE NOT EXISTS');
-      expect(sqlText).to.contain('submission_feature_security');
-      expect(sqlText).to.contain('sfs.record_end_date IS NULL');
+      // Anonymous path uses NOT EXISTS with recursive ancestor walk
+      expect(sqlText).to.include('NOT EXISTS');
+      expect(sqlText).to.include('RECURSIVE');
+      expect(sqlText).to.include('ancestors');
+      expect(sqlText).to.include('submission_feature_security');
+    });
+
+    it('should use authenticated SQL with scope check when systemUserId is provided', async () => {
+      const sqlStub = sinon.stub().resolves({
+        rowCount: 1,
+        rows: []
+      } as unknown as QueryResult<any>);
+
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new CartSubmissionFeatureRepository(mockDBConnection);
+
+      await repo.addSubmissionFeaturesToCart('cart-1', [1, 2, 3], 42);
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlArg = sqlStub.firstCall.args[0] as { text?: string };
+      const sqlText = sqlArg.text || '';
+
+      // Authenticated path checks scope access via security_scope_anchor → team_security_scope → team_member
+      expect(sqlText).to.include('security_scope_anchor');
+      expect(sqlText).to.include('team_security_scope');
+      expect(sqlText).to.include('team_member');
+      expect(sqlText).to.include('RECURSIVE');
     });
   });
 
@@ -119,7 +144,7 @@ describe('CartSubmissionFeatureRepository', () => {
   });
 
   describe('getCartSubmissionFeatures', () => {
-    it('should return submission features from the cart', async () => {
+    it('should return all features including secured ones', async () => {
       const mockRows: CartSubmissionFeature[] = [
         {
           submission_feature_id: 1,
@@ -151,6 +176,9 @@ describe('CartSubmissionFeatureRepository', () => {
       const result = await repo.getCartSubmissionFeatures('cart-1', { page: 1, limit: 25 });
 
       expect(result).to.eql(mockRows);
+      // Secured feature is included — no longer filtered out
+      expect(result).to.have.length(2);
+      expect(result[1].secured).to.be.true;
     });
 
     it('should return only the matching feature when submissionFeatureId is provided', async () => {
@@ -179,7 +207,7 @@ describe('CartSubmissionFeatureRepository', () => {
   });
 
   describe('getCartSubmissionFeatureCount', () => {
-    it('should return the correct count', async () => {
+    it('should return the count of all features in the cart', async () => {
       const mockQueryResponse = {
         rowCount: 1,
         rows: [{ count: 5 }]

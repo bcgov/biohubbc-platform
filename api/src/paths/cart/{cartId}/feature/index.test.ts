@@ -228,30 +228,57 @@ describe('cart/{cartId}', () => {
       }
     });
 
-    it('adds and removes features successfully from the cart', async () => {
+    it('adds features successfully and passes systemUserId when authenticated', async () => {
       const mockDBConnection = getMockDBConnection({
         commit: sinon.stub(),
         rollback: sinon.stub(),
-        release: sinon.stub()
+        release: sinon.stub(),
+        systemUserId: sinon.stub().returns(42)
       });
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-      sinon.stub(CartSubmissionFeatureService.prototype, 'addSubmissionFeaturesToCart').resolves();
+      const addStub = sinon.stub(CartSubmissionFeatureService.prototype, 'addSubmissionFeaturesToCart').resolves();
       sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves([]);
       sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureCount').resolves(0);
 
       const requestHandler = addSubmissionFeaturesToCart();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params.cartId = 'fake-cart-id';
-      mockReq.body = { features: ['uuid-1', 'uuid-2'] };
+      mockReq.body = { features: [1, 2] };
+      mockReq.keycloak_token = { sub: 'user-guid' };
 
       await requestHandler(mockReq, mockRes, mockNext);
 
+      expect(addStub).to.have.been.calledOnce;
+      expect(addStub.firstCall.args[2]).to.equal(42);
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.have.property('features');
-      expect(mockRes.jsonValue).to.have.property('pagination');
+    });
+
+    it('passes null systemUserId when anonymous', async () => {
+      const mockDBConnection = getMockDBConnection({
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+
+      const addStub = sinon.stub(CartSubmissionFeatureService.prototype, 'addSubmissionFeaturesToCart').resolves();
+      sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves([]);
+      sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureCount').resolves(0);
+
+      const requestHandler = addSubmissionFeaturesToCart();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params.cartId = 'fake-cart-id';
+      mockReq.body = { features: [1, 2] };
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(addStub).to.have.been.calledOnce;
+      expect(addStub.firstCall.args[2]).to.be.null;
+      expect(mockDBConnection.commit).to.have.been.calledOnce;
+      expect(mockRes.statusValue).to.equal(200);
     });
 
     it('handles empty add and remove arrays', async () => {
