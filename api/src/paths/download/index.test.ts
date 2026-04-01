@@ -341,8 +341,7 @@ describe('paths/download/index', () => {
           completed_fragments: 1,
           estimated_total_size_bytes: '1000',
           fragment_size_bytes: '1000',
-          create_date: '2026-01-01',
-          feature_count: 5
+          create_date: '2026-01-01'
         }
       ];
 

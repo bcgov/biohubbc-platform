@@ -172,8 +172,8 @@ describe('DownloadRepository', () => {
   describe('getDownloadsByTeamMembership', () => {
     it('returns download records and count from knex query', async () => {
       const mockRows = [
-        { download_id: 'uuid-1', download_status: 'ready', feature_count: 5, total_count: 2 },
-        { download_id: 'uuid-2', download_status: 'pending', feature_count: 0, total_count: 2 }
+        { download_id: 'uuid-1', download_status: 'ready', total_count: 2 },
+        { download_id: 'uuid-2', download_status: 'pending', total_count: 2 }
       ];
       const mockResponse = {
         rowCount: 2,
@@ -190,7 +190,7 @@ describe('DownloadRepository', () => {
     });
 
     it('returns paginated results when pagination is provided', async () => {
-      const mockRows = [{ download_id: 'uuid-1', feature_count: 3, total_count: 5 }];
+      const mockRows = [{ download_id: 'uuid-1', total_count: 5 }];
       const mockResponse = {
         rowCount: 1,
         rows: mockRows
