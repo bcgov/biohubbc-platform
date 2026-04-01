@@ -209,12 +209,28 @@ export class SearchFeatureRepository extends BaseRepository {
       return [];
     }
 
-    const knex = getKnex();
-    const query = this.buildSearchQuery(knex, filters, systemUserId);
-    const idsQuery = knex.from(query.as('sf_filtered')).select('submission_feature_id');
-    const response = await this.connection.knex(idsQuery);
+    const subquery = this.buildSearchFeatureIdsSubquery(filters, systemUserId);
+    const response = await this.connection.knex(subquery);
 
     return response.rows;
+  }
+
+  /**
+   * Build a Knex subquery that returns submission_feature_ids matching the
+   * given filters and security context — without executing it.
+   *
+   * Used by DownloadRepository to compose the search as a SQL subquery
+   * inside a larger query, keeping feature resolution entirely in the
+   * database (no JS array round-trip for 500K+ ID sets).
+   *
+   * @param {ISearchFeaturesFilters} filters - Search filters
+   * @param {number | null} [systemUserId] - Security context
+   * @return {Knex.QueryBuilder} Unexecuted subquery returning submission_feature_id rows
+   */
+  buildSearchFeatureIdsSubquery(filters: ISearchFeaturesFilters, systemUserId?: number | null): Knex.QueryBuilder {
+    const knex = getKnex();
+    const query = this.buildSearchQuery(knex, filters, systemUserId);
+    return knex.from(query.as('sf_filtered')).select('submission_feature_id');
   }
 
   /**

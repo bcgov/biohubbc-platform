@@ -15,7 +15,7 @@ describe('DownloadRepository', () => {
   });
 
   describe('createDownload', () => {
-    it('inserts download with status, fragment_size_bytes, and filters only', async () => {
+    it('inserts download with status, fragment_size_bytes, filters, and cart_id', async () => {
       const sqlStub = sinon
         .stub()
         .resolves(mockQueryResult([{ download_id: 'aaaa0000-0000-0000-0000-000000000001' }], 1));
@@ -30,6 +30,7 @@ describe('DownloadRepository', () => {
       expect(sqlText).to.not.include('team_id');
       expect(sqlText).to.not.include('data_request_id');
       expect(sqlText).to.include('fragment_size_bytes');
+      expect(sqlText).to.include('cart_id');
     });
 
     it('serializes filters as JSONB in SQL', async () => {
@@ -60,38 +61,38 @@ describe('DownloadRepository', () => {
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlValues = sqlStub.firstCall.args[0].values;
-      const filtersValue = sqlValues[sqlValues.length - 1];
-      expect(filtersValue).to.be.null;
+      // filters is second-to-last, cart_id is last
+      expect(sqlValues[sqlValues.length - 2]).to.be.null;
     });
-  });
 
-  describe('createDownloadFeatures', () => {
-    it('inserts join table rows for each feature ID using unnest', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 3));
+    it('passes cartId value in SQL when provided', async () => {
+      const sqlStub = sinon
+        .stub()
+        .resolves(mockQueryResult([{ download_id: 'aaaa0000-0000-0000-0000-000000000001' }], 1));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownloadFeatures('aaaa0000-0000-0000-0000-000000000001', [10, 20, 30]);
+      const cartId = 'cccc0000-0000-0000-0000-000000000001';
+      await repo.createDownload({ cartId });
 
       expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('unnest');
       const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include('aaaa0000-0000-0000-0000-000000000001');
-      expect(sqlValues).to.deep.include([10, 20, 30]);
+      expect(sqlValues).to.include(cartId);
     });
 
-    it('handles single feature ID', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
+    it('passes null cart_id when cartId is omitted', async () => {
+      const sqlStub = sinon
+        .stub()
+        .resolves(mockQueryResult([{ download_id: 'aaaa0000-0000-0000-0000-000000000001' }], 1));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownloadFeatures('aaaa0000-0000-0000-0000-000000000001', [10]);
+      await repo.createDownload({ filters: { keyword: 'moose' } });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include('aaaa0000-0000-0000-0000-000000000001');
-      expect(sqlValues).to.deep.include([10]);
+      // cart_id is the last parameter
+      expect(sqlValues[sqlValues.length - 1]).to.be.null;
     });
   });
 
@@ -189,6 +190,23 @@ describe('DownloadRepository', () => {
       expect(result.downloads[0]).to.not.have.property('total_count');
     });
 
+    it('SQL does not reference download_feature', async () => {
+      const knexStub = sinon.stub().resolves({
+        rowCount: 0,
+        rows: []
+      } as unknown as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.getDownloadsByTeamMembership(123);
+
+      expect(knexStub).to.have.been.calledOnce;
+      const builtQuery = knexStub.firstCall.args[0];
+      const sqlText = builtQuery.toString();
+      expect(sqlText).to.not.include('download_feature');
+      expect(sqlText).to.not.include('feature_count');
+    });
+
     it('returns paginated results when pagination is provided', async () => {
       const mockRows = [{ download_id: 'uuid-1', total_count: 5 }];
       const mockResponse = {
@@ -216,6 +234,153 @@ describe('DownloadRepository', () => {
 
       expect(result.downloads).to.eql([]);
       expect(result.count).to.equal(0);
+    });
+  });
+
+  describe('getDownloadSource', () => {
+    it('returns cart_id, filters, and create_user for a download', async () => {
+      const sqlStub = sinon
+        .stub()
+        .resolves(
+          mockQueryResult([{ cart_id: 'cccc0000-0000-0000-0000-000000000001', filters: null, create_user: 42 }], 1)
+        );
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.getDownloadSource('aaaa0000-0000-0000-0000-000000000001');
+
+      expect(result).to.deep.equal({
+        cart_id: 'cccc0000-0000-0000-0000-000000000001',
+        filters: null,
+        create_user: 42
+      });
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('cart_id');
+      expect(sqlText).to.include('filters');
+      expect(sqlText).to.include('create_user');
+    });
+
+    it('throws ApiExecuteSQLError when download not found', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+
+      try {
+        await repo.getDownloadSource('bad-id');
+        expect.fail('Expected error');
+      } catch (err: any) {
+        expect(err.message).to.equal('Download not found');
+      }
+    });
+  });
+
+  describe('getDownloadFeaturesByCartId', () => {
+    it('joins cart_submission_feature to submission_feature and feature_type', async () => {
+      const knexStub = sinon.stub().resolves({
+        rowCount: 1,
+        rows: [
+          { submission_feature_id: 1, submission_id: 10, feature_type_name: 'observation', estimated_byte_size: '500' }
+        ]
+      } as unknown as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.getDownloadFeaturesByCartId('cccc0000-0000-0000-0000-000000000001');
+
+      expect(result).to.have.length(1);
+      expect(result[0]).to.have.property('submission_feature_id');
+      expect(result[0]).to.have.property('feature_type_name');
+      expect(result[0]).to.have.property('estimated_byte_size');
+
+      const builtQuery = knexStub.firstCall.args[0];
+      const sqlText = builtQuery.toString();
+      expect(sqlText).to.include('cart_submission_feature');
+      expect(sqlText).to.include('submission_feature');
+      expect(sqlText).to.include('feature_type');
+    });
+  });
+
+  describe('getDownloadFeaturesBySearchQuery', () => {
+    it('uses whereIn with Knex subquery and calls connection.knex once', async () => {
+      const knexStub = sinon.stub().resolves({
+        rowCount: 1,
+        rows: [
+          { submission_feature_id: 1, submission_id: 10, feature_type_name: 'observation', estimated_byte_size: '500' }
+        ]
+      } as unknown as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      // Create a mock subquery (a Knex.QueryBuilder-like object)
+      const mockSubquery = { toString: () => 'SELECT submission_feature_id FROM ...' } as any;
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.getDownloadFeaturesBySearchQuery(mockSubquery);
+
+      expect(result).to.have.length(1);
+      // connection.knex should be called exactly once (the outer query, not the subquery)
+      expect(knexStub).to.have.been.calledOnce;
+    });
+  });
+
+  describe('getDownloadTotalSizeByCartId', () => {
+    it('returns aggregate row with total', async () => {
+      const knexStub = sinon.stub().resolves({
+        rowCount: 1,
+        rows: [{ total: '15000' }]
+      } as unknown as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.getDownloadTotalSizeByCartId('cccc0000-0000-0000-0000-000000000001');
+
+      expect(result).to.deep.equal({ total: '15000' });
+    });
+
+    it('returns row with null total when cart has no features', async () => {
+      const knexStub = sinon.stub().resolves({
+        rowCount: 1,
+        rows: [{ total: null }]
+      } as unknown as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.getDownloadTotalSizeByCartId('cccc0000-0000-0000-0000-000000000001');
+
+      expect(result).to.deep.equal({ total: null });
+    });
+  });
+
+  describe('getDownloadTotalSizeBySearchQuery', () => {
+    it('returns aggregate row with total', async () => {
+      const knexStub = sinon.stub().resolves({
+        rowCount: 1,
+        rows: [{ total: '25000' }]
+      } as unknown as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const mockSubquery = { toString: () => 'SELECT submission_feature_id FROM ...' } as any;
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.getDownloadTotalSizeBySearchQuery(mockSubquery);
+
+      expect(result).to.deep.equal({ total: '25000' });
+    });
+
+    it('returns row with null total when no features match', async () => {
+      const knexStub = sinon.stub().resolves({
+        rowCount: 1,
+        rows: [{ total: null }]
+      } as unknown as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const mockSubquery = { toString: () => 'SELECT submission_feature_id FROM ...' } as any;
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.getDownloadTotalSizeBySearchQuery(mockSubquery);
+
+      expect(result).to.deep.equal({ total: null });
     });
   });
 
@@ -289,18 +454,6 @@ describe('DownloadRepository', () => {
       const result = await repo.isDownloadClaimedByTeam('aaaa0000-0000-0000-0000-000000000001');
 
       expect(result).to.be.false;
-    });
-  });
-
-  describe('getDownloadFeatures', () => {
-    it('returns all features linked to a download without security filtering', async () => {
-      const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
-      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.getDownloadFeatures('aaaa0000-0000-0000-0000-000000000001');
-
-      expect(result).to.eql([]);
     });
   });
 });

@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { getKnex } from '../../database/db';
@@ -9,6 +10,8 @@ import {
   DownloadListRecord,
   DownloadListRow,
   DownloadRecord,
+  DownloadSource,
+  DownloadTotalSize,
   HasTeams,
   IsAuthorized
 } from '../../models/download';
@@ -35,12 +38,12 @@ export class DownloadRepository extends BaseRepository {
    * @memberof DownloadRepository
    */
   async createDownload(payload: CreateDownload): Promise<DownloadId> {
-    const { fragmentSizeBytes, filters } = payload;
+    const { fragmentSizeBytes, filters, cartId } = payload;
     const sizeBytes = fragmentSizeBytes ?? FRAGMENT_SIZE_THRESHOLD;
 
     const sql = SQL`
-      INSERT INTO download (download_status, fragment_size_bytes, filters)
-      VALUES ('pending', ${sizeBytes}, ${filters ? JSON.stringify(filters) : null}::jsonb)
+      INSERT INTO download (download_status, fragment_size_bytes, filters, cart_id)
+      VALUES ('pending', ${sizeBytes}, ${filters ? JSON.stringify(filters) : null}::jsonb, ${cartId ?? null})
       RETURNING download_id;
     `;
 
@@ -54,27 +57,6 @@ export class DownloadRepository extends BaseRepository {
     }
 
     return response.rows[0];
-  }
-
-  /**
-   * Link submission features to a download request.
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {number[]} submissionFeatureIds - The submission feature IDs to include.
-   * @return {Promise<void>}
-   * @memberof DownloadRepository
-   */
-  async createDownloadFeatures(downloadId: string, submissionFeatureIds: number[]): Promise<void> {
-    if (submissionFeatureIds.length === 0) {
-      return;
-    }
-
-    const sql = SQL`
-      INSERT INTO download_feature (download_id, submission_feature_id)
-      SELECT ${downloadId}, unnest(${submissionFeatureIds}::integer[]);
-    `;
-
-    await this.connection.sql(sql);
   }
 
   /**
@@ -167,9 +149,6 @@ export class DownloadRepository extends BaseRepository {
         'd.estimated_total_size_bytes',
         'd.fragment_size_bytes',
         'd.create_date',
-        knex.raw(
-          '(SELECT COUNT(*)::int FROM download_feature df WHERE df.download_id = d.download_id) AS feature_count'
-        ),
         knex.raw('COUNT(*) OVER()::int AS total_count')
       ])
       .from('download as d')
@@ -262,18 +241,46 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Returns all features linked to a download.
+   * Get the feature resolution source for a download.
    *
-   * Authorization is enforced at creation time via buildSecurityFilter in the
-   * search query — only authorized features are ever linked. At retrieval time
-   * we return everything that was linked, avoiding the download_team → policy_team
-   * hop that would let later team membership changes alter which features are visible.
+   * Returns cart_id and filters — exactly one should be non-null.
+   * Used by DownloadService.getDownloadFeatures to branch between
+   * cart-based (frozen snapshot) and filter-based (live re-query) paths.
    *
    * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadFeatureSummary[]>} All linked features.
+   * @return {Promise<DownloadSource>}
    * @memberof DownloadRepository
    */
-  async getDownloadFeatures(downloadId: string): Promise<DownloadFeatureSummary[]> {
+  async getDownloadSource(downloadId: string): Promise<DownloadSource> {
+    const sql = SQL`
+      SELECT cart_id, filters, create_user
+      FROM download
+      WHERE download_id = ${downloadId};
+    `;
+
+    const response = await this.connection.sql(sql, DownloadSource);
+
+    if (response.rowCount === 0) {
+      throw new ApiExecuteSQLError('Download not found', [
+        'DownloadRepository->getDownloadSource',
+        'rowCount was 0, expected 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Resolve download features from cart_submission_feature.
+   *
+   * Cart downloads are frozen: checkout marks the cart as CHECKED_OUT,
+   * so cart_submission_feature rows don't change after checkout.
+   *
+   * @param {string} cartId - The cart ID (from download.cart_id).
+   * @return {Promise<DownloadFeatureSummary[]>}
+   * @memberof DownloadRepository
+   */
+  async getDownloadFeaturesByCartId(cartId: string): Promise<DownloadFeatureSummary[]> {
     const knex = getKnex();
 
     const query = knex
@@ -283,13 +290,187 @@ export class DownloadRepository extends BaseRepository {
         knex.raw('ft.name AS feature_type_name'),
         knex.raw('sf.data_byte_size AS estimated_byte_size')
       ])
-      .from('download_feature as df')
-      .innerJoin('submission_feature as sf', 'df.submission_feature_id', 'sf.submission_feature_id')
+      .from('cart_submission_feature as csf')
+      .innerJoin('submission_feature as sf', 'csf.submission_feature_id', 'sf.submission_feature_id')
       .innerJoin('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
-      .where('df.download_id', downloadId);
+      .where('csf.cart_id', cartId);
 
     const response = await this.connection.knex(query, DownloadFeatureSummary);
     return response.rows;
+  }
+
+  /**
+   * Resolve download features by joining a search subquery directly to
+   * submission_feature + feature_type — entirely in SQL, no round-trip.
+   *
+   * The search CTE (with security filtering) runs as a subquery inside
+   * WHERE IN, so PostgreSQL plans and executes it in a single statement.
+   * This avoids pulling potentially 500K+ IDs into a JS array.
+   *
+   * @param {Knex.QueryBuilder} searchSubquery - Unexecuted Knex subquery
+   *   returning submission_feature_id rows (from SearchFeatureRepository).
+   * @return {Promise<DownloadFeatureSummary[]>}
+   * @memberof DownloadRepository
+   */
+  async getDownloadFeaturesBySearchQuery(searchSubquery: Knex.QueryBuilder): Promise<DownloadFeatureSummary[]> {
+    const knex = getKnex();
+
+    const query = knex
+      .select([
+        'sf.submission_feature_id',
+        'sf.submission_id',
+        knex.raw('ft.name AS feature_type_name'),
+        knex.raw('sf.data_byte_size AS estimated_byte_size')
+      ])
+      .from('submission_feature as sf')
+      .innerJoin('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
+      .whereIn('sf.submission_feature_id', searchSubquery);
+
+    const response = await this.connection.knex(query, DownloadFeatureSummary);
+    return response.rows;
+  }
+
+  /**
+   * Get total estimated byte size for a cart-based download as a SQL aggregate.
+   *
+   * Returns SUM(data_byte_size) for all features in the cart. Never materializes
+   * feature rows in JS — returns a single row with the aggregate from the database.
+   * Callers coerce the string total to a number (BIGINT returns as string from pg).
+   *
+   * @param {string} cartId - The cart ID (from download.cart_id).
+   * @return {Promise<DownloadTotalSize>} Row with total (string or null).
+   * @memberof DownloadRepository
+   */
+  async getDownloadTotalSizeByCartId(cartId: string): Promise<DownloadTotalSize> {
+    const knex = getKnex();
+    const query = knex
+      .sum('sf.data_byte_size as total')
+      .from('cart_submission_feature as csf')
+      .innerJoin('submission_feature as sf', 'csf.submission_feature_id', 'sf.submission_feature_id')
+      .where('csf.cart_id', cartId)
+      .first();
+
+    const response = await this.connection.knex(query, DownloadTotalSize);
+    return response.rows[0];
+  }
+
+  /**
+   * Get total estimated byte size for a filter-based download as a SQL aggregate.
+   *
+   * Returns SUM(data_byte_size) for all features matching the search subquery.
+   * Never materializes feature rows in JS — returns a single row with the aggregate.
+   * Callers coerce the string total to a number (BIGINT returns as string from pg).
+   *
+   * @param {Knex.QueryBuilder} searchSubquery - Unexecuted Knex subquery
+   *   returning submission_feature_id rows (from SearchFeatureRepository).
+   * @return {Promise<DownloadTotalSize>} Row with total (string or null).
+   * @memberof DownloadRepository
+   */
+  async getDownloadTotalSizeBySearchQuery(searchSubquery: Knex.QueryBuilder): Promise<DownloadTotalSize> {
+    const knex = getKnex();
+    const query = knex
+      .sum('sf.data_byte_size as total')
+      .from('submission_feature as sf')
+      .whereIn('sf.submission_feature_id', searchSubquery)
+      .first();
+
+    const response = await this.connection.knex(query, DownloadTotalSize);
+    return response.rows[0];
+  }
+
+  /**
+   * Stream features for a cart-based download using a SQL cursor.
+   *
+   * Yields batches of DownloadFeatureSummary to avoid loading 500K+ rows
+   * into JS memory. Features are sorted by feature_type_name so bin packing
+   * keeps same types together, minimizing duplicate CSVs across fragments.
+   *
+   * Must be called within an open transaction (cursors require tx context).
+   * Follows the streamFragmentFeaturesByType pattern.
+   *
+   * @param {string} cartId - The cart ID (from download.cart_id).
+   * @param {number} [batchSize=5000] - Rows per FETCH.
+   * @yields {DownloadFeatureSummary[]} Batches of feature summaries.
+   * @memberof DownloadRepository
+   */
+  async *streamDownloadFeaturesByCartId(cartId: string, batchSize = 5000): AsyncGenerator<DownloadFeatureSummary[]> {
+    const cursorName = `dl_cart_cursor_${cartId.replace(/[^a-z0-9_]/gi, '_')}`;
+
+    await this.connection.query(
+      `DECLARE ${cursorName} CURSOR FOR
+        SELECT
+          sf.submission_feature_id,
+          sf.submission_id,
+          ft.name AS feature_type_name,
+          sf.data_byte_size AS estimated_byte_size
+        FROM cart_submission_feature csf
+        INNER JOIN submission_feature sf ON csf.submission_feature_id = sf.submission_feature_id
+        INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
+        WHERE csf.cart_id = $1
+        ORDER BY ft.name, sf.submission_feature_id`,
+      [cartId]
+    );
+
+    try {
+      while (true) {
+        const result = await this.connection.query<DownloadFeatureSummary>(`FETCH ${batchSize} FROM ${cursorName}`);
+        if (result.rows.length === 0) {
+          break;
+        }
+        yield result.rows;
+      }
+    } finally {
+      await this.connection.query(`CLOSE ${cursorName}`);
+    }
+  }
+
+  /**
+   * Stream features for a filter-based download using a SQL cursor.
+   *
+   * The search CTE (with security filtering) is embedded in the cursor
+   * declaration — features are resolved and streamed in a single SQL
+   * statement, never materializing the full ID set in JS.
+   *
+   * @param {string} downloadId - The download ID (used for cursor naming).
+   * @param {string} searchSql - Raw SQL for the search subquery (from buildSearchFeatureIdsSubquery).
+   * @param {any[]} searchBindings - Parameterized bindings for the search SQL.
+   * @param {number} [batchSize=5000] - Rows per FETCH.
+   * @yields {DownloadFeatureSummary[]} Batches of feature summaries.
+   * @memberof DownloadRepository
+   */
+  async *streamDownloadFeaturesBySearchQuery(
+    downloadId: string,
+    searchSql: string,
+    searchBindings: any[],
+    batchSize = 5000
+  ): AsyncGenerator<DownloadFeatureSummary[]> {
+    const cursorName = `dl_filter_cursor_${downloadId.replace(/[^a-z0-9_]/gi, '_')}`;
+
+    await this.connection.query(
+      `DECLARE ${cursorName} CURSOR FOR
+        SELECT
+          sf.submission_feature_id,
+          sf.submission_id,
+          ft.name AS feature_type_name,
+          sf.data_byte_size AS estimated_byte_size
+        FROM submission_feature sf
+        INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
+        WHERE sf.submission_feature_id IN (${searchSql})
+        ORDER BY ft.name, sf.submission_feature_id`,
+      searchBindings
+    );
+
+    try {
+      while (true) {
+        const result = await this.connection.query<DownloadFeatureSummary>(`FETCH ${batchSize} FROM ${cursorName}`);
+        if (result.rows.length === 0) {
+          break;
+        }
+        yield result.rows;
+      }
+    } finally {
+      await this.connection.query(`CLOSE ${cursorName}`);
+    }
   }
 
   /**
