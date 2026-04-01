@@ -50,7 +50,7 @@ describe('DownloadService', () => {
       expect(result).to.deep.equal({ downloads: [], count: 0 });
     });
 
-    it('passes through DownloadListRecord fields including create_date and feature_count', async () => {
+    it('passes through DownloadListRecord fields including create_date', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadService(mockDBConnection);
 
@@ -66,8 +66,7 @@ describe('DownloadService', () => {
           completed_fragments: 1,
           estimated_total_size_bytes: '1000',
           fragment_size_bytes: '524288000',
-          create_date: '2025-01-01T00:00:00Z',
-          feature_count: 5
+          create_date: '2025-01-01T00:00:00Z'
         }
       ];
 
@@ -79,7 +78,6 @@ describe('DownloadService', () => {
 
       expect(result.downloads).to.have.length(1);
       expect(result.downloads[0]).to.have.property('create_date', '2025-01-01T00:00:00Z');
-      expect(result.downloads[0]).to.have.property('feature_count', 5);
       expect(result.count).to.equal(1);
     });
   });
