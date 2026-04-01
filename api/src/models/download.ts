@@ -61,10 +61,14 @@ export type DownloadFeatureSummary = z.infer<typeof DownloadFeatureSummary>;
  * Minimal projection of a download record for feature resolution.
  * Used by DownloadService.getDownloadFeatures to branch between
  * cart-based (frozen snapshot) and filter-based (live re-query) paths.
+ *
+ * Includes create_user so the pipeline can recover the creator's security
+ * context for filter-based re-queries without a separate round-trip.
  */
 export const DownloadSource = z.object({
   cart_id: z.string().uuid().nullable(),
-  filters: SearchFeatureFiltersSchema.nullable()
+  filters: SearchFeatureFiltersSchema.nullable(),
+  create_user: z.number()
 });
 export type DownloadSource = z.infer<typeof DownloadSource>;
 
@@ -108,6 +112,9 @@ export const CreateDownloadRequest = z.object({
   filters: SearchFeatureFiltersSchema.optional()
 });
 export type CreateDownloadRequest = z.infer<typeof CreateDownloadRequest>;
+
+export const DownloadTotalSize = z.object({ total: z.string().nullable() });
+export type DownloadTotalSize = z.infer<typeof DownloadTotalSize>;
 
 export const IsAuthorized = z.object({ authorized: z.boolean() });
 export type IsAuthorized = z.infer<typeof IsAuthorized>;
