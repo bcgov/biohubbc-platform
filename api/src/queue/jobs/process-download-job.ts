@@ -1,8 +1,9 @@
 import PgBoss from 'pg-boss';
-import { getAPIUserDBConnection, IDBConnection } from '../../database/db';
+import { getAPIUserDBConnection } from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { getLogger } from '../../utils/logger';
+import { withConnection } from '../with-connection';
 
 const defaultLog = getLogger('queue/jobs/process-download-job');
 
@@ -13,30 +14,6 @@ const defaultLog = getLogger('queue/jobs/process-download-job');
 export interface IProcessDownloadJobData {
   /** The download ID to process */
   downloadId: string;
-}
-
-/**
- * Run a callback within a dedicated database transaction.
- *
- * Opens a connection, executes the callback, commits on success, rolls back on error.
- *
- * @param {(connection: IDBConnection) => Promise<T>} fn - The callback to execute.
- * @return {Promise<T>} The callback's return value.
- */
-async function withConnection<T>(fn: (connection: IDBConnection) => Promise<T>): Promise<T> {
-  const connection = getAPIUserDBConnection();
-
-  try {
-    await connection.open();
-    const result = await fn(connection);
-    await connection.commit();
-    return result;
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
 }
 
 /**

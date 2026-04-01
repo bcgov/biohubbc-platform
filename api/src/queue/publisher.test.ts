@@ -10,6 +10,7 @@ import { getMockDBConnection } from '../__mocks__/db';
 import { JobQueues } from './jobs';
 import * as pgBossService from './pg-boss-service';
 import {
+  publishComputeScopeAnchorsJob,
   publishIndexSubmissionFeaturesJob,
   publishMalwareScanJob,
   publishProcessDownloadJob,
@@ -598,6 +599,100 @@ describe('publisher', () => {
       const result = await publishProcessDownloadJob(mockConnection, {
         downloadId: 'aaaa0000-0000-0000-0000-000000000001'
       });
+
+      expect(result.status).to.equal('error');
+      expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
+    });
+  });
+
+  describe('publishComputeScopeAnchorsJob', () => {
+    it('publishes job to correct queue with securityScopeId in payload', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('anchors-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      const data = { securityScopeId: 'scope-uuid-1' };
+      const result = await publishComputeScopeAnchorsJob(mockConnection, data);
+
+      expect(createQueueStub.calledOnce).to.be.true;
+      expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS);
+      expect(sendStub.calledOnce).to.be.true;
+      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS);
+      expect(sendStub.firstCall.args[1]).to.deep.equal(data);
+      expect(result.status).to.equal('published');
+      expect((result as { status: 'published'; jobId: string }).jobId).to.equal('anchors-job-id');
+    });
+
+    it('uses 30 minute timeout with retry backoff', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('anchors-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.retryLimit).to.equal(3);
+      expect(options.retryDelay).to.equal(60);
+      expect(options.retryBackoff).to.equal(true);
+      expect(options.expireInSeconds).to.equal(60 * 30);
+    });
+
+    it('passes db option using caller connection for transactional job insert', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('anchors-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.db).to.exist;
+      expect(options.db.executeSql).to.be.a('function');
+    });
+
+    it('uses global singletonKey to serialize all anchor computation jobs', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('anchors-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-456' });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.singletonKey).to.equal('scope-anchors');
+    });
+
+    it('returns duplicate status when send returns null', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves(null);
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+
+      const result = await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
+
+      expect(result.status).to.equal('duplicate');
+      expect((result as { status: 'duplicate'; message: string }).message).to.equal(
+        'Job already exists for this security scope'
+      );
+    });
+
+    it('returns error status when pg-boss throws', async () => {
+      const mockConnection = getMockDBConnection();
+      sinon.stub(pgBossService, 'getPgBoss').throws(new Error('pg-boss not initialized'));
+
+      const result = await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
 
       expect(result.status).to.equal('error');
       expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');

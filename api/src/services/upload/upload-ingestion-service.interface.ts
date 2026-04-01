@@ -6,6 +6,7 @@ export interface UploadPart {
 interface PresignedUrl {
   partNumber: number;
   url: string;
+  partSizeBytes: number;
 }
 
 export interface PresignedUploadUrlResponse {
@@ -15,7 +16,6 @@ export interface PresignedUploadUrlResponse {
   s3UploadId: string;
   uploadArchiveId: string;
   key: string;
-  partSizeBytes: number;
   partCount: number;
   presignedUrls: PresignedUrl[];
 }

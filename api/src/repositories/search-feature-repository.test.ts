@@ -742,4 +742,132 @@ describe('SearchFeatureRepository', () => {
       expect(knexSpy.callCount).to.equal(1);
     });
   });
+
+  describe('buildUserAccessFilter (via searchFeaturesByFilters)', () => {
+    it('should not apply access filter when systemUserId is undefined (internal caller)', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 1, rows: [{ submission_feature_id: 1 }] });
+
+      const mockDBConnection = getMockDBConnection({
+        knex: knexSpy
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeaturesByFilters({ keyword: 'moose' }, undefined, undefined);
+
+      expect(knexSpy.callCount).to.be.greaterThan(0);
+      const builtQuery = knexSpy.firstCall.args[0];
+      const sql = builtQuery.toString();
+      // No walk-up ancestor check or is_secured WHERE filter applied for internal callers
+      expect(sql).to.not.include('security_scope_anchor');
+      expect(sql).to.not.include('team_security_scope');
+    });
+
+    it('should filter to unsecured-only when systemUserId is null (anonymous)', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 1, rows: [{ submission_feature_id: 1 }] });
+
+      const mockDBConnection = getMockDBConnection({
+        knex: knexSpy
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeaturesByFilters({ keyword: 'moose' }, undefined, null);
+
+      expect(knexSpy.callCount).to.be.greaterThan(0);
+      const builtQuery = knexSpy.firstCall.args[0];
+      const sql = builtQuery.toString();
+      expect(sql).to.include('is_secured');
+      expect(sql).to.not.include('security_scope_anchor');
+    });
+
+    it('should apply walk-up ancestor check when systemUserId is a number (authenticated)', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 1, rows: [{ submission_feature_id: 1 }] });
+
+      const mockDBConnection = getMockDBConnection({
+        knex: knexSpy
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeaturesByFilters({ keyword: 'moose' }, undefined, 42);
+
+      expect(knexSpy.callCount).to.be.greaterThan(0);
+      const builtQuery = knexSpy.firstCall.args[0];
+      const sql = builtQuery.toString();
+      expect(sql).to.include('security_scope_anchor');
+      expect(sql).to.include('team_security_scope');
+      expect(sql).to.include('team_member');
+      expect(sql).to.include('is_secured');
+    });
+
+    it('should include the systemUserId parameter in the walk-up SQL', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 1, rows: [{ submission_feature_id: 1 }] });
+
+      const mockDBConnection = getMockDBConnection({
+        knex: knexSpy
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeaturesByFilters({ keyword: 'moose' }, undefined, 99);
+
+      const builtQuery = knexSpy.firstCall.args[0];
+      const sql = builtQuery.toString();
+      expect(sql).to.include('99');
+    });
+  });
+
+  describe('buildUserAccessFilter (via searchFeaturesByFiltersCount)', () => {
+    it('should not apply access filter when systemUserId is undefined', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 1, rows: [{ count: 5 }] });
+
+      const mockDBConnection = getMockDBConnection({
+        knex: knexSpy
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeaturesByFiltersCount({ keyword: 'moose' }, undefined);
+
+      const builtQuery = knexSpy.firstCall.args[0];
+      const sql = builtQuery.toString();
+      expect(sql).to.not.include('security_scope_anchor');
+    });
+
+    it('should filter to unsecured-only when systemUserId is null', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 1, rows: [{ count: 3 }] });
+
+      const mockDBConnection = getMockDBConnection({
+        knex: knexSpy
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeaturesByFiltersCount({ keyword: 'moose' }, null);
+
+      const builtQuery = knexSpy.firstCall.args[0];
+      const sql = builtQuery.toString();
+      expect(sql).to.include('is_secured');
+      expect(sql).to.not.include('security_scope_anchor');
+    });
+
+    it('should apply walk-up ancestor check when systemUserId is a number', async () => {
+      const knexSpy = Sinon.stub().resolves({ rowCount: 1, rows: [{ count: 3 }] });
+
+      const mockDBConnection = getMockDBConnection({
+        knex: knexSpy
+      });
+
+      const repository = new SearchFeatureRepository(mockDBConnection);
+
+      await repository.searchFeaturesByFiltersCount({ keyword: 'moose' }, 42);
+
+      const builtQuery = knexSpy.firstCall.args[0];
+      const sql = builtQuery.toString();
+      expect(sql).to.include('security_scope_anchor');
+      expect(sql).to.include('team_security_scope');
+      expect(sql).to.include('team_member');
+    });
+  });
 });

@@ -28,6 +28,7 @@ app:
   requestLimits:
     uploadNumFiles: 10 # Default maximum number of files that can be uploaded at a time vai the upload component UI.
     uploadFileSize: "52428800" # Default maximum size of a single file that can be uploaded by the upload component UI.
+    uploadTarballSize: "10737418240" # Maximum allowed TAR upload size in bytes (10 GB).
   
   
 # Openshift Resources

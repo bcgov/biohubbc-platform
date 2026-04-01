@@ -3,14 +3,17 @@ import { CreateTeamPolicy, TeamPolicy, TeamPolicyDetails, UpdateTeamPolicy } fro
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
+import { SecurityScopeService } from './security-scope-service';
 import { TeamPolicyFilters } from './team-policy-service.interface';
 
 export class TeamPolicyService extends DBService {
   teamPolicyRepository: TeamPolicyRepository;
+  securityScopeService: SecurityScopeService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.teamPolicyRepository = new TeamPolicyRepository(connection);
+    this.securityScopeService = new SecurityScopeService(connection);
   }
 
   /**
@@ -34,7 +37,12 @@ export class TeamPolicyService extends DBService {
       };
     }
 
-    return this.teamPolicyRepository.insertTeamPolicy(teamPolicyData);
+    const teamPolicy = await this.teamPolicyRepository.insertTeamPolicy(teamPolicyData);
+
+    // Grant the team access to all scopes derived from this policy's statements
+    await this.securityScopeService.grantTeamScopesForPolicy(teamPolicyData.team_id, teamPolicyData.policy_id);
+
+    return teamPolicy;
   }
 
   /**
@@ -59,11 +67,19 @@ export class TeamPolicyService extends DBService {
 
     const policyIdsToCreate = uniquePolicyIds.filter((policyId) => !existingPolicyIds.has(policyId));
 
-    return Promise.all(
+    const createdTeamPolicies = await Promise.all(
       policyIdsToCreate.map((policyId) =>
         this.teamPolicyRepository.insertTeamPolicy({ team_id: teamId, policy_id: policyId })
       )
     );
+
+    // Grant scopes only for newly created team-policy associations.
+    // Pre-existing policies already had their scopes granted on first creation.
+    for (const policyId of policyIdsToCreate) {
+      await this.securityScopeService.grantTeamScopesForPolicy(teamId, policyId);
+    }
+
+    return createdTeamPolicies;
   }
 
   /**
@@ -128,13 +144,21 @@ export class TeamPolicyService extends DBService {
   }
 
   /**
-   * Delete a team policy record.
+   * Delete a team policy and rebuild the team's security scope grants.
+   *
+   * Fetches the team_id before soft-deleting, because the rebuild needs to
+   * re-derive scopes from the remaining active policy chain for that team.
    *
    * @param {string} teamPolicyId - The id of the team policy to delete
    * @return {Promise<void>}
    * @memberof TeamPolicyService
    */
   async deleteTeamPolicy(teamPolicyId: string): Promise<void> {
+    const teamPolicy = await this.teamPolicyRepository.getTeamPolicy(teamPolicyId);
+
     await this.teamPolicyRepository.deleteTeamPolicy(teamPolicyId);
+
+    // Rebuild the team's scope grants from the remaining active policy chain
+    await this.securityScopeService.rebuildTeamSecurityScopes(teamPolicy.team_id);
   }
 }

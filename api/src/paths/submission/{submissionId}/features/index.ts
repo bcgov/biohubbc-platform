@@ -1,36 +1,22 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../constants/roles';
-import { getDBConnection } from '../../../../database/db';
+import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../../../openapi/schemas/pagination';
-import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { SubmissionService } from '../../../../services/submission-service';
 import { getLogger } from '../../../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../../utils/pagination';
 
 const defaultLog = getLogger('paths/submission/{submissionId}');
 
-export const GET: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
-          discriminator: 'SystemRole'
-        }
-      ]
-    };
-  }),
-  getSubmissionFeatures()
-];
+export const GET: Operation = [getSubmissionFeatures()];
 
 GET.apiDoc = {
-  description: 'Retrieves a submission record from the submission table',
+  description: 'Retrieves submission features. Supports both authenticated and anonymous users.',
   tags: ['submission'],
   security: [
     {
-      Bearer: []
+      OptionalBearer: []
     }
   ],
   parameters: [
@@ -88,13 +74,15 @@ GET.apiDoc = {
 };
 
 /**
- * Retrieves paginated child submission feature records.
+ * Retrieves paginated submission feature records. Uses the request token when present, otherwise the API user connection for anonymous requests.
+ *
+ * Returns all features (secured and unsecured).
  *
  * @returns {RequestHandler}
  */
 export function getSubmissionFeatures(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req.keycloak_token);
+    const connection = req.keycloak_token ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
 
     const submissionId = Number(req.params.submissionId);
     const paginationOptions = makePaginationOptionsFromRequest(req);
@@ -104,7 +92,6 @@ export function getSubmissionFeatures(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
 
-      // Service method must support pagination options
       const [features, count] = await Promise.all([
         submissionService.getSubmissionFeatures(submissionId, paginationOptions),
         submissionService.getSubmissionFeaturesCount(submissionId)

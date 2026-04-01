@@ -6,7 +6,7 @@ import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fileToUint8Array, uploadMultipartTar } from 'utils/submission-upload-utils';
+import { uploadMultipartTar } from 'utils/submission-upload-utils';
 import yup from 'utils/YupSchema';
 import { CreateSubmissionForm } from './form/CreateSubmissionForm';
 import { ICreateSubmissionForm } from './form/CreateSubmissionForm.interface';
@@ -47,17 +47,17 @@ export const CreateSubmissionPage = () => {
     const { file, ...submission } = values;
 
     try {
-      const tarData = await fileToUint8Array(file);
-
       // Request pre-signed upload URLs for multipart upload
       const uploadResponse = await bioHubApi.submissions.getSubmissionUploadUrls({
         ...submission,
-        bytes: tarData.length
+        bytes: file.size
       });
-      const uploadUrls = uploadResponse.presignedUrls.map((presigned) => presigned.url);
 
+      // Client follows backend-provided multipart instructions:
+      // - `presignedUrls` already include server-assigned part numbers.
+      // - each part includes an exact `partSizeBytes` instruction.
       // Upload TAR file in multiple parts
-      const parts = await uploadMultipartTar(uploadUrls, tarData);
+      const parts = await uploadMultipartTar(uploadResponse.presignedUrls, file);
 
       // Mark upload as complete
       await bioHubApi.submissions.completeSubmissionUpload(

@@ -191,4 +191,112 @@ export async function seed(knex: Knex): Promise<void> {
   }
 
   // Do not add users to the sampling sites policy team, for confirming that only team members can access features covered by the policy
+
+  /** ------------------------------------------------------------------
+   * 3. SECURE FEATURES + WIRE SCOPE TABLES
+   *
+   * Mark some seeded dataset features as secured so the lock icon
+   * appears in the search UI. Then wire the normalized scope tables
+   * (security_scope → policy_statement_scope → security_scope_anchor
+   * → team_security_scope) so that team members can access them.
+   *
+   * Pattern mirrors docs/SIMSBIOHUB-914/sql/scale-data-scopes.sql
+   * ------------------------------------------------------------------ */
+
+  // 3a. Mark the first 3 dataset features as secured.
+  //     Resolve IDs dynamically instead of hardcoding (IDs are not stable across environments).
+  const securedDatasetRows = await knex('submission_feature as sf')
+    .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
+    .where('ft.name', 'dataset')
+    .whereNull('sf.record_end_date')
+    .orderBy('sf.submission_feature_id', 'asc')
+    .select('sf.submission_feature_id')
+    .limit(3);
+
+  const securedDatasetIds = securedDatasetRows.map((row) => row.submission_feature_id);
+
+  // Use first security rule available
+  const firstRule = await knex('security_rule').whereNull('record_end_date').select('security_rule_id').first();
+  if (!firstRule) {
+    return; // no security rules seeded — skip scope wiring
+  }
+
+  for (const featureId of securedDatasetIds) {
+    const exists = await knex('submission_feature_security')
+      .where({ submission_feature_id: featureId, security_rule_id: firstRule.security_rule_id })
+      .first();
+
+    if (!exists) {
+      await knex('submission_feature_security').insert({
+        submission_feature_id: featureId,
+        security_rule_id: firstRule.security_rule_id,
+        create_user: createUser
+      });
+    }
+  }
+
+  // 3b. Create security scopes for each policy statement URN
+  const statements = [
+    { statement: telemetryStatement, urn: 'urn:*:telemetry:*', team: telemetryTeam },
+    {
+      statement: await knex('policy_statement')
+        .where({ policy_id: adminPolicy.policy_id, submission_feature_urn: 'urn:*:sample_site:*' })
+        .whereNull('record_end_date')
+        .first(),
+      urn: 'urn:*:sample_site:*',
+      team: adminTeam
+    }
+  ];
+
+  for (const { statement, urn, team } of statements) {
+    if (!statement) {
+      continue;
+    }
+
+    // scope_hash = sha256 of the URN (matches API SecurityScopeRepository pattern)
+    const scopeHashResult = await knex.raw(`SELECT encode(sha256(?::BYTEA), 'hex') as hash`, [urn]);
+    const scopeHash = scopeHashResult.rows[0].hash;
+
+    // Insert or find the security_scope
+    let scope = await knex('security_scope').where({ scope_hash: scopeHash }).first();
+    if (!scope) {
+      const [inserted] = await knex('security_scope').insert({ scope_hash: scopeHash }).returning('*');
+      scope = inserted;
+    }
+
+    // Link policy_statement → scope
+    const pssExists = await knex('policy_statement_scope')
+      .where({ policy_statement_id: statement.policy_statement_id })
+      .first();
+    if (!pssExists) {
+      await knex('policy_statement_scope').insert({
+        policy_statement_id: statement.policy_statement_id,
+        security_scope_id: scope.security_scope_id
+      });
+    }
+
+    // Anchor the scope to each secured dataset
+    for (const featureId of securedDatasetIds) {
+      const anchorExists = await knex('security_scope_anchor')
+        .where({ security_scope_id: scope.security_scope_id, anchor_submission_feature_id: featureId })
+        .first();
+      if (!anchorExists) {
+        await knex('security_scope_anchor').insert({
+          security_scope_id: scope.security_scope_id,
+          anchor_submission_feature_id: featureId
+        });
+      }
+    }
+
+    // Grant team access to the scope
+    const tssExists = await knex('team_security_scope')
+      .where({ team_id: team.team_id, security_scope_id: scope.security_scope_id })
+      .first();
+    if (!tssExists) {
+      await knex('team_security_scope').insert({
+        team_id: team.team_id,
+        security_scope_id: scope.security_scope_id
+      });
+    }
+  }
 }

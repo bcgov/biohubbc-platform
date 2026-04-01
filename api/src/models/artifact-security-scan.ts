@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { jsonSchema } from '../zod-schema/json';
 import { ProcessStatusStatusZod } from './process-status';
 
 /**
@@ -10,7 +11,7 @@ export const ArtifactSecurityScan = z.object({
   scan_status: ProcessStatusStatusZod,
   scanner_version: z.string().nullable(),
   scanned_at: z.string().nullable(),
-  results: z.record(z.any()).nullable()
+  results: jsonSchema.nullable()
 });
 export type ArtifactSecurityScan = z.infer<typeof ArtifactSecurityScan>;
 
@@ -22,7 +23,7 @@ export const CreateArtifactSecurityScan = z.object({
   scan_status: ProcessStatusStatusZod,
   scanner_version: z.string().nullable(),
   scanned_at: z.string().nullable(),
-  results: z.record(z.any()).nullable()
+  results: jsonSchema.nullable()
 });
 export type CreateArtifactSecurityScan = z.infer<typeof CreateArtifactSecurityScan>;
 
@@ -34,6 +35,6 @@ export const UpdateArtifactSecurityScan = z.object({
   scan_status: ProcessStatusStatusZod.optional(),
   scanner_version: z.string().nullable().optional(),
   scanned_at: z.string().nullable().optional(),
-  results: z.record(z.any()).nullable().optional()
+  results: jsonSchema.nullable().optional()
 });
 export type UpdateArtifactSecurityScan = z.infer<typeof UpdateArtifactSecurityScan>;

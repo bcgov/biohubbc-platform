@@ -1,5 +1,4 @@
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
@@ -265,10 +264,10 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Returns all features linked to a download.
    *
-   * Authorization is enforced at creation time via filterAuthorizedFeatureIds —
-   * only authorized features are ever linked. At retrieval time we return
-   * everything that was linked, avoiding the download_team → policy_team hop
-   * that would let later team membership changes alter which features are visible.
+   * Authorization is enforced at creation time via buildSecurityFilter in the
+   * search query — only authorized features are ever linked. At retrieval time
+   * we return everything that was linked, avoiding the download_team → policy_team
+   * hop that would let later team membership changes alter which features are visible.
    *
    * @param {string} downloadId - The download ID.
    * @return {Promise<DownloadFeatureSummary[]>} All linked features.
@@ -291,97 +290,6 @@ export class DownloadRepository extends BaseRepository {
 
     const response = await this.connection.knex(query, DownloadFeatureSummary);
     return response.rows;
-  }
-
-  /**
-   * Returns which of the given feature IDs are secured — directly or by
-   * inheriting security from an ancestor.
-   *
-   * Walks DOWN from secured roots to all descendants, the opposite direction
-   * of buildSecurityCheck() (which walks UP from a feature to its ancestors).
-   * Using a different traversal direction makes this a genuine cross-check:
-   * if the two methods disagree, there's a bug.
-   *
-   * Scoped to submissions containing the candidate features to avoid walking
-   * every secured tree in the system.
-   *
-   * @param {number[]} submissionFeatureIds - Feature IDs to check.
-   * @return {Promise<Set<number>>} Set of feature IDs that are secured.
-   * @memberof DownloadRepository
-   */
-  async getSecuredFeatureIds(submissionFeatureIds: number[]): Promise<Set<number>> {
-    if (submissionFeatureIds.length === 0) {
-      return new Set();
-    }
-
-    const sql = SQL`
-      WITH RECURSIVE secured_descendants AS (
-        -- Base: directly secured features, scoped to relevant submissions
-        SELECT sfs.submission_feature_id
-        FROM submission_feature_security sfs
-        INNER JOIN submission_feature sf ON sf.submission_feature_id = sfs.submission_feature_id
-        WHERE sfs.record_end_date IS NULL
-          AND sf.submission_id IN (
-            SELECT submission_id FROM submission_feature
-            WHERE submission_feature_id = ANY(${submissionFeatureIds}::int[])
-          )
-
-        UNION ALL
-
-        -- Walk down to children
-        SELECT child.submission_feature_id
-        FROM submission_feature child
-        INNER JOIN secured_descendants sd ON child.parent_submission_feature_id = sd.submission_feature_id
-      )
-      SELECT DISTINCT submission_feature_id
-      FROM secured_descendants
-      WHERE submission_feature_id = ANY(${submissionFeatureIds}::int[]);
-    `;
-
-    const response = await this.connection.sql(sql, z.object({ submission_feature_id: z.number() }));
-    return new Set(response.rows.map((r) => r.submission_feature_id));
-  }
-
-  /**
-   * Returns which of the given secured feature IDs the user has policy access to.
-   *
-   * Checks the user's team memberships for ALLOW policy statements matching
-   * each feature's submission, feature type, and feature ID. Used at download
-   * creation time before the download_team link exists — unlike
-   * getSecuredAuthorizedFeatures which checks via the download's teams.
-   *
-   * @param {number[]} submissionFeatureIds - Secured feature IDs to check.
-   * @param {number} systemUserId - The user to check policies for.
-   * @return {Promise<Set<number>>} Feature IDs the user is authorized to access.
-   * @memberof DownloadRepository
-   */
-  async getUserAuthorizedSecuredFeatureIds(submissionFeatureIds: number[], systemUserId: number): Promise<Set<number>> {
-    if (submissionFeatureIds.length === 0) {
-      return new Set();
-    }
-
-    const knex = getKnex();
-
-    const query = knex
-      .distinct('sf.submission_feature_id')
-      .from('submission_feature as sf')
-      .innerJoin('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
-      .whereIn('sf.submission_feature_id', submissionFeatureIds)
-      .andWhereRaw(
-        `EXISTS (
-          SELECT 1
-          FROM team_member tm
-          INNER JOIN team_policy tp ON tp.team_id = tm.team_id AND tp.record_end_date IS NULL
-          INNER JOIN policy_statement ps ON ps.policy_id = tp.policy_id AND ps.record_end_date IS NULL
-          WHERE tm.system_user_id = ?
-            AND tm.record_end_date IS NULL
-            AND ${this.buildPolicyMatchConditions()}
-        )`,
-        [systemUserId]
-      );
-
-    const response = await this.connection.knex(query, z.object({ submission_feature_id: z.number() }));
-    return new Set(response.rows.map((r) => r.submission_feature_id));
   }
 
   /**
@@ -489,22 +397,5 @@ export class DownloadRepository extends BaseRepository {
     const response = await this.connection.sql(sql, HasTeams);
 
     return response.rows[0]?.has_teams ?? false;
-  }
-
-  /**
-   * SQL conditions for policy statement feature-level authorization.
-   * Single source of truth for policy matching at download creation time.
-   *
-   * Requires outer query aliases: ps (policy_statement),
-   * sf (submission_feature), ft (feature_type).
-   *
-   * @return {string} Raw SQL conditions fragment.
-   * @memberof DownloadRepository
-   */
-  private buildPolicyMatchConditions(): string {
-    return `ps.effect = 'allow'
-            AND (ps.urn_submission_id = sf.submission_id::text OR ps.urn_submission_id = '*')
-            AND (ps.urn_feature_type = ft.name OR ps.urn_feature_type = '*')
-            AND (ps.urn_feature_id = sf.submission_feature_id::text OR ps.urn_feature_id = '*')`;
   }
 }

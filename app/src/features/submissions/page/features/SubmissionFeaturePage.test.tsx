@@ -1,0 +1,141 @@
+import { useCartContext } from 'hooks/useContext';
+import { useApi } from 'hooks/useApi';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { render } from 'test-helpers/test-utils';
+import { Mock } from 'vitest';
+import { SubmissionFeaturePage } from './SubmissionFeaturePage';
+
+vi.mock('../../../../hooks/useApi');
+vi.mock('../../../../hooks/useContext', () => ({
+  useCartContext: vi.fn()
+}));
+
+const mockUseApi = useApi as Mock;
+const mockUseCartContext = useCartContext as Mock;
+
+const mockGetSubmissionFeatureById = vi.fn();
+const mockGetCartFeatures = vi.fn();
+const mockAddToCart = vi.fn();
+const mockRemoveFromCart = vi.fn();
+
+const mockFeature = {
+  submission_feature_id: 10,
+  uuid: 'feat-uuid-1',
+  urn: 'urn:test:1',
+  submission_id: 1,
+  feature_type_id: 100,
+  feature_type_name: 'observation',
+  feature_type_display_name: 'Observation',
+  submission_name: 'Test Submission',
+  source_id: null,
+  data: { species_name: 'Wolf', count: '5' },
+  secured: false
+};
+
+const mockRelatedFeatures = [
+  {
+    submission_feature_id: 20,
+    feature_type_name: 'survey',
+    feature_type_display_name: 'Survey',
+    data: { name: 'Related Survey' }
+  }
+];
+
+const renderPage = (initialPath = '/submission/1/feature/10') =>
+  render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <Routes>
+        <Route path="/submission/:submissionId/feature/:submissionFeatureId" element={<SubmissionFeaturePage />} />
+      </Routes>
+    </MemoryRouter>
+  );
+
+describe('SubmissionFeaturePage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockUseApi.mockReturnValue({
+      features: {
+        getSubmissionFeatureById: mockGetSubmissionFeatureById
+      },
+      cart: {
+        getCartFeatures: mockGetCartFeatures
+      }
+    });
+
+    mockUseCartContext.mockReturnValue({
+      cartId: 'test-cart-id',
+      addToCart: mockAddToCart,
+      removeFromCart: mockRemoveFromCart
+    });
+
+    mockGetSubmissionFeatureById.mockResolvedValue({
+      feature: mockFeature,
+      relatedFeatures: []
+    });
+
+    mockGetCartFeatures.mockResolvedValue({ features: [] });
+  });
+
+  it('renders feature property rows', async () => {
+    const { findByText } = renderPage();
+
+    expect(await findByText('Properties')).toBeVisible();
+    expect(await findByText('Wolf')).toBeVisible();
+    expect(await findByText('5')).toBeVisible();
+  });
+
+  it('renders Secured chip when feature is secured', async () => {
+    mockGetSubmissionFeatureById.mockResolvedValue({
+      feature: { ...mockFeature, secured: true },
+      relatedFeatures: []
+    });
+
+    const { findByText } = renderPage();
+
+    expect(await findByText('Secured')).toBeVisible();
+  });
+
+  it('renders related features', async () => {
+    mockGetSubmissionFeatureById.mockResolvedValue({
+      feature: mockFeature,
+      relatedFeatures: mockRelatedFeatures
+    });
+
+    const { findByText } = renderPage();
+
+    expect(await findByText('Related Survey')).toBeVisible();
+  });
+
+  it('navigates to related feature URL on click', async () => {
+    mockGetSubmissionFeatureById.mockResolvedValue({
+      feature: mockFeature,
+      relatedFeatures: mockRelatedFeatures
+    });
+
+    const { findByText } = renderPage();
+
+    const relatedLink = await findByText('Related Survey');
+    const anchor = relatedLink.closest('a');
+
+    expect(anchor).toHaveAttribute('href', '/submission/1/feature/20');
+  });
+
+  it('shows "Add to Cart" when feature is not in the cart', async () => {
+    mockGetCartFeatures.mockResolvedValue({ features: [] });
+
+    const { findByText } = renderPage();
+
+    expect(await findByText('Add to Cart')).toBeVisible();
+  });
+
+  it('shows "In Cart" when feature is in the cart', async () => {
+    mockGetCartFeatures.mockResolvedValue({
+      features: [{ submission_feature_id: 10 }]
+    });
+
+    const { findByText } = renderPage();
+
+    expect(await findByText('In Cart')).toBeVisible();
+  });
+});
