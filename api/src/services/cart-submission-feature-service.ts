@@ -27,6 +27,8 @@ export class CartSubmissionFeatureService extends DBService {
 
   /**
    * Adds multiple submission features to a cart with auth-aware security gating.
+   * Anonymous users can only add unsecured features. Authenticated users can also
+   * add secured features they have scope access to.
    *
    * @param {string} cartId - The ID of the cart
    * @param {number[]} submissionFeatureIds - The list of submission feature IDs to add
@@ -43,7 +45,15 @@ export class CartSubmissionFeatureService extends DBService {
       return;
     }
 
-    await this.cartSubmissionFeatureRepository.addSubmissionFeaturesToCart(cartId, submissionFeatureIds, systemUserId);
+    if (systemUserId === null) {
+      await this.cartSubmissionFeatureRepository.addUnsecuredSubmissionFeaturesToCart(cartId, submissionFeatureIds);
+    } else {
+      await this.cartSubmissionFeatureRepository.addSubmissionFeaturesToCartWithScopeCheck(
+        cartId,
+        submissionFeatureIds,
+        systemUserId
+      );
+    }
   }
 
   /**

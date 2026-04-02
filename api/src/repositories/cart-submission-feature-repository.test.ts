@@ -14,7 +14,7 @@ describe('CartSubmissionFeatureRepository', () => {
     sinon.restore();
   });
 
-  describe('addSubmissionFeaturesToCart', () => {
+  describe('addUnsecuredSubmissionFeaturesToCart', () => {
     it('should insert multiple submission features without error', async () => {
       const mockQueryResponse = {
         rowCount: 3,
@@ -25,12 +25,12 @@ describe('CartSubmissionFeatureRepository', () => {
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
-      const result = await repo.addSubmissionFeaturesToCart('cart-1', [1, 2, 3], null);
+      const result = await repo.addUnsecuredSubmissionFeaturesToCart('cart-1', [1, 2, 3]);
 
       expect(result).to.be.undefined;
     });
 
-    it('should use anonymous SQL with recursive ancestor walk-up when systemUserId is null', async () => {
+    it('should use NOT EXISTS with recursive ancestor walk to block secured features', async () => {
       const sqlStub = sinon.stub().resolves({
         rowCount: 1,
         rows: []
@@ -40,20 +40,21 @@ describe('CartSubmissionFeatureRepository', () => {
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
-      await repo.addSubmissionFeaturesToCart('cart-1', [1, 2, 3], null);
+      await repo.addUnsecuredSubmissionFeaturesToCart('cart-1', [1, 2, 3]);
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlArg = sqlStub.firstCall.args[0] as { text?: string };
       const sqlText = sqlArg.text || '';
 
-      // Anonymous path uses NOT EXISTS with recursive ancestor walk
       expect(sqlText).to.include('NOT EXISTS');
       expect(sqlText).to.include('RECURSIVE');
       expect(sqlText).to.include('ancestors');
       expect(sqlText).to.include('submission_feature_security');
     });
+  });
 
-    it('should use authenticated SQL with scope check when systemUserId is provided', async () => {
+  describe('addSubmissionFeaturesToCartWithScopeCheck', () => {
+    it('should use scope check SQL with recursive ancestor walk', async () => {
       const sqlStub = sinon.stub().resolves({
         rowCount: 1,
         rows: []
@@ -63,13 +64,12 @@ describe('CartSubmissionFeatureRepository', () => {
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
-      await repo.addSubmissionFeaturesToCart('cart-1', [1, 2, 3], 42);
+      await repo.addSubmissionFeaturesToCartWithScopeCheck('cart-1', [1, 2, 3], 42);
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlArg = sqlStub.firstCall.args[0] as { text?: string };
       const sqlText = sqlArg.text || '';
 
-      // Authenticated path checks scope access via security_scope_anchor → team_security_scope → team_member
       expect(sqlText).to.include('security_scope_anchor');
       expect(sqlText).to.include('team_security_scope');
       expect(sqlText).to.include('team_member');

@@ -15,44 +15,18 @@ import { BaseRepository } from './base-repository';
  */
 export class CartSubmissionFeatureRepository extends BaseRepository {
   /**
-   * Add multiple submission features to an active cart with auth-aware security gating.
+   * Add unsecured submission features to an active cart (anonymous path).
+   * Walks up the ancestor chain from each candidate feature; if any ancestor has an
+   * active submission_feature_security row, the feature is excluded.
    * Ignores existing relationships (idempotent via ON CONFLICT DO NOTHING).
-   *
-   * Security is enforced at insert time only — features already in the cart are NOT
-   * re-evaluated on subsequent reads. A feature is "effectively secured" if it or any
-   * ancestor has an active submission_feature_security row (record_end_date IS NULL).
-   *
-   * Anonymous users (systemUserId = null): all effectively secured features are blocked.
-   * Authenticated users: effectively secured features are allowed only if the user has
-   * scope access via security_scope_anchor → team_security_scope → team_member.
-   * Unsecured features are always allowed regardless of auth state.
    *
    * @param {string} cartId - The ID of the cart
    * @param {number[]} submissionFeatureIds - The list of submission feature IDs to add
-   * @param {number | null} systemUserId - The authenticated user's ID, or null for anonymous
-   * @return {Promise<void>} - Resolves when the features are added to the cart
+   * @return {Promise<void>}
    * @memberof CartSubmissionFeatureRepository
    */
-  async addSubmissionFeaturesToCart(
-    cartId: string,
-    submissionFeatureIds: number[],
-    systemUserId: number | null
-  ): Promise<void> {
-    const sql =
-      systemUserId === null
-        ? this.buildAnonymousAddSql(cartId, submissionFeatureIds)
-        : this.buildAuthenticatedAddSql(cartId, submissionFeatureIds, systemUserId);
-
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Anonymous path: block all effectively secured features.
-   * Walks up the ancestor chain from each candidate feature; if any ancestor has an
-   * active submission_feature_security row, the feature is excluded.
-   */
-  private buildAnonymousAddSql(cartId: string, submissionFeatureIds: number[]) {
-    return SQL`
+  async addUnsecuredSubmissionFeaturesToCart(cartId: string, submissionFeatureIds: number[]): Promise<void> {
+    const sql = SQL`
       WITH w_cart AS (
         SELECT cart_id
         FROM cart
@@ -89,15 +63,28 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
       CROSS JOIN w_valid_features wvf
       ON CONFLICT (cart_id, submission_feature_id) DO NOTHING
     `;
+
+    await this.connection.sql(sql);
   }
 
   /**
-   * Authenticated path: allow features that are unsecured OR where the user has scope access.
-   * Walks up the ancestor chain, then checks security_scope_anchor → team_security_scope →
-   * team_member to determine if the user's team grants access to the secured subtree.
+   * Add submission features to an active cart with scope-based access check (authenticated path).
+   * Allows features that are unsecured OR where the user has scope access via
+   * security_scope_anchor → team_security_scope → team_member.
+   * Ignores existing relationships (idempotent via ON CONFLICT DO NOTHING).
+   *
+   * @param {string} cartId - The ID of the cart
+   * @param {number[]} submissionFeatureIds - The list of submission feature IDs to add
+   * @param {number} systemUserId - The authenticated user's ID
+   * @return {Promise<void>}
+   * @memberof CartSubmissionFeatureRepository
    */
-  private buildAuthenticatedAddSql(cartId: string, submissionFeatureIds: number[], systemUserId: number) {
-    return SQL`
+  async addSubmissionFeaturesToCartWithScopeCheck(
+    cartId: string,
+    submissionFeatureIds: number[],
+    systemUserId: number
+  ): Promise<void> {
+    const sql = SQL`
       WITH w_cart AS (
         SELECT cart_id
         FROM cart
@@ -149,6 +136,8 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
       CROSS JOIN w_valid_features wvf
       ON CONFLICT (cart_id, submission_feature_id) DO NOTHING
     `;
+
+    await this.connection.sql(sql);
   }
 
   /**
@@ -231,62 +220,49 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
   ): Promise<CartSubmissionFeature[]> {
     const knex = getKnex();
 
-    const baseQuery = knex
-      .withRecursive(
-        'cart_ancestors',
-        knex.raw(
-          `
-        SELECT csf2.submission_feature_id AS cart_feature_id,
-               sf2.submission_feature_id AS ancestor_id,
-               sf2.parent_submission_feature_id
-        FROM cart_submission_feature csf2
-        JOIN submission_feature sf2 ON sf2.submission_feature_id = csf2.submission_feature_id
-        JOIN cart c2 ON c2.cart_id = csf2.cart_id
-        WHERE csf2.cart_id = ?
-          AND c2.cart_status = ?
-        UNION ALL
-        SELECT ca.cart_feature_id,
-               p.submission_feature_id,
-               p.parent_submission_feature_id
-        FROM submission_feature p
-        JOIN cart_ancestors ca ON p.submission_feature_id = ca.parent_submission_feature_id
-      `,
-          [cartId, CartStatus.ACTIVE]
-        )
-      )
-      .with(
-        'effectively_secured',
-        knex.raw(`
-        SELECT DISTINCT ca.cart_feature_id AS submission_feature_id
-        FROM cart_ancestors ca
-        INNER JOIN submission_feature_security sfs
-          ON sfs.submission_feature_id = ca.ancestor_id
-        WHERE sfs.record_end_date IS NULL
-      `)
-      )
-      .select(
-        'csf.cart_submission_feature_id',
-        'sf.submission_feature_id',
-        'sf.submission_id',
-        'sf.feature_type_id',
-        'ft.name as feature_type_name',
-        knex.raw('CASE WHEN es.submission_feature_id IS NOT NULL THEN TRUE ELSE FALSE END AS secured')
-      )
-      .from('submission_feature as sf')
-      .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
-      .join('cart_submission_feature as csf', 'csf.submission_feature_id', 'sf.submission_feature_id')
+    // Step 1: Build the base page of cart features (paginated BEFORE the recursive ancestor walk)
+    const pageQuery = knex
+      .select('csf.cart_submission_feature_id', 'csf.submission_feature_id')
+      .from('cart_submission_feature as csf')
       .join('cart as c', 'c.cart_id', 'csf.cart_id')
-      .leftJoin('effectively_secured as es', 'es.submission_feature_id', 'sf.submission_feature_id')
       .where('csf.cart_id', cartId)
       .andWhere('c.cart_status', CartStatus.ACTIVE);
 
     if (submissionFeatureId) {
-      baseQuery.andWhere('sf.submission_feature_id', submissionFeatureId);
+      pageQuery.andWhere('csf.submission_feature_id', submissionFeatureId);
     }
 
-    const paginatedQuery = this.applyPagination(baseQuery, pagination);
+    const paginatedPageQuery = this.applyPagination(pageQuery, pagination);
 
-    const response = await this.connection.knex(paginatedQuery, CartSubmissionFeature);
+    // Step 2: Join feature metadata, check security via per-row correlated EXISTS
+    const query = knex
+      .with('page', paginatedPageQuery)
+      .select(
+        'page.cart_submission_feature_id',
+        'sf.submission_feature_id',
+        'sf.submission_id',
+        'sf.feature_type_id',
+        'ft.name as feature_type_name',
+        knex.raw(`EXISTS (
+          WITH RECURSIVE ancestor_chain(id) AS (
+            SELECT sf.submission_feature_id
+            UNION ALL
+            SELECT p.parent_submission_feature_id
+            FROM ancestor_chain ac
+            JOIN submission_feature p ON p.submission_feature_id = ac.id
+            WHERE p.parent_submission_feature_id IS NOT NULL
+              AND p.record_end_date IS NULL
+          )
+          SELECT 1 FROM ancestor_chain ac
+          JOIN submission_feature_security sfs ON sfs.submission_feature_id = ac.id
+          WHERE sfs.record_end_date IS NULL
+        ) AS secured`)
+      )
+      .from('page')
+      .join('submission_feature as sf', 'sf.submission_feature_id', 'page.submission_feature_id')
+      .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id');
+
+    const response = await this.connection.knex(query, CartSubmissionFeature);
 
     return response.rows;
   }
