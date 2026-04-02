@@ -65,7 +65,7 @@ describe('UploadIngestionService', () => {
         uuid: mockSubmission.uuid
       } as ISubmissionModel);
       sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: mockUploadId });
-      sinon.stub(TicketService.prototype, 'createTicket').resolves({
+      const createTicketStub = sinon.stub(TicketService.prototype, 'createTicket').resolves({
         ticket_id: '11111111-1111-1111-1111-111111111111'
       } as any);
       sinon
@@ -95,6 +95,14 @@ describe('UploadIngestionService', () => {
 
       const result = await service.startArchiveUpload(mockBytes, mockSubmission);
 
+      expect(createTicketStub).to.have.been.calledWith(
+        sinon.match({
+          subject: 'New Submission',
+          priority: 'medium',
+          description: `Submission ID: ${mockSubmissionId}. Submission UUID: ${mockSubmission.uuid}. Upload UUID: ${mockUploadId}`,
+          systemUserIds: [mockSubmission.system_user_id]
+        })
+      );
       expect(result.submissionId).to.equal(mockSubmission.uuid);
       expect(result.uploadId).to.equal(mockUploadId);
       expect(result.uploadArchiveId).to.equal(mockUploadArchiveId);
@@ -192,6 +200,62 @@ describe('UploadIngestionService', () => {
       } catch (err) {
         expect((err as Error).message).to.include('presigned URLs');
       }
+    });
+  });
+
+  describe('startArchiveUploadForExistingSubmissionByUuid', () => {
+    it('should pass submission owner system user ids to createTicket', async () => {
+      const submissionUuid = mockSubmission.uuid;
+      const existingSubmissionId = 456;
+      const ownerSystemUserId = 99;
+      const mockUploadId = 'upload-append-1';
+      const mockArtifactId = 'artifact-append-1';
+      const mockUploadArchiveId = 'upload-archive-append-1';
+      const mockS3UploadId = 's3-append-1';
+      const mockBytes = 3_000_000;
+
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
+        .resolves({ submission_id: existingSubmissionId });
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+        uuid: submissionUuid,
+        system_user_id: ownerSystemUserId
+      } as ISubmissionModel);
+      sinon.stub(UploadService.prototype, 'insertUpload').resolves({ upload_id: mockUploadId });
+      const createTicketStub = sinon.stub(TicketService.prototype, 'createTicket').resolves({
+        ticket_id: '22222222-2222-2222-2222-222222222222'
+      } as any);
+      sinon
+        .stub(SubmissionUploadService.prototype, 'insertSubmissionUpload')
+        .resolves({ submission_upload_id: 'submission-upload-append-1' });
+      sinon.stub(SubmissionUploadReviewStatusService.prototype, 'insertSubmissionUploadReviewStatus').resolves({
+        submission_upload_status_id: 1,
+        submission_upload_id: 'submission-upload-append-1',
+        status: 'submitted'
+      } as SubmissionUploadReviewStatus);
+      sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: mockArtifactId });
+      sinon
+        .stub(UploadArchiveService.prototype, 'insertUploadArchive')
+        .resolves({ upload_archive_id: mockUploadArchiveId });
+      sinon.stub(submissionUploadUtils, 'generateMultipartUploadPresignedUrls').resolves({
+        uploadId: mockS3UploadId,
+        presignedUrls: [{ partNumber: 1, url: 'https://s3-url-append', partSizeBytes: mockBytes }],
+        partCount: 1
+      });
+      sinon.stub(UploadService.prototype, 'updateUpload').resolves({ upload_id: mockUploadId });
+
+      const result = await service.startArchiveUploadForExistingSubmissionByUuid(mockBytes, submissionUuid);
+
+      expect(createTicketStub).to.have.been.calledWith(
+        sinon.match({
+          subject: 'New Submission',
+          priority: 'medium',
+          description: `Submission ID: ${existingSubmissionId}. Submission UUID: ${submissionUuid}. Upload UUID: ${mockUploadId}`,
+          systemUserIds: [ownerSystemUserId]
+        })
+      );
+      expect(result.submissionId).to.equal(submissionUuid);
+      expect(result.uploadId).to.equal(mockUploadId);
     });
   });
 

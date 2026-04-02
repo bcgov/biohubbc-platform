@@ -143,6 +143,17 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Fetch all submissions accessible to the currently authenticated user via their submission team membership.
+   *
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeature[]>}
+   */
+  const getSubmissionsForUser = async (): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
+    const { data } = await axios.get(`api/submission`);
+
+    return data;
+  };
+
+  /**
    * Fetch signed URL for a submission_feature (artifact) key value pair
    *
    * @async
@@ -200,6 +211,7 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     getPublishedSubmissionsForAdmins,
     updateSubmissionRecord,
     getPublishedSubmissions,
+    getSubmissionsForUser,
     getSubmissionFeatureSignedUrl,
     getSubmissionUploadUrls,
     completeSubmissionUpload
