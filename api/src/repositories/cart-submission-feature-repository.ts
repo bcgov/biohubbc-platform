@@ -25,7 +25,7 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
    * @return {Promise<void>}
    * @memberof CartSubmissionFeatureRepository
    */
-  async addUnsecuredSubmissionFeaturesToCart(cartId: string, submissionFeatureIds: number[]): Promise<void> {
+  async createUnsecuredCartSubmissionFeatures(cartId: string, submissionFeatureIds: number[]): Promise<void> {
     const sql = SQL`
       WITH w_cart AS (
         SELECT cart_id
@@ -79,7 +79,7 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
    * @return {Promise<void>}
    * @memberof CartSubmissionFeatureRepository
    */
-  async addSubmissionFeaturesToCartWithScopeCheck(
+  async createCartSubmissionFeaturesWithScopeCheck(
     cartId: string,
     submissionFeatureIds: number[],
     systemUserId: number

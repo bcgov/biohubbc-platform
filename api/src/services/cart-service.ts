@@ -90,7 +90,7 @@ export class CartService extends DBService {
     const cart = await this.cartRepository.createCart(systemUserId);
 
     if (submissionFeatureIds.length > 0) {
-      await this.cartSubmissionFeatureService.addSubmissionFeaturesToCart(
+      await this.cartSubmissionFeatureService.createCartSubmissionFeatures(
         cart.cart_id,
         submissionFeatureIds,
         systemUserId

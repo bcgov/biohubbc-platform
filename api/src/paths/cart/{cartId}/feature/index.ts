@@ -114,7 +114,7 @@ export const POST: Operation = [
       ]
     };
   }),
-  addSubmissionFeaturesToCart()
+  createCartSubmissionFeatures()
 ];
 
 POST.apiDoc = {
@@ -160,7 +160,7 @@ POST.apiDoc = {
  *
  * @returns {RequestHandler}
  */
-export function addSubmissionFeaturesToCart(): RequestHandler {
+export function createCartSubmissionFeatures(): RequestHandler {
   return async (req, res) => {
     const isAuthenticated = !!req.keycloak_token;
     const connection = isAuthenticated ? getDBConnection(req.keycloak_token) : getAPIUserDBConnection();
@@ -175,14 +175,14 @@ export function addSubmissionFeaturesToCart(): RequestHandler {
 
       const cartSubmissionFeatureService = new CartSubmissionFeatureService(connection);
 
-      await cartSubmissionFeatureService.addSubmissionFeaturesToCart(cartId, features, systemUserId);
+      await cartSubmissionFeatureService.createCartSubmissionFeatures(cartId, features, systemUserId);
       const response = await cartSubmissionFeatureService.getPaginatedCartFeaturesResponse(cartId, pagination);
 
       await connection.commit();
 
       return res.status(200).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'addSubmissionFeaturesToCart', message: 'Error updating cart features', error });
+      defaultLog.error({ label: 'createCartSubmissionFeatures', message: 'Error updating cart features', error });
       await connection.rollback();
       throw error;
     } finally {

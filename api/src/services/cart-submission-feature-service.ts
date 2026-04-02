@@ -36,7 +36,7 @@ export class CartSubmissionFeatureService extends DBService {
    * @return {Promise<void>}
    * @memberof CartSubmissionFeatureService
    */
-  async addSubmissionFeaturesToCart(
+  async createCartSubmissionFeatures(
     cartId: string,
     submissionFeatureIds: number[],
     systemUserId: number | null
@@ -46,9 +46,9 @@ export class CartSubmissionFeatureService extends DBService {
     }
 
     if (systemUserId === null) {
-      await this.cartSubmissionFeatureRepository.addUnsecuredSubmissionFeaturesToCart(cartId, submissionFeatureIds);
+      await this.cartSubmissionFeatureRepository.createUnsecuredCartSubmissionFeatures(cartId, submissionFeatureIds);
     } else {
-      await this.cartSubmissionFeatureRepository.addSubmissionFeaturesToCartWithScopeCheck(
+      await this.cartSubmissionFeatureRepository.createCartSubmissionFeaturesWithScopeCheck(
         cartId,
         submissionFeatureIds,
         systemUserId

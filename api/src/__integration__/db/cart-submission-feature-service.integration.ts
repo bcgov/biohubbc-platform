@@ -209,15 +209,15 @@ describe('Cart submission feature security (integration)', function () {
     return result.rows.map((r: { submission_feature_id: number }) => r.submission_feature_id);
   }
 
-  // ── addSubmissionFeaturesToCart — anonymous ──────────────────────────
+  // ── createCartSubmissionFeatures — anonymous ──────────────────────────
 
-  describe('addSubmissionFeaturesToCart — anonymous', () => {
+  describe('createCartSubmissionFeatures — anonymous', () => {
     it('should add an unsecured feature to cart', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Public Dataset' });
 
       const cartId = await createActiveCart(null);
-      await cartFeatureService.addSubmissionFeaturesToCart(cartId, [featureId], null);
+      await cartFeatureService.createCartSubmissionFeatures(cartId, [featureId], null);
 
       const ids = await getCartFeatureIds(cartId);
       expect(ids).to.deep.equal([featureId]);
@@ -229,7 +229,7 @@ describe('Cart submission feature security (integration)', function () {
       await secureFeature(featureId);
 
       const cartId = await createActiveCart(null);
-      await cartFeatureService.addSubmissionFeaturesToCart(cartId, [featureId], null);
+      await cartFeatureService.createCartSubmissionFeatures(cartId, [featureId], null);
 
       const ids = await getCartFeatureIds(cartId);
       expect(ids).to.deep.equal([]);
@@ -248,16 +248,16 @@ describe('Cart submission feature security (integration)', function () {
       await secureFeature(parentId);
 
       const cartId = await createActiveCart(null);
-      await cartFeatureService.addSubmissionFeaturesToCart(cartId, [childId], null);
+      await cartFeatureService.createCartSubmissionFeatures(cartId, [childId], null);
 
       const ids = await getCartFeatureIds(cartId);
       expect(ids).to.deep.equal([]);
     });
   });
 
-  // ── addSubmissionFeaturesToCart — authenticated ─────────────────────
+  // ── createCartSubmissionFeatures — authenticated ─────────────────────
 
-  describe('addSubmissionFeaturesToCart — authenticated', () => {
+  describe('createCartSubmissionFeatures — authenticated', () => {
     it('should add a secured feature when user has scope access', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
@@ -267,7 +267,7 @@ describe('Cart submission feature security (integration)', function () {
       await setupFullAccess(`urn:${submissionId}:*:*`, userId, 'scope-access-team');
 
       const cartId = await createActiveCart(userId);
-      await cartFeatureService.addSubmissionFeaturesToCart(cartId, [featureId], userId);
+      await cartFeatureService.createCartSubmissionFeatures(cartId, [featureId], userId);
 
       const ids = await getCartFeatureIds(cartId);
       expect(ids).to.deep.equal([featureId]);
@@ -282,7 +282,7 @@ describe('Cart submission feature security (integration)', function () {
       const userId = await createOtherUser();
 
       const cartId = await createActiveCart(userId);
-      await cartFeatureService.addSubmissionFeaturesToCart(cartId, [featureId], userId);
+      await cartFeatureService.createCartSubmissionFeatures(cartId, [featureId], userId);
 
       const ids = await getCartFeatureIds(cartId);
       expect(ids).to.deep.equal([]);
@@ -294,7 +294,7 @@ describe('Cart submission feature security (integration)', function () {
 
       const userId = await createOtherUser();
       const cartId = await createActiveCart(userId);
-      await cartFeatureService.addSubmissionFeaturesToCart(cartId, [featureId], userId);
+      await cartFeatureService.createCartSubmissionFeatures(cartId, [featureId], userId);
 
       const features = await cartFeatureService.getCartSubmissionFeatures(cartId);
       expect(features).to.have.length(1);
@@ -334,7 +334,7 @@ describe('Cart submission feature security (integration)', function () {
       await setupFullAccess(`urn:${submissionId}:*:*`, userId, 'mixed-batch-team');
 
       const cartId = await createActiveCart(userId);
-      await cartFeatureService.addSubmissionFeaturesToCart(cartId, [unsecuredId, securedId, inheritedChildId], userId);
+      await cartFeatureService.createCartSubmissionFeatures(cartId, [unsecuredId, securedId, inheritedChildId], userId);
 
       const ids = await getCartFeatureIds(cartId);
       // All three should be added: unsecured passes through, secured + inherited pass via scope access
@@ -358,7 +358,7 @@ describe('Cart submission feature security (integration)', function () {
       await setupFullAccess(`urn:${submissionA}:*:*`, userId, 'partial-auth-team');
 
       const cartId = await createActiveCart(userId);
-      await cartFeatureService.addSubmissionFeaturesToCart(cartId, [securedA, securedB], userId);
+      await cartFeatureService.createCartSubmissionFeatures(cartId, [securedA, securedB], userId);
 
       const ids = await getCartFeatureIds(cartId);
       // Only the feature from the scoped submission should be added
@@ -379,7 +379,7 @@ describe('Cart submission feature security (integration)', function () {
       await setupFullAccess(`urn:${submissionId}:*:*`, userId, 'secured-flag-team');
 
       const cartId = await createActiveCart(userId);
-      await cartFeatureService.addSubmissionFeaturesToCart(cartId, [unsecuredId, securedId], userId);
+      await cartFeatureService.createCartSubmissionFeatures(cartId, [unsecuredId, securedId], userId);
 
       const features = await cartFeatureService.getCartSubmissionFeatures(cartId);
       expect(features).to.have.length(2);
@@ -397,7 +397,7 @@ describe('Cart submission feature security (integration)', function () {
 
       // Add while unsecured (anonymous can add it)
       const cartId = await createActiveCart(null);
-      await cartFeatureService.addSubmissionFeaturesToCart(cartId, [featureId], null);
+      await cartFeatureService.createCartSubmissionFeatures(cartId, [featureId], null);
 
       // Verify initially unsecured
       let features = await cartFeatureService.getCartSubmissionFeatures(cartId);
@@ -417,7 +417,7 @@ describe('Cart submission feature security (integration)', function () {
       const featureB = await createTestFeature(connection, submissionId, 'dataset', { name: 'B' });
 
       const cartId = await createActiveCart(null);
-      await cartFeatureService.addSubmissionFeaturesToCart(cartId, [featureA, featureB], null);
+      await cartFeatureService.createCartSubmissionFeatures(cartId, [featureA, featureB], null);
 
       const filtered = await cartFeatureService.getCartSubmissionFeatures(cartId, undefined, featureA);
       expect(filtered).to.have.length(1);
@@ -438,7 +438,7 @@ describe('Cart submission feature security (integration)', function () {
       await setupFullAccess(`urn:${submissionId}:*:*`, userId, 'count-team');
 
       const cartId = await createActiveCart(userId);
-      await cartFeatureService.addSubmissionFeaturesToCart(cartId, [unsecuredId, securedId], userId);
+      await cartFeatureService.createCartSubmissionFeatures(cartId, [unsecuredId, securedId], userId);
 
       const count = await cartFeatureService.getCartSubmissionFeatureCount(cartId);
       expect(count).to.equal(2);
@@ -453,8 +453,8 @@ describe('Cart submission feature security (integration)', function () {
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
 
       const cartId = await createActiveCart(null);
-      await cartFeatureService.addSubmissionFeaturesToCart(cartId, [featureId], null);
-      await cartFeatureService.addSubmissionFeaturesToCart(cartId, [featureId], null);
+      await cartFeatureService.createCartSubmissionFeatures(cartId, [featureId], null);
+      await cartFeatureService.createCartSubmissionFeatures(cartId, [featureId], null);
 
       const ids = await getCartFeatureIds(cartId);
       expect(ids).to.deep.equal([featureId]);
@@ -471,7 +471,7 @@ describe('Cart submission feature security (integration)', function () {
         UPDATE cart SET cart_status = 'checked_out' WHERE cart_id = ${cartId};
       `);
 
-      await cartFeatureService.addSubmissionFeaturesToCart(cartId, [featureId], null);
+      await cartFeatureService.createCartSubmissionFeatures(cartId, [featureId], null);
 
       const ids = await getCartFeatureIds(cartId);
       expect(ids).to.deep.equal([]);

@@ -14,7 +14,7 @@ describe('CartSubmissionFeatureRepository', () => {
     sinon.restore();
   });
 
-  describe('addUnsecuredSubmissionFeaturesToCart', () => {
+  describe('createUnsecuredCartSubmissionFeatures', () => {
     it('should insert multiple submission features without error', async () => {
       const mockQueryResponse = {
         rowCount: 3,
@@ -25,7 +25,7 @@ describe('CartSubmissionFeatureRepository', () => {
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
-      const result = await repo.addUnsecuredSubmissionFeaturesToCart('cart-1', [1, 2, 3]);
+      const result = await repo.createUnsecuredCartSubmissionFeatures('cart-1', [1, 2, 3]);
 
       expect(result).to.be.undefined;
     });
@@ -40,7 +40,7 @@ describe('CartSubmissionFeatureRepository', () => {
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
-      await repo.addUnsecuredSubmissionFeaturesToCart('cart-1', [1, 2, 3]);
+      await repo.createUnsecuredCartSubmissionFeatures('cart-1', [1, 2, 3]);
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlArg = sqlStub.firstCall.args[0] as { text?: string };
@@ -53,7 +53,7 @@ describe('CartSubmissionFeatureRepository', () => {
     });
   });
 
-  describe('addSubmissionFeaturesToCartWithScopeCheck', () => {
+  describe('createCartSubmissionFeaturesWithScopeCheck', () => {
     it('should use scope check SQL with recursive ancestor walk', async () => {
       const sqlStub = sinon.stub().resolves({
         rowCount: 1,
@@ -64,7 +64,7 @@ describe('CartSubmissionFeatureRepository', () => {
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
-      await repo.addSubmissionFeaturesToCartWithScopeCheck('cart-1', [1, 2, 3], 42);
+      await repo.createCartSubmissionFeaturesWithScopeCheck('cart-1', [1, 2, 3], 42);
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlArg = sqlStub.firstCall.args[0] as { text?: string };
