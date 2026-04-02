@@ -328,14 +328,14 @@ describe('DownloadRepository', () => {
     it('returns aggregate row with total', async () => {
       const knexStub = sinon.stub().resolves({
         rowCount: 1,
-        rows: [{ total: '15000' }]
+        rows: [{ total: 15000 }]
       } as unknown as QueryResult<any>);
       const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repo = new DownloadRepository(mockDBConnection);
       const result = await repo.getDownloadTotalSizeByCartId('cccc0000-0000-0000-0000-000000000001');
 
-      expect(result).to.deep.equal({ total: '15000' });
+      expect(result).to.deep.equal({ total: 15000 });
     });
 
     it('returns row with null total when cart has no features', async () => {
@@ -356,7 +356,7 @@ describe('DownloadRepository', () => {
     it('returns aggregate row with total', async () => {
       const knexStub = sinon.stub().resolves({
         rowCount: 1,
-        rows: [{ total: '25000' }]
+        rows: [{ total: 25000 }]
       } as unknown as QueryResult<any>);
       const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
@@ -365,7 +365,7 @@ describe('DownloadRepository', () => {
       const repo = new DownloadRepository(mockDBConnection);
       const result = await repo.getDownloadTotalSizeBySearchQuery(mockSubquery);
 
-      expect(result).to.deep.equal({ total: '25000' });
+      expect(result).to.deep.equal({ total: 25000 });
     });
 
     it('returns row with null total when no features match', async () => {

@@ -14,6 +14,7 @@ import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { initPgBoss, stopPgBoss } from '../../queue/pg-boss-service';
+import { CartService } from '../../services/cart-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadService } from '../../services/download/download-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
@@ -77,6 +78,7 @@ describe('Download Worker', function () {
   let db: Knex;
   let storageService: ObjectStorageService;
   const createdDownloadIds: number[] = [];
+  const createdCartIds: string[] = [];
   const createdSubmissionFeatureIds: number[] = [];
   const createdSubmissionIds: number[] = [];
   const createdTicketIds: string[] = [];
@@ -103,9 +105,14 @@ describe('Download Worker', function () {
   after(async () => {
     // Cleanup in reverse dependency order
     try {
-      // 1. Delete downloads (cascades to download_feature, download_fragment, download_fragment_feature)
+      // 1. Delete downloads (cascades to download_fragment, download_fragment_feature)
       if (createdDownloadIds.length > 0) {
         await db('biohub.download').whereIn('download_id', createdDownloadIds).del();
+      }
+
+      // 1b. Delete carts (cascades to cart_submission_feature)
+      if (createdCartIds.length > 0) {
+        await db('biohub.cart').whereIn('cart_id', createdCartIds).del();
       }
 
       // 2. Delete submission features
@@ -215,28 +222,43 @@ describe('Download Worker', function () {
   }
 
   /**
-   * Create a download record, link features, publish the job to pg-boss, and wait for completion.
+   * Create a cart-backed download, publish the job to pg-boss, and wait for completion.
+   * Features are resolved at pipeline time from cart_submission_feature via download.cart_id.
    */
   async function createDownloadAndProcess(
     featureIds: number[],
     downloadOverrides?: Record<string, unknown>
   ): Promise<number> {
+    // Create a cart and link features (raw Knex — system tests don't use IDBConnection)
+    const [cart] = await db('biohub.cart')
+      .insert({
+        system_user_id: SYSTEM_USER_ID,
+        cart_status: 'checked_out',
+        create_user: SYSTEM_USER_ID
+      })
+      .returning('cart_id');
+    createdCartIds.push(cart.cart_id);
+
+    if (featureIds.length > 0) {
+      await db('biohub.cart_submission_feature').insert(
+        featureIds.map((id) => ({
+          cart_id: cart.cart_id,
+          submission_feature_id: id,
+          create_user: SYSTEM_USER_ID
+        }))
+      );
+    }
+
+    // Create download with cart_id FK — pipeline resolves features from cart_submission_feature
     const [download] = await db('biohub.download')
       .insert({
         download_status: 'pending',
+        cart_id: cart.cart_id,
         create_user: SYSTEM_USER_ID,
         ...downloadOverrides
       })
       .returning('download_id');
     createdDownloadIds.push(download.download_id);
-
-    await db('biohub.download_feature').insert(
-      featureIds.map((id) => ({
-        download_id: download.download_id,
-        submission_feature_id: id,
-        create_user: SYSTEM_USER_ID
-      }))
-    );
 
     const boss = await initPgBoss();
     await boss.createQueue('process-download');
@@ -528,6 +550,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
   let connection: IDBConnection;
   let service: DownloadPipelineService;
   let crudService: DownloadService;
+  let cartService: CartService;
   const storageService = new ObjectStorageService();
   const s3KeysToCleanup: string[] = [];
 
@@ -540,6 +563,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     await connection.open();
     service = new DownloadPipelineService(connection);
     crudService = new DownloadService(connection);
+    cartService = new CartService(connection);
   });
 
   afterEach(async () => {
@@ -565,11 +589,13 @@ describe('DownloadPipelineService download pipeline (system)', function () {
   }
 
   /**
-   * Helper: run the full download pipeline and return the resulting zip.
+   * Helper: create a cart-backed download and run the full pipeline, returning the resulting zip.
    */
   async function executeAndGetZip(featureIds: number[]): Promise<{ zip: AdmZip; downloadId: string }> {
-    const { download_id } = await crudService.createDownloadRequest({
-      submissionFeatureIds: featureIds
+    const systemUserId = connection.systemUserId();
+    const cartResponse = await cartService.createCart(systemUserId, featureIds);
+    const { download_id } = await crudService.createDownload({
+      cartId: cartResponse.cart.cart_id
     });
 
     // Run the three-phase pipeline within the test transaction
@@ -868,5 +894,85 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     expect(lines[1]).to.include('BEAR-001');
     // Dataset context
     expect(lines[1]).to.include('Denorm Test Dataset');
+  });
+
+  /**
+   * Helper: create a filter-based download and run the full pipeline, returning the resulting zip.
+   * Features are re-derived at pipeline time by re-running the search query with the stored filters.
+   */
+  async function executeFilterAndGetZip(filters: Record<string, unknown>): Promise<{ zip: AdmZip; downloadId: string }> {
+    const { download_id } = await crudService.createDownload({ filters });
+
+    // Run the three-phase pipeline within the test transaction
+    await service.planDownloadIfNeeded(download_id);
+    const fragments = await service.getFragmentsToProcess(download_id);
+    for (const fragment of fragments) {
+      await service.processFragment(fragment, download_id);
+    }
+    await service.finalizeDownload(download_id);
+
+    const download = await crudService.findDownloadById(download_id);
+    expect(download).to.not.be.null;
+    expect(download!.download_status).to.equal(DownloadStatusEnum.READY);
+
+    const allFragments = await crudService.getFragmentsByDownloadId(download_id);
+    expect(allFragments.length).to.be.greaterThanOrEqual(1);
+    const zip = await downloadAndTrackZip(allFragments[0].s3_key as string);
+    return { zip, downloadId: download_id };
+  }
+
+  it('should process a filter-based download through the full pipeline', async () => {
+    // Create test data — two datasets that will match { feature_types: ['dataset'] }
+    const submissionId = await createTestSubmission(connection);
+    await createTestFeature(connection, submissionId, 'dataset', {
+      name: 'Filter Pipeline Dataset A',
+      start_date: '2024-01-01T00:00:00.000Z'
+    });
+    await createTestFeature(connection, submissionId, 'dataset', {
+      name: 'Filter Pipeline Dataset B',
+      start_date: '2024-06-01T00:00:00.000Z'
+    });
+    // Non-matching feature to prove filter selectivity
+    await createTestFeature(
+      connection,
+      submissionId,
+      'species_observation',
+      { taxon_id: 99999, count: 1 },
+      // species_observation needs a parent to avoid orphan — use first dataset
+      undefined
+    );
+
+    const { zip, downloadId } = await executeFilterAndGetZip({ feature_types: ['dataset'] });
+    const rootFolder = `biohub-${downloadId}/`;
+
+    const entries = zip.getEntries().map((e) => e.entryName);
+
+    // Should contain dataset.csv but NOT species_observation.csv
+    expect(entries).to.include(`${rootFolder}dataset.csv`);
+    const csvEntries = entries.filter((e) => e.endsWith('.csv'));
+    expect(csvEntries).to.have.lengthOf(1);
+
+    const csv = zipEntryText(zip, `${rootFolder}dataset.csv`);
+    const lines = parseCsvLines(csv);
+    // At least header + our 2 rows (other dataset features from seed data or
+    // earlier tests in this transaction may also match the broad filter)
+    expect(lines.length).to.be.greaterThanOrEqual(3);
+    expect(csv).to.include('Filter Pipeline Dataset A');
+    expect(csv).to.include('Filter Pipeline Dataset B');
+    // species_observation should not appear
+    expect(csv).to.not.include('99999');
+
+    // Verify download record metadata
+    const download = await crudService.findDownloadById(downloadId);
+    expect(download!.download_status).to.equal(DownloadStatusEnum.READY);
+    expect(download!.completed_at).to.not.be.null;
+    expect(Number(download!.estimated_total_size_bytes)).to.be.greaterThan(0);
+
+    // Verify the download source is filter-based (no cart_id)
+    const row = await connection.sql(SQL`
+      SELECT cart_id, filters FROM download WHERE download_id = ${downloadId};
+    `);
+    expect(row.rows[0].cart_id).to.be.null;
+    expect(row.rows[0].filters).to.deep.equal({ feature_types: ['dataset'] });
   });
 });

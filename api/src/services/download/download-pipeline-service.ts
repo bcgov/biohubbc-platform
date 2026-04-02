@@ -144,7 +144,7 @@ export class DownloadPipelineService extends DBService {
       featureStream = this.downloadRepository.streamDownloadFeaturesByCartId(source.cart_id);
     } else if (source.filters) {
       const subquery = this.searchFeatureService.buildSearchFeatureIdsSubquery(source.filters, source.create_user);
-      const { sql, bindings } = subquery.toSQL();
+      const { sql, bindings } = subquery.toSQL().toNative();
       featureStream = this.downloadRepository.streamDownloadFeaturesBySearchQuery(downloadId, sql, bindings as any[]);
     } else {
       throw new Error(`Download ${downloadId} has neither cart_id nor filters`);
