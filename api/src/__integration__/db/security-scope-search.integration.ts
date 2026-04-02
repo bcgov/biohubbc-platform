@@ -656,7 +656,9 @@ describe('Security scope search (integration)', function () {
       let staleLastId = 0;
       while (true) {
         const staleBatch = await scopeService.deleteStaleAnchorBatch(scopeId, staleLastId);
-        if (!staleBatch) break;
+        if (!staleBatch) {
+          break;
+        }
         staleLastId = staleBatch.pageLastId;
       }
       const urn = await scopeService.resolveUrnForScope(scopeId);
@@ -774,7 +776,9 @@ describe('Security scope search (integration)', function () {
       let staleLastId = 0;
       while (true) {
         const staleBatch = await scopeService.deleteStaleAnchorBatch(oldScopeId, staleLastId);
-        if (!staleBatch) break;
+        if (!staleBatch) {
+          break;
+        }
         staleLastId = staleBatch.pageLastId;
       }
       const oldUrn = await scopeService.resolveUrnForScope(oldScopeId);
@@ -1069,7 +1073,9 @@ describe('Security scope search (integration)', function () {
       let staleLastId = 0;
       while (true) {
         const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
-        if (!staleBatch) break;
+        if (!staleBatch) {
+          break;
+        }
         staleLastId = staleBatch.pageLastId;
       }
       await computeAnchors(scopeId);
@@ -1139,7 +1145,9 @@ describe('Security scope search (integration)', function () {
       let staleLastId = 0;
       while (true) {
         const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
-        if (!staleBatch) break;
+        if (!staleBatch) {
+          break;
+        }
         staleLastId = staleBatch.pageLastId;
       }
       await computeAnchors(scopeId);
@@ -1211,7 +1219,9 @@ describe('Security scope search (integration)', function () {
       let staleLastId = 0;
       while (true) {
         const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
-        if (!staleBatch) break;
+        if (!staleBatch) {
+          break;
+        }
         staleLastId = staleBatch.pageLastId;
       }
       await computeAnchors(scopeId);
@@ -1434,7 +1444,9 @@ describe('Security scope search (integration)', function () {
       let staleLastId1 = 0;
       while (true) {
         const staleBatch = await scopeService.deleteStaleAnchorBatch(broadScopeId, staleLastId1);
-        if (!staleBatch) break;
+        if (!staleBatch) {
+          break;
+        }
         staleLastId1 = staleBatch.pageLastId;
       }
 
@@ -1460,7 +1472,9 @@ describe('Security scope search (integration)', function () {
       let staleLastId2 = 0;
       while (true) {
         const staleBatch = await scopeService.deleteStaleAnchorBatch(narrowScopeId, staleLastId2);
-        if (!staleBatch) break;
+        if (!staleBatch) {
+          break;
+        }
         staleLastId2 = staleBatch.pageLastId;
       }
 
@@ -1687,7 +1701,9 @@ describe('Security scope search (integration)', function () {
       let staleLastId = 0;
       while (true) {
         const staleBatch = await scopeService.deleteStaleAnchorBatch(scopeId, staleLastId);
-        if (!staleBatch) break;
+        if (!staleBatch) {
+          break;
+        }
         staleLastId = staleBatch.pageLastId;
       }
       const recomputeUrn = await scopeService.resolveUrnForScope(scopeId);

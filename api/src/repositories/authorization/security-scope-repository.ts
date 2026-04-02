@@ -253,15 +253,9 @@ export class SecurityScopeRepository extends BaseRepository {
    * @param securityScopeId UUID of the orphaned security scope
    */
   async deleteOrphanedScopeData(securityScopeId: string): Promise<void> {
-    await this.connection.query(
-      `DELETE FROM security_scope_anchor WHERE security_scope_id = $1`,
-      [securityScopeId]
-    );
+    await this.connection.query(`DELETE FROM security_scope_anchor WHERE security_scope_id = $1`, [securityScopeId]);
 
-    await this.connection.query(
-      `DELETE FROM team_security_scope WHERE security_scope_id = $1`,
-      [securityScopeId]
-    );
+    await this.connection.query(`DELETE FROM team_security_scope WHERE security_scope_id = $1`, [securityScopeId]);
   }
 
   /**
