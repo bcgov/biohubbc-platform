@@ -43,7 +43,7 @@ GET.apiDoc = {
                 type: 'array',
                 items: {
                   type: 'object',
-                  required: ['download_id', 'download_status', 'create_date', 'feature_count'],
+                  required: ['download_id', 'download_status', 'create_date'],
                   properties: {
                     download_id: {
                       type: 'string',
@@ -55,9 +55,6 @@ GET.apiDoc = {
                     },
                     create_date: {
                       type: 'string'
-                    },
-                    feature_count: {
-                      type: 'integer'
                     },
                     started_at: {
                       type: 'string',
@@ -200,21 +197,19 @@ export function createDownload(): RequestHandler {
       const searchFeatureService = new SearchFeatureService(connection);
       const downloadService = new DownloadService(connection);
 
+      // Count-only validation — no ID materialization.
       // Security filtering happens in SQL via buildSecurityFilter:
       // - systemUserId === null → anonymous, exclude secured features
       // - systemUserId === number → authenticated, include unsecured + scope-granted
       const systemUserId = isAuthenticated ? connection.systemUserId() : null;
-      const submissionFeatureIds = await searchFeatureService.getSearchFeatureIds(filters, systemUserId);
+      const matchCount = await searchFeatureService.getSearchFeaturesCount(filters, systemUserId);
 
-      if (submissionFeatureIds.length === 0) {
+      if (matchCount === 0) {
         throw new HTTP400('No features match the filter criteria');
       }
 
-      // Create download with search filters stored for traceability
-      const downloadId = await downloadService.createDownloadRequest({
-        submissionFeatureIds,
-        filters
-      });
+      // Store filters on download — features re-derived at pipeline time via search re-run
+      const downloadId = await downloadService.createDownload({ filters });
 
       // Link download to a new team for authenticated users.
       // Anonymous downloads have no download_team rows — UUID is the credential.

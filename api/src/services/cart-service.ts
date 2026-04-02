@@ -146,13 +146,12 @@ export class CartService extends DBService {
       throw new HTTP400('Cannot checkout an empty cart');
     }
 
-    // Create download record (team linking handled separately via download_team)
+    // Create download with cart_id FK — features resolved at pipeline time
+    // from cart_submission_feature via download.cart_id
     const downloadId = await this.downloadService.createDownload({
-      fragmentSizeBytes
+      fragmentSizeBytes,
+      cartId
     });
-
-    // Link features to download
-    await this.downloadService.createDownloadFeatures(downloadId.download_id, featureIds);
 
     // Create team and link to download for authenticated users.
     // Anonymous checkouts have no download_team rows — UUID is the credential.
