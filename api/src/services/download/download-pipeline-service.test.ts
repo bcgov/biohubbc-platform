@@ -321,7 +321,7 @@ describe('DownloadPipelineService', () => {
 
       const source: DownloadSource = { cart_id: 'cart-uuid', filters: null, create_user: 1 };
       sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
-      sinon.stub(DownloadRepository.prototype, 'getDownloadTotalSizeByCartId').resolves({ total: '200' });
+      sinon.stub(DownloadRepository.prototype, 'getDownloadTotalSizeByCartId').resolves({ total: 200 });
 
       const result = await service.estimateDownloadSize('aaaa0000-0000-0000-0000-000000000001');
 
@@ -334,9 +334,9 @@ describe('DownloadPipelineService', () => {
 
       const source: DownloadSource = { cart_id: null, filters: { keyword: 'moose' }, create_user: 5 };
       sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
-      const mockSubquery = { toSQL: () => ({ sql: 'SELECT 1', bindings: [] }) } as any;
+      const mockSubquery = { toSQL: () => ({ toNative: () => ({ sql: 'SELECT 1', bindings: [] }) }) } as any;
       sinon.stub(SearchFeatureService.prototype, 'buildSearchFeatureIdsSubquery').returns(mockSubquery);
-      sinon.stub(DownloadRepository.prototype, 'getDownloadTotalSizeBySearchQuery').resolves({ total: '5000' });
+      sinon.stub(DownloadRepository.prototype, 'getDownloadTotalSizeBySearchQuery').resolves({ total: 5000 });
 
       const result = await service.estimateDownloadSize('aaaa0000-0000-0000-0000-000000000001');
 
@@ -439,6 +439,60 @@ describe('DownloadPipelineService', () => {
       expect(createFragmentFeaturesStub.firstCall.args[1]).to.deep.equal([10]);
       expect(createFragmentFeaturesStub.secondCall.args[1]).to.deep.equal([20, 30]);
       expect(updateFragmentCountsStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001', 2);
+    });
+
+    it('creates fragments for filter-based downloads using search stream', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      // Stub source resolution — filter-based download
+      const source: DownloadSource = { cart_id: null, filters: { keyword: 'moose' }, create_user: 5 };
+      sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(
+        createMockDownloadRecord({
+          download_id: 'aaaa0000-0000-0000-0000-000000000001',
+          fragment_size_bytes: String(FRAGMENT_SIZE_THRESHOLD)
+        })
+      );
+
+      // Mock the search subquery and toSQL extraction
+      const mockSubquery = { toSQL: () => ({ toNative: () => ({ sql: 'SELECT submission_feature_id FROM ...', bindings: [5] }) }) } as any;
+      const buildSubqueryStub = sinon
+        .stub(SearchFeatureService.prototype, 'buildSearchFeatureIdsSubquery')
+        .returns(mockSubquery);
+
+      const features: DownloadFeatureSummary[] = [
+        { submission_feature_id: 10, feature_type_name: 'observation', estimated_byte_size: '500', submission_id: 1 },
+        { submission_feature_id: 20, feature_type_name: 'observation', estimated_byte_size: '300', submission_id: 1 }
+      ];
+      const streamStub = sinon
+        .stub(DownloadRepository.prototype, 'streamDownloadFeaturesBySearchQuery')
+        .returns(mockSummaryStream(features));
+
+      // Cart stream should NOT be called
+      const cartStreamStub = sinon.stub(DownloadRepository.prototype, 'streamDownloadFeaturesByCartId');
+
+      const createFragmentStub = sinon.stub(DownloadFragmentRepository.prototype, 'createDownloadFragment');
+      createFragmentStub.onFirstCall().resolves({ download_fragment_id: 1 });
+      const createFragmentFeaturesStub = sinon
+        .stub(DownloadFragmentRepository.prototype, 'createDownloadFragmentFeatures')
+        .resolves();
+      sinon.stub(DownloadRepository.prototype, 'updateDownloadFragmentCounts').resolves();
+      sinon.stub(DownloadRepository.prototype, 'updateEstimatedTotalSize').resolves();
+
+      await service.planFragments('aaaa0000-0000-0000-0000-000000000001', 800);
+
+      // Verify filter path was taken
+      expect(buildSubqueryStub).to.have.been.calledOnceWith({ keyword: 'moose' }, 5);
+      expect(streamStub).to.have.been.calledOnce;
+      expect(streamStub.firstCall.args[0]).to.equal('aaaa0000-0000-0000-0000-000000000001');
+      expect(streamStub.firstCall.args[1]).to.equal('SELECT submission_feature_id FROM ...');
+      expect(streamStub.firstCall.args[2]).to.deep.equal([5]);
+      expect(cartStreamStub).to.not.have.been.called;
+
+      // Both features fit in one fragment (800 bytes << 200MB threshold)
+      expect(createFragmentStub).to.have.been.calledOnce;
+      expect(createFragmentFeaturesStub.firstCall.args[1]).to.deep.equal([10, 20]);
     });
 
     it('uses custom fragment size from download record instead of default threshold', async () => {

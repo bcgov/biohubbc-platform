@@ -86,7 +86,7 @@ export const CreateDownload = z.object({
 });
 export type CreateDownload = z.infer<typeof CreateDownload>;
 
-export const DownloadTotalSize = z.object({ total: z.string().nullable() });
+export const DownloadTotalSize = z.object({ total: z.number().nullable() });
 export type DownloadTotalSize = z.infer<typeof DownloadTotalSize>;
 
 export const IsAuthorized = z.object({ authorized: z.boolean() });

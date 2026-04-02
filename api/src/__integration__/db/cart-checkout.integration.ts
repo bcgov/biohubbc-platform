@@ -138,17 +138,18 @@ describe('Cart checkout (integration)', function () {
     expect(download).to.not.be.null;
     expect(download!.download_status).to.equal('pending');
 
-    // Verify: both features linked in download_feature
-    const features = await connection.sql(SQL`
-      SELECT submission_feature_id FROM download_feature
-      WHERE download_id = ${result.download_id}
-      ORDER BY submission_feature_id;
+    // Verify: download has cart_id set (features resolved at pipeline time from cart_submission_feature)
+    const downloadRow = await connection.sql(SQL`
+      SELECT cart_id, filters FROM download WHERE download_id = ${result.download_id};
     `);
-    expect(features.rows).to.have.length(2);
-    expect(features.rows.map((r: { submission_feature_id: number }) => r.submission_feature_id)).to.deep.equal([
-      featureId1,
-      featureId2
-    ]);
+    expect(downloadRow.rows[0].cart_id).to.equal(cartId);
+    expect(downloadRow.rows[0].filters).to.be.null;
+
+    // Verify: getDownloadFeatures resolves both features from the cart
+    const features = await downloadService.getDownloadFeatures(result.download_id);
+    expect(features).to.have.length(2);
+    const featureIds = features.map((f: { submission_feature_id: number }) => f.submission_feature_id).sort();
+    expect(featureIds).to.deep.equal([featureId1, featureId2].sort());
 
     // Verify: cart status is checked_out with checkout metadata
     const cart = await connection.sql(SQL`
