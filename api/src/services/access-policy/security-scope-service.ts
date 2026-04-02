@@ -27,10 +27,12 @@ export class SecurityScopeService extends DBService {
   /**
    * Create a security scope and policy_statement_scope mapping for a policy statement.
    *
-   * If the scope is new (not previously seen for this URN), publishes a background
-   * job to compute anchors — the secured subtree roots that the walk-up search
-   * strategy checks against. If the scope already exists, anchors are already
-   * computed and no job is needed.
+   * Always publishes a background job to compute anchors — the secured subtree
+   * roots that the walk-up search strategy checks against. For new scopes this
+   * populates anchors from scratch; for existing scopes this covers the case
+   * where a URN was changed away and reverted back (orphan cleanup deletes
+   * anchors but leaves the scope row). Anchor computation is idempotent
+   * (ON CONFLICT DO NOTHING), so re-queuing an already-populated scope is safe.
    *
    * @param policyStatementId UUID of the policy statement
    * @param urn The submission_feature_urn (e.g., 'urn:10:telemetry:*')
@@ -57,9 +59,21 @@ export class SecurityScopeService extends DBService {
       return inserted.security_scope_id;
     }
 
-    // Existing scope — look up the ID and create the mapping only
+    // Existing scope — look up the ID, create the mapping, and re-queue anchor
+    // computation. The scope may have been orphaned and had its anchors cleaned
+    // up (e.g., URN changed away then reverted back). Anchor computation is
+    // idempotent (ON CONFLICT DO NOTHING), so re-queuing is always safe.
     const existing = await this.securityScopeRepository.getSecurityScopeByScopeHash(scopeHash);
     await this.securityScopeRepository.insertPolicyStatementScope(policyStatementId, existing.security_scope_id);
+
+    await publishComputeScopeAnchorsJob(this.connection, { securityScopeId: existing.security_scope_id });
+
+    defaultLog.info({
+      label: 'createScopeForPolicyStatement',
+      message: 'Existing security scope reused, anchor computation job published',
+      securityScopeId: existing.security_scope_id,
+      scopeHash
+    });
 
     return existing.security_scope_id;
   }
@@ -149,7 +163,7 @@ export class SecurityScopeService extends DBService {
   }
 
   /**
-   * Delete stale anchors for a security scope.
+   * Delete one keyset-paginated batch of stale anchors for a security scope.
    *
    * Removes anchors for features that no longer meet candidate criteria
    * (unsecured, unapproved, soft-deleted, or URN mismatch). Also handles
@@ -157,9 +171,23 @@ export class SecurityScopeService extends DBService {
    * when no policy statement validates them.
    *
    * @param securityScopeId UUID of the security scope
+   * @param afterId Keyset cursor — pass 0 to start from the beginning
+   * @returns Next cursor position, or null when no more anchors exist
    */
-  async deleteStaleAnchorsForScope(securityScopeId: string): Promise<void> {
-    await this.securityScopeRepository.deleteStaleAnchorsForScope(securityScopeId);
+  async deleteStaleAnchorBatch(securityScopeId: string, afterId: number): Promise<AnchorBatchResult | null> {
+    return this.securityScopeRepository.deleteStaleAnchorBatch(securityScopeId, afterId);
+  }
+
+  /**
+   * Clean up all derived data for an orphaned scope — anchors and team grants.
+   *
+   * Used for orphaned scopes (no active policy statements) — avoids running the
+   * expensive effectively-secured CTE when the outcome is always "delete everything."
+   *
+   * @param securityScopeId UUID of the orphaned security scope
+   */
+  async deleteOrphanedScopeData(securityScopeId: string): Promise<void> {
+    await this.securityScopeRepository.deleteOrphanedScopeData(securityScopeId);
   }
 
   /**

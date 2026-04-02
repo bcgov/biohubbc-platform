@@ -217,6 +217,30 @@ describe('Security scope search (integration)', function () {
   }
 
   /**
+   * Create a secured dataset with a child feature that inherits security,
+   * then wire a type-scoped URN and scope chain. Covers the common
+   * "parent secured, child inherits, URN targets child type" pattern.
+   */
+  async function setupInheritedSecurityScope(
+    childType: string,
+    policyName: string,
+    urnOverride?: (submissionId: number, childId: number) => string
+  ): Promise<{ submissionId: number; datasetId: number; childId: number; scopeId: string; policyId: string }> {
+    const submissionId = await createTestSubmission(connection);
+    const datasetId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
+    const childId = await createTestFeature(connection, submissionId, childType, { name: 'Child' }, datasetId);
+
+    await secureFeature(datasetId);
+
+    const urn = urnOverride ? urnOverride(submissionId, childId) : `urn:${submissionId}:${childType}:*`;
+    const policyId = await createPolicy(policyName);
+    const stmtId = await createPolicyStatement(policyId, urn);
+    const scopeId = await setupScopeChain(stmtId, urn);
+
+    return { submissionId, datasetId, childId, scopeId, policyId };
+  }
+
+  /**
    * Query anchor feature IDs for a scope.
    */
   async function getAnchorIds(scopeId: string): Promise<number[]> {
@@ -629,7 +653,14 @@ describe('Security scope search (integration)', function () {
 
       // In prod the cleanup publishes a pg-boss job that calls the service phase methods.
       // pg-boss is not running in make test-db, so invoke the service directly.
-      await scopeService.deleteStaleAnchorsForScope(scopeId);
+      let staleLastId = 0;
+      while (true) {
+        const staleBatch = await scopeService.deleteStaleAnchorBatch(scopeId, staleLastId);
+        if (!staleBatch) {
+          break;
+        }
+        staleLastId = staleBatch.pageLastId;
+      }
       const urn = await scopeService.resolveUrnForScope(scopeId);
       if (urn) {
         let lastId = 0;
@@ -742,7 +773,14 @@ describe('Security scope search (integration)', function () {
 
       // In prod the cleanup publishes a pg-boss job that calls the service phase methods.
       // pg-boss is not running in make test-db, so invoke the service directly.
-      await scopeService.deleteStaleAnchorsForScope(oldScopeId);
+      let staleLastId = 0;
+      while (true) {
+        const staleBatch = await scopeService.deleteStaleAnchorBatch(oldScopeId, staleLastId);
+        if (!staleBatch) {
+          break;
+        }
+        staleLastId = staleBatch.pageLastId;
+      }
       const oldUrn = await scopeService.resolveUrnForScope(oldScopeId);
       if (oldUrn) {
         let lastId = 0;
@@ -1032,7 +1070,14 @@ describe('Security scope search (integration)', function () {
 
       // Remove security + recompute anchors (stale anchor gets cleaned up)
       await unsecureFeature(featureId);
-      await scopeRepo.deleteStaleAnchorsForScope(scopeId);
+      let staleLastId = 0;
+      while (true) {
+        const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
+        if (!staleBatch) {
+          break;
+        }
+        staleLastId = staleBatch.pageLastId;
+      }
       await computeAnchors(scopeId);
 
       // Anchor deleted
@@ -1047,6 +1092,106 @@ describe('Security scope search (integration)', function () {
       const feature = afterAnon.find((r) => r.submission_feature_id === featureId);
       expect(feature).to.not.be.undefined;
       expect(feature?.is_secured).to.be.false;
+    });
+
+    it('should anchor child feature via inherited security from parent (type-scoped URN)', async () => {
+      const { childId, scopeId } = await setupInheritedSecurityScope('telemetry', 'inherited-security-test');
+
+      const anchorIds = await getAnchorIds(scopeId);
+      expect(anchorIds).to.include(childId);
+      expect(anchorIds).to.have.lengthOf(1);
+    });
+
+    it('should anchor specific child feature via inherited security (feature-scoped URN)', async () => {
+      // Two telemetry children — only the one named in the URN should be anchored
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
+      const telemetry1 = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Target' }, dataset);
+      const telemetry2 = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Other' }, dataset);
+      await secureFeature(dataset);
+
+      const urn = `urn:${submissionId}:telemetry:${telemetry1}`;
+      const policyId = await createPolicy('feature-scoped-inherited-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      const anchorIds = await getAnchorIds(scopeId);
+      expect(anchorIds).to.include(telemetry1);
+      expect(anchorIds).to.not.include(telemetry2);
+      expect(anchorIds).to.have.lengthOf(1);
+    });
+
+    it('should not anchor child when parent is unsecured (no inherited security)', async () => {
+      // Neither feature is secured — no anchors should be created
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Public Dataset' });
+      await createTestFeature(connection, submissionId, 'telemetry', { name: 'Public Telemetry' }, dataset);
+
+      const urn = `urn:${submissionId}:telemetry:*`;
+      const policyId = await createPolicy('no-security-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      expect(await countAnchors(scopeId)).to.equal(0);
+    });
+
+    it('should remove inherited anchor when parent is unsecured (stale cleanup)', async () => {
+      const { datasetId, childId, scopeId } = await setupInheritedSecurityScope('telemetry', 'stale-inherited-test');
+
+      expect(await getAnchorIds(scopeId)).to.include(childId);
+
+      // Unsecure the parent — child loses inherited security
+      await unsecureFeature(datasetId);
+      let staleLastId = 0;
+      while (true) {
+        const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
+        if (!staleBatch) {
+          break;
+        }
+        staleLastId = staleBatch.pageLastId;
+      }
+      await computeAnchors(scopeId);
+
+      expect(await countAnchors(scopeId)).to.equal(0);
+    });
+
+    it('should anchor deep descendant via multi-level inherited security', async () => {
+      // dataset → sample_site → telemetry (2 levels deep)
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Root' });
+      const sampleSite = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Mid' }, dataset);
+      const telemetry = await createTestFeature(
+        connection,
+        submissionId,
+        'telemetry',
+        { name: 'Deep Leaf' },
+        sampleSite
+      );
+      await secureFeature(dataset);
+
+      const urn = `urn:${submissionId}:telemetry:*`;
+      const policyId = await createPolicy('deep-inherited-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      const anchorIds = await getAnchorIds(scopeId);
+      expect(anchorIds).to.include(telemetry);
+      expect(anchorIds).to.have.lengthOf(1);
+    });
+
+    it('should grant search access to child feature via inherited anchor (end-to-end)', async () => {
+      const { submissionId, childId: telemetry } = await setupInheritedSecurityScope('telemetry', 'e2e-inherited-test');
+
+      const userId = connection.systemUserId();
+      await setupFullAccess(`urn:${submissionId}:telemetry:*`, userId, 'Inherited Access Team');
+
+      // Anonymous: telemetry should be hidden (parent is secured)
+      const anonResults = await searchInSubmission(submissionId, ['telemetry'], null);
+      expect(anonResults.map((r) => r.submission_feature_id)).to.not.include(telemetry);
+
+      // Authenticated with scope: telemetry should be visible
+      const authResults = await searchInSubmission(submissionId, ['telemetry'], userId);
+      expect(authResults.map((r) => r.submission_feature_id)).to.include(telemetry);
     });
 
     it('should delete anchors only for unsecured features, preserving anchors for still-secured features', async () => {
@@ -1071,7 +1216,14 @@ describe('Security scope search (integration)', function () {
       // Unsecure feat2 and feat3, recompute anchors (stale anchors get cleaned up)
       await unsecureFeature(feat2);
       await unsecureFeature(feat3);
-      await scopeRepo.deleteStaleAnchorsForScope(scopeId);
+      let staleLastId = 0;
+      while (true) {
+        const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
+        if (!staleBatch) {
+          break;
+        }
+        staleLastId = staleBatch.pageLastId;
+      }
       await computeAnchors(scopeId);
 
       // feat1's anchor remains, feat2 and feat3 are gone
@@ -1142,14 +1294,15 @@ describe('Security scope search (integration)', function () {
   });
 
   describe('Narrowed URN anchor computation', () => {
-    it('should anchor a specific feature by ID even when its ancestor is secured', async () => {
-      // Hierarchy: dataset → observation → telemetry
-      // Secured:   YES        NO            YES
-      // URN:       urn:{submissionId}:*:{telemetryId}  (targets telemetry by ID)
-      //
-      // Bug: the ancestor walk finds dataset (secured) and excludes telemetry
-      // from being an anchor. But the URN explicitly names telemetry — it must
-      // be the anchor regardless of what's above it.
+    /**
+     * Create a 3-level hierarchy (dataset → observation → telemetry), secure
+     * the specified features, wire a scope chain, and return all IDs.
+     */
+    async function setupDeepHierarchyScope(
+      securedFeatures: ('dataset' | 'observation' | 'telemetry')[],
+      urn: (ids: { submissionId: number; dataset: number; observation: number; telemetry: number }) => string,
+      policyName: string
+    ) {
       const submissionId = await createTestSubmission(connection);
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
       const observation = await createTestFeature(
@@ -1161,77 +1314,50 @@ describe('Security scope search (integration)', function () {
       );
       const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Telem' }, observation);
 
-      await secureFeature(dataset);
-      await secureFeature(telemetry);
+      const ids = { submissionId, dataset, observation, telemetry };
+      const featureMap = { dataset, observation, telemetry };
+      for (const f of securedFeatures) {
+        await secureFeature(featureMap[f]);
+      }
 
-      const urn = `urn:${submissionId}:*:${telemetry}`;
-      const policyId = await createPolicy('specific-feature-urn-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const urnStr = urn(ids);
+      const policyId = await createPolicy(policyName);
+      const stmtId = await createPolicyStatement(policyId, urnStr);
+      const scopeId = await setupScopeChain(stmtId, urnStr);
 
-      // The URN names this feature directly — it MUST be an anchor
+      return { ...ids, scopeId };
+    }
+
+    it('should anchor a specific feature by ID even when its ancestor is secured', async () => {
+      const { telemetry, scopeId } = await setupDeepHierarchyScope(
+        ['dataset', 'telemetry'],
+        (ids) => `urn:${ids.submissionId}:*:${ids.telemetry}`,
+        'specific-feature-urn-test'
+      );
+
       const anchorIds = await getAnchorIds(scopeId);
       expect(anchorIds).to.include(telemetry);
       expect(anchorIds).to.have.lengthOf(1);
     });
 
     it('should anchor type-scoped features even when a different-type ancestor is secured', async () => {
-      // Hierarchy: dataset → observation → telemetry
-      // Secured:   YES        YES           YES
-      // URN:       urn:{submissionId}:telemetry:*  (targets only telemetry type)
-      //
-      // Bug: the ancestor walk finds observation (secured) and excludes telemetry.
-      // But observation is not a telemetry feature — it shouldn't affect anchoring
-      // for a telemetry-scoped URN.
-      const submissionId = await createTestSubmission(connection);
-      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
-      const observation = await createTestFeature(
-        connection,
-        submissionId,
-        'species_observation',
-        { name: 'Obs' },
-        dataset
+      const { telemetry, scopeId } = await setupDeepHierarchyScope(
+        ['dataset', 'observation', 'telemetry'],
+        (ids) => `urn:${ids.submissionId}:telemetry:*`,
+        'type-scoped-urn-test'
       );
-      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Telem' }, observation);
 
-      await secureFeature(dataset);
-      await secureFeature(observation);
-      await secureFeature(telemetry);
-
-      const urn = `urn:${submissionId}:telemetry:*`;
-      const policyId = await createPolicy('type-scoped-urn-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
-
-      // Telemetry is the only candidate for this scope — secured ancestors of
-      // different types should not prevent it from being an anchor
       const anchorIds = await getAnchorIds(scopeId);
       expect(anchorIds).to.include(telemetry);
       expect(anchorIds).to.have.lengthOf(1);
     });
 
     it('should anchor a specific feature by ID with wildcard submission', async () => {
-      // Hierarchy: dataset → observation → telemetry
-      // Secured:   YES        NO            YES
-      // URN:       urn:*:*:{telemetryId}  (wildcard submission, targets feature by ID)
-      const submissionId = await createTestSubmission(connection);
-      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
-      const observation = await createTestFeature(
-        connection,
-        submissionId,
-        'species_observation',
-        { name: 'Obs' },
-        dataset
+      const { telemetry, scopeId } = await setupDeepHierarchyScope(
+        ['dataset', 'telemetry'],
+        (ids) => `urn:*:*:${ids.telemetry}`,
+        'wildcard-sub-specific-feature-test'
       );
-      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Telem' }, observation);
-
-      await secureFeature(dataset);
-      await secureFeature(telemetry);
-
-      const urn = `urn:*:*:${telemetry}`;
-      const policyId = await createPolicy('wildcard-sub-specific-feature-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
 
       const anchorIds = await getAnchorIds(scopeId);
       expect(anchorIds).to.include(telemetry);
@@ -1267,6 +1393,111 @@ describe('Security scope search (integration)', function () {
       expect(anchorIds).to.include(telem2);
       // Dataset feature excluded — wrong feature type for this scope
       expect(anchorIds).to.not.include(dataset);
+    });
+  });
+
+  // ── URN revert → orphaned scope reuse loses anchors ─────────────────
+
+  describe('URN revert → orphaned scope reuse loses anchors', () => {
+    it('should have anchors after changing URN away and back to the original (BUG: anchors lost)', async () => {
+      // Reproduces: policy starts as urn:{sub}:*:*, changed to urn:{sub}:*:{id},
+      // then changed back to urn:{sub}:*:*. The revert finds the existing
+      // security_scope row (scope_hash match) but its anchors were deleted
+      // during the orphan cleanup from the first change.
+      //
+      // setupScopeChain mirrors createScopeForPolicyStatement: it checks
+      // insertSecurityScope (ON CONFLICT DO NOTHING) — if null, reuses the
+      // existing scope WITHOUT recomputing anchors.
+      //
+      // Uses submission-scoped URNs to avoid collisions with seed data policies.
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
+      const child = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Child' }, dataset);
+
+      await secureFeature(dataset);
+      await secureFeature(child);
+
+      // ── Step 1: Policy with urn:{sub}:*:* (broad) ──
+      const broadUrn = `urn:${submissionId}:*:*`;
+      const policyId = await createPolicy('revert-test');
+      const stmt1 = await createPolicyStatement(policyId, broadUrn);
+      const broadScopeId = await setupScopeChain(stmt1, broadUrn);
+
+      const userId = connection.systemUserId();
+      const teamId = await createTeam('Revert Team');
+      await addTeamMember(teamId, userId);
+      await createTeamPolicy(teamId, policyId);
+      await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyId);
+
+      // Anchors exist (dataset is the root anchor)
+      expect(await countAnchors(broadScopeId)).to.be.greaterThan(0);
+
+      // ── Step 2: Change URN to urn:{sub}:*:{childId} (narrow) ──
+      // Soft-delete old statement
+      await connection.sql(SQL`
+        UPDATE policy_statement SET record_end_date = now()
+        WHERE policy_statement_id = ${stmt1};
+      `);
+      // Cleanup: remove old pss mapping, rebuild team scopes
+      await scopeService.cleanupScopesForDeletedStatements([stmt1], [teamId]);
+      // Simulate the orphan cleanup job
+      let staleLastId1 = 0;
+      while (true) {
+        const staleBatch = await scopeService.deleteStaleAnchorBatch(broadScopeId, staleLastId1);
+        if (!staleBatch) {
+          break;
+        }
+        staleLastId1 = staleBatch.pageLastId;
+      }
+
+      // Broad scope anchors are now gone (orphaned — no pss references)
+      expect(await countAnchors(broadScopeId)).to.equal(0);
+
+      // Create new narrow statement
+      const narrowUrn = `urn:${submissionId}:*:${child}`;
+      const stmt2 = await createPolicyStatement(policyId, narrowUrn);
+      const narrowScopeId = await setupScopeChain(stmt2, narrowUrn);
+      await scopeRepo.deleteTeamSecurityScopes(teamId);
+      await scopeRepo.insertTeamSecurityScopesFromPolicyChain(teamId);
+
+      expect(await countAnchors(narrowScopeId)).to.be.greaterThan(0);
+
+      // ── Step 3: Revert back to urn:{sub}:*:* (broad again) ──
+      // Soft-delete narrow statement
+      await connection.sql(SQL`
+        UPDATE policy_statement SET record_end_date = now()
+        WHERE policy_statement_id = ${stmt2};
+      `);
+      await scopeService.cleanupScopesForDeletedStatements([stmt2], [teamId]);
+      let staleLastId2 = 0;
+      while (true) {
+        const staleBatch = await scopeService.deleteStaleAnchorBatch(narrowScopeId, staleLastId2);
+        if (!staleBatch) {
+          break;
+        }
+        staleLastId2 = staleBatch.pageLastId;
+      }
+
+      // Re-create the original broad statement
+      const stmt3 = await createPolicyStatement(policyId, broadUrn);
+      // setupScopeChain mirrors the real service: insertSecurityScope returns null
+      // (scope_hash already exists from Step 1), so it reuses the existing scope
+      // and recomputes anchors — verifying the fix for the reuse path.
+      const reusedScopeId = await setupScopeChain(stmt3, broadUrn);
+      await scopeRepo.deleteTeamSecurityScopes(teamId);
+      await scopeRepo.insertTeamSecurityScopesFromPolicyChain(teamId);
+
+      // Same scope reused (same hash)
+      expect(reusedScopeId).to.equal(broadScopeId);
+
+      // Team has the scope mapped
+      expect(await countTeamScopes(teamId)).to.be.greaterThan(0);
+
+      // BUG: anchors are 0 because orphan cleanup deleted them in Step 2 and
+      // the reuse path in Step 3 skipped recomputation.
+      // After fix, this should be greaterThan(0).
+      const anchorCount = await countAnchors(reusedScopeId);
+      expect(anchorCount).to.be.greaterThan(0);
     });
   });
 
@@ -1466,8 +1697,15 @@ describe('Security scope search (integration)', function () {
       await unsecureFeature(root);
 
       // Recompute via the service phase methods (integration test coverage for
-      // the service-level orchestration: deleteStaleAnchorsForScope → resolveUrnForScope → computeAnchorBatch)
-      await scopeService.deleteStaleAnchorsForScope(scopeId);
+      // the service-level orchestration: deleteStaleAnchorBatch → resolveUrnForScope → computeAnchorBatch)
+      let staleLastId = 0;
+      while (true) {
+        const staleBatch = await scopeService.deleteStaleAnchorBatch(scopeId, staleLastId);
+        if (!staleBatch) {
+          break;
+        }
+        staleLastId = staleBatch.pageLastId;
+      }
       const recomputeUrn = await scopeService.resolveUrnForScope(scopeId);
       if (recomputeUrn) {
         let lastId = 0;
@@ -1494,6 +1732,68 @@ describe('Security scope search (integration)', function () {
       expect(anchorIdsAfter).to.include(childA);
       expect(anchorIdsAfter).to.include(childB);
       expect(anchorIdsAfter).to.have.lengthOf(2);
+    });
+
+    it('should delete all stale anchors across multiple keyset batches', async function () {
+      // BATCH_SIZE in deleteStaleAnchorBatch is 5000. Creating 5001 flat features
+      // (no parent → each is its own anchor) exercises multi-batch stale deletion:
+      //
+      // Setup: 5001 secured flat features → 5001 anchors.
+      // Then unsecure all features → all 5001 anchors become stale.
+      //
+      // Batch 1 (IDs 1..5000): 5000 stale anchors identified and deleted.
+      // Batch 2 (IDs 5001..5001): 1 stale anchor identified and deleted.
+      // Batch 3: no more anchors → null → loop terminates.
+      //
+      // Final state: 0 anchors. If the keyset loop or boundary fallback is broken,
+      // stale anchors survive or the loop hangs.
+      this.timeout(120000);
+
+      const submissionId = await createTestSubmission(connection);
+
+      // Bulk-insert 5001 flat features (no parent → each becomes an anchor)
+      const featureIds = await createTestFeaturesInBulk(connection, submissionId, 'dataset', 5001);
+
+      // Secure all features in bulk
+      await secureFeaturesInBulk(featureIds);
+
+      const urn = `urn:${submissionId}:*:*`;
+      const policyId = await createPolicy('multi-batch-stale-delete-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      // All 5001 flat features are anchors (no ancestor pruning for flat hierarchy)
+      expect(await countAnchors(scopeId)).to.equal(5001);
+
+      // Unsecure all features — every anchor becomes stale
+      await connection.query(
+        `UPDATE submission_feature_security
+         SET record_end_date = now()
+         WHERE submission_feature_id = ANY($1::INTEGER[])
+           AND record_end_date IS NULL`,
+        [featureIds]
+      );
+
+      // Run the paginated stale delete loop
+      let staleLastId = 0;
+      let batchCount = 0;
+
+      while (true) {
+        const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
+
+        if (!staleBatch) {
+          break;
+        }
+
+        staleLastId = staleBatch.pageLastId;
+        batchCount++;
+      }
+
+      // All stale anchors deleted across multiple batches
+      expect(await countAnchors(scopeId)).to.equal(0);
+
+      // Must have taken more than 1 batch (5001 anchors / 5000 batch size)
+      expect(batchCount).to.be.greaterThan(1);
     });
 
     it('should process all candidates across multiple keyset batches', async function () {
