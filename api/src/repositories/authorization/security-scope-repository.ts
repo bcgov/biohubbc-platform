@@ -6,23 +6,30 @@ import { AnchorBatchResult, SecurityScopeUrn } from '../../services/access-polic
 import { BaseRepository } from '../base-repository';
 
 /**
- * Recursive CTE fragment: computes all features that are "effectively secured" —
- * directly secured via submission_feature_security or inheriting security from an
- * ancestor. Security rules on a parent cascade to all descendants.
+ * Per-candidate "effectively secured" check: walks UP from a feature through its
+ * ancestors to determine if it or any ancestor has an active security rule.
  *
- * Used as a WITH RECURSIVE preamble in anchor computation and stale-anchor cleanup.
- * UNION (not UNION ALL) deduplicates and prevents re-walking already-visited subtrees.
+ * Cost is O(tree_depth) per candidate (~3–5 levels), bounded by the feature
+ * hierarchy depth regardless of total feature count.
+ *
+ * @param alias The SQL alias of the submission_feature row to check
  */
-const EFFECTIVELY_SECURED_CTE = `effectively_secured(submission_feature_id) AS (
-         SELECT sfs.submission_feature_id
-         FROM submission_feature_security sfs
-         WHERE sfs.record_end_date IS NULL
-         UNION
-         SELECT child.submission_feature_id
-         FROM submission_feature child
-         JOIN effectively_secured es ON child.parent_submission_feature_id = es.submission_feature_id
-         WHERE child.record_end_date IS NULL
-       )`;
+function isEffectivelySecured(alias: string): string {
+  return `EXISTS (
+    WITH RECURSIVE ancestor_chain(id) AS (
+      SELECT ${alias}.submission_feature_id
+      UNION ALL
+      SELECT p.parent_submission_feature_id
+      FROM ancestor_chain ac
+      JOIN submission_feature p ON p.submission_feature_id = ac.id
+      WHERE p.parent_submission_feature_id IS NOT NULL
+        AND p.record_end_date IS NULL
+    )
+    SELECT 1 FROM ancestor_chain ac
+    JOIN submission_feature_security sfs ON sfs.submission_feature_id = ac.id
+    WHERE sfs.record_end_date IS NULL
+  )`;
+}
 
 /**
  * Repository for security scope tables — the normalized access model that replaces
@@ -133,8 +140,7 @@ export class SecurityScopeRepository extends BaseRepository {
   }
 
   /**
-   * Delete stale anchors for a security scope — anchors whose features no longer
-   * meet candidate criteria.
+   * Delete one keyset-paginated batch of stale anchors for a security scope.
    *
    * An anchor becomes stale when its feature is no longer effectively secured
    * (neither it nor any ancestor has active security rules), unapproved (upload
@@ -150,42 +156,110 @@ export class SecurityScopeRepository extends BaseRepository {
    * statement validates it. For orphaned scopes (zero policy_statement_scope rows),
    * the NOT EXISTS subquery finds nothing, so all anchors are deleted.
    *
+   * **Why keyset pagination:** With ~10% of features secured per submission,
+   * a scope can have 50k+ anchors. The monolithic DELETE runs isEffectivelySecured()
+   * (recursive CTE) per anchor row — 50k recursive CTEs + WAL + row locks in one
+   * transaction. Keyset pagination bounds memory and WAL per batch.
+   *
+   * **All-valid-batch fallback:** When no anchors in a batch are stale, no rows
+   * are deleted but the batch is not exhausted. A boundary query advances the
+   * cursor past the fully-valid page.
+   *
    * @param securityScopeId UUID of the security scope to clean stale anchors for
+   * @param afterId Keyset cursor — process anchors with anchor_submission_feature_id > afterId (pass 0 to start)
+   * @returns Next cursor position, or null when no more anchors exist
    */
-  async deleteStaleAnchorsForScope(securityScopeId: string): Promise<void> {
+  async deleteStaleAnchorBatch(securityScopeId: string, afterId: number): Promise<AnchorBatchResult | null> {
+    const BATCH_SIZE = 5000;
+
+    const result = await this.connection.query<{
+      anchor_submission_feature_id: number;
+      page_last_id: number;
+    }>(
+      `WITH batch AS (
+         SELECT ssa.anchor_submission_feature_id
+         FROM security_scope_anchor ssa
+         WHERE ssa.security_scope_id = $1
+           AND ssa.anchor_submission_feature_id > $2
+         ORDER BY ssa.anchor_submission_feature_id
+         LIMIT $3
+       )
+       -- Return stale anchors: those NOT validated by any active policy statement
+       SELECT b.anchor_submission_feature_id,
+              (SELECT MAX(anchor_submission_feature_id) FROM batch) AS page_last_id
+       FROM batch b
+       WHERE NOT EXISTS (
+         SELECT 1
+         FROM policy_statement_scope pss
+         JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
+         JOIN submission_feature anchor_sf ON anchor_sf.submission_feature_id = b.anchor_submission_feature_id
+         JOIN feature_type ft ON ft.feature_type_id = anchor_sf.feature_type_id
+         WHERE pss.security_scope_id = $1
+           AND ps.record_end_date IS NULL
+           AND anchor_sf.record_end_date IS NULL
+           AND (ps.urn_submission_id = anchor_sf.submission_id::text OR ps.urn_submission_id = '*')
+           AND (ps.urn_feature_type = ft.name                       OR ps.urn_feature_type = '*')
+           AND (ps.urn_feature_id = anchor_sf.submission_feature_id::text OR ps.urn_feature_id = '*')
+           AND ${isEffectivelySecured('anchor_sf')}
+           AND anchor_sf.record_effective_date <= now()
+       )`,
+      [securityScopeId, afterId, BATCH_SIZE]
+    );
+
+    if (result.rows.length > 0) {
+      const staleIds = result.rows.map((r) => r.anchor_submission_feature_id);
+
+      await this.connection.query(
+        `DELETE FROM security_scope_anchor
+         WHERE security_scope_id = $1
+           AND anchor_submission_feature_id = ANY($2::INTEGER[])`,
+        [securityScopeId, staleIds]
+      );
+
+      return { pageLastId: result.rows[0].page_last_id };
+    }
+
+    // No stale anchors in this batch — check if the batch had any anchors at all
+    // to advance the cursor past valid anchors.
+    const boundaryResult = await this.connection.query<{ last_id: number }>(
+      `SELECT MAX(ssa.anchor_submission_feature_id) AS last_id
+       FROM (
+         SELECT ssa.anchor_submission_feature_id
+         FROM security_scope_anchor ssa
+         WHERE ssa.security_scope_id = $1
+           AND ssa.anchor_submission_feature_id > $2
+         ORDER BY ssa.anchor_submission_feature_id
+         LIMIT $3
+       ) ssa`,
+      [securityScopeId, afterId, BATCH_SIZE]
+    );
+
+    if (!boundaryResult.rows[0]?.last_id) {
+      return null;
+    }
+
+    return { pageLastId: boundaryResult.rows[0].last_id };
+  }
+
+  /**
+   * Clean up all derived data for an orphaned scope (no active policy statements).
+   *
+   * Deletes both `security_scope_anchor` and `team_security_scope` rows — no team
+   * should retain access to a scope that has no policy statements backing it.
+   * The service's `rebuildTeamSecurityScopes` handles known affected teams, but
+   * cleaning by scope_id here catches any team_security_scope rows that weren't
+   * covered (e.g., race between team-policy creation and scope orphaning).
+   *
+   * @param securityScopeId UUID of the orphaned security scope
+   */
+  async deleteOrphanedScopeData(securityScopeId: string): Promise<void> {
     await this.connection.query(
-      `-- Delete anchors that no active policy statement validates.
-       -- For orphaned scopes (no policy_statement_scope rows), every anchor
-       -- fails the NOT EXISTS check and gets deleted.
-       WITH RECURSIVE
-       ${EFFECTIVELY_SECURED_CTE}
-       DELETE FROM security_scope_anchor ssa
-       WHERE ssa.security_scope_id = $1
-         AND NOT EXISTS (
-           SELECT 1
-           -- Walk the scope → policy statement chain to find the URN pattern
-           FROM policy_statement_scope pss
-           JOIN policy_statement ps ON ps.policy_statement_id = pss.policy_statement_id
-           -- Look up the anchored feature and its type
-           JOIN submission_feature sf ON sf.submission_feature_id = ssa.anchor_submission_feature_id
-           JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-           WHERE pss.security_scope_id = $1
-             -- Policy statement must be active (not soft-deleted)
-             AND ps.record_end_date IS NULL
-             -- Feature must be active (not soft-deleted)
-             AND sf.record_end_date IS NULL
-             -- Feature must match the scope's URN pattern
-             AND (ps.urn_submission_id = sf.submission_id::text OR ps.urn_submission_id = '*')
-             AND (ps.urn_feature_type = ft.name                OR ps.urn_feature_type = '*')
-             AND (ps.urn_feature_id = sf.submission_feature_id::text OR ps.urn_feature_id = '*')
-             -- Feature must be effectively secured (directly or via ancestor)
-             AND EXISTS (
-               SELECT 1 FROM effectively_secured es
-               WHERE es.submission_feature_id = sf.submission_feature_id
-             )
-             -- Feature must be from an approved upload
-             AND sf.record_effective_date <= now()
-         )`,
+      `DELETE FROM security_scope_anchor WHERE security_scope_id = $1`,
+      [securityScopeId]
+    );
+
+    await this.connection.query(
+      `DELETE FROM team_security_scope WHERE security_scope_id = $1`,
       [securityScopeId]
     );
   }
@@ -246,7 +320,7 @@ export class SecurityScopeRepository extends BaseRepository {
    * A separate boundary query re-runs the same candidate criteria to find the page
    * maximum and advance the cursor past the fully-pruned page.
    *
-   * Insert-only with ON CONFLICT DO NOTHING — called after `deleteStaleAnchorsForScope`
+   * Insert-only with ON CONFLICT DO NOTHING — called after `deleteStaleAnchorBatch`
    * removes invalid anchors, so existing valid anchors are simply skipped.
    *
    * The caller (service) manages transaction boundaries — each batch call runs
@@ -271,24 +345,19 @@ export class SecurityScopeRepository extends BaseRepository {
       page_last_id: number;
     }>(
       `WITH RECURSIVE
-       ${EFFECTIVELY_SECURED_CTE},
-
        batch AS (
-         SELECT sf.submission_feature_id,
-                sf.parent_submission_feature_id
-         FROM submission_feature sf
-         JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-         WHERE sf.record_end_date IS NULL
-           AND sf.submission_feature_id > $1
-           AND ($2 = sf.submission_id::text OR $2 = '*')
-           AND ($3 = ft.name                OR $3 = '*')
-           AND ($4 = sf.submission_feature_id::text OR $4 = '*')
-           AND EXISTS (
-             SELECT 1 FROM effectively_secured es
-             WHERE es.submission_feature_id = sf.submission_feature_id
-           )
-           AND sf.record_effective_date <= now()
-         ORDER BY sf.submission_feature_id
+         SELECT candidate.submission_feature_id,
+                candidate.parent_submission_feature_id
+         FROM submission_feature candidate
+         JOIN feature_type ft ON ft.feature_type_id = candidate.feature_type_id
+         WHERE candidate.record_end_date IS NULL
+           AND candidate.submission_feature_id > $1
+           AND ($2 = candidate.submission_id::text OR $2 = '*')
+           AND ($3 = ft.name                       OR $3 = '*')
+           AND ($4 = candidate.submission_feature_id::text OR $4 = '*')
+           AND ${isEffectivelySecured('candidate')}
+           AND candidate.record_effective_date <= now()
+         ORDER BY candidate.submission_feature_id
          LIMIT $5
        ),
 
@@ -313,17 +382,14 @@ export class SecurityScopeRepository extends BaseRepository {
        has_candidate_ancestor AS (
          SELECT DISTINCT aw.candidate_id
          FROM ancestor_walk aw
-         JOIN submission_feature sf ON sf.submission_feature_id = aw.ancestor_id
-         JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-         WHERE sf.record_end_date IS NULL
-           AND ($2 = sf.submission_id::text OR $2 = '*')
-           AND ($3 = ft.name               OR $3 = '*')
-           AND ($4 = sf.submission_feature_id::text OR $4 = '*')
-           AND EXISTS (
-             SELECT 1 FROM effectively_secured es
-             WHERE es.submission_feature_id = sf.submission_feature_id
-           )
-           AND sf.record_effective_date <= now()
+         JOIN submission_feature ancestor ON ancestor.submission_feature_id = aw.ancestor_id
+         JOIN feature_type ft ON ft.feature_type_id = ancestor.feature_type_id
+         WHERE ancestor.record_end_date IS NULL
+           AND ($2 = ancestor.submission_id::text OR $2 = '*')
+           AND ($3 = ft.name                      OR $3 = '*')
+           AND ($4 = ancestor.submission_feature_id::text OR $4 = '*')
+           AND ${isEffectivelySecured('ancestor')}
+           AND ancestor.record_effective_date <= now()
        )
 
        -- Prune to topmost candidates only (anchors). A candidate with a candidate
@@ -358,26 +424,21 @@ export class SecurityScopeRepository extends BaseRepository {
     // This boundary query uses the same candidate criteria as the batch CTE above —
     // they MUST stay in sync or the keyset will skip/repeat candidates.
     const boundaryResult = await this.connection.query<{ last_id: number }>(
-      `WITH RECURSIVE
-       ${EFFECTIVELY_SECURED_CTE}
-       SELECT MAX(sf.submission_feature_id) AS last_id
+      `SELECT MAX(candidate.submission_feature_id) AS last_id
        FROM (
-         SELECT sf.submission_feature_id
-         FROM submission_feature sf
-         JOIN feature_type ft ON ft.feature_type_id = sf.feature_type_id
-         WHERE sf.record_end_date IS NULL
-           AND sf.submission_feature_id > $1
-           AND ($2 = sf.submission_id::text OR $2 = '*')
-           AND ($3 = ft.name               OR $3 = '*')
-           AND ($4 = sf.submission_feature_id::text OR $4 = '*')
-           AND EXISTS (
-             SELECT 1 FROM effectively_secured es
-             WHERE es.submission_feature_id = sf.submission_feature_id
-           )
-           AND sf.record_effective_date <= now()
-         ORDER BY sf.submission_feature_id
+         SELECT candidate.submission_feature_id
+         FROM submission_feature candidate
+         JOIN feature_type ft ON ft.feature_type_id = candidate.feature_type_id
+         WHERE candidate.record_end_date IS NULL
+           AND candidate.submission_feature_id > $1
+           AND ($2 = candidate.submission_id::text OR $2 = '*')
+           AND ($3 = ft.name                       OR $3 = '*')
+           AND ($4 = candidate.submission_feature_id::text OR $4 = '*')
+           AND ${isEffectivelySecured('candidate')}
+           AND candidate.record_effective_date <= now()
+         ORDER BY candidate.submission_feature_id
          LIMIT $5
-       ) sf`,
+       ) candidate`,
       [afterId, urn.urn_submission_id, urn.urn_feature_type, urn.urn_feature_id, BATCH_SIZE]
     );
 

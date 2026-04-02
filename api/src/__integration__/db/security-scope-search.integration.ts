@@ -653,7 +653,12 @@ describe('Security scope search (integration)', function () {
 
       // In prod the cleanup publishes a pg-boss job that calls the service phase methods.
       // pg-boss is not running in make test-db, so invoke the service directly.
-      await scopeService.deleteStaleAnchorsForScope(scopeId);
+      let staleLastId = 0;
+      while (true) {
+        const staleBatch = await scopeService.deleteStaleAnchorBatch(scopeId, staleLastId);
+        if (!staleBatch) break;
+        staleLastId = staleBatch.pageLastId;
+      }
       const urn = await scopeService.resolveUrnForScope(scopeId);
       if (urn) {
         let lastId = 0;
@@ -766,7 +771,12 @@ describe('Security scope search (integration)', function () {
 
       // In prod the cleanup publishes a pg-boss job that calls the service phase methods.
       // pg-boss is not running in make test-db, so invoke the service directly.
-      await scopeService.deleteStaleAnchorsForScope(oldScopeId);
+      let staleLastId = 0;
+      while (true) {
+        const staleBatch = await scopeService.deleteStaleAnchorBatch(oldScopeId, staleLastId);
+        if (!staleBatch) break;
+        staleLastId = staleBatch.pageLastId;
+      }
       const oldUrn = await scopeService.resolveUrnForScope(oldScopeId);
       if (oldUrn) {
         let lastId = 0;
@@ -1056,7 +1066,12 @@ describe('Security scope search (integration)', function () {
 
       // Remove security + recompute anchors (stale anchor gets cleaned up)
       await unsecureFeature(featureId);
-      await scopeRepo.deleteStaleAnchorsForScope(scopeId);
+      let staleLastId = 0;
+      while (true) {
+        const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
+        if (!staleBatch) break;
+        staleLastId = staleBatch.pageLastId;
+      }
       await computeAnchors(scopeId);
 
       // Anchor deleted
@@ -1121,7 +1136,12 @@ describe('Security scope search (integration)', function () {
 
       // Unsecure the parent — child loses inherited security
       await unsecureFeature(datasetId);
-      await scopeRepo.deleteStaleAnchorsForScope(scopeId);
+      let staleLastId = 0;
+      while (true) {
+        const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
+        if (!staleBatch) break;
+        staleLastId = staleBatch.pageLastId;
+      }
       await computeAnchors(scopeId);
 
       expect(await countAnchors(scopeId)).to.equal(0);
@@ -1188,7 +1208,12 @@ describe('Security scope search (integration)', function () {
       // Unsecure feat2 and feat3, recompute anchors (stale anchors get cleaned up)
       await unsecureFeature(feat2);
       await unsecureFeature(feat3);
-      await scopeRepo.deleteStaleAnchorsForScope(scopeId);
+      let staleLastId = 0;
+      while (true) {
+        const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
+        if (!staleBatch) break;
+        staleLastId = staleBatch.pageLastId;
+      }
       await computeAnchors(scopeId);
 
       // feat1's anchor remains, feat2 and feat3 are gone
@@ -1406,7 +1431,12 @@ describe('Security scope search (integration)', function () {
       // Cleanup: remove old pss mapping, rebuild team scopes
       await scopeService.cleanupScopesForDeletedStatements([stmt1], [teamId]);
       // Simulate the orphan cleanup job
-      await scopeService.deleteStaleAnchorsForScope(broadScopeId);
+      let staleLastId1 = 0;
+      while (true) {
+        const staleBatch = await scopeService.deleteStaleAnchorBatch(broadScopeId, staleLastId1);
+        if (!staleBatch) break;
+        staleLastId1 = staleBatch.pageLastId;
+      }
 
       // Broad scope anchors are now gone (orphaned — no pss references)
       expect(await countAnchors(broadScopeId)).to.equal(0);
@@ -1427,7 +1457,12 @@ describe('Security scope search (integration)', function () {
         WHERE policy_statement_id = ${stmt2};
       `);
       await scopeService.cleanupScopesForDeletedStatements([stmt2], [teamId]);
-      await scopeService.deleteStaleAnchorsForScope(narrowScopeId);
+      let staleLastId2 = 0;
+      while (true) {
+        const staleBatch = await scopeService.deleteStaleAnchorBatch(narrowScopeId, staleLastId2);
+        if (!staleBatch) break;
+        staleLastId2 = staleBatch.pageLastId;
+      }
 
       // Re-create the original broad statement
       const stmt3 = await createPolicyStatement(policyId, broadUrn);
@@ -1648,8 +1683,13 @@ describe('Security scope search (integration)', function () {
       await unsecureFeature(root);
 
       // Recompute via the service phase methods (integration test coverage for
-      // the service-level orchestration: deleteStaleAnchorsForScope → resolveUrnForScope → computeAnchorBatch)
-      await scopeService.deleteStaleAnchorsForScope(scopeId);
+      // the service-level orchestration: deleteStaleAnchorBatch → resolveUrnForScope → computeAnchorBatch)
+      let staleLastId = 0;
+      while (true) {
+        const staleBatch = await scopeService.deleteStaleAnchorBatch(scopeId, staleLastId);
+        if (!staleBatch) break;
+        staleLastId = staleBatch.pageLastId;
+      }
       const recomputeUrn = await scopeService.resolveUrnForScope(scopeId);
       if (recomputeUrn) {
         let lastId = 0;
@@ -1676,6 +1716,68 @@ describe('Security scope search (integration)', function () {
       expect(anchorIdsAfter).to.include(childA);
       expect(anchorIdsAfter).to.include(childB);
       expect(anchorIdsAfter).to.have.lengthOf(2);
+    });
+
+    it('should delete all stale anchors across multiple keyset batches', async function () {
+      // BATCH_SIZE in deleteStaleAnchorBatch is 5000. Creating 5001 flat features
+      // (no parent → each is its own anchor) exercises multi-batch stale deletion:
+      //
+      // Setup: 5001 secured flat features → 5001 anchors.
+      // Then unsecure all features → all 5001 anchors become stale.
+      //
+      // Batch 1 (IDs 1..5000): 5000 stale anchors identified and deleted.
+      // Batch 2 (IDs 5001..5001): 1 stale anchor identified and deleted.
+      // Batch 3: no more anchors → null → loop terminates.
+      //
+      // Final state: 0 anchors. If the keyset loop or boundary fallback is broken,
+      // stale anchors survive or the loop hangs.
+      this.timeout(120000);
+
+      const submissionId = await createTestSubmission(connection);
+
+      // Bulk-insert 5001 flat features (no parent → each becomes an anchor)
+      const featureIds = await createTestFeaturesInBulk(connection, submissionId, 'dataset', 5001);
+
+      // Secure all features in bulk
+      await secureFeaturesInBulk(featureIds);
+
+      const urn = `urn:${submissionId}:*:*`;
+      const policyId = await createPolicy('multi-batch-stale-delete-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      // All 5001 flat features are anchors (no ancestor pruning for flat hierarchy)
+      expect(await countAnchors(scopeId)).to.equal(5001);
+
+      // Unsecure all features — every anchor becomes stale
+      await connection.query(
+        `UPDATE submission_feature_security
+         SET record_end_date = now()
+         WHERE submission_feature_id = ANY($1::INTEGER[])
+           AND record_end_date IS NULL`,
+        [featureIds]
+      );
+
+      // Run the paginated stale delete loop
+      let staleLastId = 0;
+      let batchCount = 0;
+
+      while (true) {
+        const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
+
+        if (!staleBatch) {
+          break;
+        }
+
+        staleLastId = staleBatch.pageLastId;
+        batchCount++;
+      }
+
+      // All stale anchors deleted across multiple batches
+      expect(await countAnchors(scopeId)).to.equal(0);
+
+      // Must have taken more than 1 batch (5001 anchors / 5000 batch size)
+      expect(batchCount).to.be.greaterThan(1);
     });
 
     it('should process all candidates across multiple keyset batches', async function () {

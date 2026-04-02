@@ -212,13 +212,24 @@ describe('SecurityScopeService', () => {
     });
   });
 
-  describe('deleteStaleAnchorsForScope', () => {
-    it('delegates to repository', async () => {
-      const stub = sinon.stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorsForScope').resolves();
+  describe('deleteStaleAnchorBatch', () => {
+    it('delegates to repository and returns batch result', async () => {
+      const stub = sinon
+        .stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorBatch')
+        .resolves({ pageLastId: 5000 });
 
-      await service.deleteStaleAnchorsForScope('scope-1');
+      const result = await service.deleteStaleAnchorBatch('scope-1', 0);
 
-      expect(stub).to.have.been.calledOnceWith('scope-1');
+      expect(stub).to.have.been.calledOnceWith('scope-1', 0);
+      expect(result).to.deep.equal({ pageLastId: 5000 });
+    });
+
+    it('returns null when no more anchors', async () => {
+      sinon.stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorBatch').resolves(null);
+
+      const result = await service.deleteStaleAnchorBatch('scope-1', 5000);
+
+      expect(result).to.be.null;
     });
   });
 

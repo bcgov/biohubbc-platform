@@ -163,7 +163,7 @@ export class SecurityScopeService extends DBService {
   }
 
   /**
-   * Delete stale anchors for a security scope.
+   * Delete one keyset-paginated batch of stale anchors for a security scope.
    *
    * Removes anchors for features that no longer meet candidate criteria
    * (unsecured, unapproved, soft-deleted, or URN mismatch). Also handles
@@ -171,9 +171,23 @@ export class SecurityScopeService extends DBService {
    * when no policy statement validates them.
    *
    * @param securityScopeId UUID of the security scope
+   * @param afterId Keyset cursor — pass 0 to start from the beginning
+   * @returns Next cursor position, or null when no more anchors exist
    */
-  async deleteStaleAnchorsForScope(securityScopeId: string): Promise<void> {
-    await this.securityScopeRepository.deleteStaleAnchorsForScope(securityScopeId);
+  async deleteStaleAnchorBatch(securityScopeId: string, afterId: number): Promise<AnchorBatchResult | null> {
+    return this.securityScopeRepository.deleteStaleAnchorBatch(securityScopeId, afterId);
+  }
+
+  /**
+   * Clean up all derived data for an orphaned scope — anchors and team grants.
+   *
+   * Used for orphaned scopes (no active policy statements) — avoids running the
+   * expensive effectively-secured CTE when the outcome is always "delete everything."
+   *
+   * @param securityScopeId UUID of the orphaned security scope
+   */
+  async deleteOrphanedScopeData(securityScopeId: string): Promise<void> {
+    await this.securityScopeRepository.deleteOrphanedScopeData(securityScopeId);
   }
 
   /**
