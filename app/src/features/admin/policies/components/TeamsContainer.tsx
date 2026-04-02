@@ -192,7 +192,7 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
       await biohubApi.teams.createTeam({
         name: values.name,
         description: values.description || undefined,
-        system_user_ids: values.system_user_ids
+        system_user_ids: values.system_users.map((u) => u.system_user_id)
       });
 
       setOpenAddTeamDialog(false);
@@ -239,7 +239,7 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
       await biohubApi.teams.updateTeam(editingTeam.team_id, {
         name: values.name,
         description: values.description || undefined,
-        system_user_ids: values.system_user_ids
+        system_user_ids: values.system_users.map((u) => u.system_user_id)
       });
 
       setOpenEditTeamDialog(false);
@@ -283,7 +283,7 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
     return {
       name: editingTeam.name,
       description: editingTeam.description || '',
-      system_user_ids: editingTeamMembers.map((m) => m.system_user_id)
+      system_users: editingTeamMembers
     };
   };
 
@@ -403,7 +403,7 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
         open={openEditTeamDialog}
         dialogSaveButtonLabel="Save"
         component={{
-          element: <AddTeamForm initialUsers={editingTeamMembers} />,
+          element: <AddTeamForm />,
           initialValues: getEditTeamInitialValues(),
           validationSchema: AddTeamFormYupSchema
         }}
