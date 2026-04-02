@@ -48,8 +48,10 @@ describe('CartSubmissionFeatureRepository', () => {
 
       expect(sqlText).to.include('NOT EXISTS');
       expect(sqlText).to.include('RECURSIVE');
-      expect(sqlText).to.include('ancestors');
+      expect(sqlText).to.include('ancestor_chain');
       expect(sqlText).to.include('submission_feature_security');
+      expect(sqlText).to.include('record_effective_date');
+      expect(sqlText).to.include('record_end_date');
     });
   });
 

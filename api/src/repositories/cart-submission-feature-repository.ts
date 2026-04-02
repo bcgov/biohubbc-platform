@@ -6,6 +6,33 @@ import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
 
 /**
+ * Per-candidate "effectively secured" check: walks UP from a feature through its
+ * ancestors to determine if it or any ancestor has an active security rule
+ * whose feature is past its effective date.
+ *
+ * @param featureIdExpr SQL expression for the starting submission_feature_id
+ *   (e.g. 'wf.submission_feature_id' or 'sf.submission_feature_id')
+ */
+function isEffectivelySecured(featureIdExpr: string): string {
+  return `EXISTS (
+    WITH RECURSIVE ancestor_chain(id) AS (
+      SELECT ${featureIdExpr}
+      UNION ALL
+      SELECT p.parent_submission_feature_id
+      FROM ancestor_chain ac
+      JOIN submission_feature p ON p.submission_feature_id = ac.id
+      WHERE p.parent_submission_feature_id IS NOT NULL
+        AND p.record_end_date IS NULL
+    )
+    SELECT 1 FROM ancestor_chain ac
+    JOIN submission_feature_security sfs ON sfs.submission_feature_id = ac.id
+    JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = ac.id
+    WHERE sfs.record_end_date IS NULL
+      AND sf_sec.record_effective_date <= now()
+  )`;
+}
+
+/**
  * CartSubmissionFeature repository class.
  * Handles interactions with the cart_submission_feature table for adding, removing, and querying submission features for a cart.
  *
@@ -40,21 +67,20 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
         SELECT wf.submission_feature_id
         FROM w_features wf
         WHERE NOT EXISTS (
-          WITH RECURSIVE ancestors AS (
-            SELECT sf_inner.submission_feature_id AS ancestor_id,
-                   sf_inner.parent_submission_feature_id
-            FROM submission_feature sf_inner
-            WHERE sf_inner.submission_feature_id = wf.submission_feature_id
+          WITH RECURSIVE ancestor_chain(id) AS (
+            SELECT wf.submission_feature_id
             UNION ALL
-            SELECT p.submission_feature_id, p.parent_submission_feature_id
-            FROM submission_feature p
-            JOIN ancestors a ON p.submission_feature_id = a.parent_submission_feature_id
+            SELECT p.parent_submission_feature_id
+            FROM ancestor_chain ac
+            JOIN submission_feature p ON p.submission_feature_id = ac.id
+            WHERE p.parent_submission_feature_id IS NOT NULL
+              AND p.record_end_date IS NULL
           )
-          SELECT 1
-          FROM ancestors a
-          INNER JOIN submission_feature_security sfs
-            ON sfs.submission_feature_id = a.ancestor_id
+          SELECT 1 FROM ancestor_chain ac
+          JOIN submission_feature_security sfs ON sfs.submission_feature_id = ac.id
+          JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = ac.id
           WHERE sfs.record_end_date IS NULL
+            AND sf_sec.record_effective_date <= now()
         )
       )
       INSERT INTO cart_submission_feature (cart_id, submission_feature_id)
@@ -116,7 +142,9 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
           WHERE
             NOT EXISTS (
               SELECT 1 FROM submission_feature_security sfs
+              JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = sfs.submission_feature_id
               WHERE sfs.record_end_date IS NULL
+                AND sf_sec.record_effective_date <= now()
                 AND sfs.submission_feature_id = ANY(anc.ancestor_ids)
             )
             OR EXISTS (
@@ -243,20 +271,7 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
         'sf.submission_id',
         'sf.feature_type_id',
         'ft.name as feature_type_name',
-        knex.raw(`EXISTS (
-          WITH RECURSIVE ancestor_chain(id) AS (
-            SELECT sf.submission_feature_id
-            UNION ALL
-            SELECT p.parent_submission_feature_id
-            FROM ancestor_chain ac
-            JOIN submission_feature p ON p.submission_feature_id = ac.id
-            WHERE p.parent_submission_feature_id IS NOT NULL
-              AND p.record_end_date IS NULL
-          )
-          SELECT 1 FROM ancestor_chain ac
-          JOIN submission_feature_security sfs ON sfs.submission_feature_id = ac.id
-          WHERE sfs.record_end_date IS NULL
-        ) AS secured`)
+        knex.raw(`${isEffectivelySecured('sf.submission_feature_id')} AS secured`)
       )
       .from('page')
       .join('submission_feature as sf', 'sf.submission_feature_id', 'page.submission_feature_id')
