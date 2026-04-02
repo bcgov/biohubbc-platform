@@ -3,13 +3,8 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
-import {
-  DownloadFeatureData,
-  DownloadFeatureSummary,
-  DownloadRecord,
-  DownloadSizeEstimate
-} from '../../models/download';
-import { DownloadFragmentId, DownloadFragmentRecord } from '../../models/download-fragment';
+import { DownloadFeatureData, DownloadFeatureSummary, DownloadRecord, DownloadSource } from '../../models/download';
+import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
 import { FeatureTypeWithProperties } from '../../models/feature-type';
@@ -18,8 +13,8 @@ import { DownloadRepository } from '../../repositories/download/download-reposit
 import { getMockDBConnection } from '../../__mocks__/db';
 import { CodeService } from '../code-service';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
+import { SearchFeatureService } from '../search-feature-service';
 import { DownloadPipelineService } from './download-pipeline-service';
-import { DownloadService } from './download-service';
 
 chai.use(sinonChai);
 
@@ -101,8 +96,7 @@ describe('DownloadPipelineService', () => {
 
       sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
       sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([]);
-      const mockEstimate: DownloadSizeEstimate = { totalEstimatedBytes: 1000, features: [] };
-      const estimateStub = sinon.stub(service, 'estimateDownloadSize').resolves(mockEstimate);
+      const estimateStub = sinon.stub(service, 'estimateDownloadSize').resolves(1000);
       const planStub = sinon.stub(service, 'planFragments').resolves();
 
       await service.planDownloadIfNeeded('aaaa0000-0000-0000-0000-000000000042');
@@ -321,68 +315,113 @@ describe('DownloadPipelineService', () => {
   });
 
   describe('estimateDownloadSize', () => {
-    it('sums per-feature sizes from linked features', async () => {
+    it('returns aggregate total for cart-based downloads', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      const features: DownloadFeatureSummary[] = [
-        { submission_feature_id: 1, feature_type_name: 'observation', estimated_byte_size: '120', submission_id: 1 },
-        { submission_feature_id: 2, feature_type_name: 'sample', estimated_byte_size: '80', submission_id: 1 }
-      ];
-      sinon.stub(DownloadService.prototype, 'getDownloadFeatures').resolves(features);
+      const source: DownloadSource = { cart_id: 'cart-uuid', filters: null, create_user: 1 };
+      sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
+      sinon.stub(DownloadRepository.prototype, 'getDownloadTotalSizeByCartId').resolves({ total: '200' });
 
       const result = await service.estimateDownloadSize('aaaa0000-0000-0000-0000-000000000001');
 
-      expect(result.totalEstimatedBytes).to.equal(200);
-      expect(result.features).to.have.length(2);
+      expect(result).to.equal(200);
     });
 
-    it('returns zero total for empty downloads', async () => {
+    it('returns aggregate total for filter-based downloads', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      sinon.stub(DownloadService.prototype, 'getDownloadFeatures').resolves([]);
+      const source: DownloadSource = { cart_id: null, filters: { keyword: 'moose' }, create_user: 5 };
+      sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
+      const mockSubquery = { toSQL: () => ({ sql: 'SELECT 1', bindings: [] }) } as any;
+      sinon.stub(SearchFeatureService.prototype, 'buildSearchFeatureIdsSubquery').returns(mockSubquery);
+      sinon.stub(DownloadRepository.prototype, 'getDownloadTotalSizeBySearchQuery').resolves({ total: '5000' });
 
       const result = await service.estimateDownloadSize('aaaa0000-0000-0000-0000-000000000001');
 
-      expect(result.totalEstimatedBytes).to.equal(0);
-      expect(result.features).to.have.length(0);
+      expect(result).to.equal(5000);
+    });
+
+    it('returns zero when total is null (empty result set)', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const source: DownloadSource = { cart_id: 'cart-uuid', filters: null, create_user: 1 };
+      sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
+      sinon.stub(DownloadRepository.prototype, 'getDownloadTotalSizeByCartId').resolves({ total: null });
+
+      const result = await service.estimateDownloadSize('aaaa0000-0000-0000-0000-000000000001');
+
+      expect(result).to.equal(0);
+    });
+
+    it('throws when download has neither cart_id nor filters', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const source: DownloadSource = { cart_id: null, filters: null, create_user: 1 };
+      sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
+
+      try {
+        await service.estimateDownloadSize('aaaa0000-0000-0000-0000-000000000001');
+        expect.fail('Expected an error');
+      } catch (error) {
+        expect((error as Error).message).to.include('has neither cart_id nor filters');
+      }
     });
   });
 
-  describe('planFragments', () => {
-    it('creates multiple fragments when exceeding threshold', async () => {
-      // Verifies: Bin packing splits features across fragments based on fragment_size_bytes
+  // Helper: create a mock async generator for cursor-based streaming
+  async function* mockSummaryStream(features: DownloadFeatureSummary[]): AsyncGenerator<DownloadFeatureSummary[]> {
+    if (features.length > 0) {
+      yield features;
+    }
+  }
 
-      // Step 1: Setup service with mock connection
+  describe('planFragments', () => {
+    it('creates multiple fragments when exceeding threshold (cart-based)', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      // Step 2: Create 3 features — two fit in one bin, third needs a new bin
+      // Stub source resolution — cart-based download
+      const source: DownloadSource = { cart_id: 'cart-uuid', filters: null, create_user: 1 };
+      sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(
+        createMockDownloadRecord({
+          download_id: 'aaaa0000-0000-0000-0000-000000000001',
+          fragment_size_bytes: String(FRAGMENT_SIZE_THRESHOLD)
+        })
+      );
+
+      // Features: 120MB + 120MB + 80MB — first two exceed threshold (200MB), third fits with second
+      const oneHundredTwentyMB = 120 * 1024 * 1024;
+      const eightyMB = 80 * 1024 * 1024;
       const features: DownloadFeatureSummary[] = [
         {
           submission_feature_id: 10,
           feature_type_name: 'observation',
-          estimated_byte_size: '100',
+          estimated_byte_size: String(oneHundredTwentyMB),
           submission_id: 1
         },
         {
           submission_feature_id: 20,
           feature_type_name: 'observation',
-          estimated_byte_size: '100',
+          estimated_byte_size: String(oneHundredTwentyMB),
           submission_id: 1
         },
         {
           submission_feature_id: 30,
           feature_type_name: 'observation',
-          estimated_byte_size: '100',
+          estimated_byte_size: String(eightyMB),
           submission_id: 1
         }
       ];
-      // Step 3: Stub fragment repository methods
+      sinon.stub(DownloadRepository.prototype, 'streamDownloadFeaturesByCartId').returns(mockSummaryStream(features));
+
       const createFragmentStub = sinon.stub(DownloadFragmentRepository.prototype, 'createDownloadFragment');
-      createFragmentStub.onFirstCall().resolves({ download_fragment_id: 1 } satisfies DownloadFragmentId);
-      createFragmentStub.onSecondCall().resolves({ download_fragment_id: 2 } satisfies DownloadFragmentId);
+      createFragmentStub.onFirstCall().resolves({ download_fragment_id: 1 });
+      createFragmentStub.onSecondCall().resolves({ download_fragment_id: 2 });
       const createFragmentFeaturesStub = sinon
         .stub(DownloadFragmentRepository.prototype, 'createDownloadFragmentFeatures')
         .resolves();
@@ -391,68 +430,24 @@ describe('DownloadPipelineService', () => {
         .resolves();
       sinon.stub(DownloadRepository.prototype, 'updateEstimatedTotalSize').resolves();
 
-      // Stub findDownloadById to return record with default fragment_size_bytes
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(
-        createMockDownloadRecord({
-          download_id: 'aaaa0000-0000-0000-0000-000000000001',
-          fragment_size_bytes: String(FRAGMENT_SIZE_THRESHOLD)
-        })
-      );
+      const totalBytes = oneHundredTwentyMB * 2 + eightyMB;
+      await service.planFragments('aaaa0000-0000-0000-0000-000000000001', totalBytes);
 
-      // Step 4: Call planFragments with bin packing
-      // Feature 10 = 120MB, Feature 20 = 120MB (total 240MB > 200MB threshold), Feature 30 = 80MB
-      const oneHundredTwentyMB = 120 * 1024 * 1024;
-      const eightyMB = 80 * 1024 * 1024;
-      // Override estimated_byte_size on features for bin packing test
-      features[0].estimated_byte_size = String(oneHundredTwentyMB);
-      features[1].estimated_byte_size = String(oneHundredTwentyMB);
-      features[2].estimated_byte_size = String(eightyMB);
-      const sizeEstimate: DownloadSizeEstimate = {
-        totalEstimatedBytes: oneHundredTwentyMB * 2 + eightyMB,
-        features
-      };
-      await service.planFragments('aaaa0000-0000-0000-0000-000000000001', sizeEstimate);
-
-      // Step 5: Verify 2 fragments created — first has feature 10, then flush when 10+20 > threshold
       // Fragment 0: feature 10 (120MB) — flush when adding 20 would exceed 200MB
       // Fragment 1: features 20+30 (120+80=200MB)
       expect(createFragmentStub).to.have.been.calledTwice;
-      expect(createFragmentStub.firstCall.args[1]).to.equal(0); // fragment_index 0
-      expect(createFragmentStub.secondCall.args[1]).to.equal(1); // fragment_index 1
-      expect(createFragmentFeaturesStub.firstCall.args[1]).to.deep.equal([10]); // first bin: feature 10
-      expect(createFragmentFeaturesStub.secondCall.args[1]).to.deep.equal([20, 30]); // second bin: features 20, 30
+      expect(createFragmentFeaturesStub.firstCall.args[1]).to.deep.equal([10]);
+      expect(createFragmentFeaturesStub.secondCall.args[1]).to.deep.equal([20, 30]);
       expect(updateFragmentCountsStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001', 2);
     });
 
     it('uses custom fragment size from download record instead of default threshold', async () => {
-      // Verifies: Bin packing reads fragment_size_bytes from the download record, not the hardcoded constant
-
-      // Step 1: Setup service with mock connection
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
 
-      // Step 2: Create 3 features — with 1 GB threshold, all 3 fit in one fragment
-      const features: DownloadFeatureSummary[] = [
-        {
-          submission_feature_id: 10,
-          feature_type_name: 'observation',
-          estimated_byte_size: '100',
-          submission_id: 1
-        },
-        {
-          submission_feature_id: 20,
-          feature_type_name: 'observation',
-          estimated_byte_size: '100',
-          submission_id: 1
-        },
-        {
-          submission_feature_id: 30,
-          feature_type_name: 'observation',
-          estimated_byte_size: '100',
-          submission_id: 1
-        }
-      ];
-      // Step 3: Stub findDownloadById with custom 1 GB fragment size
+      const source: DownloadSource = { cart_id: 'cart-uuid', filters: null, create_user: 1 };
+      sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
+
       const oneGB = 1000 * 1024 * 1024;
       sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(
         createMockDownloadRecord({
@@ -461,9 +456,32 @@ describe('DownloadPipelineService', () => {
         })
       );
 
-      // Step 4: Stub fragment repository methods
+      const threeHundredMB = 300 * 1024 * 1024;
+      const twoHundredMB = 200 * 1024 * 1024;
+      const features: DownloadFeatureSummary[] = [
+        {
+          submission_feature_id: 10,
+          feature_type_name: 'observation',
+          estimated_byte_size: String(threeHundredMB),
+          submission_id: 1
+        },
+        {
+          submission_feature_id: 20,
+          feature_type_name: 'observation',
+          estimated_byte_size: String(threeHundredMB),
+          submission_id: 1
+        },
+        {
+          submission_feature_id: 30,
+          feature_type_name: 'observation',
+          estimated_byte_size: String(twoHundredMB),
+          submission_id: 1
+        }
+      ];
+      sinon.stub(DownloadRepository.prototype, 'streamDownloadFeaturesByCartId').returns(mockSummaryStream(features));
+
       const createFragmentStub = sinon.stub(DownloadFragmentRepository.prototype, 'createDownloadFragment');
-      createFragmentStub.onFirstCall().resolves({ download_fragment_id: 1 } satisfies DownloadFragmentId);
+      createFragmentStub.onFirstCall().resolves({ download_fragment_id: 1 });
       const createFragmentFeaturesStub = sinon
         .stub(DownloadFragmentRepository.prototype, 'createDownloadFragmentFeatures')
         .resolves();
@@ -472,23 +490,12 @@ describe('DownloadPipelineService', () => {
         .resolves();
       sinon.stub(DownloadRepository.prototype, 'updateEstimatedTotalSize').resolves();
 
-      // Step 5: Call planFragments — same features as previous test (300+300+200=800MB)
-      // With default 500MB threshold, this would create 2 fragments
-      // With custom 1GB threshold, all features fit in 1 fragment
-      const threeHundredMB = 300 * 1024 * 1024;
-      const twoHundredMB = 200 * 1024 * 1024;
-      features[0].estimated_byte_size = String(threeHundredMB);
-      features[1].estimated_byte_size = String(threeHundredMB);
-      features[2].estimated_byte_size = String(twoHundredMB);
-      const sizeEstimate: DownloadSizeEstimate = {
-        totalEstimatedBytes: threeHundredMB * 2 + twoHundredMB,
-        features
-      };
-      await service.planFragments('aaaa0000-0000-0000-0000-000000000001', sizeEstimate);
+      const totalBytes = threeHundredMB * 2 + twoHundredMB;
+      await service.planFragments('aaaa0000-0000-0000-0000-000000000001', totalBytes);
 
-      // Step 6: Verify only 1 fragment created — all features fit within 1 GB threshold
+      // With 1GB threshold, all features fit in 1 fragment
       expect(createFragmentStub).to.have.been.calledOnce;
-      expect(createFragmentFeaturesStub.firstCall.args[1]).to.deep.equal([10, 20, 30]); // all features in one bin
+      expect(createFragmentFeaturesStub.firstCall.args[1]).to.deep.equal([10, 20, 30]);
       expect(updateFragmentCountsStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001', 1);
     });
   });

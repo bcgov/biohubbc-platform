@@ -73,19 +73,6 @@ export const DownloadSource = z.object({
 export type DownloadSource = z.infer<typeof DownloadSource>;
 
 /**
- * Result of estimating a download's total size before processing.
- * Used by planFragments to decide how to split features across zip files.
- *
- * Per-feature and total sizes are computed inline in the SQL query.
- */
-export interface DownloadSizeEstimate {
-  /** Total estimated bytes across all features. */
-  totalEstimatedBytes: number;
-  /** The features included in this download with per-feature estimated_byte_size. */
-  features: DownloadFeatureSummary[];
-}
-
-/**
  * Payload for creating a new download record.
  *
  * Every download must have a feature source: either cartId (cart-based, frozen
@@ -98,20 +85,6 @@ export const CreateDownload = z.object({
   cartId: z.string().uuid().optional()
 });
 export type CreateDownload = z.infer<typeof CreateDownload>;
-
-/**
- * Payload for creating a download request through the pipeline.
- *
- * Accepted by the pipeline service's public entry point. Includes the feature
- * selection and optional fragment sizing before the request is persisted and
- * features are linked. Team linking is handled by the caller via download_team.
- */
-export const CreateDownloadRequest = z.object({
-  submissionFeatureIds: z.array(z.number()),
-  fragmentSizeMb: z.number().optional(),
-  filters: SearchFeatureFiltersSchema.optional()
-});
-export type CreateDownloadRequest = z.infer<typeof CreateDownloadRequest>;
 
 export const DownloadTotalSize = z.object({ total: z.string().nullable() });
 export type DownloadTotalSize = z.infer<typeof DownloadTotalSize>;
