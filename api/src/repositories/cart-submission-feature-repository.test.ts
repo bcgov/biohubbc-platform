@@ -21,7 +21,7 @@ describe('CartSubmissionFeatureRepository', () => {
         rows: []
       } as unknown as QueryResult<any>;
 
-      const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockQueryResponse });
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
@@ -31,20 +31,19 @@ describe('CartSubmissionFeatureRepository', () => {
     });
 
     it('should use NOT EXISTS with recursive ancestor walk to block secured features', async () => {
-      const sqlStub = sinon.stub().resolves({
+      const knexStub = sinon.stub().resolves({
         rowCount: 1,
         rows: []
       } as unknown as QueryResult<any>);
 
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
       await repo.createUnsecuredCartSubmissionFeatures('cart-1', [1, 2, 3]);
 
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlArg = sqlStub.firstCall.args[0] as { text?: string };
-      const sqlText = sqlArg.text || '';
+      expect(knexStub).to.have.been.calledOnce;
+      const sqlText = knexStub.firstCall.args[0].toString();
 
       expect(sqlText).to.include('NOT EXISTS');
       expect(sqlText).to.include('RECURSIVE');
@@ -57,20 +56,19 @@ describe('CartSubmissionFeatureRepository', () => {
 
   describe('createCartSubmissionFeaturesWithScopeCheck', () => {
     it('should use scope check SQL with recursive ancestor walk', async () => {
-      const sqlStub = sinon.stub().resolves({
+      const knexStub = sinon.stub().resolves({
         rowCount: 1,
         rows: []
       } as unknown as QueryResult<any>);
 
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
       await repo.createCartSubmissionFeaturesWithScopeCheck('cart-1', [1, 2, 3], 42);
 
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlArg = sqlStub.firstCall.args[0] as { text?: string };
-      const sqlText = sqlArg.text || '';
+      expect(knexStub).to.have.been.calledOnce;
+      const sqlText = knexStub.firstCall.args[0].toString();
 
       expect(sqlText).to.include('security_scope_anchor');
       expect(sqlText).to.include('team_security_scope');

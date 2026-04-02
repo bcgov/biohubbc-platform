@@ -1,4 +1,4 @@
-import SQL from 'sql-template-strings';
+import { Knex } from 'knex';
 import z from 'zod';
 import { getKnex } from '../database/db';
 import { CartStatus, CartSubmissionFeature } from '../models/cart';
@@ -53,44 +53,34 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
    * @memberof CartSubmissionFeatureRepository
    */
   async createUnsecuredCartSubmissionFeatures(cartId: string, submissionFeatureIds: number[]): Promise<void> {
-    const sql = SQL`
+    const knex = getKnex();
+
+    const query = knex.raw(
+      `
       WITH w_cart AS (
         SELECT cart_id
         FROM cart
-        WHERE cart_id = ${cartId}
-          AND cart_status = ${CartStatus.ACTIVE}
+        WHERE cart_id = ?
+          AND cart_status = ?
       ),
       w_features AS (
-        SELECT unnest(${submissionFeatureIds}::INTEGER[]) AS submission_feature_id
+        SELECT unnest(?::INTEGER[]) AS submission_feature_id
       ),
       w_valid_features AS (
         SELECT wf.submission_feature_id
         FROM w_features wf
-        WHERE NOT EXISTS (
-          WITH RECURSIVE ancestor_chain(id) AS (
-            SELECT wf.submission_feature_id
-            UNION ALL
-            SELECT p.parent_submission_feature_id
-            FROM ancestor_chain ac
-            JOIN submission_feature p ON p.submission_feature_id = ac.id
-            WHERE p.parent_submission_feature_id IS NOT NULL
-              AND p.record_end_date IS NULL
-          )
-          SELECT 1 FROM ancestor_chain ac
-          JOIN submission_feature_security sfs ON sfs.submission_feature_id = ac.id
-          JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = ac.id
-          WHERE sfs.record_end_date IS NULL
-            AND sf_sec.record_effective_date <= now()
-        )
+        WHERE NOT ${isEffectivelySecured('wf.submission_feature_id')}
       )
       INSERT INTO cart_submission_feature (cart_id, submission_feature_id)
       SELECT wc.cart_id, wvf.submission_feature_id
       FROM w_cart wc
       CROSS JOIN w_valid_features wvf
       ON CONFLICT (cart_id, submission_feature_id) DO NOTHING
-    `;
+    `,
+      [cartId, CartStatus.ACTIVE, submissionFeatureIds]
+    );
 
-    await this.connection.sql(sql);
+    await this.connection.knex(query as unknown as Knex.QueryBuilder);
   }
 
   /**
@@ -110,62 +100,52 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
     submissionFeatureIds: number[],
     systemUserId: number
   ): Promise<void> {
-    const sql = SQL`
+    const knex = getKnex();
+
+    const query = knex.raw(
+      `
       WITH w_cart AS (
         SELECT cart_id
         FROM cart
-        WHERE cart_id = ${cartId}
-          AND cart_status = ${CartStatus.ACTIVE}
+        WHERE cart_id = ?
+          AND cart_status = ?
       ),
       w_features AS (
-        SELECT unnest(${submissionFeatureIds}::INTEGER[]) AS submission_feature_id
+        SELECT unnest(?::INTEGER[]) AS submission_feature_id
       ),
       w_valid_features AS (
         SELECT wf.submission_feature_id
         FROM w_features wf
-        WHERE EXISTS (
-          SELECT 1
-          FROM (
-            WITH RECURSIVE ancestors AS (
-              SELECT sf_inner.submission_feature_id AS ancestor_id,
-                     sf_inner.parent_submission_feature_id
-              FROM submission_feature sf_inner
-              WHERE sf_inner.submission_feature_id = wf.submission_feature_id
+        WHERE
+          NOT ${isEffectivelySecured('wf.submission_feature_id')}
+          OR EXISTS (
+            WITH RECURSIVE ancestor_chain(id) AS (
+              SELECT wf.submission_feature_id
               UNION ALL
-              SELECT p.submission_feature_id, p.parent_submission_feature_id
-              FROM submission_feature p
-              JOIN ancestors a ON p.submission_feature_id = a.parent_submission_feature_id
+              SELECT p.parent_submission_feature_id
+              FROM ancestor_chain ac
+              JOIN submission_feature p ON p.submission_feature_id = ac.id
+              WHERE p.parent_submission_feature_id IS NOT NULL
+                AND p.record_end_date IS NULL
             )
-            SELECT array_agg(ancestor_id) AS ancestor_ids
-            FROM ancestors
-          ) anc
-          WHERE
-            NOT EXISTS (
-              SELECT 1 FROM submission_feature_security sfs
-              JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = sfs.submission_feature_id
-              WHERE sfs.record_end_date IS NULL
-                AND sf_sec.record_effective_date <= now()
-                AND sfs.submission_feature_id = ANY(anc.ancestor_ids)
-            )
-            OR EXISTS (
-              SELECT 1
-              FROM security_scope_anchor ssa
-                JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
-                JOIN team_member tm ON tm.team_id = tss.team_id
-                  AND tm.system_user_id = ${systemUserId}
-                  AND tm.record_end_date IS NULL
-              WHERE ssa.anchor_submission_feature_id = ANY(anc.ancestor_ids)
-            )
-        )
+            SELECT 1 FROM ancestor_chain ac
+            JOIN security_scope_anchor ssa ON ssa.anchor_submission_feature_id = ac.id
+            JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
+            JOIN team_member tm ON tm.team_id = tss.team_id
+              AND tm.system_user_id = ?
+              AND tm.record_end_date IS NULL
+          )
       )
       INSERT INTO cart_submission_feature (cart_id, submission_feature_id)
       SELECT wc.cart_id, wvf.submission_feature_id
       FROM w_cart wc
       CROSS JOIN w_valid_features wvf
       ON CONFLICT (cart_id, submission_feature_id) DO NOTHING
-    `;
+    `,
+      [cartId, CartStatus.ACTIVE, submissionFeatureIds, systemUserId]
+    );
 
-    await this.connection.sql(sql);
+    await this.connection.knex(query as unknown as Knex.QueryBuilder);
   }
 
   /**
