@@ -78,6 +78,32 @@ describe('TicketService', () => {
       expect(result).to.eql(createdTicket);
     });
 
+    it('passes system user ids to createTeam when provided', async () => {
+      const generatedTeamId = '99999999-9999-9999-9999-999999999999';
+      const createdTicket = { ...mockTicket, team_id: generatedTeamId };
+      sinon.stub(TicketRepository.prototype, 'getNextTicketSlug').resolves('04900001');
+      const mockTeam: Team = {
+        team_id: generatedTeamId,
+        name: 'Auto Team',
+        description: null,
+        member_count: 0
+      };
+      const createTeamStub = sinon.stub(TeamService.prototype, 'createTeam').resolves(mockTeam);
+      sinon.stub(TicketRepository.prototype, 'insertTicket').resolves(createdTicket);
+      sinon.stub(TicketStatusService.prototype, 'insertTicketStatus').resolves();
+
+      const systemUserIds = [7, 8];
+      await service.createTicket({ subject: 'A ticket', description: null, priority: 'medium', systemUserIds });
+
+      expect(createTeamStub).to.have.been.calledWith(
+        sinon.match({
+          name: sinon.match.string,
+          description: 'Auto-generated team for ticket assignees.',
+          system_user_ids: systemUserIds
+        })
+      );
+    });
+
     it('throws when insert fails', async () => {
       sinon.stub(TicketRepository.prototype, 'getNextTicketSlug').resolves('04900001');
       const mockTeam: Team = {

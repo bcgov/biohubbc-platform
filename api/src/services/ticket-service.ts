@@ -42,10 +42,15 @@ export class TicketService extends DBService {
    * @memberof TicketService
    */
   async createTicket(ticket: CreateTicketRequest): Promise<Ticket> {
-    const [team, slug] = await Promise.all([this.createTicketTeam(), this.ticketRepository.getNextTicketSlug()]);
+    const { systemUserIds, ...ticketData } = ticket;
+
+    const [team, slug] = await Promise.all([
+      this.createTicketTeam({ systemUserIds: systemUserIds ?? [] }),
+      this.ticketRepository.getNextTicketSlug()
+    ]);
 
     const createdTicket = await this.ticketRepository.insertTicket({
-      ...ticket,
+      ...ticketData,
       team_id: team.team_id,
       ticket_slug: slug
     });
@@ -58,14 +63,15 @@ export class TicketService extends DBService {
   /**
    * Create an internal team record for ticket ownership.
    *
+   * @param {{ systemUserIds: number[] }} params - System user IDs to add as initial team members.
    * @return {*} {Promise<Team>}
    * @memberof TicketService
    */
-  private async createTicketTeam(): Promise<Team> {
+  private async createTicketTeam({ systemUserIds }: { systemUserIds: number[] }): Promise<Team> {
     const team = await this.teamService.createTeam({
       name: `Ticket Team ${v4()}`,
       description: 'Auto-generated team for ticket assignees.',
-      system_user_ids: []
+      system_user_ids: systemUserIds
     });
 
     return team;
