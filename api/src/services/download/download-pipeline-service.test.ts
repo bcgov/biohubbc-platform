@@ -456,7 +456,9 @@ describe('DownloadPipelineService', () => {
       );
 
       // Mock the search subquery and toSQL extraction
-      const mockSubquery = { toSQL: () => ({ toNative: () => ({ sql: 'SELECT submission_feature_id FROM ...', bindings: [5] }) }) } as any;
+      const mockSubquery = {
+        toSQL: () => ({ toNative: () => ({ sql: 'SELECT submission_feature_id FROM ...', bindings: [5] }) })
+      } as any;
       const buildSubqueryStub = sinon
         .stub(SearchFeatureService.prototype, 'buildSearchFeatureIdsSubquery')
         .returns(mockSubquery);

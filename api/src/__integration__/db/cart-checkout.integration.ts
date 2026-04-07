@@ -148,8 +148,10 @@ describe('Cart checkout (integration)', function () {
     // Verify: getDownloadFeatures resolves both features from the cart
     const features = await downloadService.getDownloadFeatures(result.download_id);
     expect(features).to.have.length(2);
-    const featureIds = features.map((f: { submission_feature_id: number }) => f.submission_feature_id).sort();
-    expect(featureIds).to.deep.equal([featureId1, featureId2].sort());
+    const featureIds = features
+      .map((f: { submission_feature_id: number }) => f.submission_feature_id)
+      .sort((a, b) => a - b);
+    expect(featureIds).to.deep.equal([featureId1, featureId2].sort((a, b) => a - b));
 
     // Verify: cart status is checked_out with checkout metadata
     const cart = await connection.sql(SQL`

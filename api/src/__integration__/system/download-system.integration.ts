@@ -900,7 +900,9 @@ describe('DownloadPipelineService download pipeline (system)', function () {
    * Helper: create a filter-based download and run the full pipeline, returning the resulting zip.
    * Features are re-derived at pipeline time by re-running the search query with the stored filters.
    */
-  async function executeFilterAndGetZip(filters: Record<string, unknown>): Promise<{ zip: AdmZip; downloadId: string }> {
+  async function executeFilterAndGetZip(
+    filters: Record<string, unknown>
+  ): Promise<{ zip: AdmZip; downloadId: string }> {
     const { download_id } = await crudService.createDownload({ filters });
 
     // Run the three-phase pipeline within the test transaction
@@ -933,14 +935,8 @@ describe('DownloadPipelineService download pipeline (system)', function () {
       start_date: '2024-06-01T00:00:00.000Z'
     });
     // Non-matching feature to prove filter selectivity
-    await createTestFeature(
-      connection,
-      submissionId,
-      'species_observation',
-      { taxon_id: 99999, count: 1 },
-      // species_observation needs a parent to avoid orphan — use first dataset
-      undefined
-    );
+    // Non-matching feature needs no parent for this test — just proves filter selectivity
+    await createTestFeature(connection, submissionId, 'species_observation', { taxon_id: 99999, count: 1 });
 
     const { zip, downloadId } = await executeFilterAndGetZip({ feature_types: ['dataset'] });
     const rootFolder = `biohub-${downloadId}/`;
