@@ -1,4 +1,3 @@
-import { Knex } from 'knex';
 import z from 'zod';
 import { getKnex } from '../database/db';
 import { CartStatus, CartSubmissionFeature } from '../models/cart';
@@ -54,7 +53,7 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
       [cartId, CartStatus.ACTIVE, submissionFeatureIds]
     );
 
-    await this.connection.knex(query as unknown as Knex.QueryBuilder);
+    await this.connection.knex(query);
   }
 
   /**
@@ -119,7 +118,7 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
       [cartId, CartStatus.ACTIVE, submissionFeatureIds, systemUserId]
     );
 
-    await this.connection.knex(query as unknown as Knex.QueryBuilder);
+    await this.connection.knex(query);
   }
 
   /**
