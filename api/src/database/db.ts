@@ -162,7 +162,7 @@ export interface IDBConnection {
    * @memberof IDBConnection
    */
   knex: <T extends pg.QueryResultRow = any>(
-    queryBuilder: Knex.QueryBuilder,
+    queryBuilder: Knex.QueryBuilder | Knex.Raw,
     zodSchema?: z.Schema<T, any, any>
   ) => Promise<pg.QueryResult<T>>;
   /**
@@ -377,7 +377,7 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
    * @return {*}  {Promise<pg.QueryResult<T>>}
    */
   const _knex = async <T extends pg.QueryResultRow = any>(
-    queryBuilder: Knex.QueryBuilder,
+    queryBuilder: Knex.QueryBuilder | Knex.Raw,
     ZodSchema?: z.ZodSchema<T, any, any>
   ) => {
     const { sql, bindings } = queryBuilder.toSQL().toNative();

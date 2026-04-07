@@ -1,9 +1,9 @@
-import SQL from 'sql-template-strings';
 import z from 'zod';
 import { getKnex } from '../database/db';
 import { CartStatus, CartSubmissionFeature } from '../models/cart';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
+import { isEffectivelySecured } from './sql-fragments';
 
 /**
  * CartSubmissionFeature repository class.
@@ -15,46 +15,110 @@ import { BaseRepository } from './base-repository';
  */
 export class CartSubmissionFeatureRepository extends BaseRepository {
   /**
-   * Add multiple submission features to an active cart.
-   * Ignores existing relationships (idempotent).
+   * Add unsecured submission features to an active cart (anonymous path).
+   * Walks up the ancestor chain from each candidate feature; if any ancestor has an
+   * active submission_feature_security row, the feature is excluded.
+   * Ignores existing relationships (idempotent via ON CONFLICT DO NOTHING).
    *
    * @param {string} cartId - The ID of the cart
    * @param {number[]} submissionFeatureIds - The list of submission feature IDs to add
-   * @return {Promise<void>} - Resolves when the features are added to the cart
+   * @return {Promise<void>}
    * @memberof CartSubmissionFeatureRepository
    */
-  async addSubmissionFeaturesToCart(cartId: string, submissionFeatureIds: number[]): Promise<void> {
-    const sql = SQL`
+  async createUnsecuredCartSubmissionFeatures(cartId: string, submissionFeatureIds: number[]): Promise<void> {
+    const knex = getKnex();
+
+    const query = knex.raw(
+      `
       WITH w_cart AS (
         SELECT cart_id
         FROM cart
-        WHERE cart_id = ${cartId}
-          AND cart_status = ${CartStatus.ACTIVE}
+        WHERE cart_id = ?
+          AND cart_status = ?
       ),
       w_features AS (
-        SELECT unnest(${submissionFeatureIds}::integer[]) AS submission_feature_id
+        SELECT unnest(?::INTEGER[]) AS submission_feature_id
       ),
       w_valid_features AS (
         SELECT wf.submission_feature_id
         FROM w_features wf
-        WHERE NOT EXISTS (
-          SELECT 1
-          FROM submission_feature_security sfs
-          WHERE sfs.submission_feature_id = wf.submission_feature_id
-            AND (
-              sfs.record_end_date IS NULL
-              OR sfs.record_end_date > now()
-            )
-        )
+        WHERE NOT ${isEffectivelySecured('wf.submission_feature_id')}
       )
       INSERT INTO cart_submission_feature (cart_id, submission_feature_id)
       SELECT wc.cart_id, wvf.submission_feature_id
       FROM w_cart wc
       CROSS JOIN w_valid_features wvf
       ON CONFLICT (cart_id, submission_feature_id) DO NOTHING
-    `;
+    `,
+      [cartId, CartStatus.ACTIVE, submissionFeatureIds]
+    );
 
-    await this.connection.sql(sql);
+    await this.connection.knex(query);
+  }
+
+  /**
+   * Add submission features to an active cart with scope-based access check (authenticated path).
+   * Allows features that are unsecured OR where the user has scope access via
+   * security_scope_anchor → team_security_scope → team_member.
+   * Ignores existing relationships (idempotent via ON CONFLICT DO NOTHING).
+   *
+   * @param {string} cartId - The ID of the cart
+   * @param {number[]} submissionFeatureIds - The list of submission feature IDs to add
+   * @param {number} systemUserId - The authenticated user's ID
+   * @return {Promise<void>}
+   * @memberof CartSubmissionFeatureRepository
+   */
+  async createCartSubmissionFeaturesWithScopeCheck(
+    cartId: string,
+    submissionFeatureIds: number[],
+    systemUserId: number
+  ): Promise<void> {
+    const knex = getKnex();
+
+    const query = knex.raw(
+      `
+      WITH w_cart AS (
+        SELECT cart_id
+        FROM cart
+        WHERE cart_id = ?
+          AND cart_status = ?
+      ),
+      w_features AS (
+        SELECT unnest(?::INTEGER[]) AS submission_feature_id
+      ),
+      w_valid_features AS (
+        SELECT wf.submission_feature_id
+        FROM w_features wf
+        WHERE
+          NOT ${isEffectivelySecured('wf.submission_feature_id')}
+          OR EXISTS (
+            WITH RECURSIVE ancestor_chain(id) AS (
+              SELECT wf.submission_feature_id
+              UNION ALL
+              SELECT p.parent_submission_feature_id
+              FROM ancestor_chain ac
+              JOIN submission_feature p ON p.submission_feature_id = ac.id
+              WHERE p.parent_submission_feature_id IS NOT NULL
+                AND p.record_end_date IS NULL
+            )
+            SELECT 1 FROM ancestor_chain ac
+            JOIN security_scope_anchor ssa ON ssa.anchor_submission_feature_id = ac.id
+            JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
+            JOIN team_member tm ON tm.team_id = tss.team_id
+              AND tm.system_user_id = ?
+              AND tm.record_end_date IS NULL
+          )
+      )
+      INSERT INTO cart_submission_feature (cart_id, submission_feature_id)
+      SELECT wc.cart_id, wvf.submission_feature_id
+      FROM w_cart wc
+      CROSS JOIN w_valid_features wvf
+      ON CONFLICT (cart_id, submission_feature_id) DO NOTHING
+    `,
+      [cartId, CartStatus.ACTIVE, submissionFeatureIds, systemUserId]
+    );
+
+    await this.connection.knex(query);
   }
 
   /**
@@ -120,7 +184,9 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
 
   /**
    * Get all submission features in an active cart with pagination, optionally filtered by submission feature ID.
-   * Excludes secured features where the submission_feature_id is present in submission_feature_security.
+   * Returns ALL features in the cart — authorization was enforced at insert time, not on read.
+   * The `secured` field reflects current effective security status (feature or any ancestor has
+   * an active submission_feature_security row), computed via a bulk recursive CTE.
    *
    * @param {string} cartId - The ID of the cart
    * @param {ApiPaginationOptions} [pagination] - Optional pagination options
@@ -135,46 +201,43 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
   ): Promise<CartSubmissionFeature[]> {
     const knex = getKnex();
 
-    const baseQuery = knex
-      .with('secured_features', (qb) => {
-        qb.select('submission_feature_id')
-          .from('submission_feature_security')
-          .where((qb) => {
-            qb.whereNull('record_end_date').orWhere('record_end_date', '>', knex.fn.now());
-          });
-      })
+    // Step 1: Build the base page of cart features (paginated BEFORE the recursive ancestor walk)
+    const pageQuery = knex
+      .select('csf.cart_submission_feature_id', 'csf.submission_feature_id')
+      .from('cart_submission_feature as csf')
+      .join('cart as c', 'c.cart_id', 'csf.cart_id')
+      .where('csf.cart_id', cartId)
+      .andWhere('c.cart_status', CartStatus.ACTIVE);
+
+    if (submissionFeatureId) {
+      pageQuery.andWhere('csf.submission_feature_id', submissionFeatureId);
+    }
+
+    const paginatedPageQuery = this.applyPagination(pageQuery, pagination);
+
+    // Step 2: Join feature metadata, check security via per-row correlated EXISTS
+    const query = knex
+      .with('page', paginatedPageQuery)
       .select(
-        'csf.cart_submission_feature_id',
+        'page.cart_submission_feature_id',
         'sf.submission_feature_id',
         'sf.submission_id',
         'sf.feature_type_id',
         'ft.name as feature_type_name',
-        knex.raw('FALSE AS secured')
+        knex.raw(`${isEffectivelySecured('sf.submission_feature_id')} AS secured`)
       )
-      .from('submission_feature as sf')
-      .leftJoin('secured_features as sf_sec', 'sf_sec.submission_feature_id', 'sf.submission_feature_id')
-      .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id')
-      .join('cart_submission_feature as csf', 'csf.submission_feature_id', 'sf.submission_feature_id')
-      .join('cart as c', 'c.cart_id', 'csf.cart_id')
-      .where('csf.cart_id', cartId)
-      .andWhere('c.cart_status', CartStatus.ACTIVE)
-      // Filter out secured features
-      .whereNull('sf_sec.submission_feature_id');
+      .from('page')
+      .join('submission_feature as sf', 'sf.submission_feature_id', 'page.submission_feature_id')
+      .join('feature_type as ft', 'ft.feature_type_id', 'sf.feature_type_id');
 
-    if (submissionFeatureId) {
-      baseQuery.andWhere('sf.submission_feature_id', submissionFeatureId);
-    }
-
-    const paginatedQuery = this.applyPagination(baseQuery, pagination);
-
-    const response = await this.connection.knex(paginatedQuery, CartSubmissionFeature);
+    const response = await this.connection.knex(query, CartSubmissionFeature);
 
     return response.rows;
   }
 
   /**
    * Get the total number of submission features in an active cart.
-   * Excludes secured features.
+   * Counts ALL features — authorization was enforced at insert time, not on read.
    *
    * @param {string} cartId - The ID of the cart
    * @return {Promise<number>} - The total number of submission features in the cart
@@ -187,14 +250,6 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
       .join('cart as c', 'c.cart_id', 'csf.cart_id')
       .where('csf.cart_id', cartId)
       .andWhere('c.cart_status', CartStatus.ACTIVE)
-      .whereNotExists((qb) => {
-        qb.select('sfs.submission_feature_id')
-          .from('submission_feature_security as sfs')
-          .whereRaw('sfs.submission_feature_id = csf.submission_feature_id')
-          .andWhere((qb) => {
-            qb.whereNull('sfs.record_end_date').orWhere('sfs.record_end_date', '>', knex.fn.now());
-          });
-      })
       .select(knex.raw('count(*)::integer as count'));
 
     const response = await this.connection.knex(query, z.object({ count: z.number() }));
