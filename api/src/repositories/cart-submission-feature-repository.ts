@@ -4,33 +4,7 @@ import { getKnex } from '../database/db';
 import { CartStatus, CartSubmissionFeature } from '../models/cart';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
-
-/**
- * Per-candidate "effectively secured" check: walks UP from a feature through its
- * ancestors to determine if it or any ancestor has an active security rule
- * whose feature is past its effective date.
- *
- * @param featureIdExpr SQL expression for the starting submission_feature_id
- *   (e.g. 'wf.submission_feature_id' or 'sf.submission_feature_id')
- */
-function isEffectivelySecured(featureIdExpr: string): string {
-  return `EXISTS (
-    WITH RECURSIVE ancestor_chain(id) AS (
-      SELECT ${featureIdExpr}
-      UNION ALL
-      SELECT p.parent_submission_feature_id
-      FROM ancestor_chain ac
-      JOIN submission_feature p ON p.submission_feature_id = ac.id
-      WHERE p.parent_submission_feature_id IS NOT NULL
-        AND p.record_end_date IS NULL
-    )
-    SELECT 1 FROM ancestor_chain ac
-    JOIN submission_feature_security sfs ON sfs.submission_feature_id = ac.id
-    JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = ac.id
-    WHERE sfs.record_end_date IS NULL
-      AND sf_sec.record_effective_date <= now()
-  )`;
-}
+import { isEffectivelySecured } from './sql-fragments';
 
 /**
  * CartSubmissionFeature repository class.
