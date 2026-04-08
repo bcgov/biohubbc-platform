@@ -23,7 +23,7 @@ import { normalizeSearchValue } from '../utils/normalize';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
-import { isEffectivelySecured } from './sql-fragments';
+import { isEffectivelySecured, isVisibleToUser } from './sql-fragments';
 
 const defaultLog = getLogger('repositories/search-feature-repository');
 
@@ -682,10 +682,10 @@ export class SearchFeatureRepository extends BaseRepository {
    *
    * For anonymous users (systemUserId is null), only unsecured features pass.
    *
-   * Uses the shared `isEffectivelySecured` fragment for the security check — a feature is
-   * "effectively secured" only when it or an ancestor has an active security rule AND the
-   * feature is past its `record_effective_date`. For authenticated users, a second independent
-   * ancestor walk checks team scope grants via `security_scope_anchor`.
+   * Uses shared fragments from `sql-fragments.ts`:
+   * - `isEffectivelySecured` — a feature is "effectively secured" only when it or an ancestor
+   *   has an active security rule AND the feature is past its `record_effective_date`.
+   * - `hasTeamScopeGrant` — walks ancestors to find a scope anchor the user's team can reach.
    *
    * Walk-up (not expand-down) strategy: search filters have already narrowed features
    * to a small candidate set. For each candidate, walk UP the parent chain (~3-5 levels)
@@ -705,29 +705,9 @@ export class SearchFeatureRepository extends BaseRepository {
       return knex.raw(`NOT ${isEffectivelySecured('aggregated_results.submission_feature_id')}`);
     }
 
-    // Authenticated: feature is unsecured OR user has team scope grant
+    // Authenticated: feature is unsecured OR user has team scope grant (single ancestor walk)
     return knex.raw(
-      `
-      NOT ${isEffectivelySecured('aggregated_results.submission_feature_id')}
-      OR EXISTS (
-        WITH RECURSIVE ancestor_chain(id) AS (
-          SELECT aggregated_results.submission_feature_id
-          UNION ALL
-          SELECT p.parent_submission_feature_id
-          FROM ancestor_chain ac
-          JOIN submission_feature p ON p.submission_feature_id = ac.id
-          WHERE p.parent_submission_feature_id IS NOT NULL
-            AND p.record_end_date IS NULL
-        )
-        SELECT 1
-        FROM ancestor_chain ac
-        JOIN security_scope_anchor ssa ON ssa.anchor_submission_feature_id = ac.id
-        JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
-        JOIN team_member tm ON tm.team_id = tss.team_id
-          AND tm.system_user_id = ?
-          AND tm.record_end_date IS NULL
-      )
-    `,
+      `${isVisibleToUser('aggregated_results.submission_feature_id')}`,
       [systemUserId]
     );
   }

@@ -1237,6 +1237,151 @@ describe('Security scope search (integration)', function () {
     });
   });
 
+  // ── record_effective_date → search visibility ───────────────────────
+
+  describe('record_effective_date → search visibility', () => {
+    /**
+     * Set record_effective_date to a future timestamp.
+     * Features with a future date are not yet "effectively secured" because
+     * the isEffectivelySecured fragment requires `record_effective_date <= now()`.
+     */
+    async function markFeatureFutureDate(submissionFeatureId: number): Promise<void> {
+      await connection.sql(SQL`
+        UPDATE submission_feature
+        SET record_effective_date = now() + INTERVAL '7 days'
+        WHERE submission_feature_id = ${submissionFeatureId};
+      `);
+    }
+
+    /**
+     * Set record_effective_date to NULL (unapproved upload).
+     */
+    async function markFeatureUnapproved(submissionFeatureId: number): Promise<void> {
+      await connection.sql(SQL`
+        UPDATE submission_feature
+        SET record_effective_date = NULL
+        WHERE submission_feature_id = ${submissionFeatureId};
+      `);
+    }
+
+    it('should NOT hide feature from anonymous when security rule exists but record_effective_date is NULL', async () => {
+      // A feature with a security rule but no approval (NULL record_effective_date)
+      // is NOT effectively secured — anonymous users should still see it.
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Unapproved Secured' });
+      await secureFeature(featureId);
+      await markFeatureUnapproved(featureId);
+
+      const results = await searchInSubmission(submissionId, ['dataset'], null);
+      const featureIds = results.map((r) => r.submission_feature_id);
+
+      expect(featureIds).to.include(featureId);
+      const feature = results.find((r) => r.submission_feature_id === featureId);
+      expect(feature?.is_secured).to.be.false;
+    });
+
+    it('should NOT hide feature from anonymous when security rule exists but record_effective_date is in the future', async () => {
+      // A feature with a security rule but a future effective date is NOT
+      // effectively secured — the isEffectivelySecured fragment requires <= now().
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Future Secured' });
+      await secureFeature(featureId);
+      await markFeatureFutureDate(featureId);
+
+      const results = await searchInSubmission(submissionId, ['dataset'], null);
+      const featureIds = results.map((r) => r.submission_feature_id);
+
+      expect(featureIds).to.include(featureId);
+      const feature = results.find((r) => r.submission_feature_id === featureId);
+      expect(feature?.is_secured).to.be.false;
+    });
+
+    it('should hide feature from anonymous when security rule exists and record_effective_date is approved', async () => {
+      // Baseline: createTestFeature sets record_effective_date = now(), so feature
+      // with a security rule IS effectively secured. Anonymous should NOT see it.
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Approved Secured' });
+      await secureFeature(featureId);
+
+      const results = await searchInSubmission(submissionId, ['dataset'], null);
+      const featureIds = results.map((r) => r.submission_feature_id);
+
+      expect(featureIds).to.not.include(featureId);
+    });
+
+    it('should NOT hide child from anonymous when parent is secured but unapproved (NULL date)', async () => {
+      // Parent has a security rule but NULL record_effective_date. The parent is
+      // NOT effectively secured, so its child should remain visible.
+      const submissionId = await createTestSubmission(connection);
+      const parent = await createTestFeature(connection, submissionId, 'dataset', { name: 'Unapproved Parent' });
+      const child = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Child' }, parent);
+      await secureFeature(parent);
+      await markFeatureUnapproved(parent);
+
+      const results = await searchInSubmission(submissionId, ['dataset', 'sample_site'], null);
+      const featureIds = results.map((r) => r.submission_feature_id);
+
+      expect(featureIds).to.include(parent);
+      expect(featureIds).to.include(child);
+    });
+
+    it('should hide child from anonymous when parent is secured and approved', async () => {
+      // Parent has a security rule AND record_effective_date = now(). The parent IS
+      // effectively secured, so its child inherits security and is hidden.
+      const submissionId = await createTestSubmission(connection);
+      const parent = await createTestFeature(connection, submissionId, 'dataset', { name: 'Approved Parent' });
+      const child = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Child' }, parent);
+      await secureFeature(parent);
+
+      const results = await searchInSubmission(submissionId, ['dataset', 'sample_site'], null);
+      const featureIds = results.map((r) => r.submission_feature_id);
+
+      expect(featureIds).to.not.include(parent);
+      expect(featureIds).to.not.include(child);
+    });
+
+    it('should NOT hide feature from authenticated user (no scope) when record_effective_date is NULL', async () => {
+      // Authenticated user without scope grants sees the same as anonymous for the
+      // "not secured" branch. Unapproved security rule → feature is visible.
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Unapproved Auth' });
+      await secureFeature(featureId);
+      await markFeatureUnapproved(featureId);
+
+      const userId = await createOtherUser();
+      const results = await searchInSubmission(submissionId, ['dataset'], userId);
+      const featureIds = results.map((r) => r.submission_feature_id);
+
+      expect(featureIds).to.include(featureId);
+    });
+
+    it('should NOT hide feature from authenticated user (no scope) when record_effective_date is in the future', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Future Auth' });
+      await secureFeature(featureId);
+      await markFeatureFutureDate(featureId);
+
+      const userId = await createOtherUser();
+      const results = await searchInSubmission(submissionId, ['dataset'], userId);
+      const featureIds = results.map((r) => r.submission_feature_id);
+
+      expect(featureIds).to.include(featureId);
+    });
+
+    it('should hide feature from authenticated user (no scope) when record_effective_date is approved', async () => {
+      // Approved security rule + no scope grant → feature is hidden, same as anonymous.
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Approved Auth' });
+      await secureFeature(featureId);
+
+      const userId = await createOtherUser();
+      const results = await searchInSubmission(submissionId, ['dataset'], userId);
+      const featureIds = results.map((r) => r.submission_feature_id);
+
+      expect(featureIds).to.not.include(featureId);
+    });
+  });
+
   describe('Upload status → anchor eligibility', () => {
     /**
      * Simulate a non-approved upload by nulling record_effective_date.
@@ -1290,6 +1435,59 @@ describe('Security scope search (integration)', function () {
       const scopeId = await setupApprovalTest('Approved Dataset', 'approved-upload-test');
 
       expect(await countAnchors(scopeId)).to.equal(1);
+    });
+
+    it('should exclude features with future record_effective_date when computing anchors', async () => {
+      // A feature whose upload is approved but with a future effective date should
+      // not be anchored — isEffectivelySecured requires record_effective_date <= now().
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Future Dataset' });
+      await secureFeature(dataset);
+
+      // Set effective date to the future
+      await connection.sql(SQL`
+        UPDATE submission_feature
+        SET record_effective_date = now() + INTERVAL '7 days'
+        WHERE submission_feature_id = ${dataset};
+      `);
+
+      const urn = `urn:${submissionId}:*:*`;
+      const policyId = await createPolicy('future-date-anchor-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      expect(await countAnchors(scopeId)).to.equal(0);
+    });
+
+    it('should prune anchor when record_effective_date is set to NULL after initial computation', async () => {
+      // Compute anchors for an approved+secured feature, then de-approve it.
+      // deleteStaleAnchorBatch should remove the now-stale anchor.
+      const submissionId = await createTestSubmission(connection);
+      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'De-approved Dataset' });
+      await secureFeature(dataset);
+
+      const urn = `urn:${submissionId}:*:*`;
+      const policyId = await createPolicy('de-approve-anchor-test');
+      const stmtId = await createPolicyStatement(policyId, urn);
+      const scopeId = await setupScopeChain(stmtId, urn);
+
+      // Anchor exists for the approved+secured feature
+      expect(await countAnchors(scopeId)).to.equal(1);
+
+      // De-approve: set record_effective_date to NULL
+      await markFeatureNotYetApproved(dataset);
+
+      // Stale anchor should be pruned
+      let staleLastId = 0;
+      while (true) {
+        const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
+        if (!staleBatch) {
+          break;
+        }
+        staleLastId = staleBatch.pageLastId;
+      }
+
+      expect(await countAnchors(scopeId)).to.equal(0);
     });
   });
 

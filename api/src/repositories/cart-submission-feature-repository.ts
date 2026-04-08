@@ -3,7 +3,7 @@ import { getKnex } from '../database/db';
 import { CartStatus, CartSubmissionFeature } from '../models/cart';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
-import { isEffectivelySecured } from './sql-fragments';
+import { isEffectivelySecured, isVisibleToUser } from './sql-fragments';
 
 /**
  * CartSubmissionFeature repository class.
@@ -90,24 +90,7 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
         SELECT wf.submission_feature_id
         FROM w_features wf
         WHERE
-          NOT ${isEffectivelySecured('wf.submission_feature_id')}
-          OR EXISTS (
-            WITH RECURSIVE ancestor_chain(id) AS (
-              SELECT wf.submission_feature_id
-              UNION ALL
-              SELECT p.parent_submission_feature_id
-              FROM ancestor_chain ac
-              JOIN submission_feature p ON p.submission_feature_id = ac.id
-              WHERE p.parent_submission_feature_id IS NOT NULL
-                AND p.record_end_date IS NULL
-            )
-            SELECT 1 FROM ancestor_chain ac
-            JOIN security_scope_anchor ssa ON ssa.anchor_submission_feature_id = ac.id
-            JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
-            JOIN team_member tm ON tm.team_id = tss.team_id
-              AND tm.system_user_id = ?
-              AND tm.record_end_date IS NULL
-          )
+          ${isVisibleToUser('wf.submission_feature_id')}
       )
       INSERT INTO cart_submission_feature (cart_id, submission_feature_id)
       SELECT wc.cart_id, wvf.submission_feature_id
