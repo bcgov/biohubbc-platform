@@ -23,6 +23,7 @@ import { normalizeSearchValue } from '../utils/normalize';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
+import { isEffectivelySecured } from './sql-fragments';
 
 const defaultLog = getLogger('repositories/search-feature-repository');
 
@@ -383,25 +384,7 @@ export class SearchFeatureRepository extends BaseRepository {
         'feature_name',
         'feature_description',
         'submission_name',
-        knex.raw(`(
-          WITH RECURSIVE ancestors AS (
-            SELECT sf_inner.submission_feature_id AS ancestor_id, sf_inner.parent_submission_feature_id
-            FROM submission_feature sf_inner
-            WHERE sf_inner.submission_feature_id = aggregated_results.submission_feature_id
-            UNION ALL
-            SELECT p.submission_feature_id, p.parent_submission_feature_id
-            FROM submission_feature p
-            JOIN ancestors a ON p.submission_feature_id = a.parent_submission_feature_id
-          )
-          SELECT EXISTS (
-            SELECT 1
-            FROM ancestors a
-            INNER JOIN submission_feature_security sfs ON sfs.submission_feature_id = a.ancestor_id
-            INNER JOIN submission_feature sf_sec ON sf_sec.submission_feature_id = a.ancestor_id
-            WHERE sfs.record_end_date IS NULL
-              AND sf_sec.record_effective_date <= now()
-          )
-        ) AS is_secured`),
+        knex.raw(`${isEffectivelySecured('aggregated_results.submission_feature_id')} AS is_secured`),
         'total_relevancy_score as relevancy_score',
         'create_date'
       )
@@ -699,9 +682,10 @@ export class SearchFeatureRepository extends BaseRepository {
    *
    * For anonymous users (systemUserId is null), only unsecured features pass.
    *
-   * Uses the shared-ancestor-walk pattern from scale-query-scopes-v2: one recursive CTE
-   * produces ancestor_ids, then both the security check and grant check use = ANY(ancestor_ids)
-   * against that same array. This avoids the double-walk penalty of separate security + grant queries.
+   * Uses the shared `isEffectivelySecured` fragment for the security check — a feature is
+   * "effectively secured" only when it or an ancestor has an active security rule AND the
+   * feature is past its `record_effective_date`. For authenticated users, a second independent
+   * ancestor walk checks team scope grants via `security_scope_anchor`.
    *
    * Walk-up (not expand-down) strategy: search filters have already narrowed features
    * to a small candidate set. For each candidate, walk UP the parent chain (~3-5 levels)
@@ -718,58 +702,30 @@ export class SearchFeatureRepository extends BaseRepository {
 
     if (!systemUserId) {
       // Anonymous: only unsecured features
-      return knex.raw(`
-        NOT EXISTS (
-          WITH RECURSIVE ancestors AS (
-            SELECT sf_inner.submission_feature_id AS ancestor_id, sf_inner.parent_submission_feature_id
-            FROM submission_feature sf_inner
-            WHERE sf_inner.submission_feature_id = aggregated_results.submission_feature_id
-            UNION ALL
-            SELECT p.submission_feature_id, p.parent_submission_feature_id
-            FROM submission_feature p
-            JOIN ancestors a ON p.submission_feature_id = a.parent_submission_feature_id
-          )
-          SELECT 1
-          FROM ancestors a
-          INNER JOIN submission_feature_security sfs ON sfs.submission_feature_id = a.ancestor_id
-          WHERE sfs.record_end_date IS NULL
-        )
-      `);
+      return knex.raw(`NOT ${isEffectivelySecured('aggregated_results.submission_feature_id')}`);
     }
 
-    // Authenticated: walk ancestors once, check unsecured OR scope grant
+    // Authenticated: feature is unsecured OR user has team scope grant
     return knex.raw(
       `
-      EXISTS (
+      NOT ${isEffectivelySecured('aggregated_results.submission_feature_id')}
+      OR EXISTS (
+        WITH RECURSIVE ancestor_chain(id) AS (
+          SELECT aggregated_results.submission_feature_id
+          UNION ALL
+          SELECT p.parent_submission_feature_id
+          FROM ancestor_chain ac
+          JOIN submission_feature p ON p.submission_feature_id = ac.id
+          WHERE p.parent_submission_feature_id IS NOT NULL
+            AND p.record_end_date IS NULL
+        )
         SELECT 1
-        FROM (
-          WITH RECURSIVE ancestors AS (
-            SELECT sf_inner.submission_feature_id AS ancestor_id, sf_inner.parent_submission_feature_id
-            FROM submission_feature sf_inner
-            WHERE sf_inner.submission_feature_id = aggregated_results.submission_feature_id
-            UNION ALL
-            SELECT p.submission_feature_id, p.parent_submission_feature_id
-            FROM submission_feature p
-            JOIN ancestors a ON p.submission_feature_id = a.parent_submission_feature_id
-          )
-          SELECT array_agg(ancestor_id) AS ancestor_ids
-          FROM ancestors
-        ) anc
-        WHERE
-          NOT EXISTS (
-            SELECT 1 FROM submission_feature_security sfs
-            WHERE sfs.record_end_date IS NULL
-              AND sfs.submission_feature_id = ANY(anc.ancestor_ids)
-          )
-          OR EXISTS (
-            SELECT 1
-            FROM security_scope_anchor ssa
-              JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
-              JOIN team_member tm ON tm.team_id = tss.team_id
-                AND tm.system_user_id = ?
-                AND tm.record_end_date IS NULL
-            WHERE ssa.anchor_submission_feature_id = ANY(anc.ancestor_ids)
-          )
+        FROM ancestor_chain ac
+        JOIN security_scope_anchor ssa ON ssa.anchor_submission_feature_id = ac.id
+        JOIN team_security_scope tss ON tss.security_scope_id = ssa.security_scope_id
+        JOIN team_member tm ON tm.team_id = tss.team_id
+          AND tm.system_user_id = ?
+          AND tm.record_end_date IS NULL
       )
     `,
       [systemUserId]
