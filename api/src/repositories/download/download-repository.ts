@@ -87,6 +87,34 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
+   * Link an artifact to a download via the download_artifact join table.
+   *
+   * Downloads are tracked as formal artifacts from the moment they're requested.
+   * The artifact is created as 'pending' (no file yet) and linked here.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {string} artifactId - The artifact ID.
+   * @param {string} format - The artifact format (e.g. 'parquet').
+   * @return {Promise<void>}
+   * @memberof DownloadRepository
+   */
+  async createDownloadArtifact(downloadId: string, artifactId: string, format: string): Promise<void> {
+    const sql = SQL`
+      INSERT INTO download_artifact (download_id, artifact_id, format)
+      VALUES (${downloadId}, ${artifactId}, ${format});
+    `;
+
+    const response = await this.connection.sql(sql);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to link artifact to download', [
+        'DownloadRepository->createDownloadArtifact',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+  }
+
+  /**
    * Get a download record by ID.
    *
    * @param {string} downloadId - The download ID.
