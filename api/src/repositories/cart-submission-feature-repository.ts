@@ -162,8 +162,7 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
 
   /**
    * Get all submission feature IDs in a cart (unpaginated).
-   * Used by checkout to copy cart contents to download_feature
-   * without fetching full feature metadata.
+   * Used by checkout to validate cart is non-empty before creating download.
    *
    * @param {string} cartId - The ID of the cart
    * @return {Promise<number[]>} - Array of submission feature IDs

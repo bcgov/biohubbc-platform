@@ -1,5 +1,5 @@
 // Integration test for Download services — verifies multi-step download operations
-// (create download, link features, status transitions, fragment planning, auth, claiming)
+// (create download, cart/filter feature resolution, status transitions, fragment planning, auth, claiming)
 // work correctly against the real database.
 //
 // DownloadService = request-time operations (path handlers)
@@ -16,8 +16,11 @@ import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } 
 import { HTTP403, HTTP409 } from '../../errors/http-error';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
+import { DownloadRepository } from '../../repositories/download/download-repository';
+import { CartService } from '../../services/cart-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadService } from '../../services/download/download-service';
+import { SearchFeatureService } from '../../services/search-feature-service';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
 describe('Download services (integration)', function () {
@@ -26,6 +29,7 @@ describe('Download services (integration)', function () {
   let connection: IDBConnection;
   let service: DownloadPipelineService;
   let crudService: DownloadService;
+  let cartService: CartService;
 
   before(() => {
     initDBPool(defaultPoolConfig);
@@ -36,6 +40,7 @@ describe('Download services (integration)', function () {
     await connection.open();
     service = new DownloadPipelineService(connection);
     crudService = new DownloadService(connection);
+    cartService = new CartService(connection);
   });
 
   afterEach(async () => {
@@ -64,52 +69,69 @@ describe('Download services (integration)', function () {
     }
   }
 
-  describe('createDownloadRequest', () => {
-    it('should create a download record and link submission features', async () => {
+  /**
+   * Helper: create a cart-backed download for the given feature IDs.
+   * Creates a cart via CartService, then creates a download with the cart_id FK.
+   * Returns { download_id } to match the shape callers expect.
+   */
+  async function createCartDownload(
+    featureIds: number[],
+    fragmentSizeBytes?: number
+  ): Promise<{ download_id: string }> {
+    const systemUserId = connection.systemUserId();
+    const cartResponse = await cartService.createCart(systemUserId, featureIds);
+    return crudService.createDownload({
+      cartId: cartResponse.cart.cart_id,
+      fragmentSizeBytes
+    });
+  }
+
+  describe('createDownload', () => {
+    it('should create a cart-based download with cart_id set and filters null', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset A' });
       const featureId2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset B' });
 
-      const result = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId1, featureId2]
-      });
+      const result = await createCartDownload([featureId1, featureId2]);
 
       const download = await crudService.findDownloadById(result.download_id);
       expect(download).to.not.be.null;
       expect(download!.download_status).to.equal(DownloadStatusEnum.PENDING);
-      expect(download!.total_fragments).to.equal(1);
-      expect(download!.completed_fragments).to.equal(0);
 
-      const features = await connection.sql(SQL`
-        SELECT submission_feature_id FROM download_feature
-        WHERE download_id = ${result.download_id}
-        ORDER BY submission_feature_id;
+      // Verify cart_id is set and filters is null
+      const row = await connection.sql(SQL`
+        SELECT cart_id, filters FROM download WHERE download_id = ${result.download_id};
       `);
-      expect(features.rows).to.have.length(2);
-      expect(features.rows.map((r: { submission_feature_id: number }) => r.submission_feature_id)).to.deep.equal([
-        featureId1,
-        featureId2
-      ]);
+      expect(row.rows[0].cart_id).to.not.be.null;
+      expect(row.rows[0].filters).to.be.null;
     });
 
-    it('should fail and not create a download when linking an invalid feature ID', async () => {
-      const before = await connection.sql(SQL`SELECT COUNT(*)::int as count FROM download;`);
-      const countBefore = before.rows[0].count;
+    it('should create a filter-based download with filters set and cart_id null', async () => {
+      const filters = { keyword: 'test-keyword' };
+      const result = await crudService.createDownload({ filters });
 
-      await connection.query('SAVEPOINT before_fk_test');
+      const row = await connection.sql(SQL`
+        SELECT cart_id, filters FROM download WHERE download_id = ${result.download_id};
+      `);
+      expect(row.rows[0].cart_id).to.be.null;
+      expect(row.rows[0].filters).to.not.be.null;
+      expect(row.rows[0].filters.keyword).to.equal('test-keyword');
+    });
 
+    it('should reject download with both cart_id and filters NULL (CHECK constraint)', async () => {
+      // The CHECK constraint on download requires: cart_id IS NOT NULL OR filters IS NOT NULL.
+      // Bypass the service layer and insert directly to test the constraint.
       try {
-        await crudService.createDownloadRequest({ submissionFeatureIds: [999999] });
-        expect.fail('Should have thrown a foreign key violation');
-      } catch (error) {
-        expect(error).to.exist;
+        await connection.sql(SQL`
+          INSERT INTO download (download_status, fragment_size_bytes, cart_id, filters, create_user)
+          VALUES ('pending', 524288000, NULL, NULL, ${connection.systemUserId()});
+        `);
+        expect.fail('Expected CHECK constraint violation');
+      } catch (error: any) {
+        // PG error is wrapped by ApiExecuteSQLError — original error in errors[]
+        const pgMessage = error.errors?.[0]?.message ?? error.message ?? '';
+        expect(pgMessage).to.include('download_feature_source_check');
       }
-
-      await connection.query('ROLLBACK TO SAVEPOINT before_fk_test');
-
-      const after = await connection.sql(SQL`SELECT COUNT(*)::int as count FROM download;`);
-      const countAfter = after.rows[0].count;
-      expect(countAfter).to.equal(countBefore);
     });
   });
 
@@ -117,9 +139,7 @@ describe('Download services (integration)', function () {
     it('should set started_at only when transitioning to processing', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Test' });
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
+      const { download_id } = await createCartDownload([featureId]);
 
       await service.updateDownloadStatus(download_id, DownloadStatusEnum.PROCESSING);
 
@@ -153,9 +173,7 @@ describe('Download services (integration)', function () {
         count: 12,
         timestamp: '2024-01-16T14:30:00Z'
       });
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId1, featureId2]
-      });
+      const { download_id } = await createCartDownload([featureId1, featureId2]);
 
       // Link to a team so it appears in getDownloadsByTeamMembership
       await crudService.linkDownloadToNewTeam(
@@ -193,13 +211,11 @@ describe('Download services (integration)', function () {
   });
 
   describe('getDownloadFeatures', () => {
-    it('should return per-feature estimated_byte_size from pre-computed column', async () => {
+    it('should resolve cart-based features with estimated_byte_size from pre-computed column', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Size Test' });
 
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
+      const { download_id } = await createCartDownload([featureId]);
 
       const sizeData = await crudService.getDownloadFeatures(download_id);
 
@@ -211,17 +227,32 @@ describe('Download services (integration)', function () {
       expect(sizeData[0]).to.not.have.property('data');
     });
 
-    it('should return all linked features regardless of security status', async () => {
-      // Authorization is enforced at creation time via buildSecurityFilter in the search query.
-      // At retrieval time, getDownloadFeatures returns everything that was linked.
+    it('should return all cart features regardless of security status', async () => {
+      // Cart downloads are frozen at checkout — security was enforced when the
+      // user added features to the cart. At resolution time, getDownloadFeatures
+      // returns everything in cart_submission_feature for the download's cart.
+      //
+      // Use raw SQL to insert cart_submission_feature rows because CartService
+      // filters out secured features during addSubmissionFeaturesToCart.
+      const systemUserId = connection.systemUserId();
       const submissionId = await createTestSubmission(connection);
       const openFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
       const securedFeatureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
       await secureFeature(securedFeatureId);
 
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [openFeatureId, securedFeatureId]
-      });
+      // Create cart directly (bypasses CartService security filtering)
+      const cartResult = await connection.sql(SQL`
+        INSERT INTO cart (system_user_id, cart_status, create_user)
+        VALUES (${systemUserId}, 'active', ${systemUserId})
+        RETURNING cart_id;
+      `);
+      const cartId = cartResult.rows[0].cart_id;
+      await connection.sql(SQL`
+        INSERT INTO cart_submission_feature (cart_id, submission_feature_id, create_user)
+        VALUES (${cartId}, ${openFeatureId}, ${systemUserId}), (${cartId}, ${securedFeatureId}, ${systemUserId});
+      `);
+
+      const { download_id } = await crudService.createDownload({ cartId });
 
       const result = await crudService.getDownloadFeatures(download_id);
 
@@ -231,13 +262,13 @@ describe('Download services (integration)', function () {
       expect(featureIds).to.include(securedFeatureId);
     });
 
-    it('should not leak features across different downloads', async () => {
+    it('should not leak features across different cart-based downloads', async () => {
       const submissionId = await createTestSubmission(connection);
       const featA = await createTestFeature(connection, submissionId, 'dataset', { name: 'DL-A Feature' });
       const featB = await createTestFeature(connection, submissionId, 'dataset', { name: 'DL-B Feature' });
 
-      const dlA = await crudService.createDownloadRequest({ submissionFeatureIds: [featA] });
-      const dlB = await crudService.createDownloadRequest({ submissionFeatureIds: [featB] });
+      const dlA = await createCartDownload([featA]);
+      const dlB = await createCartDownload([featB]);
 
       const resultA = await crudService.getDownloadFeatures(dlA.download_id);
       expect(resultA).to.have.length(1);
@@ -248,14 +279,149 @@ describe('Download services (integration)', function () {
       expect(resultB[0].submission_feature_id).to.equal(featB);
     });
 
-    it('should return empty for a download with no linked features', async () => {
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: []
-      });
+    it('should resolve filter-based features by re-running search query', async () => {
+      // Filter-based downloads store filters JSONB on the download row and re-derive
+      // the feature set at pipeline time by re-running the search CTE.
+      const submissionId = await createTestSubmission(connection);
+      const feat1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Filter Test A' });
+      const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Filter Test B' });
+      // Create a non-matching feature to prove filter selectivity
+      await createTestFeature(connection, submissionId, 'species_observation', { taxon_id: 1234, count: 1 });
+
+      const filters = { feature_types: ['dataset'] };
+      const { download_id } = await crudService.createDownload({ filters });
 
       const result = await crudService.getDownloadFeatures(download_id);
 
-      expect(result).to.have.length(0);
+      // Should include both dataset features but not the species_observation
+      const featureIds = result.map((f: { submission_feature_id: number }) => f.submission_feature_id);
+      expect(featureIds).to.include(feat1);
+      expect(featureIds).to.include(feat2);
+      // All returned features should be datasets
+      for (const f of result) {
+        expect(f.feature_type_name).to.equal('dataset');
+      }
+    });
+
+    it('should not leak features across cart-based and filter-based downloads', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const cartFeat = await createTestFeature(connection, submissionId, 'species_observation', {
+        taxon_id: 9999,
+        count: 1
+      });
+      const filterFeat = await createTestFeature(connection, submissionId, 'dataset', { name: 'Filter Only' });
+
+      // Cart download includes only the observation
+      const cartDl = await createCartDownload([cartFeat]);
+      // Filter download matches only datasets
+      const filterDl = await crudService.createDownload({ filters: { feature_types: ['dataset'] } });
+
+      const cartResult = await crudService.getDownloadFeatures(cartDl.download_id);
+      expect(cartResult).to.have.length(1);
+      expect(cartResult[0].submission_feature_id).to.equal(cartFeat);
+
+      const filterResult = await crudService.getDownloadFeatures(filterDl.download_id);
+      const filterIds = filterResult.map((f: { submission_feature_id: number }) => f.submission_feature_id);
+      expect(filterIds).to.include(filterFeat);
+      expect(filterIds).to.not.include(cartFeat);
+    });
+  });
+
+  describe('estimateDownloadSize (filter-based)', () => {
+    it('should return aggregate total for filter-based downloads via SQL SUM', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const feat1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Size A' });
+      const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Size B' });
+
+      const filters = { feature_types: ['dataset'] };
+      const { download_id } = await crudService.createDownload({ filters });
+
+      const totalBytes = await service.estimateDownloadSize(download_id);
+
+      // Should be > 0 (data_byte_size = octet_length(data::text) + 500 per feature)
+      expect(totalBytes).to.be.greaterThan(0);
+
+      // Cross-check: total should equal sum of individual features
+      const features = await crudService.getDownloadFeatures(download_id);
+      const expectedTotal = features
+        .filter((f: { submission_feature_id: number }) => [feat1, feat2].includes(f.submission_feature_id))
+        .reduce((sum: number, f: { estimated_byte_size: string }) => sum + Number(f.estimated_byte_size), 0);
+      expect(totalBytes).to.be.greaterThanOrEqual(expectedTotal);
+    });
+  });
+
+  describe('cursor streaming (streamDownloadFeatures)', () => {
+    it('should stream cart-based features via DECLARE CURSOR / FETCH / CLOSE', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const feat1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Stream A' });
+      const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Stream B' });
+      const cartResponse = await cartService.createCart(connection.systemUserId(), [feat1, feat2]);
+
+      const downloadRepo = new DownloadRepository(connection);
+
+      // Cursor requires an open transaction — our test connection is already in one
+      const batches: { submission_feature_id: number; feature_type_name: string }[][] = [];
+      for await (const batch of downloadRepo.streamDownloadFeaturesByCartId(cartResponse.cart.cart_id, 1)) {
+        batches.push(batch as any);
+      }
+
+      // With batchSize=1, should yield 2 batches of 1 row each
+      expect(batches).to.have.length(2);
+      const allIds = batches.flat().map((r) => r.submission_feature_id);
+      expect(allIds).to.include(feat1);
+      expect(allIds).to.include(feat2);
+      for (const row of batches.flat()) {
+        expect(row.feature_type_name).to.equal('dataset');
+      }
+    });
+
+    it('should stream filter-based features via DECLARE CURSOR with embedded search CTE', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const feat1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'CursorFilter A' });
+      const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'CursorFilter B' });
+
+      const filters = { feature_types: ['dataset'] };
+      const { download_id } = await crudService.createDownload({ filters });
+
+      const downloadRepo = new DownloadRepository(connection);
+      const searchService = new SearchFeatureService(connection);
+
+      // Build the subquery the same way planFragments does
+      const subquery = searchService.buildSearchFeatureIdsSubquery(filters, connection.systemUserId());
+      const { sql, bindings } = subquery.toSQL().toNative();
+
+      const batches: { submission_feature_id: number; feature_type_name: string }[][] = [];
+      for await (const batch of downloadRepo.streamDownloadFeaturesBySearchQuery(
+        download_id,
+        sql,
+        bindings as any[],
+        1
+      )) {
+        batches.push(batch as any);
+      }
+
+      // With batchSize=1, at least 2 batches
+      expect(batches.length).to.be.greaterThanOrEqual(2);
+      const allIds = batches.flat().map((r) => r.submission_feature_id);
+      expect(allIds).to.include(feat1);
+      expect(allIds).to.include(feat2);
+    });
+
+    it('should yield empty for cart with no features', async () => {
+      const systemUserId = connection.systemUserId();
+      const cartResult = await connection.sql(SQL`
+        INSERT INTO cart (system_user_id, cart_status, create_user)
+        VALUES (${systemUserId}, 'active', ${systemUserId})
+        RETURNING cart_id;
+      `);
+
+      const downloadRepo = new DownloadRepository(connection);
+      const batches: unknown[][] = [];
+      for await (const batch of downloadRepo.streamDownloadFeaturesByCartId(cartResult.rows[0].cart_id)) {
+        batches.push(batch);
+      }
+
+      expect(batches).to.have.length(0);
     });
   });
 
@@ -274,9 +440,7 @@ describe('Download services (integration)', function () {
         parentFeatureId
       );
 
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [childFeatureId]
-      });
+      const { download_id } = await createCartDownload([childFeatureId]);
       const sizeEstimate = await service.estimateDownloadSize(download_id);
       await service.planFragments(download_id, sizeEstimate);
 
@@ -312,9 +476,7 @@ describe('Download services (integration)', function () {
         name: 'Root Dataset'
       });
 
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [rootFeatureId]
-      });
+      const { download_id } = await createCartDownload([rootFeatureId]);
       const sizeEstimate = await service.estimateDownloadSize(download_id);
       await service.planFragments(download_id, sizeEstimate);
 
@@ -370,9 +532,7 @@ describe('Download services (integration)', function () {
   async function createAnonymousDownload(): Promise<string> {
     const submissionId = await createTestSubmission(connection);
     const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Anon' });
-    const { download_id } = await crudService.createDownloadRequest({
-      submissionFeatureIds: [featureId]
-    });
+    const { download_id } = await createCartDownload([featureId]);
     return download_id;
   }
 
@@ -411,9 +571,7 @@ describe('Download services (integration)', function () {
     it('should fail when download already has team associations', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Team DL' });
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
+      const { download_id } = await createCartDownload([featureId]);
 
       const systemUserId = connection.systemUserId();
       // Link to a team (simulates authenticated download creation)
@@ -445,9 +603,7 @@ describe('Download services (integration)', function () {
     it('should authorize team member on team-linked download', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Team DL' });
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
+      const { download_id } = await createCartDownload([featureId]);
 
       const systemUserId = connection.systemUserId();
       await crudService.linkDownloadToNewTeam(download_id, systemUserId, 'Auth test team', 'Auth test team');
@@ -459,9 +615,7 @@ describe('Download services (integration)', function () {
     it('should throw HTTP403 for non-team-member on team-linked download', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Locked' });
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
+      const { download_id } = await createCartDownload([featureId]);
 
       const systemUserId = connection.systemUserId();
       await crudService.linkDownloadToNewTeam(download_id, systemUserId, 'Auth test team', 'Auth test team');
@@ -478,9 +632,7 @@ describe('Download services (integration)', function () {
     it('should throw HTTP403 for unauthenticated access to team-linked download', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Locked' });
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
+      const { download_id } = await createCartDownload([featureId]);
 
       const systemUserId = connection.systemUserId();
       await crudService.linkDownloadToNewTeam(download_id, systemUserId, 'Auth test team', 'Auth test team');
@@ -501,9 +653,7 @@ describe('Download services (integration)', function () {
       const apiUserId = connection.systemUserId();
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Mine' });
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
+      const { download_id } = await createCartDownload([featureId]);
 
       await crudService.linkDownloadToNewTeam(download_id, apiUserId, 'Listing test team', 'Listing test team');
 
@@ -515,9 +665,7 @@ describe('Download services (integration)', function () {
     it('should not return downloads the user has no team membership for', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Private' });
-      const { download_id } = await crudService.createDownloadRequest({
-        submissionFeatureIds: [featureId]
-      });
+      const { download_id } = await createCartDownload([featureId]);
 
       // Anonymous download (no team link) should not appear in team-based listing
       const otherUserId = await createOtherUser();
