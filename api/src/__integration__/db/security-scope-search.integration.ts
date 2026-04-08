@@ -17,6 +17,17 @@ import { SecurityScopeRepository } from '../../repositories/authorization/securi
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
 import { computeScopeHash } from '../../utils/scope-hash';
+import {
+  addTeamMember,
+  computeAnchors,
+  createPolicy,
+  createPolicyStatement,
+  createTeam,
+  createTeamPolicy,
+  secureFeature,
+  setupFullAccess,
+  setupScopeChain
+} from '../helpers/test-rbac-helpers';
 import { createTestFeature, createTestFeaturesInBulk, createTestSubmission } from '../helpers/test-submission-helpers';
 
 describe('Security scope search (integration)', function () {
@@ -46,26 +57,6 @@ describe('Security scope search (integration)', function () {
 
   // ── Helpers ──────────────────────────────────────────────────────────
 
-  /**
-   * Mark a submission feature as secured.
-   * Uses security_rule_id 1 from seed data.
-   */
-  async function secureFeature(submissionFeatureId: number): Promise<void> {
-    const systemUserId = connection.systemUserId();
-    await connection.sql(SQL`
-      INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, create_user)
-      VALUES (${submissionFeatureId}, 1, ${systemUserId});
-    `);
-  }
-
-  /**
-   * Soft-delete the security record for a feature (makes it public again).
-   */
-  /**
-   * Set record_effective_date to a future timestamp.
-   * Features with a future date are not yet "effectively secured" because
-   * the isEffectivelySecured fragment requires `record_effective_date <= now()`.
-   */
   async function markFeatureFutureDate(submissionFeatureId: number): Promise<void> {
     await connection.sql(SQL`
       UPDATE submission_feature
@@ -74,9 +65,6 @@ describe('Security scope search (integration)', function () {
     `);
   }
 
-  /**
-   * Set record_effective_date to NULL (unapproved upload).
-   */
   async function markFeatureUnapproved(submissionFeatureId: number): Promise<void> {
     await connection.sql(SQL`
       UPDATE submission_feature
@@ -92,124 +80,6 @@ describe('Security scope search (integration)', function () {
       WHERE submission_feature_id = ${submissionFeatureId}
         AND record_end_date IS NULL;
     `);
-  }
-
-  async function createTeam(name: string): Promise<string> {
-    const systemUserId = connection.systemUserId();
-    const result = await connection.sql(SQL`
-      INSERT INTO team (name, create_user)
-      VALUES (${name}, ${systemUserId})
-      RETURNING team_id;
-    `);
-    return result.rows[0].team_id;
-  }
-
-  async function addTeamMember(teamId: string, systemUserId: number): Promise<void> {
-    const apiUserId = connection.systemUserId();
-    await connection.sql(SQL`
-      INSERT INTO team_member (team_id, system_user_id, create_user)
-      VALUES (${teamId}, ${systemUserId}, ${apiUserId});
-    `);
-  }
-
-  async function createPolicy(name: string): Promise<string> {
-    const systemUserId = connection.systemUserId();
-    const result = await connection.sql(SQL`
-      INSERT INTO policy (name, create_user)
-      VALUES (${name}, ${systemUserId})
-      RETURNING policy_id;
-    `);
-    return result.rows[0].policy_id;
-  }
-
-  /**
-   * Create a policy statement with the given URN.
-   * The DB trigger auto-decomposes the URN into indexed columns.
-   */
-  async function createPolicyStatement(policyId: string, urn: string): Promise<string> {
-    const systemUserId = connection.systemUserId();
-    const result = await connection.sql(SQL`
-      INSERT INTO policy_statement (policy_id, effect, submission_feature_urn, create_user)
-      VALUES (${policyId}, 'allow', ${urn}, ${systemUserId})
-      RETURNING policy_statement_id;
-    `);
-    return result.rows[0].policy_statement_id;
-  }
-
-  async function createTeamPolicy(teamId: string, policyId: string): Promise<string> {
-    const systemUserId = connection.systemUserId();
-    const result = await connection.sql(SQL`
-      INSERT INTO team_policy (team_id, policy_id, create_user)
-      VALUES (${teamId}, ${policyId}, ${systemUserId})
-      RETURNING team_policy_id;
-    `);
-    return result.rows[0].team_policy_id;
-  }
-
-  /**
-   * Compute anchors for a scope using the split repo API (resolveUrn + batch loop).
-   * No commits between batches — stays in the test's wrapping transaction for rollback isolation.
-   */
-  async function computeAnchors(scopeId: string): Promise<void> {
-    const urn = await scopeRepo.resolveUrnForScope(scopeId);
-
-    if (!urn) {
-      return;
-    }
-
-    let lastId = 0;
-
-    while (true) {
-      const batch = await scopeRepo.computeAnchorBatch(scopeId, urn, lastId);
-
-      if (!batch) {
-        break;
-      }
-
-      lastId = batch.pageLastId;
-    }
-  }
-
-  /**
-   * Set up the full scope chain for a policy statement, bypassing pg-boss:
-   * 1. Create or get security_scope (deduped by scope_hash)
-   * 2. Map policy_statement → security_scope
-   * 3. Compute anchors synchronously
-   * Returns the security_scope_id.
-   */
-  async function setupScopeChain(policyStatementId: string, urn: string): Promise<string> {
-    const scopeHash = computeScopeHash(urn);
-    const inserted = await scopeRepo.insertSecurityScope(scopeHash);
-
-    const scopeId = inserted
-      ? inserted.security_scope_id
-      : (await scopeRepo.getSecurityScopeByScopeHash(scopeHash)).security_scope_id;
-
-    await scopeRepo.insertPolicyStatementScope(policyStatementId, scopeId);
-    await computeAnchors(scopeId);
-
-    return scopeId;
-  }
-
-  /**
-   * Full RBAC setup: policy → statement → scope chain → team → member → team-policy → team scopes.
-   * Returns all created IDs for assertions.
-   */
-  async function setupFullAccess(
-    urn: string,
-    userId: number,
-    teamName: string
-  ): Promise<{ policyId: string; stmtId: string; scopeId: string; teamId: string }> {
-    const policyId = await createPolicy(`${teamName}-policy`);
-    const stmtId = await createPolicyStatement(policyId, urn);
-    const scopeId = await setupScopeChain(stmtId, urn);
-
-    const teamId = await createTeam(teamName);
-    await addTeamMember(teamId, userId);
-    await createTeamPolicy(teamId, policyId);
-    await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyId);
-
-    return { policyId, stmtId, scopeId, teamId };
   }
 
   async function countAnchors(securityScopeId: string): Promise<number> {
@@ -230,12 +100,12 @@ describe('Security scope search (integration)', function () {
   ): Promise<{ submissionId: number; featureId: number; scopeId: string; policyId: string; stmtId: string }> {
     const submissionId = await createTestSubmission(connection);
     const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: featureName });
-    await secureFeature(featureId);
+    await secureFeature(connection, featureId);
 
     const urn = `urn:${submissionId}:*:*`;
-    const policyId = await createPolicy(policyName);
-    const stmtId = await createPolicyStatement(policyId, urn);
-    const scopeId = await setupScopeChain(stmtId, urn);
+    const policyId = await createPolicy(connection, policyName);
+    const stmtId = await createPolicyStatement(connection, policyId, urn);
+    const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
     return { submissionId, featureId, scopeId, policyId, stmtId };
   }
@@ -254,12 +124,12 @@ describe('Security scope search (integration)', function () {
     const datasetId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
     const childId = await createTestFeature(connection, submissionId, childType, { name: 'Child' }, datasetId);
 
-    await secureFeature(datasetId);
+    await secureFeature(connection, datasetId);
 
     const urn = urnOverride ? urnOverride(submissionId, childId) : `urn:${submissionId}:${childType}:*`;
-    const policyId = await createPolicy(policyName);
-    const stmtId = await createPolicyStatement(policyId, urn);
-    const scopeId = await setupScopeChain(stmtId, urn);
+    const policyId = await createPolicy(connection, policyName);
+    const stmtId = await createPolicyStatement(connection, policyId, urn);
+    const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
     return { submissionId, datasetId, childId, scopeId, policyId };
   }
@@ -421,15 +291,15 @@ describe('Security scope search (integration)', function () {
     const submissionId = await createTestSubmission(connection);
     const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: featureName });
 
-    await secureFeature(dataset);
+    await secureFeature(connection, dataset);
     if (options?.approved === false) {
       await markFeatureUnapproved(dataset);
     }
 
     const urn = `urn:${submissionId}:*:*`;
-    const policyId = await createPolicy(policyName);
-    const stmtId = await createPolicyStatement(policyId, urn);
-    return setupScopeChain(stmtId, urn);
+    const policyId = await createPolicy(connection, policyName);
+    const stmtId = await createPolicyStatement(connection, policyId, urn);
+    return setupScopeChain(scopeRepo, stmtId, urn);
   }
 
   /**
@@ -455,13 +325,13 @@ describe('Security scope search (integration)', function () {
     const ids = { submissionId, dataset, observation, telemetry };
     const featureMap = { dataset, observation, telemetry };
     for (const f of securedFeatures) {
-      await secureFeature(featureMap[f]);
+      await secureFeature(connection, featureMap[f]);
     }
 
     const urnStr = urn(ids);
-    const policyId = await createPolicy(policyName);
-    const stmtId = await createPolicyStatement(policyId, urnStr);
-    const scopeId = await setupScopeChain(stmtId, urnStr);
+    const policyId = await createPolicy(connection, policyName);
+    const stmtId = await createPolicyStatement(connection, policyId, urnStr);
+    const scopeId = await setupScopeChain(scopeRepo, stmtId, urnStr);
 
     return { ...ids, scopeId };
   }
@@ -470,10 +340,10 @@ describe('Security scope search (integration)', function () {
 
   describe('Policy create → scope creation', () => {
     it('should create security_scope and policy_statement_scope mapping', async () => {
-      const policyId = await createPolicy('scope-creation-test');
-      const stmtId = await createPolicyStatement(policyId, 'urn:1:dataset:*');
+      const policyId = await createPolicy(connection, 'scope-creation-test');
+      const stmtId = await createPolicyStatement(connection, policyId, 'urn:1:dataset:*');
 
-      const scopeId = await setupScopeChain(stmtId, 'urn:1:dataset:*');
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, 'urn:1:dataset:*');
 
       // Verify scope exists with correct hash
       const scope = await scopeRepo.getSecurityScopeByScopeHash(computeScopeHash('urn:1:dataset:*'));
@@ -490,13 +360,13 @@ describe('Security scope search (integration)', function () {
     it('should reuse the same scope for two policies with the same URN (dedup)', async () => {
       const urn = 'urn:1:telemetry:*';
 
-      const policyA = await createPolicy('dedup-A');
-      const stmtA = await createPolicyStatement(policyA, urn);
-      const scopeIdA = await setupScopeChain(stmtA, urn);
+      const policyA = await createPolicy(connection, 'dedup-A');
+      const stmtA = await createPolicyStatement(connection, policyA, urn);
+      const scopeIdA = await setupScopeChain(scopeRepo, stmtA, urn);
 
-      const policyB = await createPolicy('dedup-B');
-      const stmtB = await createPolicyStatement(policyB, urn);
-      const scopeIdB = await setupScopeChain(stmtB, urn);
+      const policyB = await createPolicy(connection, 'dedup-B');
+      const stmtB = await createPolicyStatement(connection, policyB, urn);
+      const scopeIdB = await setupScopeChain(scopeRepo, stmtB, urn);
 
       expect(scopeIdA).to.equal(scopeIdB);
 
@@ -511,12 +381,12 @@ describe('Security scope search (integration)', function () {
     it('should compute anchors for matching secured features', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Anchor Target' });
-      await secureFeature(featureId);
+      await secureFeature(connection, featureId);
 
       const urn = `urn:${submissionId}:dataset:*`;
-      const policyId = await createPolicy('anchor-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'anchor-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
       // Verify the specific feature is an anchor
       const result = await connection.sql(SQL`
@@ -531,9 +401,9 @@ describe('Security scope search (integration)', function () {
       await createTestFeature(connection, submissionId, 'dataset', { name: 'Unsecured' });
 
       const urn = `urn:${submissionId}:dataset:*`;
-      const policyId = await createPolicy('no-anchor-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'no-anchor-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
       expect(await countAnchors(scopeId)).to.equal(0);
     });
@@ -543,28 +413,28 @@ describe('Security scope search (integration)', function () {
 
   describe('Team-policy create → team scope grants', () => {
     it('should create team_security_scope rows when team-policy is assigned', async () => {
-      const policyId = await createPolicy('team-grant-test');
-      const stmtId = await createPolicyStatement(policyId, 'urn:*:*:*');
-      await setupScopeChain(stmtId, 'urn:*:*:*');
+      const policyId = await createPolicy(connection, 'team-grant-test');
+      const stmtId = await createPolicyStatement(connection, policyId, 'urn:*:*:*');
+      await setupScopeChain(scopeRepo, stmtId, 'urn:*:*:*');
 
-      const teamId = await createTeam('Grant Test Team');
-      await createTeamPolicy(teamId, policyId);
+      const teamId = await createTeam(connection, 'Grant Test Team');
+      await createTeamPolicy(connection, teamId, policyId);
       await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyId);
 
       expect(await countTeamScopes(teamId)).to.equal(1);
     });
 
     it('should grant the same scope_id to two teams with the same policy', async () => {
-      const policyId = await createPolicy('shared-policy');
-      const stmtId = await createPolicyStatement(policyId, 'urn:*:telemetry:*');
-      await setupScopeChain(stmtId, 'urn:*:telemetry:*');
+      const policyId = await createPolicy(connection, 'shared-policy');
+      const stmtId = await createPolicyStatement(connection, policyId, 'urn:*:telemetry:*');
+      await setupScopeChain(scopeRepo, stmtId, 'urn:*:telemetry:*');
 
-      const teamA = await createTeam('Team A');
-      await createTeamPolicy(teamA, policyId);
+      const teamA = await createTeam(connection, 'Team A');
+      await createTeamPolicy(connection, teamA, policyId);
       await scopeRepo.insertTeamSecurityScopesForPolicy(teamA, policyId);
 
-      const teamB = await createTeam('Team B');
-      await createTeamPolicy(teamB, policyId);
+      const teamB = await createTeam(connection, 'Team B');
+      await createTeamPolicy(connection, teamB, policyId);
       await scopeRepo.insertTeamSecurityScopesForPolicy(teamB, policyId);
 
       const scopeIdsA = await getTeamScopeIds(teamA);
@@ -573,18 +443,18 @@ describe('Security scope search (integration)', function () {
     });
 
     it('should accumulate scopes when a second policy is assigned to the same team', async () => {
-      const policyA = await createPolicy('multi-policy-A');
-      const stmtA = await createPolicyStatement(policyA, 'urn:1:dataset:*');
-      await setupScopeChain(stmtA, 'urn:1:dataset:*');
+      const policyA = await createPolicy(connection, 'multi-policy-A');
+      const stmtA = await createPolicyStatement(connection, policyA, 'urn:1:dataset:*');
+      await setupScopeChain(scopeRepo, stmtA, 'urn:1:dataset:*');
 
-      const policyB = await createPolicy('multi-policy-B');
-      const stmtB = await createPolicyStatement(policyB, 'urn:2:dataset:*');
-      await setupScopeChain(stmtB, 'urn:2:dataset:*');
+      const policyB = await createPolicy(connection, 'multi-policy-B');
+      const stmtB = await createPolicyStatement(connection, policyB, 'urn:2:dataset:*');
+      await setupScopeChain(scopeRepo, stmtB, 'urn:2:dataset:*');
 
-      const teamId = await createTeam('Multi-Policy Team');
-      await createTeamPolicy(teamId, policyA);
+      const teamId = await createTeam(connection, 'Multi-Policy Team');
+      await createTeamPolicy(connection, teamId, policyA);
       await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyA);
-      await createTeamPolicy(teamId, policyB);
+      await createTeamPolicy(connection, teamId, policyB);
       await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyB);
 
       expect(await countTeamScopes(teamId)).to.equal(2);
@@ -593,18 +463,18 @@ describe('Security scope search (integration)', function () {
     it('should not create duplicate team_security_scope for the same scope via another policy', async () => {
       const urn = 'urn:*:species_observation:*';
 
-      const policyA = await createPolicy('overlap-A');
-      const stmtA = await createPolicyStatement(policyA, urn);
-      await setupScopeChain(stmtA, urn);
+      const policyA = await createPolicy(connection, 'overlap-A');
+      const stmtA = await createPolicyStatement(connection, policyA, urn);
+      await setupScopeChain(scopeRepo, stmtA, urn);
 
-      const policyB = await createPolicy('overlap-B');
-      const stmtB = await createPolicyStatement(policyB, urn);
-      await setupScopeChain(stmtB, urn);
+      const policyB = await createPolicy(connection, 'overlap-B');
+      const stmtB = await createPolicyStatement(connection, policyB, urn);
+      await setupScopeChain(scopeRepo, stmtB, urn);
 
-      const teamId = await createTeam('Overlap Team');
-      await createTeamPolicy(teamId, policyA);
+      const teamId = await createTeam(connection, 'Overlap Team');
+      await createTeamPolicy(connection, teamId, policyA);
       await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyA);
-      await createTeamPolicy(teamId, policyB);
+      await createTeamPolicy(connection, teamId, policyB);
       await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyB);
 
       // Same scope via two policies → one row (ON CONFLICT DO NOTHING)
@@ -619,10 +489,10 @@ describe('Security scope search (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const openFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
       const securedFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
-      await secureFeature(securedFeature);
+      await secureFeature(connection, securedFeature);
 
       const userId = connection.systemUserId();
-      await setupFullAccess(`urn:${submissionId}:*:*`, userId, 'Auth Team');
+      await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:*:*`, userId, 'Auth Team');
 
       const results = await searchInSubmission(submissionId, ['dataset'], userId);
       const featureIds = results.map((r) => r.submission_feature_id);
@@ -638,7 +508,7 @@ describe('Security scope search (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const openFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
       const securedFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
-      await secureFeature(securedFeature);
+      await secureFeature(connection, securedFeature);
 
       const results = await searchInSubmission(submissionId, ['dataset'], null);
       const featureIds = results.map((r) => r.submission_feature_id);
@@ -651,7 +521,7 @@ describe('Security scope search (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const openFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Open' });
       const securedFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
-      await secureFeature(securedFeature);
+      await secureFeature(connection, securedFeature);
 
       // User exists but has no team/policy/scope
       const userId = await createOtherUser();
@@ -685,7 +555,7 @@ describe('Security scope search (integration)', function () {
       );
 
       // Only secure the root — descendants inherit security via ancestor walk
-      await secureFeature(grandparent);
+      await secureFeature(connection, grandparent);
 
       const results = await searchInSubmission(submissionId, ['dataset', 'sample_site', 'species_observation'], null);
       const featureIds = results.map((r) => r.submission_feature_id);
@@ -718,10 +588,10 @@ describe('Security scope search (integration)', function () {
         parent
       );
 
-      await secureFeature(grandparent);
+      await secureFeature(connection, grandparent);
 
       const userId = connection.systemUserId();
-      await setupFullAccess(`urn:${submissionId}:*:*`, userId, 'Deep Access Team');
+      await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:*:*`, userId, 'Deep Access Team');
 
       const results = await searchInSubmission(submissionId, ['dataset', 'sample_site', 'species_observation'], userId);
       const featureIds = results.map((r) => r.submission_feature_id);
@@ -751,7 +621,7 @@ describe('Security scope search (integration)', function () {
         parent
       );
 
-      await secureFeature(grandparent);
+      await secureFeature(connection, grandparent);
 
       const userId = await createOtherUser();
 
@@ -767,11 +637,11 @@ describe('Security scope search (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const feat1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'DS 1' });
       const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'DS 2' });
-      await secureFeature(feat1);
-      await secureFeature(feat2);
+      await secureFeature(connection, feat1);
+      await secureFeature(connection, feat2);
 
       const userId = connection.systemUserId();
-      await setupFullAccess('urn:*:*:*', userId, 'Wildcard Team');
+      await setupFullAccess(connection, scopeRepo, 'urn:*:*:*', userId, 'Wildcard Team');
 
       const results = await searchInSubmission(submissionId, ['dataset'], userId);
       const featureIds = results.map((r) => r.submission_feature_id);
@@ -787,10 +657,16 @@ describe('Security scope search (integration)', function () {
     it('should remove team_security_scope entries when policy statements are deleted', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Test' });
-      await secureFeature(featureId);
+      await secureFeature(connection, featureId);
 
       const userId = connection.systemUserId();
-      const { stmtId, teamId } = await setupFullAccess(`urn:${submissionId}:*:*`, userId, 'Delete Scope Team');
+      const { stmtId, teamId } = await setupFullAccess(
+        connection,
+        scopeRepo,
+        `urn:${submissionId}:*:*`,
+        userId,
+        'Delete Scope Team'
+      );
 
       expect(await countTeamScopes(teamId)).to.be.greaterThan(0);
 
@@ -818,18 +694,18 @@ describe('Security scope search (integration)', function () {
     it('should preserve anchors for shared scopes when one policy is deleted', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Shared Scope' });
-      await secureFeature(featureId);
+      await secureFeature(connection, featureId);
 
       // Two policies with the same URN → shared scope
       const urn = `urn:${submissionId}:*:*`;
 
-      const policyA = await createPolicy('shared-A');
-      const stmtA = await createPolicyStatement(policyA, urn);
-      const scopeId = await setupScopeChain(stmtA, urn);
+      const policyA = await createPolicy(connection, 'shared-A');
+      const stmtA = await createPolicyStatement(connection, policyA, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtA, urn);
 
-      const policyB = await createPolicy('shared-B');
-      const stmtB = await createPolicyStatement(policyB, urn);
-      await setupScopeChain(stmtB, urn); // Same scope reused
+      const policyB = await createPolicy(connection, 'shared-B');
+      const stmtB = await createPolicyStatement(connection, policyB, urn);
+      await setupScopeChain(scopeRepo, stmtB, urn); // Same scope reused
 
       const anchorsBefore = await countAnchors(scopeId);
       expect(anchorsBefore).to.be.greaterThan(0);
@@ -845,10 +721,16 @@ describe('Security scope search (integration)', function () {
     it('should block search access after policy deletion makes scope orphaned', async () => {
       const submissionId = await createTestSubmission(connection);
       const securedFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Soon Hidden' });
-      await secureFeature(securedFeature);
+      await secureFeature(connection, securedFeature);
 
       const userId = connection.systemUserId();
-      const { stmtId, teamId } = await setupFullAccess(`urn:${submissionId}:*:*`, userId, 'Block Team');
+      const { stmtId, teamId } = await setupFullAccess(
+        connection,
+        scopeRepo,
+        `urn:${submissionId}:*:*`,
+        userId,
+        'Block Team'
+      );
 
       // Before: user can see the secured feature
       const before = await searchInSubmission(submissionId, ['dataset'], userId);
@@ -870,21 +752,21 @@ describe('Security scope search (integration)', function () {
       // Two submissions, each with a secured feature
       const sub1 = await createTestSubmission(connection);
       const feat1 = await createTestFeature(connection, sub1, 'dataset', { name: 'Sub1 DS' });
-      await secureFeature(feat1);
+      await secureFeature(connection, feat1);
 
       const sub2 = await createTestSubmission(connection);
       const feat2 = await createTestFeature(connection, sub2, 'dataset', { name: 'Sub2 DS' });
-      await secureFeature(feat2);
+      await secureFeature(connection, feat2);
 
       // Policy initially targets sub1
-      const policyId = await createPolicy('update-test');
-      const oldStmtId = await createPolicyStatement(policyId, `urn:${sub1}:*:*`);
-      const oldScopeId = await setupScopeChain(oldStmtId, `urn:${sub1}:*:*`);
+      const policyId = await createPolicy(connection, 'update-test');
+      const oldStmtId = await createPolicyStatement(connection, policyId, `urn:${sub1}:*:*`);
+      const oldScopeId = await setupScopeChain(scopeRepo, oldStmtId, `urn:${sub1}:*:*`);
 
       const userId = connection.systemUserId();
-      const teamId = await createTeam('Update Team');
-      await addTeamMember(teamId, userId);
-      await createTeamPolicy(teamId, policyId);
+      const teamId = await createTeam(connection, 'Update Team');
+      await addTeamMember(connection, teamId, userId);
+      await createTeamPolicy(connection, teamId, policyId);
       await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyId);
 
       // Before: sub1 accessible, sub2 not
@@ -905,8 +787,8 @@ describe('Security scope search (integration)', function () {
       expect(await countAnchors(oldScopeId)).to.equal(0);
 
       // Create new statement and scope chain for sub2
-      const newStmtId = await createPolicyStatement(policyId, `urn:${sub2}:*:*`);
-      await setupScopeChain(newStmtId, `urn:${sub2}:*:*`);
+      const newStmtId = await createPolicyStatement(connection, policyId, `urn:${sub2}:*:*`);
+      await setupScopeChain(scopeRepo, newStmtId, `urn:${sub2}:*:*`);
       await scopeRepo.deleteTeamSecurityScopes(teamId);
       await scopeRepo.insertTeamSecurityScopesFromPolicyChain(teamId);
 
@@ -926,17 +808,17 @@ describe('Security scope search (integration)', function () {
     it('should remove team access and block search when team-policy is deleted', async () => {
       const submissionId = await createTestSubmission(connection);
       const securedFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Team Access' });
-      await secureFeature(securedFeature);
+      await secureFeature(connection, securedFeature);
 
       const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('team-delete-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'team-delete-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      await setupScopeChain(scopeRepo, stmtId, urn);
 
       const userId = connection.systemUserId();
-      const teamId = await createTeam('Team Delete');
-      await addTeamMember(teamId, userId);
-      const teamPolicyId = await createTeamPolicy(teamId, policyId);
+      const teamId = await createTeam(connection, 'Team Delete');
+      await addTeamMember(connection, teamId, userId);
+      const teamPolicyId = await createTeamPolicy(connection, teamId, policyId);
       await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyId);
 
       // Before: user can see secured feature
@@ -961,28 +843,28 @@ describe('Security scope search (integration)', function () {
       // Deleting team-policy A should leave sub2's scope intact.
       const sub1 = await createTestSubmission(connection);
       const feat1 = await createTestFeature(connection, sub1, 'dataset', { name: 'Sub1 Secured' });
-      await secureFeature(feat1);
+      await secureFeature(connection, feat1);
 
       const sub2 = await createTestSubmission(connection);
       const feat2 = await createTestFeature(connection, sub2, 'dataset', { name: 'Sub2 Secured' });
-      await secureFeature(feat2);
+      await secureFeature(connection, feat2);
 
       // Policy A covers sub1, Policy B covers sub2
-      const policyA = await createPolicy('multi-tp-A');
-      const stmtA = await createPolicyStatement(policyA, `urn:${sub1}:*:*`);
-      await setupScopeChain(stmtA, `urn:${sub1}:*:*`);
+      const policyA = await createPolicy(connection, 'multi-tp-A');
+      const stmtA = await createPolicyStatement(connection, policyA, `urn:${sub1}:*:*`);
+      await setupScopeChain(scopeRepo, stmtA, `urn:${sub1}:*:*`);
 
-      const policyB = await createPolicy('multi-tp-B');
-      const stmtB = await createPolicyStatement(policyB, `urn:${sub2}:*:*`);
-      await setupScopeChain(stmtB, `urn:${sub2}:*:*`);
+      const policyB = await createPolicy(connection, 'multi-tp-B');
+      const stmtB = await createPolicyStatement(connection, policyB, `urn:${sub2}:*:*`);
+      await setupScopeChain(scopeRepo, stmtB, `urn:${sub2}:*:*`);
 
       const userId = connection.systemUserId();
-      const teamId = await createTeam('Multi-Policy Team');
-      await addTeamMember(teamId, userId);
+      const teamId = await createTeam(connection, 'Multi-Policy Team');
+      await addTeamMember(connection, teamId, userId);
 
-      const tpA = await createTeamPolicy(teamId, policyA);
+      const tpA = await createTeamPolicy(connection, teamId, policyA);
       await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyA);
-      await createTeamPolicy(teamId, policyB);
+      await createTeamPolicy(connection, teamId, policyB);
       await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyB);
 
       // Before: user sees both secured features, team has 2 scopes
@@ -1014,25 +896,25 @@ describe('Security scope search (integration)', function () {
       // Deleting team-policy A should leave the scope intact via Policy B.
       const submissionId = await createTestSubmission(connection);
       const securedFeature = await createTestFeature(connection, submissionId, 'dataset', { name: 'Overlap' });
-      await secureFeature(securedFeature);
+      await secureFeature(connection, securedFeature);
 
       const urn = `urn:${submissionId}:*:*`;
 
-      const policyA = await createPolicy('overlap-tp-A');
-      const stmtA = await createPolicyStatement(policyA, urn);
-      await setupScopeChain(stmtA, urn);
+      const policyA = await createPolicy(connection, 'overlap-tp-A');
+      const stmtA = await createPolicyStatement(connection, policyA, urn);
+      await setupScopeChain(scopeRepo, stmtA, urn);
 
-      const policyB = await createPolicy('overlap-tp-B');
-      const stmtB = await createPolicyStatement(policyB, urn);
-      await setupScopeChain(stmtB, urn); // Same scope reused
+      const policyB = await createPolicy(connection, 'overlap-tp-B');
+      const stmtB = await createPolicyStatement(connection, policyB, urn);
+      await setupScopeChain(scopeRepo, stmtB, urn); // Same scope reused
 
       const userId = connection.systemUserId();
-      const teamId = await createTeam('Overlap TP Team');
-      await addTeamMember(teamId, userId);
+      const teamId = await createTeam(connection, 'Overlap TP Team');
+      await addTeamMember(connection, teamId, userId);
 
-      const tpA = await createTeamPolicy(teamId, policyA);
+      const tpA = await createTeamPolicy(connection, teamId, policyA);
       await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyA);
-      await createTeamPolicy(teamId, policyB);
+      await createTeamPolicy(connection, teamId, policyB);
       await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyB);
 
       // Before: 1 scope (deduped), user sees secured feature
@@ -1060,21 +942,21 @@ describe('Security scope search (integration)', function () {
     it('should compute new anchors when security rules are applied to features matching existing scopes', async () => {
       const submissionId = await createTestSubmission(connection);
       const feat1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Already Secured' });
-      await secureFeature(feat1);
+      await secureFeature(connection, feat1);
 
       const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('new-anchor-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'new-anchor-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
       const anchorsBefore = await countAnchors(scopeId);
 
       // Secure a NEW feature in the same submission
       const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Newly Secured' });
-      await secureFeature(feat2);
+      await secureFeature(connection, feat2);
 
       // Recompute anchors — new secured feature should become an anchor
-      await computeAnchors(scopeId);
+      await computeAnchors(scopeRepo, scopeId);
 
       expect(await countAnchors(scopeId)).to.be.greaterThan(anchorsBefore);
 
@@ -1099,13 +981,13 @@ describe('Security scope search (integration)', function () {
       const child = await createTestFeature(connection, submissionId, 'species_observation', { name: 'Child' }, parent);
 
       // Secure grandparent and child, but NOT parent — gap in the chain
-      await secureFeature(grandparent);
-      await secureFeature(child);
+      await secureFeature(connection, grandparent);
+      await secureFeature(connection, child);
 
       const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('gap-hierarchy-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'gap-hierarchy-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
       const anchorIds = await getAnchorIds(scopeId);
       // Grandparent is the root secured feature — it IS an anchor
@@ -1123,12 +1005,12 @@ describe('Security scope search (integration)', function () {
       const child = await createTestFeature(connection, submissionId, 'species_observation', { name: 'Child' }, parent);
 
       // Only the leaf is secured
-      await secureFeature(child);
+      await secureFeature(connection, child);
 
       const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('leaf-only-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'leaf-only-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
       // Child has no secured ancestors — it IS the anchor
       const anchorIds = await getAnchorIds(scopeId);
@@ -1145,12 +1027,12 @@ describe('Security scope search (integration)', function () {
       await createTestFeature(connection, submissionId, 'species_observation', { name: 'Child' }, parent);
 
       // Only the middle level is secured
-      await secureFeature(parent);
+      await secureFeature(connection, parent);
 
       const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('mid-only-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'mid-only-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
       // Parent has no secured ancestors — it IS the anchor
       const anchorIds = await getAnchorIds(scopeId);
@@ -1170,7 +1052,7 @@ describe('Security scope search (integration)', function () {
       // Remove security + recompute anchors (stale anchor gets cleaned up)
       await unsecureFeature(featureId);
       await deleteStaleAnchors(scopeId);
-      await computeAnchors(scopeId);
+      await computeAnchors(scopeRepo, scopeId);
 
       // Anchor deleted
       const anchorResult = await connection.sql(SQL`
@@ -1200,12 +1082,12 @@ describe('Security scope search (integration)', function () {
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured Dataset' });
       const telemetry1 = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Target' }, dataset);
       const telemetry2 = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Other' }, dataset);
-      await secureFeature(dataset);
+      await secureFeature(connection, dataset);
 
       const urn = `urn:${submissionId}:telemetry:${telemetry1}`;
-      const policyId = await createPolicy('feature-scoped-inherited-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'feature-scoped-inherited-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
       const anchorIds = await getAnchorIds(scopeId);
       expect(anchorIds).to.include(telemetry1);
@@ -1220,9 +1102,9 @@ describe('Security scope search (integration)', function () {
       await createTestFeature(connection, submissionId, 'telemetry', { name: 'Public Telemetry' }, dataset);
 
       const urn = `urn:${submissionId}:telemetry:*`;
-      const policyId = await createPolicy('no-security-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'no-security-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
       expect(await countAnchors(scopeId)).to.equal(0);
     });
@@ -1235,7 +1117,7 @@ describe('Security scope search (integration)', function () {
       // Unsecure the parent — child loses inherited security
       await unsecureFeature(datasetId);
       await deleteStaleAnchors(scopeId);
-      await computeAnchors(scopeId);
+      await computeAnchors(scopeRepo, scopeId);
 
       expect(await countAnchors(scopeId)).to.equal(0);
     });
@@ -1252,12 +1134,12 @@ describe('Security scope search (integration)', function () {
         { name: 'Deep Leaf' },
         sampleSite
       );
-      await secureFeature(dataset);
+      await secureFeature(connection, dataset);
 
       const urn = `urn:${submissionId}:telemetry:*`;
-      const policyId = await createPolicy('deep-inherited-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'deep-inherited-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
       const anchorIds = await getAnchorIds(scopeId);
       expect(anchorIds).to.include(telemetry);
@@ -1268,7 +1150,7 @@ describe('Security scope search (integration)', function () {
       const { submissionId, childId: telemetry } = await setupInheritedSecurityScope('telemetry', 'e2e-inherited-test');
 
       const userId = connection.systemUserId();
-      await setupFullAccess(`urn:${submissionId}:telemetry:*`, userId, 'Inherited Access Team');
+      await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:telemetry:*`, userId, 'Inherited Access Team');
 
       // Anonymous: telemetry should be hidden (parent is secured)
       const anonResults = await searchInSubmission(submissionId, ['telemetry'], null);
@@ -1286,14 +1168,14 @@ describe('Security scope search (integration)', function () {
       const feat1 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Stay Secured' });
       const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Going Public 1' });
       const feat3 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Going Public 2' });
-      await secureFeature(feat1);
-      await secureFeature(feat2);
-      await secureFeature(feat3);
+      await secureFeature(connection, feat1);
+      await secureFeature(connection, feat2);
+      await secureFeature(connection, feat3);
 
       const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('selective-anchor-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'selective-anchor-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
       // All 3 features are anchors
       expect(await countAnchors(scopeId)).to.equal(3);
@@ -1302,7 +1184,7 @@ describe('Security scope search (integration)', function () {
       await unsecureFeature(feat2);
       await unsecureFeature(feat3);
       await deleteStaleAnchors(scopeId);
-      await computeAnchors(scopeId);
+      await computeAnchors(scopeRepo, scopeId);
 
       // feat1's anchor remains, feat2 and feat3 are gone
       expect(await countAnchors(scopeId)).to.equal(1);
@@ -1323,7 +1205,7 @@ describe('Security scope search (integration)', function () {
       // is NOT effectively secured — anonymous users should still see it.
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Unapproved Secured' });
-      await secureFeature(featureId);
+      await secureFeature(connection, featureId);
       await markFeatureUnapproved(featureId);
 
       const results = await searchInSubmission(submissionId, ['dataset'], null);
@@ -1339,7 +1221,7 @@ describe('Security scope search (integration)', function () {
       // effectively secured — the isEffectivelySecured fragment requires <= now().
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Future Secured' });
-      await secureFeature(featureId);
+      await secureFeature(connection, featureId);
       await markFeatureFutureDate(featureId);
 
       const results = await searchInSubmission(submissionId, ['dataset'], null);
@@ -1355,7 +1237,7 @@ describe('Security scope search (integration)', function () {
       // with a security rule IS effectively secured. Anonymous should NOT see it.
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Approved Secured' });
-      await secureFeature(featureId);
+      await secureFeature(connection, featureId);
 
       const results = await searchInSubmission(submissionId, ['dataset'], null);
       const featureIds = results.map((r) => r.submission_feature_id);
@@ -1369,7 +1251,7 @@ describe('Security scope search (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const parent = await createTestFeature(connection, submissionId, 'dataset', { name: 'Unapproved Parent' });
       const child = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Child' }, parent);
-      await secureFeature(parent);
+      await secureFeature(connection, parent);
       await markFeatureUnapproved(parent);
 
       const results = await searchInSubmission(submissionId, ['dataset', 'sample_site'], null);
@@ -1385,7 +1267,7 @@ describe('Security scope search (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const parent = await createTestFeature(connection, submissionId, 'dataset', { name: 'Approved Parent' });
       const child = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Child' }, parent);
-      await secureFeature(parent);
+      await secureFeature(connection, parent);
 
       const results = await searchInSubmission(submissionId, ['dataset', 'sample_site'], null);
       const featureIds = results.map((r) => r.submission_feature_id);
@@ -1399,7 +1281,7 @@ describe('Security scope search (integration)', function () {
       // "not secured" branch. Unapproved security rule → feature is visible.
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Unapproved Auth' });
-      await secureFeature(featureId);
+      await secureFeature(connection, featureId);
       await markFeatureUnapproved(featureId);
 
       const userId = await createOtherUser();
@@ -1412,7 +1294,7 @@ describe('Security scope search (integration)', function () {
     it('should NOT hide feature from authenticated user (no scope) when record_effective_date is in the future', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Future Auth' });
-      await secureFeature(featureId);
+      await secureFeature(connection, featureId);
       await markFeatureFutureDate(featureId);
 
       const userId = await createOtherUser();
@@ -1426,7 +1308,7 @@ describe('Security scope search (integration)', function () {
       // Approved security rule + no scope grant → feature is hidden, same as anonymous.
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Approved Auth' });
-      await secureFeature(featureId);
+      await secureFeature(connection, featureId);
 
       const userId = await createOtherUser();
       const results = await searchInSubmission(submissionId, ['dataset'], userId);
@@ -1459,14 +1341,14 @@ describe('Security scope search (integration)', function () {
       // not be anchored — isEffectivelySecured requires record_effective_date <= now().
       const submissionId = await createTestSubmission(connection);
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Future Dataset' });
-      await secureFeature(dataset);
+      await secureFeature(connection, dataset);
 
       await markFeatureFutureDate(dataset);
 
       const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('future-date-anchor-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'future-date-anchor-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
       expect(await countAnchors(scopeId)).to.equal(0);
     });
@@ -1476,12 +1358,12 @@ describe('Security scope search (integration)', function () {
       // deleteStaleAnchorBatch should remove the now-stale anchor.
       const submissionId = await createTestSubmission(connection);
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'De-approved Dataset' });
-      await secureFeature(dataset);
+      await secureFeature(connection, dataset);
 
       const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('de-approve-anchor-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'de-approve-anchor-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
       // Anchor exists for the approved+secured feature
       expect(await countAnchors(scopeId)).to.equal(1);
@@ -1540,20 +1422,20 @@ describe('Security scope search (integration)', function () {
       // become anchors — assert on inclusion of test features, not exact count.
       const sub1 = await createTestSubmission(connection);
       const telem1 = await createTestFeature(connection, sub1, 'telemetry', { name: 'Telem 1' });
-      await secureFeature(telem1);
+      await secureFeature(connection, telem1);
 
       const sub2 = await createTestSubmission(connection);
       const telem2 = await createTestFeature(connection, sub2, 'telemetry', { name: 'Telem 2' });
-      await secureFeature(telem2);
+      await secureFeature(connection, telem2);
 
       // Also create a secured dataset feature — it should NOT match the telemetry scope
       const dataset = await createTestFeature(connection, sub1, 'dataset', { name: 'Dataset' });
-      await secureFeature(dataset);
+      await secureFeature(connection, dataset);
 
       const urn = 'urn:*:telemetry:*';
-      const policyId = await createPolicy('wildcard-sub-type-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'wildcard-sub-type-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
       const anchorIds = await getAnchorIds(scopeId);
       // Both telemetry features are anchors (cross-submission wildcard match)
@@ -1582,19 +1464,19 @@ describe('Security scope search (integration)', function () {
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
       const child = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Child' }, dataset);
 
-      await secureFeature(dataset);
-      await secureFeature(child);
+      await secureFeature(connection, dataset);
+      await secureFeature(connection, child);
 
       // ── Step 1: Policy with urn:{sub}:*:* (broad) ──
       const broadUrn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('revert-test');
-      const stmt1 = await createPolicyStatement(policyId, broadUrn);
-      const broadScopeId = await setupScopeChain(stmt1, broadUrn);
+      const policyId = await createPolicy(connection, 'revert-test');
+      const stmt1 = await createPolicyStatement(connection, policyId, broadUrn);
+      const broadScopeId = await setupScopeChain(scopeRepo, stmt1, broadUrn);
 
       const userId = connection.systemUserId();
-      const teamId = await createTeam('Revert Team');
-      await addTeamMember(teamId, userId);
-      await createTeamPolicy(teamId, policyId);
+      const teamId = await createTeam(connection, 'Revert Team');
+      await addTeamMember(connection, teamId, userId);
+      await createTeamPolicy(connection, teamId, policyId);
       await scopeRepo.insertTeamSecurityScopesForPolicy(teamId, policyId);
 
       // Anchors exist (dataset is the root anchor)
@@ -1611,8 +1493,8 @@ describe('Security scope search (integration)', function () {
 
       // Create new narrow statement
       const narrowUrn = `urn:${submissionId}:*:${child}`;
-      const stmt2 = await createPolicyStatement(policyId, narrowUrn);
-      const narrowScopeId = await setupScopeChain(stmt2, narrowUrn);
+      const stmt2 = await createPolicyStatement(connection, policyId, narrowUrn);
+      const narrowScopeId = await setupScopeChain(scopeRepo, stmt2, narrowUrn);
       await scopeRepo.deleteTeamSecurityScopes(teamId);
       await scopeRepo.insertTeamSecurityScopesFromPolicyChain(teamId);
 
@@ -1624,11 +1506,11 @@ describe('Security scope search (integration)', function () {
       await deleteStaleAnchorsViaService(narrowScopeId);
 
       // Re-create the original broad statement
-      const stmt3 = await createPolicyStatement(policyId, broadUrn);
+      const stmt3 = await createPolicyStatement(connection, policyId, broadUrn);
       // setupScopeChain mirrors the real service: insertSecurityScope returns null
       // (scope_hash already exists from Step 1), so it reuses the existing scope
       // and recomputes anchors — verifying the fix for the reuse path.
-      const reusedScopeId = await setupScopeChain(stmt3, broadUrn);
+      const reusedScopeId = await setupScopeChain(scopeRepo, stmt3, broadUrn);
       await scopeRepo.deleteTeamSecurityScopes(teamId);
       await scopeRepo.insertTeamSecurityScopesFromPolicyChain(teamId);
 
@@ -1657,9 +1539,9 @@ describe('Security scope search (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const baseline = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
 
-      const policyId = await createPolicy('sub-scope-match');
-      const stmtId = await createPolicyStatement(policyId, `urn:${submissionId}:*:*`);
-      const scopeId = await setupScopeChain(stmtId, `urn:${submissionId}:*:*`);
+      const policyId = await createPolicy(connection, 'sub-scope-match');
+      const stmtId = await createPolicyStatement(connection, policyId, `urn:${submissionId}:*:*`);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, `urn:${submissionId}:*:*`);
 
       const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
       const scopeIds = result.map((r) => r.security_scope_id);
@@ -1672,9 +1554,9 @@ describe('Security scope search (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const baseline = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
 
-      const policyId = await createPolicy('wildcard-match');
-      const stmtId = await createPolicyStatement(policyId, 'urn:*:*:*');
-      const scopeId = await setupScopeChain(stmtId, 'urn:*:*:*');
+      const policyId = await createPolicy(connection, 'wildcard-match');
+      const stmtId = await createPolicyStatement(connection, policyId, 'urn:*:*:*');
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, 'urn:*:*:*');
 
       const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
       const scopeIds = result.map((r) => r.security_scope_id);
@@ -1686,9 +1568,9 @@ describe('Security scope search (integration)', function () {
     it('should match a type-scoped wildcard URN (urn:*:telemetry:*) for any submission', async () => {
       const submissionId = await createTestSubmission(connection);
 
-      const policyId = await createPolicy('type-wildcard-match');
-      const stmtId = await createPolicyStatement(policyId, 'urn:*:telemetry:*');
-      const scopeId = await setupScopeChain(stmtId, 'urn:*:telemetry:*');
+      const policyId = await createPolicy(connection, 'type-wildcard-match');
+      const stmtId = await createPolicyStatement(connection, policyId, 'urn:*:telemetry:*');
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, 'urn:*:telemetry:*');
 
       const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
       const scopeIds = result.map((r) => r.security_scope_id);
@@ -1702,9 +1584,9 @@ describe('Security scope search (integration)', function () {
       const sub2 = await createTestSubmission(connection);
       const baseline = await scopeRepo.findScopeIdsMatchingSubmission(sub2);
 
-      const policyId = await createPolicy('no-match');
-      const stmtId = await createPolicyStatement(policyId, `urn:${sub1}:*:*`);
-      const scopeId = await setupScopeChain(stmtId, `urn:${sub1}:*:*`);
+      const policyId = await createPolicy(connection, 'no-match');
+      const stmtId = await createPolicyStatement(connection, policyId, `urn:${sub1}:*:*`);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, `urn:${sub1}:*:*`);
 
       const result = await scopeRepo.findScopeIdsMatchingSubmission(sub2);
       const scopeIds = result.map((r) => r.security_scope_id);
@@ -1719,14 +1601,14 @@ describe('Security scope search (integration)', function () {
       const baseline = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
 
       // Submission-scoped scope
-      const policyA = await createPolicy('specific-match');
-      const stmtA = await createPolicyStatement(policyA, `urn:${submissionId}:*:*`);
-      const scopeIdA = await setupScopeChain(stmtA, `urn:${submissionId}:*:*`);
+      const policyA = await createPolicy(connection, 'specific-match');
+      const stmtA = await createPolicyStatement(connection, policyA, `urn:${submissionId}:*:*`);
+      const scopeIdA = await setupScopeChain(scopeRepo, stmtA, `urn:${submissionId}:*:*`);
 
       // Wildcard scope (different hash → different scope row)
-      const policyB = await createPolicy('wildcard-also-match');
-      const stmtB = await createPolicyStatement(policyB, 'urn:*:*:*');
-      const scopeIdB = await setupScopeChain(stmtB, 'urn:*:*:*');
+      const policyB = await createPolicy(connection, 'wildcard-also-match');
+      const stmtB = await createPolicyStatement(connection, policyB, 'urn:*:*:*');
+      const scopeIdB = await setupScopeChain(scopeRepo, stmtB, 'urn:*:*:*');
 
       const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
       const scopeIds = result.map((r) => r.security_scope_id);
@@ -1740,9 +1622,9 @@ describe('Security scope search (integration)', function () {
       const submissionId = await createTestSubmission(connection);
       const baseline = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
 
-      const policyId = await createPolicy('soft-deleted-match');
-      const stmtId = await createPolicyStatement(policyId, `urn:${submissionId}:*:*`);
-      const scopeId = await setupScopeChain(stmtId, `urn:${submissionId}:*:*`);
+      const policyId = await createPolicy(connection, 'soft-deleted-match');
+      const stmtId = await createPolicyStatement(connection, policyId, `urn:${submissionId}:*:*`);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, `urn:${submissionId}:*:*`);
 
       await softDeleteStatement(stmtId);
 
@@ -1760,13 +1642,13 @@ describe('Security scope search (integration)', function () {
       const urn = `urn:${submissionId}:*:*`;
 
       // Two policies with the same URN → same scope (shared by hash)
-      const policyA = await createPolicy('dedup-A');
-      const stmtA = await createPolicyStatement(policyA, urn);
-      const scopeIdA = await setupScopeChain(stmtA, urn);
+      const policyA = await createPolicy(connection, 'dedup-A');
+      const stmtA = await createPolicyStatement(connection, policyA, urn);
+      const scopeIdA = await setupScopeChain(scopeRepo, stmtA, urn);
 
-      const policyB = await createPolicy('dedup-B');
-      const stmtB = await createPolicyStatement(policyB, urn);
-      const scopeIdB = await setupScopeChain(stmtB, urn);
+      const policyB = await createPolicy(connection, 'dedup-B');
+      const stmtB = await createPolicyStatement(connection, policyB, urn);
+      const scopeIdB = await setupScopeChain(scopeRepo, stmtB, urn);
 
       // Same scope_hash → same scope row
       expect(scopeIdA).to.equal(scopeIdB);
@@ -1795,14 +1677,14 @@ describe('Security scope search (integration)', function () {
       const childA = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Child A' }, root);
       const childB = await createTestFeature(connection, submissionId, 'sample_site', { name: 'Child B' }, root);
 
-      await secureFeature(root);
-      await secureFeature(childA);
-      await secureFeature(childB);
+      await secureFeature(connection, root);
+      await secureFeature(connection, childA);
+      await secureFeature(connection, childB);
 
       const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('child-promotion-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'child-promotion-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
       // Before: only root is the anchor (children pruned — root is their candidate ancestor)
       const anchorsBefore = await connection.sql(SQL`
@@ -1864,9 +1746,9 @@ describe('Security scope search (integration)', function () {
       await secureFeaturesInBulk(featureIds);
 
       const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('multi-batch-stale-delete-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'multi-batch-stale-delete-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
       // All 5001 flat features are anchors (no ancestor pruning for flat hierarchy)
       expect(await countAnchors(scopeId)).to.equal(5001);
@@ -1929,9 +1811,9 @@ describe('Security scope search (integration)', function () {
       await secureFeaturesInBulk([root, ...childIds]);
 
       const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy('multi-batch-test');
-      const stmtId = await createPolicyStatement(policyId, urn);
-      const scopeId = await setupScopeChain(stmtId, urn);
+      const policyId = await createPolicy(connection, 'multi-batch-test');
+      const stmtId = await createPolicyStatement(connection, policyId, urn);
+      const scopeId = await setupScopeChain(scopeRepo, stmtId, urn);
 
       // Exactly 1 anchor: the root. All 5001 children are pruned because root
       // is their candidate ancestor. This proves the keyset loop processed all
