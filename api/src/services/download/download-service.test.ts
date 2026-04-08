@@ -4,15 +4,18 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { FRAGMENT_SIZE_THRESHOLD, SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
+import { ArtifactStatusEnum } from '../../models/artifact';
 import { DownloadRecord } from '../../models/download';
 import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
+import * as fileUtils from '../../utils/file-utils';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { TeamService } from '../access-policy/team-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { ArtifactService } from '../upload/artifact-service';
 import { DownloadService } from './download-service';
 
 chai.use(sinonChai);
@@ -93,6 +96,75 @@ describe('DownloadService', () => {
       await service.markDownloadAsDownloaded('aaaa0000-0000-0000-0000-000000000001');
 
       expect(stub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001');
+    });
+  });
+
+  describe('createDownload', () => {
+    const mockPayload = {
+      cartId: 'aaaa0000-0000-0000-0000-000000000001'
+    };
+
+    it('creates download, pending artifact, and download_artifact link', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      const createDownloadStub = sinon
+        .stub(DownloadRepository.prototype, 'createDownload')
+        .resolves({ download_id: 'dl-uuid-1' });
+      sinon.stub(fileUtils, 'getObjectStoreBucketName').returns('test-bucket');
+      const insertArtifactStub = sinon
+        .stub(ArtifactService.prototype, 'insertArtifact')
+        .resolves({ artifact_id: 'art-uuid-1' });
+      const createDownloadArtifactStub = sinon
+        .stub(DownloadRepository.prototype, 'createDownloadArtifact')
+        .resolves();
+
+      const result = await service.createDownload(mockPayload);
+
+      expect(result).to.deep.equal({ download_id: 'dl-uuid-1' });
+      expect(createDownloadStub).to.have.been.calledOnceWith(mockPayload);
+      expect(insertArtifactStub).to.have.been.calledOnceWith({
+        bucket: 'test-bucket',
+        object_key: 'downloads/dl-uuid-1/download.parquet',
+        byte_size: null,
+        artifact_status: ArtifactStatusEnum.PENDING,
+        checksum_sha256: null,
+        uploaded_at: null
+      });
+      expect(createDownloadArtifactStub).to.have.been.calledOnceWith('dl-uuid-1', 'art-uuid-1', 'parquet');
+    });
+
+    it('propagates error when artifact insert fails', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      sinon.stub(DownloadRepository.prototype, 'createDownload').resolves({ download_id: 'dl-uuid-1' });
+      sinon.stub(fileUtils, 'getObjectStoreBucketName').returns('test-bucket');
+      sinon.stub(ArtifactService.prototype, 'insertArtifact').rejects(new Error('Artifact insert failed'));
+
+      try {
+        await service.createDownload(mockPayload);
+        expect.fail('Expected error');
+      } catch (err: any) {
+        expect(err.message).to.equal('Artifact insert failed');
+      }
+    });
+
+    it('propagates error when createDownloadArtifact fails', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadService(mockDBConnection);
+
+      sinon.stub(DownloadRepository.prototype, 'createDownload').resolves({ download_id: 'dl-uuid-1' });
+      sinon.stub(fileUtils, 'getObjectStoreBucketName').returns('test-bucket');
+      sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: 'art-uuid-1' });
+      sinon.stub(DownloadRepository.prototype, 'createDownloadArtifact').rejects(new Error('Link failed'));
+
+      try {
+        await service.createDownload(mockPayload);
+        expect.fail('Expected error');
+      } catch (err: any) {
+        expect(err.message).to.equal('Link failed');
+      }
     });
   });
 

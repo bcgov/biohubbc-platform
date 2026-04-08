@@ -1,6 +1,7 @@
 import { SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP404, HTTP409, HTTP500 } from '../../errors/http-error';
+import { ArtifactStatusEnum } from '../../models/artifact';
 import {
   CreateDownload,
   DownloadFeatureSummary,
@@ -12,11 +13,13 @@ import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { SearchFeatureService } from '../search-feature-service';
+import { ArtifactService } from '../upload/artifact-service';
 
 /**
  * Request-time service for downloads.
@@ -37,6 +40,7 @@ export class DownloadService extends DBService {
   fragmentRepository: DownloadFragmentRepository;
   teamService: TeamService;
   searchFeatureService: SearchFeatureService;
+  artifactService: ArtifactService;
 
   constructor(connection: IDBConnection) {
     super(connection);
@@ -44,17 +48,37 @@ export class DownloadService extends DBService {
     this.fragmentRepository = new DownloadFragmentRepository(connection);
     this.teamService = new TeamService(connection);
     this.searchFeatureService = new SearchFeatureService(connection);
+    this.artifactService = new ArtifactService(connection);
   }
 
   /**
-   * Create a new download record.
+   * Create a new download record with a pending artifact.
+   *
+   * Downloads are tracked as formal artifacts from the moment they're requested.
+   * A pending artifact is created (no file yet — the pipeline writes the file in
+   * a follow-up ticket) and linked via download_artifact. The S3 key is deterministic:
+   * `downloads/{downloadId}/download.parquet`. The artifact table's UNIQUE (bucket,
+   * object_key) constraint ensures idempotency on retry.
    *
    * @param {CreateDownload} payload - The download record to create.
    * @return {Promise<DownloadId>} The created record ID.
    * @memberof DownloadService
    */
   async createDownload(payload: CreateDownload): Promise<DownloadId> {
-    return this.downloadRepository.createDownload(payload);
+    const downloadId = await this.downloadRepository.createDownload(payload);
+
+    const artifact = await this.artifactService.insertArtifact({
+      bucket: getObjectStoreBucketName(),
+      object_key: `downloads/${downloadId.download_id}/download.parquet`,
+      byte_size: null,
+      artifact_status: ArtifactStatusEnum.PENDING,
+      checksum_sha256: null,
+      uploaded_at: null
+    });
+
+    await this.downloadRepository.createDownloadArtifact(downloadId.download_id, artifact.artifact_id, 'parquet');
+
+    return downloadId;
   }
 
   /**
