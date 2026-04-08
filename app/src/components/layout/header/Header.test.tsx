@@ -19,7 +19,8 @@ describe('Header', () => {
     );
 
     expect(getByTestId('submissions-header-item')).toBeVisible();
-    expect(getByTestId('tickets-header-item')).toBeVisible();
+    expect(getByTestId('portal-tickets-header-item')).toBeVisible();
+    expect(getByTestId('admin-tickets-header-item')).toBeVisible();
     expect(getByTestId('manage-users-header-item')).toBeVisible();
     expect(getByTestId('security-header-item')).toBeVisible();
   });
@@ -39,7 +40,8 @@ describe('Header', () => {
     );
 
     expect(getByTestId('submissions-header-item')).toBeVisible();
-    expect(getByTestId('tickets-header-item')).toBeVisible();
+    expect(getByTestId('portal-tickets-header-item')).toBeVisible();
+    expect(getByTestId('admin-tickets-header-item')).toBeVisible();
     expect(getByTestId('manage-users-header-item')).toBeVisible();
     expect(getByTestId('security-header-item')).toBeVisible();
   });
@@ -59,7 +61,8 @@ describe('Header', () => {
     );
 
     expect(getByTestId('submissions-header-item')).toBeVisible();
-    expect(getByTestId('tickets-header-item')).toBeVisible();
+    expect(getByTestId('portal-tickets-header-item')).toBeVisible();
+    expect(getByTestId('admin-tickets-header-item')).toBeVisible();
     expect(getByTestId('manage-users-header-item')).toBeVisible();
     expect(getByTestId('security-header-item')).toBeVisible();
   });

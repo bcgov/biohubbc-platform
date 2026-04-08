@@ -1,14 +1,14 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import * as db from '../../../../../database/db';
-import { TicketService } from '../../../../../services/ticket-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
+import * as db from '../../../../../../database/db';
+import { TicketService } from '../../../../../../services/ticket-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../__mocks__/db';
 import { deleteTicketReference } from './index';
 
 chai.use(sinonChai);
 
-describe('paths/tickets/{ticketId}/reference/{ticketReferenceId}', () => {
+describe('paths/administrative/tickets/{ticketId}/reference/{ticketReferenceId}', () => {
   const ticketId = '11111111-1111-1111-1111-111111111111';
   const ticketReferenceId = '33333333-3333-3333-3333-333333333333';
 

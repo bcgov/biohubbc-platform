@@ -27,8 +27,8 @@ export class TicketRepository extends BaseRepository {
    * @memberof TicketRepository
    */
   applyFilters(query: Knex.QueryBuilder, filters?: TicketFilters): Knex.QueryBuilder {
-    if (filters?.team_id) {
-      query = query.andWhere('team_id', filters.team_id);
+    if (filters?.team_ids !== undefined) {
+      query = filters.team_ids.length === 0 ? query.whereRaw('false') : query.whereIn('team_id', filters.team_ids);
     }
 
     if (filters?.status) {

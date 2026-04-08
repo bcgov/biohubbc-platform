@@ -1,15 +1,15 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import * as db from '../../../../database/db';
-import { TicketReference } from '../../../../models/ticket-reference';
-import { TicketService } from '../../../../services/ticket-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import * as db from '../../../../../database/db';
+import { TicketReference } from '../../../../../models/ticket-reference';
+import { TicketService } from '../../../../../services/ticket-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import { createTicketReference } from './index';
 
 chai.use(sinonChai);
 
-describe('paths/tickets/{ticketId}/reference', () => {
+describe('paths/administrative/tickets/{ticketId}/reference', () => {
   const sourceTicketId = '11111111-1111-1111-1111-111111111111';
   const targetTicketId = '22222222-2222-2222-2222-222222222222';
 

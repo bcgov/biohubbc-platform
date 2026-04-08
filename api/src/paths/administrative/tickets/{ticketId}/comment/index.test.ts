@@ -1,15 +1,15 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import * as db from '../../../../database/db';
-import { TicketComment } from '../../../../models/ticket-comment';
-import { TicketCommentService } from '../../../../services/ticket-comment-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import * as db from '../../../../../database/db';
+import { TicketComment } from '../../../../../models/ticket-comment';
+import { TicketCommentService } from '../../../../../services/ticket-comment-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import { createTicketComment } from './index';
 
 chai.use(sinonChai);
 
-describe('paths/tickets/{ticketId}/comment', () => {
+describe('paths/administrative/tickets/{ticketId}/comment', () => {
   const ticketId = '11111111-1111-1111-1111-111111111111';
 
   afterEach(() => {
