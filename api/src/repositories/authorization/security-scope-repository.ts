@@ -4,32 +4,7 @@ import { ApiExecuteSQLError } from '../../errors/api-error';
 import { SecurityScope, SecurityScopeId } from '../../models/security-scope';
 import { AnchorBatchResult, SecurityScopeUrn } from '../../services/access-policy/security-scope-service.interface';
 import { BaseRepository } from '../base-repository';
-
-/**
- * Per-candidate "effectively secured" check: walks UP from a feature through its
- * ancestors to determine if it or any ancestor has an active security rule.
- *
- * Cost is O(tree_depth) per candidate (~3–5 levels), bounded by the feature
- * hierarchy depth regardless of total feature count.
- *
- * @param alias The SQL alias of the submission_feature row to check
- */
-function isEffectivelySecured(alias: string): string {
-  return `EXISTS (
-    WITH RECURSIVE ancestor_chain(id) AS (
-      SELECT ${alias}.submission_feature_id
-      UNION ALL
-      SELECT p.parent_submission_feature_id
-      FROM ancestor_chain ac
-      JOIN submission_feature p ON p.submission_feature_id = ac.id
-      WHERE p.parent_submission_feature_id IS NOT NULL
-        AND p.record_end_date IS NULL
-    )
-    SELECT 1 FROM ancestor_chain ac
-    JOIN submission_feature_security sfs ON sfs.submission_feature_id = ac.id
-    WHERE sfs.record_end_date IS NULL
-  )`;
-}
+import { isEffectivelySecured } from '../sql-fragments';
 
 /**
  * Repository for security scope tables — the normalized access model that replaces
@@ -200,7 +175,7 @@ export class SecurityScopeRepository extends BaseRepository {
            AND (ps.urn_submission_id = anchor_sf.submission_id::text OR ps.urn_submission_id = '*')
            AND (ps.urn_feature_type = ft.name                       OR ps.urn_feature_type = '*')
            AND (ps.urn_feature_id = anchor_sf.submission_feature_id::text OR ps.urn_feature_id = '*')
-           AND ${isEffectivelySecured('anchor_sf')}
+           AND ${isEffectivelySecured('anchor_sf.submission_feature_id')}
            AND anchor_sf.record_effective_date <= now()
        )`,
       [securityScopeId, afterId, BATCH_SIZE]
@@ -349,7 +324,7 @@ export class SecurityScopeRepository extends BaseRepository {
            AND ($2 = candidate.submission_id::text OR $2 = '*')
            AND ($3 = ft.name                       OR $3 = '*')
            AND ($4 = candidate.submission_feature_id::text OR $4 = '*')
-           AND ${isEffectivelySecured('candidate')}
+           AND ${isEffectivelySecured('candidate.submission_feature_id')}
            AND candidate.record_effective_date <= now()
          ORDER BY candidate.submission_feature_id
          LIMIT $5
@@ -382,7 +357,7 @@ export class SecurityScopeRepository extends BaseRepository {
            AND ($2 = ancestor.submission_id::text OR $2 = '*')
            AND ($3 = ft.name                      OR $3 = '*')
            AND ($4 = ancestor.submission_feature_id::text OR $4 = '*')
-           AND ${isEffectivelySecured('ancestor')}
+           AND ${isEffectivelySecured('ancestor.submission_feature_id')}
            AND ancestor.record_effective_date <= now()
        )
 
@@ -428,7 +403,7 @@ export class SecurityScopeRepository extends BaseRepository {
            AND ($2 = candidate.submission_id::text OR $2 = '*')
            AND ($3 = ft.name                       OR $3 = '*')
            AND ($4 = candidate.submission_feature_id::text OR $4 = '*')
-           AND ${isEffectivelySecured('candidate')}
+           AND ${isEffectivelySecured('candidate.submission_feature_id')}
            AND candidate.record_effective_date <= now()
          ORDER BY candidate.submission_feature_id
          LIMIT $5
