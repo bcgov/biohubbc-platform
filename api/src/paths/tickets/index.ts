@@ -1,6 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../database/db';
+import { TicketFilters } from '../../models/ticket';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../openapi/schemas/pagination';
 import { TicketListResponseSchema } from '../../openapi/schemas/ticket';
@@ -70,9 +71,6 @@ export function getTicketsForUser(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
 
-    const status = req.query.status as 'open' | 'closed' | undefined;
-    const search = req.query.search as string | undefined;
-
     const pagination = makePaginationOptionsFromRequest(req);
 
     try {
@@ -83,7 +81,7 @@ export function getTicketsForUser(): RequestHandler {
       const teamMemberService = new TeamMemberService(connection);
       const teamIds = await teamMemberService.getTeamIdsBySystemUserId(systemUserId);
 
-      const filters = { team_ids: teamIds, status, search };
+      const filters: TicketFilters = { ...req.query, team_ids: teamIds };
 
       const ticketService = new TicketService(connection);
       const [tickets, count] = await Promise.all([

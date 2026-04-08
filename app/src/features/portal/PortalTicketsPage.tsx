@@ -2,12 +2,10 @@ import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import { useApi } from 'hooks/useApi';
-import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
+import { useTicketsListPageState } from 'hooks/useTicketsListPageState';
 import { useNavigate } from 'react-router-dom';
 import { PortalTicketsContainer } from './list/PortalTicketsContainer';
 import { PageHeader } from 'components/header/PageHeader';
-
-const DEFAULT_PAGE_SIZE = 10;
 
 /**
  * Portal tickets page displaying tickets accessible to the current user.
@@ -27,13 +25,7 @@ export const PortalTicketsPage = () => {
     handleSortChange,
     searchTerm,
     handleSearch
-  } = useServerPaginatedDataGrid({
-    fetcher: (search, pagination) => api.tickets.getTicketsForUser({ search, ...pagination }),
-    extractData: (response) => response.tickets,
-    extractTotal: (response) => response.pagination.total,
-    defaultSort: { field: 'create_date', sort: 'desc' },
-    defaultPageSize: DEFAULT_PAGE_SIZE
-  });
+  } = useTicketsListPageState(api.tickets.getTicketsForUser);
 
   return (
     <Box>

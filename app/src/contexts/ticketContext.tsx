@@ -10,20 +10,42 @@ export interface ITicketContext {
 }
 
 export const TicketContext = React.createContext<ITicketContext | undefined>(undefined);
+type TicketFetcher = (ticketId: string) => Promise<ITicketWithHistory>;
 
 /**
- * Shared hook that derives the ITicketContext value for a given fetch function.
- * Not exported — consumed only by the named provider variants below.
+ * Reads and validates the route-level ticket identifier.
+ *
+ * This keeps route assumptions centralized so provider logic can focus on data loading.
+ * Throwing here produces an immediate, explicit failure if route config/regression removes
+ * the expected `ticketId` param.
  */
-const useTicketContextValue = (fetchTicket: (ticketId: string) => Promise<ITicketWithHistory>): ITicketContext => {
+const useTicketIdFromRoute = (): string => {
   const { ticketId } = useParams<{ ticketId: string }>();
 
   if (!ticketId) {
     throw new Error('Missing ticketId route parameter');
   }
 
+  return ticketId;
+};
+
+/**
+ * Shared hook that derives the `ITicketContext` value from a caller-provided fetcher.
+ *
+ * The fetcher differs by caller (admin endpoint vs user endpoint), but context shape and
+ * refresh behavior are identical, so this hook keeps that behavior in one place.
+ */
+const useTicketContextValue = (fetchTicket: TicketFetcher): ITicketContext => {
+  const ticketId = useTicketIdFromRoute();
   const ticketDataLoader = useDataLoader(fetchTicket);
 
+  /**
+   * Always refresh when the route points to a different ticket.
+   *
+   * `useDataLoader` currently returns new method references on render, so adding those
+   * methods to deps causes needless refresh loops. The intended trigger is route change,
+   * therefore `ticketId` is the sole dependency.
+   */
   useEffect(() => {
     ticketDataLoader.refresh(ticketId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -39,6 +61,16 @@ const useTicketContextValue = (fetchTicket: (ticketId: string) => Promise<ITicke
 };
 
 /**
+ * Internal reusable provider that wires a caller-specific ticket fetch function into the
+ * shared ticket context value.
+ */
+const TicketContextProvider = ({ children, fetchTicket }: PropsWithChildren<{ fetchTicket: TicketFetcher }>) => {
+  const value = useTicketContextValue(fetchTicket);
+
+  return <TicketContext.Provider value={value}>{children}</TicketContext.Provider>;
+};
+
+/**
  * Provides ticket route context for admin ticket detail pages.
  * Fetches ticket data using the administrative API endpoint.
  *
@@ -47,9 +79,9 @@ const useTicketContextValue = (fetchTicket: (ticketId: string) => Promise<ITicke
  */
 export const AdminTicketContextProvider = ({ children }: PropsWithChildren) => {
   const api = useApi();
-  const value = useTicketContextValue(api.tickets.getTicketForAdmin);
+  const getTicketForAdmin = api.tickets.getTicketForAdmin;
 
-  return <TicketContext.Provider value={value}>{children}</TicketContext.Provider>;
+  return <TicketContextProvider fetchTicket={getTicketForAdmin}>{children}</TicketContextProvider>;
 };
 
 /**
@@ -61,7 +93,7 @@ export const AdminTicketContextProvider = ({ children }: PropsWithChildren) => {
  */
 export const UserTicketContextProvider = ({ children }: PropsWithChildren) => {
   const api = useApi();
-  const value = useTicketContextValue(api.tickets.getTicketForUser);
+  const getTicketForUser = api.tickets.getTicketForUser;
 
-  return <TicketContext.Provider value={value}>{children}</TicketContext.Provider>;
+  return <TicketContextProvider fetchTicket={getTicketForUser}>{children}</TicketContextProvider>;
 };
