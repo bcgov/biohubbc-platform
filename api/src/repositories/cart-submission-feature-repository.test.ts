@@ -14,41 +14,66 @@ describe('CartSubmissionFeatureRepository', () => {
     sinon.restore();
   });
 
-  describe('addSubmissionFeaturesToCart', () => {
+  describe('createUnsecuredCartSubmissionFeatures', () => {
     it('should insert multiple submission features without error', async () => {
       const mockQueryResponse = {
         rowCount: 3,
         rows: []
       } as unknown as QueryResult<any>;
 
-      const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockQueryResponse });
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
-      const result = await repo.addSubmissionFeaturesToCart('cart-1', [1, 2, 3]);
+      const result = await repo.createUnsecuredCartSubmissionFeatures('cart-1', [1, 2, 3]);
 
       expect(result).to.be.undefined;
     });
 
-    it('should exclude actively secured features in the insert SQL', async () => {
-      const sqlStub = sinon.stub().resolves({
+    it('should use NOT EXISTS with recursive ancestor walk to block secured features', async () => {
+      const knexStub = sinon.stub().resolves({
         rowCount: 1,
         rows: []
       } as unknown as QueryResult<any>);
 
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
 
       const repo = new CartSubmissionFeatureRepository(mockDBConnection);
 
-      await repo.addSubmissionFeaturesToCart('cart-1', [1, 2, 3]);
+      await repo.createUnsecuredCartSubmissionFeatures('cart-1', [1, 2, 3]);
 
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlArg = sqlStub.firstCall.args[0] as { text?: string };
-      const sqlText = sqlArg.text || '';
+      expect(knexStub).to.have.been.calledOnce;
+      const sqlText = knexStub.firstCall.args[0].toString();
 
-      expect(sqlText).to.contain('WHERE NOT EXISTS');
-      expect(sqlText).to.contain('submission_feature_security');
-      expect(sqlText).to.contain('sfs.record_end_date IS NULL');
+      expect(sqlText).to.include('NOT EXISTS');
+      expect(sqlText).to.include('RECURSIVE');
+      expect(sqlText).to.include('ancestor_chain');
+      expect(sqlText).to.include('submission_feature_security');
+      expect(sqlText).to.include('record_effective_date');
+      expect(sqlText).to.include('record_end_date');
+    });
+  });
+
+  describe('createCartSubmissionFeaturesWithScopeCheck', () => {
+    it('should use scope check SQL with recursive ancestor walk', async () => {
+      const knexStub = sinon.stub().resolves({
+        rowCount: 1,
+        rows: []
+      } as unknown as QueryResult<any>);
+
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const repo = new CartSubmissionFeatureRepository(mockDBConnection);
+
+      await repo.createCartSubmissionFeaturesWithScopeCheck('cart-1', [1, 2, 3], 42);
+
+      expect(knexStub).to.have.been.calledOnce;
+      const sqlText = knexStub.firstCall.args[0].toString();
+
+      expect(sqlText).to.include('security_scope_anchor');
+      expect(sqlText).to.include('team_security_scope');
+      expect(sqlText).to.include('team_member');
+      expect(sqlText).to.include('RECURSIVE');
     });
   });
 
@@ -119,7 +144,7 @@ describe('CartSubmissionFeatureRepository', () => {
   });
 
   describe('getCartSubmissionFeatures', () => {
-    it('should return submission features from the cart', async () => {
+    it('should return all features including secured ones', async () => {
       const mockRows: CartSubmissionFeature[] = [
         {
           submission_feature_id: 1,
@@ -151,6 +176,9 @@ describe('CartSubmissionFeatureRepository', () => {
       const result = await repo.getCartSubmissionFeatures('cart-1', { page: 1, limit: 25 });
 
       expect(result).to.eql(mockRows);
+      // Secured feature is included — no longer filtered out
+      expect(result).to.have.length(2);
+      expect(result[1].secured).to.be.true;
     });
 
     it('should return only the matching feature when submissionFeatureId is provided', async () => {
@@ -179,7 +207,7 @@ describe('CartSubmissionFeatureRepository', () => {
   });
 
   describe('getCartSubmissionFeatureCount', () => {
-    it('should return the correct count', async () => {
+    it('should return the count of all features in the cart', async () => {
       const mockQueryResponse = {
         rowCount: 1,
         rows: [{ count: 5 }]

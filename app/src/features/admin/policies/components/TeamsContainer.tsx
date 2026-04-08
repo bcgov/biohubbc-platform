@@ -13,7 +13,7 @@ import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
-import { ITeam } from 'interfaces/useTeamsApi.interface';
+import { IAvailableUser, ITeam } from 'interfaces/useTeamsApi.interface';
 import { IServerPaginationProps } from 'types/pagination';
 import { useState } from 'react';
 import { AddTeamForm, AddTeamFormInitialValues, AddTeamFormYupSchema, IAddTeamFormValues } from './AddTeamForm';
@@ -64,6 +64,7 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
   const [openAddTeamDialog, setOpenAddTeamDialog] = useState(false);
   const [openEditTeamDialog, setOpenEditTeamDialog] = useState(false);
   const [editingTeam, setEditingTeam] = useState<ITeam | null>(null);
+  const [editingTeamMembers, setEditingTeamMembers] = useState<IAvailableUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   /**
@@ -149,8 +150,32 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
    *
    * @param {ITeam} team - The team to edit
    */
-  const handleEditTeamClick = (team: ITeam) => {
+  const handleEditTeamClick = async (team: ITeam) => {
     setEditingTeam(team);
+
+    try {
+      const { members } = await biohubApi.teams.getTeamMembers(team.team_id);
+      setEditingTeamMembers(
+        members.map((m) => ({ system_user_id: m.system_user_id, user_identifier: m.user_identifier }))
+      );
+    } catch (error) {
+      const apiError = error as APIError;
+
+      setEditingTeam(null);
+
+      dialogContext.setErrorDialog({
+        open: true,
+        dialogTitle: 'Error Loading Team Members',
+        dialogText: 'An error occurred while loading team members.',
+        dialogError: apiError.message,
+        dialogErrorDetails: apiError.errors,
+        onClose: () => dialogContext.setErrorDialog({ open: false }),
+        onOk: () => dialogContext.setErrorDialog({ open: false })
+      });
+
+      return;
+    }
+
     setOpenEditTeamDialog(true);
   };
 
@@ -167,7 +192,7 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
       await biohubApi.teams.createTeam({
         name: values.name,
         description: values.description || undefined,
-        system_user_ids: values.system_user_ids
+        system_user_ids: values.system_users.map((u) => u.system_user_id)
       });
 
       setOpenAddTeamDialog(false);
@@ -214,11 +239,12 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
       await biohubApi.teams.updateTeam(editingTeam.team_id, {
         name: values.name,
         description: values.description || undefined,
-        system_user_ids: values.system_user_ids
+        system_user_ids: values.system_users.map((u) => u.system_user_id)
       });
 
       setOpenEditTeamDialog(false);
       setEditingTeam(null);
+      setEditingTeamMembers([]);
       refresh();
 
       showSnackBar({
@@ -257,7 +283,7 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
     return {
       name: editingTeam.name,
       description: editingTeam.description || '',
-      system_user_ids: []
+      system_users: editingTeamMembers
     };
   };
 
@@ -384,6 +410,7 @@ export const TeamsContainer = (props: ITeamsContainerProps) => {
         onCancel={() => {
           setOpenEditTeamDialog(false);
           setEditingTeam(null);
+          setEditingTeamMembers([]);
         }}
         onSave={handleEditTeamSave}
       />

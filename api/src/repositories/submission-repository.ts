@@ -252,7 +252,13 @@ export const SubmissionRecordWithSecurity = SubmissionRecord.extend({
 
 export type SubmissionRecordWithSecurity = z.infer<typeof SubmissionRecordWithSecurity>;
 
-export const SubmissionRecordWithSecurityAndRootFeatureType = SubmissionRecord.extend({
+export const SubmissionRecordWithSecurityAndRootFeatureType = SubmissionRecord.omit({
+  revision_count: true,
+  create_date: true,
+  update_date: true,
+  security_review_timestamp: true,
+  record_end_date: true
+}).extend({
   security: z.nativeEnum(SECURITY_APPLIED_STATUS),
   root_feature_type_id: z.number(),
   root_feature_type_name: z.string(),
@@ -963,18 +969,13 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.uuid,
         FilteredRows.system_user_id,
         FilteredRows.contributor_id,
-        FilteredRows.security_review_timestamp,
         FilteredRows.publish_timestamp,
         FilteredRows.submitted_timestamp,
         FilteredRows.name,
         FilteredRows.description,
         FilteredRows.comment,
-        FilteredRows.record_end_date,
-        FilteredRows.create_date,
         FilteredRows.create_user,
-        FilteredRows.update_date,
         FilteredRows.update_user,
-        FilteredRows.revision_count,
         submission_feature.feature_type_id AS root_feature_type_id,
         feature_type.name AS root_feature_type_name,
         ${SECURITY_APPLIED_STATUS.PENDING} AS security,
@@ -1003,23 +1004,18 @@ export class SubmissionRepository extends BaseRepository {
         region_lookup.region_id = submission_regions.region_id
       WHERE
         submission_feature.parent_submission_feature_id IS NULL
-      group by 
+      group by
         FilteredRows.submission_id,
         FilteredRows.uuid,
         FilteredRows.system_user_id,
         FilteredRows.contributor_id,
-        FilteredRows.security_review_timestamp,
         FilteredRows.publish_timestamp,
         FilteredRows.submitted_timestamp,
         FilteredRows.name,
         FilteredRows.description,
         FilteredRows.comment,
-        FilteredRows.record_end_date,
-        FilteredRows.create_date,
         FilteredRows.create_user,
-        FilteredRows.update_date,
         FilteredRows.update_user,
-        FilteredRows.revision_count,
         submission_feature.feature_type_id,
         feature_type.name;
     `;
@@ -1068,18 +1064,13 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.uuid,
         FilteredRows.system_user_id,
         FilteredRows.contributor_id,
-        FilteredRows.security_review_timestamp,
         FilteredRows.publish_timestamp,
         FilteredRows.submitted_timestamp,
         FilteredRows.name,
         FilteredRows.description,
         FilteredRows.comment,
-        FilteredRows.record_end_date,
-        FilteredRows.create_date,
         FilteredRows.create_user,
-        FilteredRows.update_date,
         FilteredRows.update_user,
-        FilteredRows.revision_count,
         submission_feature.feature_type_id AS root_feature_type_id,
         feature_type.name AS root_feature_type_name,
         CASE
@@ -1124,12 +1115,8 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.name,
         FilteredRows.description,
         FilteredRows.comment,
-        FilteredRows.record_end_date,
-        FilteredRows.create_date,
         FilteredRows.create_user,
-        FilteredRows.update_date,
         FilteredRows.update_user,
-        FilteredRows.revision_count,
         submission_feature.feature_type_id,
         feature_type.name;
     `;
@@ -1241,6 +1228,81 @@ export class SubmissionRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
+
+    return response.rows;
+  }
+
+  /**
+   * Get all submissions accessible to the given system user via their submission team membership.
+   *
+   * @param {number} systemUserId - The system user ID to fetch submissions for.
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionsByUserId(systemUserId: number): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
+    const sqlStatement = SQL`
+      SELECT
+        s.submission_id,
+        s.uuid,
+        s.system_user_id,
+        s.contributor_id,
+        s.publish_timestamp,
+        s.submitted_timestamp,
+        s.name,
+        s.description,
+        s.comment,
+        s.create_user,
+        s.update_user,
+        sf.feature_type_id AS root_feature_type_id,
+        ft.name            AS root_feature_type_name,
+        CASE
+          WHEN s.security_review_timestamp IS NULL THEN ${SECURITY_APPLIED_STATUS.PENDING}
+          WHEN COUNT(sfs.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
+          WHEN COUNT(sfs.submission_feature_security_id) = COUNT(sf.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
+          ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
+        END AS security,
+        COALESCE(ARRAY_REMOVE(ARRAY_AGG(DISTINCT rl.region_name), NULL), '{}') AS regions
+      FROM team_member tm
+      INNER JOIN submission_team st
+        ON  st.team_id = tm.team_id
+        AND st.record_end_date IS NULL
+      INNER JOIN submission s
+        ON  s.submission_id = st.submission_id
+        AND s.record_end_date IS NULL
+      INNER JOIN submission_feature sf
+        ON  sf.submission_id = s.submission_id
+        AND sf.parent_submission_feature_id IS NULL
+      INNER JOIN feature_type ft
+        ON  ft.feature_type_id = sf.feature_type_id
+      LEFT JOIN submission_feature_security sfs
+        ON  sfs.submission_feature_id = sf.submission_feature_id
+      LEFT JOIN submission_regions sr
+        ON  sr.submission_id = s.submission_id
+      LEFT JOIN region_lookup rl
+        ON  rl.region_id = sr.region_id
+      WHERE
+        tm.system_user_id = ${systemUserId}
+        AND tm.record_end_date IS NULL
+      GROUP BY
+        s.submission_id,
+        s.uuid,
+        s.system_user_id,
+        s.contributor_id,
+        s.security_review_timestamp,
+        s.publish_timestamp,
+        s.submitted_timestamp,
+        s.name,
+        s.description,
+        s.comment,
+        s.create_user,
+        s.update_user,
+        sf.feature_type_id,
+        ft.name
+      ORDER BY
+        s.submitted_timestamp DESC;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
 
     return response.rows;
   }

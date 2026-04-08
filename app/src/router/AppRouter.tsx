@@ -10,6 +10,8 @@ import { DataRequestRouter } from './data-request/DataRequestRouter';
 import { PortalRouter } from './portal/PortalRouter';
 import { SearchRouter } from './search/SearchRouter';
 import { SubmissionRouter } from './submission/SubmissionRouter';
+import { PortalRouter } from './portal/PortalRouter';
+import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 
 export const AppRouter = () => {
   return (
@@ -79,6 +81,19 @@ export const AppRouter = () => {
             <PageTitle title="Data Request" description="Data requests for secured data" />
             <DataRequestRouter />
           </>
+        }
+      />
+
+      {/* Portal Routes */}
+      <Route
+        path="/portal/*"
+        element={
+          <BaseLayout>
+            <PageTitle title="My Submissions" description="View your past submissions" />
+            <AuthenticatedRouteGuard>
+              <PortalRouter />
+            </AuthenticatedRouteGuard>
+          </BaseLayout>
         }
       />
 
