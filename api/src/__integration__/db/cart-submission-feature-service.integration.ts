@@ -71,6 +71,30 @@ describe('Cart submission feature security (integration)', function () {
   }
 
   /**
+   * Create a submission with one unsecured and one secured feature, grant scope access to
+   * a new user, add both features to a cart, and return all IDs.
+   */
+  async function setupSecuredCart(teamName: string): Promise<{
+    cartId: string;
+    userId: number;
+    unsecuredId: number;
+    securedId: number;
+  }> {
+    const submissionId = await createTestSubmission(connection);
+    const unsecuredId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Public' });
+    const securedId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
+    await secureFeature(connection, securedId);
+
+    const userId = await createOtherUser();
+    await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:*:*`, userId, teamName);
+
+    const cartId = await createActiveCart(userId);
+    await cartFeatureService.createCartSubmissionFeatures(cartId, [unsecuredId, securedId], userId);
+
+    return { cartId, userId, unsecuredId, securedId };
+  }
+
+  /**
    * Get features currently in a cart via raw SQL (bypasses the service under test).
    */
   async function getCartFeatureIds(cartId: string): Promise<number[]> {
@@ -244,16 +268,7 @@ describe('Cart submission feature security (integration)', function () {
 
   describe('getCartSubmissionFeatures — secured flag', () => {
     it('should return secured: true for secured features and secured: false for unsecured', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const unsecuredId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Public' });
-      const securedId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
-      await secureFeature(connection, securedId);
-
-      const userId = await createOtherUser();
-      await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:*:*`, userId, 'secured-flag-team');
-
-      const cartId = await createActiveCart(userId);
-      await cartFeatureService.createCartSubmissionFeatures(cartId, [unsecuredId, securedId], userId);
+      const { cartId, unsecuredId, securedId } = await setupSecuredCart('secured-flag-team');
 
       const features = await cartFeatureService.getCartSubmissionFeatures(cartId);
       expect(features).to.have.length(2);
@@ -303,16 +318,7 @@ describe('Cart submission feature security (integration)', function () {
 
   describe('getCartSubmissionFeatureCount', () => {
     it('should count all features including secured ones', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const unsecuredId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Public' });
-      const securedId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Secured' });
-      await secureFeature(connection, securedId);
-
-      const userId = await createOtherUser();
-      await setupFullAccess(connection, scopeRepo, `urn:${submissionId}:*:*`, userId, 'count-team');
-
-      const cartId = await createActiveCart(userId);
-      await cartFeatureService.createCartSubmissionFeatures(cartId, [unsecuredId, securedId], userId);
+      const { cartId } = await setupSecuredCart('count-team');
 
       const count = await cartFeatureService.getCartSubmissionFeatureCount(cartId);
       expect(count).to.equal(2);

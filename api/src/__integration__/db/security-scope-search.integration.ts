@@ -1200,37 +1200,24 @@ describe('Security scope search (integration)', function () {
   // ── record_effective_date → search visibility ───────────────────────
 
   describe('record_effective_date → search visibility', () => {
-    it('should NOT hide feature from anonymous when security rule exists but record_effective_date is NULL', async () => {
-      // A feature with a security rule but no approval (NULL record_effective_date)
-      // is NOT effectively secured — anonymous users should still see it.
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Unapproved Secured' });
-      await secureFeature(connection, featureId);
-      await markFeatureUnapproved(featureId);
+    for (const { label, markFn } of [
+      { label: 'NULL', markFn: markFeatureUnapproved },
+      { label: 'in the future', markFn: markFeatureFutureDate }
+    ] as const) {
+      it(`should NOT hide feature from anonymous when security rule exists but record_effective_date is ${label}`, async () => {
+        const submissionId = await createTestSubmission(connection);
+        const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: `Secured ${label}` });
+        await secureFeature(connection, featureId);
+        await markFn(featureId);
 
-      const results = await searchInSubmission(submissionId, ['dataset'], null);
-      const featureIds = results.map((r) => r.submission_feature_id);
+        const results = await searchInSubmission(submissionId, ['dataset'], null);
+        const featureIds = results.map((r) => r.submission_feature_id);
 
-      expect(featureIds).to.include(featureId);
-      const feature = results.find((r) => r.submission_feature_id === featureId);
-      expect(feature?.is_secured).to.be.false;
-    });
-
-    it('should NOT hide feature from anonymous when security rule exists but record_effective_date is in the future', async () => {
-      // A feature with a security rule but a future effective date is NOT
-      // effectively secured — the isEffectivelySecured fragment requires <= now().
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Future Secured' });
-      await secureFeature(connection, featureId);
-      await markFeatureFutureDate(featureId);
-
-      const results = await searchInSubmission(submissionId, ['dataset'], null);
-      const featureIds = results.map((r) => r.submission_feature_id);
-
-      expect(featureIds).to.include(featureId);
-      const feature = results.find((r) => r.submission_feature_id === featureId);
-      expect(feature?.is_secured).to.be.false;
-    });
+        expect(featureIds).to.include(featureId);
+        const feature = results.find((r) => r.submission_feature_id === featureId);
+        expect(feature?.is_secured).to.be.false;
+      });
+    }
 
     it('should hide feature from anonymous when security rule exists and record_effective_date is approved', async () => {
       // Baseline: createTestFeature sets record_effective_date = now(), so feature
