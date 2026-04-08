@@ -1,11 +1,4 @@
-import {
-  mdiClose,
-  mdiDotsVertical,
-  mdiMagnify,
-  mdiPencil,
-  mdiRefresh,
-  mdiTrashCanOutline
-} from '@mdi/js';
+import { mdiClose, mdiDotsVertical, mdiMagnify, mdiPencil, mdiRefresh, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
