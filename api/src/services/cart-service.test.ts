@@ -144,7 +144,7 @@ describe('CartService', () => {
       };
 
       sinon.stub(CartRepository.prototype, 'createCart').resolves(mockCart);
-      const addStub = sinon.stub(CartSubmissionFeatureService.prototype, 'addSubmissionFeaturesToCart').resolves();
+      const addStub = sinon.stub(CartSubmissionFeatureService.prototype, 'createCartSubmissionFeatures').resolves();
       const getStub = sinon
         .stub(CartSubmissionFeatureService.prototype, 'getPaginatedCartFeaturesResponse')
         .resolves(mockPaginationResponse);
@@ -225,7 +225,7 @@ describe('CartService', () => {
       };
 
       sinon.stub(CartRepository.prototype, 'createCart').resolves(mockCart);
-      sinon.stub(CartSubmissionFeatureService.prototype, 'addSubmissionFeaturesToCart').resolves();
+      sinon.stub(CartSubmissionFeatureService.prototype, 'createCartSubmissionFeatures').resolves();
       sinon
         .stub(CartSubmissionFeatureService.prototype, 'getPaginatedCartFeaturesResponse')
         .rejects(new Error('Service error'));

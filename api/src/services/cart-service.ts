@@ -90,7 +90,11 @@ export class CartService extends DBService {
     const cart = await this.cartRepository.createCart(systemUserId);
 
     if (submissionFeatureIds.length > 0) {
-      await this.cartSubmissionFeatureService.addSubmissionFeaturesToCart(cart.cart_id, submissionFeatureIds);
+      await this.cartSubmissionFeatureService.createCartSubmissionFeatures(
+        cart.cart_id,
+        submissionFeatureIds,
+        systemUserId
+      );
     }
 
     // Fetch paginated features with provided pagination or defaults
