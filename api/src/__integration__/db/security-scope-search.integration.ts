@@ -61,6 +61,30 @@ describe('Security scope search (integration)', function () {
   /**
    * Soft-delete the security record for a feature (makes it public again).
    */
+  /**
+   * Set record_effective_date to a future timestamp.
+   * Features with a future date are not yet "effectively secured" because
+   * the isEffectivelySecured fragment requires `record_effective_date <= now()`.
+   */
+  async function markFeatureFutureDate(submissionFeatureId: number): Promise<void> {
+    await connection.sql(SQL`
+      UPDATE submission_feature
+      SET record_effective_date = now() + INTERVAL '7 days'
+      WHERE submission_feature_id = ${submissionFeatureId};
+    `);
+  }
+
+  /**
+   * Set record_effective_date to NULL (unapproved upload).
+   */
+  async function markFeatureUnapproved(submissionFeatureId: number): Promise<void> {
+    await connection.sql(SQL`
+      UPDATE submission_feature
+      SET record_effective_date = NULL
+      WHERE submission_feature_id = ${submissionFeatureId};
+    `);
+  }
+
   async function unsecureFeature(submissionFeatureId: number): Promise<void> {
     await connection.sql(SQL`
       UPDATE submission_feature_security
@@ -299,6 +323,147 @@ describe('Security scope search (integration)', function () {
       RETURNING system_user_id;
     `);
     return result.rows[0].system_user_id;
+  }
+
+  /**
+   * Soft-delete a policy statement (sets record_end_date = now()).
+   */
+  async function softDeleteStatement(policyStatementId: string): Promise<void> {
+    await connection.sql(SQL`
+      UPDATE policy_statement SET record_end_date = now()
+      WHERE policy_statement_id = ${policyStatementId};
+    `);
+  }
+
+  /**
+   * Soft-delete a team policy (sets record_end_date = now()).
+   */
+  async function softDeleteTeamPolicy(teamPolicyId: string): Promise<void> {
+    await connection.sql(SQL`
+      UPDATE team_policy SET record_end_date = now()
+      WHERE team_policy_id = ${teamPolicyId};
+    `);
+  }
+
+  /**
+   * Run the paginated stale-anchor-delete loop for a scope (repo-level).
+   */
+  async function deleteStaleAnchors(scopeId: string): Promise<void> {
+    let lastId = 0;
+    while (true) {
+      const batch = await scopeRepo.deleteStaleAnchorBatch(scopeId, lastId);
+      if (!batch) {
+        break;
+      }
+      lastId = batch.pageLastId;
+    }
+  }
+
+  /**
+   * Run the paginated stale-anchor-delete loop for a scope (service-level).
+   * pg-boss is not running in the make test-db environment, so this
+   * invokes the service phase methods directly.
+   */
+  async function deleteStaleAnchorsViaService(scopeId: string): Promise<void> {
+    let lastId = 0;
+    while (true) {
+      const batch = await scopeService.deleteStaleAnchorBatch(scopeId, lastId);
+      if (!batch) {
+        break;
+      }
+      lastId = batch.pageLastId;
+    }
+  }
+
+  /**
+   * Simulate the pg-boss anchor-refresh job (service-level):
+   * delete stale anchors → resolve URN → recompute new anchors.
+   */
+  async function refreshAnchorsViaService(scopeId: string): Promise<void> {
+    await deleteStaleAnchorsViaService(scopeId);
+    const urn = await scopeService.resolveUrnForScope(scopeId);
+    if (urn) {
+      let lastId = 0;
+      while (true) {
+        const batch = await scopeService.computeAnchorBatch(scopeId, urn, lastId);
+        if (!batch) {
+          break;
+        }
+        lastId = batch.pageLastId;
+      }
+    }
+  }
+
+  /**
+   * Secure multiple features in bulk using a single INSERT with unnest.
+   * More efficient than calling secureFeature() in a loop for large sets.
+   */
+  async function secureFeaturesInBulk(featureIds: number[]): Promise<void> {
+    if (featureIds.length === 0) {
+      return;
+    }
+    const systemUserId = connection.systemUserId();
+    await connection.query(
+      `INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, create_user)
+       SELECT unnest($1::INTEGER[]), 1, $2`,
+      [featureIds, systemUserId]
+    );
+  }
+
+  /**
+   * Create a secured feature, optionally mark it as not-yet-approved, then compute anchors.
+   */
+  async function setupApprovalTest(
+    featureName: string,
+    policyName: string,
+    options?: { approved: boolean }
+  ): Promise<string> {
+    const submissionId = await createTestSubmission(connection);
+    const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: featureName });
+
+    await secureFeature(dataset);
+    if (options?.approved === false) {
+      await markFeatureUnapproved(dataset);
+    }
+
+    const urn = `urn:${submissionId}:*:*`;
+    const policyId = await createPolicy(policyName);
+    const stmtId = await createPolicyStatement(policyId, urn);
+    return setupScopeChain(stmtId, urn);
+  }
+
+  /**
+   * Create a 3-level hierarchy (dataset → observation → telemetry), secure
+   * the specified features, wire a scope chain, and return all IDs.
+   */
+  async function setupDeepHierarchyScope(
+    securedFeatures: ('dataset' | 'observation' | 'telemetry')[],
+    urn: (ids: { submissionId: number; dataset: number; observation: number; telemetry: number }) => string,
+    policyName: string
+  ) {
+    const submissionId = await createTestSubmission(connection);
+    const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
+    const observation = await createTestFeature(
+      connection,
+      submissionId,
+      'species_observation',
+      { name: 'Obs' },
+      dataset
+    );
+    const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Telem' }, observation);
+
+    const ids = { submissionId, dataset, observation, telemetry };
+    const featureMap = { dataset, observation, telemetry };
+    for (const f of securedFeatures) {
+      await secureFeature(featureMap[f]);
+    }
+
+    const urnStr = urn(ids);
+    const policyId = await createPolicy(policyName);
+    const stmtId = await createPolicyStatement(policyId, urnStr);
+    const scopeId = await setupScopeChain(stmtId, urnStr);
+
+    return { ...ids, scopeId };
   }
 
   // ── Policy create → scope creation ───────────────────────────────────
@@ -629,11 +794,7 @@ describe('Security scope search (integration)', function () {
 
       expect(await countTeamScopes(teamId)).to.be.greaterThan(0);
 
-      // Soft-delete statement, then cleanup
-      await connection.sql(SQL`
-        UPDATE policy_statement SET record_end_date = now()
-        WHERE policy_statement_id = ${stmtId};
-      `);
+      await softDeleteStatement(stmtId);
       await scopeService.cleanupScopesForDeletedStatements([stmtId], [teamId]);
 
       expect(await countTeamScopes(teamId)).to.equal(0);
@@ -645,33 +806,10 @@ describe('Security scope search (integration)', function () {
       expect(await countAnchors(scopeId)).to.be.greaterThan(0);
 
       // Soft-delete statement and cleanup — scope becomes orphaned
-      await connection.sql(SQL`
-        UPDATE policy_statement SET record_end_date = now()
-        WHERE policy_statement_id = ${stmtId};
-      `);
+      await softDeleteStatement(stmtId);
       await scopeService.cleanupScopesForDeletedStatements([stmtId], []);
 
-      // In prod the cleanup publishes a pg-boss job that calls the service phase methods.
-      // pg-boss is not running in make test-db, so invoke the service directly.
-      let staleLastId = 0;
-      while (true) {
-        const staleBatch = await scopeService.deleteStaleAnchorBatch(scopeId, staleLastId);
-        if (!staleBatch) {
-          break;
-        }
-        staleLastId = staleBatch.pageLastId;
-      }
-      const urn = await scopeService.resolveUrnForScope(scopeId);
-      if (urn) {
-        let lastId = 0;
-        while (true) {
-          const batch = await scopeService.computeAnchorBatch(scopeId, urn, lastId);
-          if (!batch) {
-            break;
-          }
-          lastId = batch.pageLastId;
-        }
-      }
+      await refreshAnchorsViaService(scopeId);
 
       // Anchors deleted because scope has no remaining policy_statement_scope references
       expect(await countAnchors(scopeId)).to.equal(0);
@@ -697,10 +835,7 @@ describe('Security scope search (integration)', function () {
       expect(anchorsBefore).to.be.greaterThan(0);
 
       // Delete policy A's statement — scope still referenced by policy B
-      await connection.sql(SQL`
-        UPDATE policy_statement SET record_end_date = now()
-        WHERE policy_statement_id = ${stmtA};
-      `);
+      await softDeleteStatement(stmtA);
       await scopeService.cleanupScopesForDeletedStatements([stmtA], []);
 
       // Anchors preserved — scope is NOT orphaned
@@ -719,11 +854,7 @@ describe('Security scope search (integration)', function () {
       const before = await searchInSubmission(submissionId, ['dataset'], userId);
       expect(before.map((r) => r.submission_feature_id)).to.include(securedFeature);
 
-      // Delete: soft-delete statement and cleanup
-      await connection.sql(SQL`
-        UPDATE policy_statement SET record_end_date = now()
-        WHERE policy_statement_id = ${stmtId};
-      `);
+      await softDeleteStatement(stmtId);
       await scopeService.cleanupScopesForDeletedStatements([stmtId], [teamId]);
 
       // After: user can no longer see the secured feature
@@ -765,33 +896,10 @@ describe('Security scope search (integration)', function () {
       );
 
       // Simulate update: soft-delete old statement, cleanup, create new for sub2
-      await connection.sql(SQL`
-        UPDATE policy_statement SET record_end_date = now()
-        WHERE policy_statement_id = ${oldStmtId};
-      `);
+      await softDeleteStatement(oldStmtId);
       await scopeService.cleanupScopesForDeletedStatements([oldStmtId], [teamId]);
 
-      // In prod the cleanup publishes a pg-boss job that calls the service phase methods.
-      // pg-boss is not running in make test-db, so invoke the service directly.
-      let staleLastId = 0;
-      while (true) {
-        const staleBatch = await scopeService.deleteStaleAnchorBatch(oldScopeId, staleLastId);
-        if (!staleBatch) {
-          break;
-        }
-        staleLastId = staleBatch.pageLastId;
-      }
-      const oldUrn = await scopeService.resolveUrnForScope(oldScopeId);
-      if (oldUrn) {
-        let lastId = 0;
-        while (true) {
-          const batch = await scopeService.computeAnchorBatch(oldScopeId, oldUrn, lastId);
-          if (!batch) {
-            break;
-          }
-          lastId = batch.pageLastId;
-        }
-      }
+      await refreshAnchorsViaService(oldScopeId);
 
       // Old scope's anchors cleaned up (orphaned)
       expect(await countAnchors(oldScopeId)).to.equal(0);
@@ -836,10 +944,7 @@ describe('Security scope search (integration)', function () {
       expect(before.map((r) => r.submission_feature_id)).to.include(securedFeature);
 
       // Soft-delete team-policy, rebuild team scopes
-      await connection.sql(SQL`
-        UPDATE team_policy SET record_end_date = now()
-        WHERE team_policy_id = ${teamPolicyId};
-      `);
+      await softDeleteTeamPolicy(teamPolicyId);
       await scopeRepo.deleteTeamSecurityScopes(teamId);
       await scopeRepo.insertTeamSecurityScopesFromPolicyChain(teamId);
 
@@ -890,10 +995,7 @@ describe('Security scope search (integration)', function () {
       );
 
       // Delete team-policy A, rebuild
-      await connection.sql(SQL`
-        UPDATE team_policy SET record_end_date = now()
-        WHERE team_policy_id = ${tpA};
-      `);
+      await softDeleteTeamPolicy(tpA);
       await scopeRepo.deleteTeamSecurityScopes(teamId);
       await scopeRepo.insertTeamSecurityScopesFromPolicyChain(teamId);
 
@@ -940,10 +1042,7 @@ describe('Security scope search (integration)', function () {
       ).to.include(securedFeature);
 
       // Delete team-policy A, rebuild
-      await connection.sql(SQL`
-        UPDATE team_policy SET record_end_date = now()
-        WHERE team_policy_id = ${tpA};
-      `);
+      await softDeleteTeamPolicy(tpA);
       await scopeRepo.deleteTeamSecurityScopes(teamId);
       await scopeRepo.insertTeamSecurityScopesFromPolicyChain(teamId);
 
@@ -1070,14 +1169,7 @@ describe('Security scope search (integration)', function () {
 
       // Remove security + recompute anchors (stale anchor gets cleaned up)
       await unsecureFeature(featureId);
-      let staleLastId = 0;
-      while (true) {
-        const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
-        if (!staleBatch) {
-          break;
-        }
-        staleLastId = staleBatch.pageLastId;
-      }
+      await deleteStaleAnchors(scopeId);
       await computeAnchors(scopeId);
 
       // Anchor deleted
@@ -1142,14 +1234,7 @@ describe('Security scope search (integration)', function () {
 
       // Unsecure the parent — child loses inherited security
       await unsecureFeature(datasetId);
-      let staleLastId = 0;
-      while (true) {
-        const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
-        if (!staleBatch) {
-          break;
-        }
-        staleLastId = staleBatch.pageLastId;
-      }
+      await deleteStaleAnchors(scopeId);
       await computeAnchors(scopeId);
 
       expect(await countAnchors(scopeId)).to.equal(0);
@@ -1216,14 +1301,7 @@ describe('Security scope search (integration)', function () {
       // Unsecure feat2 and feat3, recompute anchors (stale anchors get cleaned up)
       await unsecureFeature(feat2);
       await unsecureFeature(feat3);
-      let staleLastId = 0;
-      while (true) {
-        const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
-        if (!staleBatch) {
-          break;
-        }
-        staleLastId = staleBatch.pageLastId;
-      }
+      await deleteStaleAnchors(scopeId);
       await computeAnchors(scopeId);
 
       // feat1's anchor remains, feat2 and feat3 are gone
@@ -1240,30 +1318,6 @@ describe('Security scope search (integration)', function () {
   // ── record_effective_date → search visibility ───────────────────────
 
   describe('record_effective_date → search visibility', () => {
-    /**
-     * Set record_effective_date to a future timestamp.
-     * Features with a future date are not yet "effectively secured" because
-     * the isEffectivelySecured fragment requires `record_effective_date <= now()`.
-     */
-    async function markFeatureFutureDate(submissionFeatureId: number): Promise<void> {
-      await connection.sql(SQL`
-        UPDATE submission_feature
-        SET record_effective_date = now() + INTERVAL '7 days'
-        WHERE submission_feature_id = ${submissionFeatureId};
-      `);
-    }
-
-    /**
-     * Set record_effective_date to NULL (unapproved upload).
-     */
-    async function markFeatureUnapproved(submissionFeatureId: number): Promise<void> {
-      await connection.sql(SQL`
-        UPDATE submission_feature
-        SET record_effective_date = NULL
-        WHERE submission_feature_id = ${submissionFeatureId};
-      `);
-    }
-
     it('should NOT hide feature from anonymous when security rule exists but record_effective_date is NULL', async () => {
       // A feature with a security rule but no approval (NULL record_effective_date)
       // is NOT effectively secured — anonymous users should still see it.
@@ -1383,43 +1437,6 @@ describe('Security scope search (integration)', function () {
   });
 
   describe('Upload status → anchor eligibility', () => {
-    /**
-     * Simulate a non-approved upload by nulling record_effective_date.
-     *
-     * The anchor computation filter uses `sf.record_effective_date <= now()` to exclude
-     * features from uploads that haven't been approved yet. NULL evaluates as falsy
-     * in the comparison, correctly excluding the feature.
-     */
-    async function markFeatureNotYetApproved(submissionFeatureId: number): Promise<void> {
-      await connection.sql(SQL`
-        UPDATE submission_feature
-        SET record_effective_date = NULL
-        WHERE submission_feature_id = ${submissionFeatureId};
-      `);
-    }
-
-    /**
-     * Create a secured feature, optionally mark it as not-yet-approved, then compute anchors.
-     */
-    async function setupApprovalTest(
-      featureName: string,
-      policyName: string,
-      options?: { approved: boolean }
-    ): Promise<string> {
-      const submissionId = await createTestSubmission(connection);
-      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: featureName });
-
-      await secureFeature(dataset);
-      if (options?.approved === false) {
-        await markFeatureNotYetApproved(dataset);
-      }
-
-      const urn = `urn:${submissionId}:*:*`;
-      const policyId = await createPolicy(policyName);
-      const stmtId = await createPolicyStatement(policyId, urn);
-      return setupScopeChain(stmtId, urn);
-    }
-
     it('should exclude features from denied uploads when computing anchors', async () => {
       const scopeId = await setupApprovalTest('Denied Dataset', 'denied-upload-test', { approved: false });
       expect(await countAnchors(scopeId)).to.equal(0);
@@ -1444,12 +1461,7 @@ describe('Security scope search (integration)', function () {
       const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Future Dataset' });
       await secureFeature(dataset);
 
-      // Set effective date to the future
-      await connection.sql(SQL`
-        UPDATE submission_feature
-        SET record_effective_date = now() + INTERVAL '7 days'
-        WHERE submission_feature_id = ${dataset};
-      `);
+      await markFeatureFutureDate(dataset);
 
       const urn = `urn:${submissionId}:*:*`;
       const policyId = await createPolicy('future-date-anchor-test');
@@ -1475,57 +1487,15 @@ describe('Security scope search (integration)', function () {
       expect(await countAnchors(scopeId)).to.equal(1);
 
       // De-approve: set record_effective_date to NULL
-      await markFeatureNotYetApproved(dataset);
+      await markFeatureUnapproved(dataset);
 
-      // Stale anchor should be pruned
-      let staleLastId = 0;
-      while (true) {
-        const staleBatch = await scopeRepo.deleteStaleAnchorBatch(scopeId, staleLastId);
-        if (!staleBatch) {
-          break;
-        }
-        staleLastId = staleBatch.pageLastId;
-      }
+      await deleteStaleAnchors(scopeId);
 
       expect(await countAnchors(scopeId)).to.equal(0);
     });
   });
 
   describe('Narrowed URN anchor computation', () => {
-    /**
-     * Create a 3-level hierarchy (dataset → observation → telemetry), secure
-     * the specified features, wire a scope chain, and return all IDs.
-     */
-    async function setupDeepHierarchyScope(
-      securedFeatures: ('dataset' | 'observation' | 'telemetry')[],
-      urn: (ids: { submissionId: number; dataset: number; observation: number; telemetry: number }) => string,
-      policyName: string
-    ) {
-      const submissionId = await createTestSubmission(connection);
-      const dataset = await createTestFeature(connection, submissionId, 'dataset', { name: 'Dataset' });
-      const observation = await createTestFeature(
-        connection,
-        submissionId,
-        'species_observation',
-        { name: 'Obs' },
-        dataset
-      );
-      const telemetry = await createTestFeature(connection, submissionId, 'telemetry', { name: 'Telem' }, observation);
-
-      const ids = { submissionId, dataset, observation, telemetry };
-      const featureMap = { dataset, observation, telemetry };
-      for (const f of securedFeatures) {
-        await secureFeature(featureMap[f]);
-      }
-
-      const urnStr = urn(ids);
-      const policyId = await createPolicy(policyName);
-      const stmtId = await createPolicyStatement(policyId, urnStr);
-      const scopeId = await setupScopeChain(stmtId, urnStr);
-
-      return { ...ids, scopeId };
-    }
-
     it('should anchor a specific feature by ID even when its ancestor is secured', async () => {
       const { telemetry, scopeId } = await setupDeepHierarchyScope(
         ['dataset', 'telemetry'],
@@ -1631,22 +1601,10 @@ describe('Security scope search (integration)', function () {
       expect(await countAnchors(broadScopeId)).to.be.greaterThan(0);
 
       // ── Step 2: Change URN to urn:{sub}:*:{childId} (narrow) ──
-      // Soft-delete old statement
-      await connection.sql(SQL`
-        UPDATE policy_statement SET record_end_date = now()
-        WHERE policy_statement_id = ${stmt1};
-      `);
+      await softDeleteStatement(stmt1);
       // Cleanup: remove old pss mapping, rebuild team scopes
       await scopeService.cleanupScopesForDeletedStatements([stmt1], [teamId]);
-      // Simulate the orphan cleanup job
-      let staleLastId1 = 0;
-      while (true) {
-        const staleBatch = await scopeService.deleteStaleAnchorBatch(broadScopeId, staleLastId1);
-        if (!staleBatch) {
-          break;
-        }
-        staleLastId1 = staleBatch.pageLastId;
-      }
+      await deleteStaleAnchorsViaService(broadScopeId);
 
       // Broad scope anchors are now gone (orphaned — no pss references)
       expect(await countAnchors(broadScopeId)).to.equal(0);
@@ -1661,20 +1619,9 @@ describe('Security scope search (integration)', function () {
       expect(await countAnchors(narrowScopeId)).to.be.greaterThan(0);
 
       // ── Step 3: Revert back to urn:{sub}:*:* (broad again) ──
-      // Soft-delete narrow statement
-      await connection.sql(SQL`
-        UPDATE policy_statement SET record_end_date = now()
-        WHERE policy_statement_id = ${stmt2};
-      `);
+      await softDeleteStatement(stmt2);
       await scopeService.cleanupScopesForDeletedStatements([stmt2], [teamId]);
-      let staleLastId2 = 0;
-      while (true) {
-        const staleBatch = await scopeService.deleteStaleAnchorBatch(narrowScopeId, staleLastId2);
-        if (!staleBatch) {
-          break;
-        }
-        staleLastId2 = staleBatch.pageLastId;
-      }
+      await deleteStaleAnchorsViaService(narrowScopeId);
 
       // Re-create the original broad statement
       const stmt3 = await createPolicyStatement(policyId, broadUrn);
@@ -1797,11 +1744,7 @@ describe('Security scope search (integration)', function () {
       const stmtId = await createPolicyStatement(policyId, `urn:${submissionId}:*:*`);
       const scopeId = await setupScopeChain(stmtId, `urn:${submissionId}:*:*`);
 
-      // Soft-delete the statement
-      await connection.sql(SQL`
-        UPDATE policy_statement SET record_end_date = now()
-        WHERE policy_statement_id = ${stmtId};
-      `);
+      await softDeleteStatement(stmtId);
 
       const result = await scopeRepo.findScopeIdsMatchingSubmission(submissionId);
       const scopeIds = result.map((r) => r.security_scope_id);
@@ -1838,22 +1781,6 @@ describe('Security scope search (integration)', function () {
   // ── Keyset pagination → anchor computation correctness ──────────────
 
   describe('Keyset pagination → anchor computation correctness', () => {
-    /**
-     * Secure multiple features in bulk using a single INSERT with unnest.
-     * More efficient than calling secureFeature() in a loop for large sets.
-     */
-    async function secureFeaturesInBulk(featureIds: number[]): Promise<void> {
-      if (featureIds.length === 0) {
-        return;
-      }
-      const systemUserId = connection.systemUserId();
-      await connection.query(
-        `INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, create_user)
-         SELECT unnest($1::INTEGER[]), 1, $2`,
-        [featureIds, systemUserId]
-      );
-    }
-
     it('should promote children to anchors when root is unsecured and scope is recomputed', async () => {
       // Hierarchy: root → childA, root → childB
       // All secured. Root is the only anchor (children pruned by ancestor walk).
@@ -1894,27 +1821,8 @@ describe('Security scope search (integration)', function () {
       // Unsecure the root — it no longer meets candidate criteria
       await unsecureFeature(root);
 
-      // Recompute via the service phase methods (integration test coverage for
-      // the service-level orchestration: deleteStaleAnchorBatch → resolveUrnForScope → computeAnchorBatch)
-      let staleLastId = 0;
-      while (true) {
-        const staleBatch = await scopeService.deleteStaleAnchorBatch(scopeId, staleLastId);
-        if (!staleBatch) {
-          break;
-        }
-        staleLastId = staleBatch.pageLastId;
-      }
-      const recomputeUrn = await scopeService.resolveUrnForScope(scopeId);
-      if (recomputeUrn) {
-        let lastId = 0;
-        while (true) {
-          const batch = await scopeService.computeAnchorBatch(scopeId, recomputeUrn, lastId);
-          if (!batch) {
-            break;
-          }
-          lastId = batch.pageLastId;
-        }
-      }
+      // Service-level orchestration: deleteStaleAnchorBatch → resolveUrnForScope → computeAnchorBatch
+      await refreshAnchorsViaService(scopeId);
 
       // After: root anchor deleted (stale — unsecured), children promoted to anchors
       // (they are now the topmost candidates with no candidate ancestor above them)

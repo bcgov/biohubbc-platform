@@ -706,9 +706,6 @@ export class SearchFeatureRepository extends BaseRepository {
     }
 
     // Authenticated: feature is unsecured OR user has team scope grant (single ancestor walk)
-    return knex.raw(
-      `${isVisibleToUser('aggregated_results.submission_feature_id')}`,
-      [systemUserId]
-    );
+    return knex.raw(`${isVisibleToUser('aggregated_results.submission_feature_id')}`, [systemUserId]);
   }
 }
