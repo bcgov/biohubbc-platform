@@ -135,6 +135,92 @@ describe('Download services (integration)', function () {
     });
   });
 
+  describe('createDownload artifact integration', () => {
+    it('should create a pending artifact and download_artifact link for cart-based download', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Artifact Test' });
+
+      const { download_id } = await createCartDownload([featureId]);
+
+      // Verify download_artifact row exists linking download to an artifact
+      const daRows = await connection.sql(SQL`
+        SELECT da.download_id, da.artifact_id, da.format
+        FROM download_artifact da
+        WHERE da.download_id = ${download_id}
+          AND da.record_end_date IS NULL;
+      `);
+      expect(daRows.rowCount).to.equal(1);
+      expect(daRows.rows[0].format).to.equal('parquet');
+
+      // Verify the linked artifact exists with correct status and key pattern
+      const artifactRows = await connection.sql(SQL`
+        SELECT a.artifact_status, a.object_key, a.bucket
+        FROM artifact a
+        JOIN download_artifact da ON da.artifact_id = a.artifact_id
+        WHERE da.download_id = ${download_id}
+          AND da.record_end_date IS NULL;
+      `);
+      expect(artifactRows.rowCount).to.equal(1);
+      expect(artifactRows.rows[0].artifact_status).to.equal('pending');
+      expect(artifactRows.rows[0].object_key).to.equal(`downloads/${download_id}/download.parquet`);
+      expect(artifactRows.rows[0].bucket).to.not.be.empty;
+    });
+
+    it('should create a pending artifact for filter-based download', async () => {
+      const filters = { keyword: 'artifact-filter-test' };
+      const { download_id } = await crudService.createDownload({ filters });
+
+      const daRows = await connection.sql(SQL`
+        SELECT da.download_id, da.artifact_id, da.format
+        FROM download_artifact da
+        WHERE da.download_id = ${download_id}
+          AND da.record_end_date IS NULL;
+      `);
+      expect(daRows.rowCount).to.equal(1);
+      expect(daRows.rows[0].format).to.equal('parquet');
+
+      const artifactRows = await connection.sql(SQL`
+        SELECT a.artifact_status, a.object_key
+        FROM artifact a
+        WHERE a.artifact_id = ${daRows.rows[0].artifact_id};
+      `);
+      expect(artifactRows.rows[0].artifact_status).to.equal('pending');
+      expect(artifactRows.rows[0].object_key).to.equal(`downloads/${download_id}/download.parquet`);
+    });
+
+    it('should rollback artifact and download_artifact when transaction is rolled back', async () => {
+      const submissionId = await createTestSubmission(connection);
+      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Rollback Test' });
+
+      const { download_id } = await createCartDownload([featureId]);
+
+      // Verify rows exist before rollback
+      const beforeRows = await connection.sql(SQL`
+        SELECT 1 FROM download_artifact WHERE download_id = ${download_id} AND record_end_date IS NULL;
+      `);
+      expect(beforeRows.rowCount).to.equal(1);
+
+      // Rollback and get a fresh connection
+      await connection.rollback();
+      connection.release();
+
+      connection = getAPIUserDBConnection();
+      await connection.open();
+      crudService = new DownloadService(connection);
+
+      // Verify rows are gone after rollback
+      const afterRows = await connection.sql(SQL`
+        SELECT 1 FROM download_artifact WHERE download_id = ${download_id} AND record_end_date IS NULL;
+      `);
+      expect(afterRows.rowCount).to.equal(0);
+
+      const afterArtifact = await connection.sql(SQL`
+        SELECT 1 FROM artifact WHERE object_key = ${'downloads/' + download_id + '/download.parquet'};
+      `);
+      expect(afterArtifact.rowCount).to.equal(0);
+    });
+  });
+
   describe('updateDownloadStatus', () => {
     it('should set started_at only when transitioning to processing', async () => {
       const submissionId = await createTestSubmission(connection);
