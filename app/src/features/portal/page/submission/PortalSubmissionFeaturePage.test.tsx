@@ -1,4 +1,5 @@
 import { useApi } from 'hooks/useApi';
+import { fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
@@ -7,6 +8,15 @@ import { PortalSubmissionFeaturePage } from './PortalSubmissionFeaturePage';
 vi.mock('../../../../hooks/useApi');
 
 const mockUseApi = useApi as Mock;
+const mockNavigate = vi.fn();
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate
+  };
+});
 
 const mockGetSubmissionFeatureById = vi.fn();
 const mockGetSubmissionFeatureProperties = vi.fn();
@@ -83,10 +93,12 @@ describe('PortalSubmissionFeaturePage', () => {
   it('uses portal route for related feature links', async () => {
     const { findByText } = renderPage();
 
-    const relatedLinkText = await findByText('Related Survey');
-    const relatedAnchor = relatedLinkText.closest('a');
+    const relatedRowText = await findByText('Related Survey');
+    fireEvent.click(relatedRowText.closest('.MuiDataGrid-row')!);
 
-    expect(relatedAnchor).toHaveAttribute('href', '/portal/submission/1/feature/20');
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/portal/submission/1/feature/20');
+    });
   });
 
   it('renders portal as the breadcrumb root', async () => {
