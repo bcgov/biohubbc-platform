@@ -1740,38 +1740,4 @@ describe('SubmissionRepository', () => {
       expect(sqlStub).not.to.have.been.called;
     });
   });
-
-  describe('getRelatedSubmissionFeatureIds', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should return source and target IDs for a feature', async () => {
-      const mockParentResponse = {
-        rows: [{ source_feature_id: 10 }],
-        rowCount: 1
-      };
-      const mockChildResponse = {
-        rows: [{ target_feature_id: 2 }, { target_feature_id: 3 }],
-        rowCount: 2
-      };
-
-      const sqlStub = sinon
-        .stub()
-        .onFirstCall()
-        .resolves(mockParentResponse)
-        .onSecondCall()
-        .resolves(mockChildResponse);
-
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const submissionFeatureRepository = new SubmissionFeatureRepository(mockDBConnection);
-
-      const result = await submissionFeatureRepository.getRelatedSubmissionFeatureIds(1);
-
-      expect(result.sourceIds).to.deep.equal([10]);
-      expect(result.targetIds).to.deep.equal([2, 3]);
-      expect(sqlStub).to.have.been.calledTwice;
-    });
-  });
 });

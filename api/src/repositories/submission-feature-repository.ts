@@ -17,39 +17,6 @@ import { RelatedSubmissionFeature, SubmissionFeature, SubmissionFeatureRecord } 
  */
 export class SubmissionFeatureRepository extends BaseRepository {
   /**
-   * Get IDs of parent/child related submission features.
-   *
-   * @param {number} submissionFeatureId
-   * @returns {Promise<{ sourceIds: number[]; targetIds: number[] }>}
-   * @memberof SubmissionFeatureRepository
-   */
-  async getRelatedSubmissionFeatureIds(
-    submissionFeatureId: number
-  ): Promise<{ sourceIds: number[]; targetIds: number[] }> {
-    const parentSqlStatement = SQL`
-      SELECT source_feature_id
-      FROM submission_feature_feature
-      WHERE target_feature_id = ${submissionFeatureId};
-    `;
-
-    const childSqlStatement = SQL`
-      SELECT target_feature_id
-      FROM submission_feature_feature
-      WHERE source_feature_id = ${submissionFeatureId};
-    `;
-
-    const [parentResult, childResult] = await Promise.all([
-      this.connection.sql<{ source_feature_id: number }>(parentSqlStatement),
-      this.connection.sql<{ target_feature_id: number }>(childSqlStatement)
-    ]);
-
-    return {
-      sourceIds: parentResult.rows.map((r) => r.source_feature_id),
-      targetIds: childResult.rows.map((r) => r.target_feature_id)
-    };
-  }
-
-  /**
    * Get a submission feature record by uuid.
    *
    * @param {string} submissionUuid

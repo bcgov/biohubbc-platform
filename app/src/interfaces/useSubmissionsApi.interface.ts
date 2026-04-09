@@ -1,8 +1,6 @@
 import { ApiPaginationResponseParams } from 'types/pagination';
 import { SECURITY_APPLIED_STATUS } from './useDatasetApi.interface';
 
-/** NET-NEW INTERFACES FOR UPDATED SCHEMA **/
-
 export type SubmissionRecord = {
   submission_id: number;
   uuid: string;
@@ -108,6 +106,10 @@ export interface ISubmissionFeatureForReviewResponse {
 export interface IGetSubmissionsForUserResponse {
   submissions: SubmissionRecordWithSecurityAndRootFeature[];
   pagination: ApiPaginationResponseParams;
+}
+
+export interface SubmissionFilters {
+  search?: string;
 }
 
 export interface IGetDownloadSubmissionResponse {

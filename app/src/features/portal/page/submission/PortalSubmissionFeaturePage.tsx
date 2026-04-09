@@ -9,20 +9,19 @@ import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { GridColDef } from '@mui/x-data-grid';
+import { GridColDef, GridRowParams } from '@mui/x-data-grid';
 import CustomDataGrid from 'components/data-grid/CustomDataGrid';
 import { PageHeader } from 'components/header/PageHeader';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { SkeletonPage } from 'components/loading/SkeletonPage';
 import { PageSection } from 'components/section/PageSection';
-import { SubmissionFeatureRelated } from 'features/submissions/page/features/components/SubmissionFeatureRelated';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { useServerPaginatedDataGrid } from 'hooks/useServerPaginatedDataGrid';
 import { IRelatedSubmissionFeature, ISubmissionFeaturePropertiesResponse } from 'interfaces/useFeaturesApi.interface';
 import { useEffect, useMemo } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { Link as RouterLink, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 interface IFeaturePropertyRow {
   id: string;
@@ -131,12 +130,47 @@ const PortalFeaturePropertiesSection = ({
 };
 
 const PortalFeatureRelatedSection = ({ submissionId, relatedFeatures }: IPortalFeatureRelatedSectionProps) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const columns: GridColDef<IRelatedSubmissionFeature>[] = [
+    {
+      field: 'submission_feature_id',
+      headerName: 'ID',
+      width: 120
+    },
+    {
+      field: 'name',
+      headerName: 'Name',
+      flex: 1,
+      renderCell: (params) => params.row.data?.name || params.row.feature_type_display_name
+    },
+    {
+      field: 'feature_type_display_name',
+      headerName: 'Feature Type',
+      flex: 1
+    }
+  ];
+
+  const handleRowClick = (params: GridRowParams<IRelatedSubmissionFeature>) => {
+    if (!submissionId) {
+      return;
+    }
+
+    navigate(`/portal/submission/${submissionId}/feature/${params.row.submission_feature_id}${location.search}`);
+  };
+
   return (
     <PageSection id="portal-submission-feature-related" label="Related">
-      <SubmissionFeatureRelated
-        submissionId={submissionId}
-        relatedFeatures={relatedFeatures}
-        featureRouteBasePath="/portal/submission"
+      <CustomDataGrid
+        autoHeight
+        rows={relatedFeatures}
+        columns={columns}
+        getRowId={(row) => row.submission_feature_id}
+        onRowClick={handleRowClick}
+        noRowsMessage="No related features"
+        hideFooter
+        rowSelection={false}
       />
     </PageSection>
   );
