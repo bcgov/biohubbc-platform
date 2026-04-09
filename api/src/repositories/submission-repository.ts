@@ -1184,14 +1184,14 @@ export class SubmissionRepository extends BaseRepository {
    * Get all submissions accessible to the given system user via their submission team membership.
    *
    * @param {number} systemUserId - The system user ID to fetch submissions for.
-   * @param {ApiPaginationOptions} [pagination]
+   * @param {ApiPaginationOptions} pagination
    * @param {SubmissionFilters} [filters]
    * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionRepository
    */
   async getSubmissionsByUserId(
     systemUserId: number,
-    pagination: ApiPaginationOptions = { page: 1, limit: 1000, sort: 'submitted_timestamp', order: 'desc' },
+    pagination: ApiPaginationOptions,
     filters?: SubmissionFilters
   ): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
     const knex = getKnex();
@@ -1319,7 +1319,8 @@ export class SubmissionRepository extends BaseRepository {
     `;
 
     if (normalizedSearch) {
-      sqlStatement.append(SQL` AND LOWER(s.name) LIKE ${`%${normalizedSearch}%`}`);
+      const searchPattern = `%${normalizedSearch}%`;
+      sqlStatement.append(SQL` AND LOWER(s.name) LIKE ${searchPattern}`);
     }
 
     sqlStatement.append(SQL`

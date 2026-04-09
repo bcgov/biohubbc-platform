@@ -20,6 +20,7 @@ import {
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
 import { getMockDBConnection } from '../__mocks__/db';
+import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { SubmissionService } from './submission-service';
 
 chai.use(sinonChai);
@@ -606,10 +607,11 @@ describe('SubmissionService', () => {
         .resolves(mockSubmissionRecords);
 
       const submissionService = new SubmissionService(mockDBConnection);
+      const pagination: ApiPaginationOptions = { page: 1, limit: 10, sort: 'submitted_timestamp', order: 'desc' };
 
-      const response = await submissionService.getSubmissionsByUserId(3);
+      const response = await submissionService.getSubmissionsByUserId(3, pagination);
 
-      expect(getSubmissionsByUserIdStub).to.be.calledOnceWith(3);
+      expect(getSubmissionsByUserIdStub).to.be.calledOnceWith(3, pagination);
       expect(response).to.be.eql(mockSubmissionRecords);
     });
   });

@@ -291,14 +291,14 @@ export class SubmissionService extends DBService {
    * Get all submissions accessible to the given system user via their submission team membership.
    *
    * @param {number} systemUserId - The system user ID to fetch submissions for.
-   * @param {ApiPaginationOptions} [pagination]
+   * @param {ApiPaginationOptions} pagination
    * @param {SubmissionFilters} [filters]
    * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionService
    */
   async getSubmissionsByUserId(
     systemUserId: number,
-    pagination?: ApiPaginationOptions,
+    pagination: ApiPaginationOptions,
     filters?: SubmissionFilters
   ): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
     return this.submissionRepository.getSubmissionsByUserId(systemUserId, pagination, filters);
