@@ -3,7 +3,7 @@ import { getKnex } from '../database/db';
 import { CartStatus, CartSubmissionFeature } from '../models/cart';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
-import { isEffectivelySecured, isVisibleToUser } from './sql-fragments';
+import { isAccessibleToUser, isEffectivelySecured } from './sql-fragments';
 
 /**
  * CartSubmissionFeature repository class.
@@ -90,7 +90,7 @@ export class CartSubmissionFeatureRepository extends BaseRepository {
         SELECT wf.submission_feature_id
         FROM w_features wf
         WHERE
-          ${isVisibleToUser('wf.submission_feature_id')}
+          ${isAccessibleToUser('wf.submission_feature_id')}
       )
       INSERT INTO cart_submission_feature (cart_id, submission_feature_id)
       SELECT wc.cart_id, wvf.submission_feature_id

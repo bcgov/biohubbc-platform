@@ -23,7 +23,7 @@ import { normalizeSearchValue } from '../utils/normalize';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
-import { isEffectivelySecured, isVisibleToUser } from './sql-fragments';
+import { isAccessibleToUser, isEffectivelySecured } from './sql-fragments';
 
 const defaultLog = getLogger('repositories/search-feature-repository');
 
@@ -706,6 +706,6 @@ export class SearchFeatureRepository extends BaseRepository {
     }
 
     // Authenticated: feature is unsecured OR user has team scope grant (single ancestor walk)
-    return knex.raw(`${isVisibleToUser('aggregated_results.submission_feature_id')}`, [systemUserId]);
+    return knex.raw(`${isAccessibleToUser('aggregated_results.submission_feature_id')}`, [systemUserId]);
   }
 }

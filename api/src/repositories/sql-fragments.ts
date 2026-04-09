@@ -54,7 +54,7 @@ export function isEffectivelySecured(featureIdExpr: string): string {
  * @param featureIdExpr SQL expression for the starting submission_feature_id
  *   (e.g. 'wf.submission_feature_id', 'aggregated_results.submission_feature_id')
  */
-export function isVisibleToUser(featureIdExpr: string): string {
+export function isAccessibleToUser(featureIdExpr: string): string {
   return `EXISTS (
     -- Walk up the feature hierarchy once, materialized by PostgreSQL
     WITH RECURSIVE ancestor_chain(id) AS (
