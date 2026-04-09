@@ -20,7 +20,7 @@ export async function up(knex: Knex): Promise<void> {
       update_user INTEGER,
       revision_count INTEGER NOT NULL DEFAULT 0,
       CONSTRAINT download_artifact_pk PRIMARY KEY (download_artifact_id),
-      CONSTRAINT download_artifact_fk1 FOREIGN KEY (download_id) REFERENCES download(download_id) ON DELETE CASCADE,
+      CONSTRAINT download_artifact_fk1 FOREIGN KEY (download_id) REFERENCES download(download_id),
       CONSTRAINT download_artifact_fk2 FOREIGN KEY (artifact_id) REFERENCES artifact(artifact_id)
     );
 
@@ -61,7 +61,7 @@ export async function up(knex: Knex): Promise<void> {
       update_user INTEGER,
       revision_count INTEGER NOT NULL DEFAULT 0,
       CONSTRAINT download_export_pk PRIMARY KEY (download_export_id),
-      CONSTRAINT download_export_fk1 FOREIGN KEY (download_id) REFERENCES download(download_id) ON DELETE CASCADE
+      CONSTRAINT download_export_fk1 FOREIGN KEY (download_id) REFERENCES download(download_id)
     );
 
     CREATE INDEX download_export_idx1 ON download_export(download_id);
@@ -97,7 +97,7 @@ export async function up(knex: Knex): Promise<void> {
       update_user INTEGER,
       revision_count INTEGER NOT NULL DEFAULT 0,
       CONSTRAINT download_export_artifact_pk PRIMARY KEY (download_export_artifact_id),
-      CONSTRAINT download_export_artifact_fk1 FOREIGN KEY (download_export_id) REFERENCES download_export(download_export_id) ON DELETE CASCADE,
+      CONSTRAINT download_export_artifact_fk1 FOREIGN KEY (download_export_id) REFERENCES download_export(download_export_id),
       CONSTRAINT download_export_artifact_fk2 FOREIGN KEY (artifact_id) REFERENCES artifact(artifact_id)
     );
 

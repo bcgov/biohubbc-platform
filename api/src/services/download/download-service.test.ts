@@ -115,9 +115,7 @@ describe('DownloadService', () => {
       const insertArtifactStub = sinon
         .stub(ArtifactService.prototype, 'insertArtifact')
         .resolves({ artifact_id: 'art-uuid-1' });
-      const createDownloadArtifactStub = sinon
-        .stub(DownloadRepository.prototype, 'createDownloadArtifact')
-        .resolves();
+      const createDownloadArtifactStub = sinon.stub(DownloadRepository.prototype, 'createDownloadArtifact').resolves();
 
       const result = await service.createDownload(mockPayload);
 
