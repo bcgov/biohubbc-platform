@@ -1,5 +1,9 @@
 import { AxiosInstance } from 'axios';
-import { ISubmissionFeaturePropertiesResponse, ISubmissionFeatureResponse } from 'interfaces/useFeaturesApi.interface';
+import {
+  ISubmissionFeaturePropertiesResponse,
+  ISubmissionFeatureResponse,
+  SubmissionFeaturePropertyFilters
+} from 'interfaces/useFeaturesApi.interface';
 import qs from 'qs';
 import { ApiPaginationRequestOptions } from 'types/pagination';
 
@@ -32,13 +36,13 @@ export const useFeaturesApi = (axios: AxiosInstance) => {
    *
    * @param {string} submissionId
    * @param {string} submissionFeatureId
-   * @param {ApiPaginationRequestOptions & { search?: string }} params
+   * @param {ApiPaginationRequestOptions & SubmissionFeaturePropertyFilters} params
    * @return {Promise<ISubmissionFeaturePropertiesResponse>}
    */
   const getSubmissionFeatureProperties = async (
     submissionId: string,
     submissionFeatureId: string,
-    params: ApiPaginationRequestOptions & { search?: string }
+    params: ApiPaginationRequestOptions & SubmissionFeaturePropertyFilters
   ): Promise<ISubmissionFeaturePropertiesResponse> => {
     const { data } = await axios.get(`api/submission/${submissionId}/features/${submissionFeatureId}/properties`, {
       params,

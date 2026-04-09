@@ -32,6 +32,10 @@ export interface IFeaturePropertyRow {
   value: string;
 }
 
+export interface SubmissionFeaturePropertyFilters {
+  search?: string;
+}
+
 export interface ISubmissionFeaturePropertiesResponse {
   properties: IFeaturePropertyRow[];
   pagination: ApiPaginationResponseParams;
