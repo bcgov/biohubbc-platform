@@ -14,14 +14,6 @@ import { SubmissionRecordWithSecurityAndRootFeature } from 'interfaces/useSubmis
 import { Link as RouterLink } from 'react-router-dom';
 import { getDaysSinceDate, pluralize as p } from 'utils/Utils';
 
-const SECURITY_LABEL: Record<string, string> = {
-  PENDING: 'Pending Review',
-  SECURED: 'Secured',
-  UNSECURED: 'Published'
-};
-
-const RESPONSIVE_ROW_DIRECTION = { xs: 'column', sm: 'row' } as const;
-
 export interface PortalSubmissionCardProps {
   submission: SubmissionRecordWithSecurityAndRootFeature;
 }
@@ -95,13 +87,13 @@ export const PortalSubmissionCard = ({ submission }: PortalSubmissionCardProps) 
         }}>
         <Stack
           width="100%"
-          flexDirection={RESPONSIVE_ROW_DIRECTION}
+          flexDirection={{ xs: 'column', sm: 'row' }}
           flexWrap="wrap"
           gap={1}
           justifyContent="space-between">
           <Stack
             flex="1 1 auto"
-            flexDirection={RESPONSIVE_ROW_DIRECTION}
+            flexDirection={{ xs: 'column', sm: 'row' }}
             gap={{ xs: 0, sm: 1 }}
             my={1}
             component="dl"
