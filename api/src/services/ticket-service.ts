@@ -38,6 +38,7 @@ export class TicketService extends DBService {
    * Create a new ticket and write its initial status entry.
    *
    * @param {CreateTicketRequest} ticket - Ticket payload to create.
+   * @param {number[]} [systemUserIds=[]] - System user IDs to add as members of the ticket's team.
    * @return {Promise<Ticket>} The newly created ticket.
    * @memberof TicketService
    */

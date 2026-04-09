@@ -14,6 +14,7 @@ type TicketRelationshipType =
 interface TicketScenario {
   key: string;
   subject: string;
+  teamName: string;
   description: string;
   priority: TicketPriority;
   currentStatus: TicketStatus;
@@ -40,6 +41,7 @@ const TICKET_SCENARIOS: TicketScenario[] = [
   {
     key: 'ops-check',
     subject: 'Ops Health Check',
+    teamName: 'Seed Ticket Team Ops',
     description: 'Validate baseline ticket workflow behavior for active operations tickets.',
     priority: 'medium',
     currentStatus: 'open',
@@ -49,6 +51,7 @@ const TICKET_SCENARIOS: TicketScenario[] = [
   {
     key: 'data-fix',
     subject: 'Data Correction',
+    teamName: 'Seed Ticket Team Data',
     description: 'Track correction of a known metadata inconsistency in a historical record.',
     priority: 'high',
     currentStatus: 'closed',
@@ -58,6 +61,7 @@ const TICKET_SCENARIOS: TicketScenario[] = [
   {
     key: 'security-review',
     subject: 'Security Review',
+    teamName: 'Seed Ticket Team Security',
     description: 'Coordinate follow-up actions from a routine security review checklist.',
     priority: 'critical',
     currentStatus: 'open',
@@ -67,6 +71,7 @@ const TICKET_SCENARIOS: TicketScenario[] = [
   {
     key: 'duplicate-cleanup',
     subject: 'Duplicate Cleanup',
+    teamName: 'Seed Ticket Team Cleanup',
     description: 'Resolve duplicate issue reports and consolidate into canonical tracking.',
     priority: 'low',
     currentStatus: 'closed',
@@ -105,11 +110,12 @@ export async function seed(knex: Knex): Promise<void> {
   `);
 
   const createUser = await getSeedCreateUser(knex);
-  const teamId = await getOrCreateSeedTeam(knex, createUser);
 
-  const seededTicketsByKey: Record<string, { ticket_id: string; status: TicketStatus }> = {};
+  const seededTicketsByKey: Record<string, { ticket_id: string; status: TicketStatus; team_id: string }> = {};
 
   for (const scenario of TICKET_SCENARIOS) {
+    const teamId = await getOrCreateSeedTeam(knex, createUser, scenario.teamName);
+
     const ticket = await ensureTicket(knex, {
       subject: scenario.subject,
       description: scenario.description,
@@ -119,7 +125,10 @@ export async function seed(knex: Knex): Promise<void> {
       createUser
     });
 
-    seededTicketsByKey[scenario.key] = ticket;
+    seededTicketsByKey[scenario.key] = {
+      ...ticket,
+      team_id: teamId
+    };
 
     await ensureStatusTimeline(knex, ticket.ticket_id, scenario.statusTimeline, createUser);
 
@@ -136,7 +145,7 @@ export async function seed(knex: Knex): Promise<void> {
   if (opsCheckTicket) {
     await ensureDataRequest(knex, {
       reason: 'Ops health check data request',
-      teamId,
+      teamId: opsCheckTicket.team_id,
       requestedBy: createUser,
       ticketId: opsCheckTicket.ticket_id
     });
@@ -145,7 +154,7 @@ export async function seed(knex: Knex): Promise<void> {
   if (dataFixTicket) {
     await ensureDataRequest(knex, {
       reason: 'Data correction data request',
-      teamId,
+      teamId: dataFixTicket.team_id,
       requestedBy: createUser,
       ticketId: dataFixTicket.ticket_id
     });
@@ -174,9 +183,9 @@ const getSeedCreateUser = async (knex: Knex): Promise<number> => {
   return createUserRow?.system_user_id ?? 1;
 };
 
-const getOrCreateSeedTeam = async (knex: Knex, createUser: number): Promise<string> => {
+const getOrCreateSeedTeam = async (knex: Knex, createUser: number, teamName: string): Promise<string> => {
   const existingTeam = await knex('team')
-    .where('name', 'Seed Ticket Team')
+    .where('name', teamName)
     .whereNull('record_end_date')
     .select('team_id')
     .first();
@@ -187,8 +196,8 @@ const getOrCreateSeedTeam = async (knex: Knex, createUser: number): Promise<stri
 
   const [createdTeam] = await knex('team')
     .insert({
-      name: 'Seed Ticket Team',
-      description: 'Auto-created team for seeded ticket data.',
+      name: teamName,
+      description: `Auto-created team for seeded ticket data (${teamName}).`,
       create_user: createUser
     })
     .returning(['team_id']);

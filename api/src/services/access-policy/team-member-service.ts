@@ -66,6 +66,18 @@ export class TeamMemberService extends DBService {
   }
 
   /**
+   * List distinct team IDs the user is an active member of.
+   *
+   * @param {number} systemUserId - System user ID.
+   * @return {Promise<string[]>}
+   * @memberof TeamMemberService
+   */
+  async getTeamIdsBySystemUserId(systemUserId: number): Promise<string[]> {
+    const members = await this.teamMemberRepository.getTeamMembersBySystemUserId(systemUserId);
+    return members.map((member) => member.team_id);
+  }
+
+  /**
    * Update an existing team member record.
    *
    * @param {string} teamMemberId - The ID of the team member to update.
