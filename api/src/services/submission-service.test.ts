@@ -19,8 +19,8 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
-import { getMockDBConnection } from '../__mocks__/db';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
+import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionService } from './submission-service';
 
 chai.use(sinonChai);
