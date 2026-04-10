@@ -2,7 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../../../../database/db';
 import { defaultErrorResponses } from '../../../../../../openapi/schemas/http-responses';
-import { SubmissionService } from '../../../../../../services/submission-service';
+import { SubmissionFeatureService } from '../../../../../../services/submission-feature-service';
 import { UserService } from '../../../../../../services/user-service';
 import { getLogger } from '../../../../../../utils/logger';
 
@@ -92,11 +92,11 @@ export function getSubmissionFeatureSignedUrl(): RequestHandler {
       await connection.open();
 
       const userService = new UserService(connection);
-      const submissionService = new SubmissionService(connection);
+      const submissionFeatureService = new SubmissionFeatureService(connection);
 
       const isAdmin = await userService.isSystemUserAdmin();
 
-      const signedUrl = await submissionService.getSubmissionFeatureSignedUrl({
+      const signedUrl = await submissionFeatureService.getSubmissionFeatureSignedUrl({
         submissionFeatureId,
         submissionFeatureObj: { key: submissionFeatureDataKey, value: submissionFeatureDataValue },
         isAdmin

@@ -230,7 +230,22 @@ const appTheme = createTheme({
       styleOverrides: {
         root: {
           fontSize: '0.8125rem',
-          lineHeight: 1.35
+          lineHeight: 1.35,
+          '& .MuiBreadcrumbs-ol': {
+            alignItems: 'center',
+            flexWrap: 'nowrap'
+          },
+          '& .MuiBreadcrumbs-li': {
+            minWidth: 0
+          },
+          '& .MuiBreadcrumbs-li > *': {
+            fontSize: '0.8125rem',
+            lineHeight: 1.35,
+            minWidth: 0,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }
         },
         li: {
           fontSize: 'inherit',
@@ -291,14 +306,21 @@ const appTheme = createTheme({
           },
           '& .MuiInputBase-input': {
             padding: '8px 0',
-            color: theme.palette.text.primary
+            color: theme.palette.text.primary,
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
           },
           '& .MuiInputBase-input::placeholder': {
             color: theme.palette.text.secondary,
-            opacity: 0.7
+            opacity: 0.7,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
           },
           '& .MuiInputAdornment-positionStart': {
-            color: alpha(theme.palette.text.secondary, 0.78),
+            color: alpha(theme.palette.text.secondary, 0.5),
             '& .MuiSvgIcon-root, & svg': {
               color: 'inherit'
             }
@@ -367,13 +389,21 @@ const appTheme = createTheme({
     MuiInputBase: {
       styleOverrides: {
         root: ({ theme }) => ({
-          color: theme.palette.text.primary
+          color: theme.palette.text.primary,
+          fontSize: '0.9rem'
         }),
         input: ({ theme }) => ({
           color: theme.palette.text.primary,
+          minWidth: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
           '&::placeholder': {
             color: theme.palette.text.secondary,
-            opacity: 0.7
+            opacity: 0.7,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
           }
         })
       }
@@ -399,6 +429,11 @@ const appTheme = createTheme({
       styleOverrides: {
         root: ({ theme }) => ({
           color: theme.palette.text.secondary,
+          display: 'block',
+          maxWidth: 'calc(100% - 24px)',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
           '&.Mui-focused': {
             color: theme.palette.primary.main
           },

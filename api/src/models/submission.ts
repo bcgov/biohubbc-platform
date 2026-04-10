@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+export interface SubmissionFilters {
+  search?: string;
+}
+
 export const SubmissionFeatureForReview = z.object({
   submission_id: z.number().int(),
   submission_feature_id: z.number().int(),

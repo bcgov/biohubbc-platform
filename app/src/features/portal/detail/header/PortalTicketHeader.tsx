@@ -37,13 +37,11 @@ export const PortalTicketHeader = (props: IPortalTicketHeaderProps) => {
     <PageHeader
       maxWidth="xl"
       breadcrumbs={
-        <Breadcrumbs aria-label="ticket breadcrumb">
-          <Link component={RouterLink} to="/portal/tickets" underline="hover" color="inherit">
-            My Tickets
+        <Breadcrumbs aria-label="breadcrumb">
+          <Link component={RouterLink} to="/portal/ticket" underline="hover" color="inherit">
+            Portal
           </Link>
-          <Typography variant="inherit" color="text.primary">
-            {`Ticket #${ticket.ticket_slug}`}
-          </Typography>
+          <Typography color="text.primary">{ticket.subject}</Typography>
         </Breadcrumbs>
       }
       label={<Typography variant="h1">{ticket.subject}</Typography>}

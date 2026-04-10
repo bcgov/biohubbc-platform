@@ -1,6 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
+import { SubmissionFeatureFilters } from '../../../../models/submission-feature';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema, paginationResponseSchema } from '../../../../openapi/schemas/pagination';
 import { SubmissionService } from '../../../../services/submission-service';
@@ -29,6 +30,15 @@ GET.apiDoc = {
         minimum: 1
       },
       required: true
+    },
+    {
+      in: 'query',
+      name: 'search',
+      required: false,
+      schema: {
+        type: 'string'
+      },
+      description: 'Optional case-insensitive search across feature type name.'
     },
     ...paginationRequestQueryParamSchema
   ],
@@ -86,6 +96,7 @@ export function getSubmissionFeatures(): RequestHandler {
 
     const submissionId = Number(req.params.submissionId);
     const paginationOptions = makePaginationOptionsFromRequest(req);
+    const filters = { search: req.query.search } as SubmissionFeatureFilters;
 
     try {
       await connection.open();
@@ -93,8 +104,8 @@ export function getSubmissionFeatures(): RequestHandler {
       const submissionService = new SubmissionService(connection);
 
       const [features, count] = await Promise.all([
-        submissionService.getSubmissionFeatures(submissionId, paginationOptions),
-        submissionService.getSubmissionFeaturesCount(submissionId)
+        submissionService.getSubmissionFeatures(submissionId, paginationOptions, filters),
+        submissionService.getSubmissionFeaturesCount(submissionId, filters)
       ]);
 
       await connection.commit();
