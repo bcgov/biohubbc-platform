@@ -22,7 +22,7 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownload({});
+      await repo.createDownload({ format: 'csv' });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlText = sqlStub.firstCall.args[0].text;
@@ -41,7 +41,7 @@ describe('DownloadRepository', () => {
 
       const repo = new DownloadRepository(mockDBConnection);
       const filters = { keyword: 'moose' };
-      await repo.createDownload({ filters });
+      await repo.createDownload({ filters, format: 'csv' });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlText = sqlStub.firstCall.args[0].text;
@@ -57,12 +57,12 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownload({});
+      await repo.createDownload({ format: 'csv' });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlValues = sqlStub.firstCall.args[0].values;
-      // filters is second-to-last, cart_id is last
-      expect(sqlValues[sqlValues.length - 2]).to.be.null;
+      // filters is third-to-last, cart_id second-to-last, format last
+      expect(sqlValues[sqlValues.length - 3]).to.be.null;
     });
 
     it('passes cartId value in SQL when provided', async () => {
@@ -73,7 +73,7 @@ describe('DownloadRepository', () => {
 
       const repo = new DownloadRepository(mockDBConnection);
       const cartId = 'cccc0000-0000-0000-0000-000000000001';
-      await repo.createDownload({ cartId });
+      await repo.createDownload({ cartId, format: 'csv' });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlValues = sqlStub.firstCall.args[0].values;
@@ -87,12 +87,13 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownload({ filters: { keyword: 'moose' } });
+      await repo.createDownload({ filters: { keyword: 'moose' }, format: 'csv' });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlValues = sqlStub.firstCall.args[0].values;
-      // cart_id is the last parameter
-      expect(sqlValues[sqlValues.length - 1]).to.be.null;
+      // cart_id is second-to-last parameter (format is last)
+      expect(sqlValues[sqlValues.length - 2]).to.be.null;
+      expect(sqlValues[sqlValues.length - 1]).to.equal('csv');
     });
   });
 
@@ -128,26 +129,23 @@ describe('DownloadRepository', () => {
   });
 
   describe('createDownloadArtifact', () => {
-    it('inserts into download_artifact with downloadId, artifactId, and format', async () => {
+    it('inserts into download_artifact with downloadId and artifactId', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
       await repo.createDownloadArtifact(
         'aaaa0000-0000-0000-0000-000000000001',
-        'bbbb0000-0000-0000-0000-000000000001',
-        'parquet'
+        'bbbb0000-0000-0000-0000-000000000001'
       );
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlText = sqlStub.firstCall.args[0].text;
       expect(sqlText).to.include('download_artifact');
       expect(sqlText).to.include('artifact_id');
-      expect(sqlText).to.include('format');
       const sqlValues = sqlStub.firstCall.args[0].values;
       expect(sqlValues).to.include('aaaa0000-0000-0000-0000-000000000001');
       expect(sqlValues).to.include('bbbb0000-0000-0000-0000-000000000001');
-      expect(sqlValues).to.include('parquet');
     });
 
     it('throws ApiExecuteSQLError when rowCount is not 1', async () => {
@@ -159,8 +157,7 @@ describe('DownloadRepository', () => {
       try {
         await repo.createDownloadArtifact(
           'aaaa0000-0000-0000-0000-000000000001',
-          'bbbb0000-0000-0000-0000-000000000001',
-          'parquet'
+          'bbbb0000-0000-0000-0000-000000000001'
         );
         expect.fail('Expected error');
       } catch (err: any) {

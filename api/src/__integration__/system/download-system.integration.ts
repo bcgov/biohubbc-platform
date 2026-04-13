@@ -254,6 +254,7 @@ describe('Download Worker', function () {
       .insert({
         download_status: 'pending',
         cart_id: cart.cart_id,
+        format: 'csv',
         create_user: SYSTEM_USER_ID,
         ...downloadOverrides
       })
@@ -595,7 +596,8 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     const systemUserId = connection.systemUserId();
     const cartResponse = await cartService.createCart(systemUserId, featureIds);
     const { download_id } = await crudService.createDownload({
-      cartId: cartResponse.cart.cart_id
+      cartId: cartResponse.cart.cart_id,
+      format: 'csv'
     });
 
     // Run the three-phase pipeline within the test transaction
@@ -903,7 +905,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
   async function executeFilterAndGetZip(
     filters: Record<string, unknown>
   ): Promise<{ zip: AdmZip; downloadId: string }> {
-    const { download_id } = await crudService.createDownload({ filters });
+    const { download_id } = await crudService.createDownload({ filters, format: 'csv' });
 
     // Run the three-phase pipeline within the test transaction
     await service.planDownloadIfNeeded(download_id);

@@ -5,6 +5,7 @@ import { DownloadStatusZod } from './download-status';
 export const DownloadRecord = z.object({
   download_id: z.string(),
   download_status: DownloadStatusZod,
+  format: z.string(),
   metadata: z.object({}).passthrough().nullable(),
   started_at: z.string().nullable(),
   completed_at: z.string().nullable(),
@@ -82,7 +83,8 @@ export type DownloadSource = z.infer<typeof DownloadSource>;
 export const CreateDownload = z.object({
   fragmentSizeBytes: z.number().optional(),
   filters: SearchFeatureFiltersSchema.optional(),
-  cartId: z.string().uuid().optional()
+  cartId: z.string().uuid().optional(),
+  format: z.string()
 });
 export type CreateDownload = z.infer<typeof CreateDownload>;
 

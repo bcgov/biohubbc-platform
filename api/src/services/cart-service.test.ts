@@ -268,7 +268,8 @@ describe('CartService', () => {
       expect(getIdsStub).to.have.been.calledOnceWith('cart-1');
       expect(createDownloadStub).to.have.been.calledOnceWith({
         fragmentSizeBytes: undefined,
-        cartId: 'cart-1'
+        cartId: 'cart-1',
+        format: 'csv'
       });
       expect(createTeamStub).to.have.been.calledOnceWith({
         name: `Team for cart cart-1`,
@@ -301,7 +302,8 @@ describe('CartService', () => {
 
       expect(createDownloadStub).to.have.been.calledOnceWith({
         fragmentSizeBytes: undefined,
-        cartId: 'cart-1'
+        cartId: 'cart-1',
+        format: 'csv'
       });
       expect(updateCartStub).to.have.been.calledOnceWith('cart-1', {
         cart_status: CartStatus.CHECKED_OUT,
@@ -359,7 +361,8 @@ describe('CartService', () => {
 
       expect(createDownloadStub).to.have.been.calledOnceWith({
         fragmentSizeBytes: 500 * 1024 * 1024,
-        cartId: 'cart-1'
+        cartId: 'cart-1',
+        format: 'csv'
       });
     });
 

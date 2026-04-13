@@ -56,9 +56,10 @@ export class DownloadService extends DBService {
    *
    * Downloads are tracked as formal artifacts from the moment they're requested.
    * A pending artifact is created (no file yet — the pipeline writes the file in
-   * a follow-up ticket) and linked via download_artifact. The S3 key is deterministic:
-   * `downloads/{downloadId}/download.parquet`. The artifact table's UNIQUE (bucket,
-   * object_key) constraint ensures idempotency on retry.
+   * a follow-up ticket) and linked via download_artifact. The S3 key includes a
+   * timestamp to prevent local filename collisions when a user downloads multiple
+   * times: `downloads/{downloadId}/download-{timestamp}.{format}`. The artifact
+   * table's UNIQUE (bucket, object_key) constraint ensures idempotency on retry.
    *
    * @param {CreateDownload} payload - The download record to create.
    * @return {Promise<DownloadId>} The created record ID.
@@ -67,16 +68,18 @@ export class DownloadService extends DBService {
   async createDownload(payload: CreateDownload): Promise<DownloadId> {
     const downloadId = await this.downloadRepository.createDownload(payload);
 
+    const timestamp = new Date().toISOString().replace(/:/g, '').replace(/\.\d{3}/, '');
+    const { format } = payload;
     const artifact = await this.artifactService.insertArtifact({
       bucket: getObjectStoreBucketName(),
-      object_key: `downloads/${downloadId.download_id}/download.parquet`,
+      object_key: `downloads/${downloadId.download_id}/download-${timestamp}.${format}`,
       byte_size: null,
       artifact_status: ArtifactStatusEnum.PENDING,
       checksum_sha256: null,
       uploaded_at: null
     });
 
-    await this.downloadRepository.createDownloadArtifact(downloadId.download_id, artifact.artifact_id, 'parquet');
+    await this.downloadRepository.createDownloadArtifact(downloadId.download_id, artifact.artifact_id);
 
     return downloadId;
   }

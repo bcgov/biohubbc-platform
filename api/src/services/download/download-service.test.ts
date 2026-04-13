@@ -62,6 +62,7 @@ describe('DownloadService', () => {
         {
           download_id: 'aaaa0000-0000-0000-0000-000000000001',
           download_status: 'ready' as const,
+          format: 'csv',
           metadata: null,
           started_at: '2025-01-01T00:00:00Z',
           completed_at: '2025-01-01T00:01:00Z',
@@ -101,7 +102,8 @@ describe('DownloadService', () => {
 
   describe('createDownload', () => {
     const mockPayload = {
-      cartId: 'aaaa0000-0000-0000-0000-000000000001'
+      cartId: 'aaaa0000-0000-0000-0000-000000000001',
+      format: 'csv'
     };
 
     it('creates download, pending artifact, and download_artifact link', async () => {
@@ -121,15 +123,14 @@ describe('DownloadService', () => {
 
       expect(result).to.deep.equal({ download_id: 'dl-uuid-1' });
       expect(createDownloadStub).to.have.been.calledOnceWith(mockPayload);
-      expect(insertArtifactStub).to.have.been.calledOnceWith({
-        bucket: 'test-bucket',
-        object_key: 'downloads/dl-uuid-1/download.parquet',
-        byte_size: null,
-        artifact_status: ArtifactStatusEnum.PENDING,
-        checksum_sha256: null,
-        uploaded_at: null
-      });
-      expect(createDownloadArtifactStub).to.have.been.calledOnceWith('dl-uuid-1', 'art-uuid-1', 'parquet');
+      const artifactCall = insertArtifactStub.firstCall.args[0];
+      expect(artifactCall.bucket).to.equal('test-bucket');
+      expect(artifactCall.object_key).to.match(/^downloads\/dl-uuid-1\/download-\d{4}-\d{2}-\d{2}T\d{6}Z\.csv$/);
+      expect(artifactCall.byte_size).to.be.null;
+      expect(artifactCall.artifact_status).to.equal(ArtifactStatusEnum.PENDING);
+      expect(artifactCall.checksum_sha256).to.be.null;
+      expect(artifactCall.uploaded_at).to.be.null;
+      expect(createDownloadArtifactStub).to.have.been.calledOnceWith('dl-uuid-1', 'art-uuid-1');
     });
 
     it('propagates error when artifact insert fails', async () => {
@@ -170,6 +171,7 @@ describe('DownloadService', () => {
   const createMockDownloadRecord = (overrides?: Partial<DownloadRecord>): DownloadRecord => ({
     download_id: 'aaaa0000-0000-0000-0000-000000000042',
     download_status: DownloadStatusEnum.PROCESSING,
+    format: 'csv',
     metadata: null,
     started_at: null,
     completed_at: null,

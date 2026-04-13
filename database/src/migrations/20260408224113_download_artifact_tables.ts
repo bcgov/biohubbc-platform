@@ -8,11 +8,14 @@ export async function up(knex: Knex): Promise<void> {
     -- DOWNLOAD_ARTIFACT
     --------------------------------------------------------------------------------
 
+    -- Add requested format to the download table (the artifact table tracks actual file format)
+    ALTER TABLE download ADD COLUMN format VARCHAR(50) NOT NULL DEFAULT 'csv';
+    ALTER TABLE download ALTER COLUMN format DROP DEFAULT;
+
     CREATE TABLE download_artifact (
       download_artifact_id INTEGER GENERATED ALWAYS AS IDENTITY NOT NULL,
       download_id UUID NOT NULL,
       artifact_id UUID NOT NULL,
-      format VARCHAR(50) NOT NULL,
       record_end_date TIMESTAMPTZ(6),
       create_date TIMESTAMPTZ(6) DEFAULT now() NOT NULL,
       create_user INTEGER NOT NULL,
@@ -35,7 +38,6 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN download_artifact.download_artifact_id IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN download_artifact.download_id IS 'Foreign key to the download table.';
     COMMENT ON COLUMN download_artifact.artifact_id IS 'Foreign key to the artifact table.';
-    COMMENT ON COLUMN download_artifact.format IS 'Artifact format (e.g. parquet). Currently only parquet, but supports future formats (tif, zarr) for spatial data exports where parquet is not ideal.';
     COMMENT ON COLUMN download_artifact.record_end_date IS 'Timestamp for soft delete; null when record is active.';
     COMMENT ON COLUMN download_artifact.create_date IS 'The datetime the record was created.';
     COMMENT ON COLUMN download_artifact.create_user IS 'The id of the user who created the record.';
@@ -166,5 +168,7 @@ export async function down(knex: Knex): Promise<void> {
     DROP TABLE IF EXISTS download_export_artifact;
     DROP TABLE IF EXISTS download_export;
     DROP TABLE IF EXISTS download_artifact;
+
+    ALTER TABLE download DROP COLUMN IF EXISTS format;
   `);
 }

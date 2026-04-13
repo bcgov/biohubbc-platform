@@ -38,12 +38,12 @@ export class DownloadRepository extends BaseRepository {
    * @memberof DownloadRepository
    */
   async createDownload(payload: CreateDownload): Promise<DownloadId> {
-    const { fragmentSizeBytes, filters, cartId } = payload;
+    const { fragmentSizeBytes, filters, cartId, format } = payload;
     const sizeBytes = fragmentSizeBytes ?? FRAGMENT_SIZE_THRESHOLD;
 
     const sql = SQL`
-      INSERT INTO download (download_status, fragment_size_bytes, filters, cart_id)
-      VALUES ('pending', ${sizeBytes}, ${filters ? JSON.stringify(filters) : null}::jsonb, ${cartId ?? null})
+      INSERT INTO download (download_status, fragment_size_bytes, filters, cart_id, format)
+      VALUES ('pending', ${sizeBytes}, ${filters ? JSON.stringify(filters) : null}::jsonb, ${cartId ?? null}, ${format})
       RETURNING download_id;
     `;
 
@@ -94,14 +94,13 @@ export class DownloadRepository extends BaseRepository {
    *
    * @param {string} downloadId - The download ID.
    * @param {string} artifactId - The artifact ID.
-   * @param {string} format - The artifact format (e.g. 'parquet').
    * @return {Promise<void>}
    * @memberof DownloadRepository
    */
-  async createDownloadArtifact(downloadId: string, artifactId: string, format: string): Promise<void> {
+  async createDownloadArtifact(downloadId: string, artifactId: string): Promise<void> {
     const sql = SQL`
-      INSERT INTO download_artifact (download_id, artifact_id, format)
-      VALUES (${downloadId}, ${artifactId}, ${format});
+      INSERT INTO download_artifact (download_id, artifact_id)
+      VALUES (${downloadId}, ${artifactId});
     `;
 
     const response = await this.connection.sql(sql);
@@ -126,6 +125,7 @@ export class DownloadRepository extends BaseRepository {
       SELECT
         download_id,
         download_status,
+        format,
         metadata,
         started_at,
         completed_at,
@@ -168,6 +168,7 @@ export class DownloadRepository extends BaseRepository {
       .select([
         'd.download_id',
         'd.download_status',
+        'd.format',
         'd.metadata',
         'd.started_at',
         'd.completed_at',
