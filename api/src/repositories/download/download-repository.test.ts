@@ -134,10 +134,7 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownloadArtifact(
-        'aaaa0000-0000-0000-0000-000000000001',
-        'bbbb0000-0000-0000-0000-000000000001'
-      );
+      await repo.createDownloadArtifact('aaaa0000-0000-0000-0000-000000000001', 'bbbb0000-0000-0000-0000-000000000001');
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlText = sqlStub.firstCall.args[0].text;

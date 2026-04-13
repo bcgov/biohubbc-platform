@@ -312,6 +312,7 @@ describe('Download Worker', function () {
         byte_size: testFileContent.length,
         artifact_status: 'uploaded',
         uploaded_at: new Date().toISOString(),
+        format: 'tar',
         create_user: SYSTEM_USER_ID
       })
       .returning('artifact_id');
@@ -427,6 +428,7 @@ describe('Download Worker', function () {
         byte_size: file.content.length,
         artifact_status: 'uploaded',
         uploaded_at: new Date().toISOString(),
+        format: 'tar',
         create_user: SYSTEM_USER_ID
       });
       createdArtifactIds.push((await db('biohub.artifact').where('object_key', file.key).first()).artifact_id);
@@ -795,8 +797,8 @@ describe('DownloadPipelineService download pipeline (system)', function () {
       s3KeysToCleanup.push(file.key);
 
       await connection.sql(SQL`
-        INSERT INTO artifact (bucket, object_key, byte_size, artifact_status, uploaded_at, create_user)
-        VALUES (${bucketName}, ${file.key}, ${file.content.length}, 'uploaded', now(), ${systemUserId});
+        INSERT INTO artifact (bucket, object_key, byte_size, artifact_status, uploaded_at, format, create_user)
+        VALUES (${bucketName}, ${file.key}, ${file.content.length}, 'uploaded', now(), 'tar', ${systemUserId});
       `);
 
       const featureId = await createTestFeature(connection, submissionId, 'file', {

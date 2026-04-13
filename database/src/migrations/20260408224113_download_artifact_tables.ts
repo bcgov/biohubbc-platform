@@ -12,6 +12,13 @@ export async function up(knex: Knex): Promise<void> {
     ALTER TABLE download ADD COLUMN format VARCHAR(50) NOT NULL DEFAULT 'csv';
     ALTER TABLE download ALTER COLUMN format DROP DEFAULT;
 
+    -- Add actual file format to the artifact table (distinct from download.format which is the requested format)
+    ALTER TABLE artifact ADD COLUMN format VARCHAR(50);
+    UPDATE artifact SET format = 'tar' WHERE format IS NULL;
+    ALTER TABLE artifact ALTER COLUMN format SET NOT NULL;
+
+    COMMENT ON COLUMN artifact.format IS 'File format of the stored artifact (e.g. tar, csv). Tracks the physical format of the file in object storage. Distinct from download.format which is the user requested format.';
+
     CREATE TABLE download_artifact (
       download_artifact_id INTEGER GENERATED ALWAYS AS IDENTITY NOT NULL,
       download_id UUID NOT NULL,
@@ -170,5 +177,7 @@ export async function down(knex: Knex): Promise<void> {
     DROP TABLE IF EXISTS download_artifact;
 
     ALTER TABLE download DROP COLUMN IF EXISTS format;
+
+    ALTER TABLE artifact DROP COLUMN IF EXISTS format;
   `);
 }

@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import mime from 'mime';
 import { IDBConnection } from '../../database/db';
 import { ArtifactStatusEnum, BatchUpdateArtifact } from '../../models/artifact';
 import { CreateUploadArtifact, UploadArtifactRoleEnum } from '../../models/upload-artifact';
@@ -104,7 +105,8 @@ export class MediaIngestionService extends DBService {
             byte_size: mediaFile.byteSize,
             artifact_status: ArtifactStatusEnum.PENDING,
             checksum_sha256: null,
-            uploaded_at: null
+            uploaded_at: null,
+            format: mime.getExtension(mediaFile.mimetype) ?? 'bin'
           });
 
           // Step 2: queue upload_artifact lineage row (path is archive-relative files/* path).

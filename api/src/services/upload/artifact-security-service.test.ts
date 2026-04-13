@@ -223,7 +223,8 @@ describe('ArtifactSecurityService', () => {
       object_key: 'uploads/test.tar',
       byte_size: '1000',
       checksum_sha256: null,
-      uploaded_at: '2024-01-01T00:00:00Z'
+      uploaded_at: '2024-01-01T00:00:00Z',
+      format: 'tar'
     };
 
     const mockSecurityRecord: ArtifactSecurity = {

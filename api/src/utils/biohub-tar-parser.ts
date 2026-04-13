@@ -269,7 +269,8 @@ async function uploadMediaEntry(
     s3Key: context.s3Key,
     path: context.path,
     byteSize: context.byteSize,
-    checksumSha256
+    checksumSha256,
+    mimetype: context.mimetype
   };
 
   onUploaded();

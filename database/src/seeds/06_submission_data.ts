@@ -146,6 +146,7 @@ const createDirectUpload = async (
         checksum_sha256: faker.string.hexadecimal({ length: 64, casing: 'lower' }).substring(0, 64),
         artifact_status: 'uploaded',
         uploaded_at: new Date(),
+        format: 'tar',
         create_user: 1
       })
       .returning('artifact_id');
@@ -215,6 +216,7 @@ const createArchiveUpload = async (
       checksum_sha256: faker.string.hexadecimal({ length: 64, casing: 'lower' }).substring(0, 64),
       artifact_status: 'uploaded',
       uploaded_at: new Date(),
+      format: 'tar',
       create_user: 1
     })
     .returning('artifact_id');
@@ -276,6 +278,7 @@ const createArchiveUpload = async (
         checksum_sha256: faker.string.hexadecimal({ length: 64, casing: 'lower' }).substring(0, 64),
         artifact_status: 'uploaded',
         uploaded_at: new Date(),
+        format: 'tar',
         create_user: 1
       })
       .returning('artifact_id');

@@ -68,7 +68,10 @@ export class DownloadService extends DBService {
   async createDownload(payload: CreateDownload): Promise<DownloadId> {
     const downloadId = await this.downloadRepository.createDownload(payload);
 
-    const timestamp = new Date().toISOString().replace(/:/g, '').replace(/\.\d{3}/, '');
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/:/g, '')
+      .replace(/\.\d{3}/, '');
     const { format } = payload;
     const artifact = await this.artifactService.insertArtifact({
       bucket: getObjectStoreBucketName(),
@@ -76,7 +79,8 @@ export class DownloadService extends DBService {
       byte_size: null,
       artifact_status: ArtifactStatusEnum.PENDING,
       checksum_sha256: null,
-      uploaded_at: null
+      uploaded_at: null,
+      format
     });
 
     await this.downloadRepository.createDownloadArtifact(downloadId.download_id, artifact.artifact_id);

@@ -160,7 +160,7 @@ describe('Download services (integration)', function () {
 
       // Verify the linked artifact exists with correct status and key pattern
       const artifactRows = await connection.sql(SQL`
-        SELECT a.artifact_status, a.object_key, a.bucket
+        SELECT a.artifact_status, a.object_key, a.bucket, a.format
         FROM artifact a
         JOIN download_artifact da ON da.artifact_id = a.artifact_id
         WHERE da.download_id = ${download_id}
@@ -168,8 +168,14 @@ describe('Download services (integration)', function () {
       `);
       expect(artifactRows.rowCount).to.equal(1);
       expect(artifactRows.rows[0].artifact_status).to.equal('pending');
-      expect(artifactRows.rows[0].object_key).to.match(new RegExp(`^downloads/${download_id}/download-\\d{4}-\\d{2}-\\d{2}T\\d{6}Z\\.csv$`));
+      expect(artifactRows.rows[0].object_key).to.match(
+        new RegExp(`^downloads/${download_id}/download-\\d{4}-\\d{2}-\\d{2}T\\d{6}Z\\.csv$`)
+      );
       expect(artifactRows.rows[0].bucket).to.not.be.empty;
+      expect(artifactRows.rows[0].format).to.equal('csv');
+
+      // download.format (requested) matches artifact.format (actual) for new downloads
+      expect(dlRows.rows[0].format).to.equal(artifactRows.rows[0].format);
     });
 
     it('should create a pending artifact for filter-based download', async () => {
@@ -185,12 +191,15 @@ describe('Download services (integration)', function () {
       expect(daRows.rowCount).to.equal(1);
 
       const artifactRows = await connection.sql(SQL`
-        SELECT a.artifact_status, a.object_key
+        SELECT a.artifact_status, a.object_key, a.format
         FROM artifact a
         WHERE a.artifact_id = ${daRows.rows[0].artifact_id};
       `);
       expect(artifactRows.rows[0].artifact_status).to.equal('pending');
-      expect(artifactRows.rows[0].object_key).to.match(new RegExp(`^downloads/${download_id}/download-\\d{4}-\\d{2}-\\d{2}T\\d{6}Z\\.csv$`));
+      expect(artifactRows.rows[0].object_key).to.match(
+        new RegExp(`^downloads/${download_id}/download-\\d{4}-\\d{2}-\\d{2}T\\d{6}Z\\.csv$`)
+      );
+      expect(artifactRows.rows[0].format).to.equal('csv');
     });
 
     it('should rollback artifact and download_artifact when transaction is rolled back', async () => {
@@ -219,8 +228,13 @@ describe('Download services (integration)', function () {
       `);
       expect(afterRows.rowCount).to.equal(0);
 
+      // Verify artifact is also rolled back — join through download_artifact
+      // to find the artifact by download_id (object_key includes a timestamp
+      // so we can't reconstruct it from here)
       const afterArtifact = await connection.sql(SQL`
-        SELECT 1 FROM artifact WHERE object_key = ${'downloads/' + download_id + '/download.parquet'};
+        SELECT 1 FROM artifact a
+        JOIN download_artifact da ON da.artifact_id = a.artifact_id
+        WHERE da.download_id = ${download_id};
       `);
       expect(afterArtifact.rowCount).to.equal(0);
     });
