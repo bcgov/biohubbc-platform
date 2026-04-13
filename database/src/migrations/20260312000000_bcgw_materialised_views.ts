@@ -212,6 +212,34 @@ WHERE ft.name = 'telemetry'
 
   await knex.raw(`
 CREATE MATERIALIZED VIEW bcgw.observations_public AS
+WITH site_linked_observations AS (
+  -- Observations with parent that is a sample_site
+  SELECT DISTINCT sf.submission_feature_id
+  FROM biohub.submission_feature sf
+  WHERE sf.parent_submission_feature_id IS NOT NULL
+    AND sf.parent_submission_feature_id IN (
+      SELECT submission_feature_id 
+      FROM biohub.submission_feature sf_parent
+      JOIN biohub.feature_type ft_parent ON sf_parent.feature_type_id = ft_parent.feature_type_id
+      WHERE ft_parent.name = 'sample_site' AND sf_parent.record_end_date IS NULL
+    )
+  
+  UNION
+  
+  -- Observations linked to sample_sites via submission_feature_feature
+  SELECT DISTINCT sf.submission_feature_id
+  FROM biohub.submission_feature sf
+  JOIN biohub.submission_feature_feature sff ON (
+    sff.source_feature_id = sf.submission_feature_id OR sff.target_feature_id = sf.submission_feature_id
+  )
+  JOIN biohub.submission_feature sf_site ON (
+    (sff.source_feature_id = sf_site.submission_feature_id AND sff.target_feature_id = sf.submission_feature_id)
+    OR
+    (sff.target_feature_id = sf_site.submission_feature_id AND sff.source_feature_id = sf.submission_feature_id)
+  )
+  JOIN biohub.feature_type ft_site ON sf_site.feature_type_id = ft_site.feature_type_id
+  WHERE ft_site.name = 'sample_site' AND sf_site.record_end_date IS NULL
+)
 SELECT
     sf.submission_feature_id AS Feature_ID,
     (sf.data->>'timestamp')::timestamptz AS DATETIME,
@@ -239,7 +267,8 @@ WHERE ft.name = 'species_observation'
   AND sf.submission_feature_id NOT IN (
         SELECT submission_feature_id
         FROM biohub.submission_feature_security
-      );
+      )
+  AND sf.submission_feature_id IN (SELECT submission_feature_id FROM site_linked_observations);
   `);
 
   await knex.raw(`
@@ -256,11 +285,86 @@ WHERE ft.name = 'species_observation'
     COMMENT ON COLUMN bcgw.observations_public.sex IS 'Sex label from contributor codeset codes (male, female, unknown) matched by contributor_codeset_code_id';
     COMMENT ON COLUMN bcgw.observations_public.life_stage IS 'Life stage label from contributor codeset codes (adult, juvenile, etc.) matched by contributor_codeset_code_id';
   `);
+
+  await knex.raw(`
+CREATE MATERIALIZED VIEW bcgw.incidental_public AS
+WITH site_linked_observations AS (
+  -- Observations with parent that is a sample_site
+  SELECT DISTINCT sf.submission_feature_id
+  FROM biohub.submission_feature sf
+  WHERE sf.parent_submission_feature_id IS NOT NULL
+    AND sf.parent_submission_feature_id IN (
+      SELECT submission_feature_id 
+      FROM biohub.submission_feature sf_parent
+      JOIN biohub.feature_type ft_parent ON sf_parent.feature_type_id = ft_parent.feature_type_id
+      WHERE ft_parent.name = 'sample_site' AND sf_parent.record_end_date IS NULL
+    )
+  
+  UNION
+  
+  -- Observations linked to sample_sites via submission_feature_feature
+  SELECT DISTINCT sf.submission_feature_id
+  FROM biohub.submission_feature sf
+  JOIN biohub.submission_feature_feature sff ON (
+    sff.source_feature_id = sf.submission_feature_id OR sff.target_feature_id = sf.submission_feature_id
+  )
+  JOIN biohub.submission_feature sf_site ON (
+    (sff.source_feature_id = sf_site.submission_feature_id AND sff.target_feature_id = sf.submission_feature_id)
+    OR
+    (sff.target_feature_id = sf_site.submission_feature_id AND sff.source_feature_id = sf.submission_feature_id)
+  )
+  JOIN biohub.feature_type ft_site ON sf_site.feature_type_id = ft_site.feature_type_id
+  WHERE ft_site.name = 'sample_site' AND sf_site.record_end_date IS NULL
+)
+SELECT
+    sf.submission_feature_id AS Feature_ID,
+    (sf.data->>'timestamp')::timestamptz AS DATETIME,
+    (EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz))::int AS YEAR,
+    public.ST_Y(public.ST_GeomFromGeoJSON(sf.data->>'geometry')) AS Latitude,
+    public.ST_X(public.ST_GeomFromGeoJSON(sf.data->>'geometry')) AS Longitude,
+    (sf.data->>'sign')::text AS sign,
+    (sf.data->>'count')::int AS count,
+    (sf.data->>'taxon_id')::int AS taxon_id,
+    t.itis_scientific_name AS scientific_name,
+    t.common_name AS common_name,
+    COALESCE(ccc_sex.label, (sf.data->>'sex')::text) AS sex,
+    COALESCE(ccc_life_stage.label, (sf.data->>'life_stage')::text) AS life_stage
+FROM biohub.submission_feature sf
+JOIN biohub.feature_type ft
+  ON sf.feature_type_id = ft.feature_type_id
+LEFT JOIN biohub.taxon t
+  ON t.itis_tsn = (sf.data->>'taxon_id')::int
+LEFT JOIN biohub.contributor_codeset_code ccc_sex
+  ON (sf.data->>'sex')::int = ccc_sex.contributor_codeset_code_id
+LEFT JOIN biohub.contributor_codeset_code ccc_life_stage
+  ON (sf.data->>'life_stage')::int = ccc_life_stage.contributor_codeset_code_id
+WHERE ft.name = 'species_observation'
+  AND sf.record_end_date IS NULL
+  AND sf.submission_feature_id NOT IN (
+        SELECT submission_feature_id
+        FROM biohub.submission_feature_security
+      )
+  AND sf.submission_feature_id NOT IN (SELECT submission_feature_id FROM site_linked_observations);
+  `);
+
+  await knex.raw(`
+    COMMENT ON COLUMN bcgw.incidental_public.Feature_ID IS 'System generated surrogate primary key identifier';
+    COMMENT ON COLUMN bcgw.incidental_public.Latitude IS 'The latitude of the observation location';
+    COMMENT ON COLUMN bcgw.incidental_public.Longitude IS 'The longitude of the observation location';
+    COMMENT ON COLUMN bcgw.incidental_public.DATETIME IS 'The timestamp of the observation';
+    COMMENT ON COLUMN bcgw.incidental_public.YEAR IS 'The year of the observation';
+    COMMENT ON COLUMN bcgw.incidental_public.sign IS 'Type of sign associated with the observation';
+    COMMENT ON COLUMN bcgw.incidental_public.count IS 'Count value for the observation';
+    COMMENT ON COLUMN bcgw.incidental_public.taxon_id IS 'Taxonomic identifier extracted from the observation payload';
+    COMMENT ON COLUMN bcgw.incidental_public.scientific_name IS 'Scientific name from taxon table linked via ITIS TSN';
+    COMMENT ON COLUMN bcgw.incidental_public.common_name IS 'Common name from taxon table linked via ITIS TSN';
+    COMMENT ON COLUMN bcgw.incidental_public.sex IS 'Sex label from contributor codeset codes (male, female, unknown) matched by contributor_codeset_code_id';
+    COMMENT ON COLUMN bcgw.incidental_public.life_stage IS 'Life stage label from contributor codeset codes (adult, juvenile, etc.) matched by contributor_codeset_code_id';
+  `);
 }
 
 /**
  * Revert materialized view.
- *
  * @export
  * @param {Knex} knex
  * @return {*}  {Promise<void>}
@@ -274,5 +378,8 @@ export async function down(knex: Knex): Promise<void> {
   `);
   await knex.raw(`
     DROP MATERIALIZED VIEW IF EXISTS bcgw.observations_public;
+  `);
+  await knex.raw(`
+    DROP MATERIALIZED VIEW IF EXISTS bcgw.incidental_public;
   `);
 }

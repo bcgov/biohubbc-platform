@@ -100,6 +100,7 @@ const insertRecord = async (knex: Knex) => {
 
   // Sample Sites and their children
   const animalIds: number[] = [];
+  const sampleSiteObservations: { sampleSiteId: number; observationIds: number[] }[] = [];
   const sampleSitePromises = Array.from({ length: 10 }).map(async () => {
     const parent_submission_feature_id2 = await insertSampleSiteRecord(knex, {
       submission_id,
@@ -127,10 +128,16 @@ const insertRecord = async (knex: Knex) => {
 
     // Wait for all animals and observations for this sample site
     const animalResults = await Promise.all(animalPromises);
-    await Promise.all(observationPromises);
+    const observationResults = await Promise.all(observationPromises);
 
     // Collect animal IDs
     animalIds.push(...animalResults);
+
+    // Store sample site and its observation IDs for linking
+    sampleSiteObservations.push({
+      sampleSiteId: parent_submission_feature_id2,
+      observationIds: observationResults
+    });
   });
 
   // Telemetry
@@ -174,6 +181,21 @@ const insertRecord = async (knex: Knex) => {
       INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
       VALUES (${animalId}, ${randomDeployment.id})
     `);
+  }
+
+  // Link some observations to their sample sites
+  for (const { sampleSiteId, observationIds } of sampleSiteObservations) {
+    const linkPercentage = Math.random() * 0.4 + 0.3;
+    const numToLink = Math.max(1, Math.floor(observationIds.length * linkPercentage));
+    const shuffledObservations = observationIds.sort(() => Math.random() - 0.5);
+
+    for (let i = 0; i < numToLink; i++) {
+      const observationId = shuffledObservations[i];
+      await knex.raw(`
+        INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
+        VALUES (${sampleSiteId}, ${observationId})
+      `);
+    }
   }
 };
 
