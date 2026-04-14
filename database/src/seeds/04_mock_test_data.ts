@@ -460,6 +460,17 @@ export const insertObservationRecord = async (
 
   await knex.raw(`${insertSpatialPoint({ submission_feature_id })}`);
 
+  // randomly secure some observation points
+  if (Math.random() < 0.1) {
+    const ruleRes = await knex.raw(`SELECT security_rule_id FROM security_rule ORDER BY random() LIMIT 1`);
+    if (ruleRes.rows.length) {
+      await insertSubmissionFeatureSecurity(knex, {
+        submission_feature_id,
+        security_rule_id: ruleRes.rows[0].security_rule_id
+      });
+    }
+  }
+
   return submission_feature_id;
 };
 
