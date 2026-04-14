@@ -150,8 +150,17 @@ const insertRecord = async (knex: Knex) => {
     });
   });
 
-  // Wait for all sample sites and telemetry to complete concurrently
-  await Promise.all([...sampleSitePromises, ...telemetryPromises]);
+  // Create some incidental observations with no parent feature.
+  const incidentalObservationPromises = Array.from({ length: 10 }).map(() =>
+    insertObservationRecord(knex, {
+      submission_id,
+      submission_upload_id,
+      parent_submission_feature_id: null
+    })
+  );
+
+  // Wait for all sample sites, incidental observations, and telemetry to complete concurrently
+  await Promise.all([...sampleSitePromises, ...telemetryPromises, ...incidentalObservationPromises]);
 
   // Seed submission_feature_feature table
   for (const deployment of deployments) {
@@ -406,7 +415,7 @@ export const insertSampleSiteRecord = async (
 
 export const insertObservationRecord = async (
   knex: Knex,
-  options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number }
+  options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number | null }
 ): Promise<number> => {
   const taxonId = await getRandomTaxonId(knex);
 
