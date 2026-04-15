@@ -164,11 +164,11 @@ const Header = () => {
                 <AuthGuard>
                   <MenuItem
                     component={RouterLink}
-                    to="/portal/tickets"
-                    id="menu_portal_tickets_sm"
+                    to="/portal"
+                    id="menu_portal_sm"
                     onClick={hideMobileMenu}
-                    data-testid="collapsed_portal-tickets-header-item">
-                    Tickets
+                    data-testid="collapsed_portal-header-item">
+                    Portal
                   </MenuItem>
                 </AuthGuard>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
@@ -281,8 +281,8 @@ const Header = () => {
                   Home
                 </RouterLink>
                 <AuthGuard>
-                  <RouterLink to="/portal/tickets" id="menu_portal_tickets" data-testid="portal-tickets-header-item">
-                    Tickets
+                  <RouterLink to="/portal" id="menu_portal" data-testid="portal-header-item">
+                    Portal
                   </RouterLink>
                 </AuthGuard>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>

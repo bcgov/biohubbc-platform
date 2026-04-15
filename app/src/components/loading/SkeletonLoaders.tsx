@@ -10,9 +10,17 @@ interface IMultipleSkeletonProps extends SkeletonProps {
   numberOfLines?: number;
 }
 
-const SkeletonList = (props: IMultipleSkeletonProps) => (
+type ISingleSkeletonProps = SkeletonProps;
+
+/**
+ * Render a vertical list of skeleton lines.
+ *
+ * @param {IMultipleSkeletonProps} props
+ * @returns {JSX.Element}
+ */
+const SkeletonList = ({ numberOfLines, ...skeletonProps }: IMultipleSkeletonProps) => (
   <>
-    {Array.from(new Array(props.numberOfLines ?? 3).keys()).map((key: number) => (
+    {Array.from(new Array(numberOfLines ?? 3).keys()).map((key: number) => (
       <Stack
         key={key}
         flexDirection="row"
@@ -30,32 +38,50 @@ const SkeletonList = (props: IMultipleSkeletonProps) => (
             fontSize: '0.875rem'
           }
         }}>
-        <Skeleton variant="text" width={20} height={20} {...props} />
-        <Skeleton variant="text" {...props} />
+        <Skeleton variant="text" width={20} height={20} {...skeletonProps} />
+        <Skeleton variant="text" {...skeletonProps} />
       </Stack>
     ))}
   </>
 );
 
-const SkeletonHorizontalStack = (props: IMultipleSkeletonProps) => (
+/**
+ * Render a horizontal row of rounded skeleton blocks.
+ *
+ * @param {IMultipleSkeletonProps} props
+ * @returns {JSX.Element}
+ */
+const SkeletonHorizontalStack = ({ numberOfLines, ...skeletonProps }: IMultipleSkeletonProps) => (
   <Stack direction="row" spacing={1} flex="1 1 auto">
-    {Array.from(new Array(props.numberOfLines ?? 3).keys()).map((key: number) => (
-      <Skeleton key={key} variant="rounded" sx={{ flex: '0.1 0 auto' }} {...props} />
+    {Array.from(new Array(numberOfLines ?? 3).keys()).map((key: number) => (
+      <Skeleton key={key} variant="rounded" sx={{ flex: '0.1 0 auto' }} {...skeletonProps} />
     ))}
   </Stack>
 );
 
-const SkeletonTable = (props: IMultipleSkeletonProps) => (
+/**
+ * Render a table-style skeleton composed of repeated skeleton rows.
+ *
+ * @param {IMultipleSkeletonProps} props
+ * @returns {JSX.Element}
+ */
+const SkeletonTable = ({ numberOfLines, ...skeletonProps }: IMultipleSkeletonProps) => (
   <Box>
     <Paper elevation={0}>
-      {Array.from(new Array(props.numberOfLines ?? 3).keys()).map((key: number) => (
-        <SkeletonRow key={key} {...props} />
+      {Array.from(new Array(numberOfLines ?? 3).keys()).map((key: number) => (
+        <SkeletonRow key={key} {...skeletonProps} />
       ))}
     </Paper>
   </Box>
 );
 
-const SkeletonRow = (props: IMultipleSkeletonProps) => (
+/**
+ * Render a single table row skeleton.
+ *
+ * @param {ISingleSkeletonProps} skeletonProps
+ * @returns {JSX.Element}
+ */
+const SkeletonRow = (skeletonProps: ISingleSkeletonProps) => (
   <Stack
     flexDirection="row"
     alignItems="center"
@@ -73,12 +99,18 @@ const SkeletonRow = (props: IMultipleSkeletonProps) => (
       }
     }}>
     {Array.from(new Array(8).keys()).map((key: number) => (
-      <Skeleton key={key} variant="text" {...props} />
+      <Skeleton key={key} variant="text" {...skeletonProps} />
     ))}
   </Stack>
 );
 
-const SkeletonMap = (props: IMultipleSkeletonProps) => (
+/**
+ * Render a full-size map placeholder with a centered search icon.
+ *
+ * @param {ISingleSkeletonProps} skeletonProps
+ * @returns {JSX.Element}
+ */
+const SkeletonMap = (skeletonProps: ISingleSkeletonProps) => (
   <Box
     sx={{
       display: 'flex',
@@ -94,7 +126,7 @@ const SkeletonMap = (props: IMultipleSkeletonProps) => (
     <Box sx={{ position: 'absolute', margin: 'auto' }}>
       <Icon path={mdiMapSearchOutline} size={2} />
     </Box>
-    <Skeleton variant="rectangular" sx={{ width: '100%', height: '100%' }} {...props} />
+    <Skeleton variant="rectangular" sx={{ width: '100%', height: '100%' }} {...skeletonProps} />
   </Box>
 );
 

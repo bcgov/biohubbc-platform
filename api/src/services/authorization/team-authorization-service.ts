@@ -1,7 +1,7 @@
 import { IDBConnection } from '../../database/db';
 import { TeamAuthorizationRepository } from '../../repositories/authorization/team-authorization-repository';
 import { DBService } from '../db-service';
-import { SubmissionService } from '../submission-service';
+import { SubmissionFeatureService } from '../submission-feature-service';
 import { TeamAuthorizationEntity } from './authorization-service';
 
 /**
@@ -39,8 +39,8 @@ export class TeamAuthorizationService extends DBService {
         break;
 
       case 'submission_feature': {
-        const submissionService = new SubmissionService(this.connection);
-        const feature = await submissionService.getSubmissionFeatureById(entity.submissionFeatureId);
+        const submissionFeatureService = new SubmissionFeatureService(this.connection);
+        const feature = await submissionFeatureService.getSubmissionFeatureById(entity.submissionFeatureId);
 
         if (!feature.secured) {
           return true;

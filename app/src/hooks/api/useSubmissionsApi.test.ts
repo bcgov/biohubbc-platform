@@ -1,6 +1,7 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
 import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
+import { IGetSubmissionsForUserResponse } from 'interfaces/useSubmissionsApi.interface';
 import { SubmissionRecordWithSecurityAndRootFeature } from 'interfaces/useSubmissionsApi.interface';
 import useSubmissionsApi from './useSubmissionsApi';
 
@@ -40,19 +41,41 @@ describe('useSubmissionApi', () => {
         }
       ];
 
-      mock.onGet('api/submission').reply(200, mockSubmissions);
+      const mockResponse: IGetSubmissionsForUserResponse = {
+        submissions: mockSubmissions,
+        pagination: {
+          total: 1,
+          current_page: 1,
+          last_page: 1,
+          per_page: 10,
+          sort: 'submitted_timestamp',
+          order: 'desc'
+        }
+      };
+
+      mock.onGet('api/submission').reply(200, mockResponse);
 
       const result = await useSubmissionsApi(axios).getSubmissionsForUser();
 
-      expect(result).toEqual(mockSubmissions);
+      expect(result).toEqual(mockResponse);
     });
 
     it('should return an empty array when the user has no submissions', async () => {
-      mock.onGet('api/submission').reply(200, []);
+      const mockResponse: IGetSubmissionsForUserResponse = {
+        submissions: [],
+        pagination: {
+          total: 0,
+          current_page: 1,
+          last_page: 1,
+          per_page: 10
+        }
+      };
+
+      mock.onGet('api/submission').reply(200, mockResponse);
 
       const result = await useSubmissionsApi(axios).getSubmissionsForUser();
 
-      expect(result).toEqual([]);
+      expect(result).toEqual(mockResponse);
     });
   });
 

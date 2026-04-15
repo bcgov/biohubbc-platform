@@ -38,4 +38,43 @@ describe('useFeaturesApi', () => {
       expect(result).toEqual(mockResponse);
     });
   });
+
+  describe('getSubmissionFeatureProperties', () => {
+    it('should return paginated submission feature properties', async () => {
+      const mockResponse = {
+        properties: [{ id: 'species_name', property: 'species name', value: 'Wolf' }],
+        pagination: {
+          total: 1,
+          current_page: 1,
+          last_page: 1,
+          per_page: 10,
+          sort: 'property',
+          order: 'asc'
+        }
+      };
+
+      mock.onGet('api/submission/1/features/10/properties').reply((config) => {
+        expect(config.params).toEqual({
+          search: 'wolf',
+          page: 1,
+          limit: 10,
+          sort: 'property',
+          order: 'asc'
+        });
+
+        return [200, mockResponse];
+      });
+
+      const api = useFeaturesApi(axios);
+      const result = await api.getSubmissionFeatureProperties('1', '10', {
+        search: 'wolf',
+        page: 1,
+        limit: 10,
+        sort: 'property',
+        order: 'asc'
+      });
+
+      expect(result).toEqual(mockResponse);
+    });
+  });
 });

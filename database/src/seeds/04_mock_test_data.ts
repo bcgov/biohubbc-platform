@@ -488,92 +488,129 @@ export const insertSubmissionFeature = (options: {
 `;
 
 const insertSearchString = (options: { submission_feature_id: number }) => `
-    INSERT INTO search_string
+    INSERT INTO submission_feature_property_string
     (
         submission_feature_id,
-        feature_property_id,
-        value
+        feature_type_property_id,
+        value,
+        create_user
     )
-    values
-    (
-        ${options.submission_feature_id},
-        (select feature_property_id from feature_property where name = 'name'),
-        $$${faker.lorem.words(3)}$$
-    );
+    SELECT
+        sf.submission_feature_id,
+        ftp.feature_type_property_id,
+        $$${faker.lorem.words(3)}$$,
+        1
+    FROM submission_feature sf
+    JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+    WHERE sf.submission_feature_id = ${options.submission_feature_id}
+      AND sf.record_end_date IS NULL
+      AND fp.name = 'name'
+    LIMIT 1;
 `;
 
 const insertSearchNumber = (options: { submission_feature_id: number }) => `
-    INSERT INTO search_number
+    INSERT INTO submission_feature_property_number
     (
         submission_feature_id,
-        feature_property_id,
-        value
+        feature_type_property_id,
+        value,
+        create_user
     )
-    values
-    (
-        ${options.submission_feature_id},
-        (select feature_property_id from feature_property where name = 'count'),
-        $$${faker.number.int({ min: 0, max: 100 })}$$
-    );
+    SELECT
+        sf.submission_feature_id,
+        ftp.feature_type_property_id,
+        ${faker.number.int({ min: 0, max: 100 })},
+        1
+    FROM submission_feature sf
+    JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+    WHERE sf.submission_feature_id = ${options.submission_feature_id}
+      AND sf.record_end_date IS NULL
+      AND fp.name = 'count'
+    LIMIT 1;
 `;
 
 const insertSearchStringTaxonomy = (options: { submission_feature_id: number }) => `
-    INSERT INTO search_string
+    INSERT INTO submission_feature_property_taxon
     (
         submission_feature_id,
-        feature_property_id,
-        value
+        feature_type_property_id,
+        taxon_id,
+        create_user
     )
-    values
-    (
-        ${options.submission_feature_id},
-        (select feature_property_id from feature_property where name = 'taxon_id'),
-        $$${faker.number.int({ min: 10000, max: 99999 })}$$
-    );
+    SELECT
+        sf.submission_feature_id,
+        ftp.feature_type_property_id,
+        t.taxon_id,
+        1
+    FROM submission_feature sf
+    JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+    JOIN taxon t ON TRUE
+    WHERE sf.submission_feature_id = ${options.submission_feature_id}
+      AND sf.record_end_date IS NULL
+      AND fp.name = 'taxon_id'
+    ORDER BY random()
+    LIMIT 1;
 `;
 
 const insertSearchStartDatetime = (options: { submission_feature_id: number }) => `
-    INSERT INTO search_datetime
+    INSERT INTO submission_feature_property_timestamp
     (
         submission_feature_id,
-        feature_property_id,
-        value
+        feature_type_property_id,
+        value,
+        create_user
     )
-    values
-    (
-        ${options.submission_feature_id},
-        (select feature_property_id from feature_property where name = 'start_date'),
-        $$${faker.date.past().toISOString()}$$
-    );
+    SELECT
+        sf.submission_feature_id,
+        ftp.feature_type_property_id,
+        $$${faker.date.past().toISOString()}$$,
+        1
+    FROM submission_feature sf
+    JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+    WHERE sf.submission_feature_id = ${options.submission_feature_id}
+      AND sf.record_end_date IS NULL
+      AND fp.name = 'start_date'
+    LIMIT 1;
 `;
 
 const insertSearchEndDatetime = (options: { submission_feature_id: number }) => `
-    INSERT INTO search_datetime
+    INSERT INTO submission_feature_property_timestamp
     (
         submission_feature_id,
-        feature_property_id,
-        value
+        feature_type_property_id,
+        value,
+        create_user
     )
-    values
-    (
-        ${options.submission_feature_id},
-        (select feature_property_id from feature_property where name = 'end_date'),
-        $$${faker.date.future().toISOString()}$$
-    );
+    SELECT
+        sf.submission_feature_id,
+        ftp.feature_type_property_id,
+        $$${faker.date.future().toISOString()}$$,
+        1
+    FROM submission_feature sf
+    JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+    WHERE sf.submission_feature_id = ${options.submission_feature_id}
+      AND sf.record_end_date IS NULL
+      AND fp.name = 'end_date'
+    LIMIT 1;
 `;
 
 const insertSpatialPolygon = (options: { submission_feature_id: number }) =>
   `
-    INSERT INTO search_spatial
+    INSERT INTO submission_feature_property_geometry
     (
         submission_feature_id,
-        feature_property_id,
-        value
+        feature_type_property_id,
+        value,
+        create_user
     )
-    values
-    (
-        ${options.submission_feature_id},
-        (select feature_property_id from feature_property where name = 'geometry'),
+    SELECT
+        sf.submission_feature_id,
+        ftp.feature_type_property_id,
         public.ST_GeomFromGeoJSON(
             '${JSON.stringify(
               random.polygon(
@@ -583,22 +620,29 @@ const insertSpatialPolygon = (options: { submission_feature_id: number }) =>
                 [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
               )['features'][0]['geometry']
             )}'
-        )
-    );
+        ),
+        1
+    FROM submission_feature sf
+    JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+    WHERE sf.submission_feature_id = ${options.submission_feature_id}
+      AND sf.record_end_date IS NULL
+      AND fp.name = 'geometry'
+    LIMIT 1;
 `;
 
 const insertSpatialPoint = (options: { submission_feature_id: number }) =>
   `
-    INSERT INTO search_spatial
+    INSERT INTO submission_feature_property_geometry
     (
         submission_feature_id,
-        feature_property_id,
-        value
+        feature_type_property_id,
+        value,
+        create_user
     )
-    values
-    (
-        ${options.submission_feature_id},
-        (select feature_property_id from feature_property where name = 'geometry'),
+    SELECT
+        sf.submission_feature_id,
+        ftp.feature_type_property_id,
         public.ST_GeomFromGeoJSON(
             '${JSON.stringify(
               random.point(
@@ -606,8 +650,15 @@ const insertSpatialPoint = (options: { submission_feature_id: number }) =>
                 [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
               )['features'][0]['geometry']
             )}'
-        )
-    );
+        ),
+        1
+    FROM submission_feature sf
+    JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
+    JOIN feature_property fp ON fp.feature_property_id = ftp.feature_property_id AND fp.record_end_date IS NULL
+    WHERE sf.submission_feature_id = ${options.submission_feature_id}
+      AND sf.record_end_date IS NULL
+      AND fp.name = 'geometry'
+    LIMIT 1;
 `;
 
 const randomIntFromInterval = (min: number, max: number) => {

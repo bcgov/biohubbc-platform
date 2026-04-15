@@ -60,7 +60,7 @@ describe('submission index', () => {
       }
     });
 
-    it('calls SubmissionService.getSubmissionsByUserId for the current user and returns 200', async () => {
+    it('calls paginated submission service methods for the current user and returns 200', async () => {
       const mockDBConnection = getMockDBConnection({
         systemUserId: () => systemUserId,
         commit: sinon.stub(),
@@ -69,18 +69,24 @@ describe('submission index', () => {
       });
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-      const stub = sinon.stub(SubmissionService.prototype, 'getSubmissionsByUserId').resolves([mockSubmission]);
+      const submissionStub = sinon
+        .stub(SubmissionService.prototype, 'getSubmissionsByUserId')
+        .resolves([mockSubmission]);
+      const countStub = sinon.stub(SubmissionService.prototype, 'getSubmissionsByUserIdCount').resolves(1);
 
       const requestHandler = getSubmissions();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(stub).to.have.been.calledOnceWith(systemUserId);
+      expect(submissionStub).to.have.been.calledOnce;
+      expect(countStub).to.have.been.calledOnce;
       expect(mockDBConnection.commit).to.have.been.calledOnce;
       expect(mockDBConnection.release).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql([mockSubmission]);
+      expect(mockRes.jsonValue).to.have.keys(['submissions', 'pagination']);
+      expect(mockRes.jsonValue.submissions).to.eql([mockSubmission]);
+      expect(mockRes.jsonValue.pagination.total).to.equal(1);
     });
 
     it('rolls back and rethrows if service throws', async () => {
@@ -92,6 +98,7 @@ describe('submission index', () => {
       });
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(SubmissionService.prototype, 'getSubmissionsByUserId').rejects(new Error('Service error'));
+      sinon.stub(SubmissionService.prototype, 'getSubmissionsByUserIdCount').resolves(0);
 
       const requestHandler = getSubmissions();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();

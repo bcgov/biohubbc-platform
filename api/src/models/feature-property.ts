@@ -25,3 +25,11 @@ export const FeaturePropertyTypeName = z.enum([
   'taxon',
   'artifact_key'
 ]);
+
+export const SubmissionFeatureProperty = z.object({
+  id: z.string(),
+  property: z.string(),
+  value: z.string()
+});
+
+export type SubmissionFeatureProperty = z.infer<typeof SubmissionFeatureProperty>;

@@ -1,15 +1,22 @@
-import { LoadingGuard } from 'components/loading/LoadingGuard';
-import { IPortalTicketDetailPageContentProps } from './PortalTicketDetailPageContent.interface';
-import { TicketSkeleton } from 'features/admin/tickets/detail/skeleton/TicketSkeleton';
-import { PortalTicketHeader } from '../header/PortalTicketHeader';
 import { Box, Container, Stack } from '@mui/material';
+import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { PageSection } from 'components/section/PageSection';
+import { TicketComment } from 'features/admin/tickets/detail/comment/TicketComment';
+import { TicketSkeleton } from 'features/admin/tickets/detail/skeleton/TicketSkeleton';
 import { TicketTimeline } from 'features/admin/tickets/detail/timeline/TicketTimeline';
-import { PortalTicketSidebar } from '../sidebar/PortalTicketSidebar';
 import { sortChronological } from 'features/admin/tickets/utils/sortChronological';
+import { PortalTicketHeader } from '../header/PortalTicketHeader';
+import { PortalTicketSidebar } from '../sidebar/PortalTicketSidebar';
+import { IPortalTicketDetailPageContentProps } from './PortalTicketDetailPageContent.interface';
 
+/**
+ * Render portal ticket detail content including timeline, comment editor and sidebar.
+ *
+ * @param {IPortalTicketDetailPageContentProps} props
+ * @returns {JSX.Element}
+ */
 export const PortalTicketDetailPageContent = (props: IPortalTicketDetailPageContentProps) => {
-  const { ticket, isLoading } = props;
+  const { ticket, isLoading, comment, setComment, isSavingComment, onAddComment } = props;
 
   return (
     <LoadingGuard isLoading={isLoading && !ticket} isLoadingFallback={<TicketSkeleton />} isLoadingFallbackDelay={300}>
@@ -32,14 +39,18 @@ export const PortalTicketDetailPageContent = (props: IPortalTicketDetailPageCont
                   history={[...(ticket?.statuses ?? []), ...(ticket?.comments ?? [])].sort(sortChronological)}
                   isLoading={isLoading}
                 />
+                {ticket?.status === 'open' && (
+                  <TicketComment
+                    comment={comment}
+                    setComment={setComment}
+                    isSaving={isSavingComment}
+                    onAddComment={onAddComment}
+                  />
+                )}
               </Stack>
 
               <Box sx={{ width: { xs: '100%', sm: 340 }, flex: { xs: '1 1 100%', sm: '0 0 340px' } }}>
-                <PortalTicketSidebar
-                  teamId={ticket?.team_id}
-                  references={ticket?.references}
-                  ticketId={ticket?.ticket_id ?? ''}
-                />
+                <PortalTicketSidebar teamId={ticket?.team_id} />
               </Box>
             </Stack>
           </PageSection>

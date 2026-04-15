@@ -9,13 +9,16 @@ import { PortalTicketDetailPageContent } from './detail/content/PortalTicketDeta
  */
 export const PortalTicketDetailPage = () => {
   const { ticketDataLoader } = useTicketContext();
-  const { comment } = useTicketComment();
+  const { comment, setComment, isSavingComment, handleAddComment } = useTicketComment();
 
   return (
     <PortalTicketDetailPageContent
       ticket={ticketDataLoader.data}
       isLoading={ticketDataLoader.isLoading}
       comment={comment}
+      setComment={setComment}
+      isSavingComment={isSavingComment}
+      onAddComment={handleAddComment}
     />
   );
 };
