@@ -1,8 +1,9 @@
+import { ParquetWriter } from '@dsnp/parquetjs';
 import archiver from 'archiver';
 import { PassThrough } from 'node:stream';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
-import { DownloadFeatureSummary } from '../../models/download';
+import { DownloadArtifactInfo, DownloadFeatureSummary, DownloadSource } from '../../models/download';
 import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
@@ -15,11 +16,11 @@ import {
   getOutputFilename
 } from '../../utils/csv-utils';
 import { getLogger } from '../../utils/logger';
+import { buildGeoParquetMetadata, buildParquetSchema, featureToRow } from '../../utils/parquet-utils';
 import { CodeService } from '../code-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { SearchFeatureService } from '../search-feature-service';
-import { DownloadService } from './download-service';
 
 const defaultLog = getLogger('services/download-pipeline-service');
 
@@ -51,14 +52,12 @@ interface FileFeatureRef {
 export class DownloadPipelineService extends DBService {
   downloadRepository: DownloadRepository;
   fragmentRepository: DownloadFragmentRepository;
-  downloadService: DownloadService;
   searchFeatureService: SearchFeatureService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
     this.fragmentRepository = new DownloadFragmentRepository(connection);
-    this.downloadService = new DownloadService(connection);
     this.searchFeatureService = new SearchFeatureService(connection);
   }
 
@@ -281,6 +280,161 @@ export class DownloadPipelineService extends DBService {
     await this.fragmentRepository.updateFragmentStatus(fragmentId, DownloadStatusEnum.PROCESSING, {
       started_at: now
     });
+  }
+
+  /**
+   * Resolve download source and artifact info for the Parquet pipeline.
+   *
+   * Combines two lookups into a single call so the job handler doesn't
+   * need to manage the source/artifact pair separately.
+   *
+   * @param {string} downloadId - The download ID.
+   * @return {Promise<{ source: DownloadSource; artifact: DownloadArtifactInfo }>}
+   * @memberof DownloadPipelineService
+   */
+  async getDownloadMetadata(downloadId: string): Promise<{ source: DownloadSource; artifact: DownloadArtifactInfo }> {
+    const [source, artifact] = await Promise.all([
+      this.downloadRepository.getDownloadSource(downloadId),
+      this.downloadRepository.getDownloadArtifact(downloadId)
+    ]);
+
+    return { source, artifact };
+  }
+
+  /**
+   * Build schema lookup and list feature types for a Parquet download.
+   *
+   * The schema lookup maps feature type names to their property definitions.
+   * The feature type list drives the per-type Parquet file generation loop.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {DownloadSource} source - The download source (cart or filters).
+   * @return {Promise<{ schemaLookup: Map<string, CsvPropertyDefinition[]>; featureTypes: string[] }>}
+   * @memberof DownloadPipelineService
+   */
+  async resolveParquetSchema(
+    downloadId: string,
+    source: DownloadSource
+  ): Promise<{ schemaLookup: Map<string, CsvPropertyDefinition[]>; featureTypes: string[] }> {
+    const schemaLookup = await this.buildSchemaLookup();
+
+    let featureTypes: string[];
+
+    if (source.cart_id) {
+      featureTypes = await this.downloadRepository.listDownloadFeatureTypesByCartId(source.cart_id);
+    } else if (source.filters) {
+      const searchSubquery = this.searchFeatureService.buildSearchFeatureIdsSubquery(
+        source.filters,
+        source.create_user
+      );
+      featureTypes = await this.downloadRepository.listDownloadFeatureTypesBySearchQuery(searchSubquery);
+    } else {
+      throw new Error(`Download ${downloadId} has neither cart_id nor filters`);
+    }
+
+    return { schemaLookup, featureTypes };
+  }
+
+  /**
+   * Stream a single feature type to a Parquet file on S3.
+   *
+   * Each feature type gets its own Parquet file with a schema derived from
+   * feature_type_property definitions. The star-schema design keeps files
+   * independent — parent data lives in its own file, joined by parent_uuid.
+   *
+   * Pipeline: cursor → hydrateFeatureBatchFromTypedTables → featureToRow → writer.appendRow → S3
+   *
+   * Code and taxon properties arrive pre-resolved from the cursor JOIN:
+   * code → contributor_codeset_code.label, taxon → taxon.itis_scientific_name.
+   * Parquet files are standalone — GIS consumers have no database access.
+   *
+   * Zero disk usage: @dsnp/parquetjs streams to a PassThrough piped to S3 multipart upload.
+   * Prevents pod OOM kills and ephemeral storage exhaustion.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {DownloadSource} source - The download source (cart or filters).
+   * @param {DownloadArtifactInfo} artifact - The artifact info (S3 key prefix).
+   * @param {CsvPropertyDefinition[]} properties - Schema property definitions for this feature type.
+   * @param {string} featureTypeName - The feature type to stream.
+   * @return {Promise<void>}
+   * @memberof DownloadPipelineService
+   */
+  async writeFeatureTypeParquet(
+    downloadId: string,
+    source: DownloadSource,
+    artifact: DownloadArtifactInfo,
+    properties: CsvPropertyDefinition[],
+    featureTypeName: string
+  ): Promise<void> {
+    const hasSpatial = properties.some((p) => p.feature_property_type_name === 'spatial');
+    const schema = buildParquetSchema(properties, hasSpatial);
+    const s3Key = `${artifact.object_key}/${featureTypeName}/data.parquet`;
+
+    // Create streaming pipeline: Parquet writer → passThrough → S3 multipart upload
+    const passThrough = new PassThrough();
+    const objectStorageService = new ObjectStorageService();
+    const uploadPromise = objectStorageService.uploadStream(
+      BucketType.MAIN,
+      passThrough,
+      'application/octet-stream',
+      s3Key
+    );
+
+    // Open Parquet writer with optional GeoParquet metadata for spatial types
+    const writerOptions: any = {};
+    if (hasSpatial) {
+      writerOptions.metadata = { geo: buildGeoParquetMetadata() };
+    }
+    // PassThrough implements write()/end() but @dsnp/parquetjs types expect fs.WriteStream.
+    // The runtime only calls write() and end() — safe to cast.
+    const writer = await ParquetWriter.openStream(schema, passThrough as any, writerOptions);
+
+    // Open cursor for the appropriate source (cart or search filters)
+    let cursor: AsyncGenerator<any[]>;
+    if (source.cart_id) {
+      cursor = this.downloadRepository.streamFeatureBaseByCartIdAndType(source.cart_id, featureTypeName);
+    } else if (source.filters) {
+      const searchSubquery = this.searchFeatureService.buildSearchFeatureIdsSubquery(
+        source.filters,
+        source.create_user
+      );
+      const { sql, bindings } = searchSubquery.toSQL().toNative();
+      cursor = this.downloadRepository.streamFeatureBaseBySearchQueryAndType(
+        downloadId,
+        sql,
+        bindings as any[],
+        featureTypeName
+      );
+    } else {
+      throw new Error(`Download ${downloadId} has neither cart_id nor filters`);
+    }
+
+    // Stream: cursor → hydrate typed properties → convert to Parquet row → write
+    for await (const baseBatch of cursor) {
+      const hydrated = await this.downloadRepository.hydrateFeatureBatchFromTypedTables(baseBatch, properties);
+      for (const feature of hydrated) {
+        await writer.appendRow(featureToRow(feature, properties));
+      }
+    }
+
+    await writer.close();
+    await uploadPromise;
+  }
+
+  /**
+   * Finalize a Parquet download after all feature types are written.
+   *
+   * Updates the linked artifact to 'uploaded' (file is now on S3) and
+   * sets the download status to 'ready' (available for consumer retrieval).
+   *
+   * @param {string} downloadId - The download ID.
+   * @return {Promise<void>}
+   * @memberof DownloadPipelineService
+   */
+  async finalizeParquetDownload(downloadId: string): Promise<void> {
+    const now = new Date().toISOString();
+    await this.downloadRepository.updateArtifactStatusByDownloadId(downloadId, 'uploaded', now);
+    await this.updateDownloadStatus(downloadId, DownloadStatusEnum.READY);
   }
 
   /**

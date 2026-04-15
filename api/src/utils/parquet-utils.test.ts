@@ -61,31 +61,25 @@ describe('parquet-utils', () => {
 
   describe('buildParquetSchema', () => {
     it('should include uuid column for all schemas', () => {
-      const schema = buildParquetSchema([], false, true);
+      const schema = buildParquetSchema([], false);
 
       expect(schema.fields['uuid']).to.exist;
     });
 
-    it('should omit parent_uuid for core types', () => {
-      const schema = buildParquetSchema([], false, true);
-
-      expect(schema.fields['parent_uuid']).to.not.exist;
-    });
-
-    it('should include parent_uuid for child types', () => {
-      const schema = buildParquetSchema([], false, false);
+    it('should always include parent_uuid as nullable column', () => {
+      const schema = buildParquetSchema([], false);
 
       expect(schema.fields['parent_uuid']).to.exist;
     });
 
     it('should add geometry column when hasSpatial is true', () => {
-      const schema = buildParquetSchema([], true, true);
+      const schema = buildParquetSchema([], true);
 
       expect(schema.fields['geometry']).to.exist;
     });
 
     it('should not add geometry column when hasSpatial is false', () => {
-      const schema = buildParquetSchema([], false, true);
+      const schema = buildParquetSchema([], false);
 
       expect(schema.fields['geometry']).to.not.exist;
     });
@@ -96,7 +90,7 @@ describe('parquet-utils', () => {
         { feature_property_name: 'location', feature_property_type_name: 'spatial' },
         { feature_property_name: 'count', feature_property_type_name: 'number' }
       ];
-      const schema = buildParquetSchema(properties, true, true);
+      const schema = buildParquetSchema(properties, true);
 
       expect(schema.fields['name']).to.exist;
       expect(schema.fields['count']).to.exist;
@@ -118,7 +112,7 @@ describe('parquet-utils', () => {
         { feature_property_name: 'meta', feature_property_type_name: 'object' },
         { feature_property_name: 'file', feature_property_type_name: 'artifact_key' }
       ];
-      const schema = buildParquetSchema(properties, false, true);
+      const schema = buildParquetSchema(properties, false);
 
       expect(schema.fields['title']).to.exist;
       expect(schema.fields['value']).to.exist;
@@ -143,28 +137,21 @@ describe('parquet-utils', () => {
 
     it('should include uuid in every row', () => {
       const feature = makeFeature({});
-      const row = featureToRow(feature, [], true);
+      const row = featureToRow(feature, []);
 
       expect(row['uuid']).to.equal('abc-123');
     });
 
-    it('should omit parent_uuid when isCore is true', () => {
+    it('should always include parent_uuid', () => {
       const feature = makeFeature({}, 'parent-456');
-      const row = featureToRow(feature, [], true);
-
-      expect(row).to.not.have.property('parent_uuid');
-    });
-
-    it('should include parent_uuid when isCore is false', () => {
-      const feature = makeFeature({}, 'parent-456');
-      const row = featureToRow(feature, [], false);
+      const row = featureToRow(feature, []);
 
       expect(row).to.have.property('parent_uuid', 'parent-456');
     });
 
     it('should set parent_uuid to null when feature has no parent', () => {
       const feature = makeFeature({}, null);
-      const row = featureToRow(feature, [], false);
+      const row = featureToRow(feature, []);
 
       expect(row).to.have.property('parent_uuid', null);
     });
@@ -173,7 +160,7 @@ describe('parquet-utils', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'name', feature_property_type_name: 'string' }
       ];
-      const row = featureToRow(makeFeature({ name: 'Bear' }), properties, true);
+      const row = featureToRow(makeFeature({ name: 'Bear' }), properties);
 
       expect(row['name']).to.equal('Bear');
     });
@@ -182,7 +169,7 @@ describe('parquet-utils', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'count', feature_property_type_name: 'number' }
       ];
-      const row = featureToRow(makeFeature({ count: 42 }), properties, true);
+      const row = featureToRow(makeFeature({ count: 42 }), properties);
 
       expect(row['count']).to.equal(42);
     });
@@ -191,7 +178,7 @@ describe('parquet-utils', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'active', feature_property_type_name: 'boolean' }
       ];
-      const row = featureToRow(makeFeature({ active: true }), properties, true);
+      const row = featureToRow(makeFeature({ active: true }), properties);
 
       expect(row['active']).to.equal(true);
     });
@@ -200,7 +187,7 @@ describe('parquet-utils', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'created', feature_property_type_name: 'datetime' }
       ];
-      const row = featureToRow(makeFeature({ created: '2024-01-01T00:00:00Z' }), properties, true);
+      const row = featureToRow(makeFeature({ created: '2024-01-01T00:00:00Z' }), properties);
 
       expect(row['created']).to.equal('2024-01-01T00:00:00Z');
     });
@@ -209,7 +196,7 @@ describe('parquet-utils', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'status', feature_property_type_name: 'code' }
       ];
-      const row = featureToRow(makeFeature({ status: 'Active' }), properties, true);
+      const row = featureToRow(makeFeature({ status: 'Active' }), properties);
 
       expect(row['status']).to.equal('Active');
     });
@@ -218,7 +205,7 @@ describe('parquet-utils', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'species', feature_property_type_name: 'taxon' }
       ];
-      const row = featureToRow(makeFeature({ species: 'Ursus arctos' }), properties, true);
+      const row = featureToRow(makeFeature({ species: 'Ursus arctos' }), properties);
 
       expect(row['species']).to.equal('Ursus arctos');
     });
@@ -227,7 +214,7 @@ describe('parquet-utils', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'file', feature_property_type_name: 'artifact_key' }
       ];
-      const row = featureToRow(makeFeature({ file: 'uploads/photo.jpg' }), properties, true);
+      const row = featureToRow(makeFeature({ file: 'uploads/photo.jpg' }), properties);
 
       expect(row['file']).to.equal('uploads/photo.jpg');
     });
@@ -236,7 +223,7 @@ describe('parquet-utils', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'tags', feature_property_type_name: 'array' }
       ];
-      const row = featureToRow(makeFeature({ tags: [1, 2, 3] }), properties, true);
+      const row = featureToRow(makeFeature({ tags: [1, 2, 3] }), properties);
 
       expect(row['tags']).to.equal('[1,2,3]');
     });
@@ -245,7 +232,7 @@ describe('parquet-utils', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'meta', feature_property_type_name: 'object' }
       ];
-      const row = featureToRow(makeFeature({ meta: { key: 'value' } }), properties, true);
+      const row = featureToRow(makeFeature({ meta: { key: 'value' } }), properties);
 
       expect(row['meta']).to.equal('{"key":"value"}');
     });
@@ -256,8 +243,7 @@ describe('parquet-utils', () => {
       ];
       const row = featureToRow(
         makeFeature({ location: { type: 'Point', coordinates: [-120.0, 50.0] } }),
-        properties,
-        true
+        properties
       );
 
       expect(row['geometry']).to.be.instanceOf(Buffer);
@@ -270,7 +256,7 @@ describe('parquet-utils', () => {
         { feature_property_name: 'name', feature_property_type_name: 'string' },
         { feature_property_name: 'count', feature_property_type_name: 'number' }
       ];
-      const row = featureToRow(makeFeature({}), properties, true);
+      const row = featureToRow(makeFeature({}), properties);
 
       expect(row['name']).to.be.null;
       expect(row['count']).to.be.null;

@@ -64,29 +64,27 @@ export function propertyTypeToParquetType(typeName: string): FieldDefinition['ty
  * Builds a @dsnp/parquetjs schema for a single feature type's Parquet file.
  *
  * Different feature types have different column schemas — each Parquet file contains
- * one feature type only. Core types (e.g., dataset) omit `parent_uuid`; child types
- * include it to enable star-schema joins between files.
+ * one feature type only. Every file includes a nullable `parent_uuid` column for
+ * star-schema joins between files. Root types (e.g., dataset) will have null values;
+ * child types will have the parent feature's UUID.
  *
  * @param properties - Schema property definitions from `feature_type_property`.
  * @param hasSpatial - Whether this feature type has a spatial property.
- * @param isCore - Whether this is a core/root type (omits parent_uuid).
  * @returns A ParquetSchema instance ready for writer construction.
  */
 export function buildParquetSchema(
   properties: CsvPropertyDefinition[],
-  hasSpatial: boolean,
-  isCore: boolean
+  hasSpatial: boolean
 ): ParquetSchema {
   const fields: SchemaDefinition = {};
 
   // Every Parquet file includes the feature UUID for cross-file joins
   fields['uuid'] = { type: 'UTF8', optional: false };
 
-  // Child types include parent_uuid to link back to the parent feature type's file.
-  // This keeps each file independent for artifact caching and lets GIS tools join as needed.
-  if (!isCore) {
-    fields['parent_uuid'] = { type: 'UTF8', optional: true };
-  }
+  // Every file includes parent_uuid for star-schema joins. Root types (dataset)
+  // will have null values; child types link back to the parent feature type's file.
+  // Always present so consumers don't need to know which types are roots.
+  fields['parent_uuid'] = { type: 'UTF8', optional: true };
 
   for (const prop of properties) {
     const parquetType = propertyTypeToParquetType(prop.feature_property_type_name);
@@ -121,21 +119,16 @@ export function buildParquetSchema(
  *
  * @param feature - The feature row from the download cursor.
  * @param properties - Schema property definitions for this feature type.
- * @param isCore - Whether this is a core/root type (omits parent_uuid from output).
  * @returns A plain object suitable for `ParquetWriter.appendRow()`.
  */
 export function featureToRow(
   feature: ParquetFeatureData,
-  properties: CsvPropertyDefinition[],
-  isCore: boolean
+  properties: CsvPropertyDefinition[]
 ): Record<string, unknown> {
   const row: Record<string, unknown> = {};
 
   row['uuid'] = feature.uuid;
-
-  if (!isCore) {
-    row['parent_uuid'] = feature.parent_uuid ?? null;
-  }
+  row['parent_uuid'] = feature.parent_uuid ?? null;
 
   for (const prop of properties) {
     const value = feature.data[prop.feature_property_name];

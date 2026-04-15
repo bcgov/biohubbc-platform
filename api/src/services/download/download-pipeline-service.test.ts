@@ -1,15 +1,23 @@
+import * as parquetjs from '@dsnp/parquetjs';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
-import { DownloadFeatureData, DownloadFeatureSummary, DownloadRecord, DownloadSource } from '../../models/download';
+import {
+  DownloadArtifactInfo,
+  DownloadFeatureData,
+  DownloadFeatureSummary,
+  DownloadRecord,
+  DownloadSource
+} from '../../models/download';
 import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
 import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { CodeService } from '../code-service';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
@@ -554,6 +562,342 @@ describe('DownloadPipelineService', () => {
       expect(createFragmentStub).to.have.been.calledOnce;
       expect(createFragmentFeaturesStub.firstCall.args[1]).to.deep.equal([10, 20, 30]);
       expect(updateFragmentCountsStub).to.have.been.calledOnceWith('aaaa0000-0000-0000-0000-000000000001', 1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Parquet pipeline methods
+  // -------------------------------------------------------------------------
+
+  // Shared test data for Parquet tests
+  const TEST_DOWNLOAD_ID = 'aaaa0000-0000-0000-0000-000000000042';
+  const TEST_ARTIFACT: DownloadArtifactInfo = {
+    artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
+    object_key: 'downloads/aaaa0000-0000-0000-0000-000000000042'
+  };
+  const TEST_SOURCE_CART: DownloadSource = {
+    cart_id: 'cccc0000-0000-0000-0000-000000000001',
+    filters: null,
+    create_user: 1
+  };
+  const TEST_SOURCE_FILTER: DownloadSource = { cart_id: null, filters: { keyword: 'moose' }, create_user: 5 };
+
+  describe('getDownloadMetadata', () => {
+    it('returns combined source and artifact info', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const getSourceStub = sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(TEST_SOURCE_CART);
+      const getArtifactStub = sinon.stub(DownloadRepository.prototype, 'getDownloadArtifact').resolves(TEST_ARTIFACT);
+
+      const result = await service.getDownloadMetadata(TEST_DOWNLOAD_ID);
+
+      expect(getSourceStub).to.have.been.calledOnceWith(TEST_DOWNLOAD_ID);
+      expect(getArtifactStub).to.have.been.calledOnceWith(TEST_DOWNLOAD_ID);
+      expect(result.source).to.deep.equal(TEST_SOURCE_CART);
+      expect(result.artifact).to.deep.equal(TEST_ARTIFACT);
+    });
+
+    it('propagates errors from getDownloadArtifact', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(TEST_SOURCE_CART);
+      sinon.stub(DownloadRepository.prototype, 'getDownloadArtifact').rejects(new Error('Artifact not found'));
+
+      try {
+        await service.getDownloadMetadata(TEST_DOWNLOAD_ID);
+        expect.fail('Expected an error');
+      } catch (error) {
+        expect((error as Error).message).to.equal('Artifact not found');
+      }
+    });
+  });
+
+  describe('resolveParquetSchema', () => {
+    const mockCodes: FeatureTypeWithProperties[] = [
+      {
+        feature_type: { feature_type_id: 1, name: 'dataset', display_name: 'Dataset' },
+        properties: [
+          {
+            feature_type_property_id: 1,
+            name: 'title',
+            display_name: 'Title',
+            description: 'Title',
+            type_name: FEATURE_PROPERTY_TYPE.STRING,
+            required_value: true,
+            calculated_value: false
+          }
+        ]
+      },
+      {
+        feature_type: { feature_type_id: 2, name: 'observation', display_name: 'Observation' },
+        properties: [
+          {
+            feature_type_property_id: 2,
+            name: 'species',
+            display_name: 'Species',
+            description: 'Species',
+            type_name: FEATURE_PROPERTY_TYPE.STRING,
+            required_value: false,
+            calculated_value: false
+          }
+        ]
+      }
+    ];
+
+    it('resolves schema and feature types for cart-based downloads', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      const listStub = sinon
+        .stub(DownloadRepository.prototype, 'listDownloadFeatureTypesByCartId')
+        .resolves(['dataset', 'observation']);
+
+      const result = await service.resolveParquetSchema(TEST_DOWNLOAD_ID, TEST_SOURCE_CART);
+
+      expect(listStub).to.have.been.calledOnceWith(TEST_SOURCE_CART.cart_id);
+      expect(result.featureTypes).to.deep.equal(['dataset', 'observation']);
+      expect(result.schemaLookup.has('dataset')).to.be.true;
+      expect(result.schemaLookup.has('observation')).to.be.true;
+    });
+
+    it('resolves schema and feature types for filter-based downloads', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+      const mockSubquery = { toSQL: () => ({ toNative: () => ({ sql: 'SELECT 1', bindings: [] }) }) } as any;
+      const buildSubqueryStub = sinon
+        .stub(SearchFeatureService.prototype, 'buildSearchFeatureIdsSubquery')
+        .returns(mockSubquery);
+      const listStub = sinon
+        .stub(DownloadRepository.prototype, 'listDownloadFeatureTypesBySearchQuery')
+        .resolves(['observation']);
+
+      const result = await service.resolveParquetSchema(TEST_DOWNLOAD_ID, TEST_SOURCE_FILTER);
+
+      expect(buildSubqueryStub).to.have.been.calledOnceWith(TEST_SOURCE_FILTER.filters, TEST_SOURCE_FILTER.create_user);
+      expect(listStub).to.have.been.calledOnce;
+      expect(result.featureTypes).to.deep.equal(['observation']);
+    });
+
+    it('throws when download has neither cart_id nor filters', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves(mockCodes);
+
+      const noSource: DownloadSource = { cart_id: null, filters: null, create_user: 1 };
+
+      try {
+        await service.resolveParquetSchema(TEST_DOWNLOAD_ID, noSource);
+        expect.fail('Expected an error');
+      } catch (error) {
+        expect((error as Error).message).to.include('has neither cart_id nor filters');
+      }
+    });
+  });
+
+  describe('writeFeatureTypeParquet', () => {
+    const mockProperties: CsvPropertyDefinition[] = [
+      { feature_property_name: 'species', feature_property_type_name: 'string' }
+    ];
+
+    const mockSpatialProperties: CsvPropertyDefinition[] = [
+      { feature_property_name: 'species', feature_property_type_name: 'string' },
+      { feature_property_name: 'location', feature_property_type_name: 'spatial' }
+    ];
+
+    // Helper: mock async generator for base feature cursor
+    async function* mockBaseCursor(batches: any[][]): AsyncGenerator<any[]> {
+      for (const batch of batches) {
+        yield batch;
+      }
+    }
+
+    it('streams features to Parquet via cart path', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves() };
+      sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
+      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+
+      const baseBatch = [
+        { submission_feature_id: 1, uuid: 'uuid-1', feature_type_name: 'observation', data: {}, parent_uuid: 'p-1' }
+      ];
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([baseBatch]));
+
+      const hydratedFeatures = [
+        {
+          submission_feature_id: 1,
+          uuid: 'uuid-1',
+          feature_type_name: 'observation',
+          data: { species: 'bear' },
+          parent_uuid: 'p-1'
+        }
+      ];
+      sinon.stub(DownloadRepository.prototype, 'hydrateFeatureBatchFromTypedTables').resolves(hydratedFeatures);
+
+      await service.writeFeatureTypeParquet(
+        TEST_DOWNLOAD_ID,
+        TEST_SOURCE_CART,
+        TEST_ARTIFACT,
+        mockProperties,
+        'observation'
+      );
+
+      expect(mockWriter.appendRow).to.have.been.calledOnce;
+      expect(mockWriter.close).to.have.been.calledOnce;
+    });
+
+    it('streams features to Parquet via filter path', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves() };
+      sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
+      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+
+      const mockSubquery = {
+        toSQL: () => ({ toNative: () => ({ sql: 'SELECT 1', bindings: [5] }) })
+      } as any;
+      sinon.stub(SearchFeatureService.prototype, 'buildSearchFeatureIdsSubquery').returns(mockSubquery);
+
+      const baseBatch = [
+        { submission_feature_id: 1, uuid: 'uuid-1', feature_type_name: 'observation', data: {}, parent_uuid: null }
+      ];
+      const streamStub = sinon
+        .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
+        .returns(mockBaseCursor([baseBatch]));
+
+      sinon.stub(DownloadRepository.prototype, 'hydrateFeatureBatchFromTypedTables').resolves([
+        {
+          submission_feature_id: 1,
+          uuid: 'uuid-1',
+          feature_type_name: 'observation',
+          data: { species: 'moose' },
+          parent_uuid: null
+        }
+      ]);
+
+      await service.writeFeatureTypeParquet(
+        TEST_DOWNLOAD_ID,
+        TEST_SOURCE_FILTER,
+        TEST_ARTIFACT,
+        mockProperties,
+        'observation'
+      );
+
+      expect(streamStub).to.have.been.calledOnce;
+      expect(streamStub.firstCall.args[0]).to.equal(TEST_DOWNLOAD_ID);
+      expect(mockWriter.appendRow).to.have.been.calledOnce;
+      expect(mockWriter.close).to.have.been.calledOnce;
+    });
+
+    it('uses correct S3 key format: {object_key}/{featureTypeName}/data.parquet', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves() };
+      sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
+      const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
+
+      await service.writeFeatureTypeParquet(
+        TEST_DOWNLOAD_ID,
+        TEST_SOURCE_CART,
+        TEST_ARTIFACT,
+        mockProperties,
+        'observation'
+      );
+
+      expect(uploadStub).to.have.been.calledOnce;
+      expect(uploadStub.firstCall.args[3]).to.equal(`${TEST_ARTIFACT.object_key}/observation/data.parquet`);
+    });
+
+    it('includes GeoParquet metadata when feature type has spatial properties', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves() };
+      const openStreamStub = sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
+      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
+
+      await service.writeFeatureTypeParquet(
+        TEST_DOWNLOAD_ID,
+        TEST_SOURCE_CART,
+        TEST_ARTIFACT,
+        mockSpatialProperties,
+        'observation'
+      );
+
+      expect(openStreamStub).to.have.been.calledOnce;
+      const writerOptions = openStreamStub.firstCall.args[2] as any;
+      expect(writerOptions).to.have.property('metadata');
+      expect(writerOptions.metadata).to.have.property('geo').that.is.a('string');
+    });
+
+    it('omits GeoParquet metadata when feature type has no spatial properties', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves() };
+      const openStreamStub = sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
+      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
+
+      await service.writeFeatureTypeParquet(
+        TEST_DOWNLOAD_ID,
+        TEST_SOURCE_CART,
+        TEST_ARTIFACT,
+        mockProperties,
+        'observation'
+      );
+
+      expect(openStreamStub).to.have.been.calledOnce;
+      const writerOptions = openStreamStub.firstCall.args[2] as any;
+      expect(writerOptions).to.deep.equal({});
+    });
+  });
+
+  describe('finalizeParquetDownload', () => {
+    it('updates artifact status to uploaded and download status to READY', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const updateArtifactStub = sinon
+        .stub(DownloadRepository.prototype, 'updateArtifactStatusByDownloadId')
+        .resolves();
+      const updateDownloadStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
+
+      await service.finalizeParquetDownload(TEST_DOWNLOAD_ID);
+
+      expect(updateArtifactStub).to.have.been.calledOnce;
+      expect(updateArtifactStub.firstCall.args[0]).to.equal(TEST_DOWNLOAD_ID);
+      expect(updateArtifactStub.firstCall.args[1]).to.equal('uploaded');
+      expect(updateDownloadStub).to.have.been.calledOnce;
+      expect(updateDownloadStub.firstCall.args[1]).to.equal(DownloadStatusEnum.READY);
+    });
+
+    it('passes ISO timestamp to artifact status update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      const updateArtifactStub = sinon
+        .stub(DownloadRepository.prototype, 'updateArtifactStatusByDownloadId')
+        .resolves();
+      sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
+
+      await service.finalizeParquetDownload(TEST_DOWNLOAD_ID);
+
+      const timestamp = updateArtifactStub.firstCall.args[2] as string;
+      // Verify it's a valid ISO timestamp
+      expect(new Date(timestamp).toISOString()).to.equal(timestamp);
     });
   });
 });

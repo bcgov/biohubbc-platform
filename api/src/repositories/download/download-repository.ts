@@ -722,6 +722,38 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
+   * Update the artifact status for a download's linked artifact.
+   *
+   * Uses a JOIN-UPDATE through download_artifact so the pipeline only needs
+   * the download_id — avoids passing artifact_id through the call chain.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {string} status - The new artifact status (e.g. 'uploaded').
+   * @param {string} uploadedAt - ISO timestamp for uploaded_at.
+   * @return {Promise<void>}
+   * @memberof DownloadRepository
+   */
+  async updateArtifactStatusByDownloadId(downloadId: string, status: string, uploadedAt: string): Promise<void> {
+    const sql = SQL`
+      UPDATE artifact a
+      SET artifact_status = ${status}, uploaded_at = ${uploadedAt}::timestamptz
+      FROM download_artifact da
+      WHERE da.download_id = ${downloadId}
+        AND da.artifact_id = a.artifact_id
+        AND da.record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(sql);
+
+    if (response.rowCount === 0) {
+      throw new ApiExecuteSQLError('Failed to update artifact status for download', [
+        'DownloadRepository->updateArtifactStatusByDownloadId',
+        'rowCount was 0, expected at least 1'
+      ]);
+    }
+  }
+
+  /**
    * Stream base feature rows for a cart-based download, filtered by feature type.
    *
    * Returns the feature skeleton (id, uuid, data JSONB, parent_uuid) without
