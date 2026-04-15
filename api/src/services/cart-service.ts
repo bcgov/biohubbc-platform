@@ -150,7 +150,8 @@ export class CartService extends DBService {
     // from cart_submission_feature via download.cart_id
     const downloadId = await this.downloadService.createDownload({
       fragmentSizeBytes,
-      cartId
+      cartId,
+      format: 'csv'
     });
 
     // Create team and link to download for authenticated users.

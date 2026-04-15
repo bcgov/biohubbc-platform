@@ -22,7 +22,8 @@ export class ArtifactRepository extends BaseRepository {
         object_key,
         byte_size,
         checksum_sha256,
-        uploaded_at
+        uploaded_at,
+        format
       FROM
         artifact
       WHERE
@@ -60,7 +61,8 @@ export class ArtifactRepository extends BaseRepository {
         object_key,
         byte_size,
         checksum_sha256,
-        uploaded_at
+        uploaded_at,
+        format
       FROM
         artifact;
     `;
@@ -85,14 +87,16 @@ export class ArtifactRepository extends BaseRepository {
         byte_size,
         artifact_status,
         checksum_sha256,
-        uploaded_at
+        uploaded_at,
+        format
       ) VALUES (
         ${artifact.bucket},
         ${artifact.object_key},
         ${artifact.byte_size ?? null},
         ${artifact.artifact_status},
         ${artifact.checksum_sha256 ?? null},
-        ${artifact.uploaded_at ?? null}
+        ${artifact.uploaded_at ?? null},
+        ${artifact.format}
       )
       ON CONFLICT (bucket, object_key) DO NOTHING
       RETURNING artifact_id;
@@ -129,7 +133,8 @@ export class ArtifactRepository extends BaseRepository {
         object_key = COALESCE(${artifact.object_key}, object_key),
         byte_size = COALESCE(${artifact.byte_size}, byte_size),
         checksum_sha256 = COALESCE(${artifact.checksum_sha256}, checksum_sha256),
-        uploaded_at = COALESCE(${artifact.uploaded_at}, uploaded_at)
+        uploaded_at = COALESCE(${artifact.uploaded_at}, uploaded_at),
+        format = COALESCE(${artifact.format}, format)
       WHERE
         artifact_id = ${artifactId}
       RETURNING artifact_id;

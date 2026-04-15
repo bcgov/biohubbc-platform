@@ -131,7 +131,8 @@ export class UploadIngestionService extends DBService {
       object_key: key,
       byte_size: bytes,
       checksum_sha256: null,
-      uploaded_at: null
+      uploaded_at: null,
+      format: 'tar'
     });
 
     // 6. Create upload_archive metadata

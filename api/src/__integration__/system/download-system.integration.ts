@@ -254,6 +254,7 @@ describe('Download Worker', function () {
       .insert({
         download_status: 'pending',
         cart_id: cart.cart_id,
+        format: 'csv',
         create_user: SYSTEM_USER_ID,
         ...downloadOverrides
       })
@@ -311,6 +312,7 @@ describe('Download Worker', function () {
         byte_size: testFileContent.length,
         artifact_status: 'uploaded',
         uploaded_at: new Date().toISOString(),
+        format: 'tar',
         create_user: SYSTEM_USER_ID
       })
       .returning('artifact_id');
@@ -426,6 +428,7 @@ describe('Download Worker', function () {
         byte_size: file.content.length,
         artifact_status: 'uploaded',
         uploaded_at: new Date().toISOString(),
+        format: 'tar',
         create_user: SYSTEM_USER_ID
       });
       createdArtifactIds.push((await db('biohub.artifact').where('object_key', file.key).first()).artifact_id);
@@ -595,7 +598,8 @@ describe('DownloadPipelineService download pipeline (system)', function () {
     const systemUserId = connection.systemUserId();
     const cartResponse = await cartService.createCart(systemUserId, featureIds);
     const { download_id } = await crudService.createDownload({
-      cartId: cartResponse.cart.cart_id
+      cartId: cartResponse.cart.cart_id,
+      format: 'csv'
     });
 
     // Run the three-phase pipeline within the test transaction
@@ -793,8 +797,8 @@ describe('DownloadPipelineService download pipeline (system)', function () {
       s3KeysToCleanup.push(file.key);
 
       await connection.sql(SQL`
-        INSERT INTO artifact (bucket, object_key, byte_size, artifact_status, uploaded_at, create_user)
-        VALUES (${bucketName}, ${file.key}, ${file.content.length}, 'uploaded', now(), ${systemUserId});
+        INSERT INTO artifact (bucket, object_key, byte_size, artifact_status, uploaded_at, format, create_user)
+        VALUES (${bucketName}, ${file.key}, ${file.content.length}, 'uploaded', now(), 'tar', ${systemUserId});
       `);
 
       const featureId = await createTestFeature(connection, submissionId, 'file', {
@@ -903,7 +907,7 @@ describe('DownloadPipelineService download pipeline (system)', function () {
   async function executeFilterAndGetZip(
     filters: Record<string, unknown>
   ): Promise<{ zip: AdmZip; downloadId: string }> {
-    const { download_id } = await crudService.createDownload({ filters });
+    const { download_id } = await crudService.createDownload({ filters, format: 'csv' });
 
     // Run the three-phase pipeline within the test transaction
     await service.planDownloadIfNeeded(download_id);

@@ -20,7 +20,8 @@ export const Artifact = z.object({
   object_key: z.string(),
   byte_size: z.string().nullable(),
   checksum_sha256: z.string().length(64).nullable(),
-  uploaded_at: z.string().nullable()
+  uploaded_at: z.string().nullable(),
+  format: z.string()
 });
 export type Artifact = z.infer<typeof Artifact>;
 
@@ -33,7 +34,8 @@ export const CreateArtifact = z.object({
   object_key: z.string(),
   byte_size: z.number().int().nullable(),
   checksum_sha256: z.string().length(64).nullable(),
-  uploaded_at: z.string().nullable()
+  uploaded_at: z.string().nullable(),
+  format: z.string()
 });
 export type CreateArtifact = z.infer<typeof CreateArtifact>;
 
@@ -46,7 +48,8 @@ export const UpdateArtifact = z.object({
   object_key: z.string().optional(),
   byte_size: z.number().int().nullable().optional(),
   checksum_sha256: z.string().length(64).nullable().optional(),
-  uploaded_at: z.string().nullable().optional()
+  uploaded_at: z.string().nullable().optional(),
+  format: z.string().optional()
 });
 export type UpdateArtifact = z.infer<typeof UpdateArtifact>;
 

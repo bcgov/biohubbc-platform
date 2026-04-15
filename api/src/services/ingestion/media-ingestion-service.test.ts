@@ -40,14 +40,16 @@ describe('MediaIngestionService', () => {
             s3Key: 'submissions/123/uploads/submission-upload-1/media/path/to/key.pdf',
             path: 'path/to/key.pdf',
             byteSize: 10,
-            checksumSha256: '1'.repeat(64)
+            checksumSha256: '1'.repeat(64),
+            mimetype: 'application/pdf'
           },
           {
             fileName: 'photo-2.jpg',
             s3Key: 'submissions/123/uploads/submission-upload-1/media/photo-2.jpg',
             path: 'photo-2.jpg',
             byteSize: 20,
-            checksumSha256: '2'.repeat(64)
+            checksumSha256: '2'.repeat(64),
+            mimetype: 'image/jpeg'
           }
         ]);
         return { uploadedCount: 2 };
@@ -118,7 +120,8 @@ describe('MediaIngestionService', () => {
             s3Key: 'submissions/123/uploads/submission-upload-1/media/photo-1.jpg',
             path: 'photo-1.jpg',
             byteSize: 10,
-            checksumSha256: '1'.repeat(64)
+            checksumSha256: '1'.repeat(64),
+            mimetype: 'image/jpeg'
           }
         ]);
         return { uploadedCount: 1 };

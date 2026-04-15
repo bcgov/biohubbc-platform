@@ -209,7 +209,7 @@ export function createDownload(): RequestHandler {
       }
 
       // Store filters on download — features re-derived at pipeline time via search re-run
-      const downloadId = await downloadService.createDownload({ filters });
+      const downloadId = await downloadService.createDownload({ filters, format: 'csv' });
 
       // Link download to a new team for authenticated users.
       // Anonymous downloads have no download_team rows — UUID is the credential.

@@ -38,12 +38,12 @@ export class DownloadRepository extends BaseRepository {
    * @memberof DownloadRepository
    */
   async createDownload(payload: CreateDownload): Promise<DownloadId> {
-    const { fragmentSizeBytes, filters, cartId } = payload;
+    const { fragmentSizeBytes, filters, cartId, format } = payload;
     const sizeBytes = fragmentSizeBytes ?? FRAGMENT_SIZE_THRESHOLD;
 
     const sql = SQL`
-      INSERT INTO download (download_status, fragment_size_bytes, filters, cart_id)
-      VALUES ('pending', ${sizeBytes}, ${filters ? JSON.stringify(filters) : null}::jsonb, ${cartId ?? null})
+      INSERT INTO download (download_status, fragment_size_bytes, filters, cart_id, format)
+      VALUES ('pending', ${sizeBytes}, ${filters ? JSON.stringify(filters) : null}::jsonb, ${cartId ?? null}, ${format})
       RETURNING download_id;
     `;
 
@@ -87,6 +87,33 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
+   * Link an artifact to a download via the download_artifact join table.
+   *
+   * Downloads are tracked as formal artifacts from the moment they're requested.
+   * The artifact is created as 'pending' (no file yet) and linked here.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {string} artifactId - The artifact ID.
+   * @return {Promise<void>}
+   * @memberof DownloadRepository
+   */
+  async createDownloadArtifact(downloadId: string, artifactId: string): Promise<void> {
+    const sql = SQL`
+      INSERT INTO download_artifact (download_id, artifact_id)
+      VALUES (${downloadId}, ${artifactId});
+    `;
+
+    const response = await this.connection.sql(sql);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to link artifact to download', [
+        'DownloadRepository->createDownloadArtifact',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+  }
+
+  /**
    * Get a download record by ID.
    *
    * @param {string} downloadId - The download ID.
@@ -98,6 +125,7 @@ export class DownloadRepository extends BaseRepository {
       SELECT
         download_id,
         download_status,
+        format,
         metadata,
         started_at,
         completed_at,
@@ -140,6 +168,7 @@ export class DownloadRepository extends BaseRepository {
       .select([
         'd.download_id',
         'd.download_status',
+        'd.format',
         'd.metadata',
         'd.started_at',
         'd.completed_at',
