@@ -492,4 +492,505 @@ describe('DownloadRepository', () => {
       expect(result).to.be.false;
     });
   });
+
+  describe('getDownloadArtifact', () => {
+    it('returns artifact_id and object_key from download_artifact JOIN artifact', async () => {
+      const sqlStub = sinon
+        .stub()
+        .resolves(
+          mockQueryResult(
+            [{ artifact_id: 'bbbb0000-0000-0000-0000-000000000001', object_key: 'downloads/some-file.parquet' }],
+            1
+          )
+        );
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.getDownloadArtifact('aaaa0000-0000-0000-0000-000000000001');
+
+      expect(result).to.deep.equal({
+        artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
+        object_key: 'downloads/some-file.parquet'
+      });
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('download_artifact');
+      expect(sqlText).to.include('artifact');
+      expect(sqlText).to.include('object_key');
+    });
+
+    it('throws ApiExecuteSQLError when not found', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+
+      try {
+        await repo.getDownloadArtifact('bad-id');
+        expect.fail('Expected error');
+      } catch (err: any) {
+        expect(err.message).to.equal('Download artifact not found');
+      }
+    });
+  });
+
+  describe('listDownloadFeatureTypesByCartId', () => {
+    it('returns ordered feature type names with DISTINCT', async () => {
+      const sqlStub = sinon
+        .stub()
+        .resolves(mockQueryResult([{ feature_type_name: 'dataset' }, { feature_type_name: 'observation' }], 2));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.listDownloadFeatureTypesByCartId('cccc0000-0000-0000-0000-000000000001');
+
+      expect(result).to.deep.equal(['dataset', 'observation']);
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('DISTINCT');
+      expect(sqlText).to.include('cart_submission_feature');
+      expect(sqlText).to.include('feature_type');
+      expect(sqlText).to.include('ORDER BY');
+    });
+
+    it('returns empty array when cart has no features', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.listDownloadFeatureTypesByCartId('cccc0000-0000-0000-0000-000000000001');
+
+      expect(result).to.deep.equal([]);
+    });
+  });
+
+  describe('listDownloadFeatureTypesBySearchQuery', () => {
+    it('returns ordered feature type names from knex query', async () => {
+      const knexStub = sinon.stub().resolves({
+        rowCount: 2,
+        rows: [{ feature_type_name: 'dataset' }, { feature_type_name: 'observation' }]
+      } as unknown as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const mockSubquery = { toString: () => 'SELECT submission_feature_id FROM ...' } as any;
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.listDownloadFeatureTypesBySearchQuery(mockSubquery);
+
+      expect(result).to.deep.equal(['dataset', 'observation']);
+      expect(knexStub).to.have.been.calledOnce;
+    });
+
+    it('returns empty array when no features match', async () => {
+      const knexStub = sinon.stub().resolves({
+        rowCount: 0,
+        rows: []
+      } as unknown as QueryResult<any>);
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const mockSubquery = { toString: () => 'SELECT submission_feature_id FROM ...' } as any;
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const result = await repo.listDownloadFeatureTypesBySearchQuery(mockSubquery);
+
+      expect(result).to.deep.equal([]);
+    });
+  });
+
+  describe('streamFeatureBaseByCartIdAndType', () => {
+    it('yields batches via DECLARE/FETCH/CLOSE cursor sequence', async () => {
+      const queryStub = sinon.stub();
+
+      // Call 0: DECLARE cursor
+      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
+      // Call 1: FETCH with data
+      queryStub.onCall(1).resolves({
+        rows: [
+          {
+            submission_feature_id: 1,
+            uuid: 'uuid-1',
+            feature_type_name: 'observation',
+            data: { properties: {} },
+            parent_uuid: null
+          },
+          {
+            submission_feature_id: 2,
+            uuid: 'uuid-2',
+            feature_type_name: 'observation',
+            data: { properties: {} },
+            parent_uuid: 'parent-uuid-1'
+          }
+        ],
+        rowCount: 2
+      });
+      // Call 2: FETCH empty (end of cursor)
+      queryStub.onCall(2).resolves({ rows: [], rowCount: 0 });
+      // Call 3: CLOSE
+      queryStub.onCall(3).resolves({ rows: [], rowCount: 0 });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      const batches: any[][] = [];
+      for await (const batch of repo.streamFeatureBaseByCartIdAndType(
+        'cccc0000-0000-0000-0000-000000000001',
+        'observation'
+      )) {
+        batches.push(batch);
+      }
+
+      expect(batches).to.have.length(1);
+      expect(batches[0]).to.have.length(2);
+      expect(batches[0][0]).to.have.property('submission_feature_id', 1);
+      expect(batches[0][0]).to.have.property('parent_uuid', null);
+      expect(batches[0][1]).to.have.property('parent_uuid', 'parent-uuid-1');
+
+      // Verify DECLARE, FETCH, FETCH, CLOSE sequence
+      expect(queryStub.callCount).to.equal(4);
+      expect(queryStub.getCall(0).args[0]).to.include('DECLARE');
+      expect(queryStub.getCall(0).args[0]).to.include('cart_submission_feature');
+      expect(queryStub.getCall(1).args[0]).to.include('FETCH');
+      expect(queryStub.getCall(2).args[0]).to.include('FETCH');
+      expect(queryStub.getCall(3).args[0]).to.include('CLOSE');
+    });
+
+    it('calls CLOSE even when FETCH throws', async () => {
+      const queryStub = sinon.stub();
+
+      // DECLARE succeeds
+      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
+      // FETCH throws
+      queryStub.onCall(1).rejects(new Error('DB failure'));
+      // CLOSE should still be called
+      queryStub.onCall(2).resolves({ rows: [], rowCount: 0 });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _batch of repo.streamFeatureBaseByCartIdAndType(
+          'cccc0000-0000-0000-0000-000000000001',
+          'observation'
+        )) {
+          // should not reach here
+        }
+        expect.fail('Expected error');
+      } catch (err: any) {
+        expect(err.message).to.equal('DB failure');
+      }
+
+      // CLOSE must have been called despite the error
+      const closeCall = queryStub.getCalls().find((c) => String(c.args[0]).includes('CLOSE'));
+      expect(closeCall).to.not.be.undefined;
+    });
+  });
+
+  describe('streamFeatureBaseBySearchQueryAndType', () => {
+    it('yields batches via cursor with search subquery bindings', async () => {
+      const queryStub = sinon.stub();
+
+      // DECLARE
+      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
+      // FETCH with data
+      queryStub.onCall(1).resolves({
+        rows: [
+          {
+            submission_feature_id: 5,
+            uuid: 'uuid-5',
+            feature_type_name: 'observation',
+            data: { properties: {} },
+            parent_uuid: 'parent-uuid-5'
+          }
+        ],
+        rowCount: 1
+      });
+      // FETCH empty
+      queryStub.onCall(2).resolves({ rows: [], rowCount: 0 });
+      // CLOSE
+      queryStub.onCall(3).resolves({ rows: [], rowCount: 0 });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      const batches: any[][] = [];
+      for await (const batch of repo.streamFeatureBaseBySearchQueryAndType(
+        'dddd0000-0000-0000-0000-000000000001',
+        'SELECT submission_feature_id FROM search_results WHERE x = $1',
+        ['search-val'],
+        'observation'
+      )) {
+        batches.push(batch);
+      }
+
+      expect(batches).to.have.length(1);
+      expect(batches[0][0]).to.have.property('submission_feature_id', 5);
+
+      // Verify DECLARE includes search SQL and feature type binding
+      const declareArgs = queryStub.getCall(0).args;
+      expect(declareArgs[0]).to.include('DECLARE');
+      expect(declareArgs[0]).to.include('submission_feature');
+      // Bindings include search value + feature type name
+      expect(declareArgs[1]).to.deep.equal(['search-val', 'observation']);
+
+      expect(queryStub.getCall(3).args[0]).to.include('CLOSE');
+    });
+
+    it('calls CLOSE even when FETCH throws', async () => {
+      const queryStub = sinon.stub();
+
+      queryStub.onCall(0).resolves({ rows: [], rowCount: 0 });
+      queryStub.onCall(1).rejects(new Error('Search cursor failure'));
+      queryStub.onCall(2).resolves({ rows: [], rowCount: 0 });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _batch of repo.streamFeatureBaseBySearchQueryAndType(
+          'dddd0000-0000-0000-0000-000000000001',
+          'SELECT sf_id FROM search WHERE x = $1',
+          ['val'],
+          'observation'
+        )) {
+          // should not reach here
+        }
+        expect.fail('Expected error');
+      } catch (err: any) {
+        expect(err.message).to.equal('Search cursor failure');
+      }
+
+      const closeCall = queryStub.getCalls().find((c) => String(c.args[0]).includes('CLOSE'));
+      expect(closeCall).to.not.be.undefined;
+    });
+  });
+
+  describe('hydrateFeatureBatchFromTypedTables', () => {
+    it('merges typed property values into data record', async () => {
+      const queryStub = sinon.stub();
+
+      // String query returns a value for "site_name"
+      queryStub.resolves({ rows: [{ submission_feature_id: 1, name: 'site_name', value: 'Alpha Site' }] });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      const baseBatch = [
+        {
+          submission_feature_id: 1,
+          uuid: 'uuid-1',
+          feature_type_name: 'observation',
+          data: { properties: { site_name: 'fallback' } },
+          parent_uuid: null
+        }
+      ];
+
+      const properties = [{ feature_property_name: 'site_name', feature_property_type_name: 'string' }];
+
+      const result = await repo.hydrateFeatureBatchFromTypedTables(baseBatch, properties);
+
+      expect(result).to.have.length(1);
+      expect(result[0].data.site_name).to.equal('Alpha Site');
+      expect(result[0].uuid).to.equal('uuid-1');
+      expect(result[0].feature_type_name).to.equal('observation');
+      expect(result[0].parent_uuid).to.be.null;
+    });
+
+    it('resolves code property to label via contributor_codeset_code', async () => {
+      const queryStub = sinon.stub();
+
+      // Code query returns resolved label
+      queryStub.resolves({ rows: [{ submission_feature_id: 1, name: 'status', value: 'Active' }] });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      const baseBatch = [
+        {
+          submission_feature_id: 1,
+          uuid: 'uuid-1',
+          feature_type_name: 'observation',
+          data: { properties: {} },
+          parent_uuid: null
+        }
+      ];
+
+      const properties = [{ feature_property_name: 'status', feature_property_type_name: 'code' }];
+
+      const result = await repo.hydrateFeatureBatchFromTypedTables(baseBatch, properties);
+
+      expect(result[0].data.status).to.equal('Active');
+
+      // Verify SQL includes contributor_codeset_code join
+      const codeQuery = queryStub.getCalls().find((c) => String(c.args[0]).includes('contributor_codeset_code'));
+      expect(codeQuery).to.not.be.undefined;
+    });
+
+    it('resolves taxon property to itis_scientific_name', async () => {
+      const queryStub = sinon.stub();
+
+      queryStub.resolves({ rows: [{ submission_feature_id: 1, name: 'species', value: 'Alces alces' }] });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      const baseBatch = [
+        {
+          submission_feature_id: 1,
+          uuid: 'uuid-1',
+          feature_type_name: 'observation',
+          data: { properties: {} },
+          parent_uuid: null
+        }
+      ];
+
+      const properties = [{ feature_property_name: 'species', feature_property_type_name: 'taxon' }];
+
+      const result = await repo.hydrateFeatureBatchFromTypedTables(baseBatch, properties);
+
+      expect(result[0].data.species).to.equal('Alces alces');
+
+      // Verify SQL includes taxon join
+      const taxonQuery = queryStub.getCalls().find((c) => String(c.args[0]).includes('itis_scientific_name'));
+      expect(taxonQuery).to.not.be.undefined;
+    });
+
+    it('uses ST_AsGeoJSON for spatial properties', async () => {
+      const queryStub = sinon.stub();
+
+      const geoJson = { type: 'Point', coordinates: [-123.5, 48.4] };
+      queryStub.resolves({ rows: [{ submission_feature_id: 1, name: 'location', value: geoJson }] });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      const baseBatch = [
+        {
+          submission_feature_id: 1,
+          uuid: 'uuid-1',
+          feature_type_name: 'observation',
+          data: { properties: {} },
+          parent_uuid: null
+        }
+      ];
+
+      const properties = [{ feature_property_name: 'location', feature_property_type_name: 'spatial' }];
+
+      const result = await repo.hydrateFeatureBatchFromTypedTables(baseBatch, properties);
+
+      expect(result[0].data.location).to.deep.equal(geoJson);
+
+      // Verify SQL uses ST_AsGeoJSON
+      const spatialQuery = queryStub.getCalls().find((c) => String(c.args[0]).includes('ST_AsGeoJSON'));
+      expect(spatialQuery).to.not.be.undefined;
+    });
+
+    it('falls back to JSONB data.properties for array/object/artifact_key types', async () => {
+      const queryStub = sinon.stub();
+
+      // No typed table queries fire for these types
+      queryStub.resolves({ rows: [] });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      const baseBatch = [
+        {
+          submission_feature_id: 1,
+          uuid: 'uuid-1',
+          feature_type_name: 'observation',
+          data: {
+            properties: {
+              tags: ['wildlife', 'bear'],
+              metadata: { source: 'field' },
+              attachment: 'files/123_photo.jpg'
+            }
+          },
+          parent_uuid: null
+        }
+      ];
+
+      const properties = [
+        { feature_property_name: 'tags', feature_property_type_name: 'array' },
+        { feature_property_name: 'metadata', feature_property_type_name: 'object' },
+        { feature_property_name: 'attachment', feature_property_type_name: 'artifact_key' }
+      ];
+
+      const result = await repo.hydrateFeatureBatchFromTypedTables(baseBatch, properties);
+
+      expect(result[0].data.tags).to.deep.equal(['wildlife', 'bear']);
+      expect(result[0].data.metadata).to.deep.equal({ source: 'field' });
+      expect(result[0].data.attachment).to.equal('files/123_photo.jpg');
+    });
+
+    it('sets missing properties to null', async () => {
+      const queryStub = sinon.stub();
+
+      // Typed query returns no rows for this feature
+      queryStub.resolves({ rows: [] });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      const baseBatch = [
+        {
+          submission_feature_id: 1,
+          uuid: 'uuid-1',
+          feature_type_name: 'observation',
+          data: { properties: {} },
+          parent_uuid: null
+        }
+      ];
+
+      const properties = [
+        { feature_property_name: 'site_name', feature_property_type_name: 'string' },
+        { feature_property_name: 'count', feature_property_type_name: 'number' },
+        { feature_property_name: 'notes', feature_property_type_name: 'array' }
+      ];
+
+      const result = await repo.hydrateFeatureBatchFromTypedTables(baseBatch, properties);
+
+      expect(result[0].data.site_name).to.be.null;
+      expect(result[0].data.count).to.be.null;
+      expect(result[0].data.notes).to.be.null;
+    });
+
+    it('queries only typed tables for property types present in schema', async () => {
+      const queryStub = sinon.stub();
+
+      queryStub.resolves({ rows: [] });
+
+      const mockDBConnection = getMockDBConnection({ query: queryStub });
+      const repo = new DownloadRepository(mockDBConnection);
+
+      const baseBatch = [
+        {
+          submission_feature_id: 1,
+          uuid: 'uuid-1',
+          feature_type_name: 'observation',
+          data: { properties: {} },
+          parent_uuid: null
+        }
+      ];
+
+      // Only string and number types in schema — should only query those 2 tables
+      const properties = [
+        { feature_property_name: 'site_name', feature_property_type_name: 'string' },
+        { feature_property_name: 'count', feature_property_type_name: 'number' }
+      ];
+
+      await repo.hydrateFeatureBatchFromTypedTables(baseBatch, properties);
+
+      // Should have exactly 2 typed-table queries (string + number)
+      expect(queryStub.callCount).to.equal(2);
+
+      const queryTexts = queryStub.getCalls().map((c) => String(c.args[0]));
+      expect(queryTexts.some((t) => t.includes('submission_feature_property_string'))).to.be.true;
+      expect(queryTexts.some((t) => t.includes('submission_feature_property_number'))).to.be.true;
+      expect(queryTexts.some((t) => t.includes('submission_feature_property_code'))).to.be.false;
+    });
+  });
 });

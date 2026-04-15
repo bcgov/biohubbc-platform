@@ -98,6 +98,16 @@ export const HasTeams = z.object({ has_teams: z.boolean() });
 export type HasTeams = z.infer<typeof HasTeams>;
 
 /**
+ * Artifact info for the Parquet pipeline — the S3 location where Parquet files are written.
+ * JOINs download_artifact to artifact to get the object key.
+ */
+export const DownloadArtifactInfo = z.object({
+  artifact_id: z.string().uuid(),
+  object_key: z.string()
+});
+export type DownloadArtifactInfo = z.infer<typeof DownloadArtifactInfo>;
+
+/**
  * Row shape for the Parquet download pipeline.
  *
  * Mirrors DownloadFeatureData but uses `parent_uuid` instead of full parent denormalization.

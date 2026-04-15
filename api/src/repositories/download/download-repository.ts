@@ -1,10 +1,12 @@
 import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
+import { z } from 'zod';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import {
   CreateDownload,
+  DownloadArtifactInfo,
   DownloadFeatureSummary,
   DownloadId,
   DownloadListRecord,
@@ -13,11 +15,37 @@ import {
   DownloadSource,
   DownloadTotalSize,
   HasTeams,
-  IsAuthorized
+  IsAuthorized,
+  ParquetFeatureData
 } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
+import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
+
+/**
+ * Internal row shape for the typed-cursor base query.
+ * Returns the feature skeleton without typed property values — those are
+ * hydrated separately from the `submission_feature_property_*` tables.
+ */
+interface BaseFeatureRow {
+  submission_feature_id: number;
+  uuid: string;
+  feature_type_name: string;
+  data: Record<string, any>;
+  parent_uuid: string | null;
+}
+
+/**
+ * Internal row shape for typed-table hydration queries.
+ * Each typed table returns (submission_feature_id, name, value) tuples
+ * that are merged into the base row's data record.
+ */
+interface TypedPropertyRow {
+  submission_feature_id: number;
+  name: string;
+  value: any;
+}
 
 /**
  * A repository class for accessing download data.
@@ -607,5 +635,407 @@ export class DownloadRepository extends BaseRepository {
     const response = await this.connection.sql(sql, HasTeams);
 
     return response.rows[0]?.has_teams ?? false;
+  }
+
+  /**
+   * Get the artifact info (S3 object key) linked to a download.
+   *
+   * The Parquet pipeline needs the S3 key to know where to write the output file.
+   * JOINs through download_artifact to the artifact table.
+   *
+   * @param {string} downloadId - The download ID.
+   * @return {Promise<DownloadArtifactInfo>}
+   * @memberof DownloadRepository
+   */
+  async getDownloadArtifact(downloadId: string): Promise<DownloadArtifactInfo> {
+    const sql = SQL`
+      SELECT a.artifact_id, a.object_key
+      FROM download_artifact da
+      INNER JOIN artifact a ON da.artifact_id = a.artifact_id
+      WHERE da.download_id = ${downloadId};
+    `;
+
+    const response = await this.connection.sql(sql, DownloadArtifactInfo);
+
+    if (response.rowCount === 0) {
+      throw new ApiExecuteSQLError('Download artifact not found', [
+        'DownloadRepository->getDownloadArtifact',
+        'rowCount was 0, expected 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * List distinct feature type names for a cart-based download.
+   *
+   * Used by the Parquet pipeline to iterate over each feature type
+   * and generate a separate Parquet file per type.
+   *
+   * @param {string} cartId - The cart ID (from download.cart_id).
+   * @return {Promise<string[]>} Ordered list of feature type names.
+   * @memberof DownloadRepository
+   */
+  async listDownloadFeatureTypesByCartId(cartId: string): Promise<string[]> {
+    const FeatureTypeName = z.object({ feature_type_name: z.string() });
+
+    const sql = SQL`
+      SELECT DISTINCT ft.name AS feature_type_name
+      FROM cart_submission_feature csf
+      INNER JOIN submission_feature sf ON csf.submission_feature_id = sf.submission_feature_id
+      INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
+      WHERE csf.cart_id = ${cartId}
+      ORDER BY ft.name;
+    `;
+
+    const response = await this.connection.sql(sql, FeatureTypeName);
+
+    return response.rows.map((r) => r.feature_type_name);
+  }
+
+  /**
+   * List distinct feature type names for a filter-based download.
+   *
+   * Same purpose as listDownloadFeatureTypesByCartId but uses a Knex subquery
+   * from the search pipeline instead of a cart join.
+   *
+   * @param {Knex.QueryBuilder} searchSubquery - Unexecuted Knex subquery
+   *   returning submission_feature_id rows (from SearchFeatureRepository).
+   * @return {Promise<string[]>} Ordered list of feature type names.
+   * @memberof DownloadRepository
+   */
+  async listDownloadFeatureTypesBySearchQuery(searchSubquery: Knex.QueryBuilder): Promise<string[]> {
+    const FeatureTypeName = z.object({ feature_type_name: z.string() });
+
+    const knex = getKnex();
+    const query = knex
+      .distinct('ft.name as feature_type_name')
+      .from('submission_feature as sf')
+      .innerJoin('feature_type as ft', 'sf.feature_type_id', 'ft.feature_type_id')
+      .whereIn('sf.submission_feature_id', searchSubquery)
+      .orderBy('ft.name');
+
+    const response = await this.connection.knex(query, FeatureTypeName);
+
+    return response.rows.map((r) => r.feature_type_name);
+  }
+
+  /**
+   * Stream base feature rows for a cart-based download, filtered by feature type.
+   *
+   * Returns the feature skeleton (id, uuid, data JSONB, parent_uuid) without
+   * typed property values. Typed values are hydrated separately by
+   * hydrateFeatureBatchFromTypedTables to avoid joining 7 typed tables
+   * in a single massive query.
+   *
+   * Must be called within an open transaction (cursors require tx context).
+   *
+   * @param {string} cartId - The cart ID (from download.cart_id).
+   * @param {string} featureTypeName - The feature type to stream.
+   * @param {number} [batchSize=5000] - Rows per FETCH.
+   * @yields {BaseFeatureRow[]} Batches of base feature rows.
+   * @memberof DownloadRepository
+   */
+  async *streamFeatureBaseByCartIdAndType(
+    cartId: string,
+    featureTypeName: string,
+    batchSize = 5000
+  ): AsyncGenerator<BaseFeatureRow[]> {
+    const cursorName = `dl_pq_cart_cursor_${cartId.replace(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replace(
+      /[^a-z0-9_]/gi,
+      '_'
+    )}`;
+
+    await this.connection.query(
+      `DECLARE ${cursorName} CURSOR FOR
+        SELECT
+          sf.submission_feature_id,
+          sf.uuid,
+          sf.data,
+          ft.name AS feature_type_name,
+          parent_sf.uuid AS parent_uuid
+        FROM cart_submission_feature csf
+        INNER JOIN submission_feature sf ON csf.submission_feature_id = sf.submission_feature_id
+        INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
+        LEFT JOIN submission_feature parent_sf ON sf.parent_submission_feature_id = parent_sf.submission_feature_id
+        WHERE csf.cart_id = $1 AND ft.name = $2
+        ORDER BY sf.submission_feature_id`,
+      [cartId, featureTypeName]
+    );
+
+    try {
+      while (true) {
+        const result = await this.connection.query<BaseFeatureRow>(`FETCH ${batchSize} FROM ${cursorName}`);
+
+        if (result.rows.length === 0) {
+          break;
+        }
+
+        yield result.rows;
+      }
+    } finally {
+      await this.connection.query(`CLOSE ${cursorName}`);
+    }
+  }
+
+  /**
+   * Stream base feature rows for a filter-based download, filtered by feature type.
+   *
+   * Same cursor pattern as streamFeatureBaseByCartIdAndType but uses raw SQL
+   * search subquery with bindings instead of a cart join.
+   *
+   * Must be called within an open transaction (cursors require tx context).
+   *
+   * @param {string} downloadId - The download ID (used for cursor naming).
+   * @param {string} searchSql - Raw SQL for the search subquery.
+   * @param {any[]} searchBindings - Parameterized bindings for the search SQL.
+   * @param {string} featureTypeName - The feature type to stream.
+   * @param {number} [batchSize=5000] - Rows per FETCH.
+   * @yields {BaseFeatureRow[]} Batches of base feature rows.
+   * @memberof DownloadRepository
+   */
+  async *streamFeatureBaseBySearchQueryAndType(
+    downloadId: string,
+    searchSql: string,
+    searchBindings: any[],
+    featureTypeName: string,
+    batchSize = 5000
+  ): AsyncGenerator<BaseFeatureRow[]> {
+    const cursorName = `dl_pq_filter_cursor_${downloadId.replace(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replace(
+      /[^a-z0-9_]/gi,
+      '_'
+    )}`;
+
+    // featureTypeName is the last positional parameter after all search bindings
+    const allBindings = [...searchBindings, featureTypeName];
+    const typeParamIndex = allBindings.length;
+
+    await this.connection.query(
+      `DECLARE ${cursorName} CURSOR FOR
+        SELECT
+          sf.submission_feature_id,
+          sf.uuid,
+          sf.data,
+          ft.name AS feature_type_name,
+          parent_sf.uuid AS parent_uuid
+        FROM submission_feature sf
+        INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
+        LEFT JOIN submission_feature parent_sf ON sf.parent_submission_feature_id = parent_sf.submission_feature_id
+        WHERE sf.submission_feature_id IN (${searchSql}) AND ft.name = $${typeParamIndex}
+        ORDER BY sf.submission_feature_id`,
+      allBindings
+    );
+
+    try {
+      while (true) {
+        const result = await this.connection.query<BaseFeatureRow>(`FETCH ${batchSize} FROM ${cursorName}`);
+
+        if (result.rows.length === 0) {
+          break;
+        }
+
+        yield result.rows;
+      }
+    } finally {
+      await this.connection.query(`CLOSE ${cursorName}`);
+    }
+  }
+
+  /**
+   * Hydrate a batch of base feature rows with typed property values.
+   *
+   * Queries 7 typed `submission_feature_property_*` tables to reconstruct
+   * the `data` record with correct types and resolved labels:
+   * - Code properties resolve to `contributor_codeset_code.label` — the human-readable
+   *   label, not the FK. Parquet files are standalone; GIS consumers have no access
+   *   to the database, so the label must be materialized at read time.
+   * - Taxon properties resolve to `taxon.itis_scientific_name` — same standalone-file
+   *   principle.
+   * - Geometry properties use `ST_AsGeoJSON()` for GeoJSON output, later converted
+   *   to WKB by parquet-utils.
+   *
+   * Properties without typed tables (array, object, artifact_key) fall back to
+   * `submission_feature.data.properties` — these types have dynamic internal structure
+   * that can't be represented as a single typed value.
+   *
+   * Assembly lives in the repository (rather than the service) because it is a
+   * SQL-boundary concern: batching 7 typed-table queries into a single round-trip
+   * window, not a business decision.
+   *
+   * @param {BaseFeatureRow[]} baseBatch - Base feature rows from a cursor stream.
+   * @param {CsvPropertyDefinition[]} properties - Schema property definitions.
+   * @return {Promise<ParquetFeatureData[]>}
+   * @memberof DownloadRepository
+   */
+  async hydrateFeatureBatchFromTypedTables(
+    baseBatch: BaseFeatureRow[],
+    properties: CsvPropertyDefinition[]
+  ): Promise<ParquetFeatureData[]> {
+    const submissionFeatureIds = baseBatch.map((row) => row.submission_feature_id);
+
+    // Group properties by type to determine which typed tables to query
+    const typeGroups = new Map<string, string[]>();
+    for (const prop of properties) {
+      const typeName = prop.feature_property_type_name;
+      if (!typeGroups.has(typeName)) {
+        typeGroups.set(typeName, []);
+      }
+      typeGroups.get(typeName)!.push(prop.feature_property_name);
+    }
+
+    // Types that have dedicated typed tables
+    const JSONB_FALLBACK_TYPES = new Set(['array', 'object', 'artifact_key']);
+
+    // Build parallel typed-table queries for each type that has a dedicated table
+    const typedQueries: Promise<TypedPropertyRow[]>[] = [];
+
+    if (typeGroups.has('string')) {
+      typedQueries.push(
+        this.connection
+          .query<TypedPropertyRow>(
+            `SELECT p.submission_feature_id, fp.name, p.value
+            FROM submission_feature_property_string p
+            INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+            INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+            WHERE p.submission_feature_id = ANY($1)`,
+            [submissionFeatureIds]
+          )
+          .then((r) => r.rows)
+      );
+    }
+
+    if (typeGroups.has('number')) {
+      typedQueries.push(
+        this.connection
+          .query<TypedPropertyRow>(
+            `SELECT p.submission_feature_id, fp.name, p.value
+            FROM submission_feature_property_number p
+            INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+            INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+            WHERE p.submission_feature_id = ANY($1)`,
+            [submissionFeatureIds]
+          )
+          .then((r) => r.rows)
+      );
+    }
+
+    if (typeGroups.has('boolean')) {
+      typedQueries.push(
+        this.connection
+          .query<TypedPropertyRow>(
+            `SELECT p.submission_feature_id, fp.name, p.value
+            FROM submission_feature_property_boolean p
+            INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+            INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+            WHERE p.submission_feature_id = ANY($1)`,
+            [submissionFeatureIds]
+          )
+          .then((r) => r.rows)
+      );
+    }
+
+    if (typeGroups.has('datetime')) {
+      typedQueries.push(
+        this.connection
+          .query<TypedPropertyRow>(
+            `SELECT p.submission_feature_id, fp.name, p.value
+            FROM submission_feature_property_timestamp p
+            INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+            INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+            WHERE p.submission_feature_id = ANY($1)`,
+            [submissionFeatureIds]
+          )
+          .then((r) => r.rows)
+      );
+    }
+
+    if (typeGroups.has('code')) {
+      typedQueries.push(
+        this.connection
+          .query<TypedPropertyRow>(
+            `SELECT p.submission_feature_id, fp.name, ccc.label AS value
+            FROM submission_feature_property_code p
+            INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+            INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+            INNER JOIN contributor_codeset_code ccc ON p.contributor_codeset_code_id = ccc.contributor_codeset_code_id
+            WHERE p.submission_feature_id = ANY($1)`,
+            [submissionFeatureIds]
+          )
+          .then((r) => r.rows)
+      );
+    }
+
+    if (typeGroups.has('taxon')) {
+      typedQueries.push(
+        this.connection
+          .query<TypedPropertyRow>(
+            `SELECT p.submission_feature_id, fp.name, t.itis_scientific_name AS value
+            FROM submission_feature_property_taxon p
+            INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+            INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+            INNER JOIN taxon t ON p.taxon_id = t.taxon_id
+            WHERE p.submission_feature_id = ANY($1)`,
+            [submissionFeatureIds]
+          )
+          .then((r) => r.rows)
+      );
+    }
+
+    if (typeGroups.has('spatial')) {
+      typedQueries.push(
+        this.connection
+          .query<TypedPropertyRow>(
+            `SELECT p.submission_feature_id, fp.name, ST_AsGeoJSON(p.value)::jsonb AS value
+            FROM submission_feature_property_geometry p
+            INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+            INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+            WHERE p.submission_feature_id = ANY($1)`,
+            [submissionFeatureIds]
+          )
+          .then((r) => r.rows)
+      );
+    }
+
+    // Execute all typed-table queries in parallel
+    const typedResults = await Promise.all(typedQueries);
+
+    // Build property map: submission_feature_id -> { propName: value }
+    const propertyMap = new Map<number, Record<string, any>>();
+    for (const rows of typedResults) {
+      for (const row of rows) {
+        if (!propertyMap.has(row.submission_feature_id)) {
+          propertyMap.set(row.submission_feature_id, {});
+        }
+        propertyMap.get(row.submission_feature_id)![row.name] = row.value;
+      }
+    }
+
+    // Assemble ParquetFeatureData for each base row
+    return baseBatch.map((baseRow) => {
+      const typedProps = propertyMap.get(baseRow.submission_feature_id) ?? {};
+      const data: Record<string, any> = {};
+
+      for (const prop of properties) {
+        const propName = prop.feature_property_name;
+
+        if (JSONB_FALLBACK_TYPES.has(prop.feature_property_type_name)) {
+          // Array/object/artifact_key: fall back to JSONB data.properties
+          data[propName] = baseRow.data?.properties?.[propName] ?? null;
+        } else if (propName in typedProps) {
+          data[propName] = typedProps[propName];
+        } else {
+          data[propName] = null;
+        }
+      }
+
+      return {
+        submission_feature_id: baseRow.submission_feature_id,
+        uuid: baseRow.uuid,
+        feature_type_name: baseRow.feature_type_name,
+        data,
+        parent_uuid: baseRow.parent_uuid
+      };
+    });
   }
 }
