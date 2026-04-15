@@ -96,3 +96,23 @@ export type IsAuthorized = z.infer<typeof IsAuthorized>;
 
 export const HasTeams = z.object({ has_teams: z.boolean() });
 export type HasTeams = z.infer<typeof HasTeams>;
+
+/**
+ * Row shape for the Parquet download pipeline.
+ *
+ * Mirrors DownloadFeatureData but uses `parent_uuid` instead of full parent denormalization.
+ * Each Parquet file contains one feature type — parent data lives in its own file,
+ * joined by `parent_uuid` (star schema, not flattened).
+ *
+ * `data` is a record of property names to typed JS values, reconstructed from the
+ * typed `submission_feature_property_*` tables. Code properties contain the resolved
+ * label (not the FK), taxon properties contain the scientific name (not taxon_id).
+ */
+export const ParquetFeatureData = z.object({
+  submission_feature_id: z.number(),
+  uuid: z.string(),
+  feature_type_name: z.string(),
+  data: z.record(z.any()),
+  parent_uuid: z.string().nullable()
+});
+export type ParquetFeatureData = z.infer<typeof ParquetFeatureData>;
