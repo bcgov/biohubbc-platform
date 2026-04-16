@@ -13,6 +13,7 @@
 // Requires: make web (database must be running with seed data)
 
 import { expect } from 'chai';
+import { randomInt } from 'crypto';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, getKnex, IDBConnection, initDBPool } from '../../database/db';
 import { ParquetFeatureData } from '../../models/download';
@@ -279,7 +280,7 @@ describe('Download Parquet pipeline (integration)', function () {
 
     // Insert taxon row — use unique itis_tsn and suffix the scientific name to avoid
     // collision with seed data (taxon_nuk1 partial unique on itis_scientific_name)
-    const tsn = Math.floor(Math.random() * 900000) + 100000;
+    const tsn = randomInt(100000, 1000000);
     const uniqueName = `${scientificName} [test-${tsn}]`;
     const taxonResult = await connection.sql(SQL`
       INSERT INTO taxon (itis_tsn, itis_scientific_name, itis_data, itis_update_date, record_effective_date, create_user)
