@@ -366,8 +366,10 @@ export class DownloadPipelineService extends DBService {
     properties: CsvPropertyDefinition[],
     featureTypeName: string
   ): Promise<void> {
-    const hasSpatial = properties.some((p) => p.feature_property_type_name === 'spatial');
-    const schema = buildParquetSchema(properties, hasSpatial);
+    const spatialColumns = properties
+      .filter((p) => p.feature_property_type_name === 'spatial')
+      .map((p) => p.feature_property_name);
+    const schema = buildParquetSchema(properties);
     const s3Key = `${artifact.object_key}/${featureTypeName}/data.parquet`;
 
     // Create streaming pipeline: Parquet writer → passThrough → S3 multipart upload
@@ -382,8 +384,8 @@ export class DownloadPipelineService extends DBService {
 
     // Open Parquet writer with optional GeoParquet metadata for spatial types
     const writerOptions: any = {};
-    if (hasSpatial) {
-      writerOptions.metadata = { geo: buildGeoParquetMetadata() };
+    if (spatialColumns.length > 0) {
+      writerOptions.metadata = { geo: buildGeoParquetMetadata(spatialColumns) };
     }
     // PassThrough implements write()/end() but @dsnp/parquetjs types expect fs.WriteStream.
     // The runtime only calls write() and end() — safe to cast.

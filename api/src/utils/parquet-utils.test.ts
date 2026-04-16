@@ -39,8 +39,8 @@ describe('parquet-utils', () => {
       expect(propertyTypeToParquetType('taxon')).to.equal('UTF8');
     });
 
-    it('should return undefined for spatial (handled as geometry column)', () => {
-      expect(propertyTypeToParquetType('spatial')).to.be.undefined;
+    it('should map spatial to BYTE_ARRAY (WKB-encoded geometry)', () => {
+      expect(propertyTypeToParquetType('spatial')).to.equal('BYTE_ARRAY');
     });
 
     it('should map array to UTF8 (JSON-stringified fallback)', () => {
@@ -62,43 +62,45 @@ describe('parquet-utils', () => {
 
   describe('buildParquetSchema', () => {
     it('should include uuid column for all schemas', () => {
-      const schema = buildParquetSchema([], false);
+      const schema = buildParquetSchema([]);
 
       expect(schema.fields['uuid']).to.exist;
     });
 
     it('should always include parent_uuid as nullable column', () => {
-      const schema = buildParquetSchema([], false);
+      const schema = buildParquetSchema([]);
 
       expect(schema.fields['parent_uuid']).to.exist;
     });
 
-    it('should add geometry column when hasSpatial is true', () => {
-      const schema = buildParquetSchema([], true);
+    it('should add spatial properties as named BYTE_ARRAY columns', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'geometry', feature_property_type_name: 'spatial' }
+      ];
+      const schema = buildParquetSchema(properties);
 
       expect(schema.fields['geometry']).to.exist;
     });
 
-    it('should not add geometry column when hasSpatial is false', () => {
-      const schema = buildParquetSchema([], false);
+    it('should not add geometry column when no spatial properties exist', () => {
+      const schema = buildParquetSchema([]);
 
       expect(schema.fields['geometry']).to.not.exist;
     });
 
-    it('should skip spatial properties from the property list', () => {
+    it('should create a named column for each spatial property', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'name', feature_property_type_name: 'string' },
-        { feature_property_name: 'location', feature_property_type_name: 'spatial' },
+        { feature_property_name: 'geometry', feature_property_type_name: 'spatial' },
+        { feature_property_name: 'centroid', feature_property_type_name: 'spatial' },
         { feature_property_name: 'count', feature_property_type_name: 'number' }
       ];
-      const schema = buildParquetSchema(properties, true);
+      const schema = buildParquetSchema(properties);
 
       expect(schema.fields['name']).to.exist;
       expect(schema.fields['count']).to.exist;
-      // Spatial property is not a column — it goes to the geometry column
-      expect(schema.fields['location']).to.not.exist;
-      // But geometry column is present because hasSpatial is true
       expect(schema.fields['geometry']).to.exist;
+      expect(schema.fields['centroid']).to.exist;
     });
 
     it('should create columns for mixed property types', () => {
@@ -113,7 +115,7 @@ describe('parquet-utils', () => {
         { feature_property_name: 'meta', feature_property_type_name: 'object' },
         { feature_property_name: 'file', feature_property_type_name: 'artifact_key' }
       ];
-      const schema = buildParquetSchema(properties, false);
+      const schema = buildParquetSchema(properties);
 
       expect(schema.fields['title']).to.exist;
       expect(schema.fields['value']).to.exist;
@@ -238,15 +240,32 @@ describe('parquet-utils', () => {
       expect(row['meta']).to.equal('{"key":"value"}');
     });
 
-    it('should convert spatial property to WKB Buffer in geometry column', () => {
+    it('should convert spatial property to WKB Buffer using property name as column', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'location', feature_property_type_name: 'spatial' }
       ];
       const row = featureToRow(makeFeature({ location: { type: 'Point', coordinates: [-120.0, 50.0] } }), properties);
 
+      expect(row['location']).to.be.instanceOf(Buffer);
+    });
+
+    it('should handle multiple spatial properties independently', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'geometry', feature_property_type_name: 'spatial' },
+        { feature_property_name: 'centroid', feature_property_type_name: 'spatial' }
+      ];
+      const row = featureToRow(
+        makeFeature({
+          geometry: { type: 'Polygon', coordinates: [[[-120, 50], [-121, 50], [-121, 51], [-120, 50]]] },
+          centroid: { type: 'Point', coordinates: [-120.5, 50.5] }
+        }),
+        properties
+      );
+
       expect(row['geometry']).to.be.instanceOf(Buffer);
-      // Spatial property name is not a column — data goes to geometry column
-      expect(row).to.not.have.property('location');
+      expect(row['centroid']).to.be.instanceOf(Buffer);
+      // Different geometries should produce different WKB
+      expect(Buffer.compare(row['geometry'] as Buffer, row['centroid'] as Buffer)).to.not.equal(0);
     });
 
     it('should set null for null property values', () => {
@@ -470,44 +489,53 @@ describe('parquet-utils', () => {
 
   describe('buildGeoParquetMetadata', () => {
     it('should return valid JSON', () => {
-      const metadata = buildGeoParquetMetadata();
+      const metadata = buildGeoParquetMetadata(['geometry']);
 
       expect(() => JSON.parse(metadata)).to.not.throw();
     });
 
     it('should have version 1.0.0', () => {
-      const parsed = JSON.parse(buildGeoParquetMetadata());
+      const parsed = JSON.parse(buildGeoParquetMetadata(['geometry']));
 
       expect(parsed.version).to.equal('1.0.0');
     });
 
-    it('should have primary_column set to geometry', () => {
-      const parsed = JSON.parse(buildGeoParquetMetadata());
+    it('should set primary_column to the first spatial column', () => {
+      const parsed = JSON.parse(buildGeoParquetMetadata(['geometry']));
 
       expect(parsed.primary_column).to.equal('geometry');
     });
 
-    it('should specify WKB encoding for geometry column', () => {
-      const parsed = JSON.parse(buildGeoParquetMetadata());
+    it('should set primary_column to the first when multiple spatial columns exist', () => {
+      const parsed = JSON.parse(buildGeoParquetMetadata(['geometry', 'centroid']));
 
-      expect(parsed.columns.geometry.encoding).to.equal('WKB');
+      expect(parsed.primary_column).to.equal('geometry');
     });
 
-    it('should declare EPSG:4326 CRS', () => {
-      const parsed = JSON.parse(buildGeoParquetMetadata());
+    it('should specify WKB encoding for each spatial column', () => {
+      const parsed = JSON.parse(buildGeoParquetMetadata(['geometry', 'centroid']));
+
+      expect(parsed.columns.geometry.encoding).to.equal('WKB');
+      expect(parsed.columns.centroid.encoding).to.equal('WKB');
+    });
+
+    it('should declare EPSG:4326 CRS for each spatial column', () => {
+      const parsed = JSON.parse(buildGeoParquetMetadata(['geometry', 'centroid']));
 
       expect(parsed.columns.geometry.crs.id.authority).to.equal('EPSG');
       expect(parsed.columns.geometry.crs.id.code).to.equal(4326);
+      expect(parsed.columns.centroid.crs.id.authority).to.equal('EPSG');
+      expect(parsed.columns.centroid.crs.id.code).to.equal(4326);
     });
 
-    it('should have empty geometry_types array', () => {
-      const parsed = JSON.parse(buildGeoParquetMetadata());
+    it('should have empty geometry_types array for each spatial column', () => {
+      const parsed = JSON.parse(buildGeoParquetMetadata(['geometry']));
 
       expect(parsed.columns.geometry.geometry_types).to.deep.equal([]);
     });
 
     it('should declare WGS 84 datum', () => {
-      const parsed = JSON.parse(buildGeoParquetMetadata());
+      const parsed = JSON.parse(buildGeoParquetMetadata(['geometry']));
 
       expect(parsed.columns.geometry.crs.name).to.equal('WGS 84');
       expect(parsed.columns.geometry.crs.type).to.equal('GeographicCRS');

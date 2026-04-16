@@ -21,13 +21,12 @@ import { CsvPropertyDefinition } from './csv-utils';
  *
  * `array`, `object`, and `artifact_key` types have dynamic internal structure (arrays of
  * objects, nested JSON, file paths). No typed table exists for them — they fall back to
- * UTF8 (JSON-stringified) for Parquet output. `spatial` is handled separately as WKB
- * geometry and returns undefined here.
+ * UTF8 (JSON-stringified) for Parquet output. `spatial` maps to BYTE_ARRAY for WKB encoding.
  *
  * @param typeName - The feature property type name from `feature_type_property`.
- * @returns The Parquet type string, or undefined for `spatial` (handled as geometry column).
+ * @returns The Parquet type string.
  */
-export function propertyTypeToParquetType(typeName: string): FieldDefinition['type'] | undefined {
+export function propertyTypeToParquetType(typeName: string): FieldDefinition['type'] {
   switch (typeName) {
     case 'string':
       return 'UTF8';
@@ -44,8 +43,8 @@ export function propertyTypeToParquetType(typeName: string): FieldDefinition['ty
       // Taxon properties arrive pre-resolved: the cursor JOIN resolves taxon_id -> scientific name
       return 'UTF8';
     case 'spatial':
-      // Spatial properties are encoded as WKB in a dedicated geometry column — not mapped here
-      return undefined;
+      // GeoParquet WKB-encoded geometry — each spatial property gets its own BYTE_ARRAY column
+      return 'BYTE_ARRAY';
     case 'array':
       // Dynamic internal structure — JSON-stringified for Parquet output
       return 'UTF8';
@@ -68,11 +67,14 @@ export function propertyTypeToParquetType(typeName: string): FieldDefinition['ty
  * star-schema joins between files. Root types (e.g., dataset) will have null values;
  * child types will have the parent feature's UUID.
  *
+ * Spatial properties each get their own BYTE_ARRAY column (WKB-encoded) using the
+ * property's actual name. This supports feature types with multiple spatial properties
+ * (e.g. `geometry` + `centroid`) without data loss.
+ *
  * @param properties - Schema property definitions from `feature_type_property`.
- * @param hasSpatial - Whether this feature type has a spatial property.
  * @returns A ParquetSchema instance ready for writer construction.
  */
-export function buildParquetSchema(properties: CsvPropertyDefinition[], hasSpatial: boolean): ParquetSchema {
+export function buildParquetSchema(properties: CsvPropertyDefinition[]): ParquetSchema {
   const fields: SchemaDefinition = {};
 
   // Every Parquet file includes the feature UUID for cross-file joins
@@ -84,21 +86,10 @@ export function buildParquetSchema(properties: CsvPropertyDefinition[], hasSpati
   fields['parent_uuid'] = { type: 'UTF8', optional: true };
 
   for (const prop of properties) {
-    const parquetType = propertyTypeToParquetType(prop.feature_property_type_name);
-
-    // Spatial properties are encoded as WKB in the geometry column, not as individual columns
-    if (!parquetType) {
-      continue;
-    }
-
-    fields[prop.feature_property_name] = { type: parquetType, optional: true };
-  }
-
-  // GeoParquet spec requires WKB-encoded geometry in a BYTE_ARRAY column.
-  // CRS is EPSG:4326 (WGS 84). WKB is chosen over native point encoding
-  // because data includes Polygons, MultiPolygons, and other complex types.
-  if (hasSpatial) {
-    fields['geometry'] = { type: 'BYTE_ARRAY', optional: true };
+    fields[prop.feature_property_name] = {
+      type: propertyTypeToParquetType(prop.feature_property_type_name),
+      optional: true
+    };
   }
 
   return new ParquetSchema(fields);
@@ -138,7 +129,7 @@ export function featureToRow(
     switch (prop.feature_property_type_name) {
       case 'spatial': {
         const geometry = extractGeoJsonGeometry(value);
-        row['geometry'] = geometry ? geoJsonToWkb(geometry) : null;
+        row[prop.feature_property_name] = geometry ? geoJsonToWkb(geometry) : null;
         break;
       }
       case 'array':
@@ -231,39 +222,44 @@ export function extractGeoJsonGeometry(value: unknown): GeoJsonGeometry | null {
  * and GeoPandas. The CRS declares EPSG:4326 (WGS 84) using PROJJSON format per
  * the GeoParquet 1.0.0 spec.
  *
+ * Each spatial property gets its own column entry. The first spatial column is
+ * designated as `primary_column` per the GeoParquet spec.
+ *
  * `geometry_types` is left empty — the spec allows this, meaning "any type may appear."
  * This avoids needing a pre-scan of all geometries before writing.
  *
+ * @param spatialColumnNames - Names of the spatial property columns in the Parquet file.
  * @returns JSON string for the "geo" file metadata key.
  */
-export function buildGeoParquetMetadata(): string {
+export function buildGeoParquetMetadata(spatialColumnNames: string[]): string {
+  const crs = {
+    $schema: 'https://proj.org/schemas/v0.7/projjson.schema.json',
+    type: 'GeographicCRS',
+    name: 'WGS 84',
+    datum: {
+      type: 'GeodeticReferenceFrame',
+      name: 'World Geodetic System 1984',
+      ellipsoid: { name: 'WGS 84', semi_major_axis: 6378137, inverse_flattening: 298.257223563 }
+    },
+    coordinate_system: {
+      subtype: 'ellipsoidal',
+      axis: [
+        { name: 'Geodetic latitude', abbreviation: 'Lat', direction: 'north', unit: 'degree' },
+        { name: 'Geodetic longitude', abbreviation: 'Lon', direction: 'east', unit: 'degree' }
+      ]
+    },
+    id: { authority: 'EPSG', code: 4326 }
+  };
+
+  const columns: Record<string, unknown> = {};
+  for (const name of spatialColumnNames) {
+    columns[name] = { encoding: 'WKB', geometry_types: [], crs };
+  }
+
   return JSON.stringify({
     version: '1.0.0',
-    primary_column: 'geometry',
-    columns: {
-      geometry: {
-        encoding: 'WKB',
-        geometry_types: [],
-        crs: {
-          $schema: 'https://proj.org/schemas/v0.7/projjson.schema.json',
-          type: 'GeographicCRS',
-          name: 'WGS 84',
-          datum: {
-            type: 'GeodeticReferenceFrame',
-            name: 'World Geodetic System 1984',
-            ellipsoid: { name: 'WGS 84', semi_major_axis: 6378137, inverse_flattening: 298.257223563 }
-          },
-          coordinate_system: {
-            subtype: 'ellipsoidal',
-            axis: [
-              { name: 'Geodetic latitude', abbreviation: 'Lat', direction: 'north', unit: 'degree' },
-              { name: 'Geodetic longitude', abbreviation: 'Lon', direction: 'east', unit: 'degree' }
-            ]
-          },
-          id: { authority: 'EPSG', code: 4326 }
-        }
-      }
-    }
+    primary_column: spatialColumnNames[0],
+    columns
   });
 }
 
