@@ -256,7 +256,17 @@ describe('parquet-utils', () => {
       ];
       const row = featureToRow(
         makeFeature({
-          geometry: { type: 'Polygon', coordinates: [[[-120, 50], [-121, 50], [-121, 51], [-120, 50]]] },
+          geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [-120, 50],
+                [-121, 50],
+                [-121, 51],
+                [-120, 50]
+              ]
+            ]
+          },
           centroid: { type: 'Point', coordinates: [-120.5, 50.5] }
         }),
         properties
