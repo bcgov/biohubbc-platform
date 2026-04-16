@@ -40,8 +40,7 @@ export class FeatureIngestionRepository extends BaseRepository {
         source_id,
         feature_type_id,
         data,
-        data_byte_size,
-        record_effective_date
+        data_byte_size
       )
       SELECT
         staged.submission_id,
@@ -50,8 +49,7 @@ export class FeatureIngestionRepository extends BaseRepository {
         staged.source_id,
         ft.feature_type_id,
         parsed.data,
-        staged.data_byte_size,
-        now()
+        staged.data_byte_size
       FROM unnest(
         ${submissionIds}::integer[],
         ${submissionUploadIds}::uuid[],

@@ -6,7 +6,10 @@ import {
   IngestionErrorCount,
   IngestionErrorSample
 } from '../models/submission-feature-property-ingestion';
+import { getLogger } from '../utils/logger';
 import { BaseRepository } from './base-repository';
+
+const defaultLog = getLogger('repositories/submission-feature-property-ingestion-repository');
 
 /**
  * Upload-scoped repository for set-based submission feature property ingestion.
@@ -16,17 +19,43 @@ import { BaseRepository } from './base-repository';
  */
 export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository {
   /**
+   * Execute one upload-scoped SQL phase and emit timing/row-count diagnostics.
+   *
+   * @param {string} phaseName Human-readable phase identifier.
+   * @param {string} submissionUploadId Upload scope.
+   * @param {SQLStatement} sqlStatement SQL statement to execute.
+   * @returns {Promise<void>}
+   */
+  private async executeUploadScopedPhase(
+    phaseName: string,
+    submissionUploadId: string,
+    sqlStatement: any
+  ): Promise<void> {
+    const startedAt = Date.now();
+    const response = await this.connection.sql(sqlStatement);
+
+    defaultLog.debug({
+      label: 'executeUploadScopedPhase',
+      message: 'phase complete',
+      phase_name: phaseName,
+      submission_upload_id: submissionUploadId,
+      elapsed_ms: Date.now() - startedAt,
+      rows_written: response?.rowCount ?? 0
+    });
+  }
+
+  /**
    * Clear staging rows for one upload.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async dropSubmissionFeaturePropertyStagingTempTable(submissionUploadId: string): Promise<void> {
+  async clearRawPropertyStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       DELETE FROM submission_upload_staging_raw_property
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('clear raw property staging', submissionUploadId, sql);
   }
 
   /**
@@ -137,17 +166,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         props.key,
         props.value
       FROM submission_feature sf
-      CROSS JOIN LATERAL jsonb_each(
-        CASE
-          WHEN jsonb_typeof(sf.data -> 'properties') = 'object' THEN sf.data -> 'properties'
-          ELSE '{}'::jsonb
-        END
-      ) AS props
+      CROSS JOIN LATERAL jsonb_each(sf.data -> 'properties') AS props
       WHERE sf.submission_upload_id = ${submissionUploadId}::uuid
-        AND sf.record_end_date IS NULL;
+        AND sf.record_end_date IS NULL
+        AND jsonb_typeof(sf.data -> 'properties') = 'object';
     `;
 
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('stage expanded properties', submissionUploadId, sql);
   }
 
   /**
@@ -156,12 +181,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async dropTmpUploadPropertyValuesTable(submissionUploadId: string): Promise<void> {
+  async clearTypedPropertyValueStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       DELETE FROM submission_upload_staging_typed_property_value
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('clear typed property value staging', submissionUploadId, sql);
   }
 
   /**
@@ -170,69 +195,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async dropTmpResolvedStagedPropertiesTable(submissionUploadId: string): Promise<void> {
+  async clearResolvedPropertyStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       DELETE FROM submission_upload_staging_resolved_property
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Drop `submission_upload_staging_feature_type_property_map` if it exists.
-   *
-   * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
-   */
-  async dropTmpUploadFeatureTypePropertyMapTable(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      DELETE FROM submission_upload_staging_feature_type_property_map
-      WHERE submission_upload_id = ${submissionUploadId}::uuid;
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Create `submission_upload_staging_feature_type_property_map` for an upload.
-   *
-   * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
-   */
-  async createTmpUploadFeatureTypePropertyMapBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      INSERT INTO submission_upload_staging_feature_type_property_map (
-        submission_upload_id,
-        feature_type_id,
-        property_name,
-        feature_type_property_id,
-        allow_multiple,
-        required_value,
-        property_type_name
-      )
-      SELECT
-        ${submissionUploadId}::uuid,
-        ftp.feature_type_id,
-        fp.name AS property_name,
-        ftp.feature_type_property_id,
-        COALESCE(ftp.allow_multiple, false) AS allow_multiple,
-        COALESCE(ftp.required_value, false) AS required_value,
-        fpt.name AS property_type_name
-      FROM feature_type_property ftp
-      JOIN feature_property fp
-        ON fp.feature_property_id = ftp.feature_property_id
-       AND fp.record_end_date IS NULL
-      JOIN feature_property_type fpt
-        ON fpt.feature_property_type_id = fp.feature_property_type_id
-       AND fpt.record_end_date IS NULL
-      JOIN (
-        SELECT DISTINCT feature_type_id
-        FROM submission_upload_staging_raw_property
-        WHERE submission_upload_id = ${submissionUploadId}::uuid
-      ) upload_types
-        ON upload_types.feature_type_id = ftp.feature_type_id
-      WHERE ftp.record_end_date IS NULL;
-    `;
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('clear resolved property staging', submissionUploadId, sql);
   }
 
   /**
@@ -241,7 +209,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createTmpResolvedStagedPropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  async populateResolvedPropertyStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       INSERT INTO submission_upload_staging_resolved_property (
         submission_feature_property_staging_id,
@@ -262,18 +230,24 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         s.feature_type_id,
         s.property_name,
         s.value,
-        m.feature_type_property_id,
-        m.allow_multiple,
-        m.required_value,
-        m.property_type_name
+        ftp.feature_type_property_id,
+        COALESCE(ftp.allow_multiple, false) AS allow_multiple,
+        COALESCE(ftp.required_value, false) AS required_value,
+        fpt.name AS property_type_name
       FROM submission_upload_staging_raw_property s
-      LEFT JOIN submission_upload_staging_feature_type_property_map m
-        ON m.feature_type_id = s.feature_type_id
-       AND m.property_name = s.property_name
-       AND m.submission_upload_id = s.submission_upload_id
+      LEFT JOIN feature_property fp
+        ON fp.name = s.property_name
+       AND fp.record_end_date IS NULL
+      LEFT JOIN feature_property_type fpt
+        ON fpt.feature_property_type_id = fp.feature_property_type_id
+       AND fpt.record_end_date IS NULL
+      LEFT JOIN feature_type_property ftp
+        ON ftp.feature_type_id = s.feature_type_id
+       AND ftp.feature_property_id = fp.feature_property_id
+       AND ftp.record_end_date IS NULL
       WHERE s.submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('populate resolved property staging', submissionUploadId, sql);
   }
 
   /**
@@ -286,7 +260,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createTmpUploadPropertyValuesTable(submissionUploadId: string): Promise<void> {
+  async populateTypedPropertyValueStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       INSERT INTO submission_upload_staging_typed_property_value (
         submission_feature_id,
@@ -331,21 +305,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         AND rsp.allow_multiple = TRUE
         AND arr.value <> 'null'::jsonb;
     `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Drop `submission_upload_staging_valid_property_value` if it exists.
-   *
-   * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
-   */
-  async dropTmpValidPropertyValuesTable(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      DELETE FROM submission_upload_staging_valid_property_value
-      WHERE submission_upload_id = ${submissionUploadId}::uuid;
-    `;
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('populate typed property value staging', submissionUploadId, sql);
   }
 
   /**
@@ -354,12 +314,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async dropTmpDatetimeCandidatesTable(submissionUploadId: string): Promise<void> {
+  async clearDatetimeCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       DELETE FROM submission_upload_staging_datetime_candidate
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('clear datetime candidate staging', submissionUploadId, sql);
   }
 
   /**
@@ -368,12 +328,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async dropTmpSpatialCandidatesTable(submissionUploadId: string): Promise<void> {
+  async clearSpatialCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       DELETE FROM submission_upload_staging_spatial_candidate
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('clear spatial candidate staging', submissionUploadId, sql);
   }
 
   /**
@@ -382,12 +342,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async dropTmpCodeCandidatesTable(submissionUploadId: string): Promise<void> {
+  async clearCodeCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       DELETE FROM submission_upload_staging_code_candidate
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('clear code candidate staging', submissionUploadId, sql);
   }
 
   /**
@@ -396,12 +356,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async dropTmpTaxonCandidatesTable(submissionUploadId: string): Promise<void> {
+  async clearTaxonCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       DELETE FROM submission_upload_staging_taxon_candidate
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('clear taxon candidate staging', submissionUploadId, sql);
   }
 
   /**
@@ -410,53 +370,73 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async dropTmpArtifactCandidatesTable(submissionUploadId: string): Promise<void> {
+  async clearArtifactCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       DELETE FROM submission_upload_staging_artifact_candidate
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('clear artifact candidate staging', submissionUploadId, sql);
   }
 
   /**
-   * Create `submission_upload_staging_valid_property_value` for rows that currently have no errors.
+   * Clear upload property working-set staging rows in one round trip.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createTmpValidPropertyValuesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  async clearUploadPropertyWorkingSetStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      INSERT INTO submission_upload_staging_valid_property_value (
-        submission_feature_id,
-        submission_upload_id,
-        feature_type_id,
-        feature_type_property_id,
-        property_name,
-        property_type_name,
-        allow_multiple,
-        logical_value
+      WITH clear_typed AS (
+        DELETE FROM submission_upload_staging_typed_property_value
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+        RETURNING 1
+      ),
+      clear_resolved AS (
+        DELETE FROM submission_upload_staging_resolved_property
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+        RETURNING 1
       )
-      SELECT
-        v.submission_feature_id,
-        v.submission_upload_id,
-        v.feature_type_id,
-        v.feature_type_property_id,
-        v.property_name,
-        v.property_type_name,
-        v.allow_multiple,
-        v.logical_value
-      FROM submission_upload_staging_typed_property_value v
-      WHERE v.submission_upload_id = ${submissionUploadId}::uuid
-        AND NOT EXISTS (
-        SELECT 1
-        FROM submission_feature_error e
-        WHERE e.submission_upload_id = ${submissionUploadId}::uuid
-          AND e.submission_feature_id = v.submission_feature_id
-          AND e.feature_type_property_id = v.feature_type_property_id
-          AND COALESCE(e.property_name, '') = COALESCE(v.property_name, '')
-      );
+      SELECT 1;
     `;
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('clear upload property working-set staging', submissionUploadId, sql);
+  }
+
+  /**
+   * Clear complex candidate staging rows in one round trip.
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
+   */
+  async clearComplexPropertyCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      WITH clear_datetime AS (
+        DELETE FROM submission_upload_staging_datetime_candidate
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+        RETURNING 1
+      ),
+      clear_spatial AS (
+        DELETE FROM submission_upload_staging_spatial_candidate
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+        RETURNING 1
+      ),
+      clear_code AS (
+        DELETE FROM submission_upload_staging_code_candidate
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+        RETURNING 1
+      ),
+      clear_taxon AS (
+        DELETE FROM submission_upload_staging_taxon_candidate
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+        RETURNING 1
+      ),
+      clear_artifact AS (
+        DELETE FROM submission_upload_staging_artifact_candidate
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+        RETURNING 1
+      )
+      SELECT 1;
+    `;
+    await this.executeUploadScopedPhase('clear complex candidate staging', submissionUploadId, sql);
   }
 
   /**
@@ -465,7 +445,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createTmpDatetimeCandidatesTable(submissionUploadId: string): Promise<void> {
+  async populateDatetimeCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       INSERT INTO submission_upload_staging_datetime_candidate (
         submission_upload_id,
@@ -477,7 +457,26 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         date_value,
         time_value
       )
-      WITH candidates AS (
+      WITH valid_property_values AS (
+        SELECT
+          v.submission_upload_id,
+          v.submission_feature_id,
+          v.property_name,
+          v.feature_type_property_id,
+          v.property_type_name,
+          v.logical_value
+        FROM submission_upload_staging_typed_property_value v
+        WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+          AND NOT EXISTS (
+            SELECT 1
+            FROM submission_feature_error e
+            WHERE e.submission_upload_id = ${submissionUploadId}::uuid
+              AND e.submission_feature_id = v.submission_feature_id
+              AND e.feature_type_property_id = v.feature_type_property_id
+              AND COALESCE(e.property_name, '') = COALESCE(v.property_name, '')
+          )
+      ),
+      candidates AS (
         SELECT
           v.submission_upload_id,
           v.submission_feature_id,
@@ -485,9 +484,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.feature_type_property_id,
           btrim(v.logical_value #>> '{}') AS value_text,
           v.logical_value AS raw_value
-        FROM submission_upload_staging_valid_property_value v
-        WHERE v.submission_upload_id = ${submissionUploadId}::uuid
-          AND v.property_type_name = 'datetime'
+        FROM valid_property_values v
+        WHERE v.property_type_name = 'datetime'
           AND jsonb_typeof(v.logical_value) = 'string'
       )
       SELECT
@@ -510,7 +508,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         END AS time_value
       FROM candidates c;
     `;
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('populate datetime candidate staging', submissionUploadId, sql);
   }
 
   /**
@@ -519,7 +517,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createTmpSpatialCandidatesTable(submissionUploadId: string): Promise<void> {
+  async populateSpatialCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       INSERT INTO submission_upload_staging_spatial_candidate (
         submission_upload_id,
@@ -532,16 +530,34 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         validity_reason,
         is_valid
       )
-      WITH candidates AS (
+      WITH valid_property_values AS (
+        SELECT
+          v.submission_upload_id,
+          v.submission_feature_id,
+          v.property_name,
+          v.feature_type_property_id,
+          v.property_type_name,
+          v.logical_value
+        FROM submission_upload_staging_typed_property_value v
+        WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+          AND NOT EXISTS (
+            SELECT 1
+            FROM submission_feature_error e
+            WHERE e.submission_upload_id = ${submissionUploadId}::uuid
+              AND e.submission_feature_id = v.submission_feature_id
+              AND e.feature_type_property_id = v.feature_type_property_id
+              AND COALESCE(e.property_name, '') = COALESCE(v.property_name, '')
+          )
+      ),
+      candidates AS (
         SELECT
           v.submission_upload_id,
           v.submission_feature_id,
           v.property_name,
           v.feature_type_property_id,
           v.logical_value
-        FROM submission_upload_staging_valid_property_value v
-        WHERE v.submission_upload_id = ${submissionUploadId}::uuid
-          AND v.property_type_name = 'spatial'
+        FROM valid_property_values v
+        WHERE v.property_type_name = 'spatial'
           AND jsonb_typeof(v.logical_value) = 'object'
       ),
       normalized AS (
@@ -595,7 +611,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         (p.parsed_geom IS NOT NULL AND public.ST_IsValid(p.parsed_geom)) AS is_valid
       FROM parsed p;
     `;
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('populate spatial candidate staging', submissionUploadId, sql);
   }
 
   /**
@@ -604,7 +620,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {number} contributorId Contributor scope for code resolution.
    * @returns {Promise<void>}
    */
-  async createTmpCodeCandidatesBySubmissionUploadId(
+  async populateCodeCandidateStagingBySubmissionUploadId(
     submissionUploadId: string,
     contributorId: number
   ): Promise<void> {
@@ -619,7 +635,26 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         normalized_slug,
         contributor_codeset_code_id
       )
-      WITH candidates AS (
+      WITH valid_property_values AS (
+        SELECT
+          v.submission_upload_id,
+          v.submission_feature_id,
+          v.property_name,
+          v.feature_type_property_id,
+          v.property_type_name,
+          v.logical_value
+        FROM submission_upload_staging_typed_property_value v
+        WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+          AND NOT EXISTS (
+            SELECT 1
+            FROM submission_feature_error e
+            WHERE e.submission_upload_id = ${submissionUploadId}::uuid
+              AND e.submission_feature_id = v.submission_feature_id
+              AND e.feature_type_property_id = v.feature_type_property_id
+              AND COALESCE(e.property_name, '') = COALESCE(v.property_name, '')
+          )
+      ),
+      candidates AS (
         SELECT
           v.submission_upload_id,
           v.submission_feature_id,
@@ -627,9 +662,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.feature_type_property_id,
           v.logical_value AS raw_value,
           regexp_split_to_array(btrim(v.logical_value #>> '{}'), '::') AS parts
-        FROM submission_upload_staging_valid_property_value v
-        WHERE v.submission_upload_id = ${submissionUploadId}::uuid
-          AND v.property_type_name = 'code'
+        FROM valid_property_values v
+        WHERE v.property_type_name = 'code'
           AND jsonb_typeof(v.logical_value) = 'string'
       ),
       normalized AS (
@@ -664,7 +698,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
        AND ccc.key = n.contributor_codeset_code_key
        AND ccc.record_end_date IS NULL;
     `;
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('populate code candidate staging', submissionUploadId, sql);
   }
 
   /**
@@ -673,7 +707,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createTmpTaxonCandidatesTable(submissionUploadId: string): Promise<void> {
+  async populateTaxonCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       INSERT INTO submission_upload_staging_taxon_candidate (
         submission_upload_id,
@@ -684,6 +718,25 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         tsn,
         taxon_id
       )
+      WITH valid_property_values AS (
+        SELECT
+          v.submission_upload_id,
+          v.submission_feature_id,
+          v.property_name,
+          v.feature_type_property_id,
+          v.property_type_name,
+          v.logical_value
+        FROM submission_upload_staging_typed_property_value v
+        WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+          AND NOT EXISTS (
+            SELECT 1
+            FROM submission_feature_error e
+            WHERE e.submission_upload_id = ${submissionUploadId}::uuid
+              AND e.submission_feature_id = v.submission_feature_id
+              AND e.feature_type_property_id = v.feature_type_property_id
+              AND COALESCE(e.property_name, '') = COALESCE(v.property_name, '')
+          )
+      )
       SELECT
         v.submission_upload_id,
         v.submission_feature_id,
@@ -692,16 +745,15 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         v.logical_value AS raw_value,
         (v.logical_value #>> '{}')::integer AS tsn,
         t.taxon_id
-      FROM submission_upload_staging_valid_property_value v
+      FROM valid_property_values v
       LEFT JOIN taxon t
         ON t.itis_tsn = (v.logical_value #>> '{}')::integer
        AND t.record_end_date IS NULL
-      WHERE v.submission_upload_id = ${submissionUploadId}::uuid
-        AND v.property_type_name = 'taxon'
+      WHERE v.property_type_name = 'taxon'
         AND jsonb_typeof(v.logical_value) = 'number'
         AND (v.logical_value #>> '{}') ~ '^-?[0-9]+$';
     `;
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('populate taxon candidate staging', submissionUploadId, sql);
   }
 
   /**
@@ -710,7 +762,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createTmpArtifactCandidatesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+  async populateArtifactCandidateStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       INSERT INTO submission_upload_staging_artifact_candidate (
         submission_upload_id,
@@ -727,6 +779,25 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         WHERE su.submission_upload_id = ${submissionUploadId}::uuid
         LIMIT 1
       ),
+      valid_property_values AS (
+        SELECT
+          v.submission_upload_id,
+          v.submission_feature_id,
+          v.property_name,
+          v.feature_type_property_id,
+          v.property_type_name,
+          v.logical_value
+        FROM submission_upload_staging_typed_property_value v
+        WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+          AND NOT EXISTS (
+            SELECT 1
+            FROM submission_feature_error e
+            WHERE e.submission_upload_id = ${submissionUploadId}::uuid
+              AND e.submission_feature_id = v.submission_feature_id
+              AND e.feature_type_property_id = v.feature_type_property_id
+              AND COALESCE(e.property_name, '') = COALESCE(v.property_name, '')
+          )
+      ),
       candidates AS (
         SELECT
           v.submission_upload_id,
@@ -734,7 +805,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.property_name,
           v.feature_type_property_id,
           v.logical_value AS raw_value
-        FROM submission_upload_staging_valid_property_value v
+        FROM valid_property_values v
         WHERE v.property_type_name = 'artifact_key'
           AND jsonb_typeof(v.logical_value) = 'string'
       ),
@@ -765,7 +836,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         ON ua.upload_id = us.upload_id
        AND ua.path = n.normalized_reference;
     `;
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('populate artifact candidate staging', submissionUploadId, sql);
   }
 
   /**
@@ -779,14 +850,24 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    */
   async recordMissingRequiredPropertyErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      WITH required_properties AS (
-        SELECT
-          feature_type_id,
-          feature_type_property_id,
-          property_name
-        FROM submission_upload_staging_feature_type_property_map
+      WITH upload_feature_types AS (
+        SELECT DISTINCT feature_type_id
+        FROM submission_upload_staging_raw_property
         WHERE submission_upload_id = ${submissionUploadId}::uuid
-          AND required_value = TRUE
+      ),
+      required_properties AS (
+        SELECT
+          ftp.feature_type_id,
+          ftp.feature_type_property_id,
+          fp.name AS property_name
+        FROM feature_type_property ftp
+        JOIN feature_property fp
+          ON fp.feature_property_id = ftp.feature_property_id
+         AND fp.record_end_date IS NULL
+        JOIN upload_feature_types uft
+          ON uft.feature_type_id = ftp.feature_type_id
+        WHERE ftp.record_end_date IS NULL
+          AND COALESCE(ftp.required_value, false) = TRUE
       ),
       present_properties AS (
         SELECT DISTINCT
@@ -827,7 +908,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         AND pp.submission_feature_id IS NULL;
     `;
 
-    await this.connection.sql(sql);
+    await this.executeUploadScopedPhase('record required property validation errors', submissionUploadId, sql);
   }
 
   /**
@@ -1153,7 +1234,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       WHERE p.submission_upload_id = ${submissionUploadId}::uuid
         AND (
           p.date_value IS NOT NULL
-         OR p.time_value IS NOT NULL;
+         OR p.time_value IS NOT NULL
         );
     `;
 
@@ -1398,7 +1479,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       WHERE n.submission_upload_id = ${submissionUploadId}::uuid
         AND COALESCE(n.normalized_reference, '') <> ''
         AND n.artifact_id IS NOT NULL
-      ON CONFLICT (submission_feature_id, artifact_id) WHERE record_end_date IS NULL DO NOTHING;
+      ON CONFLICT (submission_feature_id, artifact_id) DO NOTHING;
     `;
 
     await this.connection.sql(sql);

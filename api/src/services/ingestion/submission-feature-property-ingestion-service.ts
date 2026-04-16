@@ -68,7 +68,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       ]);
 
       // Phase 1: initialize upload-scoped working rows.
-      currentPhase = 'initialize working tables';
+      currentPhase = 'initialize raw property staging';
       defaultLog.debug({
         label: 'indexSubmissionPropertiesBySubmissionUploadId',
         message: 'phase start',
@@ -76,7 +76,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId,
         phase: currentPhase
       });
-      await this.initializeSessionTempTables(submissionUploadId);
+      await this.initializePropertyIngestionStagingBySubmissionUploadId(submissionUploadId);
 
       // Phase 2: flatten raw `data.properties` into staging rows.
       currentPhase = 'stage expanded properties';
@@ -92,7 +92,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       );
 
       // Phase 3: prepare upload-local metadata and logical value working tables.
-      currentPhase = 'prepare upload property working set';
+      currentPhase = 'populate upload property working set';
       defaultLog.debug({
         label: 'indexSubmissionPropertiesBySubmissionUploadId',
         message: 'phase start',
@@ -100,7 +100,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId,
         phase: currentPhase
       });
-      await this.prepareUploadPropertyWorkingSetBySubmissionUploadId(submissionUploadId);
+      await this.populateUploadPropertyWorkingSetBySubmissionUploadId(submissionUploadId);
       await this.submissionFeaturePropertyIngestionRepository.deleteIngestionErrorsBySubmissionUploadId(
         submissionUploadId
       );
@@ -122,7 +122,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       );
 
       // Phase 5: materialize complex candidates/resolution maps once for reuse.
-      currentPhase = 'prepare complex property candidates';
+      currentPhase = 'populate complex property candidates';
       defaultLog.debug({
         label: 'indexSubmissionPropertiesBySubmissionUploadId',
         message: 'phase start',
@@ -130,7 +130,10 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         submissionUploadId,
         phase: currentPhase
       });
-      await this.prepareComplexPropertyCandidatesBySubmissionUploadId(submissionUploadId, contributor.contributor_id);
+      await this.populateComplexPropertyCandidateStagingBySubmissionUploadId(
+        submissionUploadId,
+        contributor.contributor_id
+      );
 
       // Phase 6: FK reference validation/resolution diagnostics.
       currentPhase = 'record code, taxon, and artifact resolution errors';
@@ -312,8 +315,8 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
   /**
    * Initialize upload-scoped staging and diagnostics working rows.
    */
-  private async initializeSessionTempTables(submissionUploadId: string): Promise<void> {
-    await this.submissionFeaturePropertyIngestionRepository.dropSubmissionFeaturePropertyStagingTempTable(
+  private async initializePropertyIngestionStagingBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    await this.submissionFeaturePropertyIngestionRepository.clearRawPropertyStagingBySubmissionUploadId(
       submissionUploadId
     );
   }
@@ -324,22 +327,18 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    * This phase materializes the reusable relational state used by requiredness checks, primitive
    * validation, and downstream typed inserts.
    */
-  private async prepareUploadPropertyWorkingSetBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    await Promise.all([
-      this.submissionFeaturePropertyIngestionRepository.dropTmpUploadPropertyValuesTable(submissionUploadId),
-      this.submissionFeaturePropertyIngestionRepository.dropTmpResolvedStagedPropertiesTable(submissionUploadId),
-      this.submissionFeaturePropertyIngestionRepository.dropTmpUploadFeatureTypePropertyMapTable(submissionUploadId)
-    ]);
-
-    await this.submissionFeaturePropertyIngestionRepository.createTmpUploadFeatureTypePropertyMapBySubmissionUploadId(
+  private async populateUploadPropertyWorkingSetBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    await this.submissionFeaturePropertyIngestionRepository.clearUploadPropertyWorkingSetStagingBySubmissionUploadId(
       submissionUploadId
     );
 
-    await this.submissionFeaturePropertyIngestionRepository.createTmpResolvedStagedPropertiesBySubmissionUploadId(
+    await this.submissionFeaturePropertyIngestionRepository.populateResolvedPropertyStagingBySubmissionUploadId(
       submissionUploadId
     );
 
-    await this.submissionFeaturePropertyIngestionRepository.createTmpUploadPropertyValuesTable(submissionUploadId);
+    await this.submissionFeaturePropertyIngestionRepository.populateTypedPropertyValueStagingBySubmissionUploadId(
+      submissionUploadId
+    );
   }
 
   /**
@@ -348,30 +347,21 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    * Candidate tables are shared by both error-recording and final insert phases to avoid repeated
    * parsing/normalization work for datetime, spatial, code, taxon, and artifact values.
    */
-  private async prepareComplexPropertyCandidatesBySubmissionUploadId(
+  private async populateComplexPropertyCandidateStagingBySubmissionUploadId(
     submissionUploadId: string,
     contributorId: number
   ): Promise<void> {
-    await Promise.all([
-      this.submissionFeaturePropertyIngestionRepository.dropTmpValidPropertyValuesTable(submissionUploadId),
-      this.submissionFeaturePropertyIngestionRepository.dropTmpDatetimeCandidatesTable(submissionUploadId),
-      this.submissionFeaturePropertyIngestionRepository.dropTmpSpatialCandidatesTable(submissionUploadId),
-      this.submissionFeaturePropertyIngestionRepository.dropTmpCodeCandidatesTable(submissionUploadId),
-      this.submissionFeaturePropertyIngestionRepository.dropTmpTaxonCandidatesTable(submissionUploadId),
-      this.submissionFeaturePropertyIngestionRepository.dropTmpArtifactCandidatesTable(submissionUploadId)
-    ]);
-
-    await this.submissionFeaturePropertyIngestionRepository.createTmpValidPropertyValuesBySubmissionUploadId(
+    await this.submissionFeaturePropertyIngestionRepository.clearComplexPropertyCandidateStagingBySubmissionUploadId(
       submissionUploadId
     );
-    await this.submissionFeaturePropertyIngestionRepository.createTmpDatetimeCandidatesTable(submissionUploadId);
-    await this.submissionFeaturePropertyIngestionRepository.createTmpSpatialCandidatesTable(submissionUploadId);
-    await this.submissionFeaturePropertyIngestionRepository.createTmpCodeCandidatesBySubmissionUploadId(
+    await this.submissionFeaturePropertyIngestionRepository.populateDatetimeCandidateStagingBySubmissionUploadId(submissionUploadId);
+    await this.submissionFeaturePropertyIngestionRepository.populateSpatialCandidateStagingBySubmissionUploadId(submissionUploadId);
+    await this.submissionFeaturePropertyIngestionRepository.populateCodeCandidateStagingBySubmissionUploadId(
       submissionUploadId,
       contributorId
     );
-    await this.submissionFeaturePropertyIngestionRepository.createTmpTaxonCandidatesTable(submissionUploadId);
-    await this.submissionFeaturePropertyIngestionRepository.createTmpArtifactCandidatesBySubmissionUploadId(
+    await this.submissionFeaturePropertyIngestionRepository.populateTaxonCandidateStagingBySubmissionUploadId(submissionUploadId);
+    await this.submissionFeaturePropertyIngestionRepository.populateArtifactCandidateStagingBySubmissionUploadId(
       submissionUploadId
     );
   }

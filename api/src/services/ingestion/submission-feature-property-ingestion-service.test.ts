@@ -30,26 +30,23 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     const stageStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'stageExpandedPropertiesBySubmissionUploadId')
       .resolves();
-    sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpUploadPropertyValuesTable').resolves();
+    sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'clearTypedPropertyValueStagingBySubmissionUploadId').resolves();
     sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpResolvedStagedPropertiesTable')
-      .resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpUploadFeatureTypePropertyMapTable')
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'clearResolvedPropertyStagingBySubmissionUploadId')
       .resolves();
     sinon
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpUploadFeatureTypePropertyMapBySubmissionUploadId'
+        'clearUploadPropertyWorkingSetStagingBySubmissionUploadId'
       )
       .resolves();
     sinon
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpResolvedStagedPropertiesBySubmissionUploadId'
+        'populateResolvedPropertyStagingBySubmissionUploadId'
       )
       .resolves();
-    sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createTmpUploadPropertyValuesTable').resolves();
+    sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'populateTypedPropertyValueStagingBySubmissionUploadId').resolves();
     const requiredStub = sinon
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,
@@ -183,26 +180,23 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'stageExpandedPropertiesBySubmissionUploadId')
       .resolves();
-    sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpUploadPropertyValuesTable').resolves();
+    sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'clearTypedPropertyValueStagingBySubmissionUploadId').resolves();
     sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpResolvedStagedPropertiesTable')
-      .resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpUploadFeatureTypePropertyMapTable')
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'clearResolvedPropertyStagingBySubmissionUploadId')
       .resolves();
     sinon
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpUploadFeatureTypePropertyMapBySubmissionUploadId'
+        'clearUploadPropertyWorkingSetStagingBySubmissionUploadId'
       )
       .resolves();
     sinon
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpResolvedStagedPropertiesBySubmissionUploadId'
+        'populateResolvedPropertyStagingBySubmissionUploadId'
       )
       .resolves();
-    sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createTmpUploadPropertyValuesTable').resolves();
+    sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'populateTypedPropertyValueStagingBySubmissionUploadId').resolves();
     sinon
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,

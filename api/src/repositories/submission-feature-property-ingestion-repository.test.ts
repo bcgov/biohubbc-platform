@@ -21,21 +21,39 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
     });
   });
 
-  describe('createTmpValidPropertyValuesBySubmissionUploadId', () => {
-    it('uses explicit projected columns for durable staging tables', async () => {
+  describe('clearUploadPropertyWorkingSetStagingBySubmissionUploadId', () => {
+    it('clears resolved and typed staging rows in one upload-scoped statement', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
 
-      await repository.createTmpValidPropertyValuesBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+      await repository.clearUploadPropertyWorkingSetStagingBySubmissionUploadId(
+        '550e8400-e29b-41d4-a716-446655440000'
+      );
 
       expect(sqlStub.calledOnce).to.equal(true);
       const sqlText = sqlStub.firstCall.args[0].text as string;
-      expect(sqlText).to.include('INSERT INTO submission_upload_staging_valid_property_value');
-      expect(sqlText).to.include('v.submission_feature_id');
-      expect(sqlText).to.include('v.logical_value');
-      expect(sqlText).to.not.include('SELECT v.*');
-      expect(sqlText).to.include('WHERE v.submission_upload_id =');
+      expect(sqlText).to.include('DELETE FROM submission_upload_staging_typed_property_value');
+      expect(sqlText).to.include('DELETE FROM submission_upload_staging_resolved_property');
+      expect(sqlText).to.not.include('submission_upload_staging_valid_property_value');
+    });
+  });
+
+  describe('populateDatetimeCandidateStagingBySubmissionUploadId', () => {
+    it('builds candidates from typed staging with inline valid-value filtering', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.populateDatetimeCandidateStagingBySubmissionUploadId(
+        '550e8400-e29b-41d4-a716-446655440000'
+      );
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.include('FROM submission_upload_staging_typed_property_value v');
+      expect(sqlText).to.include('NOT EXISTS');
+      expect(sqlText).to.not.include('submission_upload_staging_valid_property_value');
     });
   });
 
