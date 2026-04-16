@@ -1,25 +1,13 @@
 import { IDBConnection } from '../../database/db';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
-import {
-  IngestionErrorCount,
-  IngestionErrorSample,
-  SubmissionFeaturePropertyIngestionRepository
-} from '../../repositories/submission-feature-property-ingestion-repository';
+import { SubmissionFeaturePropertyIngestionRepository } from '../../repositories/submission-feature-property-ingestion-repository';
 import { SubmissionRepository } from '../../repositories/submission-repository';
 import { getLogger } from '../../utils/logger';
 import { ContributorService } from '../contributor-service';
 import { DBService } from '../db-service';
+import { SubmissionFeaturePropertyValidationOutcome } from './submission-feature-property-ingestion-service.interface';
 
 const defaultLog = getLogger('services/ingestion/submission-feature-property-ingestion-service');
-
-export type SubmissionFeaturePropertyValidationOutcome =
-  | { status: 'ok' }
-  | {
-      status: 'invalid';
-      errorCount: number;
-      errorCounts: IngestionErrorCount[];
-      errorSamples: IngestionErrorSample[];
-    };
 
 export class SubmissionFeaturePropertyIngestionService extends DBService {
   submissionFeaturePropertyIngestionRepository: SubmissionFeaturePropertyIngestionRepository;

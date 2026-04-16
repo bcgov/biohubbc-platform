@@ -149,6 +149,22 @@ describe('process-submission-features-job', () => {
 
       expect(ingestStub.called).to.be.false;
     });
+
+    it('skips processing when current status is failed terminal', async () => {
+      (SubmissionUploadService.prototype.getSubmissionUpload as sinon.SinonStub).resolves({
+        ...defaultSubmissionUpload,
+        status: 'failed'
+      });
+
+      const ingestStub = sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload');
+
+      await processSubmissionFeaturesJobHandler([createMockJob()]);
+
+      const toIngestingStub = SubmissionUploadService.prototype
+        .transitionSubmissionUploadToIngesting as sinon.SinonStub;
+      expect(ingestStub.called).to.be.false;
+      expect(toIngestingStub.called).to.be.false;
+    });
   });
 
   describe('processSubmissionFeaturesFailedHandler', () => {

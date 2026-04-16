@@ -143,6 +143,28 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       transitionStatusStub.calledWith('submission-upload-1', 'failed', ['uploaded', 'ingesting', 'ingested', 'indexing'])
     ).to.be.true;
   });
+
+  it('skips retry when status is failed terminal', async () => {
+    (SubmissionUploadService.prototype.getSubmissionUpload as sinon.SinonStub).resolves({
+      submission_upload_id: 'submission-upload-1',
+      submission_id: 777,
+      upload_id: 'upload-1',
+      status: 'failed',
+      ticket_id: '11111111-1111-1111-1111-111111111111'
+    });
+
+    const indexStub = sinon.stub(
+      SubmissionFeaturePropertyIngestionService.prototype,
+      'indexSubmissionPropertiesBySubmissionUploadId'
+    );
+
+    await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
+
+    const toIndexingStub = SubmissionUploadService.prototype
+      .transitionSubmissionUploadToIndexing as sinon.SinonStub;
+    expect(indexStub.called).to.be.false;
+    expect(toIndexingStub.called).to.be.false;
+  });
 });
 
 describe('indexSubmissionFeaturesFailedHandler', () => {

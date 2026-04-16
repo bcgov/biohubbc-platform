@@ -1,28 +1,12 @@
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
+import {
+  IngestionErrorCountRow,
+  IngestionErrorSampleRow,
+  IngestionErrorTotalCountRow,
+  IngestionErrorCount,
+  IngestionErrorSample
+} from '../models/submission-feature-property-ingestion';
 import { BaseRepository } from './base-repository';
-
-const ErrorCountRow = z.object({
-  error_code: z.string(),
-  error_count: z.number()
-});
-
-const IngestionErrorTotalCountRow = z.object({
-  count: z.number()
-});
-
-const IngestionErrorSampleRow = z.object({
-  submission_feature_id: z.number().nullable(),
-  property_name: z.string().nullable(),
-  feature_type_property_id: z.number().nullable(),
-  error_code: z.string(),
-  error_message: z.string(),
-  raw_value: z.any().nullable(),
-  details: z.any().nullable()
-});
-
-export type IngestionErrorSample = z.infer<typeof IngestionErrorSampleRow>;
-export type IngestionErrorCount = z.infer<typeof ErrorCountRow>;
 
 /**
  * Upload-scoped repository for set-based submission feature property ingestion.
@@ -452,9 +436,18 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         allow_multiple,
         logical_value
       )
-      SELECT v.*
+      SELECT
+        v.submission_feature_id,
+        v.submission_upload_id,
+        v.feature_type_id,
+        v.feature_type_property_id,
+        v.property_name,
+        v.property_type_name,
+        v.allow_multiple,
+        v.logical_value
       FROM submission_upload_staging_typed_property_value v
-      WHERE NOT EXISTS (
+      WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+        AND NOT EXISTS (
         SELECT 1
         FROM submission_feature_error e
         WHERE e.submission_upload_id = ${submissionUploadId}::uuid
@@ -1601,7 +1594,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       ORDER BY error_count DESC, error_code ASC;
     `;
 
-    const response = await this.connection.sql(sql, ErrorCountRow);
+    const response = await this.connection.sql(sql, IngestionErrorCountRow);
     return response.rows;
   }
 

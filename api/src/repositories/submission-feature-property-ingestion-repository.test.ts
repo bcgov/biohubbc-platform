@@ -21,6 +21,24 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
     });
   });
 
+  describe('createTmpValidPropertyValuesBySubmissionUploadId', () => {
+    it('uses explicit projected columns for durable staging tables', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+      const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
+
+      await repository.createTmpValidPropertyValuesBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
+
+      expect(sqlStub.calledOnce).to.equal(true);
+      const sqlText = sqlStub.firstCall.args[0].text as string;
+      expect(sqlText).to.include('INSERT INTO submission_upload_staging_valid_property_value');
+      expect(sqlText).to.include('v.submission_feature_id');
+      expect(sqlText).to.include('v.logical_value');
+      expect(sqlText).to.not.include('SELECT v.*');
+      expect(sqlText).to.include('WHERE v.submission_upload_id =');
+    });
+  });
+
   describe('getIngestionErrorCountBySubmissionUploadId', () => {
     it('returns the count value from the query', async () => {
       const mockDBConnection = getMockDBConnection({

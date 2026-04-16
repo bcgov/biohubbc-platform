@@ -1,9 +1,7 @@
 import PgBoss from 'pg-boss';
 import { SubmissionUpload } from '../../models/submission-upload';
-import {
-  SubmissionFeaturePropertyIngestionService,
-  SubmissionFeaturePropertyValidationOutcome
-} from '../../services/ingestion/submission-feature-property-ingestion-service';
+import { SubmissionFeaturePropertyIngestionService } from '../../services/ingestion/submission-feature-property-ingestion-service';
+import { SubmissionFeaturePropertyValidationOutcome } from '../../services/ingestion/submission-feature-property-ingestion-service.interface';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
 import { withConnection } from '../with-connection';
