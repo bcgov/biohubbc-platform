@@ -79,13 +79,29 @@ export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmiss
 
       const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(connection);
       const submissionUploadService = new SubmissionUploadService(connection);
-      await featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(
+      const outcome = await featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(
         submissionId,
         submissionUploadId
       );
-      await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'succeeded' });
+
+      const uploadStatus = outcome.status === 'invalid' ? 'invalid' : 'succeeded';
+      await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: uploadStatus });
 
       await connection.commit();
+
+      if (outcome.status === 'invalid') {
+        defaultLog.warn({
+          label: 'indexSubmissionFeaturesJobHandler',
+          message: 'Index submission features job completed with validation errors',
+          jobId: job.id,
+          submissionId,
+          submissionUploadId,
+          errorCount: outcome.errorCount,
+          errorCounts: outcome.errorCounts
+        });
+
+        continue;
+      }
 
       defaultLog.info({
         label: 'indexSubmissionFeaturesJobHandler',

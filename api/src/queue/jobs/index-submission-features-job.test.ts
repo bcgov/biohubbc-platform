@@ -50,7 +50,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
 
     const indexStub = sinon
       .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
-      .resolves();
+      .resolves({ status: 'ok' });
 
     await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
 
@@ -100,6 +100,39 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     expect(statusReleaseStub).to.have.been.calledOnce;
   });
 
+  it('should mark upload invalid and commit when validation outcome is invalid', async () => {
+    const mainConnection = getMockDBConnection();
+    const openStub = sinon.stub().resolves();
+    const commitStub = sinon.stub().resolves();
+    const rollbackStub = sinon.stub().resolves();
+    const releaseStub = sinon.stub();
+    mainConnection.open = openStub;
+    mainConnection.commit = commitStub;
+    mainConnection.rollback = rollbackStub;
+    mainConnection.release = releaseStub;
+
+    const getConnectionStub = sinon.stub(db, 'getAPIUserDBConnection').returns(mainConnection);
+    const updateUploadStub = SubmissionUploadService.prototype.updateSubmissionUpload as sinon.SinonStub;
+
+    const indexStub = sinon
+      .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
+      .resolves({
+        status: 'invalid',
+        errorCount: 1,
+        errorCounts: [{ error_code: 'TYPE_MISMATCH', error_count: 1 }],
+        errorSamples: []
+      });
+
+    await indexSubmissionFeaturesJobHandler([createMockJob(777)]);
+
+    expect(indexStub).to.have.been.calledOnceWith(777, 'submission-upload-1');
+    expect(updateUploadStub).to.have.been.calledOnceWith('submission-upload-1', { status: 'invalid' });
+    expect(commitStub).to.have.been.calledOnce;
+    expect(rollbackStub).not.to.have.been.called;
+    expect(releaseStub).to.have.been.calledOnce;
+    expect(getConnectionStub).to.have.been.calledOnce;
+  });
+
   it('should process multiple jobs in sequence', async () => {
     const openStub = sinon.stub().resolves();
     const commitStub = sinon.stub().resolves();
@@ -114,7 +147,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
 
     const indexStub = sinon
       .stub(SubmissionFeaturePropertyIngestionService.prototype, 'indexSubmissionPropertiesBySubmissionUploadId')
-      .resolves();
+      .resolves({ status: 'ok' });
 
     await indexSubmissionFeaturesJobHandler([
       createMockJob(1, 'submission-upload-1', 'job-1'),

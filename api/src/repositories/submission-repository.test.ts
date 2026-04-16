@@ -1574,5 +1574,4 @@ describe('SubmissionRepository', () => {
       }
     });
   });
-
 });

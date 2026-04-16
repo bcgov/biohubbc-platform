@@ -330,6 +330,11 @@ export async function up(knex: Knex): Promise<void> {
       ADD CONSTRAINT submission_feature_property_timestamp_ck1
       CHECK (date_value IS NOT NULL OR time_value IS NOT NULL);
 
+    COMMENT ON COLUMN submission_feature_property_timestamp.date_value IS
+      'Date component for canonical datetime property values; may be null when only time is provided.';
+    COMMENT ON COLUMN submission_feature_property_timestamp.time_value IS
+      'Time component for canonical datetime property values; may be null when only date is provided.';
+
     ALTER TABLE submission_feature_property_timestamp
       DROP COLUMN IF EXISTS value;
 
@@ -362,6 +367,24 @@ export async function up(knex: Knex): Promise<void> {
       WHERE record_end_date IS NULL;
 
     COMMENT ON TABLE submission_feature_artifact IS 'Join table linking submission features to backing artifacts.';
+    COMMENT ON COLUMN submission_feature_artifact.submission_feature_artifact_id IS
+      'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN submission_feature_artifact.submission_feature_id IS
+      'Foreign key to the submission_feature table.';
+    COMMENT ON COLUMN submission_feature_artifact.artifact_id IS
+      'Foreign key to the artifact table.';
+    COMMENT ON COLUMN submission_feature_artifact.record_end_date IS
+      'Date and time of soft deletion.';
+    COMMENT ON COLUMN submission_feature_artifact.create_date IS
+      'The datetime the record was created.';
+    COMMENT ON COLUMN submission_feature_artifact.create_user IS
+      'The id of the user who created the record as identified in the system user table.';
+    COMMENT ON COLUMN submission_feature_artifact.update_date IS
+      'The datetime the record was updated.';
+    COMMENT ON COLUMN submission_feature_artifact.update_user IS
+      'The id of the user who updated the record as identified in the system user table.';
+    COMMENT ON COLUMN submission_feature_artifact.revision_count IS
+      'Revision count used for concurrency control.';
 
     CREATE TRIGGER audit_submission_feature_artifact
       BEFORE INSERT OR UPDATE OR DELETE ON submission_feature_artifact
@@ -369,6 +392,85 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE TRIGGER journal_submission_feature_artifact
       AFTER INSERT OR UPDATE OR DELETE ON submission_feature_artifact
+      FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
+
+    --------------------------------------------------------------------------------
+    -- 4) Add durable submission_feature_error validation snapshot table
+    --------------------------------------------------------------------------------
+    CREATE TABLE submission_feature_error (
+      submission_feature_error_id integer GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+      submission_upload_id uuid NOT NULL,
+      submission_feature_id integer NOT NULL,
+      feature_type_property_id integer,
+      property_name text,
+      error_code text NOT NULL,
+      error_message text NOT NULL,
+      raw_value jsonb,
+      details jsonb,
+      create_date timestamptz(6) DEFAULT now() NOT NULL,
+      create_user integer NOT NULL,
+      update_date timestamptz(6),
+      update_user integer,
+      revision_count integer DEFAULT 0 NOT NULL,
+      CONSTRAINT submission_feature_error_pk PRIMARY KEY (submission_feature_error_id),
+      CONSTRAINT submission_feature_error_fk1
+        FOREIGN KEY (submission_upload_id)
+        REFERENCES submission_upload(submission_upload_id),
+      CONSTRAINT submission_feature_error_fk2
+        FOREIGN KEY (submission_feature_id)
+        REFERENCES submission_feature(submission_feature_id),
+      CONSTRAINT submission_feature_error_fk3
+        FOREIGN KEY (feature_type_property_id)
+        REFERENCES feature_type_property(feature_type_property_id)
+    );
+
+    CREATE INDEX submission_feature_error_idx1 ON submission_feature_error(submission_upload_id);
+    CREATE INDEX submission_feature_error_idx2 ON submission_feature_error(submission_feature_id);
+    CREATE INDEX submission_feature_error_idx3 ON submission_feature_error(feature_type_property_id);
+    CREATE INDEX submission_feature_error_idx4
+      ON submission_feature_error(submission_upload_id, submission_feature_id);
+    CREATE INDEX submission_feature_error_idx5
+      ON submission_feature_error(submission_upload_id, feature_type_property_id);
+    CREATE INDEX submission_feature_error_idx6
+      ON submission_feature_error(submission_upload_id, error_code);
+
+    COMMENT ON TABLE submission_feature_error IS
+      'Latest deep-validation feature-level error snapshot per submission upload.';
+    COMMENT ON COLUMN submission_feature_error.submission_feature_error_id IS
+      'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN submission_feature_error.submission_upload_id IS
+      'Foreign key to submission_upload for upload-scoped validation snapshot queries.';
+    COMMENT ON COLUMN submission_feature_error.submission_feature_id IS
+      'Foreign key to submission_feature for feature-level validation attribution.';
+    COMMENT ON COLUMN submission_feature_error.feature_type_property_id IS
+      'Optional foreign key to feature_type_property when an error maps to a resolved property definition.';
+    COMMENT ON COLUMN submission_feature_error.property_name IS
+      'Optional raw property key when no feature_type_property mapping exists.';
+    COMMENT ON COLUMN submission_feature_error.error_code IS
+      'Machine-readable validation classifier.';
+    COMMENT ON COLUMN submission_feature_error.error_message IS
+      'Human-readable validation message.';
+    COMMENT ON COLUMN submission_feature_error.raw_value IS
+      'Optional raw invalid value payload captured during validation.';
+    COMMENT ON COLUMN submission_feature_error.details IS
+      'Optional structured validation metadata.';
+    COMMENT ON COLUMN submission_feature_error.create_date IS
+      'The datetime the record was created.';
+    COMMENT ON COLUMN submission_feature_error.create_user IS
+      'The id of the user who created the record as identified in the system user table.';
+    COMMENT ON COLUMN submission_feature_error.update_date IS
+      'The datetime the record was updated.';
+    COMMENT ON COLUMN submission_feature_error.update_user IS
+      'The id of the user who updated the record as identified in the system user table.';
+    COMMENT ON COLUMN submission_feature_error.revision_count IS
+      'Revision count used for concurrency control.';
+
+    CREATE TRIGGER audit_submission_feature_error
+      BEFORE INSERT OR UPDATE OR DELETE ON submission_feature_error
+      FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
+
+    CREATE TRIGGER journal_submission_feature_error
+      AFTER INSERT OR UPDATE OR DELETE ON submission_feature_error
       FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
   `);
 }
@@ -378,14 +480,21 @@ export async function down(knex: Knex): Promise<void> {
     SET SEARCH_PATH = biohub, public;
 
     --------------------------------------------------------------------------------
-    -- 1) Drop submission_feature_artifact table
+    -- 1) Drop submission_feature_error table
+    --------------------------------------------------------------------------------
+    DROP TRIGGER IF EXISTS journal_submission_feature_error ON submission_feature_error;
+    DROP TRIGGER IF EXISTS audit_submission_feature_error ON submission_feature_error;
+    DROP TABLE IF EXISTS submission_feature_error;
+
+    --------------------------------------------------------------------------------
+    -- 2) Drop submission_feature_artifact table
     --------------------------------------------------------------------------------
     DROP TRIGGER IF EXISTS journal_submission_feature_artifact ON submission_feature_artifact;
     DROP TRIGGER IF EXISTS audit_submission_feature_artifact ON submission_feature_artifact;
     DROP TABLE IF EXISTS submission_feature_artifact;
 
     --------------------------------------------------------------------------------
-    -- 2) Restore submission_feature_property_timestamp.value
+    -- 3) Restore submission_feature_property_timestamp.value
     --------------------------------------------------------------------------------
     ALTER TABLE submission_feature_property_timestamp
       ADD COLUMN IF NOT EXISTS value timestamptz(6);
@@ -418,7 +527,7 @@ export async function down(knex: Knex): Promise<void> {
       DROP COLUMN IF EXISTS time_value;
 
     --------------------------------------------------------------------------------
-    -- 3) Restore array type and selected previous mappings
+    -- 4) Restore array type and selected previous mappings
     --------------------------------------------------------------------------------
     INSERT INTO feature_property_type (name, description)
     SELECT 'array', 'An array type'

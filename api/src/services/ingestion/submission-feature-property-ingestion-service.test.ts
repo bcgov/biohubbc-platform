@@ -1,7 +1,6 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
-import { IngestionValidationError } from '../../errors/submission-errors';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { SubmissionFeaturePropertyIngestionRepository } from '../../repositories/submission-feature-property-ingestion-repository';
 import { SubmissionRepository } from '../../repositories/submission-repository';
@@ -193,13 +192,24 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     const errorCountStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'getIngestionErrorCountBySubmissionUploadId')
       .resolves(0);
+    const publishErrorsStub = sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'publishTempIngestionErrorsBySubmissionUploadId'
+      )
+      .resolves();
 
-    await service.indexSubmissionPropertiesBySubmissionUploadId(99, '550e8400-e29b-41d4-a716-446655440000');
+    const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(
+      99,
+      '550e8400-e29b-41d4-a716-446655440000'
+    );
 
     expect(insertStringStub.calledOnce).to.equal(true);
     expect(insertReferencesStub.calledOnce).to.equal(true);
     expect(referenceErrorsStub.calledOnce).to.equal(true);
     expect(parentErrorsStub.calledOnce).to.equal(true);
+    expect(outcome).to.eql({ status: 'ok' });
+    expect(publishErrorsStub.called).to.equal(false);
 
     sinon.assert.callOrder(
       deleteDerivedPropertiesStub,
@@ -225,7 +235,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     );
   });
 
-  it('fails at end with grouped error details when ingestion errors exist', async () => {
+  it('publishes temp errors and returns invalid outcome when validation errors exist', async () => {
     const service = new SubmissionFeaturePropertyIngestionService(getMockDBConnection());
 
     sinon.stub(ContributorService.prototype, 'getContributorBySubmissionId').resolves({ contributor_id: 77 } as any);
@@ -410,16 +420,26 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
           details: null
         }
       ]);
+    const publishErrorsStub = sinon
+      .stub(
+        SubmissionFeaturePropertyIngestionRepository.prototype,
+        'publishTempIngestionErrorsBySubmissionUploadId'
+      )
+      .resolves();
 
-    try {
-      await service.indexSubmissionPropertiesBySubmissionUploadId(99, '550e8400-e29b-41d4-a716-446655440000');
-      expect.fail();
-    } catch (error) {
-      expect(error).to.be.instanceOf(IngestionValidationError);
-      expect((error as Error).message).to.contain('validation errors');
-    }
+    const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(
+      99,
+      '550e8400-e29b-41d4-a716-446655440000'
+    );
 
     expect(insertStringStub.called).to.equal(false);
     expect(insertRelationshipsStub.called).to.equal(false);
+    expect(publishErrorsStub.calledOnce).to.equal(true);
+    expect(outcome.status).to.equal('invalid');
+    if (outcome.status === 'invalid') {
+      expect(outcome.errorCount).to.equal(2);
+      expect(outcome.errorCounts).to.eql([{ error_code: 'TYPE_MISMATCH', error_count: 2 }]);
+      expect(outcome.errorSamples).to.have.length(1);
+    }
   });
 });

@@ -1,13 +1,25 @@
 import { IDBConnection } from '../../database/db';
-import { IngestionValidationError } from '../../errors/submission-errors';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
-import { SubmissionFeaturePropertyIngestionRepository } from '../../repositories/submission-feature-property-ingestion-repository';
+import {
+  IngestionErrorCount,
+  IngestionErrorSample,
+  SubmissionFeaturePropertyIngestionRepository
+} from '../../repositories/submission-feature-property-ingestion-repository';
 import { SubmissionRepository } from '../../repositories/submission-repository';
 import { getLogger } from '../../utils/logger';
 import { ContributorService } from '../contributor-service';
 import { DBService } from '../db-service';
 
 const defaultLog = getLogger('services/ingestion/submission-feature-property-ingestion-service');
+
+export type SubmissionFeaturePropertyValidationOutcome =
+  | { status: 'ok' }
+  | {
+      status: 'invalid';
+      errorCount: number;
+      errorCounts: IngestionErrorCount[];
+      errorSamples: IngestionErrorSample[];
+    };
 
 export class SubmissionFeaturePropertyIngestionService extends DBService {
   submissionFeaturePropertyIngestionRepository: SubmissionFeaturePropertyIngestionRepository;
@@ -30,7 +42,10 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
    * Generic property ingestion, datetime normalization, and spatial normalization are all executed
    * as set-based SQL phases. The service remains orchestration-only.
    */
-  async indexSubmissionPropertiesBySubmissionUploadId(submissionId: number, submissionUploadId: string): Promise<void> {
+  async indexSubmissionPropertiesBySubmissionUploadId(
+    submissionId: number,
+    submissionUploadId: string
+  ): Promise<SubmissionFeaturePropertyValidationOutcome> {
     defaultLog.debug({
       label: 'indexSubmissionPropertiesBySubmissionUploadId',
       message: 'start',
@@ -89,7 +104,9 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
     await this.submissionFeaturePropertyIngestionRepository.recordUnresolvedParentErrorsBySubmissionUploadId(
       submissionUploadId
     );
-    await this.submissionFeaturePropertyIngestionRepository.recordReferenceErrorsBySubmissionUploadId(submissionUploadId);
+    await this.submissionFeaturePropertyIngestionRepository.recordReferenceErrorsBySubmissionUploadId(
+      submissionUploadId
+    );
 
     // Phase 8: SQL-native datetime/spatial normalization diagnostics.
     await this.submissionFeaturePropertyIngestionRepository.recordDatetimeNormalizationErrorsBySubmissionUploadId(
@@ -99,7 +116,18 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       submissionUploadId
     );
 
-    // Phase 9: fail-fast with aggregated diagnostics before canonical writes.
+    // Phase 9: fail-fast boundary before canonical writes.
+    //
+    // Phases 4-8 intentionally accumulate the complete deep-validation snapshot in
+    // `pg_temp.submission_feature_ingestion_error`. If any errors exist, we must:
+    // 1. read aggregate diagnostics for logs/debugging
+    // 2. publish the full temp snapshot to durable `submission_feature_error`
+    // 3. stop before canonical writes
+    //
+    // Important:
+    // - this is expected invalid-data flow (not a system exception)
+    // - durable persistence happens before we stop
+    // - canonical parent/property/relationship writes must not run when invalid
     const errorCount =
       await this.submissionFeaturePropertyIngestionRepository.getIngestionErrorCountBySubmissionUploadId(
         submissionUploadId
@@ -114,6 +142,9 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
           submissionUploadId,
           20
         );
+      await this.submissionFeaturePropertyIngestionRepository.publishTempIngestionErrorsBySubmissionUploadId(
+        submissionUploadId
+      );
 
       defaultLog.error({
         label: 'indexSubmissionPropertiesBySubmissionUploadId',
@@ -125,7 +156,12 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         errorSamples
       });
 
-      throw new IngestionValidationError('Submission feature property ingestion failed with validation errors');
+      return {
+        status: 'invalid',
+        errorCount,
+        errorCounts,
+        errorSamples
+      };
     }
 
     // Phase 10: canonical parent updates and property inserts.
@@ -154,6 +190,8 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
     await this.submissionFeaturePropertyIngestionRepository.insertFeatureRelationshipsBySubmissionUploadId(
       submissionUploadId
     );
+
+    return { status: 'ok' };
   }
 
   /**

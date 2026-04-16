@@ -209,7 +209,16 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Create the session-scoped ingestion diagnostics table in `pg_temp`.
+   * Create the session-scoped validation error table in `pg_temp`.
+   *
+   * This table is an intentional working-state accumulator for deep-validation phases (4-8).
+   * We collect the complete per-feature error snapshot here first so we can:
+   * - keep validation writes session-local and inexpensive
+   * - compute aggregate diagnostics (counts and representative samples)
+   * - publish one durable latest snapshot at the phase-9 fail-fast boundary
+   *
+   * This temp table is not the durable source of truth. Durable persistence happens when
+   * `publishTempIngestionErrorsBySubmissionUploadId` runs.
    *
    * @returns {Promise<void>}
    */
@@ -1690,5 +1699,47 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
 
     const response = await this.connection.sql(sql, IngestionErrorSampleRow);
     return response.rows;
+  }
+
+  /**
+   * Replace durable upload-scoped validation errors from the current session temp snapshot.
+   *
+   * This performs latest-snapshot semantics for one upload:
+   * 1. delete prior durable rows for the upload
+   * 2. insert all current temp rows for the upload
+   *
+   * @param {string} submissionUploadId Upload scope.
+   * @returns {Promise<void>}
+   */
+  async publishTempIngestionErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      WITH delete_existing AS (
+        DELETE FROM submission_feature_error
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+      )
+      INSERT INTO submission_feature_error (
+        submission_upload_id,
+        submission_feature_id,
+        feature_type_property_id,
+        property_name,
+        error_code,
+        error_message,
+        raw_value,
+        details
+      )
+      SELECT
+        e.submission_upload_id,
+        e.submission_feature_id,
+        e.feature_type_property_id,
+        e.property_name,
+        e.error_code,
+        e.error_message,
+        e.raw_value,
+        e.details
+      FROM pg_temp.submission_feature_ingestion_error e
+      WHERE e.submission_upload_id = ${submissionUploadId}::uuid;
+    `;
+
+    await this.connection.sql(sql);
   }
 }
