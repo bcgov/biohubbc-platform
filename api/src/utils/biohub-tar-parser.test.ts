@@ -5,7 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as tar from 'tar-stream';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
-import { streamCodesets, streamFeatures, streamMedia } from './biohub-tar-parser';
+import { streamCodesets, streamFeatures, streamMedia, streamSubmissionArchive } from './biohub-tar-parser';
 
 chai.use(sinonChai);
 
@@ -320,6 +320,69 @@ describe('biohub-tar-parser', () => {
 
       expect(result.uploadedCount).to.equal(3);
       expect(batchSizes).to.deep.equal([2, 1]);
+    });
+  });
+
+  describe('streamSubmissionArchive', () => {
+    it('streams media, codesets, and features in one archive pass', async () => {
+      const tarBuffer = await createTestTar([
+        { name: 'files/photo.jpg', content: 'jpeg-data' },
+        {
+          name: 'codes/agency.json',
+          content: JSON.stringify({
+            agency: {
+              key: 'agency',
+              label: 'Agency',
+              external_id: 'agency',
+              description: null,
+              codes: {
+                x: {
+                  key: 'x',
+                  label: 'X',
+                  external_id: 'x',
+                  description: null
+                }
+              }
+            }
+          })
+        },
+        {
+          name: 'features/dataset.json',
+          content: JSON.stringify([
+            { id: 'feature-1', type: 'dataset', properties: { name: 'Dataset' }, content: [], parent: null }
+          ])
+        }
+      ]);
+
+      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+      const mediaBatches: number[] = [];
+      const featureBatches: number[] = [];
+      const codesetKeys: string[] = [];
+
+      const result = await streamSubmissionArchive(bufferToStream(tarBuffer), {
+        objectStorageService: new ObjectStorageService(),
+        s3KeyPrefix: 'submissions/42/uploads/sub-upload-1/media',
+        mediaBatchSize: 10,
+        mediaMaxBatchBytes: 1024,
+        mediaConcurrency: 2,
+        featureBatchSize: 10,
+        ingestMediaBatch: async (uploadedFiles) => {
+          mediaBatches.push(uploadedFiles.length);
+        },
+        ingestCodesets: async (codesets) => {
+          codesetKeys.push(...Object.keys(codesets));
+        },
+        ingestFeatureBatch: async (features) => {
+          featureBatches.push(features.length);
+        }
+      });
+
+      expect(result.uploadedCount).to.equal(1);
+      expect(result.codesetFileCount).to.equal(1);
+      expect(result.featureCount).to.equal(1);
+      expect(mediaBatches).to.deep.equal([1]);
+      expect(codesetKeys).to.deep.equal(['agency']);
+      expect(featureBatches).to.deep.equal([1]);
     });
   });
 });

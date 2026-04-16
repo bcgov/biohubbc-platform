@@ -50,6 +50,19 @@ export class ArtifactService extends DBService {
   }
 
   /**
+   * Inserts artifact records in bulk with upsert semantics.
+   *
+   * @param {CreateArtifact[]} artifacts
+   * @returns {Promise<Array<{ artifact_id: string; bucket: string; object_key: string }>>}
+   * @memberof ArtifactService
+   */
+  async insertArtifacts(
+    artifacts: CreateArtifact[]
+  ): Promise<Array<{ artifact_id: string; bucket: string; object_key: string }>> {
+    return this.artifactRepository.insertArtifacts(artifacts);
+  }
+
+  /**
    * Updates an existing artifact record by ID.
    *
    * @param {string} artifactId The ID of the artifact to update

@@ -52,6 +52,18 @@ export class CodesetIngestionService extends DBService {
   }
 
   /**
+   * Persist parsed codesets for a submission upload.
+   *
+   * @param {string} submissionUploadId
+   * @param {TarCodesets} codesets
+   * @returns {Promise<void>}
+   */
+  async ingestParsedCodesets(submissionUploadId: string, codesets: TarCodesets): Promise<void> {
+    const contributor = await this.contributorService.getContributorBySubmissionUploadId(submissionUploadId);
+    await this.persistContributorCodesets(contributor.contributor_id, codesets);
+  }
+
+  /**
    * Persist contributor codeset/codes rows for one parsed codeset payload.
    *
    * @private

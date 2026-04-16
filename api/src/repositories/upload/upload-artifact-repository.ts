@@ -91,19 +91,32 @@ export class UploadArtifactRepository extends BaseRepository {
         ${uploadArtifact.upload_archive_id},
         ${uploadArtifact.path ?? null}
       )
+      ON CONFLICT DO NOTHING
       RETURNING upload_artifact_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);
 
-    if (response.rowCount !== 1) {
+    if (response.rowCount === 1) {
+      return response.rows[0];
+    }
+
+    const existing = await this.connection.sql(SQL`
+      SELECT upload_artifact_id
+      FROM upload_artifact
+      WHERE upload_id = ${uploadArtifact.upload_id}
+        AND artifact_id = ${uploadArtifact.artifact_id}
+      LIMIT 1;
+    `);
+
+    if (existing.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert upload artifact record', [
         'UploadArtifactRepository->insertUploadArtifact',
-        `rowCount was ${response.rowCount}, expected 1`
+        'Insert conflicted but existing row could not be resolved'
       ]);
     }
 
-    return response.rows[0];
+    return existing.rows[0];
   }
 
   /**
@@ -140,17 +153,11 @@ export class UploadArtifactRepository extends BaseRepository {
         ${uploadArchiveIds}::uuid[],
         ${paths}::text[]
       )
+      ON CONFLICT DO NOTHING
       RETURNING upload_artifact_id;
     `;
 
     const response = await this.connection.sql(sqlStatement, z.object({ upload_artifact_id: z.string().uuid() }));
-
-    if (response.rowCount !== uploadArtifacts.length) {
-      throw new ApiExecuteSQLError('Failed to insert upload artifact records', [
-        'UploadArtifactRepository->insertUploadArtifacts',
-        `rowCount was ${response.rowCount}, expected ${uploadArtifacts.length}`
-      ]);
-    }
 
     return response.rows;
   }

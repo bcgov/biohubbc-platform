@@ -3,7 +3,6 @@ import { describe } from 'mocha';
 import { Readable } from 'node:stream';
 import sinon from 'sinon';
 import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
-import { IFlattenedBlock } from '../../models/submission-feature';
 import { UploadArchive } from '../../models/upload-archive';
 import * as biohubTarParser from '../../utils/biohub-tar-parser';
 import { getMockDBConnection } from '../../__mocks__/db';
@@ -29,101 +28,106 @@ describe('SubmissionIngestionService', () => {
       ticket_id: '11111111-1111-1111-1111-111111111111'
     };
 
-    it('streams features and ingests media/codesets without pre-validation pass', async () => {
-      const dbConnection = getMockDBConnection();
-      const service = new SubmissionIngestionService(dbConnection);
+    const mockUploadArchive: UploadArchive = {
+      upload_archive_id: 'archive-1',
+      upload_id: 'upload-1',
+      artifact_id: 'artifact-1',
+      archive_status: 'pending'
+    };
 
-      const mockUploadArchive: UploadArchive = {
-        upload_archive_id: 'archive-1',
-        upload_id: 'upload-1',
-        artifact_id: 'artifact-1',
-        archive_status: 'pending'
-      };
+    const mockArtifact: Artifact = {
+      artifact_id: 'artifact-1',
+      artifact_status: ArtifactStatusEnum.UPLOADED,
+      bucket: 'test-bucket',
+      object_key: 'submissions/123/uploads/upload-1.tar',
+      byte_size: '1000',
+      checksum_sha256: null,
+      uploaded_at: '2025-01-01T00:00:00Z',
+      format: 'tar'
+    };
 
-      const mockArtifact: Artifact = {
-        artifact_id: 'artifact-1',
-        artifact_status: ArtifactStatusEnum.UPLOADED,
-        bucket: 'test-bucket',
-        object_key: 'submissions/123/uploads/upload-1.tar',
-        byte_size: '1000',
-        checksum_sha256: null,
-        uploaded_at: '2025-01-01T00:00:00Z',
-        format: 'tar'
-      };
-
+    const setupTarballContext = () => {
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
       sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
+    };
+
+    it('streams archive in one pass and persists media/codes/features', async () => {
+      const dbConnection = getMockDBConnection();
+      const service = new SubmissionIngestionService(dbConnection);
+      setupTarballContext();
+
       const deleteFeaturesStub = sinon
         .stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId')
         .resolves();
       const ingestFeatureBatchStub = sinon
         .stub(SubmissionFeatureIngestionService.prototype, 'ingestFeatureBatch')
         .resolves();
-      const ingestMediaStub = sinon.stub(MediaIngestionService.prototype, 'ingestMediaFiles').resolves();
-      const ingestCodesetsStub = sinon.stub(CodesetIngestionService.prototype, 'ingestCodesets').resolves();
+      const persistMediaBatchStub = sinon.stub(MediaIngestionService.prototype, 'persistUploadedMediaBatch').resolves();
+      const ingestParsedCodesetsStub = sinon.stub(CodesetIngestionService.prototype, 'ingestParsedCodesets').resolves();
 
-      sinon.stub(biohubTarParser, 'streamFeatures').callsFake(async (_stream, _batchSize, onBatch) => {
-        const featureBatch: IFlattenedBlock[] = [
+      sinon.stub(biohubTarParser, 'streamSubmissionArchive').callsFake(async (_stream, options) => {
+        await options.ingestMediaBatch([
+          {
+            fileName: 'photo.jpg',
+            s3Key: 'submissions/123/uploads/sub-upload-uuid-1/media/photo.jpg',
+            path: 'photo.jpg',
+            byteSize: 10,
+            checksumSha256: 'a'.repeat(64),
+            mimetype: 'image/jpeg'
+          }
+        ]);
+        await options.ingestCodesets({
+          agency: {
+            key: 'agency',
+            label: 'Agency',
+            external_id: 'agency',
+            description: null,
+            codes: {
+              x: {
+                key: 'x',
+                label: 'X',
+                external_id: 'x',
+                description: null
+              }
+            }
+          }
+        });
+        await options.ingestFeatureBatch([
           {
             id: 'feature-1',
-            type: 'observation',
-            properties: { title: 'test' },
+            type: 'dataset',
+            properties: { name: 'Dataset' },
             content: [],
             parent: null
           }
-        ];
-        await onBatch(featureBatch);
-        return { featureCount: 1 };
+        ]);
+
+        return { uploadedCount: 1, featureCount: 1, codesetFileCount: 1 };
       });
 
       const result = await service.ingestSubmissionUpload(mockSubmissionUpload);
 
       expect(result).to.eql({ valid: true, errors: [] });
       expect(deleteFeaturesStub.calledOnceWithExactly(mockSubmissionUpload.submission_upload_id)).to.be.true;
-      expect(ingestMediaStub.calledOnce).to.be.true;
-      expect(ingestCodesetsStub.calledOnce).to.be.true;
+      expect(persistMediaBatchStub.calledOnce).to.be.true;
+      expect(ingestParsedCodesetsStub.calledOnce).to.be.true;
       expect(ingestFeatureBatchStub.calledOnce).to.be.true;
-      sinon.assert.callOrder(ingestMediaStub, ingestCodesetsStub, ingestFeatureBatchStub);
     });
 
-    it('throws when shallow feature stream parsing fails', async () => {
+    it('throws when archive parser fails', async () => {
       const dbConnection = getMockDBConnection();
       const service = new SubmissionIngestionService(dbConnection);
+      setupTarballContext();
 
-      const mockUploadArchive: UploadArchive = {
-        upload_archive_id: 'archive-1',
-        upload_id: 'upload-1',
-        artifact_id: 'artifact-1',
-        archive_status: 'pending'
-      };
-
-      const mockArtifact: Artifact = {
-        artifact_id: 'artifact-1',
-        artifact_status: ArtifactStatusEnum.UPLOADED,
-        bucket: 'test-bucket',
-        object_key: 'submissions/123/uploads/upload-1.tar',
-        byte_size: '1000',
-        checksum_sha256: null,
-        uploaded_at: '2025-01-01T00:00:00Z',
-        format: 'tar'
-      };
-
-      sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
-      sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
-      sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
-      sinon.stub(MediaIngestionService.prototype, 'ingestMediaFiles').resolves();
-      sinon.stub(CodesetIngestionService.prototype, 'ingestCodesets').resolves();
-      sinon
-        .stub(biohubTarParser, 'streamFeatures')
-        .rejects(new Error('Feature entry is missing required string field: id'));
+      sinon.stub(biohubTarParser, 'streamSubmissionArchive').rejects(new Error('archive stream failed'));
 
       try {
         await service.ingestSubmissionUpload(mockSubmissionUpload);
         expect.fail();
       } catch (error) {
-        expect((error as Error).message).to.equal('Feature entry is missing required string field: id');
+        expect((error as Error).message).to.equal('archive stream failed');
       }
     });
 
@@ -141,75 +145,69 @@ describe('SubmissionIngestionService', () => {
       }
     });
 
-    it('propagates media ingestion failures and does not continue to later stages', async () => {
+    it('propagates media persistence failures', async () => {
       const dbConnection = getMockDBConnection();
       const service = new SubmissionIngestionService(dbConnection);
+      setupTarballContext();
 
-      const mockUploadArchive: UploadArchive = {
-        upload_archive_id: 'archive-1',
-        upload_id: 'upload-1',
-        artifact_id: 'artifact-1',
-        archive_status: 'pending'
-      };
-
-      const mockArtifact: Artifact = {
-        artifact_id: 'artifact-1',
-        artifact_status: ArtifactStatusEnum.UPLOADED,
-        bucket: 'test-bucket',
-        object_key: 'submissions/123/uploads/upload-1.tar',
-        byte_size: '1000',
-        checksum_sha256: null,
-        uploaded_at: '2025-01-01T00:00:00Z',
-        format: 'tar'
-      };
-
-      sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
-      sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
-      sinon.stub(MediaIngestionService.prototype, 'ingestMediaFiles').rejects(new Error('media upload failed'));
-      const ingestCodesetsStub = sinon.stub(CodesetIngestionService.prototype, 'ingestCodesets').resolves();
-      const streamFeaturesStub = sinon.stub(biohubTarParser, 'streamFeatures').resolves({ featureCount: 0 });
+      sinon
+        .stub(MediaIngestionService.prototype, 'persistUploadedMediaBatch')
+        .rejects(new Error('media persist failed'));
+      const ingestParsedCodesetsStub = sinon.stub(CodesetIngestionService.prototype, 'ingestParsedCodesets').resolves();
+      const ingestFeatureBatchStub = sinon
+        .stub(SubmissionFeatureIngestionService.prototype, 'ingestFeatureBatch')
+        .resolves();
+
+      sinon.stub(biohubTarParser, 'streamSubmissionArchive').callsFake(async (_stream, options) => {
+        await options.ingestMediaBatch([
+          {
+            fileName: 'photo.jpg',
+            s3Key: 'submissions/123/uploads/sub-upload-uuid-1/media/photo.jpg',
+            path: 'photo.jpg',
+            byteSize: 10,
+            checksumSha256: 'a'.repeat(64),
+            mimetype: 'image/jpeg'
+          }
+        ]);
+        return { uploadedCount: 1, featureCount: 1, codesetFileCount: 0 };
+      });
 
       try {
         await service.ingestSubmissionUpload(mockSubmissionUpload);
         expect.fail();
       } catch (error) {
-        expect((error as Error).message).to.equal('media upload failed');
+        expect((error as Error).message).to.equal('media persist failed');
       }
 
-      expect(ingestCodesetsStub.called).to.be.false;
-      expect(streamFeaturesStub.called).to.be.false;
+      expect(ingestParsedCodesetsStub.called).to.be.false;
+      expect(ingestFeatureBatchStub.called).to.be.false;
     });
 
-    it('propagates codeset ingestion failures and does not stream feature batches', async () => {
+    it('propagates codeset persistence failures', async () => {
       const dbConnection = getMockDBConnection();
       const service = new SubmissionIngestionService(dbConnection);
+      setupTarballContext();
 
-      const mockUploadArchive: UploadArchive = {
-        upload_archive_id: 'archive-1',
-        upload_id: 'upload-1',
-        artifact_id: 'artifact-1',
-        archive_status: 'pending'
-      };
-
-      const mockArtifact: Artifact = {
-        artifact_id: 'artifact-1',
-        artifact_status: ArtifactStatusEnum.UPLOADED,
-        bucket: 'test-bucket',
-        object_key: 'submissions/123/uploads/upload-1.tar',
-        byte_size: '1000',
-        checksum_sha256: null,
-        uploaded_at: '2025-01-01T00:00:00Z',
-        format: 'tar'
-      };
-
-      sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
-      sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
-      sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
-      sinon.stub(MediaIngestionService.prototype, 'ingestMediaFiles').resolves();
-      sinon.stub(CodesetIngestionService.prototype, 'ingestCodesets').rejects(new Error('codeset persist failed'));
-      const streamFeaturesStub = sinon.stub(biohubTarParser, 'streamFeatures').resolves({ featureCount: 0 });
+      sinon.stub(MediaIngestionService.prototype, 'persistUploadedMediaBatch').resolves();
+      sinon.stub(CodesetIngestionService.prototype, 'ingestParsedCodesets').rejects(new Error('codeset persist failed'));
+      const ingestFeatureBatchStub = sinon
+        .stub(SubmissionFeatureIngestionService.prototype, 'ingestFeatureBatch')
+        .resolves();
+
+      sinon.stub(biohubTarParser, 'streamSubmissionArchive').callsFake(async (_stream, options) => {
+        await options.ingestCodesets({
+          agency: {
+            key: 'agency',
+            label: 'Agency',
+            external_id: 'agency',
+            description: null,
+            codes: {}
+          }
+        });
+        return { uploadedCount: 0, featureCount: 1, codesetFileCount: 1 };
+      });
 
       try {
         await service.ingestSubmissionUpload(mockSubmissionUpload);
@@ -218,42 +216,23 @@ describe('SubmissionIngestionService', () => {
         expect((error as Error).message).to.equal('codeset persist failed');
       }
 
-      expect(streamFeaturesStub.called).to.be.false;
+      expect(ingestFeatureBatchStub.called).to.be.false;
     });
 
-    it('propagates feature batch ingestion failures from stream callback', async () => {
+    it('propagates feature batch persistence failures', async () => {
       const dbConnection = getMockDBConnection();
       const service = new SubmissionIngestionService(dbConnection);
+      setupTarballContext();
 
-      const mockUploadArchive: UploadArchive = {
-        upload_archive_id: 'archive-1',
-        upload_id: 'upload-1',
-        artifact_id: 'artifact-1',
-        archive_status: 'pending'
-      };
-
-      const mockArtifact: Artifact = {
-        artifact_id: 'artifact-1',
-        artifact_status: ArtifactStatusEnum.UPLOADED,
-        bucket: 'test-bucket',
-        object_key: 'submissions/123/uploads/upload-1.tar',
-        byte_size: '1000',
-        checksum_sha256: null,
-        uploaded_at: '2025-01-01T00:00:00Z',
-        format: 'tar'
-      };
-
-      sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
-      sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
-      sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
-      sinon.stub(MediaIngestionService.prototype, 'ingestMediaFiles').resolves();
-      sinon.stub(CodesetIngestionService.prototype, 'ingestCodesets').resolves();
+      sinon.stub(MediaIngestionService.prototype, 'persistUploadedMediaBatch').resolves();
+      sinon.stub(CodesetIngestionService.prototype, 'ingestParsedCodesets').resolves();
       sinon
         .stub(SubmissionFeatureIngestionService.prototype, 'ingestFeatureBatch')
         .rejects(new Error('insert feature batch failed'));
-      sinon.stub(biohubTarParser, 'streamFeatures').callsFake(async (_stream, _batchSize, onBatch) => {
-        await onBatch([
+
+      sinon.stub(biohubTarParser, 'streamSubmissionArchive').callsFake(async (_stream, options) => {
+        await options.ingestFeatureBatch([
           {
             id: 'feature-1',
             type: 'dataset',
@@ -262,7 +241,7 @@ describe('SubmissionIngestionService', () => {
             parent: null
           }
         ]);
-        return { featureCount: 1 };
+        return { uploadedCount: 0, featureCount: 1, codesetFileCount: 0 };
       });
 
       try {
@@ -270,6 +249,27 @@ describe('SubmissionIngestionService', () => {
         expect.fail();
       } catch (error) {
         expect((error as Error).message).to.equal('insert feature batch failed');
+      }
+    });
+
+    it('throws when archive has no features', async () => {
+      const dbConnection = getMockDBConnection();
+      const service = new SubmissionIngestionService(dbConnection);
+      setupTarballContext();
+
+      sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
+      sinon.stub(MediaIngestionService.prototype, 'persistUploadedMediaBatch').resolves();
+      sinon.stub(CodesetIngestionService.prototype, 'ingestParsedCodesets').resolves();
+      sinon.stub(SubmissionFeatureIngestionService.prototype, 'ingestFeatureBatch').resolves();
+      sinon
+        .stub(biohubTarParser, 'streamSubmissionArchive')
+        .resolves({ uploadedCount: 1, featureCount: 0, codesetFileCount: 1 });
+
+      try {
+        await service.ingestSubmissionUpload(mockSubmissionUpload);
+        expect.fail();
+      } catch (error) {
+        expect((error as Error).message).to.equal('No feature entries were found under features/ in the archive');
       }
     });
   });

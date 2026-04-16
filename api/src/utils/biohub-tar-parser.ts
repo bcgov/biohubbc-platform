@@ -9,10 +9,12 @@ import { IngestionValidationError } from '../errors/submission-errors';
 import { IFlattenedBlock } from '../models/submission-feature';
 import { TarCodesets } from '../services/ingestion/submission-ingestion-codes-service.interface';
 import { BucketType } from '../services/object-storage/object-storage-service';
+import { getLogger } from './logger';
 import {
   IUploadedMediaFile,
   MediaUploadContext,
   ProcessMediaEntryOptions,
+  StreamSubmissionArchiveOptions,
   StreamMediaOptions,
   TarNext,
   UploadMediaEntryOptions
@@ -39,6 +41,8 @@ const FlattenedFeatureSchema: z.ZodType<IFlattenedBlock> = z.object({
   content: z.array(z.string()),
   parent: z.string().nullable()
 });
+
+const defaultLog = getLogger('utils/biohub-tar-parser');
 
 /**
  * Collect all bytes from a readable stream.
@@ -608,4 +612,287 @@ export async function streamMedia(
   await entryPromise;
 
   return { uploadedCount };
+}
+
+/**
+ * Stream a submission archive in a single pass and route entries by scope.
+ *
+ * Processing rules:
+ * - `files/*` entries are uploaded to object storage with bounded media upload concurrency.
+ * - `codes/*.json` entries are parsed and persisted through `ingestCodesets`.
+ * - `features/*.json` entries are parsed, validated, and flushed in bounded batches.
+ * - Unknown entries are drained and ignored.
+ *
+ * All caller persistence callbacks are awaited, allowing the caller to maintain transactional behavior.
+ *
+ * @param {Readable} inputStream
+ * @param {StreamSubmissionArchiveOptions} options
+ * @returns {Promise<{ uploadedCount: number; featureCount: number; codesetFileCount: number }>}
+ */
+export async function streamSubmissionArchive(
+  inputStream: Readable,
+  options: StreamSubmissionArchiveOptions
+): Promise<{ uploadedCount: number; featureCount: number; codesetFileCount: number }> {
+  const {
+    objectStorageService,
+    s3KeyPrefix,
+    mediaBatchSize,
+    mediaMaxBatchBytes,
+    mediaConcurrency,
+    featureBatchSize,
+    ingestMediaBatch,
+    ingestCodesets,
+    ingestFeatureBatch
+  } = options;
+
+  if (mediaBatchSize < 1) {
+    throw new Error('mediaBatchSize must be greater than 0');
+  }
+  if (mediaMaxBatchBytes < 1) {
+    throw new Error('mediaMaxBatchBytes must be greater than 0');
+  }
+  if (mediaConcurrency < 1) {
+    throw new Error('mediaConcurrency must be greater than 0');
+  }
+  if (featureBatchSize < 1) {
+    throw new Error('featureBatchSize must be greater than 0');
+  }
+
+  const extract = tar.extract();
+  let uploadedCount = 0;
+  let featureCount = 0;
+  let codesetFileCount = 0;
+  let entriesSeen = 0;
+  let directoriesSeen = 0;
+  let mediaEntriesSeen = 0;
+  let featureEntriesSeen = 0;
+  let codesEntriesSeen = 0;
+  let ignoredEntriesSeen = 0;
+  let lastEntryName: string | null = null;
+
+  let pendingUploadedFiles: IUploadedMediaFile[] = [];
+  let pendingUploadedBytes = 0;
+  let pendingBlocks: IFlattenedBlock[] = [];
+  let mediaStateQueue: Promise<void> = Promise.resolve();
+  const inFlightMediaUploads = new Set<Promise<void>>();
+  const progressEveryEntries = Math.max(1, Number(process.env.SUBMISSION_ARCHIVE_PROGRESS_EVERY_ENTRIES ?? 250));
+  const progressIntervalMs = Math.max(1000, Number(process.env.SUBMISSION_ARCHIVE_PROGRESS_INTERVAL_MS ?? 10000));
+
+  const logProgress = (message: string): void => {
+    defaultLog.debug({
+      label: 'streamSubmissionArchive',
+      message,
+      entriesSeen,
+      directoriesSeen,
+      mediaEntriesSeen,
+      featureEntriesSeen,
+      codesEntriesSeen,
+      ignoredEntriesSeen,
+      uploadedCount,
+      featureCount,
+      codesetFileCount,
+      inFlightMediaUploads: inFlightMediaUploads.size,
+      pendingUploadedFiles: pendingUploadedFiles.length,
+      pendingUploadedBytes,
+      pendingFeatureBlocks: pendingBlocks.length,
+      lastEntryName
+    });
+  };
+
+  defaultLog.debug({
+    label: 'streamSubmissionArchive',
+    message: 'Starting archive stream',
+    mediaBatchSize,
+    mediaMaxBatchBytes,
+    mediaConcurrency,
+    featureBatchSize,
+    progressEveryEntries,
+    progressIntervalMs
+  });
+
+  const progressInterval = setInterval(() => {
+    logProgress('Archive stream heartbeat');
+  }, progressIntervalMs);
+
+  const shouldFlushMedia = (): boolean => {
+    return pendingUploadedFiles.length >= mediaBatchSize || pendingUploadedBytes >= mediaMaxBatchBytes;
+  };
+
+  const flushPendingMedia = async (): Promise<void> => {
+    if (!pendingUploadedFiles.length) {
+      return;
+    }
+
+    const currentBatch = pendingUploadedFiles;
+    pendingUploadedFiles = [];
+    pendingUploadedBytes = 0;
+    defaultLog.debug({
+      label: 'streamSubmissionArchive',
+      message: 'Flushing pending media batch',
+      batchSize: currentBatch.length
+    });
+    await ingestMediaBatch(currentBatch);
+    logProgress('Flushed pending media batch');
+  };
+
+  const flushPendingFeatures = async (): Promise<void> => {
+    if (!pendingBlocks.length) {
+      return;
+    }
+
+    const currentBlocks = pendingBlocks;
+    pendingBlocks = [];
+    defaultLog.debug({
+      label: 'streamSubmissionArchive',
+      message: 'Flushing pending feature batch',
+      batchSize: currentBlocks.length
+    });
+    await ingestFeatureBatch(currentBlocks);
+    logProgress('Flushed pending feature batch');
+  };
+
+  const enqueueUploadedMediaFile = (uploadedFile: IUploadedMediaFile): Promise<void> => {
+    const nextWrite = mediaStateQueue.then(async () => {
+      pendingUploadedFiles.push(uploadedFile);
+      pendingUploadedBytes += uploadedFile.byteSize;
+
+      if (shouldFlushMedia()) {
+        await flushPendingMedia();
+      }
+    });
+
+    mediaStateQueue = nextWrite.then(
+      () => undefined,
+      () => undefined
+    );
+
+    return nextWrite;
+  };
+
+  const onUploaded = (): void => {
+    uploadedCount += 1;
+  };
+
+  let rejectEntryPromise: (err: unknown) => void;
+  const entryPromise = new Promise<void>((resolve, reject) => {
+    rejectEntryPromise = reject;
+
+    extract.on('entry', async (header, stream, next) => {
+      try {
+        entriesSeen += 1;
+        lastEntryName = header.name ?? null;
+
+        if (header.type === 'directory') {
+          directoriesSeen += 1;
+          await drainStream(stream);
+          if (entriesSeen % progressEveryEntries === 0) {
+            logProgress('Processed archive entries');
+          }
+          next();
+          return;
+        }
+
+        const featureEntryName = resolveScopedEntryName(header.name ?? '', 'features');
+        if (featureEntryName && featureEntryName.endsWith('.json') && header.type === 'file') {
+          featureEntriesSeen += 1;
+          const buffer = await streamToBuffer(stream);
+          const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
+          const parsedEntries = Array.isArray(parsed) ? parsed : [parsed];
+
+          for (const parsedEntry of parsedEntries) {
+            const block = extractFeatureFromTarballEntry(parsedEntry, featureEntryName);
+            pendingBlocks.push(block);
+            featureCount += 1;
+
+            if (pendingBlocks.length >= featureBatchSize) {
+              await flushPendingFeatures();
+            }
+          }
+
+          if (entriesSeen % progressEveryEntries === 0) {
+            logProgress('Processed archive entries');
+          }
+          next();
+          return;
+        }
+
+        const codesEntryName = resolveScopedEntryName(header.name ?? '', 'codes');
+        if (codesEntryName && codesEntryName.endsWith('.json') && header.type === 'file') {
+          codesEntriesSeen += 1;
+          const buffer = await streamToBuffer(stream);
+          const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
+          const codesets = extractCodesetsFromTarballEntry(parsed, codesEntryName);
+
+          await ingestCodesets(codesets);
+          codesetFileCount += 1;
+          if (entriesSeen % progressEveryEntries === 0) {
+            logProgress('Processed archive entries');
+          }
+          next();
+          return;
+        }
+
+        const mediaEntryName = resolveScopedEntryName(header.name ?? '', 'files');
+        if (mediaEntryName && header.type === 'file') {
+          mediaEntriesSeen += 1;
+          const context = buildMediaUploadContext(mediaEntryName, s3KeyPrefix, header.size ?? 0);
+
+          const uploadPromise = uploadMediaEntry(stream, context, {
+            objectStorageService,
+            ingestMediaFile: enqueueUploadedMediaFile,
+            onUploaded
+          });
+
+          inFlightMediaUploads.add(uploadPromise);
+          uploadPromise.finally(() => inFlightMediaUploads.delete(uploadPromise)).catch(reject);
+
+          if (inFlightMediaUploads.size >= mediaConcurrency) {
+            await Promise.race(inFlightMediaUploads);
+          }
+
+          if (entriesSeen % progressEveryEntries === 0) {
+            logProgress('Processed archive entries');
+          }
+          next();
+          return;
+        }
+
+        ignoredEntriesSeen += 1;
+        await drainStream(stream);
+        if (entriesSeen % progressEveryEntries === 0) {
+          logProgress('Processed archive entries');
+        }
+        next();
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    extract.on('finish', async () => {
+      try {
+        logProgress('Archive entry stream finished, waiting on in-flight work');
+        await Promise.all(inFlightMediaUploads);
+        await mediaStateQueue;
+        await flushPendingMedia();
+        await flushPendingFeatures();
+        logProgress('Archive stream processing complete');
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+    extract.on('error', reject);
+  });
+
+  pipeline(inputStream, extract).catch((error) => {
+    rejectEntryPromise(error);
+  });
+
+  try {
+    await entryPromise;
+  } finally {
+    clearInterval(progressInterval);
+  }
+
+  return { uploadedCount, featureCount, codesetFileCount };
 }

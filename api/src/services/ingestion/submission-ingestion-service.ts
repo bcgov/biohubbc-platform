@@ -1,6 +1,7 @@
 import { IngestionValidationError } from '../../errors/submission-errors';
 import { SubmissionUpload } from '../../models/submission-upload';
-import { streamFeatures } from '../../utils/biohub-tar-parser';
+import { streamSubmissionArchive } from '../../utils/biohub-tar-parser';
+import { getLogger } from '../../utils/logger';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
@@ -11,6 +12,10 @@ import { SubmissionFeatureIngestionService } from './submission-feature-ingestio
 import { IValidationResult } from './submission-ingestion-service.interface';
 
 const FEATURE_INSERT_BATCH_SIZE = 10000;
+const MEDIA_INGEST_BATCH_BYTES = Number(process.env.MEDIA_INGEST_BATCH_BYTES ?? 50 * 1024 * 1024);
+const MEDIA_INGEST_BATCH_FILES = Number(process.env.MEDIA_INGEST_BATCH_FILES ?? 1000);
+const MEDIA_INGEST_CONCURRENCY = Number(process.env.MEDIA_INGEST_CONCURRENCY ?? 4);
+const defaultLog = getLogger('services/ingestion/submission-ingestion-service');
 
 /**
  * Service for ingesting submission archives via streaming shallow-ingestion.
@@ -49,46 +54,111 @@ export class SubmissionIngestionService extends DBService {
       submission_id: submissionId,
       upload_id: uploadId
     } = submissionUpload;
+    const startTime = Date.now();
 
     // Resolve the S3 key for the uploaded tarball: upload_id → upload_archive → artifact → object_key
+    defaultLog.debug({
+      label: 'ingestSubmissionUpload',
+      message: 'Resolving tarball upload context',
+      submissionUploadId,
+      submissionId,
+      uploadId
+    });
     const { objectKey, uploadArchiveId } = await this.getTarballUploadContext(uploadId);
+    defaultLog.debug({
+      label: 'ingestSubmissionUpload',
+      message: 'Resolved tarball upload context',
+      submissionUploadId,
+      uploadArchiveId,
+      objectKey
+    });
 
     await this.featureIngestionService.deleteFeaturesBySubmissionUploadId(submissionUploadId);
+    defaultLog.debug({
+      label: 'ingestSubmissionUpload',
+      message: 'Deleted existing features by submission upload id',
+      submissionUploadId
+    });
 
-    // Checkpointed streaming passes keep memory bounded while avoiding concurrent
-    // full-archive scans against object storage for the same tarball.
-    await this.mediaIngestionService.ingestMediaFiles(
-      objectKey,
-      submissionId,
+    // Keep all DB writes serialized on this connection while allowing the parser to stream
+    // the archive once and route media/codes/features in one pass.
+    let dbWriteChain: Promise<void> = Promise.resolve();
+    const enqueueDbWrite = (writeTask: () => Promise<void>): Promise<void> => {
+      const queuedWrite = dbWriteChain.then(writeTask);
+      dbWriteChain = queuedWrite.then(
+        () => undefined,
+        () => undefined
+      );
+      return queuedWrite;
+    };
+
+    const streamStart = Date.now();
+    defaultLog.debug({
+      label: 'ingestSubmissionUpload',
+      message: 'Starting single-pass archive stream',
       submissionUploadId,
-      uploadId,
-      uploadArchiveId
+      objectKey,
+      mediaBatchSize: MEDIA_INGEST_BATCH_FILES,
+      mediaMaxBatchBytes: MEDIA_INGEST_BATCH_BYTES,
+      mediaConcurrency: MEDIA_INGEST_CONCURRENCY,
+      featureBatchSize: FEATURE_INSERT_BATCH_SIZE
+    });
+
+    const s3KeyPrefix = `submissions/${submissionId}/uploads/${submissionUploadId}/media`;
+    const { uploadedCount, featureCount, codesetFileCount } = await streamSubmissionArchive(
+      await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey),
+      {
+        objectStorageService: this.objectStorageService,
+        s3KeyPrefix,
+        mediaBatchSize: MEDIA_INGEST_BATCH_FILES,
+        mediaMaxBatchBytes: MEDIA_INGEST_BATCH_BYTES,
+        mediaConcurrency: MEDIA_INGEST_CONCURRENCY,
+        featureBatchSize: FEATURE_INSERT_BATCH_SIZE,
+        ingestMediaBatch: (uploadedFiles) =>
+          enqueueDbWrite(() =>
+            this.mediaIngestionService.persistUploadedMediaBatch(
+              uploadId,
+              uploadArchiveId,
+              submissionUploadId,
+              uploadedFiles
+            )
+          ),
+        ingestCodesets: (codesets) =>
+          enqueueDbWrite(() => this.codesetIngestionService.ingestParsedCodesets(submissionUploadId, codesets)),
+        ingestFeatureBatch: (featureBatch) =>
+          enqueueDbWrite(() =>
+            this.featureIngestionService.ingestFeatureBatch(submissionId, submissionUploadId, featureBatch)
+          )
+      }
     );
-    await this.codesetIngestionService.ingestCodesets(objectKey, submissionUploadId);
-    await this.ingestFeatures(objectKey, submissionId, submissionUploadId);
+    await dbWriteChain;
 
-    return { valid: true, errors: [] };
-  }
-
-  /**
-   * Stream feature entries from the tarball and ingest them in batches.
-   *
-   * @private
-   * @param {string} objectKey
-   * @param {number} submissionId
-   * @param {string} submissionUploadId
-   * @returns {Promise<void>}
-   */
-  private async ingestFeatures(objectKey: string, submissionId: number, submissionUploadId: string): Promise<void> {
-    const tarStream = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
-
-    const { featureCount } = await streamFeatures(tarStream, FEATURE_INSERT_BATCH_SIZE, async (featureBatch) => {
-      await this.featureIngestionService.ingestFeatureBatch(submissionId, submissionUploadId, featureBatch);
+    defaultLog.debug({
+      label: 'ingestSubmissionUpload',
+      message: 'Completed single-pass archive stream',
+      submissionUploadId,
+      uploadedCount,
+      featureCount,
+      codesetFileCount,
+      elapsedMs: Date.now() - streamStart
     });
 
     if (featureCount === 0) {
       throw new IngestionValidationError('No feature entries were found under features/ in the archive');
     }
+
+    defaultLog.info({
+      label: 'ingestSubmissionUpload',
+      message: 'Submission upload ingestion completed',
+      submissionUploadId,
+      submissionId,
+      uploadedCount,
+      featureCount,
+      codesetFileCount,
+      elapsedMs: Date.now() - startTime
+    });
+
+    return { valid: true, errors: [] };
   }
 
   /**

@@ -46,6 +46,75 @@ function isValidationFailure(error: unknown): boolean {
 }
 
 /**
+ * Persist submission upload status in a dedicated transaction after the main transaction is rolled back.
+ *
+ * @param {string} submissionUploadId Submission upload scope.
+ * @param {'invalid' | 'failed'} status Status to persist.
+ * @returns {Promise<void>}
+ */
+async function updateSubmissionUploadStatusInNewTransaction(
+  submissionUploadId: string,
+  status: 'invalid' | 'failed'
+): Promise<void> {
+  const statusConnection = getAPIUserDBConnection();
+
+  try {
+    await statusConnection.open();
+
+    const submissionUploadService = new SubmissionUploadService(statusConnection);
+    await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status });
+
+    await statusConnection.commit();
+  } catch (statusError) {
+    await statusConnection.rollback();
+
+    defaultLog.error({
+      label: 'updateSubmissionUploadStatusInNewTransaction',
+      message: 'Failed to persist submission upload status in new transaction',
+      submissionUploadId,
+      status,
+      error: statusError
+    });
+  } finally {
+    statusConnection.release();
+  }
+}
+
+/**
+ * Persist submission validation status in a dedicated transaction after the main transaction is rolled back.
+ *
+ * @param {string} jobId Process submission features job ID.
+ * @param {{ error: { name: string; message: string; stack?: string } }} result Validation payload.
+ * @returns {Promise<void>}
+ */
+async function updateSubmissionValidationInvalidInNewTransaction(
+  jobId: string,
+  result: { error: { name: string; message: string; stack?: string } }
+): Promise<void> {
+  const statusConnection = getAPIUserDBConnection();
+
+  try {
+    await statusConnection.open();
+
+    const submissionValidationService = new SubmissionValidationService(statusConnection);
+    await submissionValidationService.updateSubmissionValidationStatus(jobId, 'invalid', result);
+
+    await statusConnection.commit();
+  } catch (statusError) {
+    await statusConnection.rollback();
+
+    defaultLog.error({
+      label: 'updateSubmissionValidationInvalidInNewTransaction',
+      message: 'Failed to persist submission validation status in new transaction',
+      jobId,
+      error: statusError
+    });
+  } finally {
+    statusConnection.release();
+  }
+}
+
+/**
  * Process submission features job handler.
  *
  * Receives the full SubmissionUpload bridge record in the job payload,
@@ -80,14 +149,33 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
       const submissionValidationService = new SubmissionValidationService(connection);
       const submissionUploadService = new SubmissionUploadService(connection);
 
-      // Commit 'started' status immediately so it's visible even if processing fails
+      // Mark started/in_progress within the current transaction.
+      // Final commit occurs once per job after ingestion + enqueue decisions are complete.
       await submissionValidationService.updateSubmissionValidationStatus(job.id, 'started');
       await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'in_progress' });
-      await connection.commit();
 
       // Process the submission (streaming shallow-ingestion).
+      const ingestStart = Date.now();
+      defaultLog.debug({
+        label: 'processSubmissionFeaturesJobHandler',
+        message: 'Starting submission archive ingestion',
+        jobId: job.id,
+        submissionUploadId,
+        submissionId
+      });
       const submissionIngestionService = new SubmissionIngestionService(connection);
       const result = await submissionIngestionService.ingestSubmissionUpload(submissionUpload);
+      defaultLog.debug({
+        label: 'processSubmissionFeaturesJobHandler',
+        message: 'Completed submission archive ingestion',
+        jobId: job.id,
+        submissionUploadId,
+        submissionId,
+        elapsedMs: Date.now() - ingestStart,
+        valid: result.valid
+      });
+
+      let invalidErrorCount: number | null = null;
 
       if (!result.valid) {
         // Validation failure — permanent condition, don't retry
@@ -95,45 +183,65 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
           errors: result.errors
         });
         await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
-        await connection.commit();
+        invalidErrorCount = result.errors.length;
+      } else {
+        // Update ingestion status to completed; deep validation is handled by indexing.
+        // These updates are independent and can run concurrently within the same transaction.
+        const uploadArchiveService = new UploadArchiveService(connection);
+        await Promise.all([
+          submissionValidationService.updateSubmissionValidationStatus(job.id, 'completed'),
+          submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'succeeded' }),
+          uploadArchiveService.updateUploadArchivesByUploadId(submissionUpload.upload_id, {
+            archive_status: ProcessStatusStatusEnum.COMPLETED
+          })
+        ]);
 
+        // Publish indexing job. Status updates + enqueue happen in the same transaction/commit window.
+        const publishStart = Date.now();
+        defaultLog.debug({
+          label: 'processSubmissionFeaturesJobHandler',
+          message: 'Publishing index submission features job',
+          jobId: job.id,
+          submissionUploadId,
+          submissionId
+        });
+        const indexResult = await publishIndexSubmissionFeaturesJob(connection, {
+          submissionId,
+          submissionUploadId
+        });
+        defaultLog.debug({
+          label: 'processSubmissionFeaturesJobHandler',
+          message: 'Finished publishing index submission features job',
+          jobId: job.id,
+          submissionUploadId,
+          submissionId,
+          elapsedMs: Date.now() - publishStart,
+          indexResult
+        });
+        if (indexResult.status !== 'published') {
+          defaultLog.warn({
+            label: 'processSubmissionFeaturesJobHandler',
+            message: 'Index submission features job not published',
+            submissionId,
+            indexResult
+          });
+        }
+      }
+
+      // Single commit for this connection/job execution path.
+      await connection.commit();
+
+      if (invalidErrorCount !== null) {
         defaultLog.info({
           label: 'processSubmissionFeaturesJobHandler',
           message: 'Submission validation failed (invalid data)',
           jobId: job.id,
           submissionId,
-          errorCount: result.errors.length
+          errorCount: invalidErrorCount
         });
 
-        return;
+        continue;
       }
-
-      // Update ingestion status to completed; deep validation is handled by indexing.
-      // These updates are independent and can run concurrently within the same transaction.
-      const uploadArchiveService = new UploadArchiveService(connection);
-      await Promise.all([
-        submissionValidationService.updateSubmissionValidationStatus(job.id, 'completed'),
-        submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'succeeded' }),
-        uploadArchiveService.updateUploadArchivesByUploadId(submissionUpload.upload_id, {
-          archive_status: ProcessStatusStatusEnum.COMPLETED
-        })
-      ]);
-
-      // Publish indexing job. Status updates + enqueue happen in the same transaction/commit window.
-      const indexResult = await publishIndexSubmissionFeaturesJob(connection, {
-        submissionId,
-        submissionUploadId
-      });
-      if (indexResult.status !== 'published') {
-        defaultLog.warn({
-          label: 'processSubmissionFeaturesJobHandler',
-          message: 'Index submission features job not published',
-          submissionId,
-          indexResult
-        });
-      }
-
-      await connection.commit();
 
       defaultLog.info({
         label: 'processSubmissionFeaturesJobHandler',
@@ -145,16 +253,13 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
       await connection.rollback();
 
       const errorMetadata = toErrorMetadata(error);
-      const submissionValidationService = new SubmissionValidationService(connection);
 
       if (isValidationFailure(error)) {
         // Validation failure from ingestion parser/shape checks — permanent condition, don't retry.
-        const submissionUploadService = new SubmissionUploadService(connection);
-        await submissionValidationService.updateSubmissionValidationStatus(job.id, 'invalid', {
+        await updateSubmissionValidationInvalidInNewTransaction(job.id, {
           error: errorMetadata
         });
-        await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
-        await connection.commit();
+        await updateSubmissionUploadStatusInNewTransaction(submissionUploadId, 'invalid');
 
         defaultLog.warn({
           label: 'processSubmissionFeaturesJobHandler',
@@ -165,15 +270,12 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
           error: errorMetadata
         });
 
-        return;
+        continue;
       }
 
       try {
-        const submissionUploadService = new SubmissionUploadService(connection);
-        await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'failed' });
-        await connection.commit();
+        await updateSubmissionUploadStatusInNewTransaction(submissionUploadId, 'failed');
       } catch (statusError) {
-        await connection.rollback();
         defaultLog.error({
           label: 'processSubmissionFeaturesJobHandler',
           message: 'Failed to update submission upload status to failed',

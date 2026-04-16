@@ -164,6 +164,7 @@ describe('process-submission-features-job', () => {
 
     it('rolls back and throws when ingestSubmissionUpload throws (allows pg-boss retry)', async () => {
       const mockDBConnection = getMockDBConnection();
+      const statusConnection = getMockDBConnection();
       const testError = new Error('S3 connection failed');
 
       const rollbackStub = sinon.stub().resolves();
@@ -173,7 +174,18 @@ describe('process-submission-features-job', () => {
       mockDBConnection.rollback = rollbackStub;
       mockDBConnection.release = releaseStub;
 
-      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+      const statusOpenStub = sinon.stub().resolves();
+      const statusCommitStub = sinon.stub().resolves();
+      const statusRollbackStub = sinon.stub().resolves();
+      const statusReleaseStub = sinon.stub();
+      statusConnection.open = statusOpenStub;
+      statusConnection.commit = statusCommitStub;
+      statusConnection.rollback = statusRollbackStub;
+      statusConnection.release = statusReleaseStub;
+
+      const getConnectionStub = sinon.stub(db, 'getAPIUserDBConnection');
+      getConnectionStub.onFirstCall().returns(mockDBConnection);
+      getConnectionStub.onSecondCall().returns(statusConnection);
 
       sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
 
@@ -189,11 +201,14 @@ describe('process-submission-features-job', () => {
         expect(rollbackStub.calledOnce).to.be.true;
         expect(updateSubmissionUploadStub.calledWith('test-sub-upload-id', { status: 'failed' })).to.be.true;
         expect(releaseStub.calledOnce).to.be.true;
+        expect(statusReleaseStub.calledOnce).to.be.true;
       }
     });
 
     it('marks submission invalid and does not throw on shallow validation exceptions', async () => {
       const mockDBConnection = getMockDBConnection();
+      const statusConnection1 = getMockDBConnection();
+      const statusConnection2 = getMockDBConnection();
       const rollbackStub = sinon.stub().resolves();
       const commitStub = sinon.stub().resolves();
 
@@ -202,7 +217,28 @@ describe('process-submission-features-job', () => {
       mockDBConnection.rollback = rollbackStub;
       mockDBConnection.release = sinon.stub();
 
-      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+      const status1OpenStub = sinon.stub().resolves();
+      const status1CommitStub = sinon.stub().resolves();
+      const status1RollbackStub = sinon.stub().resolves();
+      const status1ReleaseStub = sinon.stub();
+      statusConnection1.open = status1OpenStub;
+      statusConnection1.commit = status1CommitStub;
+      statusConnection1.rollback = status1RollbackStub;
+      statusConnection1.release = status1ReleaseStub;
+
+      const status2OpenStub = sinon.stub().resolves();
+      const status2CommitStub = sinon.stub().resolves();
+      const status2RollbackStub = sinon.stub().resolves();
+      const status2ReleaseStub = sinon.stub();
+      statusConnection2.open = status2OpenStub;
+      statusConnection2.commit = status2CommitStub;
+      statusConnection2.rollback = status2RollbackStub;
+      statusConnection2.release = status2ReleaseStub;
+
+      const getConnectionStub = sinon.stub(db, 'getAPIUserDBConnection');
+      getConnectionStub.onFirstCall().returns(mockDBConnection);
+      getConnectionStub.onSecondCall().returns(statusConnection1);
+      getConnectionStub.onThirdCall().returns(statusConnection2);
 
       const updateStatusStub = sinon
         .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus')
@@ -225,8 +261,10 @@ describe('process-submission-features-job', () => {
       expect(updateStatusStub.calledWith('test-job-id', 'invalid', sinon.match.object)).to.be.true;
       expect(updateSubmissionUploadStub.calledWith('test-sub-upload-id', { status: 'invalid' })).to.be.true;
       expect(publishStub.called).to.be.false;
-      expect(commitStub.called).to.be.true;
+      expect(commitStub.called).to.be.false;
       expect(rollbackStub.called).to.be.true;
+      expect(status1CommitStub.calledOnce).to.be.true;
+      expect(status2CommitStub.calledOnce).to.be.true;
     });
 
     it('processes multiple jobs in sequence', async () => {
@@ -257,8 +295,8 @@ describe('process-submission-features-job', () => {
       await processSubmissionFeaturesJobHandler(mockJobs);
 
       expect(openStub.callCount).to.equal(2);
-      // 2 commits per job: one for 'started', one for 'completed'
-      expect(commitStub.callCount).to.equal(4);
+      // 1 commit per successful job
+      expect(commitStub.callCount).to.equal(2);
       expect(releaseStub.callCount).to.equal(2);
     });
 

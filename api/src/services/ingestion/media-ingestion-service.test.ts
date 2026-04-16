@@ -21,11 +21,19 @@ describe('MediaIngestionService', () => {
 
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
       sinon
-        .stub(ArtifactService.prototype, 'insertArtifact')
-        .onFirstCall()
-        .resolves({ artifact_id: 'artifact-1' })
-        .onSecondCall()
-        .resolves({ artifact_id: 'artifact-2' });
+        .stub(ArtifactService.prototype, 'insertArtifacts')
+        .resolves([
+          {
+            artifact_id: 'artifact-1',
+            bucket: 'gblhvt',
+            object_key: 'submissions/123/uploads/submission-upload-1/media/path/to/key.pdf'
+          },
+          {
+            artifact_id: 'artifact-2',
+            bucket: 'gblhvt',
+            object_key: 'submissions/123/uploads/submission-upload-1/media/photo-2.jpg'
+          }
+        ]);
       const insertUploadArtifactsStub = sinon
         .stub(UploadArtifactService.prototype, 'insertUploadArtifacts')
         .resolves([{ upload_artifact_id: 'upload-artifact-1' }]);
@@ -109,7 +117,13 @@ describe('MediaIngestionService', () => {
       const service = new MediaIngestionService(dbConnection);
 
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
-      sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: 'artifact-1' } as any);
+      sinon.stub(ArtifactService.prototype, 'insertArtifacts').resolves([
+        {
+          artifact_id: 'artifact-1',
+          bucket: 'gblhvt',
+          object_key: 'submissions/123/uploads/submission-upload-1/media/photo-1.jpg'
+        }
+      ]);
       sinon
         .stub(UploadArtifactService.prototype, 'insertUploadArtifacts')
         .rejects(new Error('insert upload_artifact failed'));
