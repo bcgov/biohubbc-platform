@@ -39,7 +39,7 @@ export const TicketSidebarReferences = (props: ITicketSidebarReferencesProps) =>
         <LoadingGuard
           hasNoData={!references.length}
           hasNoDataFallback={
-            <Typography variant="body2" color="textSecondary">
+            <Typography variant="body2" color="text.secondary">
               No references
             </Typography>
           }>

@@ -64,17 +64,6 @@ export const CreateDataRequestDialog = (props: ICreateDataRequestDialogProps) =>
     availableUsersLoader.refresh(search);
   }, 300);
 
-  const handleAvailableUserSearch = (search: string) => {
-    debouncedAvailableUserRefresh(search);
-  };
-
-  const handleSave = (values: ICreateDataRequestFormValues) => {
-    onSave({
-      reason: values.reason.trim(),
-      system_user_ids: values.system_user_ids
-    });
-  };
-
   return (
     <EditDialog<ICreateDataRequestFormValues>
       isLoading={isSubmitting}
@@ -87,7 +76,7 @@ export const CreateDataRequestDialog = (props: ICreateDataRequestDialogProps) =>
             options={userOptions}
             isLoadingUsers={availableUsersLoader.isLoading}
             isSubmitting={isSubmitting}
-            onSearchUsers={handleAvailableUserSearch}
+            onSearchUsers={debouncedAvailableUserRefresh}
           />
         ),
         initialValues: {
@@ -98,7 +87,7 @@ export const CreateDataRequestDialog = (props: ICreateDataRequestDialogProps) =>
         validationSchema: CreateDataRequestDialogYup
       }}
       onCancel={onCancel}
-      onSave={handleSave}
+      onSave={onSave}
     />
   );
 };

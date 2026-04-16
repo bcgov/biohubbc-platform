@@ -65,7 +65,7 @@ export const TicketSidebarDataRequests = (props: ITicketSidebarDataRequestsProps
         <LoadingGuard
           hasNoData={!orderedDataRequests.length}
           hasNoDataFallback={
-            <Typography variant="body2" color="textSecondary">
+            <Typography variant="body2" color="text.secondary">
               No data requests
             </Typography>
           }>

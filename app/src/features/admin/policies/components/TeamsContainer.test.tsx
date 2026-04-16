@@ -1,5 +1,5 @@
-import { fireEvent } from '@testing-library/react';
 import { GridColDef } from '@mui/x-data-grid';
+import { fireEvent } from '@testing-library/react';
 import { useApi } from 'hooks/useApi';
 import { ITeam } from 'interfaces/useTeamsApi.interface';
 import { MemoryRouter } from 'react-router';
@@ -24,7 +24,7 @@ vi.mock('@mui/x-data-grid', () => ({
         rows.map((row) => (
           <div key={row.team_id} data-testid={`row-${row.team_id}`}>
             <span>{row.name}</span>
-            <span>{row.description || '-'}</span>
+            <span>{row.description}</span>
             <span>{row.member_count}</span>
             {/* Render actions column */}
             {columns.find((c) => c.field === 'actions')?.renderCell?.({ row } as never)}

@@ -34,24 +34,12 @@ export const ViewPolicyDialog = (props: IViewPolicyDialogProps) => {
       dialogContent={
         <Box display="flex" flexDirection="column" gap={3} mt={1}>
           <CustomTextField label="Policy Name" value={policy.name} disabled fullWidth />
-          <CustomTextField
-            label="Description"
-            value={policy.description || '-'}
-            disabled
-            fullWidth
-            multiline
-            rows={3}
-          />
+          <CustomTextField label="Description" value={policy.description} disabled fullWidth multiline rows={3} />
           <CustomTextField label="Status" value={formattedStatus} disabled fullWidth />
 
           <Box>
             <Typography component="legend" mb={1}>
               Definition
-            </Typography>
-            <Typography variant="body2" color="text.secondary" mb={2}>
-              Add statements using JSON. Use the format:{' '}
-              <code>urn:&lt;submissionId&gt;:&lt;featureType&gt;:&lt;featureId&gt;</code> for resources. Use{' '}
-              <code>*</code> as a wildcard.
             </Typography>
             <ReadOnlyPolicyJsonEditor value={formattedPolicyJson} />
           </Box>

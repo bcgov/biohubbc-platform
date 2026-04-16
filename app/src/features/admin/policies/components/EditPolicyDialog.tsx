@@ -22,12 +22,10 @@ export const EditPolicyDialog = (props: IEditPolicyDialogProps) => {
   const { open, isLoading, policy, initialValues, onCancel, onSave } = props;
 
   const mergedInitialValues: IAddPolicyFormValues = {
-    ...{
-      name: policy.name,
-      description: policy.description || '',
-      status: policy.status,
-      policy_json: transformApiToPolicyJson(policy.statements)
-    },
+    name: policy.name,
+    description: policy.description || '',
+    status: policy.status,
+    policy_json: transformApiToPolicyJson(policy.statements),
     ...initialValues
   };
 
