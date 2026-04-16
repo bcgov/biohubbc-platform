@@ -51,11 +51,11 @@ describe('AddPolicyForm', () => {
     });
   });
 
-  it('renders the Policy Document section', async () => {
+  it('renders the Definition section', async () => {
     const { getByText } = renderContainer();
 
     await waitFor(() => {
-      expect(getByText('Policy Document')).toBeVisible();
+      expect(getByText('Definition')).toBeVisible();
     });
   });
 

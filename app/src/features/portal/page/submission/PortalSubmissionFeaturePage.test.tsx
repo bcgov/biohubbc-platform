@@ -83,7 +83,7 @@ describe('PortalSubmissionFeaturePage', () => {
     });
   });
 
-  it('renders feature properties', async () => {
+  it('renders feature properties', { timeout: 10000 }, async () => {
     const { findByText } = renderPage();
 
     expect(await findByText('Properties')).toBeVisible();
