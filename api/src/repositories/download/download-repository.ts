@@ -939,7 +939,9 @@ export class DownloadRepository extends BaseRepository {
     const queries = propertyTypeNames
       .filter((typeName) => typeName in TYPED_TABLE_QUERIES)
       .map((typeName) =>
-        this.connection.query<TypedPropertyRow>(TYPED_TABLE_QUERIES[typeName], [submissionFeatureIds]).then((r) => r.rows)
+        this.connection
+          .query<TypedPropertyRow>(TYPED_TABLE_QUERIES[typeName], [submissionFeatureIds])
+          .then((r) => r.rows)
       );
 
     const results = await Promise.all(queries);

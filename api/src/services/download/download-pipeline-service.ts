@@ -3,7 +3,12 @@ import archiver from 'archiver';
 import { PassThrough } from 'node:stream';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
-import { DownloadArtifactInfo, DownloadFeatureSummary, DownloadSource, ParquetFeatureData } from '../../models/download';
+import {
+  DownloadArtifactInfo,
+  DownloadFeatureSummary,
+  DownloadSource,
+  ParquetFeatureData
+} from '../../models/download';
 import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
@@ -446,18 +451,17 @@ export class DownloadPipelineService extends DBService {
     const JSONB_FALLBACK_TYPES = new Set(['array', 'object', 'artifact_key']);
 
     // Determine which typed tables need querying
-    const typedPropertyTypes = [...new Set(
-      properties
-        .map((p) => p.feature_property_type_name)
-        .filter((t) => !JSONB_FALLBACK_TYPES.has(t))
-    )];
+    const typedPropertyTypes = [
+      ...new Set(properties.map((p) => p.feature_property_type_name).filter((t) => !JSONB_FALLBACK_TYPES.has(t)))
+    ];
 
     const submissionFeatureIds = baseBatch.map((row) => row.submission_feature_id);
 
     // Fetch raw typed rows from the repository
-    const typedRows = typedPropertyTypes.length > 0
-      ? await this.downloadRepository.fetchTypedPropertyRows(submissionFeatureIds, typedPropertyTypes)
-      : [];
+    const typedRows =
+      typedPropertyTypes.length > 0
+        ? await this.downloadRepository.fetchTypedPropertyRows(submissionFeatureIds, typedPropertyTypes)
+        : [];
 
     // Build property map: submission_feature_id → { propName: value }
     const propertyMap = new Map<number, Record<string, any>>();
