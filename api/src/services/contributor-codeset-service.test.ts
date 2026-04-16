@@ -1,10 +1,10 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { ApiConflictError } from '../errors/api-error';
 import { ContributorCodeset, CreateContributorCodeset } from '../models/contributor-codeset';
 import { ContributorCodesetRepository } from '../repositories/contributor-codeset-repository';
-import { getMockDBConnection } from '../__mocks__/db';
 import { ContributorCodesetService } from './contributor-codeset-service';
 
 chai.use(sinonChai);

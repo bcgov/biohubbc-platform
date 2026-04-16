@@ -3,11 +3,11 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { createCart } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { ApiError } from '../../errors/api-error';
 import { CartStatus, CartWithFeaturesResponse } from '../../models/cart';
 import { CartService } from '../../services/cart-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 
 chai.use(sinonChai);
 

@@ -2,6 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import {
   CreatePolicyStatement,
   PolicyEffect,
@@ -9,7 +10,6 @@ import {
   UpdatePolicyStatement
 } from '../../models/policy-statement';
 import { PolicyStatementRepository } from '../../repositories/authorization/policy-statement-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { PolicyStatementService } from './policy-statement-service';
 
 chai.use(sinonChai);

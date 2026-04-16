@@ -2,6 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
 import { RegionService } from '../../services/region-service';
@@ -11,7 +12,6 @@ import { TicketService } from '../../services/ticket-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { UploadService } from '../../services/upload/upload-service';
 import { ValidationService } from '../../services/validation-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as intake from './intake';
 
 chai.use(sinonChai);

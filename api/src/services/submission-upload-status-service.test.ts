@@ -1,9 +1,9 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionUploadStatus } from '../models/submission-upload-status';
 import { SubmissionUploadStatusRepository } from '../repositories/submission-upload-status-repository';
-import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionUploadStatusService } from './submission-upload-status-service';
 
 chai.use(sinonChai);
