@@ -3,18 +3,8 @@ import PortalPage from 'features/portal/PortalPage';
 import { PortalTicketDetailPage } from 'features/portal/PortalTicketDetailPage';
 import { PortalSubmissionDetailPage } from 'features/portal/page/submission/PortalSubmissionDetailPage';
 import { PortalSubmissionFeaturePage } from 'features/portal/page/submission/PortalSubmissionFeaturePage';
-import { Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
-
-const LegacyPortalTicketDetailRedirect = () => {
-  const { ticketId } = useParams<{ ticketId: string }>();
-
-  if (!ticketId) {
-    return <Navigate to="/portal/ticket" replace />;
-  }
-
-  return <Navigate to={`/portal/ticket/${ticketId}`} replace />;
-};
 
 /**
  * Router for all `/portal/` pages.
@@ -43,7 +33,6 @@ export const PortalRouter = () => {
           </>
         }
       />
-      <Route path="/tickets" element={<Navigate to="/portal/ticket" replace />} />
 
       <Route
         path="/submission"
@@ -54,7 +43,6 @@ export const PortalRouter = () => {
           </>
         }
       />
-      <Route path="/submissions" element={<Navigate to="/portal/submission" replace />} />
 
       <Route
         path="/ticket/:ticketId"
@@ -65,7 +53,6 @@ export const PortalRouter = () => {
           </UserTicketContextProvider>
         }
       />
-      <Route path="/tickets/:ticketId" element={<LegacyPortalTicketDetailRedirect />} />
       <Route
         path="/submission/:submissionId"
         element={

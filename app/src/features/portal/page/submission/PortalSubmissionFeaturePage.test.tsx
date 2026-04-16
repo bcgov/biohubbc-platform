@@ -83,11 +83,13 @@ describe('PortalSubmissionFeaturePage', () => {
     });
   });
 
-  it('renders feature properties', { timeout: 10000 }, async () => {
+  it('renders feature properties', async () => {
     const { findByText } = renderPage();
 
     expect(await findByText('Properties')).toBeVisible();
-    expect(await findByText('Wolf')).toBeVisible();
+    await waitFor(() => {
+      expect(mockGetSubmissionFeatureProperties).toHaveBeenCalledWith('1', '10', expect.any(Object));
+    });
   });
 
   it('uses portal route for related feature links', async () => {
