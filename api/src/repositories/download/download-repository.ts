@@ -919,114 +919,76 @@ export class DownloadRepository extends BaseRepository {
     // Types that have dedicated typed tables
     const JSONB_FALLBACK_TYPES = new Set(['array', 'object', 'artifact_key']);
 
-    // Build parallel typed-table queries for each type that has a dedicated table
+    // Typed-table query definitions keyed by property type name.
+    // Each entry maps a logical type to its SQL query against the corresponding typed table.
+    const TYPED_TABLE_QUERIES: { typeName: string; sql: string }[] = [
+      {
+        typeName: 'string',
+        sql: `SELECT p.submission_feature_id, fp.name, p.value
+              FROM submission_feature_property_string p
+              INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+              INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+              WHERE p.submission_feature_id = ANY($1)`
+      },
+      {
+        typeName: 'number',
+        sql: `SELECT p.submission_feature_id, fp.name, p.value
+              FROM submission_feature_property_number p
+              INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+              INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+              WHERE p.submission_feature_id = ANY($1)`
+      },
+      {
+        typeName: 'boolean',
+        sql: `SELECT p.submission_feature_id, fp.name, p.value
+              FROM submission_feature_property_boolean p
+              INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+              INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+              WHERE p.submission_feature_id = ANY($1)`
+      },
+      {
+        typeName: 'datetime',
+        sql: `SELECT p.submission_feature_id, fp.name, p.value
+              FROM submission_feature_property_timestamp p
+              INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+              INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+              WHERE p.submission_feature_id = ANY($1)`
+      },
+      {
+        typeName: 'code',
+        sql: `SELECT p.submission_feature_id, fp.name, ccc.label AS value
+              FROM submission_feature_property_code p
+              INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+              INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+              INNER JOIN contributor_codeset_code ccc ON p.contributor_codeset_code_id = ccc.contributor_codeset_code_id
+              WHERE p.submission_feature_id = ANY($1)`
+      },
+      {
+        typeName: 'taxon',
+        sql: `SELECT p.submission_feature_id, fp.name, t.itis_scientific_name AS value
+              FROM submission_feature_property_taxon p
+              INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+              INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+              INNER JOIN taxon t ON p.taxon_id = t.taxon_id
+              WHERE p.submission_feature_id = ANY($1)`
+      },
+      {
+        typeName: 'spatial',
+        sql: `SELECT p.submission_feature_id, fp.name, ST_AsGeoJSON(p.value)::jsonb AS value
+              FROM submission_feature_property_geometry p
+              INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+              INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+              WHERE p.submission_feature_id = ANY($1)`
+      }
+    ];
+
+    // Build parallel typed-table queries — only for types present in this batch
     const typedQueries: Promise<TypedPropertyRow[]>[] = [];
 
-    if (typeGroups.has('string')) {
-      typedQueries.push(
-        this.connection
-          .query<TypedPropertyRow>(
-            `SELECT p.submission_feature_id, fp.name, p.value
-            FROM submission_feature_property_string p
-            INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-            INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-            WHERE p.submission_feature_id = ANY($1)`,
-            [submissionFeatureIds]
-          )
-          .then((r) => r.rows)
-      );
-    }
-
-    if (typeGroups.has('number')) {
-      typedQueries.push(
-        this.connection
-          .query<TypedPropertyRow>(
-            `SELECT p.submission_feature_id, fp.name, p.value
-            FROM submission_feature_property_number p
-            INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-            INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-            WHERE p.submission_feature_id = ANY($1)`,
-            [submissionFeatureIds]
-          )
-          .then((r) => r.rows)
-      );
-    }
-
-    if (typeGroups.has('boolean')) {
-      typedQueries.push(
-        this.connection
-          .query<TypedPropertyRow>(
-            `SELECT p.submission_feature_id, fp.name, p.value
-            FROM submission_feature_property_boolean p
-            INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-            INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-            WHERE p.submission_feature_id = ANY($1)`,
-            [submissionFeatureIds]
-          )
-          .then((r) => r.rows)
-      );
-    }
-
-    if (typeGroups.has('datetime')) {
-      typedQueries.push(
-        this.connection
-          .query<TypedPropertyRow>(
-            `SELECT p.submission_feature_id, fp.name, p.value
-            FROM submission_feature_property_timestamp p
-            INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-            INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-            WHERE p.submission_feature_id = ANY($1)`,
-            [submissionFeatureIds]
-          )
-          .then((r) => r.rows)
-      );
-    }
-
-    if (typeGroups.has('code')) {
-      typedQueries.push(
-        this.connection
-          .query<TypedPropertyRow>(
-            `SELECT p.submission_feature_id, fp.name, ccc.label AS value
-            FROM submission_feature_property_code p
-            INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-            INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-            INNER JOIN contributor_codeset_code ccc ON p.contributor_codeset_code_id = ccc.contributor_codeset_code_id
-            WHERE p.submission_feature_id = ANY($1)`,
-            [submissionFeatureIds]
-          )
-          .then((r) => r.rows)
-      );
-    }
-
-    if (typeGroups.has('taxon')) {
-      typedQueries.push(
-        this.connection
-          .query<TypedPropertyRow>(
-            `SELECT p.submission_feature_id, fp.name, t.itis_scientific_name AS value
-            FROM submission_feature_property_taxon p
-            INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-            INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-            INNER JOIN taxon t ON p.taxon_id = t.taxon_id
-            WHERE p.submission_feature_id = ANY($1)`,
-            [submissionFeatureIds]
-          )
-          .then((r) => r.rows)
-      );
-    }
-
-    if (typeGroups.has('spatial')) {
-      typedQueries.push(
-        this.connection
-          .query<TypedPropertyRow>(
-            `SELECT p.submission_feature_id, fp.name, ST_AsGeoJSON(p.value)::jsonb AS value
-            FROM submission_feature_property_geometry p
-            INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-            INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-            WHERE p.submission_feature_id = ANY($1)`,
-            [submissionFeatureIds]
-          )
-          .then((r) => r.rows)
-      );
+    for (const { typeName, sql } of TYPED_TABLE_QUERIES) {
+      if (typeGroups.has(typeName)) {
+        typedQueries.push(this.connection.query<TypedPropertyRow>(sql, [submissionFeatureIds]).then((r) => r.rows));
+      }
     }
 
     // Execute all typed-table queries in parallel

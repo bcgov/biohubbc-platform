@@ -343,10 +343,9 @@ describe('Download Worker', function () {
     );
 
     // 2. Create parquet download, publish job, and wait for completion
-    const { downloadId, artifactObjectKey } = await createDownloadAndProcess(
-      [datasetFeatureId, sampleSiteFeatureId],
-      { format: 'parquet' }
-    );
+    const { downloadId, artifactObjectKey } = await createDownloadAndProcess([datasetFeatureId, sampleSiteFeatureId], {
+      format: 'parquet'
+    });
 
     // 3. Verify download status transitions completed
     const [finalDownload] = await db('biohub.download').where('download_id', downloadId).select('*');
@@ -356,10 +355,7 @@ describe('Download Worker', function () {
 
     // 4. Verify artifact status updated to 'uploaded'
     const [artifact] = await db('biohub.artifact')
-      .whereIn(
-        'artifact_id',
-        db('biohub.download_artifact').select('artifact_id').where('download_id', downloadId)
-      )
+      .whereIn('artifact_id', db('biohub.download_artifact').select('artifact_id').where('download_id', downloadId))
       .select('*');
     expect(artifact.artifact_status).to.equal('uploaded');
 

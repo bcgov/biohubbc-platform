@@ -72,10 +72,7 @@ export function propertyTypeToParquetType(typeName: string): FieldDefinition['ty
  * @param hasSpatial - Whether this feature type has a spatial property.
  * @returns A ParquetSchema instance ready for writer construction.
  */
-export function buildParquetSchema(
-  properties: CsvPropertyDefinition[],
-  hasSpatial: boolean
-): ParquetSchema {
+export function buildParquetSchema(properties: CsvPropertyDefinition[], hasSpatial: boolean): ParquetSchema {
   const fields: SchemaDefinition = {};
 
   // Every Parquet file includes the feature UUID for cross-file joins

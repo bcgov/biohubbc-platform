@@ -602,9 +602,9 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(rows).to.have.length(2);
 
       // Verify properties are assigned to the correct feature (not swapped)
-      const sorted = rows.sort((a, b) => a.submission_feature_id - b.submission_feature_id);
-      expect(sorted[0].data.comment).to.equal('Alpha');
-      expect(sorted[1].data.comment).to.equal('Beta');
+      rows.sort((a, b) => a.submission_feature_id - b.submission_feature_id);
+      expect(rows[0].data.comment).to.equal('Alpha');
+      expect(rows[1].data.comment).to.equal('Beta');
     });
   });
 
@@ -638,7 +638,9 @@ describe('Download Parquet pipeline (integration)', function () {
       await createTestFeature(connection, submissionId, 'dataset', { name: 'DS2' });
 
       const knex = getKnex();
-      const searchSubquery = knex('submission_feature').select('submission_feature_id').where({ submission_id: submissionId });
+      const searchSubquery = knex('submission_feature')
+        .select('submission_feature_id')
+        .where({ submission_id: submissionId });
 
       const featureTypes = await downloadRepo.listDownloadFeatureTypesBySearchQuery(searchSubquery);
       expect(featureTypes).to.deep.equal(['capture', 'dataset']);

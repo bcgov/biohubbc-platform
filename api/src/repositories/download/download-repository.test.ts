@@ -1000,7 +1000,11 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.updateArtifactStatusByDownloadId('aaaa0000-0000-0000-0000-000000000001', 'uploaded', '2025-01-01T00:01:00Z');
+      await repo.updateArtifactStatusByDownloadId(
+        'aaaa0000-0000-0000-0000-000000000001',
+        'uploaded',
+        '2025-01-01T00:01:00Z'
+      );
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlText = sqlStub.firstCall.args[0].text;
@@ -1018,7 +1022,11 @@ describe('DownloadRepository', () => {
       const repo = new DownloadRepository(mockDBConnection);
 
       try {
-        await repo.updateArtifactStatusByDownloadId('aaaa0000-0000-0000-0000-000000000001', 'uploaded', '2025-01-01T00:01:00Z');
+        await repo.updateArtifactStatusByDownloadId(
+          'aaaa0000-0000-0000-0000-000000000001',
+          'uploaded',
+          '2025-01-01T00:01:00Z'
+        );
         expect.fail('Expected an error');
       } catch (error) {
         expect((error as Error).message).to.include('Failed to update artifact status');

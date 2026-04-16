@@ -241,10 +241,7 @@ describe('parquet-utils', () => {
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'location', feature_property_type_name: 'spatial' }
       ];
-      const row = featureToRow(
-        makeFeature({ location: { type: 'Point', coordinates: [-120.0, 50.0] } }),
-        properties
-      );
+      const row = featureToRow(makeFeature({ location: { type: 'Point', coordinates: [-120.0, 50.0] } }), properties);
 
       expect(row['geometry']).to.be.instanceOf(Buffer);
       // Spatial property name is not a column — data goes to geometry column
