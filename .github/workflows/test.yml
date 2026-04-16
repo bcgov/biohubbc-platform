@@ -111,7 +111,7 @@ jobs:
 
       - name: Install app dependencies
         working-directory: app
-        run: npm install
+        run: npm ci
 
       - name: Run app typecheck
         working-directory: app
