@@ -159,21 +159,6 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Delete all staged property rows for one upload from the temp staging table.
-   *
-   * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
-   */
-  async deleteStagingRowsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      DELETE FROM pg_temp.submission_feature_property_staging
-      WHERE submission_upload_id = ${submissionUploadId}::uuid;
-    `;
-
-    await this.connection.sql(sql);
-  }
-
-  /**
    * Delete all temp ingestion error rows for one upload.
    *
    * @param {string} submissionUploadId Upload scope.

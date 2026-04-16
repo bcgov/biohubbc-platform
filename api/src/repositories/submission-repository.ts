@@ -485,79 +485,6 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Delete all submission features for a submission (soft delete).
-   * Used for idempotency - allows job retries to start fresh.
-   *
-   * @param {number} submissionId The submission ID.
-   * @returns {Promise<void>}
-   * @memberof SubmissionRepository
-   */
-  async deleteSubmissionFeatures(submissionId: number): Promise<void> {
-    const sqlStatement = SQL`
-      UPDATE submission_feature
-      SET record_end_date = NOW()
-      WHERE submission_id = ${submissionId}
-        AND record_end_date IS NULL;
-    `;
-
-    await this.connection.sql(sqlStatement);
-  }
-
-  /**
-   * Delete all submission feature relationships for features belonging to a submission.
-   * Used for idempotency - allows job retries to start fresh.
-   *
-   * @param {number} submissionId The submission ID.
-   * @returns {Promise<void>}
-   * @memberof SubmissionRepository
-   */
-  async deleteSubmissionFeatureRelationships(submissionId: number): Promise<void> {
-    const sqlStatement = SQL`
-      DELETE FROM submission_feature_feature
-      WHERE source_feature_id IN (
-        SELECT submission_feature_id FROM submission_feature WHERE submission_id = ${submissionId}
-      )
-      OR target_feature_id IN (
-        SELECT submission_feature_id FROM submission_feature WHERE submission_id = ${submissionId}
-      );
-    `;
-
-    await this.connection.sql(sqlStatement);
-  }
-
-  /**
-   * Resolve external feature source ids to internal submission_feature ids for one upload.
-   *
-   * @param {string} submissionUploadId
-   * @param {string[]} sourceIds
-   * @return {Promise<Array<{ source_id: string; submission_feature_id: number }>>}
-   * @memberof SubmissionRepository
-   */
-  async getSubmissionFeatureIdMapBySourceIds(
-    submissionUploadId: string,
-    sourceIds: string[]
-  ): Promise<Array<{ source_id: string; submission_feature_id: number }>> {
-    if (!sourceIds.length) {
-      return [];
-    }
-
-    const sqlStatement = SQL`
-      SELECT
-        source_id,
-        submission_feature_id
-      FROM
-        submission_feature
-      WHERE
-        submission_upload_id = ${submissionUploadId}
-        AND record_end_date IS NULL
-        AND source_id = ANY(${sourceIds}::text[]);
-    `;
-
-    const response = await this.connection.sql<{ source_id: string; submission_feature_id: number }>(sqlStatement);
-    return response.rows;
-  }
-
-  /**
    * Delete all feature relationships for one upload attempt.
    *
    * @param {string} submissionUploadId
@@ -577,36 +504,6 @@ export class SubmissionRepository extends BaseRepository {
         FROM submission_feature
         WHERE submission_upload_id = ${submissionUploadId}
       );
-    `;
-
-    await this.connection.sql(sqlStatement);
-  }
-
-  /**
-   * Insert submission feature relationships (source-target from content array).
-   * Uses ON CONFLICT DO NOTHING to avoid failures on duplicate pairs.
-   *
-   * @param {Array<{ source_feature_id: number; target_feature_id: number }>} pairs The pairs to insert.
-   * @returns {Promise<void>}
-   * @memberof SubmissionRepository
-   */
-  async insertSubmissionFeatureRelationships(
-    pairs: Array<{ source_feature_id: number; target_feature_id: number }>
-  ): Promise<void> {
-    if (pairs.length === 0) {
-      return;
-    }
-
-    const sourceIds = pairs.map((p) => p.source_feature_id);
-    const targetIds = pairs.map((p) => p.target_feature_id);
-
-    const sqlStatement = SQL`
-      INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
-      SELECT source_id, target_id FROM unnest(
-        ${sourceIds}::integer[],
-        ${targetIds}::integer[]
-      ) AS t(source_id, target_id)
-      ON CONFLICT (source_feature_id, target_feature_id) DO NOTHING;
     `;
 
     await this.connection.sql(sqlStatement);

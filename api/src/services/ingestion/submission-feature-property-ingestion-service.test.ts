@@ -233,9 +233,6 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       .resolves();
     sinon.stub(SubmissionRepository.prototype, 'deleteSubmissionFeatureRelationshipsBySubmissionUploadId').resolves();
     sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'deleteStagingRowsBySubmissionUploadId')
-      .resolves();
-    sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'deleteIngestionErrorsBySubmissionUploadId')
       .resolves();
     sinon
