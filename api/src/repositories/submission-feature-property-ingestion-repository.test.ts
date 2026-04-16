@@ -86,9 +86,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
 
-      await repository.publishTempIngestionErrorsBySubmissionUploadId(
-        '550e8400-e29b-41d4-a716-446655440000'
-      );
+      await repository.publishTempIngestionErrorsBySubmissionUploadId('550e8400-e29b-41d4-a716-446655440000');
 
       expect(sqlStub.calledOnce).to.equal(true);
     });

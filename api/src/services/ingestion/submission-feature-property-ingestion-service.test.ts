@@ -193,10 +193,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'getIngestionErrorCountBySubmissionUploadId')
       .resolves(0);
     const publishErrorsStub = sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'publishTempIngestionErrorsBySubmissionUploadId'
-      )
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'publishTempIngestionErrorsBySubmissionUploadId')
       .resolves();
 
     const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(
@@ -421,10 +418,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
         }
       ]);
     const publishErrorsStub = sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'publishTempIngestionErrorsBySubmissionUploadId'
-      )
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'publishTempIngestionErrorsBySubmissionUploadId')
       .resolves();
 
     const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(
