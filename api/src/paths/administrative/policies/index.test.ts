@@ -269,7 +269,7 @@ describe('paths/administrative/policies/index', () => {
         policy_id: '1',
         name: 'New Policy',
         description: 'New description',
-        status: 'approved' as const,
+        status: 'approved',
         statements: [
           {
             policy_statement_id: 's1',
@@ -323,7 +323,7 @@ describe('paths/administrative/policies/index', () => {
         policy_id: '1',
         name: 'Empty Policy',
         description: null,
-        status: 'approved' as const,
+        status: 'approved',
         statements: []
       };
 

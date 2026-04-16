@@ -2,16 +2,12 @@ import { IDBConnection } from '../../database/db';
 import { parseFeatureUrn } from '../../database/urn-utils';
 import { HTTP400 } from '../../errors/http-error';
 import { CreatePolicy, Policy, PolicyStatus, UpdatePolicy } from '../../models/policy';
+import { CreatePolicyStatementPayload } from '../../models/policy-statement';
 import { PolicyRepository } from '../../repositories/authorization/policy-repository';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { DBService } from '../db-service';
-import {
-  CreatePolicyStatementInput,
-  PolicyFilters,
-  PolicyStatementWithConditions,
-  PolicyWithStatements
-} from './policy-service.interface';
+import { PolicyFilters, PolicyStatementWithConditions, PolicyWithStatements } from './policy-service.interface';
 import { PolicyStatementConditionService } from './policy-statement-condition-service';
 import { PolicyStatementService } from './policy-statement-service';
 import { SecurityScopeService } from './security-scope-service';
@@ -231,13 +227,13 @@ export class PolicyService extends DBService {
    * Create a policy and its associated statements/conditions/scopes.
    *
    * @param {CreatePolicy} policyData - Policy payload.
-   * @param {CreatePolicyStatementInput[]} statements - Statement payloads.
+   * @param {CreatePolicyStatementPayload[]} statements - Statement payloads.
    * @return {Promise<PolicyWithStatements>} Created policy with statements.
    * @memberof PolicyService
    */
   async createPolicyWithStatements(
     policyData: CreatePolicy,
-    statements: CreatePolicyStatementInput[]
+    statements: CreatePolicyStatementPayload[]
   ): Promise<PolicyWithStatements> {
     const policy = await this.policyRepository.insertPolicy(policyData);
     const createdStatements = await this.createStatementsWithScopes(policy.policy_id, statements);
@@ -249,14 +245,14 @@ export class PolicyService extends DBService {
    *
    * @param {string} policyId - Policy UUID.
    * @param {UpdatePolicy} policyData - Partial policy update payload.
-   * @param {CreatePolicyStatementInput[]} statements - Replacement statement payloads.
+   * @param {CreatePolicyStatementPayload[]} statements - Replacement statement payloads.
    * @return {Promise<PolicyWithStatements>} Updated policy with rebuilt statements.
    * @memberof PolicyService
    */
   async updatePolicyWithStatements(
     policyId: string,
     policyData: UpdatePolicy,
-    statements: CreatePolicyStatementInput[]
+    statements: CreatePolicyStatementPayload[]
   ): Promise<PolicyWithStatements> {
     const policy = await this.updatePolicy(policyId, policyData);
 
@@ -284,13 +280,13 @@ export class PolicyService extends DBService {
    *
    * @private
    * @param {string} policyId - Policy UUID.
-   * @param {CreatePolicyStatementInput[]} statements - Statement payloads.
+   * @param {CreatePolicyStatementPayload[]} statements - Statement payloads.
    * @return {Promise<PolicyStatementWithConditions[]>} Created statements with conditions.
    * @memberof PolicyService
    */
   private async createStatementsWithScopes(
     policyId: string,
-    statements: CreatePolicyStatementInput[]
+    statements: CreatePolicyStatementPayload[]
   ): Promise<PolicyStatementWithConditions[]> {
     const createdStatements = await Promise.all(
       statements.map(async (stmt) => {

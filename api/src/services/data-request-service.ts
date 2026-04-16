@@ -15,11 +15,6 @@ import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamService } from './access-policy/team-service';
 import { DBService } from './db-service';
 
-interface CreateDataRequestTeamParams {
-  requestedBy: number;
-  systemUserIds: number[];
-}
-
 /**
  * Service for data-request operations and request-scoped team/policy creation.
  *
@@ -29,6 +24,9 @@ interface CreateDataRequestTeamParams {
  */
 export class DataRequestService extends DBService {
   dataRequestRepository: DataRequestRepository;
+  policyService: PolicyService;
+  teamService: TeamService;
+  teamMemberService: TeamMemberService;
 
   /**
    * Creates an instance of DataRequestService.
@@ -39,6 +37,9 @@ export class DataRequestService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.dataRequestRepository = new DataRequestRepository(connection);
+    this.policyService = new PolicyService(connection);
+    this.teamService = new TeamService(connection);
+    this.teamMemberService = new TeamMemberService(connection);
   }
 
   /**
@@ -109,8 +110,7 @@ export class DataRequestService extends DBService {
       requestedBy: payload.requested_by,
       systemUserIds: payload.system_user_ids
     });
-    const policyService = new PolicyService(this.connection);
-    const policy = await policyService.createPolicyWithStatements(
+    const policy = await this.policyService.createPolicyWithStatements(
       {
         name: _generateDataRequestPolicyName(),
         description: 'Auto-generated policy for ticket-linked data request',
@@ -159,23 +159,20 @@ export class DataRequestService extends DBService {
    * Create a request-scoped team and populate it with unique members.
    *
    * @private
-   * @param {CreateDataRequestTeamParams} params - Team creation parameters.
+   * @param {{ requestedBy: number; systemUserIds: number[] }} params - Team creation parameters.
    * @return {Promise<Team>} Created team.
    * @memberof DataRequestService
    */
-  private async _createDataRequestTeam(params: CreateDataRequestTeamParams): Promise<Team> {
-    const teamService = new TeamService(this.connection);
-    const team = await teamService.createTeam({ name: _generateDataRequestTeamName() });
-    const teamMemberService = new TeamMemberService(this.connection);
+  private async _createDataRequestTeam(params: { requestedBy: number; systemUserIds: number[] }): Promise<Team> {
+    const team = await this.teamService.createTeam({ name: _generateDataRequestTeamName() });
     const uniqueMemberIds = Array.from(new Set([params.requestedBy, ...params.systemUserIds]));
 
     await Promise.all(
       uniqueMemberIds.map((systemUserId) =>
-        teamMemberService.createTeamMember({ system_user_id: systemUserId, team_id: team.team_id })
+        this.teamMemberService.createTeamMember({ system_user_id: systemUserId, team_id: team.team_id })
       )
     );
 
     return team;
   }
-
 }

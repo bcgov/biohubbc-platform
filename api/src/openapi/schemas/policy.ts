@@ -178,10 +178,10 @@ export const PoliciesListResponseSchema: OpenAPIV3.SchemaObject = {
 };
 
 /**
- * Schema for creating a policy statement (request input).
+ * Schema for creating a policy statement payload.
  */
-export const CreatePolicyStatementInputSchema: OpenAPIV3.SchemaObject = {
-  title: 'CreatePolicyStatementInput',
+export const CreatePolicyStatementPayloadSchema: OpenAPIV3.SchemaObject = {
+  title: 'CreatePolicyStatementPayload',
   type: 'object',
   required: ['effect', 'submission_feature_urn'],
   properties: {
@@ -255,7 +255,7 @@ export const CreatePolicyRequestSchema: OpenAPIV3.SchemaObject = {
     },
     statements: {
       type: 'array',
-      items: CreatePolicyStatementInputSchema,
+      items: CreatePolicyStatementPayloadSchema,
       description: 'Policy statements to create'
     }
   }
@@ -286,7 +286,7 @@ export const UpdatePolicyRequestSchema: OpenAPIV3.SchemaObject = {
     },
     statements: {
       type: 'array',
-      items: CreatePolicyStatementInputSchema,
+      items: CreatePolicyStatementPayloadSchema,
       description: 'Policy statements (replaces existing)'
     }
   }

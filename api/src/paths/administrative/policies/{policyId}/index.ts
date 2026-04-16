@@ -2,12 +2,11 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
-import { UpdatePolicy } from '../../../../models/policy';
+import { CreatePolicyDefinition } from '../../../../models/policy';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { PolicyWithStatementsSchema, UpdatePolicyRequestSchema } from '../../../../openapi/schemas/policy';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { PolicyService } from '../../../../services/access-policy/policy-service';
-import { CreatePolicyStatementInput } from '../../../../services/access-policy/policy-service.interface';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/policies/{policyId}');
@@ -155,13 +154,7 @@ export function updatePolicy(): RequestHandler {
     const connection = getDBConnection(req['keycloak_token']);
 
     const policyId = req.params.policyId;
-    const { name, description, status, statements } = req.body as Pick<
-      UpdatePolicy,
-      'name' | 'description' | 'status'
-    > & {
-      name: string;
-      statements: CreatePolicyStatementInput[];
-    };
+    const { name, description, status, statements } = req.body as CreatePolicyDefinition;
 
     try {
       await connection.open();

@@ -2,7 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
-import { CreatePolicy } from '../../../models/policy';
+import { CreatePolicyDefinition } from '../../../models/policy';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../../openapi/schemas/pagination';
 import {
@@ -12,7 +12,6 @@ import {
 } from '../../../openapi/schemas/policy';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { PolicyService } from '../../../services/access-policy/policy-service';
-import { CreatePolicyStatementInput } from '../../../services/access-policy/policy-service.interface';
 import { getLogger } from '../../../utils/logger';
 import { makePaginationOptionsFromRequest, makePaginationResponse } from '../../../utils/pagination';
 
@@ -151,9 +150,7 @@ export function createPolicy(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
 
-    const { name, description, statements } = req.body as Pick<CreatePolicy, 'name' | 'description'> & {
-      statements: CreatePolicyStatementInput[];
-    };
+    const { name, description, statements } = req.body as CreatePolicyDefinition;
 
     try {
       await connection.open();

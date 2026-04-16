@@ -56,21 +56,6 @@ export const UpdateTicketStatusRequest = z.object({
 });
 export type UpdateTicketStatusRequest = z.infer<typeof UpdateTicketStatusRequest>;
 
-export {
-  TicketComment,
-  CreateTicketCommentRequest,
-  UpdateTicketCommentRequest,
-  CreateTicketComment,
-  UpdateTicketComment
-} from './ticket-comment';
-export {
-  TicketRelationshipType,
-  TicketReference,
-  CreateTicketReference,
-  CreateTicketReferenceRequest,
-  CreateTicketReferenceRequestItem
-} from './ticket-reference';
-
 export const TicketWithHistory = Ticket.extend({
   statuses: z.array(TicketStatusRecord),
   comments: z.array(TicketComment),
