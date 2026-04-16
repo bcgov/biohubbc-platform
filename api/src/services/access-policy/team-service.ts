@@ -95,15 +95,25 @@ export class TeamService extends DBService {
   async updateTeam(teamId: string, teamData: UpdateTeam): Promise<Team> {
     await this.teamRepository.updateTeam(teamId, teamData);
 
-    const systemUserIds = teamData.system_user_ids ?? [];
+    // Only sync members if system_user_ids was provided in the payload
+    if (teamData.system_user_ids) {
+      const desiredUserIds = new Set(teamData.system_user_ids);
+      const currentMembers = await this.teamMemberService.getTeamMembers(teamId);
+      const currentUserIds = new Set(currentMembers.map((m) => m.system_user_id));
 
-    if (systemUserIds.length > 0) {
+      // Remove members no longer in the desired list
+      const toRemove = currentMembers.filter((m) => !desiredUserIds.has(m.system_user_id));
       await Promise.all(
-        systemUserIds.map((systemUserId) =>
-          this.teamMemberService.createTeamMember({
-            team_id: teamId,
-            system_user_id: systemUserId
-          })
+        toRemove.map((m) =>
+          this.teamMemberService.deleteTeamMemberByUser({ team_id: teamId, system_user_id: m.system_user_id })
+        )
+      );
+
+      // Add members not yet on the team
+      const toAdd = teamData.system_user_ids.filter((id) => !currentUserIds.has(id));
+      await Promise.all(
+        toAdd.map((systemUserId) =>
+          this.teamMemberService.createTeamMember({ team_id: teamId, system_user_id: systemUserId })
         )
       );
     }

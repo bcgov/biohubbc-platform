@@ -38,7 +38,8 @@ describe('ArtifactRepository', () => {
         object_key: 'key.txt',
         byte_size: '1234',
         checksum_sha256: 'checksum',
-        uploaded_at: '2025-12-31T12:00:00Z'
+        uploaded_at: '2025-12-31T12:00:00Z',
+        format: 'tar'
       };
 
       const mockQueryResponse = { rowCount: 1, rows: [mockRow] } as any as Promise<QueryResult<any>>;
@@ -64,7 +65,8 @@ describe('ArtifactRepository', () => {
           object_key: 'key1.txt',
           byte_size: '123',
           checksum_sha256: 'abc',
-          uploaded_at: '2025-12-31T12:00:00Z'
+          uploaded_at: '2025-12-31T12:00:00Z',
+          format: 'tar'
         },
         {
           artifact_id: 'artifact-uuid-2',
@@ -73,7 +75,8 @@ describe('ArtifactRepository', () => {
           object_key: 'key2.txt',
           byte_size: '456',
           checksum_sha256: 'def',
-          uploaded_at: '2025-12-31T12:10:00Z'
+          uploaded_at: '2025-12-31T12:10:00Z',
+          format: 'tar'
         }
       ];
 
@@ -103,7 +106,8 @@ describe('ArtifactRepository', () => {
         object_key: 'key.txt',
         byte_size: 100,
         checksum_sha256: 'abc',
-        uploaded_at: '2025-12-31T12:00:00Z'
+        uploaded_at: '2025-12-31T12:00:00Z',
+        format: 'csv'
       };
 
       const result = await repo.insertArtifact(payload);
@@ -132,7 +136,8 @@ describe('ArtifactRepository', () => {
         object_key: 'key.txt',
         byte_size: 100,
         checksum_sha256: 'abc',
-        uploaded_at: '2025-12-31T12:00:00Z'
+        uploaded_at: '2025-12-31T12:00:00Z',
+        format: 'csv'
       };
 
       const result = await repo.insertArtifact(payload);

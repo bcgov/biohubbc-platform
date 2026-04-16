@@ -13,7 +13,7 @@ import * as fileUtils from '../utils/file-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import { CodeService } from './code-service';
 import { ArtifactService } from './old-artifact-service';
-import { SubmissionService } from './submission-service';
+import { SubmissionFeatureService } from './submission-feature-service';
 
 chai.use(sinonChai);
 
@@ -65,7 +65,7 @@ describe('ArtifactService', () => {
       };
 
       const getSubmissionFeatureByUuidStub = sinon
-        .stub(SubmissionService.prototype, 'getSubmissionFeatureByUuid')
+        .stub(SubmissionFeatureService.prototype, 'getSubmissionFeatureByUuid')
         .resolves(artifactSubmissionFeature);
 
       const insertSearchableStringRecordsStub = sinon

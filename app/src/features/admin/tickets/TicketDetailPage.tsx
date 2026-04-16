@@ -23,6 +23,12 @@ export interface ITicketDetailPageContentProps {
   onAddComment: () => Promise<void>;
 }
 
+/**
+ * Render ticket detail content including timeline, comment editor and sidebar.
+ *
+ * @param {ITicketDetailPageContentProps} props
+ * @returns {JSX.Element}
+ */
 export const TicketDetailPageContent = (props: ITicketDetailPageContentProps) => {
   const { ticket, isLoading, comment, setComment, isSavingComment, onAddComment } = props;
 
@@ -47,14 +53,14 @@ export const TicketDetailPageContent = (props: ITicketDetailPageContentProps) =>
                   history={[...(ticket?.statuses ?? []), ...(ticket?.comments ?? [])].sort(sortChronological)}
                   isLoading={isLoading}
                 />
-                {ticket?.status === 'open' ? (
+                {ticket?.status === 'open' && (
                   <TicketComment
                     comment={comment}
                     setComment={setComment}
                     isSaving={isSavingComment}
                     onAddComment={onAddComment}
                   />
-                ) : null}
+                )}
               </Stack>
 
               <Box sx={{ width: { xs: '100%', sm: 340 }, flex: { xs: '1 1 100%', sm: '0 0 340px' } }}>
@@ -71,7 +77,7 @@ export const TicketDetailPageContent = (props: ITicketDetailPageContentProps) =>
 /**
  * Admin ticket detail page for viewing timeline activity and changing ticket status.
  *
- * @return {*}
+ * @returns {JSX.Element}
  */
 export const TicketDetailPage = () => {
   const { ticketDataLoader } = useTicketContext();

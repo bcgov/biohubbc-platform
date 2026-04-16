@@ -47,7 +47,8 @@ describe('SubmissionIngestionService', () => {
         object_key: 'submissions/123/uploads/upload-1.tar',
         byte_size: '1000',
         checksum_sha256: null,
-        uploaded_at: '2025-01-01T00:00:00Z'
+        uploaded_at: '2025-01-01T00:00:00Z',
+        format: 'tar'
       };
 
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
@@ -104,7 +105,8 @@ describe('SubmissionIngestionService', () => {
         object_key: 'submissions/123/uploads/upload-1.tar',
         byte_size: '1000',
         checksum_sha256: null,
-        uploaded_at: '2025-01-01T00:00:00Z'
+        uploaded_at: '2025-01-01T00:00:00Z',
+        format: 'tar'
       };
 
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
@@ -157,7 +159,8 @@ describe('SubmissionIngestionService', () => {
         object_key: 'submissions/123/uploads/upload-1.tar',
         byte_size: '1000',
         checksum_sha256: null,
-        uploaded_at: '2025-01-01T00:00:00Z'
+        uploaded_at: '2025-01-01T00:00:00Z',
+        format: 'tar'
       };
 
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
@@ -196,7 +199,8 @@ describe('SubmissionIngestionService', () => {
         object_key: 'submissions/123/uploads/upload-1.tar',
         byte_size: '1000',
         checksum_sha256: null,
-        uploaded_at: '2025-01-01T00:00:00Z'
+        uploaded_at: '2025-01-01T00:00:00Z',
+        format: 'tar'
       };
 
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
@@ -235,7 +239,8 @@ describe('SubmissionIngestionService', () => {
         object_key: 'submissions/123/uploads/upload-1.tar',
         byte_size: '1000',
         checksum_sha256: null,
-        uploaded_at: '2025-01-01T00:00:00Z'
+        uploaded_at: '2025-01-01T00:00:00Z',
+        format: 'tar'
       };
 
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);

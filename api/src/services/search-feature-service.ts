@@ -1,4 +1,5 @@
 import { FeatureCollection } from 'geojson';
+import { Knex } from 'knex';
 import { IDBConnection } from '../database/db';
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SubmissionRepository } from '../repositories/submission-repository';
@@ -76,6 +77,19 @@ export class SearchFeatureService extends DBService {
     defaultLog.debug({ label: 'getSearchFeatureIds', filters });
     const rows = await this.searchFeatureRepository.searchFeatureIdsByFilters(filters, systemUserId);
     return rows.map((row) => row.submission_feature_id);
+  }
+
+  /**
+   * Build a Knex subquery returning matching submission_feature_ids
+   * without executing it. Used by DownloadService to compose
+   * the search as a SQL subquery (no JS round-trip for large sets).
+   *
+   * @param {ISearchFeaturesFilters} filters - Search filters
+   * @param {number | null} [systemUserId] - Security context
+   * @return {Knex.QueryBuilder} Unexecuted subquery returning submission_feature_id rows
+   */
+  buildSearchFeatureIdsSubquery(filters: ISearchFeaturesFilters, systemUserId?: number | null): Knex.QueryBuilder {
+    return this.searchFeatureRepository.buildSearchFeatureIdsSubquery(filters, systemUserId);
   }
 
   /**

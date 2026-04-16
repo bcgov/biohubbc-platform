@@ -2,10 +2,12 @@ import { AxiosInstance } from 'axios';
 import {
   ICreateSubmission,
   IGetDownloadSubmissionResponse,
+  IGetSubmissionsForUserResponse,
   ISubmissionFeatureForReviewResponse,
   ISubmissionUploadPart,
   PresignedUploadUrlResponse,
   SubmissionFeatureSignedUrlPayload,
+  SubmissionFilters,
   SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
   SubmissionRecordWithSecurityAndRootFeature
@@ -56,7 +58,7 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
    */
   const getSubmissionFeatures = async (
     submissionId: number,
-    pagination?: ApiPaginationRequestOptions
+    pagination?: ApiPaginationRequestOptions & { search?: string }
   ): Promise<ISubmissionFeatureForReviewResponse> => {
     const params = {
       ...pagination
@@ -145,10 +147,23 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   /**
    * Fetch all submissions accessible to the currently authenticated user via their submission team membership.
    *
-   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeature[]>}
+   * @param {SubmissionFilters} [filters]
+   * @param {ApiPaginationRequestOptions} [pagination]
+   * @returns {Promise<IGetSubmissionsForUserResponse>}
    */
-  const getSubmissionsForUser = async (): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
-    const { data } = await axios.get(`api/submission`);
+  const getSubmissionsForUser = async (
+    filters?: SubmissionFilters,
+    pagination?: ApiPaginationRequestOptions
+  ): Promise<IGetSubmissionsForUserResponse> => {
+    const params = {
+      ...filters,
+      ...pagination
+    };
+
+    const { data } = await axios.get(`api/submission`, {
+      params,
+      paramsSerializer: (queryParams) => qs.stringify(queryParams)
+    });
 
     return data;
   };

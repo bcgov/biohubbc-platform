@@ -214,7 +214,8 @@ describe('Process Submission Features Worker', function () {
         object_key: objectKey,
         byte_size: tarBuffer.length,
         artifact_status: 'uploaded',
-        uploaded_at: new Date().toISOString()
+        uploaded_at: new Date().toISOString(),
+        format: 'tar'
       })
       .returning('artifact_id');
     createdArtifactIds.push(artifact.artifact_id);
@@ -452,10 +453,10 @@ describe('SubmissionIngestionService pipeline (system)', function () {
 
     // 3. artifact
     const artifactResult = await connection.sql<{ artifact_id: string }>(
-      SQL`INSERT INTO biohub.artifact (bucket, object_key, byte_size, artifact_status, uploaded_at)
+      SQL`INSERT INTO biohub.artifact (bucket, object_key, byte_size, artifact_status, uploaded_at, format)
           VALUES (${process.env.OBJECT_STORE_BUCKET_NAME}, ${objectKey}, ${
         tarBuffer.length
-      }, 'uploaded', ${new Date().toISOString()})
+      }, 'uploaded', ${new Date().toISOString()}, 'tar')
           RETURNING artifact_id`
     );
     const artifactId = artifactResult.rows[0].artifact_id;

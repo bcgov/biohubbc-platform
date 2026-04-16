@@ -14,12 +14,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
  * Props for TeamMemberSelect component.
  */
 export interface ITeamMemberSelectProps {
-  /** Currently selected user IDs */
-  selectedUserIds: number[];
-  /** Callback when selection changes */
-  onChange: (userIds: number[]) => void;
-  /** Initial users to pre-populate when editing (optional) */
-  initialUsers?: IAvailableUser[];
+  /** Currently selected users (full objects from formik state) */
+  selectedUsers: IAvailableUser[];
+  /** Callback when selection changes — returns full user objects */
+  onChange: (users: IAvailableUser[]) => void;
 }
 
 /**
@@ -28,16 +26,11 @@ export interface ITeamMemberSelectProps {
  * Uses server-side search for scalability with large user bases.
  * Fetches available users from the API (excludes SYSTEM and DATABASE users).
  */
-export const TeamMemberSelect = ({ selectedUserIds, onChange, initialUsers = [] }: ITeamMemberSelectProps) => {
+export const TeamMemberSelect = ({ selectedUsers, onChange }: ITeamMemberSelectProps) => {
   const biohubApi = useApi();
 
   // Track the search input value
   const [inputValue, setInputValue] = useState('');
-
-  // Cache of selected user objects - persists across searches
-  const [selectedUsersCache, setSelectedUsersCache] = useState<Map<number, IAvailableUser>>(
-    () => new Map(initialUsers.map((u) => [u.system_user_id, u]))
-  );
 
   // Load available users with search
   const usersDataLoader = useDataLoader((search?: string) => biohubApi.teams.getAvailableUsers(search));
@@ -47,19 +40,6 @@ export const TeamMemberSelect = ({ selectedUserIds, onChange, initialUsers = [] 
     usersDataLoader.load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Update cache when initialUsers changes (e.g., when editing different team)
-  useEffect(() => {
-    if (initialUsers.length > 0) {
-      setSelectedUsersCache((prev) => {
-        const newCache = new Map(prev);
-        for (const user of initialUsers) {
-          newCache.set(user.system_user_id, user);
-        }
-        return newCache;
-      });
-    }
-  }, [initialUsers]);
 
   /**
    * Debounced function to search users.
@@ -94,7 +74,7 @@ export const TeamMemberSelect = ({ selectedUserIds, onChange, initialUsers = [] 
     [debouncedSearch]
   );
 
-  // Merge search results with cached selected users to ensure selected users are always visible
+  // Merge search results with selected users to ensure selected users are always visible
   const availableOptions = useMemo(() => {
     const searchResults = usersDataLoader.data?.users ?? [];
     const optionsMap = new Map<number, IAvailableUser>();
@@ -104,39 +84,22 @@ export const TeamMemberSelect = ({ selectedUserIds, onChange, initialUsers = [] 
       optionsMap.set(user.system_user_id, user);
     }
 
-    // Add cached selected users (ensures they appear even if not in search results)
-    for (const userId of selectedUserIds) {
-      const cachedUser = selectedUsersCache.get(userId);
-      if (cachedUser && !optionsMap.has(userId)) {
-        optionsMap.set(userId, cachedUser);
+    // Add selected users (ensures they appear even if not in search results)
+    for (const user of selectedUsers) {
+      if (!optionsMap.has(user.system_user_id)) {
+        optionsMap.set(user.system_user_id, user);
       }
     }
 
     return Array.from(optionsMap.values()).sort((a, b) => a.user_identifier.localeCompare(b.user_identifier));
-  }, [usersDataLoader.data?.users, selectedUserIds, selectedUsersCache]);
-
-  // Get selected user objects from IDs
-  const selectedUsers = useMemo(
-    () => availableOptions.filter((u) => selectedUserIds.includes(u.system_user_id)),
-    [availableOptions, selectedUserIds]
-  );
+  }, [usersDataLoader.data?.users, selectedUsers]);
 
   /**
-   * Handle selection changes - update cache and notify parent.
+   * Handle selection changes - notify parent with full user objects.
    */
   const handleChange = useCallback(
     (_event: React.SyntheticEvent, newValue: IAvailableUser[]) => {
-      // Update cache with newly selected users
-      setSelectedUsersCache((prev) => {
-        const newCache = new Map(prev);
-        for (const user of newValue) {
-          newCache.set(user.system_user_id, user);
-        }
-        return newCache;
-      });
-
-      // Notify parent with user IDs
-      onChange(newValue.map((u) => u.system_user_id));
+      onChange(newValue);
     },
     [onChange]
   );

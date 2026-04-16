@@ -31,7 +31,8 @@ describe('ArtifactService', () => {
         object_key: 'test-object-key',
         byte_size: '1234',
         checksum_sha256: 'abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
-        uploaded_at: '2025-01-01T00:00:00Z'
+        uploaded_at: '2025-01-01T00:00:00Z',
+        format: 'tar'
       };
 
       const stub = sinon.stub(ArtifactRepository.prototype, 'getArtifact').resolves(fakeArtifact);
@@ -64,7 +65,8 @@ describe('ArtifactService', () => {
           object_key: 'test-object-key-1',
           byte_size: '1234',
           checksum_sha256: 'abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
-          uploaded_at: '2025-01-01T00:00:00Z'
+          uploaded_at: '2025-01-01T00:00:00Z',
+          format: 'tar'
         },
         {
           artifact_id: 'artifact-2',
@@ -73,7 +75,8 @@ describe('ArtifactService', () => {
           object_key: 'test-object-key-2',
           byte_size: '5678',
           checksum_sha256: '1234567890abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
-          uploaded_at: '2025-02-01T00:00:00Z'
+          uploaded_at: '2025-02-01T00:00:00Z',
+          format: 'tar'
         }
       ];
 
@@ -105,7 +108,8 @@ describe('ArtifactService', () => {
         object_key: 'test-object-key',
         byte_size: 1234,
         checksum_sha256: 'abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
-        uploaded_at: '2025-01-01T00:00:00Z'
+        uploaded_at: '2025-01-01T00:00:00Z',
+        format: 'csv'
       };
 
       const stub = sinon.stub(ArtifactRepository.prototype, 'insertArtifact').resolves({ artifact_id: 'artifact-new' });
@@ -123,7 +127,8 @@ describe('ArtifactService', () => {
         object_key: 'test-object-key',
         byte_size: 1234,
         checksum_sha256: 'abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
-        uploaded_at: '2025-01-01T00:00:00Z'
+        uploaded_at: '2025-01-01T00:00:00Z',
+        format: 'csv'
       };
 
       sinon.stub(ArtifactRepository.prototype, 'insertArtifact').throws(new Error('Insert failed'));

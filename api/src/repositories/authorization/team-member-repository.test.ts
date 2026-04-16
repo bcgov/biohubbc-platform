@@ -172,6 +172,32 @@ describe('TeamMemberRepository', () => {
     });
   });
 
+  describe('getTeamMembersBySystemUserId', () => {
+    it('returns all active team memberships for the given user', async () => {
+      const mockRows = [
+        { team_member_id: '11111111-1111-1111-1111-111111111111', system_user_id: 10, team_id: 'team-a' },
+        { team_member_id: '22222222-2222-2222-2222-222222222222', system_user_id: 10, team_id: 'team-b' }
+      ];
+      const mockResponse = { rowCount: 2, rows: mockRows } as unknown as Promise<QueryResult<any>>;
+      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+      const repository = new TeamMemberRepository(mockConnection);
+      const result = await repository.getTeamMembersBySystemUserId(10);
+
+      expect(result).to.eql(mockRows);
+    });
+
+    it('returns empty array when user has no active team memberships', async () => {
+      const mockResponse = { rowCount: 0, rows: [] } as unknown as Promise<QueryResult<any>>;
+      const mockConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+      const repository = new TeamMemberRepository(mockConnection);
+      const result = await repository.getTeamMembersBySystemUserId(999);
+
+      expect(result).to.eql([]);
+    });
+  });
+
   describe('deleteAllTeamMembers', () => {
     it('soft deletes all team members successfully', async () => {
       const mockResponse = {

@@ -1,19 +1,16 @@
 import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
-import { ApiGeneralError } from '../errors/api-error';
-import { SubmissionFeatureForReview } from '../models/submission';
+import { SubmissionFeatureForReview, SubmissionFilters } from '../models/submission';
+import { SubmissionFeatureFilters } from '../models/submission-feature';
 import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
 import {
   ICreateSubmission,
   ISubmissionFeature,
   ISubmissionModel,
   PatchSubmissionRecord,
-  RelatedSubmissionFeature,
-  SubmissionFeature,
   SubmissionFeatureDownloadRecord,
   SubmissionFeatureRecord,
   SubmissionFeatureRecordWithTypeAndSecurity,
-  SubmissionFeatureSignedUrlPayload,
   SubmissionMessageRecord,
   SubmissionRecord,
   SubmissionRecordPublishedForPublic,
@@ -23,7 +20,6 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
-import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { DBService } from './db-service';
@@ -45,7 +41,7 @@ export class SubmissionService extends DBService {
    * Insert a new submission record.
    *
    * @param {ICreateSubmission} submissionData
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @returns {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
   async insertSubmissionRecord(submissionData: ICreateSubmission): Promise<{ submission_id: number }> {
@@ -63,7 +59,7 @@ export class SubmissionService extends DBService {
    * sensitive information. Should never be shared with the general public.
    * @param {number} systemUserId
    * @param {number} contributorId
-   * @return {*}  {Promise<SubmissionRecord>}
+   * @returns {Promise<SubmissionRecord>}
    * @memberof SubmissionService
    */
   async insertSubmissionRecordWithPotentialConflict(
@@ -90,7 +86,7 @@ export class SubmissionService extends DBService {
    * @param {number} submissionId
    * @param {string} submissionUploadId - The submission_upload_id that produced these features.
    * @param {ISubmissionFeature[]} submissionFeatures
-   * @return {*}  {Promise<void>}
+   * @returns {Promise<void>}
    * @memberof SubmissionService
    */
   async insertSubmissionFeatureRecords(
@@ -156,7 +152,7 @@ export class SubmissionService extends DBService {
    * Get submission record by id.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<ISubmissionModel>}
+   * @returns {Promise<ISubmissionModel>}
    * @memberof SubmissionService
    */
   async getSubmissionRecordBySubmissionId(submissionId: number): Promise<ISubmissionModel> {
@@ -167,7 +163,7 @@ export class SubmissionService extends DBService {
    * Get submission record by uuid.
    *
    * @param {number} uuid
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @returns {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
   async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
@@ -179,7 +175,7 @@ export class SubmissionService extends DBService {
    *
    * @param {number} submissionId
    * @param {SUBMISSION_STATUS_TYPE} submissionStatusType
-   * @return {*}  {Promise<{
+   * @returns {Promise<{
    *     submission_status_id: number;
    *     submission_status_type_id: number;
    *   }>}
@@ -200,7 +196,7 @@ export class SubmissionService extends DBService {
    *
    * @param {number} submissionStatusId
    * @param {SUBMISSION_MESSAGE_TYPE} submissionMessageType
-   * @return {*}  {Promise<{
+   * @returns {Promise<{
    *     submission_message_id: number;
    *     submission_message_type_id: number;
    *   }>}
@@ -228,7 +224,7 @@ export class SubmissionService extends DBService {
    * @param {SUBMISSION_STATUS_TYPE} submissionStatusType
    * @param {SUBMISSION_MESSAGE_TYPE} submissionMessageType
    * @param {string} submissionMessage
-   * @return {*}  {Promise<{
+   * @returns {Promise<{
    *     submission_status_id: number;
    *     submission_message_id: number;
    *   }>}
@@ -264,7 +260,7 @@ export class SubmissionService extends DBService {
   /**
    * Get all submissions that are pending security review (are unreviewed).
    *
-   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionService
    */
   async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
@@ -274,7 +270,7 @@ export class SubmissionService extends DBService {
   /**
    * Get all submissions that have completed security review (are reviewed).
    *
-   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionService
    */
   async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
@@ -284,7 +280,7 @@ export class SubmissionService extends DBService {
   /**
    * Get all submissions that have completed security review and are published.
    *
-   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionService
    */
   async getPublishedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
@@ -295,18 +291,36 @@ export class SubmissionService extends DBService {
    * Get all submissions accessible to the given system user via their submission team membership.
    *
    * @param {number} systemUserId - The system user ID to fetch submissions for.
-   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @param {ApiPaginationOptions} pagination
+   * @param {SubmissionFilters} [filters]
+   * @returns {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionService
    */
-  async getSubmissionsByUserId(systemUserId: number): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
-    return this.submissionRepository.getSubmissionsByUserId(systemUserId);
+  async getSubmissionsByUserId(
+    systemUserId: number,
+    pagination: ApiPaginationOptions,
+    filters?: SubmissionFilters
+  ): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
+    return this.submissionRepository.getSubmissionsByUserId(systemUserId, pagination, filters);
+  }
+
+  /**
+   * Count submissions accessible to the given system user via team membership with optional search.
+   *
+   * @param {number} systemUserId
+   * @param {SubmissionFilters} [filters]
+   * @returns {Promise<number>}
+   * @memberof SubmissionService
+   */
+  async getSubmissionsByUserIdCount(systemUserId: number, filters?: SubmissionFilters): Promise<number> {
+    return this.submissionRepository.getSubmissionsByUserIdCount(systemUserId, filters);
   }
 
   /**
    * Get a submission record by id (with security status).
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<SubmissionRecordWithSecurity>}
+   * @returns {Promise<SubmissionRecordWithSecurity>}
    * @memberof SubmissionService
    */
   async getSubmissionRecordBySubmissionIdWithSecurity(submissionId: number): Promise<SubmissionRecordWithSecurity> {
@@ -318,7 +332,7 @@ export class SubmissionService extends DBService {
    *
    * Note: This method is used by the public API. Sensitive data should not be included in the response.
    *
-   * @return {*}  {Promise<SubmissionRecordPublishedForPublic[]>}
+   * @returns {Promise<SubmissionRecordPublishedForPublic[]>}
    * @memberof SubmissionService
    */
   async getPublishedSubmissions(): Promise<SubmissionRecordPublishedForPublic[]> {
@@ -329,7 +343,7 @@ export class SubmissionService extends DBService {
    * Retrieves submission feature records with type, name, and security data included.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<
+   * @returns {Promise<
    *     {
    *       feature_type_name: string;
    *       feature_type_display_name: string;
@@ -375,30 +389,31 @@ export class SubmissionService extends DBService {
    *
    * @param submissionId
    * @param pagination
-   * @returns {Promise<SubmissionFeatureForReview[]>}
+   * @returnss {Promise<SubmissionFeatureForReview[]>}
    */
   async getSubmissionFeatures(
     submissionId: number,
-    pagination?: ApiPaginationOptions
+    pagination?: ApiPaginationOptions,
+    filters?: SubmissionFeatureFilters
   ): Promise<SubmissionFeatureForReview[]> {
-    return this.submissionRepository.getSubmissionFeatures(submissionId, pagination);
+    return this.submissionRepository.getSubmissionFeatures(submissionId, pagination, filters);
   }
 
   /**
    * Fetch the total count of features in the given submission
    *
    * @param submissionId
-   * @returns {Promise<number>}
+   * @returnss {Promise<number>}
    */
-  async getSubmissionFeaturesCount(submissionId: number): Promise<number> {
-    return this.submissionRepository.getSubmissionFeaturesCount(submissionId);
+  async getSubmissionFeaturesCount(submissionId: number, filters?: SubmissionFeatureFilters): Promise<number> {
+    return this.submissionRepository.getSubmissionFeaturesCount(submissionId, filters);
   }
 
   /**
    * Get all messages for a submission.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<SubmissionMessageRecord[]>}
+   * @returns {Promise<SubmissionMessageRecord[]>}
    * @memberof SubmissionService
    */
   async getMessages(submissionId: number): Promise<SubmissionMessageRecord[]> {
@@ -410,7 +425,7 @@ export class SubmissionService extends DBService {
    *
    * @param {number} submissionId
    * @param {(Pick<SubmissionMessageRecord, 'submission_message_type_id' | 'label' | 'message' | 'data'>[])} messages
-   * @return {*}  {Promise<void>}
+   * @returns {Promise<void>}
    * @memberof SubmissionService
    */
   async createMessages(
@@ -428,7 +443,7 @@ export class SubmissionService extends DBService {
    *
    * @param {number} submissionId
    * @param {PatchSubmissionRecord} patch
-   * @return {*}  {Promise<SubmissionRecord>}
+   * @returns {Promise<SubmissionRecord>}
    * @memberof SubmissionServiceF
    */
   async patchSubmissionRecord(submissionId: number, patch: PatchSubmissionRecord): Promise<SubmissionRecord> {
@@ -436,43 +451,10 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Get a submission feature record by uuid.
-   *
-   * @param {string} submissionFeatureUuid
-   * @return {*}  {Promise<SubmissionFeatureRecord>}
-   * @memberof SubmissionService
-   */
-  async getSubmissionFeatureByUuid(submissionFeatureUuid: string): Promise<SubmissionFeatureRecord> {
-    return this.submissionRepository.getSubmissionFeatureByUuid(submissionFeatureUuid);
-  }
-
-  /**
-   * Get a submission feature record by its id
-   *
-   * @param {number} submissionFeatureId
-   * @return {Promise<SubmissionFeature>}
-   * @memberof SubmissionService
-   */
-  async getSubmissionFeatureById(submissionFeatureId: number): Promise<SubmissionFeature> {
-    return this.submissionRepository.getSubmissionFeatureById(submissionFeatureId);
-  }
-
-  /**
-   * Get all related submission features with their type names.
-   *
-   * @param {number} submissionFeatureId
-   * @return {Promise<RelatedSubmissionFeature[]>}
-   * @memberof SubmissionService
-   */
-  async getRelatedSubmissionFeatures(submissionFeatureId: number): Promise<RelatedSubmissionFeature[]> {
-    return this.submissionRepository.getRelatedSubmissionFeatures(submissionFeatureId);
-  }
-
-  /**
    * Get the root submission feature record for a submission.
    *
    * @param {number} submissionId
-   * @return {*}  {(Promise<SubmissionFeatureRecord>)}
+   * @returns {(Promise<SubmissionFeatureRecord>)}
    * @memberof SubmissionService
    */
   async getSubmissionRootFeature(submissionId: number): Promise<SubmissionFeatureRecord> {
@@ -487,7 +469,7 @@ export class SubmissionService extends DBService {
    *     systemUserId?: number;
    *     featureTypeNames?: string[];
    *   }} [criteria]
-   * @return {*}  {Promise<SubmissionFeatureRecord[]>}
+   * @returns {Promise<SubmissionFeatureRecord[]>}
    * @memberof SubmissionService
    */
   async findSubmissionFeatures(criteria?: {
@@ -502,7 +484,7 @@ export class SubmissionService extends DBService {
    *  Download Submission with all associated Features
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<SubmissionFeatureDownloadRecord[]>}
+   * @returns {Promise<SubmissionFeatureDownloadRecord[]>}
    * @memberof SubmissionService
    */
   async downloadSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
@@ -513,39 +495,10 @@ export class SubmissionService extends DBService {
    *  Download Published Submission with all associated Features
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<SubmissionFeatureDownloadRecord[]>}
+   * @returns {Promise<SubmissionFeatureDownloadRecord[]>}
    * @memberof SubmissionService
    */
   async downloadPublishedSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
     return this.submissionRepository.downloadPublishedSubmission(submissionId);
-  }
-
-  /**
-   * Generates a signed URL for a submission_feature's (artifact) key value pair
-   * ie: "artifact_key": "artifact/test-file.txt"
-   *
-   * Note: admin's can generate signed urls for secure submission_features
-   *
-   * @async
-   * @param {SubmissionFeatureSignedUrlPayload} payload
-   * @throws {ApiGeneralError}
-   * @memberof SubmissionService
-   * @returns {Promise<string>} signed URL
-   */
-  async getSubmissionFeatureSignedUrl(payload: SubmissionFeatureSignedUrlPayload): Promise<string> {
-    const artifactKey = payload.isAdmin
-      ? await this.submissionRepository.getAdminSubmissionFeatureArtifactKey(payload)
-      : await this.submissionRepository.getSubmissionFeatureArtifactKey(payload);
-
-    const signedUrl = await getS3SignedURL(artifactKey);
-
-    if (!signedUrl) {
-      throw new ApiGeneralError(
-        `Failed to generate signed URL for "${payload.submissionFeatureObj.key}":"${payload.submissionFeatureObj.value}"`,
-        ['SubmissionRepository->getSubmissionFeatureSignedUrl', 'getS3SignedUrl returned NULL']
-      );
-    }
-
-    return signedUrl;
   }
 }

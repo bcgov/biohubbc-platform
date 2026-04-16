@@ -471,6 +471,7 @@ describe('publisher', () => {
     const createMockDownload = (overrides: Partial<DownloadRecord> = {}): DownloadRecord => ({
       download_id: 'aaaa0000-0000-0000-0000-000000000001',
       download_status: 'pending',
+      format: 'csv',
       metadata: null,
       started_at: null,
       completed_at: null,

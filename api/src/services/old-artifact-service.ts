@@ -8,7 +8,7 @@ import { deleteFileFromS3, generateSubmissionFeatureS3FileKey, uploadFileToS3 } 
 import { getLogger } from '../utils/logger';
 import { CodeService } from './code-service';
 import { DBService } from './db-service';
-import { SubmissionService } from './submission-service';
+import { SubmissionFeatureService } from './submission-feature-service';
 
 const defaultLog = getLogger('services/artifact-service');
 
@@ -20,13 +20,13 @@ const defaultLog = getLogger('services/artifact-service');
  */
 export class ArtifactService extends DBService {
   artifactRepository: ArtifactRepository;
-  submissionService: SubmissionService;
+  submissionFeatureService: SubmissionFeatureService;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.artifactRepository = new ArtifactRepository(connection);
-    this.submissionService = new SubmissionService(connection);
+    this.submissionFeatureService = new SubmissionFeatureService(connection);
   }
 
   /**
@@ -52,7 +52,7 @@ export class ArtifactService extends DBService {
     artifactUploadKey: string,
     file: Express.Multer.File
   ): Promise<SubmissionFeatureRecord> {
-    const artifactFeatureSubmission = await this.submissionService.getSubmissionFeatureByUuid(artifactUploadKey);
+    const artifactFeatureSubmission = await this.submissionFeatureService.getSubmissionFeatureByUuid(artifactUploadKey);
 
     // Generate S3 key
     const artifactS3Key = generateSubmissionFeatureS3FileKey({

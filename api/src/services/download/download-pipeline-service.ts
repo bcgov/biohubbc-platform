@@ -2,7 +2,7 @@ import archiver from 'archiver';
 import { PassThrough } from 'node:stream';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
-import { DownloadSizeEstimate } from '../../models/download';
+import { DownloadFeatureSummary } from '../../models/download';
 import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
@@ -18,6 +18,7 @@ import { getLogger } from '../../utils/logger';
 import { CodeService } from '../code-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { SearchFeatureService } from '../search-feature-service';
 import { DownloadService } from './download-service';
 
 const defaultLog = getLogger('services/download-pipeline-service');
@@ -51,12 +52,14 @@ export class DownloadPipelineService extends DBService {
   downloadRepository: DownloadRepository;
   fragmentRepository: DownloadFragmentRepository;
   downloadService: DownloadService;
+  searchFeatureService: SearchFeatureService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
     this.fragmentRepository = new DownloadFragmentRepository(connection);
     this.downloadService = new DownloadService(connection);
+    this.searchFeatureService = new SearchFeatureService(connection);
   }
 
   /**
@@ -87,44 +90,67 @@ export class DownloadPipelineService extends DBService {
   }
 
   /**
-   * Estimate the total download size and plan fragmentation.
+   * Get the total estimated download size — SQL aggregate only.
    *
-   * Uses pre-computed data_byte_size which includes JSONB size + CSV overhead + artifact file size.
+   * Returns SUM(data_byte_size) without materializing feature rows.
+   * Branches on cart_id vs filters (same source resolution as getDownloadFeatures).
    *
    * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadSizeEstimate>}
+   * @return {Promise<number>} Total estimated bytes.
    * @memberof DownloadPipelineService
    */
-  async estimateDownloadSize(downloadId: string): Promise<DownloadSizeEstimate> {
-    const features = await this.downloadService.getDownloadFeatures(downloadId);
-    const totalEstimatedBytes = features.reduce((sum, f) => sum + Number(f.estimated_byte_size), 0);
+  async estimateDownloadSize(downloadId: string): Promise<number> {
+    const source = await this.downloadRepository.getDownloadSource(downloadId);
 
-    return { totalEstimatedBytes, features };
+    if (source.cart_id) {
+      const row = await this.downloadRepository.getDownloadTotalSizeByCartId(source.cart_id);
+      return Number(row.total ?? 0);
+    }
+
+    if (source.filters) {
+      const searchSubquery = this.searchFeatureService.buildSearchFeatureIdsSubquery(
+        source.filters,
+        source.create_user
+      );
+      const row = await this.downloadRepository.getDownloadTotalSizeBySearchQuery(searchSubquery);
+      return Number(row.total ?? 0);
+    }
+
+    throw new Error(`Download ${downloadId} has neither cart_id nor filters`);
   }
 
   /**
-   * Plan fragments for a download based on size estimation.
+   * Plan fragments for a download using cursor-based streaming.
    *
-   * Uses greedy bin packing driven by the download record's `fragment_size_bytes`.
-   * When total bytes fit within one bin, a single fragment is naturally created.
-   * Oversized files get their own dedicated fragment.
+   * Opens a DECLARE CURSOR over features sorted by feature_type_name,
+   * FETCHes in batches of 5000, and assigns to bins on the fly.
+   * Never holds more than one batch in memory.
+   *
+   * Follows the streamFragmentFeaturesByType pattern (download-fragment-repository.ts:136).
    *
    * @param {string} downloadId - The download ID.
-   * @param {DownloadSizeEstimate} sizeEstimate - The size estimation result.
+   * @param {number} totalEstimatedBytes - Total estimated size from estimateDownloadSize.
    * @return {Promise<void>}
    * @memberof DownloadPipelineService
    */
-  async planFragments(downloadId: string, sizeEstimate: DownloadSizeEstimate): Promise<void> {
-    // Sort by feature type so same types stay together during bin packing.
-    // This minimizes duplicate CSVs across fragments (e.g. one species_observation.csv
-    // instead of the same CSV appearing in multiple parts).
-    const features = [...sizeEstimate.features].sort((a, b) => a.feature_type_name.localeCompare(b.feature_type_name));
-
-    // Read configurable fragment size from the download record
+  async planFragments(downloadId: string, totalEstimatedBytes: number): Promise<void> {
     const download = await this.downloadRepository.findDownloadById(downloadId);
     const fragmentThreshold = Number(download?.fragment_size_bytes ?? FRAGMENT_SIZE_THRESHOLD);
+    const source = await this.downloadRepository.getDownloadSource(downloadId);
 
-    // Greedy bin packing using fragment_size_bytes as the bin capacity
+    // Open the appropriate cursor based on feature source
+    let featureStream: AsyncGenerator<DownloadFeatureSummary[]>;
+    if (source.cart_id) {
+      featureStream = this.downloadRepository.streamDownloadFeaturesByCartId(source.cart_id);
+    } else if (source.filters) {
+      const subquery = this.searchFeatureService.buildSearchFeatureIdsSubquery(source.filters, source.create_user);
+      const { sql, bindings } = subquery.toSQL().toNative();
+      featureStream = this.downloadRepository.streamDownloadFeaturesBySearchQuery(downloadId, sql, bindings as any[]);
+    } else {
+      throw new Error(`Download ${downloadId} has neither cart_id nor filters`);
+    }
+
+    // Greedy bin packing over the cursor stream
     let fragmentIndex = 0;
     let currentBinSize = 0;
     let currentBinFeatures: number[] = [];
@@ -145,40 +171,43 @@ export class DownloadPipelineService extends DBService {
       currentBinFeatures = [];
     };
 
-    for (const feature of features) {
-      const featureSize = Number(feature.estimated_byte_size);
+    // Cursor already ORDER BY ft.name, sf.submission_feature_id
+    // — same types stay together, no JS sort needed
+    for await (const batch of featureStream) {
+      for (const feature of batch) {
+        const featureSize = Number(feature.estimated_byte_size);
 
-      // Oversized file: give it its own dedicated fragment
-      if (featureSize > fragmentThreshold) {
-        await flushFragment();
-        const fragment = await this.fragmentRepository.createDownloadFragment(
-          downloadId,
-          fragmentIndex,
-          featureSize,
-          1
-        );
-        await this.fragmentRepository.createDownloadFragmentFeatures(fragment.download_fragment_id, [
-          feature.submission_feature_id
-        ]);
-        fragmentIndex++;
-        continue;
+        // Oversized file: give it its own dedicated fragment
+        if (featureSize > fragmentThreshold) {
+          await flushFragment();
+          const fragment = await this.fragmentRepository.createDownloadFragment(
+            downloadId,
+            fragmentIndex,
+            featureSize,
+            1
+          );
+          await this.fragmentRepository.createDownloadFragmentFeatures(fragment.download_fragment_id, [
+            feature.submission_feature_id
+          ]);
+          fragmentIndex++;
+          continue;
+        }
+
+        // Would exceed threshold? Flush current bin first
+        if (currentBinSize + featureSize > fragmentThreshold && currentBinFeatures.length > 0) {
+          await flushFragment();
+        }
+
+        currentBinFeatures.push(feature.submission_feature_id);
+        currentBinSize += featureSize;
       }
-
-      // Would exceed threshold? Flush current bin first
-      if (currentBinSize + featureSize > fragmentThreshold && currentBinFeatures.length > 0) {
-        await flushFragment();
-      }
-
-      currentBinFeatures.push(feature.submission_feature_id);
-      currentBinSize += featureSize;
     }
 
     // Flush remaining features
     await flushFragment();
 
     await this.downloadRepository.updateDownloadFragmentCounts(downloadId, fragmentIndex, 0);
-
-    await this.downloadRepository.updateEstimatedTotalSize(downloadId, sizeEstimate.totalEstimatedBytes);
+    await this.downloadRepository.updateEstimatedTotalSize(downloadId, totalEstimatedBytes);
   }
 
   /**
@@ -206,8 +235,8 @@ export class DownloadPipelineService extends DBService {
       return;
     }
 
-    const sizeEstimate = await this.estimateDownloadSize(downloadId);
-    await this.planFragments(downloadId, sizeEstimate);
+    const totalBytes = await this.estimateDownloadSize(downloadId);
+    await this.planFragments(downloadId, totalBytes);
   }
 
   /**
