@@ -1,4 +1,5 @@
 import { IDBConnection } from '../../database/db';
+import { ApiConflictError } from '../../errors/api-error';
 import {
   CreateSubmissionUpload,
   SubmissionUpload,
@@ -103,6 +104,144 @@ export class SubmissionUploadService extends DBService {
     submissionUpload: UpdateSubmissionUpload
   ): Promise<{ submission_upload_id: string }> {
     return this.submissionUploadRepository.updateSubmissionUpload(submissionUploadId, submissionUpload);
+  }
+
+  /**
+   * Validate a status transition against an allowed current-status set.
+   */
+  private assertSubmissionUploadStatusTransition(
+    submissionUploadId: string,
+    currentStatus: SubmissionUpload['status'],
+    nextStatus: SubmissionUpload['status'],
+    allowedCurrentStatuses: SubmissionUpload['status'][]
+  ): void {
+    if (!allowedCurrentStatuses.includes(currentStatus)) {
+      throw new ApiConflictError('Invalid submission upload status transition', [
+        'SubmissionUploadService->transitionSubmissionUploadStatus',
+        { submissionUploadId, currentStatus, nextStatus, allowedCurrentStatuses }
+      ]);
+    }
+  }
+
+  /**
+   * Transition submission upload status after asserting the current status is allowed.
+   *
+   * @param {string} submissionUploadId
+   * @param {SubmissionUpload['status']} nextStatus
+   * @param {SubmissionUpload['status'][]} allowedCurrentStatuses
+   * @returns {Promise<void>}
+   */
+  async transitionSubmissionUploadStatus(
+    submissionUploadId: string,
+    nextStatus: SubmissionUpload['status'],
+    allowedCurrentStatuses: SubmissionUpload['status'][]
+  ): Promise<void> {
+    const current = await this.getSubmissionUpload(submissionUploadId);
+
+    this.assertSubmissionUploadStatusTransition(
+      submissionUploadId,
+      current.status,
+      nextStatus,
+      allowedCurrentStatuses
+    );
+
+    await this.updateSubmissionUpload(submissionUploadId, { status: nextStatus });
+  }
+
+  /**
+   * Attempt a status transition. Returns false when current status is not allowed.
+   *
+   * @param {string} submissionUploadId
+   * @param {SubmissionUpload['status']} nextStatus
+   * @param {SubmissionUpload['status'][]} allowedCurrentStatuses
+   * @returns {Promise<boolean>}
+   */
+  async tryTransitionSubmissionUploadStatus(
+    submissionUploadId: string,
+    nextStatus: SubmissionUpload['status'],
+    allowedCurrentStatuses: SubmissionUpload['status'][]
+  ): Promise<boolean> {
+    try {
+      await this.transitionSubmissionUploadStatus(submissionUploadId, nextStatus, allowedCurrentStatuses);
+      return true;
+    } catch (error) {
+      if (error instanceof ApiConflictError) {
+        return false;
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Transition to indexing when index stage starts.
+   * - ingested -> indexing
+   * - indexing -> indexing (no-op)
+   * - all other statuses -> conflict
+   */
+  async transitionSubmissionUploadToIndexing(submissionUploadId: string): Promise<void> {
+    const current = await this.getSubmissionUpload(submissionUploadId);
+
+    if (current.status === 'indexing') {
+      return;
+    }
+
+    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'indexing', ['ingested']);
+    await this.updateSubmissionUpload(submissionUploadId, { status: 'indexing' });
+  }
+
+  /**
+   * Transition to indexed when index stage completes successfully.
+   * - indexing|ingested -> indexed
+   * - indexed -> indexed (no-op)
+   * - all other statuses -> conflict
+   */
+  async transitionSubmissionUploadToIndexed(submissionUploadId: string): Promise<void> {
+    const current = await this.getSubmissionUpload(submissionUploadId);
+
+    if (current.status === 'indexed') {
+      return;
+    }
+
+    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'indexed', [
+      'indexing',
+      'ingested'
+    ]);
+    await this.updateSubmissionUpload(submissionUploadId, { status: 'indexed' });
+  }
+
+  /**
+   * Transition to invalid for deterministic validation failure.
+   * - indexing|ingested -> invalid
+   * - invalid -> invalid (no-op)
+   * - all other statuses -> conflict
+   */
+  async transitionSubmissionUploadToInvalid(submissionUploadId: string): Promise<void> {
+    const current = await this.getSubmissionUpload(submissionUploadId);
+
+    if (current.status === 'invalid') {
+      return;
+    }
+
+    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'invalid', [
+      'indexing',
+      'ingested'
+    ]);
+    await this.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
+  }
+
+  /**
+   * Conditionally transition to failed if status is mutable.
+   * - uploaded|ingesting|ingested|indexing -> failed
+   * - terminal/non-mutable statuses -> no-op (false)
+   */
+  async transitionSubmissionUploadToFailedIfMutable(submissionUploadId: string): Promise<boolean> {
+    return this.tryTransitionSubmissionUploadStatus(submissionUploadId, 'failed', [
+      'uploaded',
+      'ingesting',
+      'ingested',
+      'indexing'
+    ]);
   }
 
   /**

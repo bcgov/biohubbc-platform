@@ -13,7 +13,7 @@ import { ArtifactService } from '../upload/artifact-service';
 import { UploadArtifactService } from '../upload/upload-artifact-service';
 
 const MEDIA_INGEST_BATCH_BYTES = Number(process.env.MEDIA_INGEST_BATCH_BYTES ?? 50 * 1024 * 1024);
-const MEDIA_INGEST_BATCH_FILES = Number(process.env.MEDIA_INGEST_BATCH_FILES ?? 1000);
+const MEDIA_INGEST_BATCH_FILES = Number(process.env.MEDIA_INGEST_BATCH_FILES ?? 10000);
 const defaultLog = getLogger('services/ingestion/media-ingestion-service');
 
 /**

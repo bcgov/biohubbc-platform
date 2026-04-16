@@ -13,7 +13,7 @@ import { IValidationResult } from './submission-ingestion-service.interface';
 
 const FEATURE_INSERT_BATCH_SIZE = 10000;
 const MEDIA_INGEST_BATCH_BYTES = Number(process.env.MEDIA_INGEST_BATCH_BYTES ?? 50 * 1024 * 1024);
-const MEDIA_INGEST_BATCH_FILES = Number(process.env.MEDIA_INGEST_BATCH_FILES ?? 1000);
+const MEDIA_INGEST_BATCH_FILES = Number(process.env.MEDIA_INGEST_BATCH_FILES ?? 10000);
 const MEDIA_INGEST_CONCURRENCY = Number(process.env.MEDIA_INGEST_CONCURRENCY ?? 4);
 const defaultLog = getLogger('services/ingestion/submission-ingestion-service');
 

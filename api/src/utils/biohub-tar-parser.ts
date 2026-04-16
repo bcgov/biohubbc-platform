@@ -675,7 +675,7 @@ export async function streamSubmissionArchive(
   let pendingBlocks: IFlattenedBlock[] = [];
   let mediaStateQueue: Promise<void> = Promise.resolve();
   const inFlightMediaUploads = new Set<Promise<void>>();
-  const progressEveryEntries = Math.max(1, Number(process.env.SUBMISSION_ARCHIVE_PROGRESS_EVERY_ENTRIES ?? 250));
+  const progressEveryEntries = Math.max(1, Number(process.env.SUBMISSION_ARCHIVE_PROGRESS_EVERY_ENTRIES ?? 5000));
   const progressIntervalMs = Math.max(1000, Number(process.env.SUBMISSION_ARCHIVE_PROGRESS_INTERVAL_MS ?? 10000));
 
   const logProgress = (message: string): void => {

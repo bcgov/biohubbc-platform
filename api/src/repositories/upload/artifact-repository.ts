@@ -47,9 +47,21 @@ export class ArtifactRepository extends BaseRepository {
           format
         )
       ),
-      distinct_input AS (
+      distinct_keys AS (
         SELECT DISTINCT bucket, object_key
         FROM input_rows
+      ),
+      distinct_input AS (
+        SELECT DISTINCT ON (bucket, object_key)
+          bucket,
+          artifact_status,
+          object_key,
+          byte_size,
+          checksum_sha256,
+          uploaded_at,
+          format
+        FROM input_rows
+        ORDER BY bucket, object_key
       ),
       inserted AS (
         INSERT INTO artifact (
@@ -62,24 +74,38 @@ export class ArtifactRepository extends BaseRepository {
           format
         )
         SELECT
-          input_rows.bucket,
-          input_rows.object_key,
-          input_rows.byte_size,
-          input_rows.artifact_status,
-          input_rows.checksum_sha256,
-          input_rows.uploaded_at,
-          input_rows.format
-        FROM input_rows
+          di.bucket,
+          di.object_key,
+          di.byte_size,
+          di.artifact_status,
+          di.checksum_sha256,
+          di.uploaded_at,
+          di.format
+        FROM distinct_input di
         ON CONFLICT (bucket, object_key) DO NOTHING
+        RETURNING artifact_id, bucket, object_key
+      ),
+      existing AS (
+        SELECT
+          a.artifact_id,
+          dk.bucket,
+          dk.object_key
+        FROM distinct_keys dk
+        INNER JOIN artifact a
+          ON a.bucket = dk.bucket
+         AND a.object_key = dk.object_key
       )
       SELECT
-        a.artifact_id,
-        d.bucket,
-        d.object_key
-      FROM distinct_input d
-      INNER JOIN artifact a
-        ON a.bucket = d.bucket
-       AND a.object_key = d.object_key;
+        artifact_id,
+        bucket,
+        object_key
+      FROM inserted
+      UNION
+      SELECT
+        artifact_id,
+        bucket,
+        object_key
+      FROM existing;
     `;
 
     const response = await this.connection.sql(

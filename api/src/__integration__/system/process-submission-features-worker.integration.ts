@@ -273,7 +273,7 @@ describe('Process Submission Features Worker', function () {
         submission_upload_id: params.submissionUploadId,
         submission_id: params.submissionId,
         upload_id: params.uploadId,
-        status: 'pending',
+        status: 'uploaded',
         ticket_id: params.ticketId
       });
       await connection.commit();
@@ -501,7 +501,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       submission_upload_id: setup.submissionUploadId,
       submission_id: setup.submissionId,
       upload_id: setup.uploadId,
-      status: 'pending',
+      status: 'uploaded',
       ticket_id: setup.ticketId
     });
     return { result, ...setup };
