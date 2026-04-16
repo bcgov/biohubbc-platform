@@ -15,20 +15,18 @@ import {
   DownloadSource,
   DownloadTotalSize,
   HasTeams,
-  IsAuthorized,
-  ParquetFeatureData
+  IsAuthorized
 } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { BaseRepository } from '../base-repository';
 
 /**
- * Internal row shape for the typed-cursor base query.
+ * Row shape for the typed-cursor base query.
  * Returns the feature skeleton without typed property values — those are
  * hydrated separately from the `submission_feature_property_*` tables.
  */
-interface BaseFeatureRow {
+export interface BaseFeatureRow {
   submission_feature_id: number;
   uuid: string;
   feature_type_name: string;
@@ -37,11 +35,11 @@ interface BaseFeatureRow {
 }
 
 /**
- * Internal row shape for typed-table hydration queries.
+ * Row shape for typed-table hydration queries.
  * Each typed table returns (submission_feature_id, name, value) tuples
  * that are merged into the base row's data record.
  */
-interface TypedPropertyRow {
+export interface TypedPropertyRow {
   submission_feature_id: number;
   name: string;
   value: any;
@@ -758,7 +756,7 @@ export class DownloadRepository extends BaseRepository {
    *
    * Returns the feature skeleton (id, uuid, data JSONB, parent_uuid) without
    * typed property values. Typed values are hydrated separately by
-   * hydrateFeatureBatchFromTypedTables to avoid joining 7 typed tables
+   * fetchTypedPropertyRows to avoid joining 7 typed tables
    * in a single massive query.
    *
    * Must be called within an open transaction (cursors require tx context).
@@ -875,161 +873,77 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Hydrate a batch of base feature rows with typed property values.
+   * Fetch typed property values for a batch of features from typed tables.
    *
-   * Queries 7 typed `submission_feature_property_*` tables to reconstruct
-   * the `data` record with correct types and resolved labels:
-   * - Code properties resolve to `contributor_codeset_code.label` — the human-readable
-   *   label, not the FK. Parquet files are standalone; GIS consumers have no access
-   *   to the database, so the label must be materialized at read time.
-   * - Taxon properties resolve to `taxon.itis_scientific_name` — same standalone-file
-   *   principle.
-   * - Geometry properties use `ST_AsGeoJSON()` for GeoJSON output, later converted
-   *   to WKB by parquet-utils.
+   * Queries the typed `submission_feature_property_*` tables in parallel for
+   * only the property types present in the schema. Returns raw (id, name, value)
+   * tuples — the service layer handles assembly and JSONB fallback logic.
    *
-   * Properties without typed tables (array, object, artifact_key) fall back to
-   * `submission_feature.data.properties` — these types have dynamic internal structure
-   * that can't be represented as a single typed value.
+   * - Code properties resolve to `contributor_codeset_code.label` — Parquet files
+   *   are standalone, so the human-readable label must be materialized at read time.
+   * - Taxon properties resolve to `taxon.itis_scientific_name`.
+   * - Geometry properties use `ST_AsGeoJSON()` for GeoJSON output.
    *
-   * Assembly lives in the repository (rather than the service) because it is a
-   * SQL-boundary concern: batching 7 typed-table queries into a single round-trip
-   * window, not a business decision.
-   *
-   * @param {BaseFeatureRow[]} baseBatch - Base feature rows from a cursor stream.
-   * @param {CsvPropertyDefinition[]} properties - Schema property definitions.
-   * @return {Promise<ParquetFeatureData[]>}
+   * @param {number[]} submissionFeatureIds - IDs of features in this batch.
+   * @param {string[]} propertyTypeNames - Distinct property type names to query.
+   * @return {Promise<TypedPropertyRow[]>} Flat list of (id, name, value) tuples.
    * @memberof DownloadRepository
    */
-  async hydrateFeatureBatchFromTypedTables(
-    baseBatch: BaseFeatureRow[],
-    properties: CsvPropertyDefinition[]
-  ): Promise<ParquetFeatureData[]> {
-    const submissionFeatureIds = baseBatch.map((row) => row.submission_feature_id);
-
-    // Group properties by type to determine which typed tables to query
-    const typeGroups = new Map<string, string[]>();
-    for (const prop of properties) {
-      const typeName = prop.feature_property_type_name;
-      if (!typeGroups.has(typeName)) {
-        typeGroups.set(typeName, []);
-      }
-      typeGroups.get(typeName)!.push(prop.feature_property_name);
-    }
-
-    // Types that have dedicated typed tables
-    const JSONB_FALLBACK_TYPES = new Set(['array', 'object', 'artifact_key']);
-
+  async fetchTypedPropertyRows(
+    submissionFeatureIds: number[],
+    propertyTypeNames: string[]
+  ): Promise<TypedPropertyRow[]> {
     // Typed-table query definitions keyed by property type name.
     // Each entry maps a logical type to its SQL query against the corresponding typed table.
-    const TYPED_TABLE_QUERIES: { typeName: string; sql: string }[] = [
-      {
-        typeName: 'string',
-        sql: `SELECT p.submission_feature_id, fp.name, p.value
-              FROM submission_feature_property_string p
-              INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-              INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-              WHERE p.submission_feature_id = ANY($1)`
-      },
-      {
-        typeName: 'number',
-        sql: `SELECT p.submission_feature_id, fp.name, p.value
-              FROM submission_feature_property_number p
-              INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-              INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-              WHERE p.submission_feature_id = ANY($1)`
-      },
-      {
-        typeName: 'boolean',
-        sql: `SELECT p.submission_feature_id, fp.name, p.value
-              FROM submission_feature_property_boolean p
-              INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-              INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-              WHERE p.submission_feature_id = ANY($1)`
-      },
-      {
-        typeName: 'datetime',
-        sql: `SELECT p.submission_feature_id, fp.name, p.value
-              FROM submission_feature_property_timestamp p
-              INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-              INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-              WHERE p.submission_feature_id = ANY($1)`
-      },
-      {
-        typeName: 'code',
-        sql: `SELECT p.submission_feature_id, fp.name, ccc.label AS value
-              FROM submission_feature_property_code p
-              INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-              INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-              INNER JOIN contributor_codeset_code ccc ON p.contributor_codeset_code_id = ccc.contributor_codeset_code_id
-              WHERE p.submission_feature_id = ANY($1)`
-      },
-      {
-        typeName: 'taxon',
-        sql: `SELECT p.submission_feature_id, fp.name, t.itis_scientific_name AS value
+    const TYPED_TABLE_QUERIES: Record<string, string> = {
+      string: `SELECT p.submission_feature_id, fp.name, p.value
+               FROM submission_feature_property_string p
+               INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+               INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+               WHERE p.submission_feature_id = ANY($1)`,
+      number: `SELECT p.submission_feature_id, fp.name, p.value
+               FROM submission_feature_property_number p
+               INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+               INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+               WHERE p.submission_feature_id = ANY($1)`,
+      boolean: `SELECT p.submission_feature_id, fp.name, p.value
+                FROM submission_feature_property_boolean p
+                INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+                INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+                WHERE p.submission_feature_id = ANY($1)`,
+      datetime: `SELECT p.submission_feature_id, fp.name, p.value
+                 FROM submission_feature_property_timestamp p
+                 INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+                 INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+                 WHERE p.submission_feature_id = ANY($1)`,
+      code: `SELECT p.submission_feature_id, fp.name, ccc.label AS value
+             FROM submission_feature_property_code p
+             INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+             INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+             INNER JOIN contributor_codeset_code ccc ON p.contributor_codeset_code_id = ccc.contributor_codeset_code_id
+             WHERE p.submission_feature_id = ANY($1)`,
+      taxon: `SELECT p.submission_feature_id, fp.name, t.itis_scientific_name AS value
               FROM submission_feature_property_taxon p
               INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
               INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
               INNER JOIN taxon t ON p.taxon_id = t.taxon_id
-              WHERE p.submission_feature_id = ANY($1)`
-      },
-      {
-        typeName: 'spatial',
-        sql: `SELECT p.submission_feature_id, fp.name, ST_AsGeoJSON(p.value)::jsonb AS value
-              FROM submission_feature_property_geometry p
-              INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
-              INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
-              WHERE p.submission_feature_id = ANY($1)`
-      }
-    ];
+              WHERE p.submission_feature_id = ANY($1)`,
+      spatial: `SELECT p.submission_feature_id, fp.name, ST_AsGeoJSON(p.value)::jsonb AS value
+                FROM submission_feature_property_geometry p
+                INNER JOIN feature_type_property ftp ON p.feature_type_property_id = ftp.feature_type_property_id
+                INNER JOIN feature_property fp ON ftp.feature_property_id = fp.feature_property_id
+                WHERE p.submission_feature_id = ANY($1)`
+    };
 
-    // Build parallel typed-table queries — only for types present in this batch
-    const typedQueries: Promise<TypedPropertyRow[]>[] = [];
+    // Query only the typed tables for property types present in this batch
+    const queries = propertyTypeNames
+      .filter((typeName) => typeName in TYPED_TABLE_QUERIES)
+      .map((typeName) =>
+        this.connection.query<TypedPropertyRow>(TYPED_TABLE_QUERIES[typeName], [submissionFeatureIds]).then((r) => r.rows)
+      );
 
-    for (const { typeName, sql } of TYPED_TABLE_QUERIES) {
-      if (typeGroups.has(typeName)) {
-        typedQueries.push(this.connection.query<TypedPropertyRow>(sql, [submissionFeatureIds]).then((r) => r.rows));
-      }
-    }
+    const results = await Promise.all(queries);
 
-    // Execute all typed-table queries in parallel
-    const typedResults = await Promise.all(typedQueries);
-
-    // Build property map: submission_feature_id -> { propName: value }
-    const propertyMap = new Map<number, Record<string, any>>();
-    for (const rows of typedResults) {
-      for (const row of rows) {
-        if (!propertyMap.has(row.submission_feature_id)) {
-          propertyMap.set(row.submission_feature_id, {});
-        }
-        propertyMap.get(row.submission_feature_id)![row.name] = row.value;
-      }
-    }
-
-    // Assemble ParquetFeatureData for each base row
-    return baseBatch.map((baseRow) => {
-      const typedProps = propertyMap.get(baseRow.submission_feature_id) ?? {};
-      const data: Record<string, any> = {};
-
-      for (const prop of properties) {
-        const propName = prop.feature_property_name;
-
-        if (JSONB_FALLBACK_TYPES.has(prop.feature_property_type_name)) {
-          // Array/object/artifact_key: fall back to JSONB data.properties
-          data[propName] = baseRow.data?.properties?.[propName] ?? null;
-        } else if (propName in typedProps) {
-          data[propName] = typedProps[propName];
-        } else {
-          data[propName] = null;
-        }
-      }
-
-      return {
-        submission_feature_id: baseRow.submission_feature_id,
-        uuid: baseRow.uuid,
-        feature_type_name: baseRow.feature_type_name,
-        data,
-        parent_uuid: baseRow.parent_uuid
-      };
-    });
+    return results.flat();
   }
 }

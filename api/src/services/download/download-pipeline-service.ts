@@ -3,11 +3,11 @@ import archiver from 'archiver';
 import { PassThrough } from 'node:stream';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
-import { DownloadArtifactInfo, DownloadFeatureSummary, DownloadSource } from '../../models/download';
+import { DownloadArtifactInfo, DownloadFeatureSummary, DownloadSource, ParquetFeatureData } from '../../models/download';
 import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
-import { DownloadRepository } from '../../repositories/download/download-repository';
+import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
 import {
   buildCombinedHeaders,
   CsvPropertyDefinition,
@@ -342,7 +342,7 @@ export class DownloadPipelineService extends DBService {
    * feature_type_property definitions. The star-schema design keeps files
    * independent — parent data lives in its own file, joined by parent_uuid.
    *
-   * Pipeline: cursor → hydrateFeatureBatchFromTypedTables → featureToRow → writer.appendRow → S3
+   * Pipeline: cursor → hydrateFeatureBatch → featureToRow → writer.appendRow → S3
    *
    * Code and taxon properties arrive pre-resolved from the cursor JOIN:
    * code → contributor_codeset_code.label, taxon → taxon.itis_scientific_name.
@@ -413,7 +413,7 @@ export class DownloadPipelineService extends DBService {
 
     // Stream: cursor → hydrate typed properties → convert to Parquet row → write
     for await (const baseBatch of cursor) {
-      const hydrated = await this.downloadRepository.hydrateFeatureBatchFromTypedTables(baseBatch, properties);
+      const hydrated = await this.hydrateFeatureBatch(baseBatch, properties);
       for (const feature of hydrated) {
         await writer.appendRow(featureToRow(feature, properties));
       }
@@ -421,6 +421,79 @@ export class DownloadPipelineService extends DBService {
 
     await writer.close();
     await uploadPromise;
+  }
+
+  /**
+   * Hydrate a batch of base feature rows with typed property values.
+   *
+   * Fetches values from typed `submission_feature_property_*` tables via the
+   * repository, then assembles them into `ParquetFeatureData` records.
+   *
+   * Properties without typed tables (array, object, artifact_key) fall back to
+   * `submission_feature.data.properties` — these types have dynamic internal
+   * structure that can't be represented as a single typed value.
+   *
+   * @param {BaseFeatureRow[]} baseBatch - Base feature rows from a cursor stream.
+   * @param {CsvPropertyDefinition[]} properties - Schema property definitions.
+   * @return {Promise<ParquetFeatureData[]>}
+   * @memberof DownloadPipelineService
+   */
+  async hydrateFeatureBatch(
+    baseBatch: BaseFeatureRow[],
+    properties: CsvPropertyDefinition[]
+  ): Promise<ParquetFeatureData[]> {
+    // Types that live in the JSONB blob rather than typed tables
+    const JSONB_FALLBACK_TYPES = new Set(['array', 'object', 'artifact_key']);
+
+    // Determine which typed tables need querying
+    const typedPropertyTypes = [...new Set(
+      properties
+        .map((p) => p.feature_property_type_name)
+        .filter((t) => !JSONB_FALLBACK_TYPES.has(t))
+    )];
+
+    const submissionFeatureIds = baseBatch.map((row) => row.submission_feature_id);
+
+    // Fetch raw typed rows from the repository
+    const typedRows = typedPropertyTypes.length > 0
+      ? await this.downloadRepository.fetchTypedPropertyRows(submissionFeatureIds, typedPropertyTypes)
+      : [];
+
+    // Build property map: submission_feature_id → { propName: value }
+    const propertyMap = new Map<number, Record<string, any>>();
+    for (const row of typedRows) {
+      if (!propertyMap.has(row.submission_feature_id)) {
+        propertyMap.set(row.submission_feature_id, {});
+      }
+      propertyMap.get(row.submission_feature_id)![row.name] = row.value;
+    }
+
+    // Assemble ParquetFeatureData for each base row
+    return baseBatch.map((baseRow) => {
+      const typedProps = propertyMap.get(baseRow.submission_feature_id) ?? {};
+      const data: Record<string, any> = {};
+
+      for (const prop of properties) {
+        const propName = prop.feature_property_name;
+
+        if (JSONB_FALLBACK_TYPES.has(prop.feature_property_type_name)) {
+          // Array/object/artifact_key: fall back to JSONB data.properties
+          data[propName] = baseRow.data?.properties?.[propName] ?? null;
+        } else if (propName in typedProps) {
+          data[propName] = typedProps[propName];
+        } else {
+          data[propName] = null;
+        }
+      }
+
+      return {
+        submission_feature_id: baseRow.submission_feature_id,
+        uuid: baseRow.uuid,
+        feature_type_name: baseRow.feature_type_name,
+        data,
+        parent_uuid: baseRow.parent_uuid
+      };
+    });
   }
 
   /**

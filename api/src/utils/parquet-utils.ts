@@ -193,6 +193,8 @@ export function extractGeoJsonGeometry(value: unknown): GeoJsonGeometry | null {
 
   // Bare geometry object
   if (isGeometryType(geo.type as string)) {
+    // isGeometryType() already validated the shape — cast instead of copying to avoid
+    // allocating a throwaway object for every feature in the download stream
     return geo as unknown as GeoJsonGeometry;
   }
 

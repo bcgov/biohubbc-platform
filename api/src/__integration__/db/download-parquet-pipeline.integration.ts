@@ -3,7 +3,7 @@
 // and resolves code labels, taxon names, geometry GeoJSON, and JSONB fallback.
 //
 // Tests the repository methods that power DownloadPipelineService.streamParquetForType:
-//   listDownloadFeatureTypesByCartId  →  streamFeatureBaseByCartIdAndType  →  hydrateFeatureBatchFromTypedTables
+//   listDownloadFeatureTypesByCartId  →  streamFeatureBaseByCartIdAndType  →  fetchTypedPropertyRows
 //
 // Also covers: getDownloadArtifact, updateArtifactStatusByDownloadId, status transitions.
 //
@@ -293,6 +293,50 @@ describe('Download Parquet pipeline (integration)', function () {
   }
 
   /**
+   * Helper: assemble ParquetFeatureData from base rows + typed property rows.
+   * Mirrors the service-layer hydrateFeatureBatch logic for integration testing.
+   */
+  function assembleFeatureData(
+    baseBatch: { submission_feature_id: number; uuid: string; feature_type_name: string; data: Record<string, any>; parent_uuid: string | null }[],
+    typedRows: { submission_feature_id: number; name: string; value: any }[],
+    properties: CsvPropertyDefinition[]
+  ): ParquetFeatureData[] {
+    const JSONB_FALLBACK_TYPES = new Set(['array', 'object', 'artifact_key']);
+
+    const propertyMap = new Map<number, Record<string, any>>();
+    for (const row of typedRows) {
+      if (!propertyMap.has(row.submission_feature_id)) {
+        propertyMap.set(row.submission_feature_id, {});
+      }
+      propertyMap.get(row.submission_feature_id)![row.name] = row.value;
+    }
+
+    return baseBatch.map((baseRow) => {
+      const typedProps = propertyMap.get(baseRow.submission_feature_id) ?? {};
+      const data: Record<string, any> = {};
+
+      for (const prop of properties) {
+        const propName = prop.feature_property_name;
+        if (JSONB_FALLBACK_TYPES.has(prop.feature_property_type_name)) {
+          data[propName] = baseRow.data?.properties?.[propName] ?? null;
+        } else if (propName in typedProps) {
+          data[propName] = typedProps[propName];
+        } else {
+          data[propName] = null;
+        }
+      }
+
+      return {
+        submission_feature_id: baseRow.submission_feature_id,
+        uuid: baseRow.uuid,
+        feature_type_name: baseRow.feature_type_name,
+        data,
+        parent_uuid: baseRow.parent_uuid
+      };
+    });
+  }
+
+  /**
    * Helper: stream all base feature rows for a given cart and feature type,
    * then hydrate them with typed property values.
    * Returns the hydrated ParquetFeatureData array.
@@ -302,11 +346,18 @@ describe('Download Parquet pipeline (integration)', function () {
     featureTypeName: string,
     properties: CsvPropertyDefinition[]
   ): Promise<ParquetFeatureData[]> {
+    const JSONB_FALLBACK_TYPES = new Set(['array', 'object', 'artifact_key']);
+    const typedPropertyTypes = [...new Set(
+      properties.map((p) => p.feature_property_type_name).filter((t) => !JSONB_FALLBACK_TYPES.has(t))
+    )];
     const allRows: ParquetFeatureData[] = [];
 
     for await (const baseBatch of downloadRepo.streamFeatureBaseByCartIdAndType(cartId, featureTypeName, 100)) {
-      const hydrated = await downloadRepo.hydrateFeatureBatchFromTypedTables(baseBatch, properties);
-      allRows.push(...hydrated);
+      const ids = baseBatch.map((r) => r.submission_feature_id);
+      const typedRows = typedPropertyTypes.length > 0
+        ? await downloadRepo.fetchTypedPropertyRows(ids, typedPropertyTypes)
+        : [];
+      allRows.push(...assembleFeatureData(baseBatch, typedRows, properties));
     }
 
     return allRows;
@@ -323,6 +374,10 @@ describe('Download Parquet pipeline (integration)', function () {
     featureTypeName: string,
     properties: CsvPropertyDefinition[]
   ): Promise<ParquetFeatureData[]> {
+    const JSONB_FALLBACK_TYPES = new Set(['array', 'object', 'artifact_key']);
+    const typedPropertyTypes = [...new Set(
+      properties.map((p) => p.feature_property_type_name).filter((t) => !JSONB_FALLBACK_TYPES.has(t))
+    )];
     const searchSql = 'SELECT submission_feature_id FROM submission_feature WHERE submission_id = $1';
     const searchBindings = [submissionId];
     const allRows: ParquetFeatureData[] = [];
@@ -334,8 +389,11 @@ describe('Download Parquet pipeline (integration)', function () {
       featureTypeName,
       100
     )) {
-      const hydrated = await downloadRepo.hydrateFeatureBatchFromTypedTables(baseBatch, properties);
-      allRows.push(...hydrated);
+      const ids = baseBatch.map((r) => r.submission_feature_id);
+      const typedRows = typedPropertyTypes.length > 0
+        ? await downloadRepo.fetchTypedPropertyRows(ids, typedPropertyTypes)
+        : [];
+      allRows.push(...assembleFeatureData(baseBatch, typedRows, properties));
     }
 
     return allRows;

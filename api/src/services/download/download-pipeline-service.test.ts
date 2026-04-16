@@ -726,20 +726,18 @@ describe('DownloadPipelineService', () => {
       sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
 
       const baseBatch = [
-        { submission_feature_id: 1, uuid: 'uuid-1', feature_type_name: 'observation', data: {}, parent_uuid: 'p-1' }
-      ];
-      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([baseBatch]));
-
-      const hydratedFeatures = [
         {
           submission_feature_id: 1,
           uuid: 'uuid-1',
           feature_type_name: 'observation',
-          data: { species: 'bear' },
+          data: { properties: {} },
           parent_uuid: 'p-1'
         }
       ];
-      sinon.stub(DownloadRepository.prototype, 'hydrateFeatureBatchFromTypedTables').resolves(hydratedFeatures);
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([baseBatch]));
+      sinon
+        .stub(DownloadRepository.prototype, 'fetchTypedPropertyRows')
+        .resolves([{ submission_feature_id: 1, name: 'species', value: 'bear' }]);
 
       await service.writeFeatureTypeParquet(
         TEST_DOWNLOAD_ID,
@@ -767,21 +765,20 @@ describe('DownloadPipelineService', () => {
       sinon.stub(SearchFeatureService.prototype, 'buildSearchFeatureIdsSubquery').returns(mockSubquery);
 
       const baseBatch = [
-        { submission_feature_id: 1, uuid: 'uuid-1', feature_type_name: 'observation', data: {}, parent_uuid: null }
-      ];
-      const streamStub = sinon
-        .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
-        .returns(mockBaseCursor([baseBatch]));
-
-      sinon.stub(DownloadRepository.prototype, 'hydrateFeatureBatchFromTypedTables').resolves([
         {
           submission_feature_id: 1,
           uuid: 'uuid-1',
           feature_type_name: 'observation',
-          data: { species: 'moose' },
+          data: { properties: {} },
           parent_uuid: null
         }
-      ]);
+      ];
+      const streamStub = sinon
+        .stub(DownloadRepository.prototype, 'streamFeatureBaseBySearchQueryAndType')
+        .returns(mockBaseCursor([baseBatch]));
+      sinon
+        .stub(DownloadRepository.prototype, 'fetchTypedPropertyRows')
+        .resolves([{ submission_feature_id: 1, name: 'species', value: 'moose' }]);
 
       await service.writeFeatureTypeParquet(
         TEST_DOWNLOAD_ID,
