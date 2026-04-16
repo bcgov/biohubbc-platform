@@ -33,9 +33,10 @@ export class PolicyRepository extends BaseRepository {
       .insert({
         name: policyData.name,
         description: policyData.description,
-        record_end_date: policyData.record_end_date
+        record_end_date: policyData.record_end_date,
+        status: policyData.status
       })
-      .returning(['policy_id', 'name', 'description']);
+      .returning(['policy_id', 'name', 'description', 'status']);
 
     const response = await this.connection.knex(query, Policy);
 
@@ -86,7 +87,8 @@ export class PolicyRepository extends BaseRepository {
     const query = this.applyFilters(knex.table('policy').whereNull('record_end_date'), filters).select([
       'policy_id',
       'name',
-      'description'
+      'description',
+      'status'
     ]);
 
     if (pagination) {
@@ -149,6 +151,7 @@ export class PolicyRepository extends BaseRepository {
         ON ps.policy_id = p.policy_id
       WHERE tm.system_user_id = ${systemUserId}
         AND (p.record_end_date IS NULL OR p.record_end_date > NOW())
+        AND p.status = 'approved'
         AND (ps.part1 = ${urnParts.submissionId} OR ps.part1 = '*')
         AND (ps.part2 = ${urnParts.featureTypeName} OR ps.part2 = '*')
         AND (ps.part3 = ${urnParts.submissionFeatureId} OR ps.part3 = '*')
@@ -158,6 +161,7 @@ export class PolicyRepository extends BaseRepository {
 
     return response.rows;
   }
+
   /**
    * Update an existing policy record.
    *
@@ -173,10 +177,11 @@ export class PolicyRepository extends BaseRepository {
       .update({
         name: policyData.name,
         description: policyData.description,
-        record_end_date: policyData.record_end_date
+        record_end_date: policyData.record_end_date,
+        status: policyData.status
       })
       .where('policy_id', policyId)
-      .returning(['policy_id', 'name', 'description']);
+      .returning(['policy_id', 'name', 'description', 'status']);
 
     const response = await this.connection.knex(query, Policy);
 

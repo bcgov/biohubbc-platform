@@ -2,6 +2,7 @@ import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { IDBConnection } from '../database/db';
+import { DataRequest } from '../models/data-request';
 import { Team } from '../models/team';
 import { Ticket, TicketFilters } from '../models/ticket';
 import { TicketReference } from '../models/ticket-reference';
@@ -10,6 +11,7 @@ import { TicketCommentRepository } from '../repositories/ticket-comment-reposito
 import { TicketRepository } from '../repositories/ticket-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { TeamService } from './access-policy/team-service';
+import { DataRequestService } from './data-request-service';
 import { TicketReferenceService } from './ticket-reference-service';
 import { TicketService } from './ticket-service';
 import { TicketStatusService } from './ticket-status-service';
@@ -183,6 +185,7 @@ describe('TicketService', () => {
       const getReferenceLogStub = sinon
         .stub(TicketReferenceService.prototype, 'getTicketReferencesForTicket')
         .resolves(referenceLog);
+      const getDataRequestLogStub = sinon.stub(DataRequestService.prototype, 'findDataRequestsByTicketId').resolves([]);
 
       const result = await service.getTicket(mockTicket.ticket_id);
 
@@ -190,11 +193,13 @@ describe('TicketService', () => {
       expect(getStatusLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getCommentLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getReferenceLogStub).to.have.been.calledWith(mockTicket.ticket_id);
+      expect(getDataRequestLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(result).to.eql({
         ...mockTicket,
         statuses: statusLog,
         comments: commentLog,
-        references: referenceLog
+        references: referenceLog,
+        data_requests: []
       });
     });
   });
@@ -216,22 +221,99 @@ describe('TicketService', () => {
       const updated: Ticket = { ...mockTicket, status: 'closed' };
       const updateStub = sinon.stub(TicketRepository.prototype, 'updateTicket').resolves(updated);
       const historyStub = sinon.stub(TicketStatusService.prototype, 'insertTicketStatus').resolves();
+      const getDataRequestsStub = sinon.stub(DataRequestService.prototype, 'findDataRequestsByTicketId').resolves([]);
 
       const result = await service.updateTicket(mockTicket.ticket_id, { status: 'closed' });
 
+      expect(getDataRequestsStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(updateStub).to.have.been.calledWith(mockTicket.ticket_id, { status: 'closed' });
       expect(historyStub).to.have.been.calledWith(mockTicket.ticket_id, 'closed');
       expect(result).to.eql(updated);
+    });
+
+    it('throws when attempting to close ticket with requested data requests', async () => {
+      const updateStub = sinon
+        .stub(TicketRepository.prototype, 'updateTicket')
+        .resolves({ ...mockTicket, status: 'closed' });
+      const historyStub = sinon.stub(TicketStatusService.prototype, 'insertTicketStatus').resolves();
+      const dataRequest: DataRequest = {
+        data_request_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        reason: 'Need access',
+        team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        requested_by: 1,
+        ticket_id: mockTicket.ticket_id,
+        policy_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+        status: 'requested'
+      };
+      const getDataRequestsStub = sinon
+        .stub(DataRequestService.prototype, 'findDataRequestsByTicketId')
+        .resolves([dataRequest]);
+
+      try {
+        await service.updateTicket(mockTicket.ticket_id, { status: 'closed' });
+        expect.fail();
+      } catch (error) {
+        expect(getDataRequestsStub).to.have.been.calledWith(mockTicket.ticket_id);
+        expect((error as Error).message).to.equal('Cannot close tickets that have unaddressed data requests');
+        expect(updateStub).to.not.have.been.called;
+        expect(historyStub).to.not.have.been.called;
+      }
     });
   });
 
   describe('deleteTicket', () => {
     it('soft deletes an active ticket', async () => {
       const deleteStub = sinon.stub(TicketRepository.prototype, 'deleteTicket').resolves(mockTicket);
+      const getDataRequestsStub = sinon.stub(DataRequestService.prototype, 'findDataRequestsByTicketId').resolves([]);
 
       await service.deleteTicket(mockTicket.ticket_id);
 
+      expect(getDataRequestsStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(deleteStub).to.have.been.calledWith(mockTicket.ticket_id);
+    });
+
+    it('throws when deleting ticket with requested data requests', async () => {
+      const deleteStub = sinon.stub(TicketRepository.prototype, 'deleteTicket').resolves(mockTicket);
+      const dataRequest: DataRequest = {
+        data_request_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        reason: 'Need access',
+        team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        requested_by: 1,
+        ticket_id: mockTicket.ticket_id,
+        policy_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+        status: 'requested'
+      };
+      sinon.stub(DataRequestService.prototype, 'findDataRequestsByTicketId').resolves([dataRequest]);
+
+      try {
+        await service.deleteTicket(mockTicket.ticket_id);
+        expect.fail();
+      } catch (error) {
+        expect((error as Error).message).to.equal('Cannot delete tickets that have unaddressed data requests');
+        expect(deleteStub).to.not.have.been.called;
+      }
+    });
+
+    it('throws when deleting ticket with reviewed data requests', async () => {
+      const deleteStub = sinon.stub(TicketRepository.prototype, 'deleteTicket').resolves(mockTicket);
+      const dataRequest: DataRequest = {
+        data_request_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        reason: 'Need access',
+        team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        requested_by: 1,
+        ticket_id: mockTicket.ticket_id,
+        policy_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+        status: 'reviewed'
+      };
+      sinon.stub(DataRequestService.prototype, 'findDataRequestsByTicketId').resolves([dataRequest]);
+
+      try {
+        await service.deleteTicket(mockTicket.ticket_id);
+        expect.fail();
+      } catch (error) {
+        expect((error as Error).message).to.equal('Cannot delete tickets that have unaddressed data requests');
+        expect(deleteStub).to.not.have.been.called;
+      }
     });
   });
 

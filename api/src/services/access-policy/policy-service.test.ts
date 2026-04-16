@@ -28,21 +28,9 @@ describe('PolicyService', () => {
     sinon.restore();
   });
 
-  describe('createPolicy', () => {
-    it('should call repository.insertPolicy and return the created policy', async () => {
-      const mockPolicy: Policy = { policy_id: '1', name: 'Test Policy', description: 'Test' };
-      const insertPolicyStub = sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
-
-      const result = await policyService.createPolicy({ name: 'Test Policy', description: 'Test' } as CreatePolicy);
-
-      expect(insertPolicyStub).to.have.been.calledWith({ name: 'Test Policy', description: 'Test' });
-      expect(result).to.eql(mockPolicy);
-    });
-  });
-
   describe('getPolicy', () => {
     it('should call repository.getPolicy and return a policy', async () => {
-      const mockPolicy: Policy = { policy_id: '1', name: 'Test Policy', description: 'Test' };
+      const mockPolicy: Policy = { policy_id: '1', name: 'Test Policy', description: 'Test', status: 'approved' };
       const getPolicyStub = sinon.stub(PolicyRepository.prototype, 'getPolicy').resolves(mockPolicy);
 
       const result = await policyService.getPolicy('1');
@@ -54,7 +42,7 @@ describe('PolicyService', () => {
 
   describe('getPolicies', () => {
     it('should call repository.getPolicy and return a policy', async () => {
-      const mockPolicy: Policy[] = [{ policy_id: '1', name: 'Test Policy', description: 'Test' }];
+      const mockPolicy: Policy[] = [{ policy_id: '1', name: 'Test Policy', description: 'Test', status: 'approved' }];
       const getPolicyStub = sinon.stub(PolicyRepository.prototype, 'getPolicies').resolves(mockPolicy);
 
       const result = await policyService.getPolicies();
@@ -81,8 +69,8 @@ describe('PolicyService', () => {
   describe('getPoliciesThatAuthorizeFeatureAccessByUrn', () => {
     it('should call repository.getPoliciesThatAuthorizeFeatureAccessByUrn and return policies', async () => {
       const mockPolicies: Policy[] = [
-        { policy_id: '1', name: 'Policy 1', description: 'Desc 1' },
-        { policy_id: '2', name: 'Policy 2', description: 'Desc 2' }
+        { policy_id: '1', name: 'Policy 1', description: 'Desc 1', status: 'approved' },
+        { policy_id: '2', name: 'Policy 2', description: 'Desc 2', status: 'approved' }
       ];
       const stub = sinon
         .stub(PolicyRepository.prototype, 'getPoliciesThatAuthorizeFeatureAccessByUrn')
@@ -100,7 +88,8 @@ describe('PolicyService', () => {
       const updatedPolicy: Policy = {
         policy_id: '1',
         name: 'Updated',
-        description: 'Updated desc'
+        description: 'Updated desc',
+        status: 'approved'
       };
       const stub = sinon.stub(PolicyRepository.prototype, 'updatePolicy').resolves(updatedPolicy);
 
@@ -167,8 +156,8 @@ describe('PolicyService', () => {
   describe('getPoliciesWithStatements', () => {
     it('should call repository.getPolicies and return policies with statements', async () => {
       const mockPolicies: Policy[] = [
-        { policy_id: '1', name: 'Policy 1', description: 'Desc 1' },
-        { policy_id: '2', name: 'Policy 2', description: 'Desc 2' }
+        { policy_id: '1', name: 'Policy 1', description: 'Desc 1', status: 'approved' },
+        { policy_id: '2', name: 'Policy 2', description: 'Desc 2', status: 'approved' }
       ];
       const mockStatements: PolicyStatement[] = [
         { policy_statement_id: 's1', policy_id: '1', effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:*:*' }
@@ -214,7 +203,7 @@ describe('PolicyService', () => {
 
   describe('getPolicyWithStatements', () => {
     it('should call repository.getPolicy and return policy with statements', async () => {
-      const mockPolicy: Policy = { policy_id: '1', name: 'Test Policy', description: 'Test' };
+      const mockPolicy: Policy = { policy_id: '1', name: 'Test Policy', description: 'Test', status: 'approved' };
       const mockStatements: PolicyStatement[] = [
         {
           policy_statement_id: 's1',
@@ -286,7 +275,7 @@ describe('PolicyService', () => {
 
   describe('createPolicyWithStatements', () => {
     it('should create policy, statements, and scopes for each statement', async () => {
-      const mockPolicy: Policy = { policy_id: '1', name: 'New Policy', description: 'Desc' };
+      const mockPolicy: Policy = { policy_id: '1', name: 'New Policy', description: 'Desc', status: 'requested' };
       const mockStatement: PolicyStatement = {
         policy_statement_id: 's1',
         policy_id: '1',
@@ -313,7 +302,7 @@ describe('PolicyService', () => {
         .resolves('scope-1');
 
       const result = await policyService.createPolicyWithStatements(
-        { name: 'New Policy', description: 'Desc' } as CreatePolicy,
+        { name: 'New Policy', description: 'Desc', status: 'requested' } as CreatePolicy,
         [
           {
             effect: PolicyEffect.ALLOW,
@@ -323,7 +312,11 @@ describe('PolicyService', () => {
         ]
       );
 
-      expect(insertPolicyStub).to.have.been.calledWith({ name: 'New Policy', description: 'Desc' });
+      expect(insertPolicyStub).to.have.been.calledWith({
+        name: 'New Policy',
+        description: 'Desc',
+        status: 'requested'
+      });
       expect(insertStatementStub).to.have.been.calledOnce;
       expect(insertConditionStub).to.have.been.calledOnce;
       expect(createScopeStub).to.have.been.calledOnce;
@@ -335,14 +328,19 @@ describe('PolicyService', () => {
     });
 
     it('should not call createScopeForPolicyStatement when no statements provided', async () => {
-      const mockPolicy: Policy = { policy_id: '1', name: 'Empty Policy', description: 'No statements' };
+      const mockPolicy: Policy = {
+        policy_id: '1',
+        name: 'Empty Policy',
+        description: 'No statements',
+        status: 'requested'
+      };
       sinon.stub(PolicyRepository.prototype, 'insertPolicy').resolves(mockPolicy);
       const createScopeStub = sinon
         .stub(SecurityScopeService.prototype, 'createScopeForPolicyStatement')
         .resolves('scope-1');
 
       const result = await policyService.createPolicyWithStatements(
-        { name: 'Empty Policy', description: 'No statements' } as CreatePolicy,
+        { name: 'Empty Policy', description: 'No statements', status: 'requested' } as CreatePolicy,
         []
       );
 
@@ -351,7 +349,7 @@ describe('PolicyService', () => {
     });
 
     it('should create scopes for multiple statements', async () => {
-      const mockPolicy: Policy = { policy_id: '1', name: 'Multi Policy', description: 'Desc' };
+      const mockPolicy: Policy = { policy_id: '1', name: 'Multi Policy', description: 'Desc', status: 'requested' };
       const mockStatement1: PolicyStatement = {
         policy_statement_id: 's1',
         policy_id: '1',
@@ -387,7 +385,12 @@ describe('PolicyService', () => {
 
   describe('updatePolicyWithStatements', () => {
     it('should clean up old scope mappings, create new scopes, and rebuild affected teams', async () => {
-      const mockPolicy: Policy = { policy_id: '1', name: 'Updated Policy', description: 'Updated' };
+      const mockPolicy: Policy = {
+        policy_id: '1',
+        name: 'Updated Policy',
+        description: 'Updated',
+        status: 'requested'
+      };
       const existingStatements: PolicyStatement[] = [
         {
           policy_statement_id: 'old-s1',
@@ -438,7 +441,7 @@ describe('PolicyService', () => {
     });
 
     it('should clean up old scope mappings and skip scope creation when updating with empty statements', async () => {
-      const mockPolicy: Policy = { policy_id: '1', name: 'Policy', description: 'Desc' };
+      const mockPolicy: Policy = { policy_id: '1', name: 'Policy', description: 'Desc', status: 'requested' };
       const existingStatements: PolicyStatement[] = [
         { policy_statement_id: 's1', policy_id: '1', effect: PolicyEffect.ALLOW, submission_feature_urn: 'urn:*:*:*' },
         { policy_statement_id: 's2', policy_id: '1', effect: PolicyEffect.DENY, submission_feature_urn: 'urn:*:*:*' }
