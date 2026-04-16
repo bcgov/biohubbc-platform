@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
+import wkx from 'wkx';
 
 import { ParquetFeatureData } from '../models/download';
 import { CsvPropertyDefinition } from './csv-utils';
@@ -510,6 +511,244 @@ describe('parquet-utils', () => {
 
       expect(parsed.columns.geometry.crs.name).to.equal('WGS 84');
       expect(parsed.columns.geometry.crs.type).to.equal('GeographicCRS');
+    });
+  });
+
+  // ===========================================================================
+  // WKB round-trip validation via wkx
+  //
+  // The byte-level tests above verify structure (header, type codes, sizes).
+  // These tests verify *correctness* by decoding our WKB output with an
+  // independent parser (wkx) and comparing the resulting GeoJSON coordinates.
+  // ===========================================================================
+  describe('geoJsonToWkb round-trip via wkx', () => {
+    /**
+     * Encode GeoJSON → WKB with our function, decode with wkx, return GeoJSON.
+     */
+    function roundTrip(geoJson: unknown): Record<string, unknown> {
+      const wkb = geoJsonToWkb(geoJson);
+      expect(wkb, 'WKB should not be null').to.not.be.null;
+      const parsed = wkx.Geometry.parse(wkb as Buffer);
+      return parsed.toGeoJSON() as Record<string, unknown>;
+    }
+
+    it('Point: coordinates survive round-trip', () => {
+      const input = { type: 'Point', coordinates: [-123.3656, 48.4284] };
+      const result = roundTrip(input);
+
+      expect(result.type).to.equal('Point');
+      const coords = result.coordinates as number[];
+      expect(coords[0]).to.be.closeTo(-123.3656, 1e-10);
+      expect(coords[1]).to.be.closeTo(48.4284, 1e-10);
+    });
+
+    it('Point: origin [0, 0]', () => {
+      const result = roundTrip({ type: 'Point', coordinates: [0, 0] });
+      const coords = result.coordinates as number[];
+
+      expect(coords[0]).to.equal(0);
+      expect(coords[1]).to.equal(0);
+    });
+
+    it('Point: extreme coordinates [-180, -90]', () => {
+      const result = roundTrip({ type: 'Point', coordinates: [-180, -90] });
+      const coords = result.coordinates as number[];
+
+      expect(coords[0]).to.equal(-180);
+      expect(coords[1]).to.equal(-90);
+    });
+
+    it('LineString: two-point line', () => {
+      const input = {
+        type: 'LineString',
+        coordinates: [
+          [-123.3656, 48.4284],
+          [-123.37, 48.43]
+        ]
+      };
+      const result = roundTrip(input);
+
+      expect(result.type).to.equal('LineString');
+      const coords = result.coordinates as number[][];
+      expect(coords).to.have.lengthOf(2);
+      expect(coords[0][0]).to.be.closeTo(-123.3656, 1e-10);
+    });
+
+    it('LineString: multi-segment', () => {
+      const input = {
+        type: 'LineString',
+        coordinates: [
+          [0, 0],
+          [1, 1],
+          [2, 0],
+          [3, 1]
+        ]
+      };
+      const result = roundTrip(input);
+      const coords = result.coordinates as number[][];
+
+      expect(coords).to.have.lengthOf(4);
+      expect(coords[2]).to.deep.equal([2, 0]);
+    });
+
+    it('Polygon: single ring with coordinate fidelity', () => {
+      const ring = [
+        [-120, 50],
+        [-121, 50],
+        [-121, 51],
+        [-120, 51],
+        [-120, 50]
+      ];
+      const result = roundTrip({ type: 'Polygon', coordinates: [ring] });
+
+      expect(result.type).to.equal('Polygon');
+      const rings = result.coordinates as number[][][];
+      expect(rings).to.have.lengthOf(1);
+      expect(rings[0]).to.have.lengthOf(5);
+      // Closed ring: first == last
+      expect(rings[0][0]).to.deep.equal(rings[0][4]);
+    });
+
+    it('Polygon: with hole (two rings)', () => {
+      const outer = [
+        [0, 0],
+        [20, 0],
+        [20, 20],
+        [0, 20],
+        [0, 0]
+      ];
+      const hole = [
+        [5, 5],
+        [15, 5],
+        [15, 15],
+        [5, 15],
+        [5, 5]
+      ];
+      const result = roundTrip({ type: 'Polygon', coordinates: [outer, hole] });
+      const rings = result.coordinates as number[][][];
+
+      expect(rings).to.have.lengthOf(2);
+      expect(rings[1][0]).to.deep.equal([5, 5]);
+    });
+
+    it('MultiPoint: all points preserved', () => {
+      const input = {
+        type: 'MultiPoint',
+        coordinates: [
+          [-123.0, 48.0],
+          [-124.0, 49.0],
+          [-125.0, 50.0]
+        ]
+      };
+      const result = roundTrip(input);
+
+      expect(result.type).to.equal('MultiPoint');
+      const coords = result.coordinates as number[][];
+      expect(coords).to.have.lengthOf(3);
+      expect(coords[1][0]).to.equal(-124);
+    });
+
+    it('MultiLineString: two lines', () => {
+      const input = {
+        type: 'MultiLineString',
+        coordinates: [
+          [
+            [0, 0],
+            [1, 1]
+          ],
+          [
+            [2, 2],
+            [3, 3]
+          ]
+        ]
+      };
+      const result = roundTrip(input);
+
+      expect(result.type).to.equal('MultiLineString');
+      const lines = result.coordinates as number[][][];
+      expect(lines).to.have.lengthOf(2);
+      expect(lines[1][0]).to.deep.equal([2, 2]);
+    });
+
+    it('MultiPolygon: two polygons', () => {
+      const poly1 = [
+        [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+          [0, 0]
+        ]
+      ];
+      const poly2 = [
+        [
+          [10, 10],
+          [11, 10],
+          [11, 11],
+          [10, 11],
+          [10, 10]
+        ]
+      ];
+      const result = roundTrip({ type: 'MultiPolygon', coordinates: [poly1, poly2] });
+
+      expect(result.type).to.equal('MultiPolygon');
+      const polys = result.coordinates as number[][][][];
+      expect(polys).to.have.lengthOf(2);
+      expect(polys[1][0][0]).to.deep.equal([10, 10]);
+    });
+
+    it('GeometryCollection: mixed types', () => {
+      const input = {
+        type: 'GeometryCollection',
+        geometries: [
+          { type: 'Point', coordinates: [1, 2] },
+          {
+            type: 'LineString',
+            coordinates: [
+              [3, 4],
+              [5, 6]
+            ]
+          }
+        ]
+      };
+      const result = roundTrip(input);
+
+      expect(result.type).to.equal('GeometryCollection');
+      const geoms = result.geometries as Record<string, unknown>[];
+      expect(geoms).to.have.lengthOf(2);
+      expect(geoms[0].type).to.equal('Point');
+      expect(geoms[1].type).to.equal('LineString');
+    });
+
+    it('GeometryCollection: empty', () => {
+      const result = roundTrip({ type: 'GeometryCollection', geometries: [] });
+
+      expect(result.type).to.equal('GeometryCollection');
+      expect(result.geometries).to.have.lengthOf(0);
+    });
+
+    it('Feature wrapper: unwraps and encodes geometry', () => {
+      const result = roundTrip({
+        type: 'Feature',
+        properties: { name: 'test' },
+        geometry: { type: 'Point', coordinates: [7, 8] }
+      });
+
+      expect(result.type).to.equal('Point');
+      expect(result.coordinates).to.deep.equal([7, 8]);
+    });
+
+    it('FeatureCollection wrapper: uses first geometry', () => {
+      const result = roundTrip({
+        type: 'FeatureCollection',
+        features: [
+          { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [5, 10] } },
+          { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [15, 20] } }
+        ]
+      });
+
+      expect(result.type).to.equal('Point');
+      expect(result.coordinates).to.deep.equal([5, 10]);
     });
   });
 });
