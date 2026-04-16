@@ -195,17 +195,6 @@ export class PolicyService extends DBService {
   }
 
   /**
-   * Internal lifecycle-only delete for request-linked policies.
-   *
-   * @param {string} policyId
-   * @return {Promise<void>}
-   * @memberof PolicyService
-   */
-  deletePolicyFromRequestLifecycle(policyId: string): Promise<void> {
-    return this.deletePolicy(policyId, { bypassLinkedPolicyDeleteGuard: true });
-  }
-
-  /**
    * Get policies with their statements and conditions.
    *
    * @param {PolicyFilters} [filters] - Optional filter set.
@@ -291,14 +280,6 @@ export class PolicyService extends DBService {
     policyData: UpdatePolicy,
     statements: CreatePolicyStatementInput[]
   ): Promise<PolicyWithStatements> {
-    const linkedDataRequest = await this.policyRepository.findActiveDataRequestByPolicyId(policyId);
-
-    if (linkedDataRequest) {
-      throw new HTTP400(
-        'Policy is linked to a data request and cannot be updated directly'
-      );
-    }
-
     const policy = await this.updatePolicy(policyId, policyData);
 
     const existingStatements = await this.policyStatementService.getPolicyStatements(policyId);

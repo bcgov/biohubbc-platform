@@ -1,5 +1,11 @@
 import { IDBConnection } from '../database/db';
-import { CreateDataRequest, DataRequest, DataRequestFilters, UpdateDataRequest } from '../models/data-request';
+import {
+  CreateDataRequest,
+  CreateDataRequestPayload,
+  DataRequest,
+  DataRequestFilters,
+  UpdateDataRequest
+} from '../models/data-request';
 import { PolicyStatus } from '../models/policy';
 import { PolicyEffect } from '../models/policy-statement';
 import { Team } from '../models/team';
@@ -95,18 +101,18 @@ export class DataRequestService extends DBService {
   /**
    * Create a data request and its linked team/policy artifacts.
    *
-   * @param {CreateDataRequest} payload - Create payload.
+   * @param {CreateDataRequestPayload} payload - Create payload.
    * @return {Promise<DataRequest>} Created data request.
    * @memberof DataRequestService
    */
-  async createDataRequest(payload: CreateDataRequest): Promise<DataRequest> {
+  async createDataRequest(payload: CreateDataRequestPayload): Promise<DataRequest> {
     const team = await this._createDataRequestTeam({
       requestedBy: payload.requested_by,
       systemUserIds: payload.system_user_ids
     });
     const policy = await this.createPolicy();
 
-    const payloadWithIds: Omit<CreateDataRequest, 'system_user_ids'> & { team_id: string; policy_id: string } = {
+    const payloadWithIds: CreateDataRequest = {
       requested_by: payload.requested_by,
       reason: payload.reason,
       team_id: team.team_id,

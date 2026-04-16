@@ -264,10 +264,56 @@ describe('TicketService', () => {
   describe('deleteTicket', () => {
     it('soft deletes an active ticket', async () => {
       const deleteStub = sinon.stub(TicketRepository.prototype, 'deleteTicket').resolves(mockTicket);
+      const getDataRequestsStub = sinon.stub(DataRequestService.prototype, 'findDataRequestsByTicketId').resolves([]);
 
       await service.deleteTicket(mockTicket.ticket_id);
 
+      expect(getDataRequestsStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(deleteStub).to.have.been.calledWith(mockTicket.ticket_id);
+    });
+
+    it('throws when deleting ticket with requested data requests', async () => {
+      const deleteStub = sinon.stub(TicketRepository.prototype, 'deleteTicket').resolves(mockTicket);
+      const dataRequest: DataRequest = {
+        data_request_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        reason: 'Need access',
+        team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        requested_by: 1,
+        ticket_id: mockTicket.ticket_id,
+        policy_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+        status: 'requested'
+      };
+      sinon.stub(DataRequestService.prototype, 'findDataRequestsByTicketId').resolves([dataRequest]);
+
+      try {
+        await service.deleteTicket(mockTicket.ticket_id);
+        expect.fail();
+      } catch (error) {
+        expect((error as Error).message).to.equal('Cannot delete tickets that have unaddressed data requests');
+        expect(deleteStub).to.not.have.been.called;
+      }
+    });
+
+    it('throws when deleting ticket with reviewed data requests', async () => {
+      const deleteStub = sinon.stub(TicketRepository.prototype, 'deleteTicket').resolves(mockTicket);
+      const dataRequest: DataRequest = {
+        data_request_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        reason: 'Need access',
+        team_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        requested_by: 1,
+        ticket_id: mockTicket.ticket_id,
+        policy_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+        status: 'reviewed'
+      };
+      sinon.stub(DataRequestService.prototype, 'findDataRequestsByTicketId').resolves([dataRequest]);
+
+      try {
+        await service.deleteTicket(mockTicket.ticket_id);
+        expect.fail();
+      } catch (error) {
+        expect((error as Error).message).to.equal('Cannot delete tickets that have unaddressed data requests');
+        expect(deleteStub).to.not.have.been.called;
+      }
     });
   });
 

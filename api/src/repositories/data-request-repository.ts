@@ -1,4 +1,5 @@
 import { Knex } from 'knex';
+import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { CreateDataRequest, DataRequest, DataRequestFilters, UpdateDataRequest } from '../models/data-request';
@@ -181,27 +182,63 @@ export class DataRequestRepository extends BaseRepository {
   }
 
   /**
+   * Find a data request by linked policy ID and return null when not found.
+   *
+   * @param {string} policyId - Policy UUID.
+   * @return {Promise<(DataRequest | null)>} Matching data request or null.
+   * @memberof DataRequestRepository
+   */
+  async findDataRequestByPolicy(policyId: string): Promise<DataRequest | null> {
+    const knex = getKnex();
+    const query = knex('data_request as dr')
+      .select(
+        'dr.data_request_id',
+        'dr.team_id',
+        'dr.reason',
+        'dr.requested_by',
+        'dr.ticket_id',
+        'dr.policy_id',
+        'p.status as status',
+        'dr.create_date'
+      )
+      .join('policy as p', 'p.policy_id', 'dr.policy_id')
+      .where('dr.policy_id', policyId)
+      .whereNull('dr.record_end_date')
+      .whereNull('p.record_end_date');
+
+    const response = await this.connection.knex(query, DataRequest);
+    return response.rows[0] ?? null;
+  }
+
+  /**
    * Create a data request row.
    *
-   * @param {Omit<CreateDataRequest, 'system_user_ids'> & { team_id: string; policy_id: string }} payload - Insert payload.
+   * @param {CreateDataRequest} payload - Insert payload.
    * @return {Promise<DataRequest>} Created data request.
    * @memberof DataRequestRepository
    */
-  async createDataRequest(
-    payload: Omit<CreateDataRequest, 'system_user_ids'> & { team_id: string; policy_id: string }
-  ): Promise<DataRequest> {
-    const knex = getKnex();
-    const query = knex('data_request')
-      .insert({
-        requested_by: payload.requested_by,
-        team_id: payload.team_id,
-        reason: payload.reason,
-        ticket_id: payload.ticket_id,
-        policy_id: payload.policy_id
-      })
-      .returning(['requested_by', 'team_id', 'data_request_id', 'reason', 'ticket_id', 'policy_id', 'create_date']);
+  async createDataRequest(payload: CreateDataRequest): Promise<DataRequest> {
+    const query = SQL`
+      WITH inserted_data_request AS (
+        INSERT INTO data_request (requested_by, team_id, reason, ticket_id, policy_id)
+        VALUES (${payload.requested_by}, ${payload.team_id}, ${payload.reason}, ${payload.ticket_id}, ${payload.policy_id})
+        RETURNING requested_by, team_id, data_request_id, reason, ticket_id, policy_id, create_date
+      )
+      SELECT
+        dr.requested_by,
+        dr.team_id,
+        dr.data_request_id,
+        dr.reason,
+        dr.ticket_id,
+        dr.policy_id,
+        p.status AS status,
+        dr.create_date
+      FROM inserted_data_request dr
+      JOIN policy p ON p.policy_id = dr.policy_id
+      WHERE p.record_end_date IS NULL;
+    `;
 
-    const response = await this.connection.knex(query, DataRequest.omit({ status: true }));
+    const response = await this.connection.sql(query, DataRequest);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to create data request', [
@@ -210,10 +247,7 @@ export class DataRequestRepository extends BaseRepository {
       ]);
     }
 
-    return {
-      ...response.rows[0],
-      status: 'requested'
-    } as DataRequest;
+    return response.rows[0];
   }
 
   /**

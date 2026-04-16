@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { CreateDataRequest, DataRequest, UpdateDataRequest } from '../models/data-request';
+import { CreateDataRequestPayload, DataRequest, UpdateDataRequest } from '../models/data-request';
 import { PolicyEffect } from '../models/policy-statement';
 import { TeamMemberWithUser } from '../models/team-member';
 import { DataRequestRepository } from '../repositories/data-request-repository';
@@ -60,7 +60,7 @@ describe('DataRequestService', () => {
       statements: []
     };
 
-    const payload: CreateDataRequest = {
+    const payload: CreateDataRequestPayload = {
       requested_by: mockDataRequest.requested_by,
       reason: 'New research project',
       ticket_id: mockDataRequest.ticket_id,

@@ -230,18 +230,22 @@ describe('DataRequestRepository', () => {
 
   describe('createDataRequest', () => {
     it('should create and return a new data request', async () => {
+      const createdDataRequest: DataRequest = {
+        ...mockDataRequest,
+        status: 'reviewed'
+      };
       const mockQueryResponse = {
         rowCount: 1,
-        rows: [mockDataRequest]
+        rows: [createdDataRequest]
       } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
+        sql: async () => mockQueryResponse
       });
 
       const repo = new DataRequestRepository(mockDBConnection);
 
-      const payload: Omit<CreateDataRequest, 'system_user_ids'> & { team_id: string; policy_id: string } = {
+      const payload: CreateDataRequest = {
         requested_by: mockDataRequest.requested_by,
         reason: 'New research project',
         team_id: mockDataRequest.team_id,
@@ -251,7 +255,7 @@ describe('DataRequestRepository', () => {
 
       const result = await repo.createDataRequest(payload);
 
-      expect(result).to.eql(mockDataRequest);
+      expect(result).to.eql(createdDataRequest);
     });
 
     it('should throw error when rowCount !== 1 on data request insert', async () => {
@@ -261,12 +265,12 @@ describe('DataRequestRepository', () => {
       } as unknown as QueryResult<any>;
 
       const mockDBConnection = getMockDBConnection({
-        knex: async () => mockQueryResponse
+        sql: async () => mockQueryResponse
       });
 
       const repo = new DataRequestRepository(mockDBConnection);
 
-      const payload: Omit<CreateDataRequest, 'system_user_ids'> & { team_id: string; policy_id: string } = {
+      const payload: CreateDataRequest = {
         requested_by: mockDataRequest.requested_by,
         reason: 'Test',
         team_id: mockDataRequest.team_id,

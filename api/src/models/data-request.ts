@@ -27,9 +27,18 @@ export const CreateDataRequest = z.object({
   requested_by: z.number().int(),
   reason: z.string(),
   ticket_id: z.string().uuid(),
-  system_user_ids: z.array(z.number().int())
+  team_id: z.string().uuid(),
+  policy_id: z.string().uuid()
 });
 export type CreateDataRequest = z.infer<typeof CreateDataRequest>;
+
+export const CreateDataRequestPayload = z.object({
+  requested_by: z.number().int(),
+  reason: z.string(),
+  ticket_id: z.string().uuid(),
+  system_user_ids: z.array(z.number().int())
+});
+export type CreateDataRequestPayload = z.infer<typeof CreateDataRequestPayload>;
 
 export const UpdateDataRequest = z.object({
   reason: z.string().optional()

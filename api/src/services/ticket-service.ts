@@ -216,6 +216,26 @@ export class TicketService extends DBService {
    * @memberof TicketService
    */
   async deleteTicket(ticketId: string): Promise<void> {
+    const dataRequests = await this.dataRequestService.findDataRequestsByTicketId(ticketId);
+    this.assertCanDeleteTicket(dataRequests.map((dataRequest) => dataRequest.status));
+
     await this.ticketRepository.deleteTicket(ticketId);
+  }
+
+  /**
+   * Assert that a ticket can be deleted based on linked data-request statuses.
+   *
+   * @private
+   * @param {PolicyStatus[]} dataRequestStatuses - Linked statuses.
+   * @return {void}
+   * @memberof TicketService
+   */
+  private assertCanDeleteTicket(dataRequestStatuses: PolicyStatus[]): void {
+    const blockedStatuses = new Set(['requested', 'reviewed']);
+    const hasBlockedStatuses = dataRequestStatuses.some((status) => blockedStatuses.has(status));
+
+    if (hasBlockedStatuses) {
+      throw new HTTP400('Cannot delete tickets that have unaddressed data requests');
+    }
   }
 }
