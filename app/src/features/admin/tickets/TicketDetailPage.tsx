@@ -50,7 +50,11 @@ export const TicketDetailPageContent = (props: ITicketDetailPageContentProps) =>
               }}>
               <Stack spacing={4} sx={{ flex: '1 1 0', minWidth: { xs: '100%', md: 560 } }}>
                 <TicketTimeline
-                  history={[...(ticket?.statuses ?? []), ...(ticket?.comments ?? [])].sort(sortChronological)}
+                  history={[
+                    ...(ticket?.statuses ?? []),
+                    ...(ticket?.comments ?? []),
+                    ...(ticket?.data_requests ?? [])
+                  ].sort(sortChronological)}
                   isLoading={isLoading}
                 />
                 {ticket?.status === 'open' && (
@@ -64,7 +68,11 @@ export const TicketDetailPageContent = (props: ITicketDetailPageContentProps) =>
               </Stack>
 
               <Box sx={{ width: { xs: '100%', sm: 340 }, flex: { xs: '1 1 100%', sm: '0 0 340px' } }}>
-                <TicketSidebar teamId={ticket?.team_id} references={ticket?.references} />
+                <TicketSidebar
+                  teamId={ticket?.team_id}
+                  references={ticket?.references}
+                  dataRequests={ticket?.data_requests}
+                />
               </Box>
             </Stack>
           </PageSection>

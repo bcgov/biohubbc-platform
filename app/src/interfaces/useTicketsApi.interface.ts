@@ -1,4 +1,5 @@
 import { ApiPaginationRequestOptions, ApiPaginationResponseParams } from 'types/pagination';
+import { DataRequestResponse } from './useDataRequestApi.interface';
 
 export type TicketStatus = 'open' | 'closed';
 export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
@@ -17,11 +18,13 @@ export interface ITicket {
 export interface ITicketStatusHistory {
   ticket_status_history_id?: string | null;
   ticket_comment_id?: string | null;
+  data_request_id?: string | null;
   ticket_id: string;
   user_identifier: string;
   create_date: string;
   status?: TicketStatus | null;
   comment?: string | null;
+  reason?: string | null;
 }
 
 export interface ITicketStatusLog {
@@ -66,6 +69,7 @@ export interface ITicketWithHistory extends ITicket {
   statuses: ITicketStatusLog[];
   comments: ITicketCommentLog[];
   references: ITicketReference[];
+  data_requests: DataRequestResponse[];
 }
 
 export interface ICreateTicketRequest {

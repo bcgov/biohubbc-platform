@@ -1,5 +1,6 @@
 import { fireEvent } from '@testing-library/react';
 import { GridColDef } from '@mui/x-data-grid';
+import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { useApi } from 'hooks/useApi';
 import { IPolicy } from 'interfaces/usePoliciesApi.interface';
 import { ITeamPolicyDetails } from 'interfaces/useTeamPoliciesApi.interface';
@@ -60,9 +61,27 @@ const mockTeams: ITeam[] = [
 ];
 
 const mockPolicies: IPolicy[] = [
-  { policy_id: 'policy-1', name: 'Data Access Policy', description: 'Access policy', statements: [] },
-  { policy_id: 'policy-2', name: 'Security Policy', description: 'Security policy', statements: [] },
-  { policy_id: 'policy-3', name: 'Admin Policy', description: 'Admin policy', statements: [] }
+  {
+    policy_id: 'policy-1',
+    name: 'Data Access Policy',
+    description: 'Access policy',
+    status: PolicyStatus.APPROVED,
+    statements: []
+  },
+  {
+    policy_id: 'policy-2',
+    name: 'Security Policy',
+    description: 'Security policy',
+    status: PolicyStatus.APPROVED,
+    statements: []
+  },
+  {
+    policy_id: 'policy-3',
+    name: 'Admin Policy',
+    description: 'Admin policy',
+    status: PolicyStatus.APPROVED,
+    statements: []
+  }
 ];
 
 const mockCreateTeamPolicies = vi.fn();

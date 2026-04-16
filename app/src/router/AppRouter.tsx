@@ -3,10 +3,9 @@ import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
 import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import BaseLayout from 'layouts/BaseLayout';
-import { Routes, Route, Navigate, Outlet } from 'react-router';
+import { Navigate, Outlet, Route, Routes } from 'react-router';
 import { PageTitle } from 'utils/RouteWithMeta';
 import { AdminRouter } from './admin/AdminRouter';
-import { DataRequestRouter } from './data-request/DataRequestRouter';
 import { PortalRouter } from './portal/PortalRouter';
 import { SearchRouter } from './search/SearchRouter';
 import { SubmissionRouter } from './submission/SubmissionRouter';
@@ -68,17 +67,6 @@ export const AppRouter = () => {
               <PortalRouter />
             </AuthenticatedRouteGuard>
           </BaseLayout>
-        }
-      />
-
-      {/* Data Request Routes */}
-      <Route
-        path="/data-request/*"
-        element={
-          <>
-            <PageTitle title="Data Request" description="Data requests for secured data" />
-            <DataRequestRouter />
-          </>
         }
       />
 
