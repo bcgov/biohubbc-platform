@@ -1,6 +1,8 @@
 // System integration tests for the download pipeline. Requires MinIO (S3) to be running.
 //
-// 1. Download Worker — full flow via pg-boss (publish job → worker picks up → zip → S3 → status ready)
+// 1. Download Worker — full flow via pg-boss:
+//    a. CSV/zip path: publish job → worker picks up → zip → S3 → status ready
+//    b. Parquet path: publish job → worker picks up → per-type .parquet files → S3 → status ready
 // 2. DownloadPipelineService planDownloadIfNeeded/processFragment/finalizeDownload — calls service methods directly to verify
 //    CSV generation, zip packaging, column union, empty data, file features, and error placeholders.
 //
@@ -80,6 +82,7 @@ describe('Download Worker', function () {
   const createdDownloadIds: number[] = [];
   const createdCartIds: string[] = [];
   const createdSubmissionFeatureIds: number[] = [];
+  const createdSubmissionUploadIds: string[] = [];
   const createdSubmissionIds: number[] = [];
   const createdTicketIds: string[] = [];
   const createdS3Keys: string[] = [];
@@ -105,8 +108,9 @@ describe('Download Worker', function () {
   after(async () => {
     // Cleanup in reverse dependency order
     try {
-      // 1. Delete downloads (cascades to download_fragment, download_fragment_feature)
+      // 1. Delete download_artifact (parquet downloads create this link), then downloads
       if (createdDownloadIds.length > 0) {
+        await db('biohub.download_artifact').whereIn('download_id', createdDownloadIds).del();
         await db('biohub.download').whereIn('download_id', createdDownloadIds).del();
       }
 
@@ -123,6 +127,12 @@ describe('Download Worker', function () {
       // 2b. Delete artifact records
       if (createdArtifactIds.length > 0) {
         await db('biohub.artifact').whereIn('artifact_id', createdArtifactIds).del();
+      }
+
+      // 2c. Delete submission_upload (and its child submission_upload_status) before submission
+      if (createdSubmissionUploadIds.length > 0) {
+        await db('biohub.submission_upload_status').whereIn('submission_upload_id', createdSubmissionUploadIds).del();
+        await db('biohub.submission_upload').whereIn('submission_upload_id', createdSubmissionUploadIds).del();
       }
 
       // 3. Delete submissions
@@ -204,6 +214,7 @@ describe('Download Worker', function () {
         create_user: SYSTEM_USER_ID
       })
       .returning('submission_upload_id');
+    createdSubmissionUploadIds.push(bridge.submission_upload_id);
 
     const [row] = await db('biohub.submission_feature')
       .insert({
@@ -224,11 +235,14 @@ describe('Download Worker', function () {
   /**
    * Create a cart-backed download, publish the job to pg-boss, and wait for completion.
    * Features are resolved at pipeline time from cart_submission_feature via download.cart_id.
+   *
+   * For parquet format, also creates the artifact + download_artifact link required by the
+   * pipeline to resolve the S3 key prefix (mirrors DownloadService.createDownload).
    */
   async function createDownloadAndProcess(
     featureIds: number[],
     downloadOverrides?: Record<string, unknown>
-  ): Promise<number> {
+  ): Promise<{ downloadId: number; artifactObjectKey: string | null }> {
     // Create a cart and link features (raw Knex — system tests don't use IDBConnection)
     const [cart] = await db('biohub.cart')
       .insert({
@@ -249,17 +263,49 @@ describe('Download Worker', function () {
       );
     }
 
+    const format = (downloadOverrides?.format as string) ?? 'csv';
+
     // Create download with cart_id FK — pipeline resolves features from cart_submission_feature
     const [download] = await db('biohub.download')
       .insert({
         download_status: 'pending',
         cart_id: cart.cart_id,
-        format: 'csv',
+        format,
         create_user: SYSTEM_USER_ID,
         ...downloadOverrides
       })
       .returning('download_id');
     createdDownloadIds.push(download.download_id);
+
+    // Parquet pipeline needs artifact + download_artifact to resolve the S3 key prefix.
+    // Mirror the timestamp pattern from DownloadService.createDownload (download-service.ts:71-78)
+    let artifactObjectKey: string | null = null;
+    if (format === 'parquet') {
+      const timestamp = new Date()
+        .toISOString()
+        .replace(/:/g, '')
+        .replace(/\.\d{3}/, '');
+      artifactObjectKey = `downloads/${download.download_id}/download-${timestamp}.parquet`;
+      const bucketName = process.env.OBJECT_STORE_BUCKET_NAME!;
+      const [artifact] = await db('biohub.artifact')
+        .insert({
+          bucket: bucketName,
+          object_key: artifactObjectKey,
+          byte_size: null,
+          artifact_status: 'pending',
+          uploaded_at: null,
+          format: 'parquet',
+          create_user: SYSTEM_USER_ID
+        })
+        .returning('artifact_id');
+      createdArtifactIds.push(artifact.artifact_id);
+
+      await db('biohub.download_artifact').insert({
+        download_id: download.download_id,
+        artifact_id: artifact.artifact_id,
+        create_user: SYSTEM_USER_ID
+      });
+    }
 
     const boss = await initPgBoss();
     await boss.createQueue('process-download');
@@ -271,8 +317,76 @@ describe('Download Worker', function () {
 
     await waitForDownloadStatus(db, download.download_id, 'ready');
 
-    return download.download_id;
+    return { downloadId: download.download_id, artifactObjectKey };
   }
+
+  it('should process a parquet download job and upload per-type files to S3', async () => {
+    // 1. Create test data: submission with parent dataset and child sample_site
+    const submissionId = await createTestSubmission();
+
+    const datasetFeatureId = await createTestFeature(submissionId, 'dataset', {
+      name: 'Parquet Integration Test Dataset',
+      start_date: '2024-01-01T00:00:00.000Z',
+      end_date: '2024-12-31T00:00:00.000Z',
+      geometry: { type: 'Point', coordinates: [-124.856, 54.321] }
+    });
+
+    const sampleSiteFeatureId = await createTestFeature(
+      submissionId,
+      'sample_site',
+      {
+        name: 'Parquet Test Site',
+        description: 'Integration test sample site',
+        geometry: { type: 'Point', coordinates: [-130.849, 56.207] }
+      },
+      datasetFeatureId
+    );
+
+    // 2. Create parquet download, publish job, and wait for completion
+    const { downloadId, artifactObjectKey } = await createDownloadAndProcess(
+      [datasetFeatureId, sampleSiteFeatureId],
+      { format: 'parquet' }
+    );
+
+    // 3. Verify download status transitions completed
+    const [finalDownload] = await db('biohub.download').where('download_id', downloadId).select('*');
+    expect(finalDownload.download_status).to.equal('ready');
+    expect(finalDownload.format).to.equal('parquet');
+    expect(finalDownload.completed_at).to.not.be.null;
+
+    // 4. Verify artifact status updated to 'uploaded'
+    const [artifact] = await db('biohub.artifact')
+      .whereIn(
+        'artifact_id',
+        db('biohub.download_artifact').select('artifact_id').where('download_id', downloadId)
+      )
+      .select('*');
+    expect(artifact.artifact_status).to.equal('uploaded');
+
+    // 5. Verify per-feature-type Parquet files exist on S3
+    const datasetKey = `${artifactObjectKey}/dataset/data.parquet`;
+    const sampleSiteKey = `${artifactObjectKey}/sample_site/data.parquet`;
+    createdS3Keys.push(datasetKey, sampleSiteKey);
+
+    const datasetMeta = await storageService.getMetadata(BucketType.MAIN, datasetKey);
+    expect(datasetMeta).to.exist;
+    expect(datasetMeta.ContentLength).to.be.greaterThan(0);
+
+    const sampleSiteMeta = await storageService.getMetadata(BucketType.MAIN, sampleSiteKey);
+    expect(sampleSiteMeta).to.exist;
+    expect(sampleSiteMeta.ContentLength).to.be.greaterThan(0);
+
+    // 6. Verify Parquet files have valid headers (PAR1 magic bytes)
+    const datasetStream = await storageService.getFileStream(BucketType.MAIN, datasetKey);
+    const datasetChunks: Buffer[] = [];
+    for await (const chunk of datasetStream) {
+      datasetChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    const datasetBuffer = Buffer.concat(datasetChunks);
+    // Parquet magic bytes: PAR1 at start and end of file
+    expect(datasetBuffer.subarray(0, 4).toString()).to.equal('PAR1');
+    expect(datasetBuffer.subarray(datasetBuffer.length - 4).toString()).to.equal('PAR1');
+  });
 
   it('should process a download job and upload zip to S3', async () => {
     // 1. Create test data: submission with parent dataset and child features
@@ -329,7 +443,7 @@ describe('Download Worker', function () {
     );
 
     // 2. Create download, link features, publish job, and wait for completion
-    const downloadId = await createDownloadAndProcess([datasetFeatureId, sampleSiteFeatureId, fileFeatureId]);
+    const { downloadId } = await createDownloadAndProcess([datasetFeatureId, sampleSiteFeatureId, fileFeatureId]);
 
     // 3. Verify download record was updated correctly
     const [finalDownload] = await db('biohub.download').where('download_id', downloadId).select('*');
@@ -438,7 +552,7 @@ describe('Download Worker', function () {
     const fileFeatureIdB = await createTestFeature(submissionId, 'file', { file: testFileB.key }, datasetFeatureId);
 
     // 2. Create download with tiny fragment size, link features, publish job, and wait
-    const downloadId = await createDownloadAndProcess(
+    const { downloadId } = await createDownloadAndProcess(
       [datasetFeatureId, telemetryFeatureId, fileFeatureIdA, fileFeatureIdB],
       { fragment_size_bytes: 1 }
     );
