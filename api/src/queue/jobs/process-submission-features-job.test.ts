@@ -54,9 +54,10 @@ describe('process-submission-features-job', () => {
         ...defaultSubmissionUpload,
         status: 'uploaded'
       });
-      sinon
-        .stub(SubmissionUploadService.prototype, 'tryTransitionSubmissionUploadStatus')
-        .resolves(true);
+      sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToIngesting').resolves();
+      sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToIngested').resolves();
+      sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToInvalid').resolves();
+      sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus').resolves();
       sinon.stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatus').resolves();
       sinon
         .stub(UploadArchiveService.prototype, 'updateUploadArchivesByUploadId')
@@ -71,9 +72,11 @@ describe('process-submission-features-job', () => {
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);
 
-      const updateStatusStub = SubmissionUploadService.prototype.tryTransitionSubmissionUploadStatus as sinon.SinonStub;
-      expect(updateStatusStub.calledWith('test-sub-upload-id', 'ingesting', sinon.match.array)).to.be.true;
-      expect(updateStatusStub.calledWith('test-sub-upload-id', 'ingested', sinon.match.array)).to.be.true;
+      const toIngestingStub = SubmissionUploadService.prototype
+        .transitionSubmissionUploadToIngesting as sinon.SinonStub;
+      const toIngestedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIngested as sinon.SinonStub;
+      expect(toIngestingStub.calledWith('test-sub-upload-id')).to.be.true;
+      expect(toIngestedStub.calledWith('test-sub-upload-id')).to.be.true;
       expect(publishStub.calledOnce).to.be.true;
     });
 
@@ -85,9 +88,10 @@ describe('process-submission-features-job', () => {
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);
 
-      const updateStatusStub = SubmissionUploadService.prototype.tryTransitionSubmissionUploadStatus as sinon.SinonStub;
-      expect(updateStatusStub.calledWith('test-sub-upload-id', 'ingested', sinon.match.array)).to.be.true;
-      expect(updateStatusStub.neverCalledWith('test-sub-upload-id', 'failed', sinon.match.any)).to.be.true;
+      const toIngestedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIngested as sinon.SinonStub;
+      const toFailedStub = SubmissionUploadService.prototype.transitionSubmissionUploadStatus as sinon.SinonStub;
+      expect(toIngestedStub.calledWith('test-sub-upload-id')).to.be.true;
+      expect(toFailedStub.calledWith('test-sub-upload-id', 'failed')).to.be.false;
     });
 
     it('marks upload invalid when ingestion returns deterministic validation errors', async () => {
@@ -100,8 +104,8 @@ describe('process-submission-features-job', () => {
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);
 
-      const updateStatusStub = SubmissionUploadService.prototype.tryTransitionSubmissionUploadStatus as sinon.SinonStub;
-      expect(updateStatusStub.calledWith('test-sub-upload-id', 'invalid', sinon.match.array)).to.be.true;
+      const toInvalidStub = SubmissionUploadService.prototype.transitionSubmissionUploadToInvalid as sinon.SinonStub;
+      expect(toInvalidStub.calledWith('test-sub-upload-id')).to.be.true;
       expect(publishStub.called).to.be.false;
     });
 
@@ -112,8 +116,8 @@ describe('process-submission-features-job', () => {
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);
 
-      const updateStatusStub = SubmissionUploadService.prototype.tryTransitionSubmissionUploadStatus as sinon.SinonStub;
-      expect(updateStatusStub.calledWith('test-sub-upload-id', 'invalid', sinon.match.array)).to.be.true;
+      const toInvalidStub = SubmissionUploadService.prototype.transitionSubmissionUploadToInvalid as sinon.SinonStub;
+      expect(toInvalidStub.calledWith('test-sub-upload-id')).to.be.true;
     });
 
     it('marks upload failed and rethrows on ingestion system exceptions', async () => {
@@ -127,8 +131,10 @@ describe('process-submission-features-job', () => {
         expect(error).to.equal(testError);
       }
 
-      const updateStatusStub = SubmissionUploadService.prototype.tryTransitionSubmissionUploadStatus as sinon.SinonStub;
-      expect(updateStatusStub.calledWith('test-sub-upload-id', 'failed', sinon.match.array)).to.be.true;
+      const toFailedStub = SubmissionUploadService.prototype.transitionSubmissionUploadStatus as sinon.SinonStub;
+      expect(
+        toFailedStub.calledWith('test-sub-upload-id', 'failed', ['uploaded', 'ingesting', 'ingested', 'indexing'])
+      ).to.be.true;
     });
 
     it('skips processing when current status is terminal', async () => {
@@ -150,8 +156,8 @@ describe('process-submission-features-job', () => {
       stubConnections();
 
       const updateUploadStub = sinon
-        .stub(SubmissionUploadService.prototype, 'tryTransitionSubmissionUploadStatus')
-        .resolves(true);
+        .stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus')
+        .resolves();
       const updateValidationStub = sinon
         .stub(SubmissionValidationService.prototype, 'updateSubmissionValidationStatusBySubmissionUploadId')
         .resolves();
@@ -165,7 +171,9 @@ describe('process-submission-features-job', () => {
       await processSubmissionFeaturesFailedHandler([job]);
 
       expect(updateValidationStub.calledOnce).to.be.true;
-      expect(updateUploadStub.calledWith('test-sub-upload-id', 'failed', sinon.match.array)).to.be.true;
+      expect(
+        updateUploadStub.calledWith('test-sub-upload-id', 'failed', ['uploaded', 'ingesting', 'ingested', 'indexing'])
+      ).to.be.true;
     });
   });
 });

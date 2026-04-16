@@ -54,7 +54,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToIndexing').resolves();
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToInvalid').resolves();
     sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToIndexed').resolves();
-    sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToFailedIfMutable').resolves(true);
+    sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus').resolves();
   });
 
   it('indexes successfully and sets indexed', async () => {
@@ -138,9 +138,10 @@ describe('indexSubmissionFeaturesJobHandler', () => {
       expect(error).to.equal(testError);
     }
 
-    const toFailedIfMutableStub = SubmissionUploadService.prototype
-      .transitionSubmissionUploadToFailedIfMutable as sinon.SinonStub;
-    expect(toFailedIfMutableStub.calledWith('submission-upload-1')).to.be.true;
+    const transitionStatusStub = SubmissionUploadService.prototype.transitionSubmissionUploadStatus as sinon.SinonStub;
+    expect(
+      transitionStatusStub.calledWith('submission-upload-1', 'failed', ['uploaded', 'ingesting', 'ingested', 'indexing'])
+    ).to.be.true;
   });
 });
 

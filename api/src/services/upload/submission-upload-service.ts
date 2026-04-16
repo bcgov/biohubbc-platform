@@ -149,35 +149,13 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
-   * Attempt a status transition. Returns false when current status is not allowed.
-   *
-   * @param {string} submissionUploadId
-   * @param {SubmissionUpload['status']} nextStatus
-   * @param {SubmissionUpload['status'][]} allowedCurrentStatuses
-   * @returns {Promise<boolean>}
-   */
-  async tryTransitionSubmissionUploadStatus(
-    submissionUploadId: string,
-    nextStatus: SubmissionUpload['status'],
-    allowedCurrentStatuses: SubmissionUpload['status'][]
-  ): Promise<boolean> {
-    try {
-      await this.transitionSubmissionUploadStatus(submissionUploadId, nextStatus, allowedCurrentStatuses);
-      return true;
-    } catch (error) {
-      if (error instanceof ApiConflictError) {
-        return false;
-      }
-
-      throw error;
-    }
-  }
-
-  /**
    * Transition to indexing when index stage starts.
    * - ingested -> indexing
    * - indexing -> indexing (no-op)
    * - all other statuses -> conflict
+   *
+   * @param {string} submissionUploadId Submission upload scope.
+   * @returns {Promise<void>}
    */
   async transitionSubmissionUploadToIndexing(submissionUploadId: string): Promise<void> {
     const current = await this.getSubmissionUpload(submissionUploadId);
@@ -191,10 +169,53 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
+   * Transition to ingesting when process stage starts.
+   * - uploaded -> ingesting
+   * - ingesting -> ingesting (no-op)
+   * - all other statuses -> conflict
+   *
+   * @param {string} submissionUploadId Submission upload scope.
+   * @returns {Promise<void>}
+   */
+  async transitionSubmissionUploadToIngesting(submissionUploadId: string): Promise<void> {
+    const current = await this.getSubmissionUpload(submissionUploadId);
+
+    if (current.status === 'ingesting') {
+      return;
+    }
+
+    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'ingesting', ['uploaded']);
+    await this.updateSubmissionUpload(submissionUploadId, { status: 'ingesting' });
+  }
+
+  /**
+   * Transition to ingested when process stage completes successfully.
+   * - ingesting -> ingested
+   * - ingested -> ingested (no-op)
+   * - all other statuses -> conflict
+   *
+   * @param {string} submissionUploadId Submission upload scope.
+   * @returns {Promise<void>}
+   */
+  async transitionSubmissionUploadToIngested(submissionUploadId: string): Promise<void> {
+    const current = await this.getSubmissionUpload(submissionUploadId);
+
+    if (current.status === 'ingested') {
+      return;
+    }
+
+    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'ingested', ['ingesting']);
+    await this.updateSubmissionUpload(submissionUploadId, { status: 'ingested' });
+  }
+
+  /**
    * Transition to indexed when index stage completes successfully.
    * - indexing|ingested -> indexed
    * - indexed -> indexed (no-op)
    * - all other statuses -> conflict
+   *
+   * @param {string} submissionUploadId Submission upload scope.
+   * @returns {Promise<void>}
    */
   async transitionSubmissionUploadToIndexed(submissionUploadId: string): Promise<void> {
     const current = await this.getSubmissionUpload(submissionUploadId);
@@ -212,9 +233,12 @@ export class SubmissionUploadService extends DBService {
 
   /**
    * Transition to invalid for deterministic validation failure.
-   * - indexing|ingested -> invalid
+   * - uploaded|ingesting|ingested|indexing -> invalid
    * - invalid -> invalid (no-op)
    * - all other statuses -> conflict
+   *
+   * @param {string} submissionUploadId Submission upload scope.
+   * @returns {Promise<void>}
    */
   async transitionSubmissionUploadToInvalid(submissionUploadId: string): Promise<void> {
     const current = await this.getSubmissionUpload(submissionUploadId);
@@ -224,24 +248,12 @@ export class SubmissionUploadService extends DBService {
     }
 
     this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'invalid', [
-      'indexing',
-      'ingested'
-    ]);
-    await this.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
-  }
-
-  /**
-   * Conditionally transition to failed if status is mutable.
-   * - uploaded|ingesting|ingested|indexing -> failed
-   * - terminal/non-mutable statuses -> no-op (false)
-   */
-  async transitionSubmissionUploadToFailedIfMutable(submissionUploadId: string): Promise<boolean> {
-    return this.tryTransitionSubmissionUploadStatus(submissionUploadId, 'failed', [
       'uploaded',
       'ingesting',
       'ingested',
       'indexing'
     ]);
+    await this.updateSubmissionUpload(submissionUploadId, { status: 'invalid' });
   }
 
   /**

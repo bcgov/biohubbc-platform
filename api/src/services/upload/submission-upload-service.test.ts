@@ -230,33 +230,71 @@ describe('SubmissionUploadService', () => {
     });
   });
 
-  describe('tryTransitionSubmissionUploadStatus', () => {
-    it('returns false when transition would violate allowed current statuses', async () => {
+  describe('transitionSubmissionUploadToIngesting', () => {
+    it('updates status from uploaded to ingesting', async () => {
       sinon.stub(service, 'getSubmissionUpload').resolves({
         submission_upload_id: 'artifact-1',
         submission_id: 1,
         upload_id: 'upload-1',
-        status: 'invalid',
+        status: 'uploaded',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      });
+      const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1'
+      });
+
+      await service.transitionSubmissionUploadToIngesting('artifact-1');
+      expect(updateStub).to.have.been.calledWith('artifact-1', { status: 'ingesting' });
+    });
+
+    it('no-ops when already ingesting', async () => {
+      sinon.stub(service, 'getSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1',
+        submission_id: 1,
+        upload_id: 'upload-1',
+        status: 'ingesting',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      });
+      const updateStub = sinon.stub(service, 'updateSubmissionUpload');
+
+      await service.transitionSubmissionUploadToIngesting('artifact-1');
+      expect(updateStub.called).to.equal(false);
+    });
+  });
+
+  describe('transitionSubmissionUploadToIngested', () => {
+    it('updates status from ingesting to ingested', async () => {
+      sinon.stub(service, 'getSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1',
+        submission_id: 1,
+        upload_id: 'upload-1',
+        status: 'ingesting',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      });
+      const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1'
+      });
+
+      await service.transitionSubmissionUploadToIngested('artifact-1');
+      expect(updateStub).to.have.been.calledWith('artifact-1', { status: 'ingested' });
+    });
+
+    it('throws ApiConflictError from invalid source state', async () => {
+      sinon.stub(service, 'getSubmissionUpload').resolves({
+        submission_upload_id: 'artifact-1',
+        submission_id: 1,
+        upload_id: 'upload-1',
+        status: 'indexed',
         ticket_id: '11111111-1111-1111-1111-111111111111'
       });
 
-      const result = await service.tryTransitionSubmissionUploadStatus('artifact-1', 'ingesting', [
-        'uploaded',
-        'ingesting'
-      ]);
-
-      expect(result).to.equal(false);
-    });
-
-    it('rethrows non-conflict errors', async () => {
-      sinon.stub(service, 'getSubmissionUpload').rejects(new Error('database error'));
-
       try {
-        await service.tryTransitionSubmissionUploadStatus('artifact-1', 'ingesting', ['uploaded']);
-        expect.fail('Expected error not thrown');
+        await service.transitionSubmissionUploadToIngested('artifact-1');
+        expect.fail('Expected ApiConflictError not thrown');
       } catch (err) {
-        expect((err as Error).message).to.equal('database error');
+        expect(err).to.be.instanceOf(ApiConflictError);
       }
     });
   });
+
 });

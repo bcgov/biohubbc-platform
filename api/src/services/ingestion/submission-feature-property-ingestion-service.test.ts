@@ -30,18 +30,6 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     const stageStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'stageExpandedPropertiesBySubmissionUploadId')
       .resolves();
-    const createTempErrorTableStub = sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createIngestionErrorTempTable')
-      .resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createIngestionErrorTempUploadIndex')
-      .resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createIngestionErrorTempErrorCodeIndex')
-      .resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createIngestionErrorTempFeatureIndex')
-      .resolves();
     sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpUploadPropertyValuesTable').resolves();
     sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpResolvedStagedPropertiesTable')
@@ -58,55 +46,10 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     sinon
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpUploadFeatureTypePropertyMapFeatureTypePropertyNameIndex'
-      )
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpUploadFeatureTypePropertyMapFeatureTypePropertyIdIndex'
-      )
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
         'createTmpResolvedStagedPropertiesBySubmissionUploadId'
       )
       .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpResolvedStagedPropertiesSubmissionFeatureIndex'
-      )
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpResolvedStagedPropertiesFeatureTypePropertyIndex'
-      )
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpResolvedStagedPropertiesPropertyTypeIndex'
-      )
-      .resolves();
     sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createTmpUploadPropertyValuesTable').resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createTmpUploadPropertyValuesPropertyTypeIndex')
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpUploadPropertyValuesFeatureTypePropertyIndex'
-      )
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpUploadPropertyValuesSubmissionFeatureIndex'
-      )
-      .resolves();
     const requiredStub = sinon
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,
@@ -192,10 +135,6 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     const errorCountStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'getIngestionErrorCountBySubmissionUploadId')
       .resolves(0);
-    const publishErrorsStub = sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'publishTempIngestionErrorsBySubmissionUploadId')
-      .resolves();
-
     const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(
       99,
       '550e8400-e29b-41d4-a716-446655440000'
@@ -206,12 +145,10 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     expect(referenceErrorsStub.calledOnce).to.equal(true);
     expect(parentErrorsStub.calledOnce).to.equal(true);
     expect(outcome).to.eql({ status: 'ok' });
-    expect(publishErrorsStub.called).to.equal(false);
 
     sinon.assert.callOrder(
       deleteDerivedPropertiesStub,
       deleteRelationshipsStub,
-      createTempErrorTableStub,
       stageStub,
       deleteErrorsStub,
       requiredStub,
@@ -232,7 +169,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     );
   });
 
-  it('publishes temp errors and returns invalid outcome when validation errors exist', async () => {
+  it('returns invalid outcome when validation errors exist', async () => {
     const service = new SubmissionFeaturePropertyIngestionService(getMockDBConnection());
 
     sinon.stub(ContributorService.prototype, 'getContributorBySubmissionId').resolves({ contributor_id: 77 } as any);
@@ -245,16 +182,6 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       .resolves();
     sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'stageExpandedPropertiesBySubmissionUploadId')
-      .resolves();
-    sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createIngestionErrorTempTable').resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createIngestionErrorTempUploadIndex')
-      .resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createIngestionErrorTempErrorCodeIndex')
-      .resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createIngestionErrorTempFeatureIndex')
       .resolves();
     sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'dropTmpUploadPropertyValuesTable').resolves();
     sinon
@@ -272,55 +199,10 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     sinon
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpUploadFeatureTypePropertyMapFeatureTypePropertyNameIndex'
-      )
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpUploadFeatureTypePropertyMapFeatureTypePropertyIdIndex'
-      )
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
         'createTmpResolvedStagedPropertiesBySubmissionUploadId'
       )
       .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpResolvedStagedPropertiesSubmissionFeatureIndex'
-      )
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpResolvedStagedPropertiesFeatureTypePropertyIndex'
-      )
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpResolvedStagedPropertiesPropertyTypeIndex'
-      )
-      .resolves();
     sinon.stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createTmpUploadPropertyValuesTable').resolves();
-    sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'createTmpUploadPropertyValuesPropertyTypeIndex')
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpUploadPropertyValuesFeatureTypePropertyIndex'
-      )
-      .resolves();
-    sinon
-      .stub(
-        SubmissionFeaturePropertyIngestionRepository.prototype,
-        'createTmpUploadPropertyValuesSubmissionFeatureIndex'
-      )
-      .resolves();
     sinon
       .stub(
         SubmissionFeaturePropertyIngestionRepository.prototype,
@@ -417,10 +299,6 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
           details: null
         }
       ]);
-    const publishErrorsStub = sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'publishTempIngestionErrorsBySubmissionUploadId')
-      .resolves();
-
     const outcome = await service.indexSubmissionPropertiesBySubmissionUploadId(
       99,
       '550e8400-e29b-41d4-a716-446655440000'
@@ -428,7 +306,6 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
 
     expect(insertStringStub.called).to.equal(false);
     expect(insertRelationshipsStub.called).to.equal(false);
-    expect(publishErrorsStub.calledOnce).to.equal(true);
     expect(outcome.status).to.equal('invalid');
     if (outcome.status === 'invalid') {
       expect(outcome.errorCount).to.equal(2);

@@ -27,62 +27,20 @@ export type IngestionErrorCount = z.infer<typeof ErrorCountRow>;
 /**
  * Upload-scoped repository for set-based submission feature property ingestion.
  *
- * Important: temp working tables in this repository are session-scoped under `pg_temp`.
- * Callers must execute all phases for a job on a single open DB connection.
+ * Working tables in this repository are durable upload-scoped tables.
+ * Callers must clean and repopulate rows by `submission_upload_id` per job run.
  */
 export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository {
   /**
-   * Drop the temp staging table if it exists in the current session.
+   * Clear staging rows for one upload.
    *
+   * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async dropSubmissionFeaturePropertyStagingTempTable(): Promise<void> {
-    const sql = SQL`DROP TABLE IF EXISTS pg_temp.submission_feature_property_staging;`;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Create the temp staging table in the current session.
-   *
-   * @returns {Promise<void>}
-   */
-  async createSubmissionFeaturePropertyStagingTempTable(): Promise<void> {
+  async dropSubmissionFeaturePropertyStagingTempTable(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      CREATE TEMP TABLE pg_temp.submission_feature_property_staging (
-        submission_feature_property_staging_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        submission_feature_id integer NOT NULL,
-        submission_upload_id uuid NOT NULL,
-        feature_type_id integer NOT NULL,
-        property_name text NOT NULL,
-        value jsonb NOT NULL,
-        create_date timestamptz(6) DEFAULT now() NOT NULL
-      ) ON COMMIT DROP;
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Create the staging upload/type/property index used by metadata resolution joins.
-   *
-   * @returns {Promise<void>}
-   */
-  async createSubmissionFeaturePropertyStagingTempUploadFeatureIndex(): Promise<void> {
-    const sql = SQL`
-      CREATE INDEX tmp_submission_feature_property_staging_idx1
-      ON pg_temp.submission_feature_property_staging (submission_upload_id, feature_type_id, property_name);
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Create the staging upload/property index used by metadata key resolution.
-   *
-   * @returns {Promise<void>}
-   */
-  async createSubmissionFeaturePropertyStagingTempUploadPropertyIndex(): Promise<void> {
-    const sql = SQL`
-      CREATE INDEX tmp_submission_feature_property_staging_idx2
-      ON pg_temp.submission_feature_property_staging (submission_upload_id, property_name);
+      DELETE FROM submission_upload_staging_raw_property
+      WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
     await this.connection.sql(sql);
   }
@@ -166,7 +124,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    */
   async deleteIngestionErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      DELETE FROM pg_temp.submission_feature_ingestion_error
+      DELETE FROM submission_feature_error
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
 
@@ -181,7 +139,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    */
   async stageExpandedPropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      INSERT INTO pg_temp.submission_feature_property_staging (
+      INSERT INTO submission_upload_staging_raw_property (
         submission_feature_id,
         submission_upload_id,
         feature_type_id,
@@ -209,116 +167,66 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Create the session-scoped validation error table in `pg_temp`.
+   * Drop `submission_upload_staging_typed_property_value` if it exists.
    *
-   * This table is an intentional working-state accumulator for deep-validation phases (4-8).
-   * We collect the complete per-feature error snapshot here first so we can:
-   * - keep validation writes session-local and inexpensive
-   * - compute aggregate diagnostics (counts and representative samples)
-   * - publish one durable latest snapshot at the phase-9 fail-fast boundary
-   *
-   * This temp table is not the durable source of truth. Durable persistence happens when
-   * `publishTempIngestionErrorsBySubmissionUploadId` runs.
-   *
+   * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createIngestionErrorTempTable(): Promise<void> {
+  async dropTmpUploadPropertyValuesTable(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      CREATE TEMP TABLE IF NOT EXISTS pg_temp.submission_feature_ingestion_error (
-        submission_feature_ingestion_error_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-        submission_upload_id uuid NOT NULL,
-        submission_feature_id integer,
-        property_name text,
-        feature_type_property_id integer,
-        error_code text NOT NULL,
-        error_message text NOT NULL,
-        raw_value jsonb,
-        details jsonb,
-        create_date timestamptz(6) DEFAULT now() NOT NULL
-      ) ON COMMIT DROP;
+      DELETE FROM submission_upload_staging_typed_property_value
+      WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
     await this.connection.sql(sql);
   }
 
   /**
-   * Create an upload-scope index on `pg_temp.submission_feature_ingestion_error`.
+   * Drop `submission_upload_staging_resolved_property` if it exists.
    *
+   * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createIngestionErrorTempUploadIndex(): Promise<void> {
+  async dropTmpResolvedStagedPropertiesTable(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      CREATE INDEX IF NOT EXISTS tmp_submission_feature_ingestion_error_idx1
-      ON pg_temp.submission_feature_ingestion_error (submission_upload_id);
+      DELETE FROM submission_upload_staging_resolved_property
+      WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
     await this.connection.sql(sql);
   }
 
   /**
-   * Create an upload-and-error-code index on `pg_temp.submission_feature_ingestion_error`.
+   * Drop `submission_upload_staging_feature_type_property_map` if it exists.
    *
+   * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createIngestionErrorTempErrorCodeIndex(): Promise<void> {
+  async dropTmpUploadFeatureTypePropertyMapTable(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      CREATE INDEX IF NOT EXISTS tmp_submission_feature_ingestion_error_idx2
-      ON pg_temp.submission_feature_ingestion_error (submission_upload_id, error_code);
+      DELETE FROM submission_upload_staging_feature_type_property_map
+      WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
     await this.connection.sql(sql);
   }
 
   /**
-   * Create an upload-and-feature index on `pg_temp.submission_feature_ingestion_error`.
-   *
-   * @returns {Promise<void>}
-   */
-  async createIngestionErrorTempFeatureIndex(): Promise<void> {
-    const sql = SQL`
-      CREATE INDEX IF NOT EXISTS tmp_submission_feature_ingestion_error_idx3
-      ON pg_temp.submission_feature_ingestion_error (submission_upload_id, submission_feature_id);
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Drop `pg_temp.tmp_upload_property_values` if it exists.
-   *
-   * @returns {Promise<void>}
-   */
-  async dropTmpUploadPropertyValuesTable(): Promise<void> {
-    const sql = SQL`DROP TABLE IF EXISTS pg_temp.tmp_upload_property_values;`;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Drop `pg_temp.tmp_resolved_staged_properties` if it exists.
-   *
-   * @returns {Promise<void>}
-   */
-  async dropTmpResolvedStagedPropertiesTable(): Promise<void> {
-    const sql = SQL`DROP TABLE IF EXISTS pg_temp.tmp_resolved_staged_properties;`;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Drop `pg_temp.tmp_upload_feature_type_property_map` if it exists.
-   *
-   * @returns {Promise<void>}
-   */
-  async dropTmpUploadFeatureTypePropertyMapTable(): Promise<void> {
-    const sql = SQL`DROP TABLE IF EXISTS pg_temp.tmp_upload_feature_type_property_map;`;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Create `pg_temp.tmp_upload_feature_type_property_map` for an upload.
+   * Create `submission_upload_staging_feature_type_property_map` for an upload.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
   async createTmpUploadFeatureTypePropertyMapBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      CREATE TEMP TABLE pg_temp.tmp_upload_feature_type_property_map ON COMMIT DROP AS
+      INSERT INTO submission_upload_staging_feature_type_property_map (
+        submission_upload_id,
+        feature_type_id,
+        property_name,
+        feature_type_property_id,
+        allow_multiple,
+        required_value,
+        property_type_name
+      )
       SELECT
+        ${submissionUploadId}::uuid,
         ftp.feature_type_id,
         fp.name AS property_name,
         ftp.feature_type_property_id,
@@ -334,7 +242,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
        AND fpt.record_end_date IS NULL
       JOIN (
         SELECT DISTINCT feature_type_id
-        FROM pg_temp.submission_feature_property_staging
+        FROM submission_upload_staging_raw_property
         WHERE submission_upload_id = ${submissionUploadId}::uuid
       ) upload_types
         ON upload_types.feature_type_id = ftp.feature_type_id
@@ -344,40 +252,25 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Create `(feature_type_id, property_name)` index on `pg_temp.tmp_upload_feature_type_property_map`.
-   *
-   * @returns {Promise<void>}
-   */
-  async createTmpUploadFeatureTypePropertyMapFeatureTypePropertyNameIndex(): Promise<void> {
-    const sql = SQL`
-      CREATE INDEX tmp_upload_feature_type_property_map_idx1
-      ON pg_temp.tmp_upload_feature_type_property_map (feature_type_id, property_name);
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Create `feature_type_property_id` index on `pg_temp.tmp_upload_feature_type_property_map`.
-   *
-   * @returns {Promise<void>}
-   */
-  async createTmpUploadFeatureTypePropertyMapFeatureTypePropertyIdIndex(): Promise<void> {
-    const sql = SQL`
-      CREATE INDEX tmp_upload_feature_type_property_map_idx2
-      ON pg_temp.tmp_upload_feature_type_property_map (feature_type_property_id);
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Create `pg_temp.tmp_resolved_staged_properties` for an upload.
+   * Create `submission_upload_staging_resolved_property` for an upload.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
   async createTmpResolvedStagedPropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      CREATE TEMP TABLE pg_temp.tmp_resolved_staged_properties ON COMMIT DROP AS
+      INSERT INTO submission_upload_staging_resolved_property (
+        submission_feature_property_staging_id,
+        submission_feature_id,
+        submission_upload_id,
+        feature_type_id,
+        property_name,
+        value,
+        feature_type_property_id,
+        allow_multiple,
+        required_value,
+        property_type_name
+      )
       SELECT
         s.submission_feature_property_staging_id,
         s.submission_feature_id,
@@ -389,66 +282,38 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         m.allow_multiple,
         m.required_value,
         m.property_type_name
-      FROM pg_temp.submission_feature_property_staging s
-      LEFT JOIN pg_temp.tmp_upload_feature_type_property_map m
+      FROM submission_upload_staging_raw_property s
+      LEFT JOIN submission_upload_staging_feature_type_property_map m
         ON m.feature_type_id = s.feature_type_id
        AND m.property_name = s.property_name
+       AND m.submission_upload_id = s.submission_upload_id
       WHERE s.submission_upload_id = ${submissionUploadId}::uuid;
     `;
     await this.connection.sql(sql);
   }
 
   /**
-   * Create `submission_feature_id` index on `pg_temp.tmp_resolved_staged_properties`.
-   *
-   * @returns {Promise<void>}
-   */
-  async createTmpResolvedStagedPropertiesSubmissionFeatureIndex(): Promise<void> {
-    const sql = SQL`
-      CREATE INDEX tmp_resolved_staged_properties_idx1
-      ON pg_temp.tmp_resolved_staged_properties (submission_feature_id);
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Create `feature_type_property_id` index on `pg_temp.tmp_resolved_staged_properties`.
-   *
-   * @returns {Promise<void>}
-   */
-  async createTmpResolvedStagedPropertiesFeatureTypePropertyIndex(): Promise<void> {
-    const sql = SQL`
-      CREATE INDEX tmp_resolved_staged_properties_idx2
-      ON pg_temp.tmp_resolved_staged_properties (feature_type_property_id);
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Create `property_type_name` index on `pg_temp.tmp_resolved_staged_properties`.
-   *
-   * @returns {Promise<void>}
-   */
-  async createTmpResolvedStagedPropertiesPropertyTypeIndex(): Promise<void> {
-    const sql = SQL`
-      CREATE INDEX tmp_resolved_staged_properties_idx3
-      ON pg_temp.tmp_resolved_staged_properties (property_type_name);
-    `;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Create `pg_temp.tmp_upload_property_values` with one logical value per row.
+   * Create `submission_upload_staging_typed_property_value` with one logical value per row.
    *
    * Note: `jsonb_typeof(...)= 'array'` here is checking JSON transport shape only.
    * It is not a logical `feature_property_type` of `array`. Logical multiplicity is
    * controlled by `allow_multiple` on `feature_type_property`.
    *
+   * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createTmpUploadPropertyValuesTable(): Promise<void> {
+  async createTmpUploadPropertyValuesTable(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      CREATE TEMP TABLE pg_temp.tmp_upload_property_values ON COMMIT DROP AS
+      INSERT INTO submission_upload_staging_typed_property_value (
+        submission_feature_id,
+        submission_upload_id,
+        feature_type_id,
+        feature_type_property_id,
+        property_name,
+        property_type_name,
+        allow_multiple,
+        logical_value
+      )
       SELECT
         rsp.submission_feature_id,
         rsp.submission_upload_id,
@@ -458,8 +323,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         rsp.property_type_name,
         rsp.allow_multiple,
         rsp.value AS logical_value
-      FROM pg_temp.tmp_resolved_staged_properties rsp
+      FROM submission_upload_staging_resolved_property rsp
       WHERE rsp.feature_type_property_id IS NOT NULL
+        AND rsp.submission_upload_id = ${submissionUploadId}::uuid
         AND jsonb_typeof(rsp.value) <> 'array'
         AND rsp.value IS NOT NULL
         AND rsp.value <> 'null'::jsonb
@@ -473,9 +339,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         rsp.property_type_name,
         rsp.allow_multiple,
         arr.value AS logical_value
-      FROM pg_temp.tmp_resolved_staged_properties rsp
+      FROM submission_upload_staging_resolved_property rsp
       CROSS JOIN LATERAL jsonb_array_elements(rsp.value) AS arr(value)
       WHERE rsp.feature_type_property_id IS NOT NULL
+        AND rsp.submission_upload_id = ${submissionUploadId}::uuid
         AND jsonb_typeof(rsp.value) = 'array'
         AND rsp.allow_multiple = TRUE
         AND arr.value <> 'null'::jsonb;
@@ -484,118 +351,112 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Create `property_type_name` index on `pg_temp.tmp_upload_property_values`.
+   * Drop `submission_upload_staging_valid_property_value` if it exists.
    *
+   * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createTmpUploadPropertyValuesPropertyTypeIndex(): Promise<void> {
+  async dropTmpValidPropertyValuesTable(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      CREATE INDEX tmp_upload_property_values_idx1
-      ON pg_temp.tmp_upload_property_values (property_type_name);
+      DELETE FROM submission_upload_staging_valid_property_value
+      WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
     await this.connection.sql(sql);
   }
 
   /**
-   * Create `feature_type_property_id` index on `pg_temp.tmp_upload_property_values`.
+   * Drop `submission_upload_staging_datetime_candidate` if it exists.
    *
+   * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createTmpUploadPropertyValuesFeatureTypePropertyIndex(): Promise<void> {
+  async dropTmpDatetimeCandidatesTable(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      CREATE INDEX tmp_upload_property_values_idx2
-      ON pg_temp.tmp_upload_property_values (feature_type_property_id);
+      DELETE FROM submission_upload_staging_datetime_candidate
+      WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
     await this.connection.sql(sql);
   }
 
   /**
-   * Create `submission_feature_id` index on `pg_temp.tmp_upload_property_values`.
+   * Drop `submission_upload_staging_spatial_candidate` if it exists.
    *
+   * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createTmpUploadPropertyValuesSubmissionFeatureIndex(): Promise<void> {
+  async dropTmpSpatialCandidatesTable(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      CREATE INDEX tmp_upload_property_values_idx3
-      ON pg_temp.tmp_upload_property_values (submission_feature_id);
+      DELETE FROM submission_upload_staging_spatial_candidate
+      WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
     await this.connection.sql(sql);
   }
 
   /**
-   * Drop `pg_temp.tmp_valid_property_values` if it exists.
+   * Drop `submission_upload_staging_code_candidate` if it exists.
    *
+   * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async dropTmpValidPropertyValuesTable(): Promise<void> {
-    const sql = SQL`DROP TABLE IF EXISTS pg_temp.tmp_valid_property_values;`;
+  async dropTmpCodeCandidatesTable(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      DELETE FROM submission_upload_staging_code_candidate
+      WHERE submission_upload_id = ${submissionUploadId}::uuid;
+    `;
     await this.connection.sql(sql);
   }
 
   /**
-   * Drop `pg_temp.tmp_datetime_candidates` if it exists.
+   * Drop `submission_upload_staging_taxon_candidate` if it exists.
    *
+   * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async dropTmpDatetimeCandidatesTable(): Promise<void> {
-    const sql = SQL`DROP TABLE IF EXISTS pg_temp.tmp_datetime_candidates;`;
+  async dropTmpTaxonCandidatesTable(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      DELETE FROM submission_upload_staging_taxon_candidate
+      WHERE submission_upload_id = ${submissionUploadId}::uuid;
+    `;
     await this.connection.sql(sql);
   }
 
   /**
-   * Drop `pg_temp.tmp_spatial_candidates` if it exists.
+   * Drop `submission_upload_staging_artifact_candidate` if it exists.
    *
+   * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async dropTmpSpatialCandidatesTable(): Promise<void> {
-    const sql = SQL`DROP TABLE IF EXISTS pg_temp.tmp_spatial_candidates;`;
+  async dropTmpArtifactCandidatesTable(submissionUploadId: string): Promise<void> {
+    const sql = SQL`
+      DELETE FROM submission_upload_staging_artifact_candidate
+      WHERE submission_upload_id = ${submissionUploadId}::uuid;
+    `;
     await this.connection.sql(sql);
   }
 
   /**
-   * Drop `pg_temp.tmp_code_candidates` if it exists.
-   *
-   * @returns {Promise<void>}
-   */
-  async dropTmpCodeCandidatesTable(): Promise<void> {
-    const sql = SQL`DROP TABLE IF EXISTS pg_temp.tmp_code_candidates;`;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Drop `pg_temp.tmp_taxon_candidates` if it exists.
-   *
-   * @returns {Promise<void>}
-   */
-  async dropTmpTaxonCandidatesTable(): Promise<void> {
-    const sql = SQL`DROP TABLE IF EXISTS pg_temp.tmp_taxon_candidates;`;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Drop `pg_temp.tmp_artifact_candidates` if it exists.
-   *
-   * @returns {Promise<void>}
-   */
-  async dropTmpArtifactCandidatesTable(): Promise<void> {
-    const sql = SQL`DROP TABLE IF EXISTS pg_temp.tmp_artifact_candidates;`;
-    await this.connection.sql(sql);
-  }
-
-  /**
-   * Create `pg_temp.tmp_valid_property_values` for rows that currently have no errors.
+   * Create `submission_upload_staging_valid_property_value` for rows that currently have no errors.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
   async createTmpValidPropertyValuesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      CREATE TEMP TABLE pg_temp.tmp_valid_property_values ON COMMIT DROP AS
+      INSERT INTO submission_upload_staging_valid_property_value (
+        submission_feature_id,
+        submission_upload_id,
+        feature_type_id,
+        feature_type_property_id,
+        property_name,
+        property_type_name,
+        allow_multiple,
+        logical_value
+      )
       SELECT v.*
-      FROM pg_temp.tmp_upload_property_values v
+      FROM submission_upload_staging_typed_property_value v
       WHERE NOT EXISTS (
         SELECT 1
-        FROM pg_temp.submission_feature_ingestion_error e
+        FROM submission_feature_error e
         WHERE e.submission_upload_id = ${submissionUploadId}::uuid
           AND e.submission_feature_id = v.submission_feature_id
           AND e.feature_type_property_id = v.feature_type_property_id
@@ -606,13 +467,23 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Create `pg_temp.tmp_datetime_candidates` with parsed date/time values.
+   * Create `submission_upload_staging_datetime_candidate` with parsed date/time values.
    *
+   * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createTmpDatetimeCandidatesTable(): Promise<void> {
+  async createTmpDatetimeCandidatesTable(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      CREATE TEMP TABLE pg_temp.tmp_datetime_candidates ON COMMIT DROP AS
+      INSERT INTO submission_upload_staging_datetime_candidate (
+        submission_upload_id,
+        submission_feature_id,
+        property_name,
+        feature_type_property_id,
+        value_text,
+        raw_value,
+        date_value,
+        time_value
+      )
       WITH candidates AS (
         SELECT
           v.submission_upload_id,
@@ -621,8 +492,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.feature_type_property_id,
           btrim(v.logical_value #>> '{}') AS value_text,
           v.logical_value AS raw_value
-        FROM pg_temp.tmp_valid_property_values v
-        WHERE v.property_type_name = 'datetime'
+        FROM submission_upload_staging_valid_property_value v
+        WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+          AND v.property_type_name = 'datetime'
           AND jsonb_typeof(v.logical_value) = 'string'
       )
       SELECT
@@ -649,13 +521,24 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Create `pg_temp.tmp_spatial_candidates` with normalized geometry and validity metadata.
+   * Create `submission_upload_staging_spatial_candidate` with normalized geometry and validity metadata.
    *
+   * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createTmpSpatialCandidatesTable(): Promise<void> {
+  async createTmpSpatialCandidatesTable(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      CREATE TEMP TABLE pg_temp.tmp_spatial_candidates ON COMMIT DROP AS
+      INSERT INTO submission_upload_staging_spatial_candidate (
+        submission_upload_id,
+        submission_feature_id,
+        property_name,
+        feature_type_property_id,
+        logical_value,
+        geometry_json,
+        parsed_geom,
+        validity_reason,
+        is_valid
+      )
       WITH candidates AS (
         SELECT
           v.submission_upload_id,
@@ -663,8 +546,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.property_name,
           v.feature_type_property_id,
           v.logical_value
-        FROM pg_temp.tmp_valid_property_values v
-        WHERE v.property_type_name = 'spatial'
+        FROM submission_upload_staging_valid_property_value v
+        WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+          AND v.property_type_name = 'spatial'
           AND jsonb_typeof(v.logical_value) = 'object'
       ),
       normalized AS (
@@ -722,14 +606,26 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Create `pg_temp.tmp_code_candidates` with parsed code key parts and resolved IDs.
+   * Create `submission_upload_staging_code_candidate` with parsed code key parts and resolved IDs.
    *
    * @param {number} contributorId Contributor scope for code resolution.
    * @returns {Promise<void>}
    */
-  async createTmpCodeCandidatesByContributorId(contributorId: number): Promise<void> {
+  async createTmpCodeCandidatesBySubmissionUploadId(
+    submissionUploadId: string,
+    contributorId: number
+  ): Promise<void> {
     const sql = SQL`
-      CREATE TEMP TABLE pg_temp.tmp_code_candidates ON COMMIT DROP AS
+      INSERT INTO submission_upload_staging_code_candidate (
+        submission_upload_id,
+        submission_feature_id,
+        property_name,
+        feature_type_property_id,
+        raw_value,
+        is_format_valid,
+        normalized_slug,
+        contributor_codeset_code_id
+      )
       WITH candidates AS (
         SELECT
           v.submission_upload_id,
@@ -738,8 +634,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.feature_type_property_id,
           v.logical_value AS raw_value,
           regexp_split_to_array(btrim(v.logical_value #>> '{}'), '::') AS parts
-        FROM pg_temp.tmp_valid_property_values v
-        WHERE v.property_type_name = 'code'
+        FROM submission_upload_staging_valid_property_value v
+        WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+          AND v.property_type_name = 'code'
           AND jsonb_typeof(v.logical_value) = 'string'
       ),
       normalized AS (
@@ -778,13 +675,22 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Create `pg_temp.tmp_taxon_candidates` with parsed TSNs and resolved taxon IDs.
+   * Create `submission_upload_staging_taxon_candidate` with parsed TSNs and resolved taxon IDs.
    *
+   * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async createTmpTaxonCandidatesTable(): Promise<void> {
+  async createTmpTaxonCandidatesTable(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      CREATE TEMP TABLE pg_temp.tmp_taxon_candidates ON COMMIT DROP AS
+      INSERT INTO submission_upload_staging_taxon_candidate (
+        submission_upload_id,
+        submission_feature_id,
+        property_name,
+        feature_type_property_id,
+        raw_value,
+        tsn,
+        taxon_id
+      )
       SELECT
         v.submission_upload_id,
         v.submission_feature_id,
@@ -793,11 +699,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         v.logical_value AS raw_value,
         (v.logical_value #>> '{}')::integer AS tsn,
         t.taxon_id
-      FROM pg_temp.tmp_valid_property_values v
+      FROM submission_upload_staging_valid_property_value v
       LEFT JOIN taxon t
         ON t.itis_tsn = (v.logical_value #>> '{}')::integer
        AND t.record_end_date IS NULL
-      WHERE v.property_type_name = 'taxon'
+      WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+        AND v.property_type_name = 'taxon'
         AND jsonb_typeof(v.logical_value) = 'number'
         AND (v.logical_value #>> '{}') ~ '^-?[0-9]+$';
     `;
@@ -805,14 +712,22 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Create `pg_temp.tmp_artifact_candidates` with normalized references and resolved artifact IDs.
+   * Create `submission_upload_staging_artifact_candidate` with normalized references and resolved artifact IDs.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
   async createTmpArtifactCandidatesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      CREATE TEMP TABLE pg_temp.tmp_artifact_candidates ON COMMIT DROP AS
+      INSERT INTO submission_upload_staging_artifact_candidate (
+        submission_upload_id,
+        submission_feature_id,
+        property_name,
+        feature_type_property_id,
+        raw_value,
+        normalized_reference,
+        artifact_id
+      )
       WITH upload_scope AS (
         SELECT su.upload_id
         FROM submission_upload su
@@ -826,7 +741,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.property_name,
           v.feature_type_property_id,
           v.logical_value AS raw_value
-        FROM pg_temp.tmp_valid_property_values v
+        FROM submission_upload_staging_valid_property_value v
         WHERE v.property_type_name = 'artifact_key'
           AND jsonb_typeof(v.logical_value) = 'string'
       ),
@@ -876,20 +791,22 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           feature_type_id,
           feature_type_property_id,
           property_name
-        FROM pg_temp.tmp_upload_feature_type_property_map
-        WHERE required_value = TRUE
+        FROM submission_upload_staging_feature_type_property_map
+        WHERE submission_upload_id = ${submissionUploadId}::uuid
+          AND required_value = TRUE
       ),
       present_properties AS (
         SELECT DISTINCT
           rsp.submission_feature_id,
           rsp.feature_type_property_id
-        FROM pg_temp.tmp_resolved_staged_properties rsp
-        WHERE rsp.feature_type_property_id IS NOT NULL
+        FROM submission_upload_staging_resolved_property rsp
+        WHERE rsp.submission_upload_id = ${submissionUploadId}::uuid
+          AND rsp.feature_type_property_id IS NOT NULL
           AND rsp.value IS NOT NULL
           AND rsp.value <> 'null'::jsonb
           AND NOT (jsonb_typeof(rsp.value) = 'array' AND jsonb_array_length(rsp.value) = 0)
       )
-      INSERT INTO pg_temp.submission_feature_ingestion_error (
+      INSERT INTO submission_feature_error (
         submission_upload_id,
         submission_feature_id,
         property_name,
@@ -942,7 +859,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           'MULTIPLE_VALUES_NOT_ALLOWED'::text AS error_code,
           'Property does not allow multiple values'::text AS error_message,
           m.value AS raw_value
-        FROM pg_temp.tmp_resolved_staged_properties m
+        FROM submission_upload_staging_resolved_property m
         WHERE m.feature_type_property_id IS NOT NULL
           AND m.submission_upload_id = ${submissionUploadId}::uuid
           AND jsonb_typeof(m.value) = 'array'
@@ -965,7 +882,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
             ELSE 'Property value type mismatch'
           END AS error_message,
           v.logical_value AS raw_value
-        FROM pg_temp.tmp_upload_property_values v
+        FROM submission_upload_staging_typed_property_value v
         WHERE
           v.submission_upload_id = ${submissionUploadId}::uuid
           AND (
@@ -1003,7 +920,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           'UNSUPPORTED_PROPERTY_TYPE'::text AS error_code,
           'Unsupported property type'::text AS error_message,
           m.value AS raw_value
-        FROM pg_temp.tmp_resolved_staged_properties m
+        FROM submission_upload_staging_resolved_property m
         WHERE m.feature_type_property_id IS NOT NULL
           AND m.submission_upload_id = ${submissionUploadId}::uuid
           AND m.property_type_name NOT IN (
@@ -1017,7 +934,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
             'taxon'
           )
       )
-      INSERT INTO pg_temp.submission_feature_ingestion_error (
+      INSERT INTO submission_feature_error (
         submission_upload_id,
         submission_feature_id,
         property_name,
@@ -1058,7 +975,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           'Code property value must match code::<contributor-codeset-key>::<contributor-codeset-code-key>'::text AS error_message,
           c.raw_value,
           NULL::jsonb AS details
-        FROM pg_temp.tmp_code_candidates c
+        FROM submission_upload_staging_code_candidate c
         WHERE c.submission_upload_id = ${submissionUploadId}::uuid
           AND NOT c.is_format_valid
       ),
@@ -1072,12 +989,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           'Failed to resolve code slug to contributor_codeset_code_id'::text AS error_message,
           c.raw_value,
           jsonb_build_object('normalized_code_slug', c.normalized_slug) AS details
-        FROM pg_temp.tmp_code_candidates c
+        FROM submission_upload_staging_code_candidate c
         WHERE c.submission_upload_id = ${submissionUploadId}::uuid
           AND c.is_format_valid
           AND c.contributor_codeset_code_id IS NULL
       )
-      INSERT INTO pg_temp.submission_feature_ingestion_error (
+      INSERT INTO submission_feature_error (
         submission_upload_id,
         submission_feature_id,
         property_name,
@@ -1101,9 +1018,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async recordTaxonPropertyResolutionErrorsBySubmissionUploadId(_submissionUploadId: string): Promise<void> {
+  async recordTaxonPropertyResolutionErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      INSERT INTO pg_temp.submission_feature_ingestion_error (
+      INSERT INTO submission_feature_error (
         submission_upload_id,
         submission_feature_id,
         property_name,
@@ -1120,8 +1037,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         'UNRESOLVED_TAXON',
         'Failed to resolve taxon TSN to taxon_id',
         c.raw_value
-      FROM pg_temp.tmp_taxon_candidates c
-      WHERE c.taxon_id IS NULL;
+      FROM submission_upload_staging_taxon_candidate c
+      WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+        AND c.taxon_id IS NULL;
     `;
 
     await this.connection.sql(sql);
@@ -1133,7 +1051,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async recordArtifactPropertyResolutionErrorsBySubmissionUploadId(_submissionUploadId: string): Promise<void> {
+  async recordArtifactPropertyResolutionErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       WITH normalized_empty AS (
         SELECT
@@ -1145,8 +1063,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           'Artifact key resolved to an empty normalized reference'::text AS error_message,
           n.raw_value,
           NULL::jsonb AS details
-        FROM pg_temp.tmp_artifact_candidates n
-        WHERE COALESCE(n.normalized_reference, '') = ''
+        FROM submission_upload_staging_artifact_candidate n
+        WHERE n.submission_upload_id = ${submissionUploadId}::uuid
+          AND COALESCE(n.normalized_reference, '') = ''
       ),
       unresolved AS (
         SELECT
@@ -1158,11 +1077,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           'Failed to resolve artifact reference to artifact_id'::text AS error_message,
           n.raw_value,
           jsonb_build_object('normalized_reference', n.normalized_reference) AS details
-        FROM pg_temp.tmp_artifact_candidates n
-        WHERE COALESCE(n.normalized_reference, '') <> ''
+        FROM submission_upload_staging_artifact_candidate n
+        WHERE n.submission_upload_id = ${submissionUploadId}::uuid
+          AND COALESCE(n.normalized_reference, '') <> ''
           AND n.artifact_id IS NULL
       )
-      INSERT INTO pg_temp.submission_feature_ingestion_error (
+      INSERT INTO submission_feature_error (
         submission_upload_id,
         submission_feature_id,
         property_name,
@@ -1189,9 +1109,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async recordDatetimeNormalizationErrorsBySubmissionUploadId(_submissionUploadId: string): Promise<void> {
+  async recordDatetimeNormalizationErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      INSERT INTO pg_temp.submission_feature_ingestion_error (
+      INSERT INTO submission_feature_error (
         submission_upload_id,
         submission_feature_id,
         property_name,
@@ -1208,8 +1128,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         'INVALID_TIMESTAMP_VALUE',
         'Invalid timestamp property value',
         p.raw_value
-      FROM pg_temp.tmp_datetime_candidates p
-      WHERE p.date_value IS NULL
+      FROM submission_upload_staging_datetime_candidate p
+      WHERE p.submission_upload_id = ${submissionUploadId}::uuid
+        AND p.date_value IS NULL
         AND p.time_value IS NULL;
     `;
 
@@ -1222,7 +1143,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async insertTimestampPropertiesBySubmissionUploadId(_submissionUploadId: string): Promise<void> {
+  async insertTimestampPropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       INSERT INTO submission_feature_property_timestamp (
         submission_feature_id,
@@ -1235,9 +1156,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         p.feature_type_property_id,
         p.date_value,
         p.time_value
-      FROM pg_temp.tmp_datetime_candidates p
-      WHERE p.date_value IS NOT NULL
+      FROM submission_upload_staging_datetime_candidate p
+      WHERE p.submission_upload_id = ${submissionUploadId}::uuid
+        AND (
+          p.date_value IS NOT NULL
          OR p.time_value IS NOT NULL;
+        );
     `;
 
     await this.connection.sql(sql);
@@ -1249,9 +1173,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async recordSpatialNormalizationErrorsBySubmissionUploadId(_submissionUploadId: string): Promise<void> {
+  async recordSpatialNormalizationErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      INSERT INTO pg_temp.submission_feature_ingestion_error (
+      INSERT INTO submission_feature_error (
         submission_upload_id,
         submission_feature_id,
         property_name,
@@ -1270,10 +1194,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         'Invalid geometry value for geometry property',
         p.logical_value,
         jsonb_build_object('reason', p.validity_reason)
-      FROM pg_temp.tmp_spatial_candidates p
-      WHERE p.geometry_json IS NULL
+      FROM submission_upload_staging_spatial_candidate p
+      WHERE p.submission_upload_id = ${submissionUploadId}::uuid
+        AND (
+          p.geometry_json IS NULL
          OR p.parsed_geom IS NULL
-         OR NOT public.ST_IsValid(p.parsed_geom);
+         OR NOT public.ST_IsValid(p.parsed_geom)
+        );
     `;
 
     await this.connection.sql(sql);
@@ -1285,7 +1212,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async insertGeometryPropertiesBySubmissionUploadId(_submissionUploadId: string): Promise<void> {
+  async insertGeometryPropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       INSERT INTO submission_feature_property_geometry (
         submission_feature_id,
@@ -1296,8 +1223,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         p.submission_feature_id,
         p.feature_type_property_id,
         public.ST_Force2D(p.parsed_geom)
-      FROM pg_temp.tmp_spatial_candidates p
-      WHERE p.parsed_geom IS NOT NULL
+      FROM submission_upload_staging_spatial_candidate p
+      WHERE p.submission_upload_id = ${submissionUploadId}::uuid
+        AND p.parsed_geom IS NOT NULL
         AND public.ST_IsValid(p.parsed_geom);
     `;
 
@@ -1321,12 +1249,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         v.submission_feature_id,
         v.feature_type_property_id,
         v.logical_value #>> '{}'
-      FROM pg_temp.tmp_upload_property_values v
-      WHERE v.property_type_name = 'string'
+      FROM submission_upload_staging_typed_property_value v
+      WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+        AND v.property_type_name = 'string'
         AND jsonb_typeof(v.logical_value) = 'string'
         AND NOT EXISTS (
           SELECT 1
-          FROM pg_temp.submission_feature_ingestion_error e
+          FROM submission_feature_error e
           WHERE e.submission_upload_id = ${submissionUploadId}::uuid
             AND e.submission_feature_id = v.submission_feature_id
             AND e.feature_type_property_id = v.feature_type_property_id
@@ -1354,12 +1283,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         v.submission_feature_id,
         v.feature_type_property_id,
         (v.logical_value #>> '{}')::numeric
-      FROM pg_temp.tmp_upload_property_values v
-      WHERE v.property_type_name = 'number'
+      FROM submission_upload_staging_typed_property_value v
+      WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+        AND v.property_type_name = 'number'
         AND jsonb_typeof(v.logical_value) = 'number'
         AND NOT EXISTS (
           SELECT 1
-          FROM pg_temp.submission_feature_ingestion_error e
+          FROM submission_feature_error e
           WHERE e.submission_upload_id = ${submissionUploadId}::uuid
             AND e.submission_feature_id = v.submission_feature_id
             AND e.feature_type_property_id = v.feature_type_property_id
@@ -1387,12 +1317,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         v.submission_feature_id,
         v.feature_type_property_id,
         (v.logical_value #>> '{}')::boolean
-      FROM pg_temp.tmp_upload_property_values v
-      WHERE v.property_type_name = 'boolean'
+      FROM submission_upload_staging_typed_property_value v
+      WHERE v.submission_upload_id = ${submissionUploadId}::uuid
+        AND v.property_type_name = 'boolean'
         AND jsonb_typeof(v.logical_value) = 'boolean'
         AND NOT EXISTS (
           SELECT 1
-          FROM pg_temp.submission_feature_ingestion_error e
+          FROM submission_feature_error e
           WHERE e.submission_upload_id = ${submissionUploadId}::uuid
             AND e.submission_feature_id = v.submission_feature_id
             AND e.feature_type_property_id = v.feature_type_property_id
@@ -1410,7 +1341,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {number} contributorId Contributor scope for code resolution.
    * @returns {Promise<void>}
    */
-  async insertCodePropertiesBySubmissionUploadId(_submissionUploadId: string, _contributorId: number): Promise<void> {
+  async insertCodePropertiesBySubmissionUploadId(submissionUploadId: string, _contributorId: number): Promise<void> {
     const sql = SQL`
       INSERT INTO submission_feature_property_code (
         submission_feature_id,
@@ -1421,8 +1352,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         c.submission_feature_id,
         c.feature_type_property_id,
         c.contributor_codeset_code_id
-      FROM pg_temp.tmp_code_candidates c
-      WHERE c.is_format_valid
+      FROM submission_upload_staging_code_candidate c
+      WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+        AND c.is_format_valid
         AND c.contributor_codeset_code_id IS NOT NULL;
     `;
 
@@ -1435,7 +1367,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async insertTaxonPropertiesBySubmissionUploadId(_submissionUploadId: string): Promise<void> {
+  async insertTaxonPropertiesBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       INSERT INTO submission_feature_property_taxon (
         submission_feature_id,
@@ -1446,8 +1378,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         c.submission_feature_id,
         c.feature_type_property_id,
         c.taxon_id
-      FROM pg_temp.tmp_taxon_candidates c
-      WHERE c.taxon_id IS NOT NULL;
+      FROM submission_upload_staging_taxon_candidate c
+      WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+        AND c.taxon_id IS NOT NULL;
     `;
 
     await this.connection.sql(sql);
@@ -1459,7 +1392,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
-  async insertArtifactLinksBySubmissionUploadId(_submissionUploadId: string): Promise<void> {
+  async insertArtifactLinksBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
       INSERT INTO submission_feature_artifact (
         submission_feature_id,
@@ -1468,8 +1401,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       SELECT DISTINCT
         n.submission_feature_id,
         n.artifact_id
-      FROM pg_temp.tmp_artifact_candidates n
-      WHERE COALESCE(n.normalized_reference, '') <> ''
+      FROM submission_upload_staging_artifact_candidate n
+      WHERE n.submission_upload_id = ${submissionUploadId}::uuid
+        AND COALESCE(n.normalized_reference, '') <> ''
         AND n.artifact_id IS NOT NULL
       ON CONFLICT (submission_feature_id, artifact_id) WHERE record_end_date IS NULL DO NOTHING;
     `;
@@ -1563,7 +1497,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           AND sf.record_end_date IS NULL
           AND btrim(content_item.reference_source_id) <> ''
       )
-      INSERT INTO pg_temp.submission_feature_ingestion_error (
+      INSERT INTO submission_feature_error (
         submission_upload_id,
         submission_feature_id,
         error_code,
@@ -1604,7 +1538,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    */
   async recordUnresolvedParentErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
-      INSERT INTO pg_temp.submission_feature_ingestion_error (
+      INSERT INTO submission_feature_error (
         submission_upload_id,
         submission_feature_id,
         error_code,
@@ -1642,7 +1576,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   async getIngestionErrorCountBySubmissionUploadId(submissionUploadId: string): Promise<number> {
     const sql = SQL`
       SELECT COUNT(*)::integer AS count
-      FROM pg_temp.submission_feature_ingestion_error
+      FROM submission_feature_error
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
 
@@ -1661,7 +1595,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       SELECT
         error_code,
         COUNT(*)::integer AS error_count
-      FROM pg_temp.submission_feature_ingestion_error
+      FROM submission_feature_error
       WHERE submission_upload_id = ${submissionUploadId}::uuid
       GROUP BY error_code
       ORDER BY error_count DESC, error_code ASC;
@@ -1691,55 +1625,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         error_message,
         raw_value,
         details
-      FROM pg_temp.submission_feature_ingestion_error
+      FROM submission_feature_error
       WHERE submission_upload_id = ${submissionUploadId}::uuid
-      ORDER BY submission_feature_ingestion_error_id ASC
+      ORDER BY submission_feature_error_id ASC
       LIMIT ${limit};
     `;
 
     const response = await this.connection.sql(sql, IngestionErrorSampleRow);
     return response.rows;
-  }
-
-  /**
-   * Replace durable upload-scoped validation errors from the current session temp snapshot.
-   *
-   * This performs latest-snapshot semantics for one upload:
-   * 1. delete prior durable rows for the upload
-   * 2. insert all current temp rows for the upload
-   *
-   * @param {string} submissionUploadId Upload scope.
-   * @returns {Promise<void>}
-   */
-  async publishTempIngestionErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sql = SQL`
-      WITH delete_existing AS (
-        DELETE FROM submission_feature_error
-        WHERE submission_upload_id = ${submissionUploadId}::uuid
-      )
-      INSERT INTO submission_feature_error (
-        submission_upload_id,
-        submission_feature_id,
-        feature_type_property_id,
-        property_name,
-        error_code,
-        error_message,
-        raw_value,
-        details
-      )
-      SELECT
-        e.submission_upload_id,
-        e.submission_feature_id,
-        e.feature_type_property_id,
-        e.property_name,
-        e.error_code,
-        e.error_message,
-        e.raw_value,
-        e.details
-      FROM pg_temp.submission_feature_ingestion_error e
-      WHERE e.submission_upload_id = ${submissionUploadId}::uuid;
-    `;
-
-    await this.connection.sql(sql);
   }
 }
