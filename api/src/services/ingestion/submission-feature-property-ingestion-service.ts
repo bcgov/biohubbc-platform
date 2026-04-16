@@ -85,11 +85,11 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       submissionUploadId
     );
 
-    // Phase 7: parent validation and update.
+    // Phase 7: parent/reference diagnostics.
     await this.submissionFeaturePropertyIngestionRepository.recordUnresolvedParentErrorsBySubmissionUploadId(
       submissionUploadId
     );
-    await this.featureIngestionRepository.updateSubmissionFeatureParentsBySubmissionUploadId(submissionUploadId);
+    await this.submissionFeaturePropertyIngestionRepository.recordReferenceErrorsBySubmissionUploadId(submissionUploadId);
 
     // Phase 8: SQL-native datetime/spatial normalization diagnostics.
     await this.submissionFeaturePropertyIngestionRepository.recordDatetimeNormalizationErrorsBySubmissionUploadId(
@@ -99,36 +99,7 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
       submissionUploadId
     );
 
-    // Phase 9: canonical inserts for primitive, datetime, spatial and FK-backed properties.
-    await Promise.all([
-      this.submissionFeaturePropertyIngestionRepository.insertStringPropertiesBySubmissionUploadId(submissionUploadId),
-      this.submissionFeaturePropertyIngestionRepository.insertNumberPropertiesBySubmissionUploadId(submissionUploadId),
-      this.submissionFeaturePropertyIngestionRepository.insertBooleanPropertiesBySubmissionUploadId(submissionUploadId)
-    ]);
-    await this.submissionFeaturePropertyIngestionRepository.insertTimestampPropertiesBySubmissionUploadId(
-      submissionUploadId
-    );
-    await this.submissionFeaturePropertyIngestionRepository.insertGeometryPropertiesBySubmissionUploadId(
-      submissionUploadId
-    );
-    await this.submissionFeaturePropertyIngestionRepository.insertCodePropertiesBySubmissionUploadId(
-      submissionUploadId,
-      contributor.contributor_id
-    );
-    await this.submissionFeaturePropertyIngestionRepository.insertTaxonPropertiesBySubmissionUploadId(
-      submissionUploadId
-    );
-    await this.submissionFeaturePropertyIngestionRepository.insertArtifactLinksBySubmissionUploadId(submissionUploadId);
-
-    // Phase 10: relationships from `data.content`.
-    await Promise.all([
-      this.submissionFeaturePropertyIngestionRepository.insertFeatureRelationshipsBySubmissionUploadId(
-        submissionUploadId
-      ),
-      this.submissionFeaturePropertyIngestionRepository.recordReferenceErrorsBySubmissionUploadId(submissionUploadId)
-    ]);
-
-    // Phase 11: fail-at-end with aggregated diagnostics after full-upload processing.
+    // Phase 9: fail-fast with aggregated diagnostics before canonical writes.
     const errorCount =
       await this.submissionFeaturePropertyIngestionRepository.getIngestionErrorCountBySubmissionUploadId(
         submissionUploadId
@@ -156,6 +127,33 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
 
       throw new IngestionValidationError('Submission feature property ingestion failed with validation errors');
     }
+
+    // Phase 10: canonical parent updates and property inserts.
+    await this.featureIngestionRepository.updateSubmissionFeatureParentsBySubmissionUploadId(submissionUploadId);
+    await Promise.all([
+      this.submissionFeaturePropertyIngestionRepository.insertStringPropertiesBySubmissionUploadId(submissionUploadId),
+      this.submissionFeaturePropertyIngestionRepository.insertNumberPropertiesBySubmissionUploadId(submissionUploadId),
+      this.submissionFeaturePropertyIngestionRepository.insertBooleanPropertiesBySubmissionUploadId(submissionUploadId)
+    ]);
+    await this.submissionFeaturePropertyIngestionRepository.insertTimestampPropertiesBySubmissionUploadId(
+      submissionUploadId
+    );
+    await this.submissionFeaturePropertyIngestionRepository.insertGeometryPropertiesBySubmissionUploadId(
+      submissionUploadId
+    );
+    await this.submissionFeaturePropertyIngestionRepository.insertCodePropertiesBySubmissionUploadId(
+      submissionUploadId,
+      contributor.contributor_id
+    );
+    await this.submissionFeaturePropertyIngestionRepository.insertTaxonPropertiesBySubmissionUploadId(
+      submissionUploadId
+    );
+    await this.submissionFeaturePropertyIngestionRepository.insertArtifactLinksBySubmissionUploadId(submissionUploadId);
+
+    // Phase 11: relationships from `data.content`.
+    await this.submissionFeaturePropertyIngestionRepository.insertFeatureRelationshipsBySubmissionUploadId(
+      submissionUploadId
+    );
   }
 
   /**

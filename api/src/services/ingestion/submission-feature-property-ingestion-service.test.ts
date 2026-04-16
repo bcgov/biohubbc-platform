@@ -190,7 +190,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'recordUnresolvedParentErrorsBySubmissionUploadId')
       .resolves();
 
-    sinon
+    const errorCountStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'getIngestionErrorCountBySubmissionUploadId')
       .resolves(0);
 
@@ -213,14 +213,15 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       taxonErrorsStub,
       artifactErrorsStub,
       parentErrorsStub,
-      updateParentsStub,
+      referenceErrorsStub,
       datetimeErrorsStub,
       spatialErrorsStub,
+      errorCountStub,
+      updateParentsStub,
       insertStringStub,
       insertTimestampStub,
       insertGeometryStub,
-      insertReferencesStub,
-      referenceErrorsStub
+      insertReferencesStub
     );
   });
 
@@ -355,7 +356,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
         'recordSpatialNormalizationErrorsBySubmissionUploadId'
       )
       .resolves();
-    sinon
+    const insertStringStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertStringPropertiesBySubmissionUploadId')
       .resolves();
     sinon
@@ -379,7 +380,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertArtifactLinksBySubmissionUploadId')
       .resolves();
-    sinon
+    const insertRelationshipsStub = sinon
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'insertFeatureRelationshipsBySubmissionUploadId')
       .resolves();
     sinon
@@ -417,5 +418,8 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       expect(error).to.be.instanceOf(IngestionValidationError);
       expect((error as Error).message).to.contain('validation errors');
     }
+
+    expect(insertStringStub.called).to.equal(false);
+    expect(insertRelationshipsStub.called).to.equal(false);
   });
 });
