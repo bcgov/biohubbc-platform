@@ -3,8 +3,8 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { CartSubmissionFeature } from '../models/cart';
 import { getMockDBConnection } from '../__mocks__/db';
+import { CartSubmissionFeature } from '../models/cart';
 import { CartSubmissionFeatureRepository } from './cart-submission-feature-repository';
 
 chai.use(sinonChai);

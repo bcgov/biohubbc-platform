@@ -1,8 +1,8 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
-import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { getMockDBConnection } from '../../__mocks__/db';
+import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadFragmentService } from './download-fragment-service';
 
 describe('DownloadFragmentService', () => {

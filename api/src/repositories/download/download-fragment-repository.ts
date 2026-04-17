@@ -1,4 +1,5 @@
 import SQL from 'sql-template-strings';
+import { DOWNLOAD_FEATURE_BATCH_SIZE } from '../../constants/download';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { DownloadFeatureData } from '../../models/download';
 import { DownloadFragmentId, DownloadFragmentRecord } from '../../models/download-fragment';
@@ -129,14 +130,14 @@ export class DownloadFragmentRepository extends BaseRepository {
    *
    * @param {number} downloadFragmentId - The fragment ID.
    * @param {string} featureTypeName - The feature type to stream.
-   * @param {number} [batchSize=500] - Number of rows to fetch per batch.
+   * @param {number} [batchSize=DOWNLOAD_FEATURE_BATCH_SIZE] - Number of rows to fetch per batch.
    * @yields {DownloadFeatureData[]} Batches of feature data.
    * @memberof DownloadFragmentRepository
    */
   async *streamFragmentFeaturesByType(
     downloadFragmentId: number,
     featureTypeName: string,
-    batchSize = 5000
+    batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<DownloadFeatureData[]> {
     const cursorName = `frag_cursor_${downloadFragmentId}_${featureTypeName.replace(/[^a-z0-9_]/gi, '_')}`;
 

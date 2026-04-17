@@ -2,11 +2,11 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
 import { Team } from '../../models/team';
 import { TeamMember, TeamMemberWithUser } from '../../models/team-member';
 import { TeamRepository } from '../../repositories/authorization/team-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { TeamMemberService } from './team-member-service';
 import { TeamService } from './team-service';
 

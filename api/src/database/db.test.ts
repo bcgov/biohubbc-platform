@@ -3,11 +3,11 @@ import { describe } from 'mocha';
 import * as pg from 'pg';
 import Sinon, { SinonStub } from 'sinon';
 import SQL from 'sql-template-strings';
+import { getMockDBConnection } from '../__mocks__/db';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { HTTPError } from '../errors/http-error';
 import { SystemUser } from '../repositories/user-repository';
-import { getMockDBConnection } from '../__mocks__/db';
 import * as db from './db';
 import {
   DB_CLIENT,

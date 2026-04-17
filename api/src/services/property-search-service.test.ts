@@ -3,8 +3,8 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 
-import { PropertySearchRepository } from '../repositories/property-search-repository';
 import { getMockDBConnection } from '../__mocks__/db';
+import { PropertySearchRepository } from '../repositories/property-search-repository';
 import { PropertySearchService } from './property-search-service';
 import { SearchPropertyResult } from './property-search-service.interface';
 

@@ -2,10 +2,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { SearchService } from '../../services/search-service';
 import { SearchResponseWithCounts } from '../../services/search-service.interface';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as search from './index';
 
 chai.use(sinonChai);

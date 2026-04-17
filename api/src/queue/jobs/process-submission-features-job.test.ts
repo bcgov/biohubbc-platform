@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import PgBoss from 'pg-boss';
 import sinon from 'sinon';
+import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { IngestionValidationError } from '../../errors/submission-errors';
 import { SubmissionUpload } from '../../models/submission-upload';
@@ -10,7 +11,6 @@ import { SubmissionIngestionService } from '../../services/ingestion/submission-
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { UploadArchiveService } from '../../services/upload/upload-archive-service';
-import { getMockDBConnection } from '../../__mocks__/db';
 import * as publisher from '../publisher';
 import {
   processSubmissionFeaturesFailedHandler,

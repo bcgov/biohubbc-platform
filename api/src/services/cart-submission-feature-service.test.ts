@@ -2,11 +2,11 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { ApiError } from '../errors/api-error';
 import { CartFeatureListResponse, CartSubmissionFeature } from '../models/cart';
 import { CartSubmissionFeatureRepository } from '../repositories/cart-submission-feature-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
-import { getMockDBConnection } from '../__mocks__/db';
 import { CartSubmissionFeatureService } from './cart-submission-feature-service';
 
 chai.use(sinonChai);

@@ -2,8 +2,8 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiExecuteSQLError } from '../errors/api-error';
 import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
+import { ApiExecuteSQLError } from '../errors/api-error';
 import { TicketCommentRepository } from './ticket-comment-repository';
 
 chai.use(sinonChai);

@@ -3,12 +3,12 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getSubmissions } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { ApiError } from '../../errors/api-error';
 import { SECURITY_APPLIED_STATUS } from '../../repositories/security-repository';
 import { SubmissionRecordWithSecurityAndRootFeatureType } from '../../repositories/submission-repository';
 import { SubmissionService } from '../../services/submission-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 
 chai.use(sinonChai);
 

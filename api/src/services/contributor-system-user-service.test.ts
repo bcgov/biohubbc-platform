@@ -1,8 +1,8 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ContributorSystemUserRepository } from '../repositories/contributor-system-user-repository';
 import { getMockDBConnection } from '../__mocks__/db';
+import { ContributorSystemUserRepository } from '../repositories/contributor-system-user-repository';
 import { ContributorSystemUserService } from './contributor-system-user-service';
 
 chai.use(sinonChai);
