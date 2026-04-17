@@ -86,6 +86,10 @@ COPY --from=stage_2 ${HOME}/package*.json ./
 
 ENV PATH ${HOME}/node_modules/.bin/:${HOME}/.npm-global/bin/:${HOME}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends procps \
+    && rm -rf /var/lib/apt/lists/*
+
 # Application VOLUME
 VOLUME ${HOME}
 
