@@ -19,7 +19,6 @@ import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { CodeService } from '../code-service';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { SearchFeatureService } from '../search-feature-service';

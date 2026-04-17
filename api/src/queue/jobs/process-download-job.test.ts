@@ -3,12 +3,12 @@ import { describe } from 'mocha';
 import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
-import { getMockDBConnection } from '../../__mocks__/db';
 import {
   IProcessDownloadJobData,
   processDownloadFailedHandler,
