@@ -95,6 +95,3 @@ export interface ITicketsQueryParams extends Partial<ApiPaginationRequestOptions
   status?: TicketStatus;
   search?: string;
 }
-
-export type IGetTicketsParams = ITicketsQueryParams;
-export type IGetUserTicketsParams = ITicketsQueryParams;

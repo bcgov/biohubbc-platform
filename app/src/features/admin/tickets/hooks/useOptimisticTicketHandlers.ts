@@ -160,8 +160,7 @@ export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersP
     (nextStatus: TicketStatus) => {
       const currentTicket = getCurrentTicket();
       const hasUnaddressedDataRequests = currentTicket.data_requests.some(
-        (dataRequest) =>
-          dataRequest.status === PolicyStatus.REQUESTED || dataRequest.status === PolicyStatus.REVIEWED
+        (dataRequest) => dataRequest.status === PolicyStatus.REQUESTED || dataRequest.status === PolicyStatus.REVIEWED
       );
 
       if (nextStatus === 'closed' && hasUnaddressedDataRequests) {

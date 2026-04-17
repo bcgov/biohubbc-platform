@@ -18,11 +18,11 @@ import { IPolicy, PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { useState } from 'react';
 import { getRelativeTimeLabel } from 'utils/date';
 import {
-  ICommentTimelineEvent,
-  IDataRequestTimelineEvent,
-  IStatusTimelineEvent,
+  CommentEvent,
+  DataRequestEvent,
+  StatusEvent,
   ITicketTimelineProps,
-  ITimelineEvent
+  TimelineEvent
 } from './TicketTimeline.interface';
 import { TicketCommentTimelineItem } from './item/TicketCommentTimelineItem';
 import { TicketDataRequestTimelineItem } from './item/TicketDataRequestTimelineItem';
@@ -51,10 +51,10 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     dialogContext.setYesNoDialog({ open: false });
   };
 
-  const timelineEvents: ITimelineEvent[] = ticket
+  const timelineEvents: TimelineEvent[] = ticket
     ? [
         ...ticket.statuses.map(
-          (status): IStatusTimelineEvent => ({
+          (status): StatusEvent => ({
             kind: 'status',
             id: status.ticket_status_history_id,
             create_date: status.create_date,
@@ -63,7 +63,7 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
           })
         ),
         ...ticket.comments.map(
-          (comment): ICommentTimelineEvent => ({
+          (comment): CommentEvent => ({
             kind: 'comment',
             id: comment.ticket_comment_id,
             create_date: comment.create_date,
@@ -72,11 +72,11 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
           })
         ),
         ...ticket.data_requests.map(
-          (dataRequest): IDataRequestTimelineEvent => ({
+          (dataRequest): DataRequestEvent => ({
             kind: 'data_request',
             id: dataRequest.data_request_id,
             create_date: dataRequest.create_date,
-            dataRequest
+            data_request: dataRequest
           })
         )
       ].toSorted((a, b) => new Date(a.create_date).getTime() - new Date(b.create_date).getTime())
@@ -299,24 +299,24 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
           icon: <Icon path={TICKET_TIMELINE_ICONS.data_request} size={0.75} />,
           children: (
             <TicketDataRequestTimelineItem
-              dataRequest={item.dataRequest}
+              dataRequest={item.data_request}
               dateLabel={
                 getRelativeTimeLabel(item.create_date ?? '', {
                   maxRelativeDays: 30,
                   absoluteFormat: DATE_FORMAT.ShortMediumDateFormat
                 }) ?? ''
               }
-              isUpdating={updatingDataRequestId === item.dataRequest.data_request_id}
+              isUpdating={updatingDataRequestId === item.data_request.data_request_id}
               onViewPolicy={handleOpenPolicyDialog}
               onViewFinalizedPolicy={handleOpenViewPolicyDialog}
               onApprove={(dataRequestId) =>
-                handleConfirmDataRequestStatusUpdate(dataRequestId, item.dataRequest.policy_id, PolicyStatus.APPROVED)
+                handleConfirmDataRequestStatusUpdate(dataRequestId, item.data_request.policy_id, PolicyStatus.APPROVED)
               }
               onDeny={(dataRequestId) =>
-                handleConfirmDataRequestStatusUpdate(dataRequestId, item.dataRequest.policy_id, PolicyStatus.DENIED)
+                handleConfirmDataRequestStatusUpdate(dataRequestId, item.data_request.policy_id, PolicyStatus.DENIED)
               }
               onResetToReviewed={(dataRequestId) =>
-                handleConfirmResetToReviewed(dataRequestId, item.dataRequest.policy_id, item.dataRequest.status)
+                handleConfirmResetToReviewed(dataRequestId, item.data_request.policy_id, item.data_request.status)
               }
             />
           )

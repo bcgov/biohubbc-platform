@@ -3,13 +3,12 @@ import {
   ICreateTicketCommentRequest,
   ICreateTicketReferenceRequest,
   ICreateTicketRequest,
-  IGetTicketsParams,
   IGetTicketsResponse,
-  IGetUserTicketsParams,
   ITicket,
   ITicketCommentLog,
   ITicketReference,
   ITicketExtended,
+  ITicketsQueryParams,
   IUpdateTicketRequest,
   TicketStatus
 } from 'interfaces/useTicketsApi.interface';
@@ -25,10 +24,10 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   /**
    * Get tickets using optional filters and pagination options.
    *
-   * @param {IGetTicketsParams} [params]
+   * @param {ITicketsQueryParams} [params]
    * @return {*} {Promise<IGetTicketsResponse>}
    */
-  const getTicketsForAdmin = async (params?: IGetTicketsParams): Promise<IGetTicketsResponse> => {
+  const getTicketsForAdmin = async (params?: ITicketsQueryParams): Promise<IGetTicketsResponse> => {
     const { data } = await axios.get('/api/administrative/tickets', {
       params,
       paramsSerializer: (params) => qs.stringify(params)
@@ -143,10 +142,10 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   /**
    * Get tickets accessible to the current user via team membership.
    *
-   * @param {IGetUserTicketsParams} [params]
+   * @param {ITicketsQueryParams} [params]
    * @return {*} {Promise<IGetTicketsResponse>}
    */
-  const getTicketsForUser = async (params?: IGetUserTicketsParams): Promise<IGetTicketsResponse> => {
+  const getTicketsForUser = async (params?: ITicketsQueryParams): Promise<IGetTicketsResponse> => {
     const { data } = await axios.get('/api/tickets', {
       params,
       paramsSerializer: (params) => qs.stringify(params)

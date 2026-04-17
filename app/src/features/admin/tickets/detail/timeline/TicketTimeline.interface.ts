@@ -6,27 +6,27 @@ export interface ITicketTimelineProps {
   isLoading: boolean;
 }
 
-export type IStatusTimelineEvent = {
-  kind: 'status';
+export interface TimelineEventBase {
+  kind: 'status' | 'comment' | 'data_request';
   id: string;
   create_date: string;
+}
+
+export interface StatusEvent extends TimelineEventBase {
+  kind: 'status';
   user_identifier: string;
   status: TicketStatus;
-};
+}
 
-export type ICommentTimelineEvent = {
+export interface CommentEvent extends TimelineEventBase {
   kind: 'comment';
-  id: string;
-  create_date: string;
   user_identifier: string;
   comment: string;
-};
+}
 
-export type IDataRequestTimelineEvent = {
+export interface DataRequestEvent extends TimelineEventBase {
   kind: 'data_request';
-  id: string;
-  create_date: string;
-  dataRequest: DataRequestResponse;
-};
+  data_request: DataRequestResponse;
+}
 
-export type ITimelineEvent = IStatusTimelineEvent | ICommentTimelineEvent | IDataRequestTimelineEvent;
+export type TimelineEvent = StatusEvent | CommentEvent | DataRequestEvent;

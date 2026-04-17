@@ -18,9 +18,7 @@ vi.mock('./hooks/useTicketComment', () => ({
 }));
 
 vi.mock('./detail/header/TicketHeader', () => ({
-  TicketHeader: ({ ticket }: { ticket: ITicketExtended }) => (
-    <div data-testid="ticket-header">{ticket.ticket_slug}</div>
-  )
+  TicketHeader: ({ ticket }: { ticket: ITicketExtended }) => <div data-testid="ticket-header">{ticket.ticket_slug}</div>
 }));
 
 vi.mock('./detail/timeline/TicketTimeline', () => ({
@@ -29,15 +27,11 @@ vi.mock('./detail/timeline/TicketTimeline', () => ({
       data-testid="ticket-timeline"
       data-loading={String(isLoading)}
       data-ticket-id={ticket?.ticket_id ?? ''}
-      data-events={
-        JSON.stringify(
-          [
-            ...(ticket?.statuses ?? []),
-            ...(ticket?.comments ?? []),
-            ...(ticket?.data_requests ?? [])
-          ].sort((a, b) => new Date(a.create_date).getTime() - new Date(b.create_date).getTime())
+      data-events={JSON.stringify(
+        [...(ticket?.statuses ?? []), ...(ticket?.comments ?? []), ...(ticket?.data_requests ?? [])].sort(
+          (a, b) => new Date(a.create_date).getTime() - new Date(b.create_date).getTime()
         )
-      }
+      )}
     />
   )
 }));
