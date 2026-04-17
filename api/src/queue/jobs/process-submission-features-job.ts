@@ -3,6 +3,7 @@ import { PROCESS_START_STATUSES, TERMINAL_UPLOAD_STATUSES } from '../../constant
 import { IngestionValidationError } from '../../errors/submission-errors';
 import { ProcessStatusStatusEnum } from '../../models/process-status';
 import { SubmissionUpload } from '../../models/submission-upload';
+import { SubmissionFeatureIngestionService } from '../../services/ingestion/submission-feature-ingestion-service';
 import { SubmissionIngestionService } from '../../services/ingestion/submission-ingestion-service';
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
@@ -10,7 +11,7 @@ import { UploadArchiveService } from '../../services/upload/upload-archive-servi
 import { getLogger } from '../../utils/logger';
 import { publishIndexSubmissionFeaturesJob } from '../publisher';
 import { withConnection } from '../with-connection';
-import { ProcessSubmissionFeaturesExecutionOutcome } from './process-submission-features-job.interface';
+import { ProcessSubmissionFeatureOutcome } from './process-submission-features-job.interface';
 
 const defaultLog = getLogger('queue/jobs/process-submission-features-job');
 
@@ -138,12 +139,12 @@ async function initializeProcessSubmissionFeaturesStage(submissionUploadId: stri
  *
  * @param {SubmissionUpload} submissionUpload Submission upload payload from queue.
  * @param {string} jobId Job identifier.
- * @returns {Promise<ProcessSubmissionFeaturesExecutionOutcome>} Execution outcome.
+ * @returns {Promise<ProcessSubmissionFeatureOutcome>} Execution outcome.
  */
 async function executeProcessSubmissionFeaturesIngestion(
   submissionUpload: SubmissionUpload,
   jobId: string
-): Promise<ProcessSubmissionFeaturesExecutionOutcome> {
+): Promise<ProcessSubmissionFeatureOutcome> {
   return withConnection(async (connection) => {
     // This transaction encapsulates archive ingestion and any DB writes performed by the ingestion service.
     const ingestStart = Date.now();
@@ -203,13 +204,13 @@ async function executeProcessSubmissionFeaturesIngestion(
  *
  * @param {SubmissionUpload} submissionUpload Submission upload payload.
  * @param {string} jobId Job identifier.
- * @param {ProcessSubmissionFeaturesExecutionOutcome} outcome Execution outcome.
+ * @param {ProcessSubmissionFeatureOutcome} outcome Execution outcome.
  * @returns {Promise<void>}
  */
 async function finalizeProcessSubmissionFeaturesStage(
   submissionUpload: SubmissionUpload,
   jobId: string,
-  outcome: ProcessSubmissionFeaturesExecutionOutcome
+  outcome: ProcessSubmissionFeatureOutcome
 ): Promise<void> {
   if (outcome.status === 'invalid') {
     // Step 1a: Record validation failure payload for observability.
@@ -352,6 +353,30 @@ async function runProcessSubmissionFeaturesStage(job: PgBoss.Job<SubmissionUploa
 }
 
 /**
+ * Best-effort cleanup for partial feature rows after a process-stage failure.
+ *
+ * Cleanup is scoped to the current submission upload and only affects rows that
+ * are still pending approval (record_effective_date IS NULL in repository SQL).
+ *
+ * @param {string} submissionUploadId Submission upload scope.
+ * @param {string} jobId Job identifier.
+ * @returns {Promise<void>}
+ */
+async function cleanupFailedProcessSubmissionFeatures(submissionUploadId: string, jobId: string): Promise<void> {
+  await withConnection(async (connection) => {
+    const submissionFeatureIngestionService = new SubmissionFeatureIngestionService(connection);
+    await submissionFeatureIngestionService.deleteFeaturesBySubmissionUploadId(submissionUploadId);
+  });
+
+  defaultLog.info({
+    label: 'cleanupFailedProcessSubmissionFeatures',
+    message: 'Cleaned up pending submission features after process-stage failure',
+    jobId,
+    submissionUploadId
+  });
+}
+
+/**
  * Process submission features job handler.
  *
  * Responsibilities:
@@ -380,6 +405,19 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
     try {
       await runProcessSubmissionFeaturesStage(job);
     } catch (error) {
+      try {
+        await cleanupFailedProcessSubmissionFeatures(submissionUploadId, job.id);
+      } catch (cleanupError) {
+        // Cleanup must not hide the original processing error; retry flow still relies on original throw.
+        defaultLog.error({
+          label: 'cleanupFailedProcessSubmissionFeatures',
+          message: 'Failed to clean up pending submission features after process-stage failure',
+          jobId: job.id,
+          submissionUploadId,
+          error: toErrorMetadata(cleanupError)
+        });
+      }
+
       defaultLog.error({
         label: 'processSubmissionFeaturesJobHandler',
         message: 'Process submission features job failed; allowing pg-boss retry',

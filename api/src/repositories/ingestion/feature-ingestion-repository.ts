@@ -5,6 +5,13 @@ import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { CreateSubmissionFeatureIngestionRecord, InsertSubmissionFeatureRecord } from '../../models/submission-feature';
 import { BaseRepository } from '../base-repository';
 
+const ActiveFeatureTypeRow = z.object({
+  feature_type_id: z.number(),
+  name: z.string()
+});
+
+export type ActiveFeatureTypeRow = z.infer<typeof ActiveFeatureTypeRow>;
+
 /**
  * A repository class for ingestion-related data access.
  *
@@ -16,10 +23,13 @@ export class FeatureIngestionRepository extends BaseRepository {
   /**
    * Get active feature type name/id mapping.
    *
-   * @returns {Promise<Map<string, number>>}
+   * Repository methods should return row-shaped data; callers can project this
+   * into domain-specific structures (for example, a `Map`) in the service layer.
+   *
+   * @returns {Promise<ActiveFeatureTypeRow[]>}
    * @memberof FeatureIngestionRepository
    */
-  async getActiveFeatureTypeMap(): Promise<Map<string, number>> {
+  async getActiveFeatureTypeMap(): Promise<ActiveFeatureTypeRow[]> {
     const sqlStatement = SQL`
       SELECT
         feature_type_id,
@@ -30,15 +40,9 @@ export class FeatureIngestionRepository extends BaseRepository {
         record_end_date IS NULL;
     `;
 
-    const response = await this.connection.sql(
-      sqlStatement,
-      z.object({
-        feature_type_id: z.number(),
-        name: z.string()
-      })
-    );
+    const response = await this.connection.sql(sqlStatement, ActiveFeatureTypeRow);
 
-    return new Map(response.rows.map((row) => [row.name, row.feature_type_id]));
+    return response.rows;
   }
 
   /**
@@ -267,6 +271,7 @@ export class FeatureIngestionRepository extends BaseRepository {
       UPDATE submission_feature
       SET record_end_date = NOW()
       WHERE submission_upload_id = ${submissionUploadId}
+        AND record_effective_date IS NULL
         AND record_end_date IS NULL;
     `;
 

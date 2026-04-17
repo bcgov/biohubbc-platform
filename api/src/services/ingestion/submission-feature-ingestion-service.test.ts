@@ -14,12 +14,10 @@ describe('SubmissionFeatureIngestionService', () => {
   describe('ingestFeatureBatch', () => {
     it('persists shallow-validated feature rows with raw payload and byte size', async () => {
       const service = new SubmissionFeatureIngestionService(getMockDBConnection());
-      sinon.stub(FeatureIngestionRepository.prototype, 'getActiveFeatureTypeMap').resolves(
-        new Map<string, number>([
-          ['dataset', 1],
-          ['sample_site', 2]
-        ])
-      );
+      sinon.stub(FeatureIngestionRepository.prototype, 'getActiveFeatureTypeMap').resolves([
+        { feature_type_id: 1, name: 'dataset' },
+        { feature_type_id: 2, name: 'sample_site' }
+      ]);
       const insertStub = sinon
         .stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecordsByTypeId')
         .resolves(2);
@@ -85,7 +83,7 @@ describe('SubmissionFeatureIngestionService', () => {
       const service = new SubmissionFeatureIngestionService(getMockDBConnection());
       sinon
         .stub(FeatureIngestionRepository.prototype, 'getActiveFeatureTypeMap')
-        .resolves(new Map<string, number>([['dataset', 1]]));
+        .resolves([{ feature_type_id: 1, name: 'dataset' }]);
       const insertStub = sinon
         .stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecordsByTypeId')
         .resolves(1);

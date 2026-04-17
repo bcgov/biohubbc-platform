@@ -315,6 +315,230 @@ async function processMediaEntry(
 }
 
 /**
+ * Attempt to process one `features/*.json` tar entry.
+ *
+ * Behavior:
+ * - Returns `false` when the entry is outside `features/`, not JSON, or not a file.
+ * - Buffers and parses JSON payloads for matching entries.
+ * - Accepts either one object or an array payload and forwards each item through
+ *   `ingestFeatureEntry` so caller-owned batching/validation rules stay centralized.
+ * - Returns `true` once the entry has been fully consumed and processed.
+ *
+ * @param {{ name?: string | null; type?: string | null }} header Tar entry header.
+ * @param {Readable} stream Tar entry data stream.
+ * @param {{ ingestFeatureEntry: (entryValue: unknown, entryName: string) => Promise<void> }} options
+ * Feature processing callback and dependencies.
+ * @returns {Promise<boolean>} True when the entry matched and was handled.
+ */
+async function processFeatureArchiveEntry(
+  header: { name?: string | null; type?: string | null },
+  stream: Readable,
+  options: {
+    ingestFeatureEntry: (entryValue: unknown, entryName: string) => Promise<void>;
+  }
+): Promise<boolean> {
+  const resolvedFeatureEntryName = resolveScopedEntryName(header.name ?? '', 'features');
+  if (!(resolvedFeatureEntryName && resolvedFeatureEntryName.endsWith('.json') && header.type === 'file')) {
+    return false;
+  }
+
+  const buffer = await streamToBuffer(stream);
+  const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
+  const parsedEntries = Array.isArray(parsed) ? parsed : [parsed];
+
+  for (const parsedEntry of parsedEntries) {
+    await options.ingestFeatureEntry(parsedEntry, resolvedFeatureEntryName);
+  }
+
+  return true;
+}
+
+/**
+ * Attempt to process one `codes/*.json` tar entry.
+ *
+ * Behavior:
+ * - Returns `false` when the entry is outside `codes/`, not JSON, or not a file.
+ * - Buffers and parses the JSON payload.
+ * - Validates/transforms through `extractCodesetsFromTarballEntry`.
+ * - Persists via `ingestCodesets` and increments caller-owned counters.
+ *
+ * @param {{ name?: string | null; type?: string | null }} header Tar entry header.
+ * @param {Readable} stream Tar entry data stream.
+ * @param {{
+ *   ingestCodesets: (codesets: TarCodesets) => Promise<void>;
+ *   onCodesetFileParsed: () => void;
+ * }} options Codeset sink and side-effect callback.
+ * @returns {Promise<boolean>} True when the entry matched and was handled.
+ */
+async function processCodesArchiveEntry(
+  header: { name?: string | null; type?: string | null },
+  stream: Readable,
+  options: {
+    ingestCodesets: (codesets: TarCodesets) => Promise<void>;
+    onCodesetFileParsed: () => void;
+  }
+): Promise<boolean> {
+  const resolvedCodesEntryName = resolveScopedEntryName(header.name ?? '', 'codes');
+  if (!(resolvedCodesEntryName && resolvedCodesEntryName.endsWith('.json') && header.type === 'file')) {
+    return false;
+  }
+
+  const buffer = await streamToBuffer(stream);
+  const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
+  const codesets = extractCodesetsFromTarballEntry(parsed, resolvedCodesEntryName);
+  await options.ingestCodesets(codesets);
+  options.onCodesetFileParsed();
+  return true;
+}
+
+/**
+ * Attempt to process one `files/*` media entry with bounded concurrency.
+ *
+ * Behavior:
+ * - Returns `false` for non-media entries.
+ * - Starts upload immediately for matched entries and tracks the promise in
+ *   `inFlightMediaUploads` for lifecycle management.
+ * - Applies backpressure via `Promise.race` when in-flight uploads reach the
+ *   configured concurrency ceiling.
+ *
+ * @param {{ name?: string | null; type?: string | null; size?: number }} header Tar entry header.
+ * @param {Readable} stream Tar entry data stream.
+ * @param {(err: unknown) => void} reject Error callback for async upload failures.
+ * @param {{
+ *   objectStorageService: StreamSubmissionArchiveOptions['objectStorageService'];
+ *   s3KeyPrefix: string;
+ *   ingestMediaFile: (uploadedFile: IUploadedMediaFile) => Promise<void>;
+ *   onUploaded: () => void;
+ *   mediaConcurrency: number;
+ *   inFlightMediaUploads: Set<Promise<void>>;
+ * }} options Media upload dependencies and tracking state.
+ * @returns {Promise<boolean>} True when the entry matched and upload was started.
+ */
+async function processConcurrentMediaArchiveEntry(
+  header: { name?: string | null; type?: string | null; size?: number },
+  stream: Readable,
+  reject: (err: unknown) => void,
+  options: {
+    objectStorageService: StreamSubmissionArchiveOptions['objectStorageService'];
+    s3KeyPrefix: string;
+    ingestMediaFile: (uploadedFile: IUploadedMediaFile) => Promise<void>;
+    onUploaded: () => void;
+    mediaConcurrency: number;
+    inFlightMediaUploads: Set<Promise<void>>;
+  }
+): Promise<boolean> {
+  const resolvedMediaEntryName = resolveScopedEntryName(header.name ?? '', 'files');
+  if (!(resolvedMediaEntryName && header.type === 'file')) {
+    return false;
+  }
+
+  const context = buildMediaUploadContext(resolvedMediaEntryName, options.s3KeyPrefix, header.size ?? 0);
+  const uploadPromise = uploadMediaEntry(stream, context, {
+    objectStorageService: options.objectStorageService,
+    ingestMediaFile: options.ingestMediaFile,
+    onUploaded: options.onUploaded
+  });
+
+  options.inFlightMediaUploads.add(uploadPromise);
+  uploadPromise.finally(() => options.inFlightMediaUploads.delete(uploadPromise)).catch(reject);
+
+  if (options.inFlightMediaUploads.size >= options.mediaConcurrency) {
+    await Promise.race(options.inFlightMediaUploads);
+  }
+
+  return true;
+}
+
+/**
+ * Route one tar entry through feature, codeset, and media handlers.
+ *
+ * Processing order is intentional:
+ * 1. Directories are drained and skipped.
+ * 2. Feature JSON entries are processed first.
+ * 3. Codeset JSON entries are processed second.
+ * 4. Media file entries are uploaded last with concurrency bounds.
+ * 5. Everything else is drained and ignored.
+ *
+ * This function is responsible for always calling `next()` exactly once per entry.
+ *
+ * @param {{ name?: string | null; type?: string | null; size?: number }} header Tar entry header.
+ * @param {Readable} stream Tar entry data stream.
+ * @param {TarNext} next Tar continuation callback.
+ * @param {(err: unknown) => void} reject Error callback for asynchronous failures.
+ * @param {{
+ *   ingestFeatureEntry: (entryValue: unknown, entryName: string) => Promise<void>;
+ *   ingestCodesets: (codesets: TarCodesets) => Promise<void>;
+ *   onCodesetFileParsed: () => void;
+ *   objectStorageService: StreamSubmissionArchiveOptions['objectStorageService'];
+ *   s3KeyPrefix: string;
+ *   ingestMediaFile: (uploadedFile: IUploadedMediaFile) => Promise<void>;
+ *   onUploaded: () => void;
+ *   mediaConcurrency: number;
+ *   inFlightMediaUploads: Set<Promise<void>>;
+ * }} options Entry handlers and shared processing state.
+ * @returns {Promise<void>}
+ */
+async function processSubmissionArchiveEntry(
+  header: { name?: string | null; type?: string | null; size?: number },
+  stream: Readable,
+  next: TarNext,
+  reject: (err: unknown) => void,
+  options: {
+    ingestFeatureEntry: (entryValue: unknown, entryName: string) => Promise<void>;
+    ingestCodesets: (codesets: TarCodesets) => Promise<void>;
+    onCodesetFileParsed: () => void;
+    objectStorageService: StreamSubmissionArchiveOptions['objectStorageService'];
+    s3KeyPrefix: string;
+    ingestMediaFile: (uploadedFile: IUploadedMediaFile) => Promise<void>;
+    onUploaded: () => void;
+    mediaConcurrency: number;
+    inFlightMediaUploads: Set<Promise<void>>;
+  }
+): Promise<void> {
+  if (header.type === 'directory') {
+    await drainStream(stream);
+    next();
+    return;
+  }
+
+  if (
+    await processFeatureArchiveEntry(header, stream, {
+      ingestFeatureEntry: options.ingestFeatureEntry
+    })
+  ) {
+    next();
+    return;
+  }
+
+  if (
+    await processCodesArchiveEntry(header, stream, {
+      ingestCodesets: options.ingestCodesets,
+      onCodesetFileParsed: options.onCodesetFileParsed
+    })
+  ) {
+    next();
+    return;
+  }
+
+  if (
+    await processConcurrentMediaArchiveEntry(header, stream, reject, {
+      objectStorageService: options.objectStorageService,
+      s3KeyPrefix: options.s3KeyPrefix,
+      ingestMediaFile: options.ingestMediaFile,
+      onUploaded: options.onUploaded,
+      mediaConcurrency: options.mediaConcurrency,
+      inFlightMediaUploads: options.inFlightMediaUploads
+    })
+  ) {
+    next();
+    return;
+  }
+
+  await drainStream(stream);
+  next();
+}
+
+/**
  * Stream features from a TAR archive and emit fixed-size flattened batches.
  *
  * Processing rules:
@@ -665,6 +889,9 @@ export async function streamSubmissionArchive(
   let pendingUploadedBytes = 0;
   const inFlightMediaUploads = new Set<Promise<void>>();
 
+  /**
+   * Flush buffered feature blocks to caller persistence callback.
+   */
   const flushPendingFeatures = async (): Promise<void> => {
     if (!pendingFeatureBlocks.length) {
       return;
@@ -675,17 +902,27 @@ export async function streamSubmissionArchive(
     await ingestFeatureBatch(currentBlocks);
   };
 
+  /**
+   * Flush buffered media metadata rows to caller persistence callback.
+   */
   const flushPendingMedia = async (): Promise<void> => {
-    if (!pendingUploadedFiles.length) {
+    const hasPendingMedia = pendingUploadedFiles.length > 0;
+    if (!hasPendingMedia) {
       return;
     }
 
-    const currentBatch = pendingUploadedFiles;
-    pendingUploadedFiles = [];
+    const currentBatch = pendingUploadedFiles.splice(0, pendingUploadedFiles.length);
     pendingUploadedBytes = 0;
     await ingestMediaBatch(currentBatch);
   };
 
+  /**
+   * Serialize media metadata buffering and threshold-based flushes.
+   *
+   * Upload completion callbacks may resolve concurrently; this queue ensures
+   * shared mutable state (`pendingUploadedFiles`, `pendingUploadedBytes`) is
+   * mutated in one logical write stream.
+   */
   const enqueueUploadedMediaFile = (uploadedFile: IUploadedMediaFile): Promise<void> => {
     const nextWrite = mediaStateQueue.then(async () => {
       pendingUploadedFiles.push(uploadedFile);
@@ -708,76 +945,35 @@ export async function streamSubmissionArchive(
   const entryPromise = new Promise<void>((resolve, reject) => {
     rejectEntryPromise = reject;
 
-    extract.on('entry', async (header, stream, next) => {
-      try {
-        if (header.type === 'directory') {
-          await drainStream(stream);
-          next();
-          return;
-        }
-
-        const resolvedFeatureEntryName = resolveScopedEntryName(header.name ?? '', 'features');
-        if (resolvedFeatureEntryName && resolvedFeatureEntryName.endsWith('.json') && header.type === 'file') {
-          const buffer = await streamToBuffer(stream);
-          const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
-          const parsedEntries = Array.isArray(parsed) ? parsed : [parsed];
-
-          for (const parsedEntry of parsedEntries) {
-            const block = extractFeatureFromTarballEntry(parsedEntry, resolvedFeatureEntryName);
-            pendingFeatureBlocks.push(block);
-            featureCount += 1;
-
-            if (pendingFeatureBlocks.length >= featureBatchSize) {
-              await flushPendingFeatures();
-            }
+    extract.on('entry', (header, stream, next) => {
+      processSubmissionArchiveEntry(header, stream, next, reject, {
+        ingestFeatureEntry: async (entryValue, entryName) => {
+          const block = extractFeatureFromTarballEntry(entryValue, entryName);
+          pendingFeatureBlocks.push(block);
+          featureCount += 1;
+          if (pendingFeatureBlocks.length >= featureBatchSize) {
+            await flushPendingFeatures();
           }
-
-          next();
-          return;
-        }
-
-        const resolvedCodesEntryName = resolveScopedEntryName(header.name ?? '', 'codes');
-        if (resolvedCodesEntryName && resolvedCodesEntryName.endsWith('.json') && header.type === 'file') {
-          const buffer = await streamToBuffer(stream);
-          const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
-          const codesets = extractCodesetsFromTarballEntry(parsed, resolvedCodesEntryName);
-          await ingestCodesets(codesets);
+        },
+        ingestCodesets,
+        onCodesetFileParsed: () => {
           codesetFileCount += 1;
-          next();
-          return;
-        }
-
-        const resolvedMediaEntryName = resolveScopedEntryName(header.name ?? '', 'files');
-        if (resolvedMediaEntryName && header.type === 'file') {
-          const context = buildMediaUploadContext(resolvedMediaEntryName, s3KeyPrefix, header.size ?? 0);
-          const uploadPromise = uploadMediaEntry(stream, context, {
-            objectStorageService,
-            ingestMediaFile: enqueueUploadedMediaFile,
-            onUploaded: () => {
-              uploadedCount += 1;
-            }
-          });
-
-          inFlightMediaUploads.add(uploadPromise);
-          uploadPromise.finally(() => inFlightMediaUploads.delete(uploadPromise)).catch(reject);
-
-          if (inFlightMediaUploads.size >= mediaConcurrency) {
-            await Promise.race(inFlightMediaUploads);
-          }
-
-          next();
-          return;
-        }
-
-        await drainStream(stream);
-        next();
-      } catch (error) {
-        reject(error);
-      }
+        },
+        objectStorageService,
+        s3KeyPrefix,
+        ingestMediaFile: enqueueUploadedMediaFile,
+        onUploaded: () => {
+          uploadedCount += 1;
+        },
+        mediaConcurrency,
+        inFlightMediaUploads
+      }).catch(reject);
     });
 
     extract.on('finish', async () => {
       try {
+        // Wait for uploads and serialized media queue before final flushes so no
+        // late-arriving media rows are dropped.
         await Promise.all(inFlightMediaUploads);
         await mediaStateQueue;
         await flushPendingFeatures();

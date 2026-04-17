@@ -104,12 +104,10 @@ export class ArtifactRepository extends BaseRepository {
       })
     );
 
-    const expectedKeyCount = new Set(artifacts.map((artifact) => `${artifact.bucket}|${artifact.object_key}`)).size;
-
-    if (response.rowCount !== expectedKeyCount) {
+    if (response.rowCount !== artifacts.length) {
       throw new ApiExecuteSQLError('Failed to insert artifact records', [
         'ArtifactRepository->insertArtifacts',
-        `rowCount was ${response.rowCount}, expected ${expectedKeyCount}`
+        `rowCount was ${response.rowCount}, expected ${artifacts.length}`
       ]);
     }
 

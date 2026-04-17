@@ -16,7 +16,7 @@ describe('FeatureIngestionRepository', () => {
   });
 
   describe('getActiveFeatureTypeMap', () => {
-    it('returns a map of active feature type names to ids', async () => {
+    it('returns active feature type rows', async () => {
       const mockQueryResponse = {
         rowCount: 2,
         rows: [
@@ -29,8 +29,10 @@ describe('FeatureIngestionRepository', () => {
 
       const result = await ingestionRepository.getActiveFeatureTypeMap();
 
-      expect(result.get('dataset')).to.equal(1);
-      expect(result.get('sample_site')).to.equal(2);
+      expect(result).to.deep.equal([
+        { feature_type_id: 1, name: 'dataset' },
+        { feature_type_id: 2, name: 'sample_site' }
+      ]);
     });
   });
 
@@ -233,9 +235,10 @@ describe('FeatureIngestionRepository', () => {
   });
 
   describe('deleteSubmissionFeaturesBySubmissionUploadId', () => {
-    it('should scope WHERE by submission_upload_id', async () => {
+    it('should scope WHERE by submission_upload_id and pending effective rows', async () => {
       const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
         expect(sqlStatement.text).to.include('submission_upload_id');
+        expect(sqlStatement.text).to.include('record_effective_date IS NULL');
         expect(sqlStatement.text).to.include('record_end_date IS NULL');
         return Promise.resolve({ rowCount: 2, rows: [], command: '', oid: 0, fields: [] });
       });
