@@ -192,7 +192,7 @@ const buildOptimisticStatuses = (ticket: ITicketExtended, nextStatus: TicketStat
   return [
     ...ticket.statuses,
     {
-      ticket_status_history_id: `optimistic-status-${Date.now()}`,
+      ticket_status_id: `optimistic-status-${Date.now()}`,
       ticket_id: ticket.ticket_id,
       user_identifier: userIdentifier,
       create_date: new Date().toISOString(),

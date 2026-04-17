@@ -29,7 +29,7 @@ vi.mock('./detail/timeline/TicketTimeline', () => ({
       data-ticket-id={ticket?.ticket_id ?? ''}
       data-events={JSON.stringify(
         [...(ticket?.statuses ?? []), ...(ticket?.comments ?? []), ...(ticket?.data_requests ?? [])].sort(
-          (a, b) => new Date(a.create_date).getTime() - new Date(b.create_date).getTime()
+          (a, b) => new Date(a.create_date ?? '').getTime() - new Date(b.create_date ?? '').getTime()
         )
       )}
     />
@@ -89,14 +89,14 @@ const baseTicket: ITicketExtended = {
   status: 'open',
   statuses: [
     {
-      ticket_status_history_id: 'status-2',
+      ticket_status_id: 'status-2',
       ticket_id: '11111111-1111-1111-1111-111111111111',
       user_identifier: 'Bob',
       create_date: '2026-02-25T00:00:00.000Z',
       status: 'closed'
     },
     {
-      ticket_status_history_id: 'status-1',
+      ticket_status_id: 'status-1',
       ticket_id: '11111111-1111-1111-1111-111111111111',
       user_identifier: 'Sarah',
       create_date: '2026-02-24T00:00:00.000Z',

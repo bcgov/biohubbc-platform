@@ -16,7 +16,7 @@ export interface ITicket {
 }
 
 export interface ITicketStatusLog {
-  ticket_status_history_id: string;
+  ticket_status_id: string;
   ticket_id: string;
   user_identifier: string;
   create_date: string;
@@ -64,6 +64,7 @@ export interface ICreateTicketRequest {
   subject: string;
   description: string | null;
   priority: TicketPriority;
+  systemUserIds?: number[];
 }
 
 export interface IUpdateTicketRequest {

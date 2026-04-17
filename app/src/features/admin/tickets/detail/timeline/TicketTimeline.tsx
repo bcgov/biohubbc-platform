@@ -56,7 +56,7 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
         ...ticket.statuses.map(
           (status): StatusEvent => ({
             kind: 'status',
-            id: status.ticket_status_history_id,
+            id: status.ticket_status_id,
             create_date: status.create_date,
             user_identifier: status.user_identifier,
             status: status.status
@@ -75,7 +75,7 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
           (dataRequest): DataRequestEvent => ({
             kind: 'data_request',
             id: dataRequest.data_request_id,
-            create_date: dataRequest.create_date,
+            create_date: dataRequest.create_date ?? '',
             data_request: dataRequest
           })
         )
