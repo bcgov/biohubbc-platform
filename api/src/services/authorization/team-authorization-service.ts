@@ -22,6 +22,12 @@ export class TeamAuthorizationService extends DBService {
   /**
    * Check if a user is authorized for a team-scoped entity.
    *
+   * Entity semantics:
+   * - `ticket`: membership in the ticket visibility team.
+   * - `data_request`: membership in the data-request visibility team.
+   * - `submission_feature`: membership in a policy recipient team linked through
+   *   team_policy for an ALLOWing policy statement chain.
+   *
    * @param {number} systemUserId
    * @param {TeamAuthorizationEntity} entity
    * @return {Promise<boolean>}
@@ -31,6 +37,10 @@ export class TeamAuthorizationService extends DBService {
     let record: { record_end_date: string | null } | null;
 
     switch (entity.entity) {
+      case 'ticket':
+        record = await this.teamAuthorizationRepository.findTeamMembershipByTicket(systemUserId, entity.ticketId);
+        break;
+
       case 'data_request':
         record = await this.teamAuthorizationRepository.findTeamMembershipByDataRequest(
           systemUserId,

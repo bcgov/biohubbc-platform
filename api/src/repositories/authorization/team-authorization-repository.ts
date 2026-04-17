@@ -1,7 +1,7 @@
 import SQL from 'sql-template-strings';
 import { getKnex } from '../../database/db';
 import { PolicyEffect } from '../../models/policy-statement';
-import { DataRequestRecord, TeamPolicyRecord } from '../../models/team-authorization';
+import { DataRequestRecord, TeamPolicyRecord, TicketRecord } from '../../models/team-authorization';
 import { BaseRepository } from '../base-repository';
 
 /**
@@ -12,6 +12,30 @@ import { BaseRepository } from '../base-repository';
  * @extends {BaseRepository}
  */
 export class TeamAuthorizationRepository extends BaseRepository {
+  /**
+   * Find a ticket-team membership for a user through a ticket.
+   *
+   * @param {number} systemUserId
+   * @param {string} ticketId
+   * @return {Promise<TicketRecord | null>}
+   * @memberof TeamAuthorizationRepository
+   */
+  async findTeamMembershipByTicket(systemUserId: number, ticketId: string): Promise<TicketRecord | null> {
+    const knex = getKnex();
+    const query = knex
+      .queryBuilder()
+      .select('t.ticket_id', 'tm.record_end_date')
+      .from('ticket as t')
+      .join('team_member as tm', 'tm.team_id', 't.team_id')
+      .where('t.ticket_id', ticketId)
+      .where('tm.system_user_id', systemUserId)
+      .whereNull('t.record_end_date')
+      .limit(1);
+
+    const response = await this.connection.knex(query, TicketRecord);
+    return response.rows[0] ?? null;
+  }
+
   /**
    * Find a team membership for a user through a data request.
    *
