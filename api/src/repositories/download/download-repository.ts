@@ -1,7 +1,7 @@
 import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
-import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
+import { DOWNLOAD_FEATURE_BATCH_SIZE, FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import {
@@ -444,11 +444,14 @@ export class DownloadRepository extends BaseRepository {
    * Follows the streamFragmentFeaturesByType pattern.
    *
    * @param {string} cartId - The cart ID (from download.cart_id).
-   * @param {number} [batchSize=5000] - Rows per FETCH.
+   * @param {number} [batchSize=DOWNLOAD_FEATURE_BATCH_SIZE] - Rows per FETCH.
    * @yields {DownloadFeatureSummary[]} Batches of feature summaries.
    * @memberof DownloadRepository
    */
-  async *streamDownloadFeaturesByCartId(cartId: string, batchSize = 5000): AsyncGenerator<DownloadFeatureSummary[]> {
+  async *streamDownloadFeaturesByCartId(
+    cartId: string,
+    batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
+  ): AsyncGenerator<DownloadFeatureSummary[]> {
     const cursorName = `dl_cart_cursor_${cartId.replace(/[^a-z0-9_]/gi, '_')}`;
 
     await this.connection.query(
@@ -489,7 +492,7 @@ export class DownloadRepository extends BaseRepository {
    * @param {string} downloadId - The download ID (used for cursor naming).
    * @param {string} searchSql - Raw SQL for the search subquery (from buildSearchFeatureIdsSubquery).
    * @param {any[]} searchBindings - Parameterized bindings for the search SQL.
-   * @param {number} [batchSize=5000] - Rows per FETCH.
+   * @param {number} [batchSize=DOWNLOAD_FEATURE_BATCH_SIZE] - Rows per FETCH.
    * @yields {DownloadFeatureSummary[]} Batches of feature summaries.
    * @memberof DownloadRepository
    */
@@ -497,7 +500,7 @@ export class DownloadRepository extends BaseRepository {
     downloadId: string,
     searchSql: string,
     searchBindings: any[],
-    batchSize = 5000
+    batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<DownloadFeatureSummary[]> {
     const cursorName = `dl_filter_cursor_${downloadId.replace(/[^a-z0-9_]/gi, '_')}`;
 
@@ -676,8 +679,6 @@ export class DownloadRepository extends BaseRepository {
    * @memberof DownloadRepository
    */
   async listDownloadFeatureTypesByCartId(cartId: string): Promise<string[]> {
-    const FeatureTypeName = z.object({ feature_type_name: z.string() });
-
     const sql = SQL`
       SELECT DISTINCT ft.name AS feature_type_name
       FROM cart_submission_feature csf
@@ -687,7 +688,7 @@ export class DownloadRepository extends BaseRepository {
       ORDER BY ft.name;
     `;
 
-    const response = await this.connection.sql(sql, FeatureTypeName);
+    const response = await this.connection.sql(sql, z.object({ feature_type_name: z.string() }));
 
     return response.rows.map((r) => r.feature_type_name);
   }
@@ -704,8 +705,6 @@ export class DownloadRepository extends BaseRepository {
    * @memberof DownloadRepository
    */
   async listDownloadFeatureTypesBySearchQuery(searchSubquery: Knex.QueryBuilder): Promise<string[]> {
-    const FeatureTypeName = z.object({ feature_type_name: z.string() });
-
     const knex = getKnex();
     const query = knex
       .distinct('ft.name as feature_type_name')
@@ -714,7 +713,7 @@ export class DownloadRepository extends BaseRepository {
       .whereIn('sf.submission_feature_id', searchSubquery)
       .orderBy('ft.name');
 
-    const response = await this.connection.knex(query, FeatureTypeName);
+    const response = await this.connection.knex(query, z.object({ feature_type_name: z.string() }));
 
     return response.rows.map((r) => r.feature_type_name);
   }
@@ -763,14 +762,14 @@ export class DownloadRepository extends BaseRepository {
    *
    * @param {string} cartId - The cart ID (from download.cart_id).
    * @param {string} featureTypeName - The feature type to stream.
-   * @param {number} [batchSize=5000] - Rows per FETCH.
+   * @param {number} [batchSize=DOWNLOAD_FEATURE_BATCH_SIZE] - Rows per FETCH.
    * @yields {BaseFeatureRow[]} Batches of base feature rows.
    * @memberof DownloadRepository
    */
   async *streamFeatureBaseByCartIdAndType(
     cartId: string,
     featureTypeName: string,
-    batchSize = 5000
+    batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<BaseFeatureRow[]> {
     const cursorName = `dl_pq_cart_cursor_${cartId.replace(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replace(
       /[^a-z0-9_]/gi,
@@ -821,7 +820,7 @@ export class DownloadRepository extends BaseRepository {
    * @param {string} searchSql - Raw SQL for the search subquery.
    * @param {any[]} searchBindings - Parameterized bindings for the search SQL.
    * @param {string} featureTypeName - The feature type to stream.
-   * @param {number} [batchSize=5000] - Rows per FETCH.
+   * @param {number} [batchSize=DOWNLOAD_FEATURE_BATCH_SIZE] - Rows per FETCH.
    * @yields {BaseFeatureRow[]} Batches of base feature rows.
    * @memberof DownloadRepository
    */
@@ -830,7 +829,7 @@ export class DownloadRepository extends BaseRepository {
     searchSql: string,
     searchBindings: any[],
     featureTypeName: string,
-    batchSize = 5000
+    batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<BaseFeatureRow[]> {
     const cursorName = `dl_pq_filter_cursor_${downloadId.replace(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replace(
       /[^a-z0-9_]/gi,
