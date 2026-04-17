@@ -8,9 +8,9 @@ export const DataRequest = z.object({
   requested_by: z.number(),
   ticket_id: z.string().uuid(),
   policy_id: z.string().uuid(),
+  create_date: z.string(),
   // Derived from joined policy.status (not persisted on data_request).
-  status: PolicyStatus,
-  create_date: z.string().optional()
+  status: PolicyStatus
 });
 export type DataRequest = z.infer<typeof DataRequest>;
 

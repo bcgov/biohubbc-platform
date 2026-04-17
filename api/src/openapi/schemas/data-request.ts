@@ -2,7 +2,7 @@ import { OpenAPIV3 } from 'openapi-types';
 
 export const DataRequestResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['requested_by', 'team_id', 'data_request_id', 'reason', 'ticket_id', 'policy_id', 'status'],
+  required: ['requested_by', 'team_id', 'data_request_id', 'reason', 'ticket_id', 'policy_id', 'status', 'create_date'],
   additionalProperties: false,
   properties: {
     data_request_id: {

@@ -2,11 +2,11 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { CreateDataRequestPayload, DataRequest, UpdateDataRequest } from '../models/data-request';
 import { PolicyEffect } from '../models/policy-statement';
 import { TeamMemberWithUser } from '../models/team-member';
 import { DataRequestRepository } from '../repositories/data-request-repository';
-import { getMockDBConnection } from '../__mocks__/db';
 import { PolicyService } from './access-policy/policy-service';
 import { TeamMemberService } from './access-policy/team-member-service';
 import { TeamService } from './access-policy/team-service';
@@ -26,7 +26,8 @@ describe('DataRequestService', () => {
     requested_by: 1,
     ticket_id: 'd4e5f6a7-b8c9-0123-def0-234567890123',
     policy_id: 'f5f6a7b8-c9d0-1234-efab-345678901234',
-    status: 'requested'
+    status: 'requested',
+    create_date: '2026-04-17T00:00:00.000Z'
   };
 
   const mockTeamMember: TeamMemberWithUser = {

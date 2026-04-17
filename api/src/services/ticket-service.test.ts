@@ -243,7 +243,8 @@ describe('TicketService', () => {
         requested_by: 1,
         ticket_id: mockTicket.ticket_id,
         policy_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-        status: 'requested'
+        status: 'requested',
+        create_date: '2026-04-17T00:00:00.000Z'
       };
       const getDataRequestsStub = sinon
         .stub(DataRequestService.prototype, 'findDataRequestsByTicketId')
@@ -281,7 +282,8 @@ describe('TicketService', () => {
         requested_by: 1,
         ticket_id: mockTicket.ticket_id,
         policy_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-        status: 'requested'
+        status: 'requested',
+        create_date: '2026-04-17T00:00:00.000Z'
       };
       sinon.stub(DataRequestService.prototype, 'findDataRequestsByTicketId').resolves([dataRequest]);
 
@@ -303,7 +305,8 @@ describe('TicketService', () => {
         requested_by: 1,
         ticket_id: mockTicket.ticket_id,
         policy_id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-        status: 'reviewed'
+        status: 'reviewed',
+        create_date: '2026-04-17T00:00:00.000Z'
       };
       sinon.stub(DataRequestService.prototype, 'findDataRequestsByTicketId').resolves([dataRequest]);
 

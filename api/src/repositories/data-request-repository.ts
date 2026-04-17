@@ -50,7 +50,10 @@ export class DataRequestRepository extends BaseRepository {
    * @return {Promise<DataRequest[]>} Matching data requests.
    * @memberof DataRequestRepository
    */
-  async findDataRequestsByTeamMembership(systemUserIds: number[], filters?: DataRequestFilters): Promise<DataRequest[]> {
+  async findDataRequestsByTeamMembership(
+    systemUserIds: number[],
+    filters?: DataRequestFilters
+  ): Promise<DataRequest[]> {
     if (systemUserIds.length === 0) {
       return [];
     }

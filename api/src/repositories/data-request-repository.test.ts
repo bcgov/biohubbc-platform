@@ -3,9 +3,9 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { ApiNotFoundError } from '../errors/api-error';
 import { CreateDataRequest, DataRequest, UpdateDataRequest } from '../models/data-request';
-import { getMockDBConnection } from '../__mocks__/db';
 import { DataRequestRepository } from './data-request-repository';
 
 chai.use(sinonChai);
@@ -22,7 +22,8 @@ describe('DataRequestRepository', () => {
     requested_by: 1,
     ticket_id: 'd4e5f6a7-b8c9-0123-def0-234567890123',
     policy_id: 'f5f6a7b8-c9d0-1234-efab-345678901234',
-    status: 'requested'
+    status: 'requested',
+    create_date: '2026-04-17T00:00:00.000Z'
   };
   describe('findDataRequests', () => {
     it('should return data requests when found', async () => {

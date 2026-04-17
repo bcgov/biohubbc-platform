@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { findDataRequests } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import * as db from '../../database/db';
 import { ApiError } from '../../errors/api-error';
@@ -10,7 +11,6 @@ import { DataRequest } from '../../models/data-request';
 import { SystemUserExtended } from '../../models/user';
 import { DataRequestService } from '../../services/data-request-service';
 import { UserService } from '../../services/user-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 
 chai.use(sinonChai);
 
@@ -26,7 +26,8 @@ describe('data-request', () => {
     requested_by: 1,
     ticket_id: 'd4e5f6a7-b8c9-0123-def0-234567890123',
     policy_id: 'f5f6a7b8-c9d0-1234-efab-345678901234',
-    status: 'requested'
+    status: 'requested',
+    create_date: '2025-01-01T00:00:00.000Z'
   };
 
   const mockAdminUser: SystemUserExtended = {

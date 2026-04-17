@@ -1,10 +1,10 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
 import { DataRequest } from '../../../../models/data-request';
 import { DataRequestService } from '../../../../services/data-request-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import { createTicketDataRequest } from './index';
 
 chai.use(sinonChai);
@@ -29,7 +29,8 @@ describe('paths/tickets/{ticketId}/data-request', () => {
       requested_by: 1,
       ticket_id: '33333333-3333-3333-3333-333333333333',
       policy_id: '44444444-4444-4444-4444-444444444444',
-      status: 'requested'
+      status: 'requested',
+      create_date: '2026-04-17T00:00:00.000Z'
     };
 
     const createStub = sinon.stub(DataRequestService.prototype, 'createDataRequest').resolves(createdDataRequest);
