@@ -2,11 +2,11 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { SecurityScope } from '../../models/security-scope';
 import * as publisher from '../../queue/publisher';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import * as scopeHashUtil from '../../utils/scope-hash';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { SecurityScopeService } from './security-scope-service';
 
 chai.use(sinonChai);
@@ -51,7 +51,7 @@ describe('SecurityScopeService', () => {
       expect(result).to.equal(securityScopeId);
     });
 
-    it('looks up existing scope and creates mapping without publishing when scope_hash already exists', async () => {
+    it('looks up existing scope, creates mapping, and publishes anchor job when scope_hash already exists', async () => {
       const existingScope: SecurityScope = { security_scope_id: securityScopeId, scope_hash: scopeHash };
       const insertStub = sinon.stub(SecurityScopeRepository.prototype, 'insertSecurityScope').resolves(null);
       const getStub = sinon
@@ -67,7 +67,7 @@ describe('SecurityScopeService', () => {
       expect(insertStub).to.have.been.calledWith(scopeHash);
       expect(getStub).to.have.been.calledWith(scopeHash);
       expect(mappingStub).to.have.been.calledWith(policyStatementId, securityScopeId);
-      expect(publishStub).not.to.have.been.called;
+      expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, { securityScopeId });
       expect(result).to.equal(securityScopeId);
     });
 
@@ -212,13 +212,24 @@ describe('SecurityScopeService', () => {
     });
   });
 
-  describe('deleteStaleAnchorsForScope', () => {
-    it('delegates to repository', async () => {
-      const stub = sinon.stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorsForScope').resolves();
+  describe('deleteStaleAnchorBatch', () => {
+    it('delegates to repository and returns batch result', async () => {
+      const stub = sinon
+        .stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorBatch')
+        .resolves({ pageLastId: 5000 });
 
-      await service.deleteStaleAnchorsForScope('scope-1');
+      const result = await service.deleteStaleAnchorBatch('scope-1', 0);
 
-      expect(stub).to.have.been.calledOnceWith('scope-1');
+      expect(stub).to.have.been.calledOnceWith('scope-1', 0);
+      expect(result).to.deep.equal({ pageLastId: 5000 });
+    });
+
+    it('returns null when no more anchors', async () => {
+      sinon.stub(SecurityScopeRepository.prototype, 'deleteStaleAnchorBatch').resolves(null);
+
+      const result = await service.deleteStaleAnchorBatch('scope-1', 5000);
+
+      expect(result).to.be.null;
     });
   });
 

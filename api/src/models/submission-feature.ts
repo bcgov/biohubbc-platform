@@ -1,6 +1,20 @@
 import { z } from 'zod';
 import { ArtifactSecurity } from './artifact-security';
 
+export interface SubmissionFeatureFilters {
+  search?: string;
+}
+
+export interface SubmissionFeaturePropertyFilters {
+  search?: string;
+}
+
+export interface SubmissionFeatureSignedUrlPayload {
+  submissionFeatureId: number;
+  submissionFeatureObj: { key: string; value: string };
+  isAdmin: boolean;
+}
+
 /**
  * Model for a single submission feature
  */

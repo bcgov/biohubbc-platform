@@ -3,9 +3,9 @@ import { describe } from 'mocha';
 import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { SearchFeatureService } from '../../services/search-feature-service';
-import { getMockDBConnection } from '../../__mocks__/db';
 import {
   IIndexSubmissionFeaturesJobData,
   indexSubmissionFeaturesFailedHandler,

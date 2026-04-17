@@ -1,6 +1,7 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
 import {
   CreateUploadArtifact,
@@ -9,7 +10,6 @@ import {
   UploadArtifactRoleEnum
 } from '../../models/upload-artifact';
 import { UploadArtifactRepository } from '../../repositories/upload/upload-artifact-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { UploadArtifactService } from './upload-artifact-service';
 
 chai.use(sinonChai);

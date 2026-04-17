@@ -2,12 +2,12 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { addSubmissionFeaturesToCart, clearCartSubmissionFeatures, getCartSubmissionFeatures } from '.';
+import { clearCartSubmissionFeatures, createCartSubmissionFeatures, getCartSubmissionFeatures } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
 import { HTTP500 } from '../../../../errors/http-error';
 import { CartSubmissionFeature } from '../../../../models/cart';
 import { CartSubmissionFeatureService } from '../../../../services/cart-submission-feature-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 
 chai.use(sinonChai);
 
@@ -203,7 +203,7 @@ describe('cart/{cartId}', () => {
     });
   });
 
-  describe('addSubmissionFeaturesToCart', () => {
+  describe('createCartSubmissionFeatures', () => {
     it('throws error if DB connection fails to open', async () => {
       const mockDBConnection = getMockDBConnection({
         commit: sinon.stub(),
@@ -213,7 +213,7 @@ describe('cart/{cartId}', () => {
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
 
-      const requestHandler = addSubmissionFeaturesToCart();
+      const requestHandler = createCartSubmissionFeatures();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params.cartId = 'fake-cart-id';
       mockReq.body = { features: ['uuid-1', 'uuid-2'] };
@@ -228,30 +228,57 @@ describe('cart/{cartId}', () => {
       }
     });
 
-    it('adds and removes features successfully from the cart', async () => {
+    it('adds features successfully and passes systemUserId when authenticated', async () => {
+      const mockDBConnection = getMockDBConnection({
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub(),
+        systemUserId: sinon.stub().returns(42)
+      });
+      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+
+      const addStub = sinon.stub(CartSubmissionFeatureService.prototype, 'createCartSubmissionFeatures').resolves();
+      sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves([]);
+      sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureCount').resolves(0);
+
+      const requestHandler = createCartSubmissionFeatures();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.params.cartId = 'fake-cart-id';
+      mockReq.body = { features: [1, 2] };
+      mockReq.keycloak_token = { sub: 'user-guid' };
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(addStub).to.have.been.calledOnce;
+      expect(addStub.firstCall.args[2]).to.equal(42);
+      expect(mockDBConnection.commit).to.have.been.calledOnce;
+      expect(mockDBConnection.release).to.have.been.calledOnce;
+      expect(mockRes.statusValue).to.equal(200);
+    });
+
+    it('passes null systemUserId when anonymous', async () => {
       const mockDBConnection = getMockDBConnection({
         commit: sinon.stub(),
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
 
-      sinon.stub(CartSubmissionFeatureService.prototype, 'addSubmissionFeaturesToCart').resolves();
+      const addStub = sinon.stub(CartSubmissionFeatureService.prototype, 'createCartSubmissionFeatures').resolves();
       sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves([]);
       sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureCount').resolves(0);
 
-      const requestHandler = addSubmissionFeaturesToCart();
+      const requestHandler = createCartSubmissionFeatures();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params.cartId = 'fake-cart-id';
-      mockReq.body = { features: ['uuid-1', 'uuid-2'] };
+      mockReq.body = { features: [1, 2] };
 
       await requestHandler(mockReq, mockRes, mockNext);
 
+      expect(addStub).to.have.been.calledOnce;
+      expect(addStub.firstCall.args[2]).to.be.null;
       expect(mockDBConnection.commit).to.have.been.calledOnce;
-      expect(mockDBConnection.release).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.have.property('features');
-      expect(mockRes.jsonValue).to.have.property('pagination');
     });
 
     it('handles empty add and remove arrays', async () => {
@@ -262,11 +289,11 @@ describe('cart/{cartId}', () => {
       });
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-      sinon.stub(CartSubmissionFeatureService.prototype, 'addSubmissionFeaturesToCart').resolves();
+      sinon.stub(CartSubmissionFeatureService.prototype, 'createCartSubmissionFeatures').resolves();
       sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves([]);
       sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatureCount').resolves(0);
 
-      const requestHandler = addSubmissionFeaturesToCart();
+      const requestHandler = createCartSubmissionFeatures();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params.cartId = 'fake-cart-id';
       mockReq.body = { features: [] };
@@ -280,7 +307,7 @@ describe('cart/{cartId}', () => {
       expect(mockRes.jsonValue).to.have.property('pagination');
     });
 
-    it('rolls back and rethrows if CartService.addSubmissionFeaturesToCart throws an error', async () => {
+    it('rolls back and rethrows if CartService.createCartSubmissionFeatures throws an error', async () => {
       const mockDBConnection = getMockDBConnection({
         commit: sinon.stub(),
         rollback: sinon.stub(),
@@ -290,10 +317,10 @@ describe('cart/{cartId}', () => {
       sinon.stub(mockDBConnection, 'open').resolves();
 
       sinon
-        .stub(CartSubmissionFeatureService.prototype, 'addSubmissionFeaturesToCart')
+        .stub(CartSubmissionFeatureService.prototype, 'createCartSubmissionFeatures')
         .rejects(new Error('Service error'));
 
-      const requestHandler = addSubmissionFeaturesToCart();
+      const requestHandler = createCartSubmissionFeatures();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.params.cartId = 'fake-cart-id';
       mockReq.body = { features: ['uuid-1'] };

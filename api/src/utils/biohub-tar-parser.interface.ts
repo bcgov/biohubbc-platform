@@ -11,6 +11,8 @@ export interface IUploadedMediaFile {
   byteSize: number;
   /** SHA-256 checksum computed from streamed bytes */
   checksumSha256: string;
+  /** MIME type derived from filename (e.g. "image/png", "application/octet-stream") */
+  mimetype: string;
 }
 
 export type TarNext = () => void;

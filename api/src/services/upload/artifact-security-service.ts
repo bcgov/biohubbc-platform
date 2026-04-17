@@ -8,7 +8,7 @@ import { SecurityStatusEnum } from '../../models/security-status';
 import { UploadArchive } from '../../models/upload-archive';
 import { publishProcessSubmissionFeaturesJob } from '../../queue/publisher';
 import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
-import { getObjectStoreBucketName, getSecurityObjectStoreBucketName, _getClamAvScanner } from '../../utils/file-utils';
+import { _getClamAvScanner, getObjectStoreBucketName, getSecurityObjectStoreBucketName } from '../../utils/file-utils';
 import { sanitizeJsonbValue } from '../../utils/jsonb';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';

@@ -2,11 +2,11 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import { Readable } from 'node:stream';
 import sinon from 'sinon';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
 import { IFlattenedBlock } from '../../models/submission-feature';
 import { UploadArchive } from '../../models/upload-archive';
 import * as biohubTarParser from '../../utils/biohub-tar-parser';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
@@ -47,7 +47,8 @@ describe('SubmissionIngestionService', () => {
         object_key: 'submissions/123/uploads/upload-1.tar',
         byte_size: '1000',
         checksum_sha256: null,
-        uploaded_at: '2025-01-01T00:00:00Z'
+        uploaded_at: '2025-01-01T00:00:00Z',
+        format: 'tar'
       };
 
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
@@ -104,7 +105,8 @@ describe('SubmissionIngestionService', () => {
         object_key: 'submissions/123/uploads/upload-1.tar',
         byte_size: '1000',
         checksum_sha256: null,
-        uploaded_at: '2025-01-01T00:00:00Z'
+        uploaded_at: '2025-01-01T00:00:00Z',
+        format: 'tar'
       };
 
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
@@ -157,7 +159,8 @@ describe('SubmissionIngestionService', () => {
         object_key: 'submissions/123/uploads/upload-1.tar',
         byte_size: '1000',
         checksum_sha256: null,
-        uploaded_at: '2025-01-01T00:00:00Z'
+        uploaded_at: '2025-01-01T00:00:00Z',
+        format: 'tar'
       };
 
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
@@ -196,7 +199,8 @@ describe('SubmissionIngestionService', () => {
         object_key: 'submissions/123/uploads/upload-1.tar',
         byte_size: '1000',
         checksum_sha256: null,
-        uploaded_at: '2025-01-01T00:00:00Z'
+        uploaded_at: '2025-01-01T00:00:00Z',
+        format: 'tar'
       };
 
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
@@ -235,7 +239,8 @@ describe('SubmissionIngestionService', () => {
         object_key: 'submissions/123/uploads/upload-1.tar',
         byte_size: '1000',
         checksum_sha256: null,
-        uploaded_at: '2025-01-01T00:00:00Z'
+        uploaded_at: '2025-01-01T00:00:00Z',
+        format: 'tar'
       };
 
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);

@@ -1,5 +1,6 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { SECURITY_APPLIED_STATUS } from '../../repositories/security-repository';
+import { paginationResponseSchema } from './pagination';
 
 export const SubmissionResponseSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
@@ -102,6 +103,14 @@ export const SubmissionResponseSchema: OpenAPIV3.SchemaObject = {
 };
 
 export const SubmissionListResponseSchema: OpenAPIV3.SchemaObject = {
-  type: 'array',
-  items: SubmissionResponseSchema
+  type: 'object',
+  required: ['submissions', 'pagination'],
+  additionalProperties: false,
+  properties: {
+    submissions: {
+      type: 'array',
+      items: SubmissionResponseSchema
+    },
+    pagination: paginationResponseSchema
+  }
 };

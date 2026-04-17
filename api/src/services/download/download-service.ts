@@ -1,9 +1,9 @@
 import { SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP404, HTTP409, HTTP500 } from '../../errors/http-error';
+import { ArtifactStatusEnum } from '../../models/artifact';
 import {
   CreateDownload,
-  CreateDownloadRequest,
   DownloadFeatureSummary,
   DownloadId,
   DownloadListRecord,
@@ -13,10 +13,13 @@ import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
+import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
+import { SearchFeatureService } from '../search-feature-service';
+import { ArtifactService } from '../upload/artifact-service';
 
 /**
  * Request-time service for downloads.
@@ -36,60 +39,51 @@ export class DownloadService extends DBService {
   downloadRepository: DownloadRepository;
   fragmentRepository: DownloadFragmentRepository;
   teamService: TeamService;
+  searchFeatureService: SearchFeatureService;
+  artifactService: ArtifactService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
     this.fragmentRepository = new DownloadFragmentRepository(connection);
     this.teamService = new TeamService(connection);
+    this.searchFeatureService = new SearchFeatureService(connection);
+    this.artifactService = new ArtifactService(connection);
   }
 
   /**
-   * Create a new download record.
+   * Create a new download record with a pending artifact.
+   *
+   * Downloads are tracked as formal artifacts from the moment they're requested.
+   * A pending artifact is created (no file yet — the pipeline writes the file in
+   * a follow-up ticket) and linked via download_artifact. The S3 key includes a
+   * timestamp to prevent local filename collisions when a user downloads multiple
+   * times: `downloads/{downloadId}/download-{timestamp}.{format}`. The artifact
+   * table's UNIQUE (bucket, object_key) constraint ensures idempotency on retry.
    *
    * @param {CreateDownload} payload - The download record to create.
    * @return {Promise<DownloadId>} The created record ID.
    * @memberof DownloadService
    */
   async createDownload(payload: CreateDownload): Promise<DownloadId> {
-    return this.downloadRepository.createDownload(payload);
-  }
+    const downloadId = await this.downloadRepository.createDownload(payload);
 
-  /**
-   * Link submission features to a download record.
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {number[]} submissionFeatureIds - The submission feature IDs to include.
-   * @return {Promise<void>}
-   * @memberof DownloadService
-   */
-  async createDownloadFeatures(downloadId: string, submissionFeatureIds: number[]): Promise<void> {
-    return this.downloadRepository.createDownloadFeatures(downloadId, submissionFeatureIds);
-  }
-
-  /**
-   * Create a new download request from search filters.
-   *
-   * Creates a download record and links the specified submission features.
-   * Caller must validate that submissionFeatureIds is non-empty.
-   *
-   * Team linking is handled separately by the caller via linkDownloadToNewTeam.
-   * Anonymous downloads have no team rows (UUID is the credential).
-   *
-   * @param {CreateDownloadRequest} payload
-   * @return {Promise<DownloadId>} The created download record ID.
-   * @memberof DownloadService
-   */
-  async createDownloadRequest(payload: CreateDownloadRequest): Promise<DownloadId> {
-    const { submissionFeatureIds, fragmentSizeMb, filters } = payload;
-    const fragmentSizeBytes = fragmentSizeMb ? fragmentSizeMb * 1024 * 1024 : undefined;
-
-    const downloadId = await this.downloadRepository.createDownload({
-      fragmentSizeBytes,
-      filters
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/:/g, '')
+      .replace(/\.\d{3}/, '');
+    const { format } = payload;
+    const artifact = await this.artifactService.insertArtifact({
+      bucket: getObjectStoreBucketName(),
+      object_key: `downloads/${downloadId.download_id}/download-${timestamp}.${format}`,
+      byte_size: null,
+      artifact_status: ArtifactStatusEnum.PENDING,
+      checksum_sha256: null,
+      uploaded_at: null,
+      format
     });
 
-    await this.downloadRepository.createDownloadFeatures(downloadId.download_id, submissionFeatureIds);
+    await this.downloadRepository.createDownloadArtifact(downloadId.download_id, artifact.artifact_id);
 
     return downloadId;
   }
@@ -133,20 +127,41 @@ export class DownloadService extends DBService {
   }
 
   /**
-   * Returns all features linked to a download.
+   * Resolve all features included in a download.
    *
-   * Authorization is enforced once at creation time via buildSecurityFilter in
-   * the search query — only authorized features are ever linked to the download.
-   * Re-checking at retrieval time caused a bug: the download_team → policy_team
-   * hop meant adding a user to the download team could change which features
-   * were visible.
+   * Branches based on the download's feature source:
+   * - **Cart-based** (cart_id set): features resolved from cart_submission_feature.
+   *   Cart downloads are frozen — checkout marks the cart as CHECKED_OUT, so
+   *   cart_submission_feature rows don't change post-checkout.
+   * - **Filter-based** (filters set): re-runs the search query at pipeline time,
+   *   intentionally picking up newly ingested data matching the filters.
+   *   The creator's security scope is recovered from `create_user` (set
+   *   automatically by `tr_audit_trigger` on INSERT). The search CTE runs as
+   *   a subquery inside the summary JOIN, keeping feature resolution in SQL
+   *   and avoiding a 500K+ ID round-trip through JS.
    *
    * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadFeatureSummary[]>} All linked features.
+   * @return {Promise<DownloadFeatureSummary[]>} All features for this download.
    * @memberof DownloadService
    */
   async getDownloadFeatures(downloadId: string): Promise<DownloadFeatureSummary[]> {
-    return this.downloadRepository.getDownloadFeatures(downloadId);
+    const source = await this.downloadRepository.getDownloadSource(downloadId);
+
+    if (source.cart_id) {
+      return this.downloadRepository.getDownloadFeaturesByCartId(source.cart_id);
+    }
+
+    if (source.filters) {
+      const searchSubquery = this.searchFeatureService.buildSearchFeatureIdsSubquery(
+        source.filters,
+        source.create_user
+      );
+
+      return this.downloadRepository.getDownloadFeaturesBySearchQuery(searchSubquery);
+    }
+
+    // CHECK constraint prevents this, but guard defensively
+    throw new Error(`Download ${downloadId} has neither cart_id nor filters`);
   }
 
   /**

@@ -161,6 +161,16 @@ const Header = () => {
                 <MenuItem component={RouterLink} to="/" id="menu_home_sm" data-testid="collapsed_home-header-item">
                   Home
                 </MenuItem>
+                <AuthGuard>
+                  <MenuItem
+                    component={RouterLink}
+                    to="/portal"
+                    id="menu_portal_sm"
+                    onClick={hideMobileMenu}
+                    data-testid="collapsed_portal-header-item">
+                    Portal
+                  </MenuItem>
+                </AuthGuard>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
                   <MenuItem
                     component={RouterLink}
@@ -175,9 +185,9 @@ const Header = () => {
                   <MenuItem
                     component={RouterLink}
                     to="/admin/tickets"
-                    id="menu_tickets_sm"
+                    id="menu_admin_tickets_sm"
                     onClick={hideMobileMenu}
-                    data-testid="collapsed_tickets-header-item">
+                    data-testid="collapsed_admin-tickets-header-item">
                     Tickets
                   </MenuItem>
                 </SystemRoleGuard>
@@ -270,13 +280,18 @@ const Header = () => {
                 <RouterLink to="/" id="menu_home" data-testid="home-header-item">
                   Home
                 </RouterLink>
+                <AuthGuard>
+                  <RouterLink to="/portal" id="menu_portal" data-testid="portal-header-item">
+                    Portal
+                  </RouterLink>
+                </AuthGuard>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
                   <RouterLink to="/admin/submissions" id="menu_dashboard" data-testid="submissions-header-item">
                     Submissions
                   </RouterLink>
                 </SystemRoleGuard>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <RouterLink to="/admin/tickets" id="menu_tickets" data-testid="tickets-header-item">
+                  <RouterLink to="/admin/tickets" id="menu_admin_tickets" data-testid="admin-tickets-header-item">
                     Tickets
                   </RouterLink>
                 </SystemRoleGuard>

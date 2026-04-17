@@ -3,17 +3,18 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { claimDownloadForCurrentUser, findDownloadById } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { HTTP403, HTTP404, HTTP409, HTTPError } from '../../../errors/http-error';
 import { DownloadRecord } from '../../../models/download';
 import { DownloadService } from '../../../services/download/download-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 
 chai.use(sinonChai);
 
 const makeDownloadRecord = (overrides: Partial<DownloadRecord> = {}): DownloadRecord => ({
   download_id: 'aaaa0000-0000-0000-0000-000000000001',
   download_status: 'ready',
+  format: 'csv',
   metadata: null,
   started_at: '2025-01-01T00:00:00Z',
   completed_at: '2025-01-01T00:01:00Z',

@@ -1,11 +1,12 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { Ticket } from '../../models/ticket';
+import { TeamMemberService } from '../../services/access-policy/team-member-service';
 import { TicketService } from '../../services/ticket-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
-import { createTicket, getTickets } from './index';
+import { getTicketsForUser } from './index';
 
 chai.use(sinonChai);
 
@@ -25,96 +26,87 @@ describe('paths/tickets', () => {
     sinon.restore();
   });
 
-  it('POST createTicket returns 201 with created ticket', async () => {
-    const mockDBConnection = getMockDBConnection({
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
+  describe('getTicketsForUser', () => {
+    it('resolves team IDs for the current user and returns their tickets', async () => {
+      const systemUserId = 7;
+      const teamIds = [mockTicket.team_id];
+
+      const mockDBConnection = getMockDBConnection({
+        systemUserId: () => systemUserId,
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+
+      const getTeamIdsStub = sinon.stub(TeamMemberService.prototype, 'getTeamIdsBySystemUserId').resolves(teamIds);
+      const listStub = sinon.stub(TicketService.prototype, 'getTickets').resolves([mockTicket]);
+      const countStub = sinon.stub(TicketService.prototype, 'getTicketsCount').resolves(1);
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.query = { status: 'open', page: '1', limit: '10' };
+
+      await getTicketsForUser()(mockReq, mockRes, mockNext);
+
+      expect(getTeamIdsStub).to.have.been.calledWith(systemUserId);
+      expect(listStub).to.have.been.calledWithMatch(
+        { team_ids: teamIds, status: 'open', search: undefined },
+        sinon.match.object
+      );
+      expect(countStub).to.have.been.calledWithMatch({ team_ids: teamIds, status: 'open', search: undefined });
+      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.jsonValue.tickets).to.eql([mockTicket]);
+      expect(mockRes.jsonValue.pagination.total).to.equal(1);
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-    sinon.stub(TicketService.prototype, 'createTicket').resolves(mockTicket);
 
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.body = { subject: 'A ticket', description: null, priority: 'medium' };
+    it('returns an empty list when the user has no team memberships', async () => {
+      const systemUserId = 99;
 
-    await createTicket()(mockReq, mockRes, mockNext);
+      const mockDBConnection = getMockDBConnection({
+        systemUserId: () => systemUserId,
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-    expect(mockRes.statusValue).to.equal(201);
-    expect(mockRes.jsonValue).to.eql(mockTicket);
-  });
+      sinon.stub(TeamMemberService.prototype, 'getTeamIdsBySystemUserId').resolves([]);
+      const listStub = sinon.stub(TicketService.prototype, 'getTickets').resolves([]);
+      const countStub = sinon.stub(TicketService.prototype, 'getTicketsCount').resolves(0);
 
-  it('GET getTickets returns paginated response', async () => {
-    const mockDBConnection = getMockDBConnection({
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.query = { page: '1', limit: '10' };
+
+      await getTicketsForUser()(mockReq, mockRes, mockNext);
+
+      expect(listStub).to.have.been.calledWithMatch({ team_ids: [] });
+      expect(countStub).to.have.been.calledWithMatch({ team_ids: [] });
+      expect(mockRes.statusValue).to.equal(200);
+      expect(mockRes.jsonValue.tickets).to.eql([]);
+      expect(mockRes.jsonValue.pagination.total).to.equal(0);
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-    const listStub = sinon.stub(TicketService.prototype, 'getTickets').resolves([mockTicket]);
-    const countStub = sinon.stub(TicketService.prototype, 'getTicketsCount').resolves(21);
 
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.query = { team_id: mockTicket.team_id, status: 'open', search: 'ticket', page: '2', limit: '10' };
+    it('rolls back and rethrows on error', async () => {
+      const mockDBConnection = getMockDBConnection({
+        systemUserId: () => 1,
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-    await getTickets()(mockReq, mockRes, mockNext);
+      const fetchError = new Error('service failure');
+      sinon.stub(TeamMemberService.prototype, 'getTeamIdsBySystemUserId').rejects(fetchError);
 
-    expect(listStub).to.have.been.calledWith(
-      { team_id: mockTicket.team_id, status: 'open', search: 'ticket' },
-      {
-        page: 2,
-        limit: 10,
-        sort: undefined,
-        order: undefined
-      }
-    );
-    expect(countStub).to.have.been.calledWith({ team_id: mockTicket.team_id, status: 'open', search: 'ticket' });
-    expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql({
-      tickets: [mockTicket],
-      pagination: {
-        total: 21,
-        per_page: 10,
-        current_page: 2,
-        last_page: 3,
-        sort: undefined,
-        order: undefined
-      }
-    });
-  });
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.query = {};
 
-  it('GET getTickets returns all tickets when team_id is omitted', async () => {
-    const mockDBConnection = getMockDBConnection({
-      commit: sinon.stub(),
-      rollback: sinon.stub(),
-      release: sinon.stub()
-    });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-    const listStub = sinon.stub(TicketService.prototype, 'getTickets').resolves([mockTicket]);
-    const countStub = sinon.stub(TicketService.prototype, 'getTicketsCount').resolves(1);
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    mockReq.query = { page: '1', limit: '10' };
-    const noFilters = { team_id: undefined, status: undefined, search: undefined };
-
-    await getTickets()(mockReq, mockRes, mockNext);
-
-    expect(listStub).to.have.been.calledWith(noFilters, {
-      page: 1,
-      limit: 10,
-      sort: undefined,
-      order: undefined
-    });
-    expect(countStub).to.have.been.calledWith(noFilters);
-    expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql({
-      tickets: [mockTicket],
-      pagination: {
-        total: 1,
-        per_page: 10,
-        current_page: 1,
-        last_page: 1,
-        sort: undefined,
-        order: undefined
+      try {
+        await getTicketsForUser()(mockReq, mockRes, mockNext);
+        expect.fail('Expected error not thrown');
+      } catch (error) {
+        expect(error).to.equal(fetchError);
+        expect((mockDBConnection.rollback as sinon.SinonStub).calledOnce).to.be.true;
       }
     });
   });

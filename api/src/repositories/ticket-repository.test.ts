@@ -1,10 +1,11 @@
 import chai, { expect } from 'chai';
+import { Knex } from 'knex';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { Ticket, TicketSlug } from '../models/ticket';
-import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { TicketRepository } from './ticket-repository';
 
 chai.use(sinonChai);
@@ -24,6 +25,53 @@ describe('TicketRepository', () => {
     priority: 'medium',
     status: 'open'
   };
+
+  describe('applyFilters', () => {
+    const makeMockQuery = () => {
+      const query = {
+        whereRaw: sinon.stub(),
+        whereIn: sinon.stub(),
+        andWhere: sinon.stub()
+      } as unknown as Knex.QueryBuilder;
+
+      (query.whereRaw as sinon.SinonStub).returns(query);
+      (query.whereIn as sinon.SinonStub).returns(query);
+      (query.andWhere as sinon.SinonStub).returns(query);
+
+      return query;
+    };
+
+    it('calls whereRaw("false") when team_ids is an empty array', () => {
+      const repo = new TicketRepository(getMockDBConnection());
+      const query = makeMockQuery();
+
+      repo.applyFilters(query, { team_ids: [] });
+
+      expect(query.whereRaw as sinon.SinonStub).to.have.been.calledWith('false');
+      expect(query.whereIn as sinon.SinonStub).to.not.have.been.called;
+    });
+
+    it('calls whereIn when team_ids has entries', () => {
+      const repo = new TicketRepository(getMockDBConnection());
+      const query = makeMockQuery();
+      const teamIds = ['team-a', 'team-b'];
+
+      repo.applyFilters(query, { team_ids: teamIds });
+
+      expect(query.whereIn as sinon.SinonStub).to.have.been.calledWith('team_id', teamIds);
+      expect(query.whereRaw as sinon.SinonStub).to.not.have.been.called;
+    });
+
+    it('applies no team filter when team_ids is undefined', () => {
+      const repo = new TicketRepository(getMockDBConnection());
+      const query = makeMockQuery();
+
+      repo.applyFilters(query, { team_ids: undefined });
+
+      expect(query.whereRaw as sinon.SinonStub).to.not.have.been.called;
+      expect(query.whereIn as sinon.SinonStub).to.not.have.been.called;
+    });
+  });
 
   describe('insertTicket', () => {
     it('throws an error if insert fails', async () => {
@@ -126,7 +174,7 @@ describe('TicketRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
       const repo = new TicketRepository(mockDBConnection);
 
-      const result = await repo.getTickets({ team_id: mockTicket.team_id, status: 'open' }, { page: 1, limit: 10 });
+      const result = await repo.getTickets({ team_ids: [mockTicket.team_id], status: 'open' }, { page: 1, limit: 10 });
       expect(result).to.eql([mockTicket]);
     });
   });
@@ -137,7 +185,7 @@ describe('TicketRepository', () => {
       const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
       const repo = new TicketRepository(mockDBConnection);
 
-      const result = await repo.getTicketsCount({ team_id: mockTicket.team_id, status: 'open' });
+      const result = await repo.getTicketsCount({ team_ids: [mockTicket.team_id], status: 'open' });
       expect(result).to.equal(7);
     });
   });

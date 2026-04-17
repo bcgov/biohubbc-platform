@@ -2,6 +2,7 @@ import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { Readable } from 'stream';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { IDBConnection } from '../../database/db';
 import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
 import { ArtifactSecurity, CreateArtifactSecurity, UpdateArtifactSecurity } from '../../models/artifact-security';
@@ -11,7 +12,6 @@ import { UploadArchive } from '../../models/upload-archive';
 import * as publisher from '../../queue/publisher';
 import { ArtifactSecurityRepository } from '../../repositories/upload/artifact-security-repository';
 import * as fileUtils from '../../utils/file-utils';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactSecurityScanService } from './artifact-security-scan-service';
 import { ArtifactSecurityService } from './artifact-security-service';
@@ -223,7 +223,8 @@ describe('ArtifactSecurityService', () => {
       object_key: 'uploads/test.tar',
       byte_size: '1000',
       checksum_sha256: null,
-      uploaded_at: '2024-01-01T00:00:00Z'
+      uploaded_at: '2024-01-01T00:00:00Z',
+      format: 'tar'
     };
 
     const mockSecurityRecord: ArtifactSecurity = {

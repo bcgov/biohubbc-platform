@@ -2,8 +2,8 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import { Readable } from 'node:stream';
 import sinon from 'sinon';
-import * as biohubTarParser from '../../utils/biohub-tar-parser';
 import { getMockDBConnection } from '../../__mocks__/db';
+import * as biohubTarParser from '../../utils/biohub-tar-parser';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArtifactService } from '../upload/upload-artifact-service';
@@ -40,14 +40,16 @@ describe('MediaIngestionService', () => {
             s3Key: 'submissions/123/uploads/submission-upload-1/media/path/to/key.pdf',
             path: 'path/to/key.pdf',
             byteSize: 10,
-            checksumSha256: '1'.repeat(64)
+            checksumSha256: '1'.repeat(64),
+            mimetype: 'application/pdf'
           },
           {
             fileName: 'photo-2.jpg',
             s3Key: 'submissions/123/uploads/submission-upload-1/media/photo-2.jpg',
             path: 'photo-2.jpg',
             byteSize: 20,
-            checksumSha256: '2'.repeat(64)
+            checksumSha256: '2'.repeat(64),
+            mimetype: 'image/jpeg'
           }
         ]);
         return { uploadedCount: 2 };
@@ -118,7 +120,8 @@ describe('MediaIngestionService', () => {
             s3Key: 'submissions/123/uploads/submission-upload-1/media/photo-1.jpg',
             path: 'photo-1.jpg',
             byteSize: 10,
-            checksumSha256: '1'.repeat(64)
+            checksumSha256: '1'.repeat(64),
+            mimetype: 'image/jpeg'
           }
         ]);
         return { uploadedCount: 1 };

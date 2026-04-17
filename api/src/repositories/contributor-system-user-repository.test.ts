@@ -2,9 +2,9 @@ import chai, { expect } from 'chai';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../src/__mocks__/db';
 import { ApiExecuteSQLError } from '../../src/errors/api-error';
 import { ContributorSystemUserRepository } from '../../src/repositories/contributor-system-user-repository';
-import { getMockDBConnection } from '../../src/__mocks__/db';
 
 chai.use(sinonChai);
 

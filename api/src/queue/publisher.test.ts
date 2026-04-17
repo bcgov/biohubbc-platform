@@ -1,12 +1,12 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
+import { getMockDBConnection } from '../__mocks__/db';
 import type { DownloadRecord } from '../models/download';
 import type { SubmissionUpload } from '../models/submission-upload';
 import type { SubmissionValidationRecord } from '../models/submission-validation';
 import { DownloadService } from '../services/download/download-service';
 import { SubmissionValidationService } from '../services/submission-validation-service';
-import { getMockDBConnection } from '../__mocks__/db';
 import { JobQueues } from './jobs';
 import * as pgBossService from './pg-boss-service';
 import {
@@ -456,6 +456,7 @@ describe('publisher', () => {
     const createMockDownload = (overrides: Partial<DownloadRecord> = {}): DownloadRecord => ({
       download_id: 'aaaa0000-0000-0000-0000-000000000001',
       download_status: 'pending',
+      format: 'csv',
       metadata: null,
       started_at: null,
       completed_at: null,

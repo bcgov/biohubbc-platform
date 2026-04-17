@@ -1,15 +1,10 @@
 import { fireEvent, waitFor } from '@testing-library/react';
-import { useApi } from 'hooks/useApi';
-import { IGetTicketsResponse, ITicket } from 'interfaces/useTicketsApi.interface';
+import { ITicket } from 'interfaces/useTicketsApi.interface';
 import { render } from 'test-helpers/test-utils';
-import { Mock } from 'vitest';
 import { TicketsContainer } from './TicketsContainer';
 
-vi.mock('hooks/useApi');
-
 describe('TicketsContainer', () => {
-  const mockUseApi = useApi as Mock;
-  const updateTicketStatus = vi.fn();
+  const onToggleTicketStatus = vi.fn();
 
   const tickets: ITicket[] = [
     {
@@ -34,30 +29,9 @@ describe('TicketsContainer', () => {
     }
   ];
 
-  const response: IGetTicketsResponse = {
-    tickets,
-    pagination: {
-      total: 2,
-      current_page: 1,
-      last_page: 1,
-      per_page: 10,
-      sort: 'create_date',
-      order: 'desc'
-    }
-  };
-
   const renderList = () => {
-    mockUseApi.mockReturnValue({
-      tickets: {
-        updateTicketStatus,
-        createTicket: vi.fn(),
-        deleteTicket: vi.fn()
-      }
-    });
-
     return render(
       <TicketsContainer
-        response={response}
         rows={tickets}
         rowCount={2}
         paginationModel={{ page: 0, pageSize: 10 }}
@@ -66,8 +40,12 @@ describe('TicketsContainer', () => {
         setSortModel={vi.fn()}
         searchTerm=""
         onSearch={vi.fn()}
-        refresh={vi.fn()}
-        setData={vi.fn()}
+        onAddTicket={vi.fn()}
+        rowActions={{
+          onEditTicket: vi.fn(),
+          onToggleTicketStatus,
+          onDeleteTicket: vi.fn()
+        }}
         onRowClick={vi.fn()}
       />
     );
@@ -75,7 +53,6 @@ describe('TicketsContainer', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    updateTicketStatus.mockResolvedValue({ ...tickets[0], status: 'closed' });
   });
 
   it('shows close action for open tickets', async () => {
@@ -90,12 +67,11 @@ describe('TicketsContainer', () => {
     fireEvent.click(getByTestId('custom-menu-icon-item-Closeticket'));
 
     await waitFor(() => {
-      expect(updateTicketStatus).toHaveBeenCalledWith(tickets[0].ticket_id, 'closed');
+      expect(onToggleTicketStatus).toHaveBeenCalledWith(tickets[0], 'closed');
     });
   });
 
   it('shows reopen action for closed tickets', async () => {
-    updateTicketStatus.mockResolvedValue({ ...tickets[1], status: 'open' });
     const { getAllByTestId, getByTestId } = renderList();
 
     fireEvent.click(getAllByTestId('custom-menu-icon-Actions')[1]);
@@ -107,7 +83,7 @@ describe('TicketsContainer', () => {
     fireEvent.click(getByTestId('custom-menu-icon-item-Reopenticket'));
 
     await waitFor(() => {
-      expect(updateTicketStatus).toHaveBeenCalledWith(tickets[1].ticket_id, 'open');
+      expect(onToggleTicketStatus).toHaveBeenCalledWith(tickets[1], 'open');
     });
   });
 });

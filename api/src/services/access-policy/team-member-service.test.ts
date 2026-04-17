@@ -2,6 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import {
   CreateTeamMember,
   TeamMember,
@@ -10,7 +11,6 @@ import {
   UpdateTeamMember
 } from '../../models/team-member';
 import { TeamMemberRepository } from '../../repositories/authorization/team-member-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { TeamMemberService } from './team-member-service';
 
 chai.use(sinonChai);
@@ -126,6 +126,29 @@ describe('TeamMemberService', () => {
 
       expect(stub).to.have.been.calledWith('22222222-2222-2222-2222-222222222222');
       expect(result).to.eql(mockTeamMembers);
+    });
+  });
+
+  describe('getTeamIdsBySystemUserId', () => {
+    it("returns team IDs derived from the user's active team memberships", async () => {
+      const mockMembers: TeamMember[] = [
+        { team_member_id: '11111111-1111-1111-1111-111111111111', system_user_id: 5, team_id: 'team-a' },
+        { team_member_id: '22222222-2222-2222-2222-222222222222', system_user_id: 5, team_id: 'team-b' }
+      ];
+      const stub = sinon.stub(TeamMemberRepository.prototype, 'getTeamMembersBySystemUserId').resolves(mockMembers);
+
+      const result = await service.getTeamIdsBySystemUserId(5);
+
+      expect(stub).to.have.been.calledWith(5);
+      expect(result).to.eql(['team-a', 'team-b']);
+    });
+
+    it('returns empty array when user has no active team memberships', async () => {
+      sinon.stub(TeamMemberRepository.prototype, 'getTeamMembersBySystemUserId').resolves([]);
+
+      const result = await service.getTeamIdsBySystemUserId(99);
+
+      expect(result).to.eql([]);
     });
   });
 

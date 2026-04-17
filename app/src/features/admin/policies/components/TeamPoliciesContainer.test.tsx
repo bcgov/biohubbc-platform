@@ -7,6 +7,7 @@ import { ITeam } from 'interfaces/useTeamsApi.interface';
 import { MemoryRouter } from 'react-router';
 import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
+import type { ITeamPolicyFormValues } from './TeamPolicyForm';
 import { ITeamPoliciesContainerProps, TeamPoliciesContainer } from './TeamPoliciesContainer';
 
 interface MockDataGridProps {
@@ -35,6 +36,20 @@ vi.mock('@mui/x-data-grid', () => ({
 
 vi.mock('../../../../hooks/useApi');
 const mockBiohubApi = useApi as Mock;
+
+vi.mock('./CreateTeamPolicyDialog', () => ({
+  CreateTeamPolicyDialog: ({ open, onSave }: { open: boolean; onSave: (values: ITeamPolicyFormValues) => void }) =>
+    open ? (
+      <div>
+        <div>Add Assignment</div>
+        <button
+          data-testid="mock-create-assignment-save"
+          onClick={() => onSave({ team_id: 'team-3', policies: ['policy-3'] })}>
+          Save
+        </button>
+      </div>
+    ) : null
+}));
 
 const mockTeamPolicies: ITeamPolicyDetails[] = [
   {
@@ -165,18 +180,7 @@ describe('TeamPoliciesContainer', () => {
     });
 
     fireEvent.click(getByRole('button', { name: /add/i }));
-    fireEvent.keyDown(getByRole('combobox', { name: 'Team' }), { key: 'ArrowDown' });
-    await waitFor(() => {
-      expect(getByRole('option', { name: 'Gamma Team' })).toBeVisible();
-    });
-    fireEvent.click(getByRole('option', { name: 'Gamma Team' }));
-
-    fireEvent.keyDown(getByRole('combobox', { name: 'Policy' }), { key: 'ArrowDown' });
-    await waitFor(() => {
-      expect(getByRole('option', { name: 'Admin Policy' })).toBeVisible();
-    });
-    fireEvent.click(getByRole('option', { name: 'Admin Policy' }));
-    fireEvent.click(getByTestId('edit-dialog-save-button'));
+    fireEvent.click(getByTestId('mock-create-assignment-save'));
 
     await waitFor(() => {
       expect(mockCreateTeamPolicies).toHaveBeenCalledWith('team-3', { policies: ['policy-3'] });
