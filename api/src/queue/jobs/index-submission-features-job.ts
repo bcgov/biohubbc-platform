@@ -27,7 +27,7 @@ const defaultLog = getLogger('queue/jobs/index-submission-features-job');
  * @returns {boolean} True when status is terminal.
  */
 function isTerminalSubmissionUploadStatus(status: SubmissionUpload['status']): boolean {
-  return TERMINAL_UPLOAD_STATUSES.has(status);
+  return TERMINAL_UPLOAD_STATUSES.includes(status);
 }
 
 /**

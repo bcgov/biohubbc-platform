@@ -181,8 +181,7 @@ export function submissionIntake(): RequestHandler {
       const { submission_upload_id } = await submissionUploadService.insertSubmissionUpload({
         submission_id: submissionRecord.submission_id,
         upload_id,
-        ticket_id: ticket.ticket_id,
-        status: 'uploaded'
+        ticket_id: ticket.ticket_id
       });
 
       // insert each submission feature record

@@ -14,8 +14,15 @@ const defaultLog = getLogger('repositories/submission-feature-property-ingestion
 /**
  * Upload-scoped repository for set-based submission feature property ingestion.
  *
- * Working tables in this repository are durable upload-scoped tables.
- * Callers must clean and repopulate rows by `submission_upload_id` per job run.
+ * This repository implements a multi-phase ingestion pipeline that:
+ * 1) expands raw JSON properties from `submission_feature.data`
+ * 2) resolves metadata and candidate values into upload-scoped staging tables
+ * 3) records aggregated validation/resolution errors
+ * 4) inserts valid canonical values into typed property tables
+ *
+ * Working tables used here are durable (not temporary table definitions), and are
+ * partitioned logically by `submission_upload_id`. Callers are expected to clear
+ * upload-scoped rows before repopulating them so retries remain idempotent.
  */
 export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository {
   /**
@@ -45,7 +52,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Clear staging rows for one upload.
+   * Remove all raw property staging rows for a single upload.
+   *
+   * This is the reset step before re-expanding `submission_feature.data.properties`
+   * for the same upload. It only affects `submission_upload_staging_raw_property`
+   * rows in the provided upload scope.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -130,7 +141,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Delete all temp ingestion error rows for one upload.
+   * Delete all aggregated ingestion error rows for one upload.
+   *
+   * Errors are accumulated in `submission_feature_error` across validation phases.
+   * This method clears that upload-scoped accumulator so a rerun can recompute
+   * clean counts and summaries from scratch.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -145,7 +160,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Expand `submission_feature.data.properties` into upload-scoped staging rows.
+   * Expand raw JSON properties into one staging row per key/value pair.
+   *
+   * For each active `submission_feature` in the upload, this method extracts
+   * entries from `data.properties` via `jsonb_each(...)` and writes them into
+   * `submission_upload_staging_raw_property`.
+   *
+   * Rows are produced only when `data.properties` is a JSON object.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -176,7 +197,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Drop `submission_upload_staging_typed_property_value` if it exists.
+   * Clear upload-scoped rows from `submission_upload_staging_typed_property_value`.
+   *
+   * This table stores one logical value per row (including array-expanded rows)
+   * after property metadata resolution. Clearing it prepares the upload for a
+   * fresh type-validation pass.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -190,7 +215,11 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Drop `submission_upload_staging_resolved_property` if it exists.
+   * Clear upload-scoped rows from `submission_upload_staging_resolved_property`.
+   *
+   * This table links raw staged property names to active feature/property metadata
+   * (`feature_type_property`, logical type, required/multi flags). Clearing avoids
+   * stale resolution rows on retries.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -204,7 +233,16 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Create `submission_upload_staging_resolved_property` for an upload.
+   * Populate resolved-property staging by joining raw properties to active metadata.
+   *
+   * For each row in `submission_upload_staging_raw_property`, this method resolves:
+   * - matching `feature_property` by property name
+   * - matching `feature_type_property` for the feature's type
+   * - logical `feature_property_type` name
+   * - `allow_multiple` and `required_value` behavior flags
+   *
+   * Unresolved properties are preserved with nullable metadata so downstream phases
+   * can detect and report validation/resolution issues.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -251,11 +289,17 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Create `submission_upload_staging_typed_property_value` with one logical value per row.
+   * Populate typed-property-value staging with one logical value per row.
    *
-   * Note: `jsonb_typeof(...)= 'array'` here is checking JSON transport shape only.
-   * It is not a logical `feature_property_type` of `array`. Logical multiplicity is
-   * controlled by `allow_multiple` on `feature_type_property`.
+   * This phase normalizes JSON transport shape before type checks:
+   * - scalar/non-array values are copied as-is
+   * - array values are expanded with `jsonb_array_elements(...)`, but only when
+   *   `allow_multiple = true`
+   * - null JSON values are excluded
+   *
+   * Note: array detection here is transport-shape handling. Logical property type
+   * is still determined by `property_type_name`; multiplicity is governed by
+   * `allow_multiple` on `feature_type_property`.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -309,7 +353,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Drop `submission_upload_staging_datetime_candidate` if it exists.
+   * Clear upload-scoped datetime candidate rows.
+   *
+   * Datetime candidates are intermediate parsed representations produced from
+   * typed values. This reset ensures parsing/normalization can be recomputed.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -323,7 +370,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Drop `submission_upload_staging_spatial_candidate` if it exists.
+   * Clear upload-scoped spatial candidate rows.
+   *
+   * Spatial candidates hold normalized GeoJSON, parsed PostGIS geometry, and
+   * validity metadata for later error recording and insertion.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -337,7 +387,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Drop `submission_upload_staging_code_candidate` if it exists.
+   * Clear upload-scoped code candidate rows.
+   *
+   * Code candidates store parsed slug parts and resolved
+   * `contributor_codeset_code_id` values for code properties.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -351,7 +404,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Drop `submission_upload_staging_taxon_candidate` if it exists.
+   * Clear upload-scoped taxon candidate rows.
+   *
+   * Taxon candidates store parsed TSN values and resolved `taxon_id` values.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -365,7 +420,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Drop `submission_upload_staging_artifact_candidate` if it exists.
+   * Clear upload-scoped artifact candidate rows.
+   *
+   * Artifact candidates store normalized artifact references and resolved
+   * `artifact_id` values for artifact-backed properties.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -379,7 +437,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Clear upload property working-set staging rows in one round trip.
+   * Clear upload property working-set staging tables in one SQL round trip.
+   *
+   * Removes both:
+   * - `submission_upload_staging_typed_property_value`
+   * - `submission_upload_staging_resolved_property`
+   *
+   * This is a convenience reset for the core property normalization pipeline.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -402,7 +466,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Clear complex candidate staging rows in one round trip.
+   * Clear all complex-type candidate staging tables in one SQL round trip.
+   *
+   * Removes upload-scoped rows from datetime, spatial, code, taxon, and artifact
+   * candidate tables so candidate generation phases can rerun idempotently.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -441,6 +508,15 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
 
   /**
    * Create `submission_upload_staging_datetime_candidate` with parsed date/time values.
+   *
+   * Candidate rows are created from typed values where logical property type is
+   * `datetime` and the underlying value is a JSON string. The parser supports:
+   * - date-only forms (`YYYY-MM-DD`)
+   * - time-only forms (`HH:MM[:SS[.fraction]]`)
+   * - datetime forms with optional timezone
+   *
+   * Parsed outputs are split into `date_value` and `time_value` so downstream
+   * consumers can represent date/time semantics independently.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -505,6 +581,14 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
 
   /**
    * Create `submission_upload_staging_spatial_candidate` with normalized geometry and validity metadata.
+   *
+   * This phase accepts spatial logical values as JSON objects and normalizes:
+   * - GeoJSON Feature -> its `geometry`
+   * - GeoJSON FeatureCollection -> synthesized GeometryCollection
+   * - raw geometry object -> unchanged
+   *
+   * It then attempts parsing via `biohub.try_geom_from_geojson`, records
+   * `validity_reason`, and computes `is_valid` using PostGIS checks.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -601,6 +685,16 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Create `submission_upload_staging_code_candidate` with parsed code key parts and resolved IDs.
    *
+   * Expected format is `code::<contributor-codeset-key>::<contributor-codeset-code-key>`.
+   * This method:
+   * - parses and validates slug structure
+   * - normalizes slug text
+   * - resolves to `contributor_codeset_code_id` within the provided contributor scope
+   *
+   * Rows remain in candidate staging even when unresolved so later phases can
+   * emit aggregated resolution errors.
+   *
+   * @param {string} submissionUploadId Upload scope.
    * @param {number} contributorId Contributor scope for code resolution.
    * @returns {Promise<void>}
    */
@@ -680,6 +774,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Create `submission_upload_staging_taxon_candidate` with parsed TSNs and resolved taxon IDs.
    *
+   * Taxon candidates are accepted only when typed logical values are numeric and
+   * pass integer regex checks. Parsed TSNs are resolved against active `taxon`
+   * rows; unresolved values are retained for error recording.
+   *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
@@ -726,6 +824,13 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
 
   /**
    * Create `submission_upload_staging_artifact_candidate` with normalized references and resolved artifact IDs.
+   *
+   * Artifact-key values are normalized by trimming and removing a leading
+   * `files/` segment and any leading slashes. Resolution is then performed within
+   * the upload's `upload_id` by joining against `upload_artifact.path`.
+   *
+   * Candidate rows keep both normalized reference and nullable `artifact_id` so
+   * downstream phases can insert valid links and record unresolved references.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -900,6 +1005,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    * - JSON primitive type mismatches by logical property type
    * - unsupported logical property types
    *
+   * Errors are grouped and upserted into `submission_feature_error`, incrementing
+   * existing counts for matching `(submission_upload_id, error_code, feature_type_property_id, property_name)`.
+   *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
@@ -1041,6 +1149,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Record malformed or unresolved code property references.
    *
+   * This phase writes two grouped error categories:
+   * - `INVALID_CODE_REFERENCE_FORMAT`: slug does not match expected `code::...::...` structure
+   * - `UNRESOLVED_CODE_REFERENCE`: format is valid but no `contributor_codeset_code_id` was found
+   *
+   * Counts are aggregated and upserted into `submission_feature_error`.
+   *
    * @param {string} submissionUploadId Upload scope.
    * @param {number} _contributorId Unused at this stage; kept for interface compatibility.
    * @returns {Promise<void>}
@@ -1129,6 +1243,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Record unresolved taxon TSN values for taxon properties.
    *
+   * Candidate rows where parsed TSN did not resolve to `taxon_id` are grouped by
+   * upload/property/feature-type-property and written as `UNRESOLVED_TAXON`.
+   *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
@@ -1182,6 +1299,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
 
   /**
    * Record unresolved or invalid artifact references for artifact-backed properties.
+   *
+   * This phase records:
+   * - `INVALID_ARTIFACT_REFERENCE` when normalization yields an empty key
+   * - `UNRESOLVED_ARTIFACT_REFERENCE` when a non-empty key cannot be matched to `artifact_id`
+   *
+   * Error counts are aggregated and upserted into `submission_feature_error`.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -1325,6 +1448,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Insert valid datetime values into `submission_feature_property_timestamp`.
    *
+   * Rows are inserted when at least one parsed component (`date_value` or
+   * `time_value`) is present in datetime candidate staging.
+   *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
@@ -1354,6 +1480,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
 
   /**
    * Record invalid spatial values after GeoJSON normalization and PostGIS validation.
+   *
+   * Any candidate with missing normalized geometry, failed parsing, or invalid
+   * PostGIS geometry contributes to grouped `INVALID_SPATIAL_VALUE` errors.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -1413,6 +1542,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Insert valid spatial values into `submission_feature_property_geometry`.
    *
+   * Inserts only candidates with non-null parsed geometry that passes
+   * `ST_IsValid(...)`; geometries are forced to 2D with `ST_Force2D(...)`.
+   *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
@@ -1438,6 +1570,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
 
   /**
    * Insert valid string properties into `submission_feature_property_string`.
+   *
+   * Values are sourced from typed staging where logical type is `string` and
+   * JSON transport type is also string, then extracted as text via `#>> '{}'`.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -1465,6 +1600,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Insert valid numeric properties into `submission_feature_property_number`.
    *
+   * Values are sourced from typed staging where logical and transport types are
+   * numeric, then cast into canonical numeric column storage.
+   *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
@@ -1491,6 +1629,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Insert valid boolean properties into `submission_feature_property_boolean`.
    *
+   * Values are sourced from typed staging where logical and transport types are
+   * boolean, then cast into canonical boolean column storage.
+   *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
@@ -1516,6 +1657,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
 
   /**
    * Insert valid resolved code references into `submission_feature_property_code`.
+   *
+   * Inserts only rows with valid slug format and non-null resolved
+   * `contributor_codeset_code_id` from code candidate staging.
    *
    * @param {string} submissionUploadId Upload scope.
    * @param {number} contributorId Contributor scope for code resolution.
@@ -1544,6 +1688,8 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Insert valid resolved taxon values into `submission_feature_property_taxon`.
    *
+   * Inserts candidate rows where TSN successfully resolved to a non-null `taxon_id`.
+   *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
@@ -1568,6 +1714,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
 
   /**
    * Insert valid artifact links into `submission_feature_artifact`.
+   *
+   * Inserts distinct `(submission_feature_id, artifact_id)` pairs from artifact
+   * candidate staging where normalized reference is non-empty and resolution
+   * succeeded. Uses conflict-ignore semantics for idempotent reruns.
    *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
@@ -1741,6 +1891,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Record unresolved parent source-id references for the upload.
    *
+   * A parent error is recorded when `child.data.parent` is non-empty but no active
+   * feature in the same upload has a matching `source_id`.
+   *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<void>}
    */
@@ -1798,6 +1951,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Get total number of ingestion error rows for one upload.
    *
+   * Returns the aggregated sum of `submission_feature_error.count` rather than row
+   * cardinality. If no errors exist, returns `0`.
+   *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<number>}
    */
@@ -1820,6 +1976,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   /**
    * Get grouped ingestion error counts by `error_code` for one upload.
    *
+   * Results are ordered by descending count then stable code order for deterministic
+   * API responses and tests.
+   *
    * @param {string} submissionUploadId Upload scope.
    * @returns {Promise<IngestionErrorCount[]>}
    */
@@ -1840,6 +1999,9 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
 
   /**
    * Get upload-scoped aggregated ingestion error summaries for one upload.
+   *
+   * Returns pre-aggregated error rows (including optional `property_name` and
+   * `feature_type_property_id`) sorted by highest count first.
    *
    * @param {string} submissionUploadId Upload scope.
    * @param {number} [limit=25] Max rows to return.

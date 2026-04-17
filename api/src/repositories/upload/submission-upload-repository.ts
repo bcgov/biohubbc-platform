@@ -154,13 +154,11 @@ export class SubmissionUploadRepository extends BaseRepository {
       INSERT INTO submission_upload (
         submission_id,
         upload_id,
-        ticket_id,
-        status
+        ticket_id
       ) VALUES (
         ${submissionUpload.submission_id},
         ${submissionUpload.upload_id},
-        ${submissionUpload.ticket_id},
-        ${submissionUpload.status}
+        ${submissionUpload.ticket_id}
       )
       RETURNING submission_upload_id;
     `;
@@ -195,14 +193,12 @@ export class SubmissionUploadRepository extends BaseRepository {
       INSERT INTO submission_upload (
         submission_id,
         upload_id,
-        ticket_id,
-        status
+        ticket_id
       )
       SELECT
         ${submissionId},
         ua.upload_id,
-        ${ticketId},
-        'uploaded'::submission_upload_job_status
+        ${ticketId}
       FROM upload_artifact ua
       WHERE ua.upload_id = ${uploadId}
       RETURNING submission_upload_id;

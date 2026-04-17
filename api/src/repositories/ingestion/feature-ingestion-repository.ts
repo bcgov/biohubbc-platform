@@ -161,31 +161,6 @@ export class FeatureIngestionRepository extends BaseRepository {
   }
 
   /**
-   * Set parent references from `submission_feature.data.parent` within the same upload scope.
-   *
-   * @param {string} submissionUploadId The submission_upload_id scope.
-   * @return {Promise<void>}
-   * @memberof FeatureIngestionRepository
-   */
-  async updateSubmissionFeatureParentsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
-    const sqlStatement = SQL`
-      UPDATE submission_feature AS child
-      SET parent_submission_feature_id = parent.submission_feature_id
-      FROM submission_feature AS parent
-      WHERE child.submission_upload_id = ${submissionUploadId}::uuid
-        AND parent.submission_upload_id = ${submissionUploadId}::uuid
-        AND child.record_end_date IS NULL
-        AND parent.record_end_date IS NULL
-        AND parent.source_id IS NOT NULL
-        AND jsonb_typeof(child.data -> 'parent') = 'string'
-        AND btrim(child.data ->> 'parent') <> ''
-        AND parent.source_id = btrim(child.data ->> 'parent');
-    `;
-
-    await this.connection.sql(sqlStatement);
-  }
-
-  /**
    * Soft-delete features scoped to a specific upload event.
    * Multiple uploads produce features under the same submission_id;
    * re-ingesting one upload must not affect features from other uploads.

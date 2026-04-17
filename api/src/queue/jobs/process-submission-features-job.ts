@@ -82,7 +82,7 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
 
       // Commit 'started' status immediately so it's visible even if processing fails
       await submissionValidationService.updateSubmissionValidationStatus(job.id, 'started');
-      await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'ingesting' });
+      await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'in_progress' });
       await connection.commit();
 
       // Process the submission (streaming shallow-ingestion).
@@ -113,14 +113,14 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
       const uploadArchiveService = new UploadArchiveService(connection);
       await Promise.all([
         submissionValidationService.updateSubmissionValidationStatus(job.id, 'completed'),
-        submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'ingested' }),
+        submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'succeeded' }),
         uploadArchiveService.updateUploadArchivesByUploadId(submissionUpload.upload_id, {
           archive_status: ProcessStatusStatusEnum.COMPLETED
         })
       ]);
 
       // Publish indexing job. Status updates + enqueue happen in the same transaction/commit window.
-      const indexResult = await publishIndexSubmissionFeaturesJob(connection, { submissionId, submissionUploadId });
+      const indexResult = await publishIndexSubmissionFeaturesJob(connection, { submissionId });
       if (indexResult.status !== 'published') {
         defaultLog.warn({
           label: 'processSubmissionFeaturesJobHandler',

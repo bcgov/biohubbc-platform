@@ -15,27 +15,23 @@ describe('MediaIngestionService', () => {
   });
 
   describe('ingestMediaFiles', () => {
-    it('streams media, upserts uploaded artifacts, and creates upload_artifact rows', async () => {
+    it('streams media, creates pending artifacts, and batch-updates artifacts', async () => {
       const dbConnection = getMockDBConnection();
       const service = new MediaIngestionService(dbConnection);
 
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
-      sinon.stub(ArtifactService.prototype, 'insertArtifacts').resolves([
-        {
-          artifact_id: 'artifact-1',
-          bucket: 'gblhvt',
-          object_key: 'submissions/123/uploads/submission-upload-1/media/path/to/key.pdf'
-        },
-        {
-          artifact_id: 'artifact-2',
-          bucket: 'gblhvt',
-          object_key: 'submissions/123/uploads/submission-upload-1/media/photo-2.jpg'
-        }
-      ]);
+      sinon
+        .stub(ArtifactService.prototype, 'insertArtifact')
+        .onFirstCall()
+        .resolves({ artifact_id: 'artifact-1' })
+        .onSecondCall()
+        .resolves({ artifact_id: 'artifact-2' });
       const insertUploadArtifactsStub = sinon
         .stub(UploadArtifactService.prototype, 'insertUploadArtifacts')
         .resolves([{ upload_artifact_id: 'upload-artifact-1' }]);
-      const insertArtifactsStub = ArtifactService.prototype.insertArtifacts as sinon.SinonStub;
+      const updateArtifactsByIdsStub = sinon
+        .stub(ArtifactService.prototype, 'updateArtifactsByIds')
+        .resolves([{ artifact_id: 'artifact-1' }, { artifact_id: 'artifact-2' }]);
 
       sinon.stub(biohubTarParser, 'streamMedia').callsFake(async (_stream, options) => {
         await options.ingestMediaBatch([
@@ -61,18 +57,6 @@ describe('MediaIngestionService', () => {
 
       await service.ingestMediaFiles('archive/key.tar', 123, 'submission-upload-1', 'upload-1', 'archive-1');
 
-      expect(insertArtifactsStub.calledOnce).to.be.true;
-      expect(insertArtifactsStub.firstCall.args[0]).to.have.length(2);
-      expect(insertArtifactsStub.firstCall.args[0][0]).to.include({
-        object_key: 'submissions/123/uploads/submission-upload-1/media/path/to/key.pdf',
-        artifact_status: 'uploaded',
-        checksum_sha256: '1'.repeat(64)
-      });
-      expect(insertArtifactsStub.firstCall.args[0][1]).to.include({
-        object_key: 'submissions/123/uploads/submission-upload-1/media/photo-2.jpg',
-        artifact_status: 'uploaded',
-        checksum_sha256: '2'.repeat(64)
-      });
       expect(insertUploadArtifactsStub.calledOnce).to.be.true;
       expect(insertUploadArtifactsStub.firstCall.args[0]).to.deep.equal([
         {
@@ -90,6 +74,19 @@ describe('MediaIngestionService', () => {
           path: 'photo-2.jpg'
         }
       ]);
+
+      expect(updateArtifactsByIdsStub.calledOnce).to.be.true;
+      expect(updateArtifactsByIdsStub.firstCall.args[0]).to.have.length(2);
+      expect(updateArtifactsByIdsStub.firstCall.args[0][0]).to.include({
+        artifact_id: 'artifact-1',
+        artifact_status: 'uploaded',
+        checksum_sha256: '1'.repeat(64)
+      });
+      expect(updateArtifactsByIdsStub.firstCall.args[0][1]).to.include({
+        artifact_id: 'artifact-2',
+        artifact_status: 'uploaded',
+        checksum_sha256: '2'.repeat(64)
+      });
     });
 
     it('propagates stream extraction failures', async () => {
@@ -112,13 +109,7 @@ describe('MediaIngestionService', () => {
       const service = new MediaIngestionService(dbConnection);
 
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
-      sinon.stub(ArtifactService.prototype, 'insertArtifacts').resolves([
-        {
-          artifact_id: 'artifact-1',
-          bucket: 'gblhvt',
-          object_key: 'submissions/123/uploads/submission-upload-1/media/photo-1.jpg'
-        }
-      ]);
+      sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: 'artifact-1' } as any);
       sinon
         .stub(UploadArtifactService.prototype, 'insertUploadArtifacts')
         .rejects(new Error('insert upload_artifact failed'));
