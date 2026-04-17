@@ -84,7 +84,6 @@ describe('Download Worker', function () {
   const createdSubmissionFeatureIds: number[] = [];
   const createdSubmissionUploadIds: string[] = [];
   const createdSubmissionIds: number[] = [];
-  const createdSubmissionUploadIds: string[] = [];
   const createdUploadIds: string[] = [];
   const createdTicketIds: string[] = [];
   const createdS3Keys: string[] = [];
@@ -139,12 +138,6 @@ describe('Download Worker', function () {
       // 2c. Delete artifact records
       if (createdArtifactIds.length > 0) {
         await db('biohub.artifact').whereIn('artifact_id', createdArtifactIds).del();
-      }
-
-      // 2c. Delete submission_upload (and its child submission_upload_status) before submission
-      if (createdSubmissionUploadIds.length > 0) {
-        await db('biohub.submission_upload_status').whereIn('submission_upload_id', createdSubmissionUploadIds).del();
-        await db('biohub.submission_upload').whereIn('submission_upload_id', createdSubmissionUploadIds).del();
       }
 
       // 3. Delete submissions

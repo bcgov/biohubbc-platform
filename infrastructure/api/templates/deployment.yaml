@@ -234,6 +234,21 @@ spec:
               value: {{ .Values.app.mediaIngestion.batchBytes | quote }}
             - name: MEDIA_INGEST_BATCH_FILES
               value: {{ .Values.app.mediaIngestion.batchFiles | quote }}
+            # Submission archive multipart upload sizing
+            - name: UPLOAD_PART_SIZE_CAP_BYTES
+              value: {{ .Values.app.uploadMultipart.partSizeCapBytes | quote }}
+            - name: UPLOAD_TARGET_PART_COUNT
+              value: {{ .Values.app.uploadMultipart.targetPartCount | quote }}
+            - name: UPLOAD_PART_SIZE_SCALE_START_BYTES
+              value: {{ .Values.app.uploadMultipart.scaleStartBytes | quote }}
+            - name: UPLOAD_PART_SIZE_SCALE_STEP_BYTES
+              value: {{ .Values.app.uploadMultipart.scaleStepBytes | quote }}
+            - name: UPLOAD_PART_SIZE_SCALE_STEP_INCREMENT_BYTES
+              value: {{ .Values.app.uploadMultipart.scaleStepIncrementBytes | quote }}
+            - name: UPLOAD_PRESIGNED_URL_BATCH_SIZE
+              value: {{ .Values.app.uploadMultipart.presignedUrlBatchSize | quote }}
+            - name: UPLOAD_PRESIGNED_URL_EXPIRY_SECONDS
+              value: {{ .Values.app.uploadMultipart.presignedUrlExpirySeconds | quote }}
             # GCNotify
             - name: GCNOTIFY_SECRET_API_KEY
               valueFrom:

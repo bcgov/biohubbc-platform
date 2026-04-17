@@ -9,7 +9,7 @@ import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
 import { UploadArtifactService } from '../upload/upload-artifact-service';
 import { CodesetIngestionService } from './codeset-ingestion-service';
-import { MediaIngestionService, MEDIA_INGEST_BATCH_BYTES, MEDIA_INGEST_BATCH_FILES } from './media-ingestion-service';
+import { MEDIA_INGEST_BATCH_BYTES, MEDIA_INGEST_BATCH_FILES, MediaIngestionService } from './media-ingestion-service';
 import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
 import { IValidationResult } from './submission-ingestion-service.interface';
 

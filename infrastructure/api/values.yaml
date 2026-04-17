@@ -79,6 +79,16 @@ app:
   mediaIngestion:
     batchBytes: "" # Optional override for MEDIA_INGEST_BATCH_BYTES
     batchFiles: "" # Optional override for MEDIA_INGEST_BATCH_FILES
+
+  # Submission archive multipart upload sizing
+  uploadMultipart:
+    partSizeCapBytes: "104857600" # Prefer max 100 MiB part size (configurable)
+    targetPartCount: "10" # Prefer ~10 or fewer parts when possible
+    scaleStartBytes: "" # Optional override for UPLOAD_PART_SIZE_SCALE_START_BYTES
+    scaleStepBytes: "" # Optional override for UPLOAD_PART_SIZE_SCALE_STEP_BYTES
+    scaleStepIncrementBytes: "" # Optional override for UPLOAD_PART_SIZE_SCALE_STEP_INCREMENT_BYTES
+    presignedUrlBatchSize: "" # Optional override for UPLOAD_PRESIGNED_URL_BATCH_SIZE
+    presignedUrlExpirySeconds: "" # Optional override for UPLOAD_PRESIGNED_URL_EXPIRY_SECONDS
     
   # ITIS SOLR
   itisSolr: "https://services.itis.gov"
