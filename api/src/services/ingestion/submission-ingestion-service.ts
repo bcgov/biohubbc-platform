@@ -2,10 +2,12 @@ import { IngestionValidationError } from '../../errors/submission-errors';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { streamSubmissionArchive } from '../../utils/biohub-tar-parser';
 import { getLogger } from '../../utils/logger';
+import { ContributorService } from '../contributor-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
+import { UploadArtifactService } from '../upload/upload-artifact-service';
 import { CodesetIngestionService } from './codeset-ingestion-service';
 import { MediaIngestionService, MEDIA_INGEST_BATCH_BYTES, MEDIA_INGEST_BATCH_FILES } from './media-ingestion-service';
 import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
@@ -26,7 +28,9 @@ export class SubmissionIngestionService extends DBService {
   featureIngestionService = new SubmissionFeatureIngestionService(this.connection);
   mediaIngestionService = new MediaIngestionService(this.connection);
   codesetIngestionService = new CodesetIngestionService(this.connection);
+  contributorService = new ContributorService(this.connection);
   uploadArchiveService = new UploadArchiveService(this.connection);
+  uploadArtifactService = new UploadArtifactService(this.connection);
   artifactService = new ArtifactService(this.connection);
   objectStorageService = new ObjectStorageService();
 
@@ -35,7 +39,8 @@ export class SubmissionIngestionService extends DBService {
    * Deep validation and reference resolution are deferred to the indexing workflow.
    *
    * Idempotent: safe for pg-boss retries. Existing features for the current upload are
-   * soft-deleted before re-insertion, artifact inserts use ON CONFLICT DO NOTHING, and S3 PUTs overwrite.
+   * soft-deleted before re-insertion, archive-derived upload_artifact rows are deleted
+   * before rebuilding, artifact inserts upsert by key, and S3 PUTs overwrite by object key.
    *
    * Caller provides the pre-resolved submission_upload bridge record to avoid redundant
    * lookups — the job handler already resolves it for logging/indexing.
@@ -71,6 +76,9 @@ export class SubmissionIngestionService extends DBService {
       objectKey
     });
 
+    // Step 1: Remove previously-ingested feature rows for this submission upload attempt.
+    // Retries can re-run after partial success; scoping by submission_upload_id ensures
+    // we only reset rows produced by this upload attempt, not other uploads.
     await this.featureIngestionService.deleteFeaturesBySubmissionUploadId(submissionUploadId);
     defaultLog.debug({
       label: 'ingestSubmissionUpload',
@@ -78,8 +86,28 @@ export class SubmissionIngestionService extends DBService {
       submissionUploadId
     });
 
-    const contributorId = await this.codesetIngestionService.getContributorIdBySubmissionUploadId(submissionUploadId);
+    // Step 2: Soft-delete active upload_artifact links for this upload.
+    // Why delete upload_artifact rows here:
+    // - `upload_artifact` has uniqueness constraints (upload_id+artifact_id and upload_id+path for archive rows).
+    // - A retry may produce the same paths/artifacts, and pure-insert repository methods should not own conflict resolution.
+    // - Marking rows inactive once up-front keeps repository inserts deterministic.
+    // - Scope is all active rows for this upload so conflicts are fully avoided on retry.
+    await this.uploadArtifactService.deleteUploadArtifactsByUploadId(uploadId);
+    defaultLog.debug({
+      label: 'ingestSubmissionUpload',
+      message: 'Deleted existing archive-derived upload artifact rows by upload id',
+      uploadId
+    });
 
+    // Step 3: Resolve contributor context used by codeset ingestion callbacks.
+    const contributor = await this.contributorService.getContributorBySubmissionUploadId(submissionUploadId);
+    const contributorId = contributor.contributor_id;
+
+    // Step 4: Stream tarball once and fan out entry processing by folder:
+    // - features/* -> feature ingestion service
+    // - codes/*    -> codeset ingestion service
+    // - files/*    -> media ingestion service
+    // The parser handles batching/concurrency; callbacks persist scoped records.
     const tarStream = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
     const { featureCount, uploadedCount, codesetFileCount } = await streamSubmissionArchive(tarStream, {
       objectStorageService: this.objectStorageService,
@@ -104,6 +132,8 @@ export class SubmissionIngestionService extends DBService {
       }
     });
 
+    // Step 5: Guardrail validation for malformed/empty archives.
+    // Archive must contain at least one feature payload to be considered ingestible.
     if (featureCount === 0) {
       throw new IngestionValidationError('No feature entries were found under features/ in the archive');
     }

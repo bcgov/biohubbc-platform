@@ -43,23 +43,13 @@ export class CodesetIngestionService extends DBService {
    * @return {Promise<void>}
    */
   async ingestCodesets(objectKey: string, submissionUploadId: string): Promise<void> {
-    const contributorId = await this.getContributorIdBySubmissionUploadId(submissionUploadId);
+    const contributor = await this.contributorService.getContributorBySubmissionUploadId(submissionUploadId);
+    const contributorId = contributor.contributor_id;
     const tarStream = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
 
     await streamCodesets(tarStream, async (codesets) => {
       await this.persistContributorCodesets(contributorId, codesets);
     });
-  }
-
-  /**
-   * Resolve contributor id from submission upload id.
-   *
-   * @param {string} submissionUploadId
-   * @returns {Promise<number>}
-   */
-  async getContributorIdBySubmissionUploadId(submissionUploadId: string): Promise<number> {
-    const contributor = await this.contributorService.getContributorBySubmissionUploadId(submissionUploadId);
-    return contributor.contributor_id;
   }
 
   /**

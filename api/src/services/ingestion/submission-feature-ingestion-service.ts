@@ -107,11 +107,9 @@ export class SubmissionFeatureIngestionService extends DBService {
    * @memberof SubmissionFeatureIngestionService
    */
   private async getActiveFeatureTypeMap(): Promise<Map<string, number>> {
-    if (this.activeFeatureTypeMapPromise === null) {
-      this.activeFeatureTypeMapPromise = this.ingestionRepository
-        .getActiveFeatureTypeMap()
-        .then((rows) => new Map(rows.map((row) => [row.name, row.feature_type_id])));
-    }
+    this.activeFeatureTypeMapPromise ??= this.ingestionRepository
+      .getActiveFeatureTypeMap()
+      .then((rows) => new Map(rows.map((row) => [row.name, row.feature_type_id])));
 
     return this.activeFeatureTypeMapPromise;
   }

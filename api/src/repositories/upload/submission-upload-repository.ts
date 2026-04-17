@@ -128,7 +128,8 @@ export class SubmissionUploadRepository extends BaseRepository {
       .from('submission_upload')
       .join('upload_artifact as ua', 'ua.upload_id', 'submission_upload.upload_id')
       .where('submission_upload.submission_id', submissionId)
-      .whereNull('submission_upload.record_end_date');
+      .whereNull('submission_upload.record_end_date')
+      .whereNull('ua.record_end_date');
 
     if (filters?.role) {
       query = query.andWhere('role', filters.role);
@@ -205,6 +206,7 @@ export class SubmissionUploadRepository extends BaseRepository {
         'uploaded'::submission_upload_job_status
       FROM upload_artifact ua
       WHERE ua.upload_id = ${uploadId}
+        AND ua.record_end_date IS NULL
       RETURNING submission_upload_id;
     `;
 

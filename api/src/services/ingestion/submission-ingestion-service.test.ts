@@ -6,10 +6,11 @@ import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
 import { UploadArchive } from '../../models/upload-archive';
 import * as biohubTarParser from '../../utils/biohub-tar-parser';
 import { getMockDBConnection } from '../../__mocks__/db';
+import { ContributorService } from '../contributor-service';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
-import { CodesetIngestionService } from './codeset-ingestion-service';
+import { UploadArtifactService } from '../upload/upload-artifact-service';
 import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
 import { SubmissionIngestionService } from './submission-ingestion-service';
 
@@ -59,9 +60,12 @@ describe('SubmissionIngestionService', () => {
       const deleteFeaturesStub = sinon
         .stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId')
         .resolves();
-      const contributorIdStub = sinon
-        .stub(CodesetIngestionService.prototype, 'getContributorIdBySubmissionUploadId')
-        .resolves(99);
+      const deleteUploadArtifactsStub = sinon
+        .stub(UploadArtifactService.prototype, 'deleteUploadArtifactsByUploadId')
+        .resolves();
+      const contributorByUploadStub = sinon
+        .stub(ContributorService.prototype, 'getContributorBySubmissionUploadId')
+        .resolves({ contributor_id: 99 } as any);
       const streamArchiveStub = sinon.stub(biohubTarParser, 'streamSubmissionArchive').resolves({
         featureCount: 1,
         uploadedCount: 2,
@@ -72,7 +76,9 @@ describe('SubmissionIngestionService', () => {
 
       expect(result).to.eql({ valid: true, errors: [] });
       expect(deleteFeaturesStub.calledOnceWithExactly(mockSubmissionUpload.submission_upload_id)).to.be.true;
-      expect(contributorIdStub.calledOnceWithExactly(mockSubmissionUpload.submission_upload_id)).to.be.true;
+      expect(deleteUploadArtifactsStub.calledOnceWithExactly(mockSubmissionUpload.upload_id)).to.be.true;
+      expect(deleteUploadArtifactsStub.calledBefore(streamArchiveStub)).to.be.true;
+      expect(contributorByUploadStub.calledOnceWithExactly(mockSubmissionUpload.submission_upload_id)).to.be.true;
       expect(streamArchiveStub.calledOnce).to.be.true;
     });
 
@@ -82,7 +88,10 @@ describe('SubmissionIngestionService', () => {
       setupTarballContext();
 
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
-      sinon.stub(CodesetIngestionService.prototype, 'getContributorIdBySubmissionUploadId').resolves(99);
+      sinon.stub(UploadArtifactService.prototype, 'deleteUploadArtifactsByUploadId').resolves();
+      sinon
+        .stub(ContributorService.prototype, 'getContributorBySubmissionUploadId')
+        .resolves({ contributor_id: 99 } as any);
       sinon.stub(biohubTarParser, 'streamSubmissionArchive').rejects(new Error('archive stream failed'));
 
       try {
@@ -113,7 +122,10 @@ describe('SubmissionIngestionService', () => {
       setupTarballContext();
 
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
-      sinon.stub(CodesetIngestionService.prototype, 'getContributorIdBySubmissionUploadId').resolves(99);
+      sinon.stub(UploadArtifactService.prototype, 'deleteUploadArtifactsByUploadId').resolves();
+      sinon
+        .stub(ContributorService.prototype, 'getContributorBySubmissionUploadId')
+        .resolves({ contributor_id: 99 } as any);
       sinon.stub(biohubTarParser, 'streamSubmissionArchive').rejects(new Error('archive persist failed'));
 
       try {
@@ -130,7 +142,10 @@ describe('SubmissionIngestionService', () => {
       setupTarballContext();
 
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
-      sinon.stub(CodesetIngestionService.prototype, 'getContributorIdBySubmissionUploadId').resolves(99);
+      sinon.stub(UploadArtifactService.prototype, 'deleteUploadArtifactsByUploadId').resolves();
+      sinon
+        .stub(ContributorService.prototype, 'getContributorBySubmissionUploadId')
+        .resolves({ contributor_id: 99 } as any);
       sinon
         .stub(biohubTarParser, 'streamSubmissionArchive')
         .resolves({ featureCount: 0, uploadedCount: 0, codesetFileCount: 0 });
