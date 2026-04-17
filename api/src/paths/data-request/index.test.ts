@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { createDataRequest, findDataRequests } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import * as db from '../../database/db';
 import { ApiError } from '../../errors/api-error';
@@ -10,7 +11,6 @@ import { DataRequestWithStatus } from '../../models/data-request';
 import { SystemUserExtended } from '../../models/user';
 import { DataRequestService } from '../../services/data-request-service';
 import { UserService } from '../../services/user-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 
 chai.use(sinonChai);
 

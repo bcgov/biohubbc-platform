@@ -1,9 +1,9 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
+import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { SubmissionFeaturePropertyTimestamp } from '../models/submission-feature-property-timestamp';
-import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { SubmissionFeaturePropertyTimestampRepository } from './submission-feature-property-timestamp-repository';
 
 describe('SubmissionFeaturePropertyTimestampRepository', () => {

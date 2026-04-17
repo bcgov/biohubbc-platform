@@ -1,9 +1,9 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { TicketReference } from '../models/ticket-reference';
 import { TicketReferenceRepository } from '../repositories/ticket-reference-repository';
-import { getMockDBConnection } from '../__mocks__/db';
 import { TicketReferenceService } from './ticket-reference-service';
 
 chai.use(sinonChai);

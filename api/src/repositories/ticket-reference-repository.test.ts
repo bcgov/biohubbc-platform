@@ -2,9 +2,9 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { TicketReference } from '../models/ticket-reference';
-import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { TicketReferenceRepository } from './ticket-reference-repository';
 
 chai.use(sinonChai);

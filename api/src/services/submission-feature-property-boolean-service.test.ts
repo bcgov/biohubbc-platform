@@ -1,12 +1,12 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import {
   CreateSubmissionFeaturePropertyBoolean,
   SubmissionFeaturePropertyBoolean
 } from '../models/submission-feature-property-boolean';
 import { SubmissionFeaturePropertyBooleanRepository } from '../repositories/submission-feature-property-boolean-repository';
-import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionFeaturePropertyBooleanService } from './submission-feature-property-boolean-service';
 
 chai.use(sinonChai);

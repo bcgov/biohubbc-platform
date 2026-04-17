@@ -3,8 +3,8 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { DownloadStatusEnum } from '../../models/download-status';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
+import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from './download-repository';
 
 chai.use(sinonChai);

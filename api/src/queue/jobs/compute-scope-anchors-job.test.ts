@@ -3,9 +3,9 @@ import { describe } from 'mocha';
 import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { SecurityScopeService } from '../../services/access-policy/security-scope-service';
-import { getMockDBConnection } from '../../__mocks__/db';
 import {
   computeScopeAnchorsFailedHandler,
   computeScopeAnchorsJobHandler,

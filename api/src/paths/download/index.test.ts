@@ -3,13 +3,13 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { createDownload, getDownloads } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
 import { DownloadListRecord } from '../../models/download';
 import * as publisher from '../../queue/publisher';
 import { DownloadService } from '../../services/download/download-service';
 import { SearchFeatureService } from '../../services/search-feature-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 
 chai.use(sinonChai);
 
@@ -58,10 +58,14 @@ describe('paths/download/index', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
+      const apiHost = process.env.API_HOST || 'localhost';
+      const apiPort = process.env.API_PORT || '6100';
+      const baseUrl = apiHost === 'localhost' ? `http://${apiHost}:${apiPort}` : `https://${apiHost}`;
+
       expect(mockRes.statusValue).to.equal(201);
       expect(mockRes.jsonValue).to.eql({
         download_id: 'uuid-1',
-        download_url: 'http://localhost:6100/api/download/uuid-1'
+        download_url: `${baseUrl}/api/download/uuid-1`
       });
     });
 

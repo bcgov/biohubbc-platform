@@ -2,9 +2,9 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { GCNotifyService } from '../../../services/gcnotify-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import { requestAccess } from './requestAccess';
 
 chai.use(sinonChai);

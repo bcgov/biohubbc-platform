@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   ArtifactSecurityScanFile,
@@ -10,7 +11,6 @@ import {
   UpdateArtifactSecurityScanFile
 } from '../../models/artifact-security-scan-file';
 import { SecurityStatusEnum } from '../../models/security-status';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { ArtifactSecurityScanFileRepository } from './artifact-security-scan-file-repository';
 
 chai.use(sinonChai);

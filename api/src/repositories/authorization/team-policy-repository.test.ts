@@ -3,8 +3,8 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { getMockDBConnection } from '../../__mocks__/db';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { TeamPolicyRepository } from './team-policy-repository';
 
 chai.use(sinonChai);

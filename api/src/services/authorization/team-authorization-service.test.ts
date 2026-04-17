@@ -2,9 +2,9 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { TeamAuthorizationRepository } from '../../repositories/authorization/team-authorization-repository';
 import { SubmissionFeature } from '../../repositories/submission-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { SubmissionFeatureService } from '../submission-feature-service';
 import { TeamAuthorizationService } from './team-authorization-service';
 
