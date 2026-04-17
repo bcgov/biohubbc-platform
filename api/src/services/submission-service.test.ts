@@ -2,12 +2,15 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { FeatureIngestionRepository } from '../repositories/ingestion/feature-ingestion-repository';
 import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
   ISubmissionFeature,
   ISubmissionModel,
   PatchSubmissionRecord,
+  SUBMISSION_MESSAGE_TYPE,
+  SUBMISSION_STATUS_TYPE,
   SubmissionFeatureDownloadRecord,
   SubmissionFeatureRecord,
   SubmissionFeatureRecordWithTypeAndSecurity,
@@ -15,12 +18,9 @@ import {
   SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
   SubmissionRecordWithSecurityAndRootFeatureType,
-  SubmissionRepository,
-  SUBMISSION_MESSAGE_TYPE,
-  SUBMISSION_STATUS_TYPE
+  SubmissionRepository
 } from '../repositories/submission-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
-import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionService } from './submission-service';
 
 chai.use(sinonChai);

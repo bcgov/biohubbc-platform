@@ -2,6 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import * as db from '../../database/db';
@@ -9,7 +10,6 @@ import { HTTP401, HTTPError } from '../../errors/http-error';
 import { SystemUserExtended } from '../../repositories/user-repository';
 import { UserService } from '../../services/user-service';
 import * as keycloakUtils from '../../utils/keycloak-utils';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as self from './self';
 
 chai.use(sinonChai);

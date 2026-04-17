@@ -3,8 +3,8 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon, { SinonStub } from 'sinon';
 import sinonChai from 'sinon-chai';
-import { SystemUser } from '../repositories/user-repository';
 import { getMockDBConnection } from '../__mocks__/db';
+import { SystemUser } from '../repositories/user-repository';
 import * as db from './db';
 import { getDBConstants, initDBConstants } from './db-constants';
 

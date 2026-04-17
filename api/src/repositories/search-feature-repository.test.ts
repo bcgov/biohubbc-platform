@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import dayjs from 'dayjs';
 import { QueryResult } from 'pg';
 import Sinon from 'sinon';
+import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
   DatetimeSearchableRecord,
@@ -10,7 +11,6 @@ import {
   SpatialSearchableRecord,
   StringSearchableRecord
 } from '../services/search-feature-service.interface';
-import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { SearchFeatureRepository } from './search-feature-repository';
 
 describe('SearchFeatureRepository', () => {

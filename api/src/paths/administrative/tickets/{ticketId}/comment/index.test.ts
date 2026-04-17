@@ -1,10 +1,10 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import * as db from '../../../../../database/db';
 import { TicketComment } from '../../../../../models/ticket-comment';
 import { TicketCommentService } from '../../../../../services/ticket-comment-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 import { createTicketComment } from './index';
 
 chai.use(sinonChai);

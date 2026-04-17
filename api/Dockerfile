@@ -6,7 +6,7 @@
 # Stage 1: Create the dist
 #####################################################
 
-FROM node:24 AS stage_1
+FROM node:24-slim AS stage_1
 
 USER 0
 
@@ -38,7 +38,7 @@ RUN npm run build
 # Stage 2: Install production dependencies
 #####################################################
 
-FROM node:24 AS stage_2
+FROM node:24-slim AS stage_2
 
 USER 0
 
@@ -61,7 +61,7 @@ RUN npm ci --omit=dev
 # Stage 3: Create the final image
 #####################################################
 
-FROM node:24 as stage_3
+FROM node:24-slim as stage_3
 
 USER 0
 
@@ -85,6 +85,10 @@ COPY --from=stage_2 ${HOME}/node_modules ${HOME}/node_modules
 COPY --from=stage_2 ${HOME}/package*.json ./
 
 ENV PATH ${HOME}/node_modules/.bin/:${HOME}/.npm-global/bin/:${HOME}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends procps \
+    && rm -rf /var/lib/apt/lists/*
 
 # Application VOLUME
 VOLUME ${HOME}

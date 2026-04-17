@@ -2,9 +2,9 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { DataRequestStatus, DataRequestStatusEnum } from '../models/data-request-status';
 import { DataRequestStatusRepository } from '../repositories/data-request-status-repository';
-import { getMockDBConnection } from '../__mocks__/db';
 import { DataRequestStatusService } from './data-request-status-service';
 
 chai.use(sinonChai);

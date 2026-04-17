@@ -1,12 +1,12 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import {
   CreateSubmissionFeaturePropertyGeometry,
   SubmissionFeaturePropertyGeometry
 } from '../models/submission-feature-property-geometry';
 import { SubmissionFeaturePropertyGeometryRepository } from '../repositories/submission-feature-property-geometry-repository';
-import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionFeaturePropertyGeometryService } from './submission-feature-property-geometry-service';
 
 chai.use(sinonChai);

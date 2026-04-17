@@ -2,10 +2,10 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import PgBoss from 'pg-boss';
 import sinon from 'sinon';
+import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
-import { getMockDBConnection } from '../../__mocks__/db';
 import {
   IProcessDownloadJobData,
   processDownloadFailedHandler,

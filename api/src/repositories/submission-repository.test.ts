@@ -4,8 +4,8 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiExecuteSQLError, ApiGeneralError, ApiNotFoundError } from '../errors/api-error';
 import { getMockDBConnection } from '../__mocks__/db';
+import { ApiExecuteSQLError, ApiGeneralError, ApiNotFoundError } from '../errors/api-error';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
 import { SubmissionFeatureRepository } from './submission-feature-repository';
 import {
@@ -13,13 +13,13 @@ import {
   ISpatialComponentCount,
   ISubmissionModel,
   PatchSubmissionRecord,
+  SUBMISSION_MESSAGE_TYPE,
+  SUBMISSION_STATUS_TYPE,
   SubmissionFeatureRecord,
   SubmissionRecord,
   SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
-  SubmissionRepository,
-  SUBMISSION_MESSAGE_TYPE,
-  SUBMISSION_STATUS_TYPE
+  SubmissionRepository
 } from './submission-repository';
 
 chai.use(sinonChai);

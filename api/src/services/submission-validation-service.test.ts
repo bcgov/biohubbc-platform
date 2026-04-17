@@ -1,8 +1,8 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
-import { SubmissionValidationRepository } from '../repositories/submission-validation-repository';
 import { getMockDBConnection } from '../__mocks__/db';
+import { SubmissionValidationRepository } from '../repositories/submission-validation-repository';
 import { SubmissionValidationService } from './submission-validation-service';
 
 describe('SubmissionValidationService', () => {
