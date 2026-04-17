@@ -2,12 +2,12 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
 import { SECURITY_APPLIED_STATUS } from '../../../repositories/security-repository';
 import { SubmissionRecordWithSecurityAndRootFeatureType } from '../../../repositories/submission-repository';
 import { SubmissionService } from '../../../services/submission-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import { getPublishedSubmissionsForAdmins } from './published';
 
 chai.use(sinonChai);

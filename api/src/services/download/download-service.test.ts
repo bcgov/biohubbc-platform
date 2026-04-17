@@ -2,6 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { FRAGMENT_SIZE_THRESHOLD, SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
 import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
@@ -12,7 +13,6 @@ import { DownloadFragmentRepository } from '../../repositories/download/download
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
 import * as fileUtils from '../../utils/file-utils';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { TeamService } from '../access-policy/team-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';

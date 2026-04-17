@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   CreateUploadArtifact,
@@ -10,7 +11,6 @@ import {
   UploadArtifact,
   UploadArtifactRoleEnum
 } from '../../models/upload-artifact';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { UploadArtifactRepository } from './upload-artifact-repository';
 
 chai.use(sinonChai);

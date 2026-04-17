@@ -1,9 +1,9 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { CreateSubmissionFeatureIngestionRecord, IFlattenedBlock } from '../../models/submission-feature';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
 
 describe('SubmissionFeatureIngestionService', () => {

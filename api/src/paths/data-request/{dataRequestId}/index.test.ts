@@ -3,11 +3,11 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { deleteDataRequest, getDataRequestById, updateDataRequest } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { ApiError } from '../../../errors/api-error';
 import { DataRequest } from '../../../models/data-request';
 import { DataRequestService } from '../../../services/data-request-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 
 chai.use(sinonChai);
 

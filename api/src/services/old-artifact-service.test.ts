@@ -3,6 +3,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { FEATURE_PROPERTY_TYPE } from '../models/feature-property';
 import { FeatureTypeProperty } from '../models/feature-type-property';
 import { Artifact, ArtifactRepository } from '../repositories/artifact-repository';
@@ -10,7 +11,6 @@ import { SearchFeatureRepository } from '../repositories/search-feature-reposito
 import { SecurityRepository } from '../repositories/security-repository';
 import { SubmissionFeatureRecord } from '../repositories/submission-repository';
 import * as fileUtils from '../utils/file-utils';
-import { getMockDBConnection } from '../__mocks__/db';
 import { CodeService } from './code-service';
 import { ArtifactService } from './old-artifact-service';
 import { SubmissionFeatureService } from './submission-feature-service';

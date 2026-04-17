@@ -3,11 +3,11 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { claimDownloadForCurrentUser, findDownloadById } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { HTTP403, HTTP404, HTTP409, HTTPError } from '../../../errors/http-error';
 import { DownloadRecord } from '../../../models/download';
 import { DownloadService } from '../../../services/download/download-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 
 chai.use(sinonChai);
 

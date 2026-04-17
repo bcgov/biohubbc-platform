@@ -4,9 +4,9 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { GET } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import * as db from '../../../../database/db';
 import { ItisService } from '../../../../services/itis-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import { getHierarchyForTSNs } from './hierarchy';
 
 chai.use(sinonChai);

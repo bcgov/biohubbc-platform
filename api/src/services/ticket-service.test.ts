@@ -1,6 +1,7 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { IDBConnection } from '../database/db';
 import { DataRequest } from '../models/data-request';
 import { Team } from '../models/team';
@@ -9,7 +10,6 @@ import { TicketReference } from '../models/ticket-reference';
 import { TicketStatus } from '../models/ticket-status';
 import { TicketCommentRepository } from '../repositories/ticket-comment-repository';
 import { TicketRepository } from '../repositories/ticket-repository';
-import { getMockDBConnection } from '../__mocks__/db';
 import { TeamService } from './access-policy/team-service';
 import { DataRequestService } from './data-request-service';
 import { TicketReferenceService } from './ticket-reference-service';

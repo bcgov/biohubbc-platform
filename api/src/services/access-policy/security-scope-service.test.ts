@@ -2,11 +2,11 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { SecurityScope } from '../../models/security-scope';
 import * as publisher from '../../queue/publisher';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
 import * as scopeHashUtil from '../../utils/scope-hash';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { SecurityScopeService } from './security-scope-service';
 
 chai.use(sinonChai);

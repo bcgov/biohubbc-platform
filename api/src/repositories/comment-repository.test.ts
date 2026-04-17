@@ -3,8 +3,8 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { Comment } from '../models/comment';
 import { getMockDBConnection } from '../__mocks__/db';
+import { Comment } from '../models/comment';
 import { CommentRepository } from './comment-repository';
 
 chai.use(sinonChai);

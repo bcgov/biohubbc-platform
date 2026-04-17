@@ -2,11 +2,11 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../__mocks__/db';
 import * as db from '../../../../../../database/db';
 import { HTTP400, HTTPError } from '../../../../../../errors/http-error';
 import { SubmissionFeatureService } from '../../../../../../services/submission-feature-service';
 import { UserService } from '../../../../../../services/user-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../../__mocks__/db';
 import { getSubmissionFeatureSignedUrl } from './signed-url';
 
 chai.use(sinonChai);

@@ -3,9 +3,9 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { Policy } from '../../models/policy';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { PolicyRepository } from './policy-repository';
 
 chai.use(sinonChai);

@@ -3,11 +3,11 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { ApiGeneralError } from '../../errors/api-error';
 import { IngestionValidationError } from '../../errors/submission-errors';
 import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { CreateSubmissionFeatureIngestionRecord } from '../../models/submission-feature';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { FeatureIngestionRepository } from './feature-ingestion-repository';
 
 chai.use(sinonChai);

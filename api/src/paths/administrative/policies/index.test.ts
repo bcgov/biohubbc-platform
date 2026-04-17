@@ -3,12 +3,12 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { createPolicy, getPolicies } from '.';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
 import { PolicyEffect } from '../../../models/policy-statement';
 import { PolicyService } from '../../../services/access-policy/policy-service';
 import { PolicyWithStatements } from '../../../services/access-policy/policy-service.interface';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 
 chai.use(sinonChai);
 

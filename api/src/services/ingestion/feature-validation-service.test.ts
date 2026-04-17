@@ -2,11 +2,11 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { FeatureTypeProperty } from '../../models/feature-type-property';
 import { IFlattenedBlock } from '../../models/submission-feature';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { FeatureValidationService } from './feature-validation-service';
 import { IValidationError, ValidationErrorType } from './feature-validation-service.interface';
 
