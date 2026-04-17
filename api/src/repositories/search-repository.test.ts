@@ -4,6 +4,7 @@ import { QueryResult } from 'pg';
 import Sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 
+import { getMockDBConnection } from '../__mocks__/db';
 import {
   SearchFeatureResult,
   SearchSubmissionResult,
@@ -13,7 +14,6 @@ import {
   SearchTaxonResult,
   WithCount
 } from '../models/search';
-import { getMockDBConnection } from '../__mocks__/db';
 import { SearchRepository } from './search-repository';
 
 chai.use(sinonChai);

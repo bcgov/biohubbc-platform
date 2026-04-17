@@ -5,11 +5,11 @@ import { SecurityRuleWithFeatureCount, SecuritySearchFilters } from '../models/s
 import {
   ArtifactPersecution,
   PersecutionAndHarmSecurity,
+  SECURITY_APPLIED_STATUS,
   SecurityCategoryRecord,
   SecurityRepository,
   SecurityRuleAndCategory,
   SecurityRuleRecord,
-  SECURITY_APPLIED_STATUS,
   SubmissionFeatureSecurityRecord,
   SubmissionFeatureSecurityRulesSummary
 } from '../repositories/security-repository';

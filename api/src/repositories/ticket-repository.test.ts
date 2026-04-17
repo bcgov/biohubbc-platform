@@ -3,9 +3,9 @@ import { Knex } from 'knex';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { Ticket, TicketSlug } from '../models/ticket';
-import { getMockDBConnection, mockQueryResult } from '../__mocks__/db';
 import { TicketRepository } from './ticket-repository';
 
 chai.use(sinonChai);

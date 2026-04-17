@@ -8,6 +8,8 @@ import {
   ISubmissionFeature,
   ISubmissionModel,
   PatchSubmissionRecord,
+  SUBMISSION_MESSAGE_TYPE,
+  SUBMISSION_STATUS_TYPE,
   SubmissionFeatureDownloadRecord,
   SubmissionFeatureRecord,
   SubmissionFeatureRecordWithTypeAndSecurity,
@@ -16,9 +18,7 @@ import {
   SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
   SubmissionRecordWithSecurityAndRootFeatureType,
-  SubmissionRepository,
-  SUBMISSION_MESSAGE_TYPE,
-  SUBMISSION_STATUS_TYPE
+  SubmissionRepository
 } from '../repositories/submission-repository';
 import { getLogger } from '../utils/logger';
 import { ApiPaginationOptions } from '../zod-schema/pagination';

@@ -4,8 +4,8 @@ import { QueryResult } from 'pg';
 import Sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 
-import { SearchPropertyResult } from '../services/property-search-service.interface';
 import { getMockDBConnection } from '../__mocks__/db';
+import { SearchPropertyResult } from '../services/property-search-service.interface';
 import { PropertySearchRepository } from './property-search-repository';
 
 chai.use(sinonChai);

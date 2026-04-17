@@ -3,10 +3,10 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CreateSubmissionUpload, SubmissionUpload, UpdateSubmissionUpload } from '../../models/submission-upload';
 import { UploadArtifactRoleEnum } from '../../models/upload-artifact';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { SubmissionUploadRepository } from './submission-upload-repository';
 
 chai.use(sinonChai);

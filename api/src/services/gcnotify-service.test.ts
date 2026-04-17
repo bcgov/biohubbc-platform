@@ -3,10 +3,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../__mocks__/db';
 import { ApiError } from '../errors/api-error';
 import { IgcNotifyGenericMessage } from '../interfaces/gcnotify.interface';
 import { Artifact } from '../repositories/artifact-repository';
-import { getMockDBConnection } from '../__mocks__/db';
 import { GCNotifyService, ISubmitArtifactRequestAccess } from './gcnotify-service';
 import { ArtifactService } from './old-artifact-service';
 

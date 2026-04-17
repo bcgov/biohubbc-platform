@@ -2,9 +2,9 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { getMockDBConnection } from '../../__mocks__/db';
 import { CreateTeamPolicy, TeamPolicy, TeamPolicyDetails, UpdateTeamPolicy } from '../../models/team-policy';
 import { TeamPolicyRepository } from '../../repositories/authorization/team-policy-repository';
-import { getMockDBConnection } from '../../__mocks__/db';
 import { SecurityScopeService } from './security-scope-service';
 import { TeamPolicyService } from './team-policy-service';
 
