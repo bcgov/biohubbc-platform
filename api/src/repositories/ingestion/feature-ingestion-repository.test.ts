@@ -4,7 +4,6 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../../errors/api-error';
-import { IngestionValidationError } from '../../errors/submission-errors';
 import { CreateSubmissionFeatureIngestionRecord } from '../../models/submission-feature';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { FeatureIngestionRepository } from './feature-ingestion-repository';
@@ -48,7 +47,7 @@ describe('FeatureIngestionRepository', () => {
       expect(sqlStub).to.have.been.calledOnce;
     });
 
-    it('should throw when inserted row count does not match records length', async () => {
+    it('returns dropped-row summary when inserted row count does not match records length', async () => {
       const records: CreateSubmissionFeatureIngestionRecord[] = [
         {
           submissionId: 1,
@@ -66,17 +65,20 @@ describe('FeatureIngestionRepository', () => {
         }
       ];
 
-      const mockDBConnection = getMockDBConnection({
-        sql: sinon.stub().resolves({ rowCount: 0, rows: [], command: '', oid: 0, fields: [] })
-      });
+      const sqlStub = sinon.stub();
+      sqlStub.onFirstCall().resolves({ rowCount: 0, rows: [], command: '', oid: 0, fields: [] });
+      sqlStub.onSecondCall().resolves({ rowCount: 0, rows: [], command: '', oid: 0, fields: [] });
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
 
-      try {
-        await ingestionRepository.insertSubmissionFeatureRecords(records);
-        expect.fail();
-      } catch (actualError) {
-        expect(actualError).to.be.instanceof(IngestionValidationError);
-      }
+      const result = await ingestionRepository.insertSubmissionFeatureRecords(records);
+
+      expect(result).to.eql({
+        expectedCount: 1,
+        insertedCount: 0,
+        droppedCount: 1,
+        droppedReasons: [{ reason: 'unknown_feature_type_ignored', count: 1, featureTypeCounts: { dataset: 1 } }]
+      });
     });
   });
 

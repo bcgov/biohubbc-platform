@@ -1,5 +1,5 @@
 import { IDBConnection } from '../../database/db';
-import { IFlattenedBlock } from '../../models/submission-feature';
+import { IFlattenedBlock, SubmissionFeatureBatchInsertResult } from '../../models/submission-feature';
 import { FeatureIngestionRepository } from '../../repositories/ingestion/feature-ingestion-repository';
 import { DBService } from '../db-service';
 
@@ -33,15 +33,20 @@ export class SubmissionFeatureIngestionService extends DBService {
    * @param {number} submissionId
    * @param {string} submissionUploadId
    * @param {IFlattenedBlock[]} features
-   * @returns {Promise<void>}
+   * @returns {Promise<SubmissionFeatureBatchInsertResult>}
    */
   async ingestFeatureBatch(
     submissionId: number,
     submissionUploadId: string,
     features: IFlattenedBlock[]
-  ): Promise<void> {
+  ): Promise<SubmissionFeatureBatchInsertResult> {
     if (!features.length) {
-      return;
+      return {
+        expectedCount: 0,
+        insertedCount: 0,
+        droppedCount: 0,
+        droppedReasons: []
+      };
     }
 
     const records = features.map((feature) => {
@@ -55,7 +60,7 @@ export class SubmissionFeatureIngestionService extends DBService {
       };
     });
 
-    await this.ingestionRepository.insertSubmissionFeatureRecords(records);
+    return this.ingestionRepository.insertSubmissionFeatureRecords(records);
   }
 
   /**

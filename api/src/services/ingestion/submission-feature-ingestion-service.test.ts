@@ -14,7 +14,12 @@ describe('SubmissionFeatureIngestionService', () => {
   describe('ingestFeatureBatch', () => {
     it('persists shallow-validated feature rows with raw payload and byte size', async () => {
       const service = new SubmissionFeatureIngestionService(getMockDBConnection());
-      const insertStub = sinon.stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecords').resolves();
+      const insertStub = sinon.stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecords').resolves({
+        expectedCount: 2,
+        insertedCount: 2,
+        droppedCount: 0,
+        droppedReasons: []
+      });
 
       const features: IFlattenedBlock[] = [
         {
@@ -57,7 +62,12 @@ describe('SubmissionFeatureIngestionService', () => {
 
     it('returns early when batch is empty', async () => {
       const service = new SubmissionFeatureIngestionService(getMockDBConnection());
-      const insertStub = sinon.stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecords').resolves();
+      const insertStub = sinon.stub(FeatureIngestionRepository.prototype, 'insertSubmissionFeatureRecords').resolves({
+        expectedCount: 0,
+        insertedCount: 0,
+        droppedCount: 0,
+        droppedReasons: []
+      });
 
       await service.ingestFeatureBatch(42, 'submission-upload-1', []);
 

@@ -52,10 +52,22 @@ export interface IValidationError {
 }
 
 /**
+ * Non-fatal validation records captured during ingestion.
+ * These are persisted as metadata to explain dropped/ignored rows.
+ */
+export interface IValidationRecord {
+  level: 'warning';
+  code: 'unknown_feature_type_ignored' | 'feature_not_inserted';
+  message: string;
+  details: Record<string, unknown>;
+}
+
+/**
  * Result of validating submission features.
  * Contains validation status and all collected errors.
  */
 export interface IValidationResult {
   valid: boolean;
   errors: IValidationError[];
+  records?: IValidationRecord[];
 }

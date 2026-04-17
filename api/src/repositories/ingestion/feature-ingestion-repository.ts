@@ -1,8 +1,11 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { IngestionValidationError } from '../../errors/submission-errors';
-import { CreateSubmissionFeatureIngestionRecord, InsertSubmissionFeatureRecord } from '../../models/submission-feature';
+import {
+  CreateSubmissionFeatureIngestionRecord,
+  InsertSubmissionFeatureRecord,
+  SubmissionFeatureBatchInsertResult
+} from '../../models/submission-feature';
 import { BaseRepository } from '../base-repository';
 
 /**
@@ -17,12 +20,19 @@ export class FeatureIngestionRepository extends BaseRepository {
    * Bulk insert submission feature rows (raw payload persisted in `data`).
    *
    * @param {CreateSubmissionFeatureIngestionRecord[]} records
-   * @return {Promise<void>}
+   * @return {Promise<SubmissionFeatureBatchInsertResult>}
    * @memberof FeatureIngestionRepository
    */
-  async insertSubmissionFeatureRecords(records: CreateSubmissionFeatureIngestionRecord[]): Promise<void> {
+  async insertSubmissionFeatureRecords(
+    records: CreateSubmissionFeatureIngestionRecord[]
+  ): Promise<SubmissionFeatureBatchInsertResult> {
     if (!records.length) {
-      return;
+      return {
+        expectedCount: 0,
+        insertedCount: 0,
+        droppedCount: 0,
+        droppedReasons: []
+      };
     }
 
     const submissionIds = records.map((record) => record.submissionId);
@@ -74,41 +84,62 @@ export class FeatureIngestionRepository extends BaseRepository {
     const expectedCount = records.length;
 
     if (insertedCount !== expectedCount) {
-      const submissionUploadId = submissionUploadIds[0];
       const missingCount = expectedCount - insertedCount;
 
       const featureTypeCounts = new Map<string, number>();
       for (const featureTypeName of featureTypeNames) {
         featureTypeCounts.set(featureTypeName, (featureTypeCounts.get(featureTypeName) ?? 0) + 1);
       }
-      const featureTypeSummary = [...featureTypeCounts.entries()]
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .slice(0, 8)
-        .map(([name, count]) => `${name}:${count}`)
-        .join(', ');
 
-      const sourceIdCounts = new Map<string, number>();
-      for (const sourceId of sourceIds) {
-        sourceIdCounts.set(sourceId, (sourceIdCounts.get(sourceId) ?? 0) + 1);
+      const activeFeatureTypesSql = SQL`
+        SELECT name
+        FROM feature_type
+        WHERE name = ANY(${featureTypeNames}::text[])
+          AND record_end_date IS NULL;
+      `;
+      const activeFeatureTypesResponse = await this.connection.sql(activeFeatureTypesSql, z.object({ name: z.string() }));
+      const activeFeatureTypeNames = new Set(activeFeatureTypesResponse.rows.map((row) => row.name));
+
+      const unknownFeatureTypeCounts: Record<string, number> = {};
+      let unknownFeatureTypeCount = 0;
+      for (const [name, count] of featureTypeCounts.entries()) {
+        if (!activeFeatureTypeNames.has(name)) {
+          unknownFeatureTypeCounts[name] = count;
+          unknownFeatureTypeCount += count;
+        }
       }
-      const duplicateSourceIds = [...sourceIdCounts.entries()]
-        .filter(([, count]) => count > 1)
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .slice(0, 5)
-        .map(([sourceId, count]) => `${sourceId}:${count}`);
 
-      const duplicateSourceHint = duplicateSourceIds.length
-        ? ` Duplicate source_id values in batch (top): ${duplicateSourceIds.join(', ')}.`
-        : '';
+      const droppedReasons: SubmissionFeatureBatchInsertResult['droppedReasons'] = [];
+      if (unknownFeatureTypeCount > 0) {
+        droppedReasons.push({
+          reason: 'unknown_feature_type_ignored',
+          count: unknownFeatureTypeCount,
+          featureTypeCounts: unknownFeatureTypeCounts
+        });
+      }
 
-      throw new IngestionValidationError(
-        `Failed to insert all submission feature records for submission_upload_id=${submissionUploadId}: ` +
-          `inserted ${insertedCount} of ${expectedCount} (missing ${missingCount}). ` +
-          `Batch feature_type_name counts: ${featureTypeSummary || 'none'}. ` +
-          `Insert path joins on feature_type.name with record_end_date IS NULL; rows are dropped when no active feature_type match exists.` +
-          duplicateSourceHint
-      );
+      const unexplainedDroppedCount = Math.max(0, missingCount - unknownFeatureTypeCount);
+      if (unexplainedDroppedCount > 0) {
+        droppedReasons.push({
+          reason: 'feature_not_inserted',
+          count: unexplainedDroppedCount
+        });
+      }
+
+      return {
+        expectedCount,
+        insertedCount,
+        droppedCount: missingCount,
+        droppedReasons
+      };
     }
+
+    return {
+      expectedCount,
+      insertedCount,
+      droppedCount: 0,
+      droppedReasons: []
+    };
   }
 
   /**

@@ -15,6 +15,13 @@ import { SubmissionFeatureIngestionService } from './submission-feature-ingestio
 import { SubmissionIngestionService } from './submission-ingestion-service';
 
 describe('SubmissionIngestionService', () => {
+  const noDroppedFeatureInsertResult = {
+    expectedCount: 1,
+    insertedCount: 1,
+    droppedCount: 0,
+    droppedReasons: []
+  };
+
   afterEach(() => {
     sinon.restore();
   });
@@ -62,7 +69,7 @@ describe('SubmissionIngestionService', () => {
         .resolves();
       const ingestFeatureBatchStub = sinon
         .stub(SubmissionFeatureIngestionService.prototype, 'ingestFeatureBatch')
-        .resolves();
+        .resolves(noDroppedFeatureInsertResult);
       const persistMediaBatchStub = sinon.stub(MediaIngestionService.prototype, 'persistUploadedMediaBatch').resolves();
       const ingestParsedCodesetsStub = sinon.stub(CodesetIngestionService.prototype, 'ingestParsedCodesets').resolves();
 
@@ -157,7 +164,7 @@ describe('SubmissionIngestionService', () => {
       const ingestParsedCodesetsStub = sinon.stub(CodesetIngestionService.prototype, 'ingestParsedCodesets').resolves();
       const ingestFeatureBatchStub = sinon
         .stub(SubmissionFeatureIngestionService.prototype, 'ingestFeatureBatch')
-        .resolves();
+        .resolves(noDroppedFeatureInsertResult);
 
       sinon.stub(biohubTarParser, 'streamSubmissionArchive').callsFake(async (_stream, options) => {
         await options.ingestMediaBatch([
@@ -194,7 +201,7 @@ describe('SubmissionIngestionService', () => {
       sinon.stub(CodesetIngestionService.prototype, 'ingestParsedCodesets').rejects(new Error('codeset persist failed'));
       const ingestFeatureBatchStub = sinon
         .stub(SubmissionFeatureIngestionService.prototype, 'ingestFeatureBatch')
-        .resolves();
+        .resolves(noDroppedFeatureInsertResult);
 
       sinon.stub(biohubTarParser, 'streamSubmissionArchive').callsFake(async (_stream, options) => {
         await options.ingestCodesets({
@@ -260,7 +267,9 @@ describe('SubmissionIngestionService', () => {
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
       sinon.stub(MediaIngestionService.prototype, 'persistUploadedMediaBatch').resolves();
       sinon.stub(CodesetIngestionService.prototype, 'ingestParsedCodesets').resolves();
-      sinon.stub(SubmissionFeatureIngestionService.prototype, 'ingestFeatureBatch').resolves();
+      sinon
+        .stub(SubmissionFeatureIngestionService.prototype, 'ingestFeatureBatch')
+        .resolves(noDroppedFeatureInsertResult);
       sinon
         .stub(biohubTarParser, 'streamSubmissionArchive')
         .resolves({ uploadedCount: 1, featureCount: 0, codesetFileCount: 1 });
@@ -271,6 +280,49 @@ describe('SubmissionIngestionService', () => {
       } catch (error) {
         expect((error as Error).message).to.equal('No feature entries were found under features/ in the archive');
       }
+    });
+
+    it('returns warning validation records when feature rows are dropped', async () => {
+      const dbConnection = getMockDBConnection();
+      const service = new SubmissionIngestionService(dbConnection);
+      setupTarballContext();
+
+      sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
+      sinon.stub(MediaIngestionService.prototype, 'persistUploadedMediaBatch').resolves();
+      sinon.stub(CodesetIngestionService.prototype, 'ingestParsedCodesets').resolves();
+      sinon.stub(SubmissionFeatureIngestionService.prototype, 'ingestFeatureBatch').resolves({
+        expectedCount: 2,
+        insertedCount: 1,
+        droppedCount: 1,
+        droppedReasons: [
+          {
+            reason: 'unknown_feature_type_ignored',
+            count: 1,
+            featureTypeCounts: { mystery: 1 }
+          }
+        ]
+      });
+      sinon
+        .stub(biohubTarParser, 'streamSubmissionArchive')
+        .resolves({ uploadedCount: 0, featureCount: 2, codesetFileCount: 0 });
+
+      const result = await service.ingestSubmissionUpload(mockSubmissionUpload);
+
+      expect(result).to.eql({
+        valid: true,
+        errors: [],
+        records: [
+          {
+            level: 'warning',
+            code: 'unknown_feature_type_ignored',
+            message: 'Ignored 1 feature row(s) with unknown or inactive feature type',
+            details: {
+              count: 1,
+              featureTypeCounts: { mystery: 1 }
+            }
+          }
+        ]
+      });
     });
   });
 });

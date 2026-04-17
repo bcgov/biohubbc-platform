@@ -9,7 +9,7 @@ import { UploadArchiveService } from '../upload/upload-archive-service';
 import { CodesetIngestionService } from './codeset-ingestion-service';
 import { MediaIngestionService } from './media-ingestion-service';
 import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
-import { IValidationResult } from './submission-ingestion-service.interface';
+import { IValidationRecord, IValidationResult } from './submission-ingestion-service.interface';
 
 const FEATURE_INSERT_BATCH_SIZE = 10000;
 const MEDIA_INGEST_BATCH_BYTES = Number(process.env.MEDIA_INGEST_BATCH_BYTES ?? 50 * 1024 * 1024);
@@ -105,6 +105,10 @@ export class SubmissionIngestionService extends DBService {
     });
 
     const s3KeyPrefix = `submissions/${submissionId}/uploads/${submissionUploadId}/media`;
+    const droppedUnknownFeatureTypeCounts = new Map<string, number>();
+    let droppedUnknownFeatureTypeCount = 0;
+    let droppedUnexplainedCount = 0;
+    let droppedFeatureCount = 0;
     const { uploadedCount, featureCount, codesetFileCount } = await streamSubmissionArchive(
       await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey),
       {
@@ -126,9 +130,34 @@ export class SubmissionIngestionService extends DBService {
         ingestCodesets: (codesets) =>
           enqueueDbWrite(() => this.codesetIngestionService.ingestParsedCodesets(submissionUploadId, codesets)),
         ingestFeatureBatch: (featureBatch) =>
-          enqueueDbWrite(() =>
-            this.featureIngestionService.ingestFeatureBatch(submissionId, submissionUploadId, featureBatch)
-          )
+          enqueueDbWrite(async () => {
+            const ingestResult = await this.featureIngestionService.ingestFeatureBatch(
+              submissionId,
+              submissionUploadId,
+              featureBatch
+            );
+
+            if (ingestResult.droppedCount > 0) {
+              droppedFeatureCount += ingestResult.droppedCount;
+
+              for (const droppedReason of ingestResult.droppedReasons) {
+                if (droppedReason.reason === 'unknown_feature_type_ignored') {
+                  droppedUnknownFeatureTypeCount += droppedReason.count;
+
+                  const featureTypeCounts = droppedReason.featureTypeCounts ?? {};
+                  for (const [featureTypeName, count] of Object.entries(featureTypeCounts)) {
+                    droppedUnknownFeatureTypeCounts.set(
+                      featureTypeName,
+                      (droppedUnknownFeatureTypeCounts.get(featureTypeName) ?? 0) + count
+                    );
+                  }
+                  continue;
+                }
+
+                droppedUnexplainedCount += droppedReason.count;
+              }
+            }
+          })
       }
     );
     await dbWriteChain;
@@ -140,6 +169,7 @@ export class SubmissionIngestionService extends DBService {
       uploadedCount,
       featureCount,
       codesetFileCount,
+      droppedFeatureCount,
       elapsedMs: Date.now() - streamStart
     });
 
@@ -158,7 +188,42 @@ export class SubmissionIngestionService extends DBService {
       elapsedMs: Date.now() - startTime
     });
 
-    return { valid: true, errors: [] };
+    const validationRecords: IValidationRecord[] = [];
+    if (droppedUnknownFeatureTypeCount > 0) {
+      validationRecords.push({
+        level: 'warning',
+        code: 'unknown_feature_type_ignored',
+        message: `Ignored ${droppedUnknownFeatureTypeCount} feature row(s) with unknown or inactive feature type`,
+        details: {
+          count: droppedUnknownFeatureTypeCount,
+          featureTypeCounts: Object.fromEntries(droppedUnknownFeatureTypeCounts.entries())
+        }
+      });
+    }
+
+    if (droppedUnexplainedCount > 0) {
+      validationRecords.push({
+        level: 'warning',
+        code: 'feature_not_inserted',
+        message: `Ignored ${droppedUnexplainedCount} feature row(s) that could not be inserted`,
+        details: {
+          count: droppedUnexplainedCount
+        }
+      });
+    }
+
+    if (validationRecords.length > 0) {
+      defaultLog.warn({
+        label: 'ingestSubmissionUpload',
+        message: 'Submission upload ingestion completed with dropped feature rows',
+        submissionUploadId,
+        submissionId,
+        droppedFeatureCount,
+        validationRecordCount: validationRecords.length
+      });
+    }
+
+    return { valid: true, errors: [], records: validationRecords };
   }
 
   /**

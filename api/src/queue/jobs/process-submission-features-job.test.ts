@@ -109,6 +109,30 @@ describe('process-submission-features-job', () => {
       expect(publishStub.called).to.be.false;
     });
 
+    it('persists completed validation metadata when ingestion has warning records', async () => {
+      const warningRecords = [
+        {
+          level: 'warning',
+          code: 'unknown_feature_type_ignored',
+          message: 'Ignored 1 feature row(s) with unknown or inactive feature type',
+          details: { count: 1, featureTypeCounts: { mystery: 1 } }
+        }
+      ];
+      sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').resolves({
+        valid: true,
+        errors: [],
+        records: warningRecords
+      });
+      sinon
+        .stub(publisher, 'publishIndexSubmissionFeaturesJob')
+        .resolves({ status: 'published', jobId: 'index-job-id' });
+
+      await processSubmissionFeaturesJobHandler([createMockJob()]);
+
+      const updateValidationStub = SubmissionValidationService.prototype.updateSubmissionValidationStatus as sinon.SinonStub;
+      expect(updateValidationStub.calledWith('test-job-id', 'completed', { records: warningRecords })).to.be.true;
+    });
+
     it('marks upload invalid and does not throw on shallow validation exceptions', async () => {
       sinon
         .stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload')

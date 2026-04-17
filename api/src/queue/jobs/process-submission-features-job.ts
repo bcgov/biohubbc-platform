@@ -111,10 +111,10 @@ async function initializeProcessSubmissionFeaturesStage(submissionUploadId: stri
 }
 
 type ProcessSubmissionFeaturesExecutionOutcome =
-  | { status: 'ok' }
+  | { status: 'ok'; validationPayload?: Record<string, unknown> }
   | {
       status: 'invalid';
-      validationPayload: { errors?: unknown[]; error?: { name: string; message: string; stack?: string } };
+      validationPayload: Record<string, unknown>;
       errorCount: number;
     };
 
@@ -151,6 +151,15 @@ async function executeProcessSubmissionFeaturesIngestion(
           status: 'invalid',
           validationPayload: { errors: ingestionResult.errors },
           errorCount: ingestionResult.errors.length
+        };
+      }
+
+      if (ingestionResult.records?.length) {
+        return {
+          status: 'ok',
+          validationPayload: {
+            records: ingestionResult.records
+          }
         };
       }
 
@@ -208,7 +217,7 @@ async function finalizeProcessSubmissionFeaturesStage(
     const submissionUploadService = new SubmissionUploadService(connection);
     const uploadArchiveService = new UploadArchiveService(connection);
 
-    await submissionValidationService.updateSubmissionValidationStatus(jobId, 'completed');
+    await submissionValidationService.updateSubmissionValidationStatus(jobId, 'completed', outcome.validationPayload);
     await submissionUploadService.transitionSubmissionUploadToIngested(submissionUpload.submission_upload_id);
 
     await uploadArchiveService.updateUploadArchivesByUploadId(submissionUpload.upload_id, {
