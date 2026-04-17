@@ -78,7 +78,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
         status: 'invalid',
         errorCount: 1,
         errorCounts: [{ error_code: 'TYPE_MISMATCH', error_count: 1 }],
-        errorSamples: []
+        errorSummaries: []
       });
 
     await indexSubmissionFeaturesJobHandler([createMockJob(777)]);

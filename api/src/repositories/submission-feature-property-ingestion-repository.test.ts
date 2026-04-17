@@ -40,7 +40,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
   });
 
   describe('populateDatetimeCandidateStagingBySubmissionUploadId', () => {
-    it('builds candidates from typed staging with inline valid-value filtering', async () => {
+    it('builds candidates directly from typed staging rows', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
@@ -52,7 +52,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       expect(sqlStub.calledOnce).to.equal(true);
       const sqlText = sqlStub.firstCall.args[0].text as string;
       expect(sqlText).to.include('FROM submission_upload_staging_typed_property_value v');
-      expect(sqlText).to.include('NOT EXISTS');
+      expect(sqlText).to.include("WHERE v.property_type_name = 'datetime'");
       expect(sqlText).to.not.include('submission_upload_staging_valid_property_value');
     });
   });
@@ -89,16 +89,15 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
     });
   });
 
-  describe('getIngestionErrorSamplesBySubmissionUploadId', () => {
-    it('returns sample rows', async () => {
+  describe('getIngestionErrorSummariesBySubmissionUploadId', () => {
+    it('returns summary rows', async () => {
       const rows = [
         {
-          submission_feature_id: 11,
           property_name: 'count',
           feature_type_property_id: 22,
           error_code: 'TYPE_MISMATCH',
           error_message: 'Property value type mismatch',
-          raw_value: 'abc',
+          count: 3,
           details: null
         }
       ];
@@ -107,7 +106,7 @@ describe('SubmissionFeaturePropertyIngestionRepository', () => {
       });
       const repository = new SubmissionFeaturePropertyIngestionRepository(mockDBConnection);
 
-      const result = await repository.getIngestionErrorSamplesBySubmissionUploadId(
+      const result = await repository.getIngestionErrorSummariesBySubmissionUploadId(
         '550e8400-e29b-41d4-a716-446655440000',
         10
       );

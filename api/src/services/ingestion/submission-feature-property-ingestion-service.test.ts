@@ -281,15 +281,14 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
       .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'getIngestionErrorCountsByCode')
       .resolves([{ error_code: 'TYPE_MISMATCH', error_count: 2 }]);
     sinon
-      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'getIngestionErrorSamplesBySubmissionUploadId')
+      .stub(SubmissionFeaturePropertyIngestionRepository.prototype, 'getIngestionErrorSummariesBySubmissionUploadId')
       .resolves([
         {
-          submission_feature_id: 11,
           property_name: 'count',
           feature_type_property_id: 22,
           error_code: 'TYPE_MISMATCH',
           error_message: 'Property value type mismatch',
-          raw_value: 'bad',
+          count: 2,
           details: null
         }
       ]);
@@ -304,7 +303,7 @@ describe('SubmissionFeaturePropertyIngestionService', () => {
     if (outcome.status === 'invalid') {
       expect(outcome.errorCount).to.equal(2);
       expect(outcome.errorCounts).to.eql([{ error_code: 'TYPE_MISMATCH', error_count: 2 }]);
-      expect(outcome.errorSamples).to.have.length(1);
+      expect(outcome.errorSummaries).to.have.length(1);
     }
   });
 });

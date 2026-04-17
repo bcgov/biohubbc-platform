@@ -16,15 +16,14 @@ export const IngestionErrorTotalCountRow = z.object({
 });
 
 /**
- * Deep-validation error sample row for diagnostics/logging.
+ * Deep-validation aggregated error summary row for diagnostics/logging.
  */
-export const IngestionErrorSampleRow = z.object({
-  submission_feature_id: z.number().nullable(),
+export const IngestionErrorSummaryRow = z.object({
   property_name: z.string().nullable(),
   feature_type_property_id: z.number().nullable(),
   error_code: z.string(),
   error_message: z.string(),
-  raw_value: z.any().nullable(),
+  count: z.number(),
   details: z.any().nullable()
 });
 
@@ -39,6 +38,6 @@ export type IngestionErrorCount = z.infer<typeof IngestionErrorCountRow>;
 export type IngestionErrorTotalCount = z.infer<typeof IngestionErrorTotalCountRow>;
 
 /**
- * Representative deep-validation error sample for diagnostics/logging.
+ * Representative deep-validation aggregated error summary for diagnostics/logging.
  */
-export type IngestionErrorSample = z.infer<typeof IngestionErrorSampleRow>;
+export type IngestionErrorSummary = z.infer<typeof IngestionErrorSummaryRow>;

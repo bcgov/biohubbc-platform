@@ -1,10 +1,10 @@
 import SQL from 'sql-template-strings';
 import {
   IngestionErrorCountRow,
-  IngestionErrorSampleRow,
+  IngestionErrorSummaryRow,
   IngestionErrorTotalCountRow,
   IngestionErrorCount,
-  IngestionErrorSample
+  IngestionErrorSummary
 } from '../models/submission-feature-property-ingestion';
 import { getLogger } from '../utils/logger';
 import { BaseRepository } from './base-repository';
@@ -467,14 +467,6 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.logical_value
         FROM submission_upload_staging_typed_property_value v
         WHERE v.submission_upload_id = ${submissionUploadId}::uuid
-          AND NOT EXISTS (
-            SELECT 1
-            FROM submission_feature_error e
-            WHERE e.submission_upload_id = ${submissionUploadId}::uuid
-              AND e.submission_feature_id = v.submission_feature_id
-              AND e.feature_type_property_id = v.feature_type_property_id
-              AND COALESCE(e.property_name, '') = COALESCE(v.property_name, '')
-          )
       ),
       candidates AS (
         SELECT
@@ -540,14 +532,6 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.logical_value
         FROM submission_upload_staging_typed_property_value v
         WHERE v.submission_upload_id = ${submissionUploadId}::uuid
-          AND NOT EXISTS (
-            SELECT 1
-            FROM submission_feature_error e
-            WHERE e.submission_upload_id = ${submissionUploadId}::uuid
-              AND e.submission_feature_id = v.submission_feature_id
-              AND e.feature_type_property_id = v.feature_type_property_id
-              AND COALESCE(e.property_name, '') = COALESCE(v.property_name, '')
-          )
       ),
       candidates AS (
         SELECT
@@ -645,14 +629,6 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.logical_value
         FROM submission_upload_staging_typed_property_value v
         WHERE v.submission_upload_id = ${submissionUploadId}::uuid
-          AND NOT EXISTS (
-            SELECT 1
-            FROM submission_feature_error e
-            WHERE e.submission_upload_id = ${submissionUploadId}::uuid
-              AND e.submission_feature_id = v.submission_feature_id
-              AND e.feature_type_property_id = v.feature_type_property_id
-              AND COALESCE(e.property_name, '') = COALESCE(v.property_name, '')
-          )
       ),
       candidates AS (
         SELECT
@@ -728,14 +704,6 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.logical_value
         FROM submission_upload_staging_typed_property_value v
         WHERE v.submission_upload_id = ${submissionUploadId}::uuid
-          AND NOT EXISTS (
-            SELECT 1
-            FROM submission_feature_error e
-            WHERE e.submission_upload_id = ${submissionUploadId}::uuid
-              AND e.submission_feature_id = v.submission_feature_id
-              AND e.feature_type_property_id = v.feature_type_property_id
-              AND COALESCE(e.property_name, '') = COALESCE(v.property_name, '')
-          )
       )
       SELECT
         v.submission_upload_id,
@@ -789,14 +757,6 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           v.logical_value
         FROM submission_upload_staging_typed_property_value v
         WHERE v.submission_upload_id = ${submissionUploadId}::uuid
-          AND NOT EXISTS (
-            SELECT 1
-            FROM submission_feature_error e
-            WHERE e.submission_upload_id = ${submissionUploadId}::uuid
-              AND e.submission_feature_id = v.submission_feature_id
-              AND e.feature_type_property_id = v.feature_type_property_id
-              AND COALESCE(e.property_name, '') = COALESCE(v.property_name, '')
-          )
       ),
       candidates AS (
         SELECT
@@ -879,33 +839,54 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
           AND rsp.value IS NOT NULL
           AND rsp.value <> 'null'::jsonb
           AND NOT (jsonb_typeof(rsp.value) = 'array' AND jsonb_array_length(rsp.value) = 0)
+      ),
+      grouped_errors AS (
+        SELECT
+          sf.submission_upload_id,
+          rp.property_name,
+          rp.feature_type_property_id,
+          'MISSING_REQUIRED_PROPERTY'::text AS error_code,
+          'Missing required property value'::text AS error_message,
+          COUNT(*)::integer AS count
+        FROM submission_feature sf
+        JOIN required_properties rp
+          ON rp.feature_type_id = sf.feature_type_id
+        LEFT JOIN present_properties pp
+          ON pp.submission_feature_id = sf.submission_feature_id
+         AND pp.feature_type_property_id = rp.feature_type_property_id
+        WHERE sf.submission_upload_id = ${submissionUploadId}::uuid
+          AND sf.record_end_date IS NULL
+          AND pp.submission_feature_id IS NULL
+        GROUP BY sf.submission_upload_id, rp.feature_type_property_id, rp.property_name
       )
       INSERT INTO submission_feature_error (
         submission_upload_id,
-        submission_feature_id,
         property_name,
         feature_type_property_id,
         error_code,
         error_message,
-        raw_value
+        count,
+        details
       )
       SELECT
-        sf.submission_upload_id,
-        sf.submission_feature_id,
-        rp.property_name,
-        rp.feature_type_property_id,
-        'MISSING_REQUIRED_PROPERTY',
-        'Missing required property value',
+        submission_upload_id,
+        property_name,
+        feature_type_property_id,
+        error_code,
+        error_message,
+        count,
         NULL::jsonb
-      FROM submission_feature sf
-      JOIN required_properties rp
-        ON rp.feature_type_id = sf.feature_type_id
-      LEFT JOIN present_properties pp
-        ON pp.submission_feature_id = sf.submission_feature_id
-       AND pp.feature_type_property_id = rp.feature_type_property_id
-      WHERE sf.submission_upload_id = ${submissionUploadId}::uuid
-        AND sf.record_end_date IS NULL
-        AND pp.submission_feature_id IS NULL;
+      FROM grouped_errors
+      ON CONFLICT (
+        submission_upload_id,
+        error_code,
+        feature_type_property_id,
+        property_name
+      )
+      DO UPDATE SET
+        count = submission_feature_error.count + EXCLUDED.count,
+        error_message = EXCLUDED.error_message,
+        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
     `;
 
     await this.executeUploadScopedPhase('record required property validation errors', submissionUploadId, sql);
@@ -927,12 +908,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       WITH cardinality_errors AS (
         SELECT
           m.submission_upload_id,
-          m.submission_feature_id,
           m.property_name,
           m.feature_type_property_id,
           'MULTIPLE_VALUES_NOT_ALLOWED'::text AS error_code,
-          'Property does not allow multiple values'::text AS error_message,
-          m.value AS raw_value
+          'Property does not allow multiple values'::text AS error_message
         FROM submission_upload_staging_resolved_property m
         WHERE m.feature_type_property_id IS NOT NULL
           AND m.submission_upload_id = ${submissionUploadId}::uuid
@@ -942,7 +921,6 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       type_errors AS (
         SELECT
           v.submission_upload_id,
-          v.submission_feature_id,
           v.property_name,
           v.feature_type_property_id,
           CASE
@@ -951,11 +929,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
             ELSE 'TYPE_MISMATCH'
           END AS error_code,
           CASE
-            WHEN v.property_type_name = 'taxon' THEN 'Taxon property value must be an integer TSN'
-            WHEN v.property_type_name = 'spatial' THEN 'Spatial property value must be a GeoJSON object'
+            WHEN v.property_type_name = 'taxon' THEN 'Invalid taxon value'
+            WHEN v.property_type_name = 'spatial' THEN 'Invalid spatial value'
             ELSE 'Property value type mismatch'
-          END AS error_message,
-          v.logical_value AS raw_value
+          END AS error_message
         FROM submission_upload_staging_typed_property_value v
         WHERE
           v.submission_upload_id = ${submissionUploadId}::uuid
@@ -988,12 +965,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       unsupported_type_errors AS (
         SELECT
           m.submission_upload_id,
-          m.submission_feature_id,
           m.property_name,
           m.feature_type_property_id,
           'UNSUPPORTED_PROPERTY_TYPE'::text AS error_code,
-          'Unsupported property type'::text AS error_message,
-          m.value AS raw_value
+          'Unsupported property type'::text AS error_message
         FROM submission_upload_staging_resolved_property m
         WHERE m.feature_type_property_id IS NOT NULL
           AND m.submission_upload_id = ${submissionUploadId}::uuid
@@ -1007,21 +982,57 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
             'code',
             'taxon'
           )
+      ),
+      grouped_errors AS (
+        SELECT
+          aggregated.submission_upload_id,
+          aggregated.property_name,
+          aggregated.feature_type_property_id,
+          aggregated.error_code,
+          aggregated.error_message,
+          COUNT(*)::integer AS count
+        FROM (
+          SELECT * FROM cardinality_errors
+          UNION ALL
+          SELECT * FROM type_errors
+          UNION ALL
+          SELECT * FROM unsupported_type_errors
+        ) AS aggregated
+        GROUP BY
+          aggregated.submission_upload_id,
+          aggregated.property_name,
+          aggregated.feature_type_property_id,
+          aggregated.error_code,
+          aggregated.error_message
       )
       INSERT INTO submission_feature_error (
         submission_upload_id,
-        submission_feature_id,
         property_name,
         feature_type_property_id,
         error_code,
         error_message,
-        raw_value
+        count,
+        details
       )
-      SELECT * FROM cardinality_errors
-      UNION ALL
-      SELECT * FROM type_errors
-      UNION ALL
-      SELECT * FROM unsupported_type_errors;
+      SELECT
+        submission_upload_id,
+        property_name,
+        feature_type_property_id,
+        error_code,
+        error_message,
+        count,
+        NULL::jsonb
+      FROM grouped_errors
+      ON CONFLICT (
+        submission_upload_id,
+        error_code,
+        feature_type_property_id,
+        property_name
+      )
+      DO UPDATE SET
+        count = submission_feature_error.count + EXCLUDED.count,
+        error_message = EXCLUDED.error_message,
+        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
     `;
 
     await this.connection.sql(sql);
@@ -1042,13 +1053,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       WITH format_errors AS (
         SELECT
           c.submission_upload_id,
-          c.submission_feature_id,
           c.property_name,
           c.feature_type_property_id,
           'INVALID_CODE_REFERENCE_FORMAT'::text AS error_code,
-          'Code property value must match code::<contributor-codeset-key>::<contributor-codeset-code-key>'::text AS error_message,
-          c.raw_value,
-          NULL::jsonb AS details
+          'Code property value must match code::<contributor-codeset-key>::<contributor-codeset-code-key>'::text AS error_message
         FROM submission_upload_staging_code_candidate c
         WHERE c.submission_upload_id = ${submissionUploadId}::uuid
           AND NOT c.is_format_valid
@@ -1056,31 +1064,63 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       unresolved AS (
         SELECT
           c.submission_upload_id,
-          c.submission_feature_id,
           c.property_name,
           c.feature_type_property_id,
           'UNRESOLVED_CODE_REFERENCE'::text AS error_code,
-          'Failed to resolve code slug to contributor_codeset_code_id'::text AS error_message,
-          c.raw_value,
-          jsonb_build_object('normalized_code_slug', c.normalized_slug) AS details
+          'Failed to resolve code slug to contributor_codeset_code_id'::text AS error_message
         FROM submission_upload_staging_code_candidate c
         WHERE c.submission_upload_id = ${submissionUploadId}::uuid
           AND c.is_format_valid
           AND c.contributor_codeset_code_id IS NULL
+      ),
+      grouped_errors AS (
+        SELECT
+          aggregated.submission_upload_id,
+          aggregated.property_name,
+          aggregated.feature_type_property_id,
+          aggregated.error_code,
+          aggregated.error_message,
+          COUNT(*)::integer AS count
+        FROM (
+          SELECT * FROM format_errors
+          UNION ALL
+          SELECT * FROM unresolved
+        ) AS aggregated
+        GROUP BY
+          aggregated.submission_upload_id,
+          aggregated.property_name,
+          aggregated.feature_type_property_id,
+          aggregated.error_code,
+          aggregated.error_message
       )
       INSERT INTO submission_feature_error (
         submission_upload_id,
-        submission_feature_id,
         property_name,
         feature_type_property_id,
         error_code,
         error_message,
-        raw_value,
+        count,
         details
       )
-      SELECT * FROM format_errors
-      UNION ALL
-      SELECT * FROM unresolved;
+      SELECT
+        submission_upload_id,
+        property_name,
+        feature_type_property_id,
+        error_code,
+        error_message,
+        count,
+        NULL::jsonb
+      FROM grouped_errors
+      ON CONFLICT (
+        submission_upload_id,
+        error_code,
+        feature_type_property_id,
+        property_name
+      )
+      DO UPDATE SET
+        count = submission_feature_error.count + EXCLUDED.count,
+        error_message = EXCLUDED.error_message,
+        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
     `;
 
     await this.connection.sql(sql);
@@ -1094,26 +1134,47 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    */
   async recordTaxonPropertyResolutionErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
+      WITH grouped_errors AS (
+        SELECT
+          c.submission_upload_id,
+          c.property_name,
+          c.feature_type_property_id,
+          'UNRESOLVED_TAXON'::text AS error_code,
+          'Failed to resolve taxon TSN to taxon_id'::text AS error_message,
+          COUNT(*)::integer AS count
+        FROM submission_upload_staging_taxon_candidate c
+        WHERE c.submission_upload_id = ${submissionUploadId}::uuid
+          AND c.taxon_id IS NULL
+        GROUP BY c.submission_upload_id, c.property_name, c.feature_type_property_id
+      )
       INSERT INTO submission_feature_error (
         submission_upload_id,
-        submission_feature_id,
         property_name,
         feature_type_property_id,
         error_code,
         error_message,
-        raw_value
+        count,
+        details
       )
       SELECT
-        c.submission_upload_id,
-        c.submission_feature_id,
-        c.property_name,
-        c.feature_type_property_id,
-        'UNRESOLVED_TAXON',
-        'Failed to resolve taxon TSN to taxon_id',
-        c.raw_value
-      FROM submission_upload_staging_taxon_candidate c
-      WHERE c.submission_upload_id = ${submissionUploadId}::uuid
-        AND c.taxon_id IS NULL;
+        submission_upload_id,
+        property_name,
+        feature_type_property_id,
+        error_code,
+        error_message,
+        count,
+        NULL::jsonb
+      FROM grouped_errors
+      ON CONFLICT (
+        submission_upload_id,
+        error_code,
+        feature_type_property_id,
+        property_name
+      )
+      DO UPDATE SET
+        count = submission_feature_error.count + EXCLUDED.count,
+        error_message = EXCLUDED.error_message,
+        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
     `;
 
     await this.connection.sql(sql);
@@ -1130,13 +1191,10 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       WITH normalized_empty AS (
         SELECT
           n.submission_upload_id,
-          n.submission_feature_id,
           n.property_name,
           n.feature_type_property_id,
           'INVALID_ARTIFACT_REFERENCE'::text AS error_code,
-          'Artifact key resolved to an empty normalized reference'::text AS error_message,
-          n.raw_value,
-          NULL::jsonb AS details
+          'Artifact key resolved to an empty normalized reference'::text AS error_message
         FROM submission_upload_staging_artifact_candidate n
         WHERE n.submission_upload_id = ${submissionUploadId}::uuid
           AND COALESCE(n.normalized_reference, '') = ''
@@ -1144,31 +1202,63 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       unresolved AS (
         SELECT
           n.submission_upload_id,
-          n.submission_feature_id,
           n.property_name,
           n.feature_type_property_id,
           'UNRESOLVED_ARTIFACT_REFERENCE'::text AS error_code,
-          'Failed to resolve artifact reference to artifact_id'::text AS error_message,
-          n.raw_value,
-          jsonb_build_object('normalized_reference', n.normalized_reference) AS details
+          'Failed to resolve artifact reference to artifact_id'::text AS error_message
         FROM submission_upload_staging_artifact_candidate n
         WHERE n.submission_upload_id = ${submissionUploadId}::uuid
           AND COALESCE(n.normalized_reference, '') <> ''
           AND n.artifact_id IS NULL
+      ),
+      grouped_errors AS (
+        SELECT
+          aggregated.submission_upload_id,
+          aggregated.property_name,
+          aggregated.feature_type_property_id,
+          aggregated.error_code,
+          aggregated.error_message,
+          COUNT(*)::integer AS count
+        FROM (
+          SELECT * FROM normalized_empty
+          UNION ALL
+          SELECT * FROM unresolved
+        ) AS aggregated
+        GROUP BY
+          aggregated.submission_upload_id,
+          aggregated.property_name,
+          aggregated.feature_type_property_id,
+          aggregated.error_code,
+          aggregated.error_message
       )
       INSERT INTO submission_feature_error (
         submission_upload_id,
-        submission_feature_id,
         property_name,
         feature_type_property_id,
         error_code,
         error_message,
-        raw_value,
+        count,
         details
       )
-      SELECT * FROM normalized_empty
-      UNION ALL
-      SELECT * FROM unresolved;
+      SELECT
+        submission_upload_id,
+        property_name,
+        feature_type_property_id,
+        error_code,
+        error_message,
+        count,
+        NULL::jsonb
+      FROM grouped_errors
+      ON CONFLICT (
+        submission_upload_id,
+        error_code,
+        feature_type_property_id,
+        property_name
+      )
+      DO UPDATE SET
+        count = submission_feature_error.count + EXCLUDED.count,
+        error_message = EXCLUDED.error_message,
+        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
     `;
 
     await this.connection.sql(sql);
@@ -1185,27 +1275,48 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    */
   async recordDatetimeNormalizationErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
+      WITH grouped_errors AS (
+        SELECT
+          p.submission_upload_id,
+          p.property_name,
+          p.feature_type_property_id,
+          'INVALID_TIMESTAMP_VALUE'::text AS error_code,
+          'Invalid timestamp property value'::text AS error_message,
+          COUNT(*)::integer AS count
+        FROM submission_upload_staging_datetime_candidate p
+        WHERE p.submission_upload_id = ${submissionUploadId}::uuid
+          AND p.date_value IS NULL
+          AND p.time_value IS NULL
+        GROUP BY p.submission_upload_id, p.property_name, p.feature_type_property_id
+      )
       INSERT INTO submission_feature_error (
         submission_upload_id,
-        submission_feature_id,
         property_name,
         feature_type_property_id,
         error_code,
         error_message,
-        raw_value
+        count,
+        details
       )
       SELECT
-        p.submission_upload_id,
-        p.submission_feature_id,
-        p.property_name,
-        p.feature_type_property_id,
-        'INVALID_TIMESTAMP_VALUE',
-        'Invalid timestamp property value',
-        p.raw_value
-      FROM submission_upload_staging_datetime_candidate p
-      WHERE p.submission_upload_id = ${submissionUploadId}::uuid
-        AND p.date_value IS NULL
-        AND p.time_value IS NULL;
+        submission_upload_id,
+        property_name,
+        feature_type_property_id,
+        error_code,
+        error_message,
+        count,
+        NULL::jsonb
+      FROM grouped_errors
+      ON CONFLICT (
+        submission_upload_id,
+        error_code,
+        feature_type_property_id,
+        property_name
+      )
+      DO UPDATE SET
+        count = submission_feature_error.count + EXCLUDED.count,
+        error_message = EXCLUDED.error_message,
+        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
     `;
 
     await this.connection.sql(sql);
@@ -1249,32 +1360,51 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    */
   async recordSpatialNormalizationErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
+      WITH grouped_errors AS (
+        SELECT
+          p.submission_upload_id,
+          p.property_name,
+          p.feature_type_property_id,
+          'INVALID_SPATIAL_VALUE'::text AS error_code,
+          'Invalid spatial value'::text AS error_message,
+          COUNT(*)::integer AS count
+        FROM submission_upload_staging_spatial_candidate p
+        WHERE p.submission_upload_id = ${submissionUploadId}::uuid
+          AND (
+            p.geometry_json IS NULL
+            OR p.parsed_geom IS NULL
+            OR NOT public.ST_IsValid(p.parsed_geom)
+          )
+        GROUP BY p.submission_upload_id, p.property_name, p.feature_type_property_id
+      )
       INSERT INTO submission_feature_error (
         submission_upload_id,
-        submission_feature_id,
         property_name,
         feature_type_property_id,
         error_code,
         error_message,
-        raw_value,
+        count,
         details
       )
       SELECT
-        p.submission_upload_id,
-        p.submission_feature_id,
-        p.property_name,
-        p.feature_type_property_id,
-        'INVALID_SPATIAL_VALUE',
-        'Invalid geometry value for geometry property',
-        p.logical_value,
-        jsonb_build_object('reason', p.validity_reason)
-      FROM submission_upload_staging_spatial_candidate p
-      WHERE p.submission_upload_id = ${submissionUploadId}::uuid
-        AND (
-          p.geometry_json IS NULL
-         OR p.parsed_geom IS NULL
-         OR NOT public.ST_IsValid(p.parsed_geom)
-        );
+        submission_upload_id,
+        property_name,
+        feature_type_property_id,
+        error_code,
+        error_message,
+        count,
+        NULL::jsonb
+      FROM grouped_errors
+      ON CONFLICT (
+        submission_upload_id,
+        error_code,
+        feature_type_property_id,
+        property_name
+      )
+      DO UPDATE SET
+        count = submission_feature_error.count + EXCLUDED.count,
+        error_message = EXCLUDED.error_message,
+        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
     `;
 
     await this.connection.sql(sql);
@@ -1326,15 +1456,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       FROM submission_upload_staging_typed_property_value v
       WHERE v.submission_upload_id = ${submissionUploadId}::uuid
         AND v.property_type_name = 'string'
-        AND jsonb_typeof(v.logical_value) = 'string'
-        AND NOT EXISTS (
-          SELECT 1
-          FROM submission_feature_error e
-          WHERE e.submission_upload_id = ${submissionUploadId}::uuid
-            AND e.submission_feature_id = v.submission_feature_id
-            AND e.feature_type_property_id = v.feature_type_property_id
-            AND COALESCE(e.property_name, '') = COALESCE(v.property_name, '')
-        );
+        AND jsonb_typeof(v.logical_value) = 'string';
     `;
 
     await this.connection.sql(sql);
@@ -1360,15 +1482,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       FROM submission_upload_staging_typed_property_value v
       WHERE v.submission_upload_id = ${submissionUploadId}::uuid
         AND v.property_type_name = 'number'
-        AND jsonb_typeof(v.logical_value) = 'number'
-        AND NOT EXISTS (
-          SELECT 1
-          FROM submission_feature_error e
-          WHERE e.submission_upload_id = ${submissionUploadId}::uuid
-            AND e.submission_feature_id = v.submission_feature_id
-            AND e.feature_type_property_id = v.feature_type_property_id
-            AND COALESCE(e.property_name, '') = COALESCE(v.property_name, '')
-        );
+        AND jsonb_typeof(v.logical_value) = 'number';
     `;
 
     await this.connection.sql(sql);
@@ -1394,15 +1508,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       FROM submission_upload_staging_typed_property_value v
       WHERE v.submission_upload_id = ${submissionUploadId}::uuid
         AND v.property_type_name = 'boolean'
-        AND jsonb_typeof(v.logical_value) = 'boolean'
-        AND NOT EXISTS (
-          SELECT 1
-          FROM submission_feature_error e
-          WHERE e.submission_upload_id = ${submissionUploadId}::uuid
-            AND e.submission_feature_id = v.submission_feature_id
-            AND e.feature_type_property_id = v.feature_type_property_id
-            AND COALESCE(e.property_name, '') = COALESCE(v.property_name, '')
-        );
+        AND jsonb_typeof(v.logical_value) = 'boolean';
     `;
 
     await this.connection.sql(sql);
@@ -1570,35 +1676,63 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
         WHERE sf.submission_upload_id = ${submissionUploadId}::uuid
           AND sf.record_end_date IS NULL
           AND btrim(content_item.reference_source_id) <> ''
+      ),
+      error_rows AS (
+        SELECT
+          CASE
+            WHEN target.submission_feature_id IS NULL THEN 'UNRESOLVED_REFERENCE'
+            ELSE 'INVALID_SELF_REFERENCE'
+          END AS error_code,
+          CASE
+            WHEN target.submission_feature_id IS NULL THEN 'Failed to resolve feature reference source_id within upload'
+            ELSE 'Feature reference cannot point to itself'
+          END AS error_message,
+          COUNT(*)::integer AS count
+        FROM expanded e
+        LEFT JOIN submission_feature target
+          ON target.submission_upload_id = ${submissionUploadId}::uuid
+         AND target.record_end_date IS NULL
+         AND target.source_id = e.reference_source_id
+        WHERE target.submission_feature_id IS NULL
+           OR target.submission_feature_id = e.source_feature_id
+      ),
+      grouped_errors AS (
+        SELECT
+          ${submissionUploadId}::uuid AS submission_upload_id,
+          error_rows.error_code,
+          error_rows.error_message,
+          COUNT(*)::integer AS count
+        FROM error_rows
+        GROUP BY error_rows.error_code, error_rows.error_message
       )
       INSERT INTO submission_feature_error (
         submission_upload_id,
-        submission_feature_id,
+        property_name,
+        feature_type_property_id,
         error_code,
         error_message,
-        raw_value,
+        count,
         details
       )
       SELECT
-        ${submissionUploadId}::uuid,
-        e.source_feature_id,
-        CASE
-          WHEN target.submission_feature_id IS NULL THEN 'UNRESOLVED_REFERENCE'
-          ELSE 'INVALID_SELF_REFERENCE'
-        END,
-        CASE
-          WHEN target.submission_feature_id IS NULL THEN 'Failed to resolve feature reference source_id within upload'
-          ELSE 'Feature reference cannot point to itself'
-        END,
-        to_jsonb(e.reference_source_id),
-        jsonb_build_object('reference_source_id', e.reference_source_id)
-      FROM expanded e
-      LEFT JOIN submission_feature target
-        ON target.submission_upload_id = ${submissionUploadId}::uuid
-       AND target.record_end_date IS NULL
-       AND target.source_id = e.reference_source_id
-      WHERE target.submission_feature_id IS NULL
-         OR target.submission_feature_id = e.source_feature_id;
+        submission_upload_id,
+        NULL::text,
+        NULL::integer,
+        error_code,
+        error_message,
+        count,
+        NULL::jsonb
+      FROM grouped_errors
+      ON CONFLICT (
+        submission_upload_id,
+        error_code,
+        feature_type_property_id,
+        property_name
+      )
+      DO UPDATE SET
+        count = submission_feature_error.count + EXCLUDED.count,
+        error_message = EXCLUDED.error_message,
+        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
     `;
 
     await this.connection.sql(sql);
@@ -1612,30 +1746,50 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    */
   async recordUnresolvedParentErrorsBySubmissionUploadId(submissionUploadId: string): Promise<void> {
     const sql = SQL`
+      WITH grouped_errors AS (
+        SELECT
+          ${submissionUploadId}::uuid AS submission_upload_id,
+          'UNRESOLVED_PARENT'::text AS error_code,
+          'Failed to resolve parent feature source_id within upload'::text AS error_message,
+          COUNT(*)::integer AS count
+        FROM submission_feature child
+        LEFT JOIN submission_feature parent
+          ON parent.submission_upload_id = child.submission_upload_id
+         AND parent.record_end_date IS NULL
+         AND parent.source_id = NULLIF(child.data ->> 'parent', '')
+        WHERE child.submission_upload_id = ${submissionUploadId}::uuid
+          AND child.record_end_date IS NULL
+          AND NULLIF(child.data ->> 'parent', '') IS NOT NULL
+          AND parent.submission_feature_id IS NULL
+      )
       INSERT INTO submission_feature_error (
         submission_upload_id,
-        submission_feature_id,
+        property_name,
+        feature_type_property_id,
         error_code,
         error_message,
-        raw_value,
+        count,
         details
       )
       SELECT
-        ${submissionUploadId}::uuid,
-        child.submission_feature_id,
-        'UNRESOLVED_PARENT',
-        'Failed to resolve parent feature source_id within upload',
-        to_jsonb(NULLIF(child.data ->> 'parent', '')),
-        jsonb_build_object('parent_source_id', NULLIF(child.data ->> 'parent', ''))
-      FROM submission_feature child
-      LEFT JOIN submission_feature parent
-        ON parent.submission_upload_id = child.submission_upload_id
-       AND parent.record_end_date IS NULL
-       AND parent.source_id = NULLIF(child.data ->> 'parent', '')
-      WHERE child.submission_upload_id = ${submissionUploadId}::uuid
-        AND child.record_end_date IS NULL
-        AND NULLIF(child.data ->> 'parent', '') IS NOT NULL
-        AND parent.submission_feature_id IS NULL;
+        submission_upload_id,
+        NULL::text,
+        NULL::integer,
+        error_code,
+        error_message,
+        count,
+        NULL::jsonb
+      FROM grouped_errors
+      ON CONFLICT (
+        submission_upload_id,
+        error_code,
+        feature_type_property_id,
+        property_name
+      )
+      DO UPDATE SET
+        count = submission_feature_error.count + EXCLUDED.count,
+        error_message = EXCLUDED.error_message,
+        details = COALESCE(EXCLUDED.details, submission_feature_error.details);
     `;
 
     await this.connection.sql(sql);
@@ -1649,7 +1803,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
    */
   async getIngestionErrorCountBySubmissionUploadId(submissionUploadId: string): Promise<number> {
     const sql = SQL`
-      SELECT COUNT(*)::integer AS count
+      SELECT COALESCE(SUM(count), 0)::integer AS count
       FROM submission_feature_error
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
@@ -1668,7 +1822,7 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
     const sql = SQL`
       SELECT
         error_code,
-        COUNT(*)::integer AS error_count
+        SUM(count)::integer AS error_count
       FROM submission_feature_error
       WHERE submission_upload_id = ${submissionUploadId}::uuid
       GROUP BY error_code
@@ -1680,32 +1834,31 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
   }
 
   /**
-   * Get representative sample ingestion errors for one upload.
+   * Get upload-scoped aggregated ingestion error summaries for one upload.
    *
    * @param {string} submissionUploadId Upload scope.
    * @param {number} [limit=25] Max rows to return.
-   * @returns {Promise<IngestionErrorSample[]>}
+   * @returns {Promise<IngestionErrorSummary[]>}
    */
-  async getIngestionErrorSamplesBySubmissionUploadId(
+  async getIngestionErrorSummariesBySubmissionUploadId(
     submissionUploadId: string,
     limit = 25
-  ): Promise<IngestionErrorSample[]> {
+  ): Promise<IngestionErrorSummary[]> {
     const sql = SQL`
       SELECT
-        submission_feature_id,
         property_name,
         feature_type_property_id,
         error_code,
         error_message,
-        raw_value,
+        count,
         details
       FROM submission_feature_error
       WHERE submission_upload_id = ${submissionUploadId}::uuid
-      ORDER BY submission_feature_error_id ASC
+      ORDER BY count DESC, error_code ASC
       LIMIT ${limit};
     `;
 
-    const response = await this.connection.sql(sql, IngestionErrorSampleRow);
+    const response = await this.connection.sql(sql, IngestionErrorSummaryRow);
     return response.rows;
   }
 }

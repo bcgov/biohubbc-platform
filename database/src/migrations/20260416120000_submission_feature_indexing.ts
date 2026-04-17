@@ -376,81 +376,61 @@ export async function up(knex: Knex): Promise<void> {
       'Foreign key to the artifact table.';
 
     --------------------------------------------------------------------------------
-    -- 4) Add durable submission_feature_error validation snapshot table
+    -- 4) Add durable upload-scoped submission_feature_error validation summary table
     --------------------------------------------------------------------------------
     CREATE TABLE submission_feature_error (
       submission_feature_error_id integer GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
       submission_upload_id uuid NOT NULL,
-      submission_feature_id integer NOT NULL,
       feature_type_property_id integer,
       property_name text,
       error_code text NOT NULL,
       error_message text NOT NULL,
-      raw_value jsonb,
+      count integer NOT NULL,
       details jsonb,
       CONSTRAINT submission_feature_error_pk PRIMARY KEY (submission_feature_error_id),
       CONSTRAINT submission_feature_error_fk1
         FOREIGN KEY (submission_upload_id)
         REFERENCES submission_upload(submission_upload_id),
       CONSTRAINT submission_feature_error_fk2
-        FOREIGN KEY (submission_feature_id)
-        REFERENCES submission_feature(submission_feature_id),
-      CONSTRAINT submission_feature_error_fk3
         FOREIGN KEY (feature_type_property_id)
         REFERENCES feature_type_property(feature_type_property_id)
     );
 
     CREATE INDEX submission_feature_error_idx1 ON submission_feature_error(submission_upload_id);
-    CREATE INDEX submission_feature_error_idx2 ON submission_feature_error(submission_feature_id);
-    CREATE INDEX submission_feature_error_idx3 ON submission_feature_error(feature_type_property_id);
-    CREATE INDEX submission_feature_error_idx4
-      ON submission_feature_error(submission_upload_id, submission_feature_id);
-    CREATE INDEX submission_feature_error_idx5
+    CREATE INDEX submission_feature_error_idx2 ON submission_feature_error(submission_upload_id, error_code);
+    CREATE INDEX submission_feature_error_idx3
       ON submission_feature_error(submission_upload_id, feature_type_property_id);
-    CREATE INDEX submission_feature_error_idx6
-      ON submission_feature_error(submission_upload_id, error_code);
-    CREATE INDEX submission_feature_error_idx7
+    CREATE UNIQUE INDEX submission_feature_error_u1
       ON submission_feature_error (
         submission_upload_id,
-        submission_feature_id,
+        error_code,
         feature_type_property_id,
         property_name
       );
 
     COMMENT ON TABLE submission_feature_error IS
-      'Latest deep-validation feature-level error snapshot per submission upload.';
+      'Upload-scoped aggregated validation error summary for deep property ingestion.';
     COMMENT ON COLUMN submission_feature_error.submission_feature_error_id IS
       'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN submission_feature_error.submission_upload_id IS
-      'Foreign key to submission_upload for upload-scoped validation snapshot queries.';
-    COMMENT ON COLUMN submission_feature_error.submission_feature_id IS
-      'Foreign key to submission_feature for feature-level validation attribution.';
+      'Foreign key to submission_upload for upload-scoped validation summary queries.';
     COMMENT ON COLUMN submission_feature_error.feature_type_property_id IS
       'Optional foreign key to feature_type_property when an error maps to a resolved property definition.';
     COMMENT ON COLUMN submission_feature_error.property_name IS
       'Optional raw property key when no feature_type_property mapping exists.';
     COMMENT ON COLUMN submission_feature_error.error_code IS
-      'Machine-readable validation classifier.';
+      'Machine-readable validation classifier used for grouping and UI rendering.';
     COMMENT ON COLUMN submission_feature_error.error_message IS
-      'Human-readable validation message.';
-    COMMENT ON COLUMN submission_feature_error.raw_value IS
-      'Optional raw invalid value payload captured during validation.';
+      'Human-readable summary message for the grouped validation issue.';
+    COMMENT ON COLUMN submission_feature_error.count IS
+      'Number of feature-level validation error instances represented by this row.';
     COMMENT ON COLUMN submission_feature_error.details IS
-      'Optional structured validation metadata.';
+      'Optional structured aggregated metadata for the grouped validation issue.';
 
     --------------------------------------------------------------------------------
     -- 5) Complete cutover to explicit submission_upload lifecycle states
     --    pending -> uploaded, in_progress -> ingesting, succeeded -> ingested
     --------------------------------------------------------------------------------
-    UPDATE submission_upload
-    SET status = CASE
-      WHEN status::text = 'pending' THEN 'uploaded'::submission_upload_job_status
-      WHEN status::text = 'in_progress' THEN 'ingesting'::submission_upload_job_status
-      WHEN status::text = 'succeeded' THEN 'ingested'::submission_upload_job_status
-      ELSE status
-    END
-    WHERE status::text IN ('pending', 'in_progress', 'succeeded');
-
     CREATE TYPE submission_upload_job_status_v2 AS ENUM (
       'uploaded',
       'ingesting',
@@ -466,7 +446,14 @@ export async function up(knex: Knex): Promise<void> {
 
     ALTER TABLE submission_upload
       ALTER COLUMN status TYPE submission_upload_job_status_v2
-      USING status::text::submission_upload_job_status_v2;
+      USING (
+        CASE status::text
+          WHEN 'pending' THEN 'uploaded'
+          WHEN 'in_progress' THEN 'ingesting'
+          WHEN 'succeeded' THEN 'ingested'
+          ELSE status::text
+        END
+      )::submission_upload_job_status_v2;
 
     DROP TYPE submission_upload_job_status;
 

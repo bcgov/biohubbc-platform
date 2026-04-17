@@ -215,8 +215,8 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
         const errorCounts = await this.submissionFeaturePropertyIngestionRepository.getIngestionErrorCountsByCode(
           submissionUploadId
         );
-        const errorSamples =
-          await this.submissionFeaturePropertyIngestionRepository.getIngestionErrorSamplesBySubmissionUploadId(
+        const errorSummaries =
+          await this.submissionFeaturePropertyIngestionRepository.getIngestionErrorSummariesBySubmissionUploadId(
             submissionUploadId,
             20
           );
@@ -228,14 +228,14 @@ export class SubmissionFeaturePropertyIngestionService extends DBService {
           phase: currentPhase,
           errorCount,
           errorCounts,
-          errorSamples
+          errorSummaries
         });
 
         return {
           status: 'invalid',
           errorCount,
           errorCounts,
-          errorSamples
+          errorSummaries
         };
       }
 

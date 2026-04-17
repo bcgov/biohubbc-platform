@@ -74,8 +74,39 @@ export class FeatureIngestionRepository extends BaseRepository {
     const expectedCount = records.length;
 
     if (insertedCount !== expectedCount) {
+      const submissionUploadId = submissionUploadIds[0];
+      const missingCount = expectedCount - insertedCount;
+
+      const featureTypeCounts = new Map<string, number>();
+      for (const featureTypeName of featureTypeNames) {
+        featureTypeCounts.set(featureTypeName, (featureTypeCounts.get(featureTypeName) ?? 0) + 1);
+      }
+      const featureTypeSummary = [...featureTypeCounts.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, 8)
+        .map(([name, count]) => `${name}:${count}`)
+        .join(', ');
+
+      const sourceIdCounts = new Map<string, number>();
+      for (const sourceId of sourceIds) {
+        sourceIdCounts.set(sourceId, (sourceIdCounts.get(sourceId) ?? 0) + 1);
+      }
+      const duplicateSourceIds = [...sourceIdCounts.entries()]
+        .filter(([, count]) => count > 1)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, 5)
+        .map(([sourceId, count]) => `${sourceId}:${count}`);
+
+      const duplicateSourceHint = duplicateSourceIds.length
+        ? ` Duplicate source_id values in batch (top): ${duplicateSourceIds.join(', ')}.`
+        : '';
+
       throw new IngestionValidationError(
-        `Failed to insert all submission feature records: inserted ${insertedCount} of ${expectedCount}`
+        `Failed to insert all submission feature records for submission_upload_id=${submissionUploadId}: ` +
+          `inserted ${insertedCount} of ${expectedCount} (missing ${missingCount}). ` +
+          `Batch feature_type_name counts: ${featureTypeSummary || 'none'}. ` +
+          `Insert path joins on feature_type.name with record_end_date IS NULL; rows are dropped when no active feature_type match exists.` +
+          duplicateSourceHint
       );
     }
   }
