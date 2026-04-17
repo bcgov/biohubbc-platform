@@ -110,7 +110,7 @@ describe('DataRequestRepository', () => {
 
       const repo = new DataRequestRepository(mockDBConnection);
 
-      const result = await repo.findDataRequestsByTeamMembership(mockDataRequest.requested_by);
+      const result = await repo.findDataRequestsByTeamMembership([mockDataRequest.requested_by]);
 
       expect(result).to.eql([mockDataRequest]);
     });
@@ -127,7 +127,7 @@ describe('DataRequestRepository', () => {
 
       const repo = new DataRequestRepository(mockDBConnection);
 
-      const result = await repo.findDataRequestsByTeamMembership(999);
+      const result = await repo.findDataRequestsByTeamMembership([999]);
 
       expect(result).to.eql([]);
     });
@@ -144,11 +144,24 @@ describe('DataRequestRepository', () => {
 
       const repo = new DataRequestRepository(mockDBConnection);
 
-      const result = await repo.findDataRequestsByTeamMembership(mockDataRequest.requested_by, {
+      const result = await repo.findDataRequestsByTeamMembership([mockDataRequest.requested_by], {
         status: 'requested'
       });
 
       expect(result).to.eql([mockDataRequest]);
+    });
+
+    it('should return empty array when no system user ids are provided', async () => {
+      const mockDBConnection = getMockDBConnection({
+        knex: async () => {
+          throw new Error('query should not execute');
+        }
+      });
+
+      const repo = new DataRequestRepository(mockDBConnection);
+      const result = await repo.findDataRequestsByTeamMembership([]);
+
+      expect(result).to.eql([]);
     });
   });
 

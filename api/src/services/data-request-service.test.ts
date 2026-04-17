@@ -48,6 +48,22 @@ describe('DataRequestService', () => {
     expect(result).to.deep.equal(mockDataRequest);
   });
 
+  it('findDataRequestsByTeamMembership delegates to repository with system user ids', async () => {
+    const mockDB = getMockDBConnection();
+    const service = new DataRequestService(mockDB);
+    const userIds = [1, 2];
+    const filters = { status: 'requested' as const };
+
+    const stub = sinon
+      .stub(DataRequestRepository.prototype, 'findDataRequestsByTeamMembership')
+      .resolves([mockDataRequest]);
+
+    const result = await service.findDataRequestsByTeamMembership(userIds, filters);
+
+    expect(stub).to.have.been.calledOnceWith(userIds, filters);
+    expect(result).to.deep.equal([mockDataRequest]);
+  });
+
   it('createDataRequest creates team, requested policy, and request', async () => {
     const mockDB = getMockDBConnection();
     const service = new DataRequestService(mockDB);

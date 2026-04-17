@@ -76,15 +76,18 @@ export class DataRequestService extends DBService {
   }
 
   /**
-   * Find data requests visible to a system user via team membership.
+   * Find data requests visible to one or more system users via team membership.
    *
-   * @param {number} systemUserId - System user identifier.
+   * @param {number[]} systemUserIds - System user identifiers.
    * @param {DataRequestFilters} [filters] - Optional query filters.
    * @return {Promise<DataRequest[]>} Matching data requests.
    * @memberof DataRequestService
    */
-  async findDataRequestsBySystemUserId(systemUserId: number, filters?: DataRequestFilters): Promise<DataRequest[]> {
-    return this.dataRequestRepository.findDataRequestsByTeamMembership(systemUserId, filters);
+  async findDataRequestsByTeamMembership(
+    systemUserIds: number[],
+    filters?: DataRequestFilters
+  ): Promise<DataRequest[]> {
+    return this.dataRequestRepository.findDataRequestsByTeamMembership(systemUserIds, filters);
   }
 
   /**

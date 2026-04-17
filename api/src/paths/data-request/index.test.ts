@@ -84,7 +84,7 @@ describe('data-request', () => {
       }
     });
 
-    it('calls DataRequestService.findDataRequestsBySystemUserId for non-admin with no filters and returns 200', async () => {
+    it('calls DataRequestService.findDataRequestsByTeamMembership for non-admin with no filters and returns 200', async () => {
       const mockDBConnection = getMockDBConnection({
         systemUserId: () => mockNonAdminUser.system_user_id,
         commit: sinon.stub(),
@@ -95,7 +95,7 @@ describe('data-request', () => {
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockNonAdminUser);
 
       const stub = sinon
-        .stub(DataRequestService.prototype, 'findDataRequestsBySystemUserId')
+        .stub(DataRequestService.prototype, 'findDataRequestsByTeamMembership')
         .resolves([mockDataRequest]);
 
       const requestHandler = findDataRequests();
@@ -103,7 +103,7 @@ describe('data-request', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(stub).to.have.been.calledOnceWith(mockNonAdminUser.system_user_id, {
+      expect(stub).to.have.been.calledOnceWith([mockNonAdminUser.system_user_id], {
         date_from: undefined,
         date_to: undefined,
         requested_by: undefined,
@@ -127,7 +127,7 @@ describe('data-request', () => {
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockNonAdminUser);
 
       const stub = sinon
-        .stub(DataRequestService.prototype, 'findDataRequestsBySystemUserId')
+        .stub(DataRequestService.prototype, 'findDataRequestsByTeamMembership')
         .resolves([mockDataRequest]);
 
       const requestHandler = findDataRequests();
@@ -143,7 +143,7 @@ describe('data-request', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(stub).to.have.been.calledOnceWith(mockNonAdminUser.system_user_id, {
+      expect(stub).to.have.been.calledOnceWith([mockNonAdminUser.system_user_id], {
         date_from: '2025-01-01',
         date_to: '2025-01-31',
         requested_by: 1,
@@ -162,7 +162,7 @@ describe('data-request', () => {
       });
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockAdminUser);
-      sinon.stub(DataRequestService.prototype, 'findDataRequestsBySystemUserId').rejects(new Error('Service error'));
+      sinon.stub(DataRequestService.prototype, 'findDataRequestsByTeamMembership').rejects(new Error('Service error'));
 
       const requestHandler = findDataRequests();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();

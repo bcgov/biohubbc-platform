@@ -43,14 +43,18 @@ export class DataRequestRepository extends BaseRepository {
   }
 
   /**
-   * Find data requests scoped to teams that include the specified system user.
+   * Find data requests scoped to teams that include any of the specified system users.
    *
-   * @param {number} systemUserId - System user identifier.
+   * @param {number[]} systemUserIds - System user identifiers.
    * @param {DataRequestFilters} [filters] - Optional query filters.
    * @return {Promise<DataRequest[]>} Matching data requests.
    * @memberof DataRequestRepository
    */
-  async findDataRequestsByTeamMembership(systemUserId: number, filters?: DataRequestFilters): Promise<DataRequest[]> {
+  async findDataRequestsByTeamMembership(systemUserIds: number[], filters?: DataRequestFilters): Promise<DataRequest[]> {
+    if (systemUserIds.length === 0) {
+      return [];
+    }
+
     const knex = getKnex();
     const queryBuilder = knex('data_request as dr')
       .select(
@@ -65,7 +69,7 @@ export class DataRequestRepository extends BaseRepository {
       )
       .join('policy as p', 'p.policy_id', 'dr.policy_id')
       .join('team_member as tm', 'tm.team_id', 'dr.team_id')
-      .where('tm.system_user_id', systemUserId)
+      .whereIn('tm.system_user_id', systemUserIds)
       .whereNull('dr.record_end_date')
       .whereNull('p.record_end_date')
       .whereNull('tm.record_end_date');

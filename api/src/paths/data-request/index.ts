@@ -97,7 +97,7 @@ export function findDataRequests(): RequestHandler {
       const systemUserId = connection.systemUserId();
 
       const dataRequestService = new DataRequestService(connection);
-      const dataRequests = await dataRequestService.findDataRequestsBySystemUserId(systemUserId, filters);
+      const dataRequests = await dataRequestService.findDataRequestsByTeamMembership([systemUserId], filters);
 
       await connection.commit();
 

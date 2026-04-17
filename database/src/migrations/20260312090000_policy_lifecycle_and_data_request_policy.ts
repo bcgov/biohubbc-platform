@@ -17,7 +17,7 @@ export async function up(knex: Knex): Promise<void> {
     ALTER TABLE policy
       ADD COLUMN status policy_status NOT NULL DEFAULT 'requested';
 
-    COMMENT ON COLUMN policy.status IS 'Lifecycle status of a policy: requested, reviewed, approved, or denied.';
+    COMMENT ON COLUMN policy.status IS 'Workflow state used to track review progress and gate policy effects.';
 
     --------------------------------------------------------------------------------
     -- DATA REQUEST POLICY LINK
