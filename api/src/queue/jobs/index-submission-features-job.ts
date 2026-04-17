@@ -8,8 +8,11 @@ import { getLogger } from '../../utils/logger';
 import { withConnection } from '../with-connection';
 
 /**
- * Index submission features job data interface.
- * Contains submission scope for async deep property indexing/validation.
+ * Payload carried by each `index-submission-features` queue job.
+ *
+ * The pair `(submissionId, submissionUploadId)` defines:
+ * - the submission-level scope used by indexing routines
+ * - the exact upload lifecycle row whose status is guarded and transitioned
  */
 export interface IIndexSubmissionFeaturesJobData {
   /** The submission ID whose features should be indexed for search */
@@ -21,31 +24,47 @@ export interface IIndexSubmissionFeaturesJobData {
 const defaultLog = getLogger('queue/jobs/index-submission-features-job');
 
 /**
- * Return true when a submission upload status is terminal.
+ * Determine whether an upload status is terminal for indexing purposes.
+ *
+ * Terminal statuses represent lifecycle completion where the index stage must not
+ * run again for this upload (`indexed`, `invalid`, `failed`).
  *
  * @param {SubmissionUpload['status']} status Submission upload status.
- * @returns {boolean} True when status is terminal.
+ * @returns {boolean} `true` when the status is terminal and should short-circuit processing.
  */
 function isTerminalSubmissionUploadStatus(status: SubmissionUpload['status']): boolean {
   return TERMINAL_UPLOAD_STATUSES.includes(status);
 }
 
 /**
- * Return true when the index stage can start or resume from the status.
+ * Determine whether indexing is allowed to start or resume from the current status.
+ *
+ * Indexing is allowed only from:
+ * - `ingested`: first entry into the indexing stage
+ * - `indexing`: retry/resume of an interrupted indexing attempt
  *
  * @param {SubmissionUpload['status']} status Submission upload status.
- * @returns {boolean} True when status is index-startable.
+ * @returns {boolean} `true` when indexing is permitted for the given status.
  */
 function isIndexStartableSubmissionUploadStatus(status: SubmissionUpload['status']): boolean {
   return status === 'ingested' || status === 'indexing';
 }
 
 /**
- * Initialize index stage guard/entry transition.
+ * Guard and initialize the indexing stage for one upload.
+ *
+ * Workflow:
+ * 1) Load the current upload lifecycle row.
+ * 2) Skip when upload is already terminal.
+ * 3) Skip when upload is not in an index-startable state.
+ * 4) Transition lifecycle status to `indexing` before heavy work begins.
+ *
+ * This method is intentionally idempotent for retries: if a job is retried while
+ * already `indexing`, the stage is allowed to proceed again.
  *
  * @param {string} submissionUploadId Submission upload scope.
  * @param {string} jobId Job identifier.
- * @returns {Promise<boolean>} True when stage should proceed.
+ * @returns {Promise<boolean>} `true` when indexing should proceed; `false` when skipped by guard checks.
  */
 async function initializeIndexSubmissionFeaturesStage(submissionUploadId: string, jobId: string): Promise<boolean> {
   return withConnection(async (connection) => {
@@ -80,11 +99,15 @@ async function initializeIndexSubmissionFeaturesStage(submissionUploadId: string
 }
 
 /**
- * Execute heavy indexing work for one submission upload.
+ * Execute the core submission-property indexing and validation workload.
+ *
+ * This calls `SubmissionFeaturePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(...)`
+ * inside a DB connection scope and returns a normalized outcome describing whether
+ * the upload is valid for indexing completion.
  *
  * @param {number} submissionId Submission scope.
  * @param {string} submissionUploadId Submission upload scope.
- * @returns {Promise<SubmissionFeaturePropertyValidationOutcome>} Validation/indexing outcome.
+ * @returns {Promise<SubmissionFeaturePropertyValidationOutcome>} Structured indexing outcome used for final status transition.
  */
 async function executeIndexSubmissionFeaturesIngestion(
   submissionId: number,
@@ -100,7 +123,13 @@ async function executeIndexSubmissionFeaturesIngestion(
 }
 
 /**
- * Finalize index stage by persisting terminal status from outcome.
+ * Finalize lifecycle status based on indexing outcome and emit completion logs.
+ *
+ * Outcome handling:
+ * - `invalid`: mark upload `invalid` and log validation counts
+ * - otherwise: mark upload `indexed`
+ *
+ * This is the stage-commit step after heavy indexing work has finished.
  *
  * @param {number} submissionId Submission scope.
  * @param {string} submissionUploadId Submission upload scope.
@@ -146,7 +175,14 @@ async function finalizeIndexSubmissionFeaturesStage(
 }
 
 /**
- * Orchestrate the index stage workflow.
+ * Orchestrate the complete indexing stage for one queue item.
+ *
+ * Stage order:
+ * 1) initialize/guard
+ * 2) execute indexing
+ * 3) finalize lifecycle status
+ *
+ * If initialization returns `false`, processing is intentionally skipped without error.
  *
  * @param {number} submissionId Submission scope.
  * @param {string} submissionUploadId Submission upload scope.
@@ -168,10 +204,16 @@ async function runIndexSubmissionFeaturesStage(
 }
 
 /**
- * Index submission features job handler.
+ * Primary pg-boss worker handler for `index-submission-features`.
  *
- * @param {PgBoss.Job<IIndexSubmissionFeaturesJobData>[]} jobs The jobs to process
- * @return {*}  {Promise<void>}
+ * For each dequeued job:
+ * - log job context
+ * - run the indexing stage orchestrator
+ * - on unexpected failure, transition upload status to `failed` (when currently
+ *   in an allowed non-terminal state) and rethrow so pg-boss retry policy applies
+ *
+ * @param {PgBoss.Job<IIndexSubmissionFeaturesJobData>[]} jobs Batched jobs provided by pg-boss.
+ * @returns {Promise<void>}
  */
 export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmissionFeaturesJobData> = async (jobs) => {
   for (const job of jobs) {
@@ -213,10 +255,13 @@ export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmiss
 };
 
 /**
- * Dead Letter Queue handler for failed index submission features jobs.
+ * Dead-letter handler for jobs that exhausted all retry attempts.
  *
- * @param {PgBoss.Job<IIndexSubmissionFeaturesJobData>[]} jobs The failed jobs
- * @return {*}  {Promise<void>}
+ * This handler does not mutate lifecycle state; it emits terminal operational logs
+ * with final job metadata/output so failures are observable and diagnosable.
+ *
+ * @param {PgBoss.Job<IIndexSubmissionFeaturesJobData>[]} jobs Failed jobs moved to the DLQ.
+ * @returns {Promise<void>}
  */
 export const indexSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IIndexSubmissionFeaturesJobData> = async (
   jobs
