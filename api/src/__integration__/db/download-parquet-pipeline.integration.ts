@@ -13,7 +13,7 @@
 // Requires: make web (database must be running with seed data)
 
 import { expect } from 'chai';
-import { randomInt } from 'crypto';
+import { randomInt } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, getKnex, IDBConnection, initDBPool } from '../../database/db';
 import { ParquetFeatureData } from '../../models/download';
@@ -24,6 +24,57 @@ import { DownloadPipelineService } from '../../services/download/download-pipeli
 import { DownloadService } from '../../services/download/download-service';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
+
+/**
+ * Helper: assemble ParquetFeatureData from base rows + typed property rows.
+ * Mirrors the service-layer hydrateFeatureBatch logic for integration testing.
+ * Pure function — extracted to module scope so it is not re-created per test.
+ */
+function assembleFeatureData(
+  baseBatch: {
+    submission_feature_id: number;
+    uuid: string;
+    feature_type_name: string;
+    data: Record<string, any>;
+    parent_uuid: string | null;
+  }[],
+  typedRows: { submission_feature_id: number; name: string; value: any }[],
+  properties: CsvPropertyDefinition[]
+): ParquetFeatureData[] {
+  const JSONB_FALLBACK_TYPES = new Set(['array', 'object', 'artifact_key']);
+
+  const propertyMap = new Map<number, Record<string, any>>();
+  for (const row of typedRows) {
+    if (!propertyMap.has(row.submission_feature_id)) {
+      propertyMap.set(row.submission_feature_id, {});
+    }
+    propertyMap.get(row.submission_feature_id)![row.name] = row.value;
+  }
+
+  return baseBatch.map((baseRow) => {
+    const typedProps = propertyMap.get(baseRow.submission_feature_id) ?? {};
+    const data: Record<string, any> = {};
+
+    for (const prop of properties) {
+      const propName = prop.feature_property_name;
+      if (JSONB_FALLBACK_TYPES.has(prop.feature_property_type_name)) {
+        data[propName] = baseRow.data?.properties?.[propName] ?? null;
+      } else if (propName in typedProps) {
+        data[propName] = typedProps[propName];
+      } else {
+        data[propName] = null;
+      }
+    }
+
+    return {
+      submission_feature_id: baseRow.submission_feature_id,
+      uuid: baseRow.uuid,
+      feature_type_name: baseRow.feature_type_name,
+      data,
+      parent_uuid: baseRow.parent_uuid
+    };
+  });
+}
 
 describe('Download Parquet pipeline (integration)', function () {
   this.timeout(15000);
@@ -290,56 +341,6 @@ describe('Download Parquet pipeline (integration)', function () {
     const taxonId = taxonResult.rows[0].taxon_id;
 
     return { featureTypePropertyId, taxonId };
-  }
-
-  /**
-   * Helper: assemble ParquetFeatureData from base rows + typed property rows.
-   * Mirrors the service-layer hydrateFeatureBatch logic for integration testing.
-   */
-  function assembleFeatureData(
-    baseBatch: {
-      submission_feature_id: number;
-      uuid: string;
-      feature_type_name: string;
-      data: Record<string, any>;
-      parent_uuid: string | null;
-    }[],
-    typedRows: { submission_feature_id: number; name: string; value: any }[],
-    properties: CsvPropertyDefinition[]
-  ): ParquetFeatureData[] {
-    const JSONB_FALLBACK_TYPES = new Set(['array', 'object', 'artifact_key']);
-
-    const propertyMap = new Map<number, Record<string, any>>();
-    for (const row of typedRows) {
-      if (!propertyMap.has(row.submission_feature_id)) {
-        propertyMap.set(row.submission_feature_id, {});
-      }
-      propertyMap.get(row.submission_feature_id)![row.name] = row.value;
-    }
-
-    return baseBatch.map((baseRow) => {
-      const typedProps = propertyMap.get(baseRow.submission_feature_id) ?? {};
-      const data: Record<string, any> = {};
-
-      for (const prop of properties) {
-        const propName = prop.feature_property_name;
-        if (JSONB_FALLBACK_TYPES.has(prop.feature_property_type_name)) {
-          data[propName] = baseRow.data?.properties?.[propName] ?? null;
-        } else if (propName in typedProps) {
-          data[propName] = typedProps[propName];
-        } else {
-          data[propName] = null;
-        }
-      }
-
-      return {
-        submission_feature_id: baseRow.submission_feature_id,
-        uuid: baseRow.uuid,
-        feature_type_name: baseRow.feature_type_name,
-        data,
-        parent_uuid: baseRow.parent_uuid
-      };
-    });
   }
 
   /**

@@ -771,7 +771,7 @@ export class DownloadRepository extends BaseRepository {
     featureTypeName: string,
     batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<BaseFeatureRow[]> {
-    const cursorName = `dl_pq_cart_cursor_${cartId.replace(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replace(
+    const cursorName = `dl_pq_cart_cursor_${cartId.replaceAll(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replaceAll(
       /[^a-z0-9_]/gi,
       '_'
     )}`;
@@ -831,7 +831,7 @@ export class DownloadRepository extends BaseRepository {
     featureTypeName: string,
     batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<BaseFeatureRow[]> {
-    const cursorName = `dl_pq_filter_cursor_${downloadId.replace(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replace(
+    const cursorName = `dl_pq_filter_cursor_${downloadId.replaceAll(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replaceAll(
       /[^a-z0-9_]/gi,
       '_'
     )}`;

@@ -283,7 +283,7 @@ describe('Download Worker', function () {
     if (format === 'parquet') {
       const timestamp = new Date()
         .toISOString()
-        .replace(/:/g, '')
+        .replaceAll(':', '')
         .replace(/\.\d{3}/, '');
       artifactObjectKey = `downloads/${download.download_id}/download-${timestamp}.parquet`;
       const bucketName = process.env.OBJECT_STORE_BUCKET_NAME!;
@@ -381,7 +381,7 @@ describe('Download Worker', function () {
     const datasetBuffer = Buffer.concat(datasetChunks);
     // Parquet magic bytes: PAR1 at start and end of file
     expect(datasetBuffer.subarray(0, 4).toString()).to.equal('PAR1');
-    expect(datasetBuffer.subarray(datasetBuffer.length - 4).toString()).to.equal('PAR1');
+    expect(datasetBuffer.subarray(-4).toString()).to.equal('PAR1');
   });
 
   it('should process a download job and upload zip to S3', async () => {
