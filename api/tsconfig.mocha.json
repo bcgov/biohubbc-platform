@@ -3,5 +3,10 @@
   "compilerOptions": {
     "module": "commonjs",
     "moduleResolution": "node"
+  },
+  "ts-node": {
+    "moduleTypes": {
+      "**/*.ts": "cjs"
+    }
   }
 }

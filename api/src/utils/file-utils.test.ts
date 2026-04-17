@@ -198,6 +198,6 @@ describe('generateDatasetS3FileKey', () => {
       fileName: 'testFileName'
     });
 
-    expect(result).to.equal(`${process.env.S3_KEY_PREFIX || 'biohub'}/datasets/123-456-789/dwca/testFileName`);
+    expect(result).to.equal(`${getS3KeyPrefix()}/datasets/123-456-789/dwca/testFileName`);
   });
 });

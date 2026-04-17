@@ -1,6 +1,5 @@
 {
   "extension": ["ts"],
   "spec": "src/__integration__/db/*.integration.ts",
-  "require": "tsx/cjs",
   "exit": true
 }

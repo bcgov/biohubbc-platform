@@ -1,4 +1,4 @@
-import { setLogLevel } from './src/utils/logger';
+import { setLogLevel } from './src/utils/logger.ts';
 
 // See https://mochajs.org/#global-setup-fixtures
 export const mochaGlobalSetup = async function () {

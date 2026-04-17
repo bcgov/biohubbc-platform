@@ -1,6 +1,5 @@
 {
   "extension": ["ts"],
   "spec": "src/__integration__/system/*.integration.ts",
-  "require": "tsx/cjs",
   "timeout": 60000
 }
