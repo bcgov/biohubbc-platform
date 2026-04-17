@@ -1,7 +1,6 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { ApiExecuteSQLError } from '../../errors/api-error';
-import { IngestionValidationError } from '../../errors/submission-errors';
 import { FeatureTypeWithProperties } from '../../models/feature-type';
 import { CreateSubmissionFeatureIngestionRecord, InsertSubmissionFeatureRecord } from '../../models/submission-feature';
 import { BaseRepository } from '../base-repository';
@@ -15,15 +14,43 @@ import { BaseRepository } from '../base-repository';
  */
 export class FeatureIngestionRepository extends BaseRepository {
   /**
+   * Get active feature type name/id mapping.
+   *
+   * @returns {Promise<Map<string, number>>}
+   * @memberof FeatureIngestionRepository
+   */
+  async getActiveFeatureTypeMap(): Promise<Map<string, number>> {
+    const sqlStatement = SQL`
+      SELECT
+        feature_type_id,
+        name
+      FROM
+        feature_type
+      WHERE
+        record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql(
+      sqlStatement,
+      z.object({
+        feature_type_id: z.number(),
+        name: z.string()
+      })
+    );
+
+    return new Map(response.rows.map((row) => [row.name, row.feature_type_id]));
+  }
+
+  /**
    * Bulk insert submission feature rows (raw payload persisted in `data`).
    *
    * @param {CreateSubmissionFeatureIngestionRecord[]} records
-   * @return {Promise<void>}
+   * @return {Promise<number>} Inserted row count.
    * @memberof FeatureIngestionRepository
    */
-  async insertSubmissionFeatureRecords(records: CreateSubmissionFeatureIngestionRecord[]): Promise<void> {
+  async insertSubmissionFeatureRecords(records: CreateSubmissionFeatureIngestionRecord[]): Promise<number> {
     if (!records.length) {
-      return;
+      return 0;
     }
 
     const submissionIds = records.map((record) => record.submissionId);
@@ -41,8 +68,7 @@ export class FeatureIngestionRepository extends BaseRepository {
         source_id,
         feature_type_id,
         data,
-        data_byte_size,
-        record_effective_date
+        data_byte_size
       )
       SELECT
         staged.submission_id,
@@ -51,8 +77,7 @@ export class FeatureIngestionRepository extends BaseRepository {
         staged.source_id,
         ft.feature_type_id,
         parsed.data,
-        staged.data_byte_size,
-        now()
+        staged.data_byte_size
       FROM unnest(
         ${submissionIds}::integer[],
         ${submissionUploadIds}::uuid[],
@@ -73,14 +98,82 @@ export class FeatureIngestionRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement);
-    const insertedCount = response.rowCount ?? 0;
-    const expectedCount = records.length;
+    return response.rowCount ?? 0;
+  }
 
-    if (insertedCount !== expectedCount) {
-      throw new IngestionValidationError(
-        `Failed to insert all submission feature records: inserted ${insertedCount} of ${expectedCount}`
-      );
+  /**
+   * Bulk insert submission feature rows with pre-resolved feature_type_id.
+   *
+   * @param {Array<{
+   *   submissionId: number;
+   *   submissionUploadId: string;
+   *   sourceId: string;
+   *   featureTypeId: number;
+   *   data: unknown;
+   *   dataByteSize: number;
+   * }>} records
+   * @return {Promise<number>}
+   * @memberof FeatureIngestionRepository
+   */
+  async insertSubmissionFeatureRecordsByTypeId(
+    records: Array<{
+      submissionId: number;
+      submissionUploadId: string;
+      sourceId: string;
+      featureTypeId: number;
+      data: unknown;
+      dataByteSize: number;
+    }>
+  ): Promise<number> {
+    if (!records.length) {
+      return 0;
     }
+
+    const submissionIds = records.map((record) => record.submissionId);
+    const submissionUploadIds = records.map((record) => record.submissionUploadId);
+    const sourceIds = records.map((record) => record.sourceId);
+    const featureTypeIds = records.map((record) => record.featureTypeId);
+    const dataValues = records.map((record) => JSON.stringify(record.data));
+    const dataByteSizes = records.map((record) => record.dataByteSize);
+
+    const sqlStatement = SQL`
+      INSERT INTO submission_feature (
+        submission_id,
+        submission_upload_id,
+        parent_submission_feature_id,
+        source_id,
+        feature_type_id,
+        data,
+        data_byte_size
+      )
+      SELECT
+        staged.submission_id,
+        staged.submission_upload_id,
+        NULL,
+        staged.source_id,
+        staged.feature_type_id,
+        parsed.data,
+        staged.data_byte_size
+      FROM unnest(
+        ${submissionIds}::integer[],
+        ${submissionUploadIds}::uuid[],
+        ${sourceIds}::text[],
+        ${featureTypeIds}::integer[],
+        ${dataValues}::text[],
+        ${dataByteSizes}::bigint[]
+      ) AS staged(
+        submission_id,
+        submission_upload_id,
+        source_id,
+        feature_type_id,
+        data_text,
+        data_byte_size
+      )
+      CROSS JOIN LATERAL (SELECT staged.data_text::jsonb AS data) parsed;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+    return response.rowCount ?? 0;
   }
 
   /**
@@ -181,31 +274,11 @@ export class FeatureIngestionRepository extends BaseRepository {
   }
 
   /**
-   * Delete all submission features for a submission (soft delete).
-   * Used for idempotency - allows job retries to start fresh.
-   *
-   * @param {number} submissionId The submission ID.
-   * @return {Promise<void>}
-   * @memberof FeatureIngestionRepository
-   */
-  async deleteSubmissionFeatures(submissionId: number): Promise<void> {
-    const sqlStatement = SQL`
-      UPDATE submission_feature
-      SET record_end_date = NOW()
-      WHERE submission_id = ${submissionId}
-        AND record_end_date IS NULL;
-    `;
-
-    await this.connection.sql(sqlStatement);
-  }
-
-  /**
    * Get feature type with its associated properties.
    * Returns null if the feature type does not exist.
-   * Returns empty properties array if the feature type exists but has no properties.
    *
-   * @param {string} name - The feature type name to look up
-   * @return {Promise<FeatureTypeWithProperties | null>} The feature type with properties, or null if not found
+   * @param {string} name Feature type name.
+   * @return {Promise<FeatureTypeWithProperties | null>}
    * @memberof FeatureIngestionRepository
    */
   async findFeatureTypeWithProperties(name: string): Promise<FeatureTypeWithProperties | null> {

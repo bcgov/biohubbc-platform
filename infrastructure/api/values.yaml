@@ -74,6 +74,11 @@ app:
     fileDatePattern: YYYY-MM-DD # Date pattern for log the files
     fileMaxSize: 45m # Maximum size an individual log file can reach before a new file is created
     fileMaxFiles: "" # Either the maximum number of log files to keep (10) or the maximum number of days to keep log files (10d)
+
+  # Media ingestion batching
+  mediaIngestion:
+    batchBytes: "" # Optional override for MEDIA_INGEST_BATCH_BYTES
+    batchFiles: "" # Optional override for MEDIA_INGEST_BATCH_FILES
     
   # ITIS SOLR
   itisSolr: "https://services.itis.gov"

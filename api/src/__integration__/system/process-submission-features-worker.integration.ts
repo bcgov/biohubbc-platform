@@ -273,7 +273,7 @@ describe('Process Submission Features Worker', function () {
         submission_upload_id: params.submissionUploadId,
         submission_id: params.submissionId,
         upload_id: params.uploadId,
-        status: 'pending',
+        status: 'uploaded',
         ticket_id: params.ticketId
       });
       await connection.commit();
@@ -358,7 +358,7 @@ describe('Process Submission Features Worker', function () {
     }
   });
 
-  it('should mark submission upload invalid for unknown feature type', async () => {
+  it('should ignore unknown feature type without marking upload invalid', async () => {
     const datasetId = randomUUID();
     const featureId = randomUUID();
 
@@ -381,8 +381,17 @@ describe('Process Submission Features Worker', function () {
     const { submissionId, uploadId, submissionUploadId, ticketId } = await setupSubmissionWithTar(tarBuffer);
     await publishJob({ submissionUploadId, submissionId, uploadId, ticketId });
 
-    const uploadStatus = await waitForSubmissionUploadStatus(db, submissionUploadId, ['invalid'], 60000);
-    expect(uploadStatus).to.equal('invalid');
+    const validation = await waitForValidationStatus(db, submissionId);
+    expect(validation.status).to.equal('completed');
+
+    const uploadStatus = await waitForSubmissionUploadStatus(db, submissionUploadId, ['ingested'], 60000);
+    expect(uploadStatus).to.equal('ingested');
+
+    const insertedFeatureCount = await db('biohub.submission_feature')
+      .where('submission_upload_id', submissionUploadId)
+      .count<{ count: string }>('submission_feature_id as count')
+      .first();
+    expect(insertedFeatureCount?.count).to.equal('0');
   });
 });
 
@@ -501,7 +510,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       submission_upload_id: setup.submissionUploadId,
       submission_id: setup.submissionId,
       upload_id: setup.uploadId,
-      status: 'pending',
+      status: 'uploaded',
       ticket_id: setup.ticketId
     });
     return { result, ...setup };
@@ -569,7 +578,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     expect(site?.parent_submission_feature_id).to.be.null;
   });
 
-  it('should throw for unknown feature type during raw insert', async () => {
+  it('should ignore unknown feature type during raw insert', async () => {
     const datasetId = randomUUID();
 
     const tarBuffer = await createTarBuffer([
@@ -588,12 +597,15 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
     ]);
 
-    try {
-      await ingestTar(tarBuffer);
-      expect.fail('Expected ingestion to throw for unknown feature type');
-    } catch (error) {
-      expect(String(error)).to.include('Failed to insert all submission feature records');
-    }
+    const { result, submissionId } = await ingestTar(tarBuffer);
+
+    expect(result.valid).to.be.true;
+    expect(result.errors).to.have.lengthOf(0);
+
+    const features = await connection.sql<{ count: string }>(
+      SQL`SELECT count(*)::text as count FROM biohub.submission_feature WHERE submission_id = ${submissionId}`
+    );
+    expect(features.rows[0].count).to.equal('0');
   });
 
   it('should process media files and create artifact records', async () => {
@@ -774,7 +786,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
     expect(properties).to.have.property('unknown_prop_b', 42);
   });
 
-  it('should throw on unknown feature types during raw insert', async () => {
+  it('should ignore unknown feature types during raw insert', async () => {
     const datasetId = randomUUID();
     const duplicateId = randomUUID();
 
@@ -801,11 +813,14 @@ describe('SubmissionIngestionService pipeline (system)', function () {
       }
     ]);
 
-    try {
-      await ingestTar(tarBuffer);
-      expect.fail('Expected ingestion to throw for unknown feature types');
-    } catch (error) {
-      expect(String(error)).to.include('Failed to insert all submission feature records');
-    }
+    const { result, submissionId } = await ingestTar(tarBuffer);
+
+    expect(result.valid).to.be.true;
+    expect(result.errors).to.have.lengthOf(0);
+
+    const features = await connection.sql<{ count: string }>(
+      SQL`SELECT count(*)::text as count FROM biohub.submission_feature WHERE submission_id = ${submissionId}`
+    );
+    expect(features.rows[0].count).to.equal('0');
   });
 });

@@ -27,7 +27,7 @@ describe('publisher', () => {
     submission_upload_id: 'sub-upload-uuid-1',
     submission_id: 123,
     upload_id: 'upload-uuid-1',
-    status: 'pending',
+    status: 'uploaded',
     ticket_id: '11111111-1111-1111-1111-111111111111'
   };
 
@@ -387,7 +387,9 @@ describe('publisher', () => {
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
-      await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 777 });
+      await publishIndexSubmissionFeaturesJob(mockConnection, {
+        submissionId: 777
+      });
 
       const options = sendStub.firstCall.args[2];
       expect(options.retryLimit).to.equal(3);
@@ -404,7 +406,9 @@ describe('publisher', () => {
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
-      await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 777 });
+      await publishIndexSubmissionFeaturesJob(mockConnection, {
+        submissionId: 777
+      });
 
       const options = sendStub.firstCall.args[2];
       expect(options.db).to.exist;
@@ -419,7 +423,9 @@ describe('publisher', () => {
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
-      await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 456 });
+      await publishIndexSubmissionFeaturesJob(mockConnection, {
+        submissionId: 456
+      });
 
       const options = sendStub.firstCall.args[2];
       expect(options.singletonKey).to.equal('submission-idx-456');
@@ -433,7 +439,9 @@ describe('publisher', () => {
 
       sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
 
-      const result = await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 777 });
+      const result = await publishIndexSubmissionFeaturesJob(mockConnection, {
+        submissionId: 777
+      });
 
       expect(result.status).to.equal('duplicate');
       expect((result as { status: 'duplicate'; message: string }).message).to.equal(
@@ -445,7 +453,9 @@ describe('publisher', () => {
       const mockConnection = getMockDBConnection();
       sinon.stub(pgBossService, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
-      const result = await publishIndexSubmissionFeaturesJob(mockConnection, { submissionId: 777 });
+      const result = await publishIndexSubmissionFeaturesJob(mockConnection, {
+        submissionId: 777
+      });
 
       expect(result.status).to.equal('error');
       expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');

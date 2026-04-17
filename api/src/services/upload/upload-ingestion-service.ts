@@ -114,7 +114,8 @@ export class UploadIngestionService extends DBService {
     const { submission_upload_id } = await this.submissionUploadService.insertSubmissionUpload({
       submission_id: submissionId,
       upload_id,
-      ticket_id: ticket.ticket_id
+      ticket_id: ticket.ticket_id,
+      status: 'uploaded'
     });
 
     // 4. Create initial review status (submitted = unreviewed)

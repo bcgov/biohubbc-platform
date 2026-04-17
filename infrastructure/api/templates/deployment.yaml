@@ -229,6 +229,11 @@ spec:
               value: {{ .Values.app.logging.fileMaxSize | quote }}
             - name: LOG_FILE_MAX_FILES
               value: {{ .Values.app.logging.fileMaxFiles | quote }}
+            # Media ingestion batching
+            - name: MEDIA_INGEST_BATCH_BYTES
+              value: {{ .Values.app.mediaIngestion.batchBytes | quote }}
+            - name: MEDIA_INGEST_BATCH_FILES
+              value: {{ .Values.app.mediaIngestion.batchFiles | quote }}
             # GCNotify
             - name: GCNOTIFY_SECRET_API_KEY
               valueFrom:

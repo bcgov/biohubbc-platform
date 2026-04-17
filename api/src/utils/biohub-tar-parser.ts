@@ -14,9 +14,11 @@ import {
   MediaUploadContext,
   ProcessMediaEntryOptions,
   StreamMediaOptions,
+  StreamSubmissionArchiveOptions,
   TarNext,
   UploadMediaEntryOptions
 } from './biohub-tar-parser.interface';
+import { getLogger } from './logger';
 
 /**
  * TAR ingestion helpers for submission archives.
@@ -39,6 +41,7 @@ const FlattenedFeatureSchema: z.ZodType<IFlattenedBlock> = z.object({
   content: z.array(z.string()),
   parent: z.string().nullable()
 });
+const defaultLog = getLogger('utils/biohub-tar-parser');
 
 /**
  * Collect all bytes from a readable stream.
@@ -608,4 +611,197 @@ export async function streamMedia(
   await entryPromise;
 
   return { uploadedCount };
+}
+
+/**
+ * Stream a submission archive once and persist media, codesets, and features.
+ *
+ * Processing rules:
+ * - `features/*.json` are parsed and batched to `ingestFeatureBatch`.
+ * - `codes/*.json` are parsed and sent to `ingestCodesets`.
+ * - `files/*` entries are streamed to object storage and batched to `ingestMediaBatch`.
+ *
+ * @param {Readable} inputStream
+ * @param {StreamSubmissionArchiveOptions} options
+ * @returns {Promise<{ featureCount: number; uploadedCount: number }>}
+ */
+export async function streamSubmissionArchive(
+  inputStream: Readable,
+  options: StreamSubmissionArchiveOptions
+): Promise<{ featureCount: number; uploadedCount: number; codesetFileCount: number }> {
+  const {
+    objectStorageService,
+    s3KeyPrefix,
+    featureBatchSize,
+    mediaBatchSize,
+    mediaMaxBatchBytes,
+    mediaConcurrency,
+    ingestFeatureBatch,
+    ingestCodesets,
+    ingestMediaBatch
+  } = options;
+
+  if (featureBatchSize < 1) {
+    throw new Error('featureBatchSize must be greater than 0');
+  }
+  if (mediaBatchSize < 1) {
+    throw new Error('mediaBatchSize must be greater than 0');
+  }
+  if (mediaMaxBatchBytes < 1) {
+    throw new Error('mediaMaxBatchBytes must be greater than 0');
+  }
+  if (mediaConcurrency < 1) {
+    throw new Error('mediaConcurrency must be greater than 0');
+  }
+
+  const extract = tar.extract();
+
+  let featureCount = 0;
+  let uploadedCount = 0;
+  let codesetFileCount = 0;
+  let mediaStateQueue: Promise<void> = Promise.resolve();
+  let pendingFeatureBlocks: IFlattenedBlock[] = [];
+  let pendingUploadedFiles: IUploadedMediaFile[] = [];
+  let pendingUploadedBytes = 0;
+  const inFlightMediaUploads = new Set<Promise<void>>();
+
+  const flushPendingFeatures = async (): Promise<void> => {
+    if (!pendingFeatureBlocks.length) {
+      return;
+    }
+
+    const currentBlocks = pendingFeatureBlocks;
+    pendingFeatureBlocks = [];
+    await ingestFeatureBatch(currentBlocks);
+  };
+
+  const flushPendingMedia = async (): Promise<void> => {
+    if (!pendingUploadedFiles.length) {
+      return;
+    }
+
+    const currentBatch = pendingUploadedFiles;
+    pendingUploadedFiles = [];
+    pendingUploadedBytes = 0;
+    await ingestMediaBatch(currentBatch);
+  };
+
+  const enqueueUploadedMediaFile = (uploadedFile: IUploadedMediaFile): Promise<void> => {
+    const nextWrite = mediaStateQueue.then(async () => {
+      pendingUploadedFiles.push(uploadedFile);
+      pendingUploadedBytes += uploadedFile.byteSize;
+
+      if (pendingUploadedFiles.length >= mediaBatchSize || pendingUploadedBytes >= mediaMaxBatchBytes) {
+        await flushPendingMedia();
+      }
+    });
+
+    mediaStateQueue = nextWrite.then(
+      () => undefined,
+      () => undefined
+    );
+
+    return nextWrite;
+  };
+
+  let rejectEntryPromise: (err: unknown) => void;
+  const entryPromise = new Promise<void>((resolve, reject) => {
+    rejectEntryPromise = reject;
+
+    extract.on('entry', async (header, stream, next) => {
+      try {
+        if (header.type === 'directory') {
+          await drainStream(stream);
+          next();
+          return;
+        }
+
+        const resolvedFeatureEntryName = resolveScopedEntryName(header.name ?? '', 'features');
+        if (resolvedFeatureEntryName && resolvedFeatureEntryName.endsWith('.json') && header.type === 'file') {
+          const buffer = await streamToBuffer(stream);
+          const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
+          const parsedEntries = Array.isArray(parsed) ? parsed : [parsed];
+
+          for (const parsedEntry of parsedEntries) {
+            const block = extractFeatureFromTarballEntry(parsedEntry, resolvedFeatureEntryName);
+            pendingFeatureBlocks.push(block);
+            featureCount += 1;
+
+            if (pendingFeatureBlocks.length >= featureBatchSize) {
+              await flushPendingFeatures();
+            }
+          }
+
+          next();
+          return;
+        }
+
+        const resolvedCodesEntryName = resolveScopedEntryName(header.name ?? '', 'codes');
+        if (resolvedCodesEntryName && resolvedCodesEntryName.endsWith('.json') && header.type === 'file') {
+          const buffer = await streamToBuffer(stream);
+          const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
+          const codesets = extractCodesetsFromTarballEntry(parsed, resolvedCodesEntryName);
+          await ingestCodesets(codesets);
+          codesetFileCount += 1;
+          next();
+          return;
+        }
+
+        const resolvedMediaEntryName = resolveScopedEntryName(header.name ?? '', 'files');
+        if (resolvedMediaEntryName && header.type === 'file') {
+          const context = buildMediaUploadContext(resolvedMediaEntryName, s3KeyPrefix, header.size ?? 0);
+          const uploadPromise = uploadMediaEntry(stream, context, {
+            objectStorageService,
+            ingestMediaFile: enqueueUploadedMediaFile,
+            onUploaded: () => {
+              uploadedCount += 1;
+            }
+          });
+
+          inFlightMediaUploads.add(uploadPromise);
+          uploadPromise.finally(() => inFlightMediaUploads.delete(uploadPromise)).catch(reject);
+
+          if (inFlightMediaUploads.size >= mediaConcurrency) {
+            await Promise.race(inFlightMediaUploads);
+          }
+
+          next();
+          return;
+        }
+
+        await drainStream(stream);
+        next();
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    extract.on('finish', async () => {
+      try {
+        await Promise.all(inFlightMediaUploads);
+        await mediaStateQueue;
+        await flushPendingFeatures();
+        await flushPendingMedia();
+        defaultLog.debug({
+          label: 'streamSubmissionArchive',
+          message: 'Completed archive stream',
+          uploadedCount,
+          featureCount,
+          codesetFileCount
+        });
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
+    extract.on('error', reject);
+  });
+
+  pipeline(inputStream, extract).catch((error) => {
+    rejectEntryPromise(error);
+  });
+
+  await entryPromise;
+
+  return { featureCount, uploadedCount, codesetFileCount };
 }
