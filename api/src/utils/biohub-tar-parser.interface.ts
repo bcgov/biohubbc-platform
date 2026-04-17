@@ -1,3 +1,5 @@
+import { IFlattenedBlock } from '../models/submission-feature';
+import { TarCodesets } from '../services/ingestion/submission-ingestion-codes-service.interface';
 import { ObjectStorageService } from '../services/object-storage/object-storage-service';
 
 export interface IUploadedMediaFile {
@@ -43,5 +45,17 @@ export interface StreamMediaOptions {
   s3KeyPrefix: string;
   batchSize: number;
   maxBatchBytes: number;
+  ingestMediaBatch: (uploadedFiles: IUploadedMediaFile[]) => Promise<void>;
+}
+
+export interface StreamSubmissionArchiveOptions {
+  objectStorageService: ObjectStorageService;
+  s3KeyPrefix: string;
+  featureBatchSize: number;
+  mediaBatchSize: number;
+  mediaMaxBatchBytes: number;
+  mediaConcurrency: number;
+  ingestFeatureBatch: (blocks: IFlattenedBlock[]) => Promise<void>;
+  ingestCodesets: (codesets: TarCodesets) => Promise<void>;
   ingestMediaBatch: (uploadedFiles: IUploadedMediaFile[]) => Promise<void>;
 }

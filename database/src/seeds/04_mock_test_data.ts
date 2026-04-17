@@ -555,18 +555,23 @@ const insertSearchStringTaxonomy = (options: { submission_feature_id: number }) 
     LIMIT 1;
 `;
 
-const insertSearchStartDatetime = (options: { submission_feature_id: number }) => `
+const insertSearchStartDatetime = (options: { submission_feature_id: number }) => {
+  const timestamp = faker.date.past().toISOString();
+
+  return `
     INSERT INTO submission_feature_property_timestamp
     (
         submission_feature_id,
         feature_type_property_id,
-        value,
+        date_value,
+        time_value,
         create_user
     )
     SELECT
         sf.submission_feature_id,
         ftp.feature_type_property_id,
-        $$${faker.date.past().toISOString()}$$,
+        $$${timestamp}$$::timestamptz::date,
+        $$${timestamp}$$::timestamptz::time,
         1
     FROM submission_feature sf
     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
@@ -576,19 +581,25 @@ const insertSearchStartDatetime = (options: { submission_feature_id: number }) =
       AND fp.name = 'start_date'
     LIMIT 1;
 `;
+};
 
-const insertSearchEndDatetime = (options: { submission_feature_id: number }) => `
+const insertSearchEndDatetime = (options: { submission_feature_id: number }) => {
+  const timestamp = faker.date.future().toISOString();
+
+  return `
     INSERT INTO submission_feature_property_timestamp
     (
         submission_feature_id,
         feature_type_property_id,
-        value,
+        date_value,
+        time_value,
         create_user
     )
     SELECT
         sf.submission_feature_id,
         ftp.feature_type_property_id,
-        $$${faker.date.future().toISOString()}$$,
+        $$${timestamp}$$::timestamptz::date,
+        $$${timestamp}$$::timestamptz::time,
         1
     FROM submission_feature sf
     JOIN feature_type_property ftp ON ftp.feature_type_id = sf.feature_type_id AND ftp.record_end_date IS NULL
@@ -598,6 +609,7 @@ const insertSearchEndDatetime = (options: { submission_feature_id: number }) => 
       AND fp.name = 'end_date'
     LIMIT 1;
 `;
+};
 
 const insertSpatialPolygon = (options: { submission_feature_id: number }) =>
   `

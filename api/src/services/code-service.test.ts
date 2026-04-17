@@ -34,7 +34,8 @@ describe('codeService', () => {
               description: 'Name',
               type_name: FEATURE_PROPERTY_TYPE.STRING,
               required_value: true,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             }
           ]
         }
@@ -103,7 +104,8 @@ describe('codeService', () => {
               description: 'Name',
               type_name: FEATURE_PROPERTY_TYPE.STRING,
               required_value: true,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             },
             {
               feature_type_property_id: 2,
@@ -112,7 +114,8 @@ describe('codeService', () => {
               description: 'Age',
               type_name: FEATURE_PROPERTY_TYPE.NUMBER,
               required_value: false,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             }
           ]
         },
@@ -130,7 +133,8 @@ describe('codeService', () => {
               description: 'Filename',
               type_name: FEATURE_PROPERTY_TYPE.STRING,
               required_value: true,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             }
           ]
         }

@@ -53,6 +53,19 @@ export interface CreateSubmissionFeatureIngestionRecord {
   dataByteSize: number;
 }
 
+export interface DroppedSubmissionFeatureReason {
+  reason: 'unknown_feature_type_ignored' | 'feature_not_inserted';
+  count: number;
+  featureTypeCounts?: Record<string, number>;
+}
+
+export interface SubmissionFeatureBatchInsertResult {
+  expectedCount: number;
+  insertedCount: number;
+  droppedCount: number;
+  droppedReasons: DroppedSubmissionFeatureReason[];
+}
+
 export interface InsertSubmissionFeatureRecord {
   submissionId: number;
   submissionUploadId: string;

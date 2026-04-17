@@ -1,81 +1,220 @@
 import PgBoss from 'pg-boss';
-import { getAPIUserDBConnection } from '../../database/db';
-import { SearchFeatureService } from '../../services/search-feature-service';
+import { SubmissionUpload } from '../../models/submission-upload';
+import { SubmissionFeaturePropertyIngestionService } from '../../services/ingestion/submission-feature-property-ingestion-service';
+import { SubmissionFeaturePropertyValidationOutcome } from '../../services/ingestion/submission-feature-property-ingestion-service.interface';
+import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { getLogger } from '../../utils/logger';
-
-const defaultLog = getLogger('queue/jobs/index-submission-features-job');
+import { withConnection } from '../with-connection';
 
 /**
  * Index submission features job data interface.
- * Contains the submission ID for async search indexing.
+ * Contains submission scope for async deep property indexing/validation.
  */
 export interface IIndexSubmissionFeaturesJobData {
   /** The submission ID whose features should be indexed for search */
   submissionId: number;
+  /** The submission upload ID whose rows should be validated/indexed */
+  submissionUploadId: string;
+}
+
+const defaultLog = getLogger('queue/jobs/index-submission-features-job');
+
+const TERMINAL_UPLOAD_STATUSES: SubmissionUpload['status'][] = ['indexed', 'invalid', 'failed'];
+
+/**
+ * Return true when a submission upload status is terminal.
+ *
+ * @param {SubmissionUpload['status']} status Submission upload status.
+ * @returns {boolean} True when status is terminal.
+ */
+function isTerminalSubmissionUploadStatus(status: SubmissionUpload['status']): boolean {
+  return TERMINAL_UPLOAD_STATUSES.includes(status);
+}
+
+/**
+ * Return true when the index stage can start or resume from the status.
+ *
+ * @param {SubmissionUpload['status']} status Submission upload status.
+ * @returns {boolean} True when status is index-startable.
+ */
+function isIndexStartableSubmissionUploadStatus(status: SubmissionUpload['status']): boolean {
+  return status === 'ingested' || status === 'indexing';
+}
+
+/**
+ * Initialize index stage guard/entry transition.
+ *
+ * @param {string} submissionUploadId Submission upload scope.
+ * @param {string} jobId Job identifier.
+ * @returns {Promise<boolean>} True when stage should proceed.
+ */
+async function initializeIndexSubmissionFeaturesStage(submissionUploadId: string, jobId: string): Promise<boolean> {
+  return withConnection(async (connection) => {
+    const submissionUploadService = new SubmissionUploadService(connection);
+    const currentUpload = await submissionUploadService.getSubmissionUpload(submissionUploadId);
+
+    if (isTerminalSubmissionUploadStatus(currentUpload.status)) {
+      defaultLog.info({
+        label: 'initializeIndexSubmissionFeaturesStage',
+        message: 'Skipping index job because submission upload is terminal',
+        jobId,
+        submissionUploadId,
+        status: currentUpload.status
+      });
+      return false;
+    }
+
+    if (!isIndexStartableSubmissionUploadStatus(currentUpload.status)) {
+      defaultLog.warn({
+        label: 'initializeIndexSubmissionFeaturesStage',
+        message: 'Skipping index job because submission upload is not index-startable',
+        jobId,
+        submissionUploadId,
+        status: currentUpload.status
+      });
+      return false;
+    }
+
+    await submissionUploadService.transitionSubmissionUploadToIndexing(submissionUploadId);
+    return true;
+  });
+}
+
+/**
+ * Execute heavy indexing work for one submission upload.
+ *
+ * @param {number} submissionId Submission scope.
+ * @param {string} submissionUploadId Submission upload scope.
+ * @returns {Promise<SubmissionFeaturePropertyValidationOutcome>} Validation/indexing outcome.
+ */
+async function executeIndexSubmissionFeaturesIngestion(
+  submissionId: number,
+  submissionUploadId: string
+): Promise<SubmissionFeaturePropertyValidationOutcome> {
+  return withConnection(async (connection) => {
+    const featurePropertyIngestionService = new SubmissionFeaturePropertyIngestionService(connection);
+    return featurePropertyIngestionService.indexSubmissionPropertiesBySubmissionUploadId(
+      submissionId,
+      submissionUploadId
+    );
+  });
+}
+
+/**
+ * Finalize index stage by persisting terminal status from outcome.
+ *
+ * @param {number} submissionId Submission scope.
+ * @param {string} submissionUploadId Submission upload scope.
+ * @param {string} jobId Job identifier.
+ * @param {SubmissionFeaturePropertyValidationOutcome} outcome Indexing outcome.
+ * @returns {Promise<void>}
+ */
+async function finalizeIndexSubmissionFeaturesStage(
+  submissionId: number,
+  submissionUploadId: string,
+  jobId: string,
+  outcome: SubmissionFeaturePropertyValidationOutcome
+): Promise<void> {
+  await withConnection(async (connection) => {
+    const submissionUploadService = new SubmissionUploadService(connection);
+
+    if (outcome.status === 'invalid') {
+      await submissionUploadService.transitionSubmissionUploadToInvalid(submissionUploadId);
+
+      defaultLog.warn({
+        label: 'finalizeIndexSubmissionFeaturesStage',
+        message: 'Index submission features job completed with validation errors',
+        jobId,
+        submissionId,
+        submissionUploadId,
+        errorCount: outcome.errorCount,
+        errorCounts: outcome.errorCounts
+      });
+
+      return;
+    }
+
+    await submissionUploadService.transitionSubmissionUploadToIndexed(submissionUploadId);
+
+    defaultLog.info({
+      label: 'finalizeIndexSubmissionFeaturesStage',
+      message: 'Index submission features job completed successfully',
+      jobId,
+      submissionId,
+      submissionUploadId
+    });
+  });
+}
+
+/**
+ * Orchestrate the index stage workflow.
+ *
+ * @param {number} submissionId Submission scope.
+ * @param {string} submissionUploadId Submission upload scope.
+ * @param {string} jobId Job identifier.
+ * @returns {Promise<void>}
+ */
+async function runIndexSubmissionFeaturesStage(
+  submissionId: number,
+  submissionUploadId: string,
+  jobId: string
+): Promise<void> {
+  const shouldRun = await initializeIndexSubmissionFeaturesStage(submissionUploadId, jobId);
+  if (!shouldRun) {
+    return;
+  }
+
+  const outcome = await executeIndexSubmissionFeaturesIngestion(submissionId, submissionUploadId);
+  await finalizeIndexSubmissionFeaturesStage(submissionId, submissionUploadId, jobId, outcome);
 }
 
 /**
  * Index submission features job handler.
- *
- * Indexes submission features for search asynchronously after validation completes.
- * Indexing is a separate concern from validation — a failed index does not invalidate
- * the submission. The DLQ handler logs but does not affect validation status.
  *
  * @param {PgBoss.Job<IIndexSubmissionFeaturesJobData>[]} jobs The jobs to process
  * @return {*}  {Promise<void>}
  */
 export const indexSubmissionFeaturesJobHandler: PgBoss.WorkHandler<IIndexSubmissionFeaturesJobData> = async (jobs) => {
   for (const job of jobs) {
-    const { submissionId } = job.data;
+    const { submissionId, submissionUploadId } = job.data;
 
     defaultLog.info({
       label: 'indexSubmissionFeaturesJobHandler',
       message: 'Processing index submission features job',
       jobId: job.id,
-      submissionId
+      submissionId,
+      submissionUploadId
     });
 
-    const connection = getAPIUserDBConnection();
-
     try {
-      await connection.open();
-
-      const searchFeatureService = new SearchFeatureService(connection);
-      await searchFeatureService.indexFeaturesBySubmissionId(submissionId);
-
-      await connection.commit();
-
-      defaultLog.info({
-        label: 'indexSubmissionFeaturesJobHandler',
-        message: 'Index submission features job completed successfully',
-        jobId: job.id,
-        submissionId
-      });
+      await runIndexSubmissionFeaturesStage(submissionId, submissionUploadId, job.id);
     } catch (error) {
-      await connection.rollback();
+      await withConnection(async (connection) => {
+        const submissionUploadService = new SubmissionUploadService(connection);
+        await submissionUploadService.transitionSubmissionUploadStatus(submissionUploadId, 'failed', [
+          'uploaded',
+          'ingesting',
+          'ingested',
+          'indexing'
+        ]);
+      });
 
       defaultLog.error({
         label: 'indexSubmissionFeaturesJobHandler',
         message: 'Index submission features job failed',
         jobId: job.id,
         submissionId,
+        submissionUploadId,
         error
       });
 
       throw error; // pg-boss will handle retry based on configuration
-    } finally {
-      connection.release();
     }
   }
 };
 
 /**
  * Dead Letter Queue handler for failed index submission features jobs.
- *
- * Indexing failure is independent of validation — a failed index does not invalidate
- * the submission. This handler only logs the failure with error details. There is no
- * tracking record to update (unlike malware scan or download jobs), so no DB connection
- * is needed.
  *
  * @param {PgBoss.Job<IIndexSubmissionFeaturesJobData>[]} jobs The failed jobs
  * @return {*}  {Promise<void>}
@@ -84,7 +223,7 @@ export const indexSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IIndexSubm
   jobs
 ) => {
   for (const job of jobs) {
-    const { submissionId } = job.data;
+    const { submissionId, submissionUploadId } = job.data;
 
     // Cast to access output field available on failed jobs
     const jobOutput = (job as PgBoss.JobWithMetadata<IIndexSubmissionFeaturesJobData>).output;
@@ -94,6 +233,7 @@ export const indexSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<IIndexSubm
       message: 'Index submission features job failed after all retries',
       jobId: job.id,
       submissionId,
+      submissionUploadId,
       output: jobOutput ?? 'Job failed after all retries'
     });
   }

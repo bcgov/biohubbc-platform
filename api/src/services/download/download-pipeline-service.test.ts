@@ -179,7 +179,8 @@ describe('DownloadPipelineService', () => {
               description: 'Artifact Key',
               type_name: FEATURE_PROPERTY_TYPE.ARTIFACT_KEY,
               required_value: true,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             }
           ]
         }
@@ -246,7 +247,8 @@ describe('DownloadPipelineService', () => {
               description: 'Species',
               type_name: FEATURE_PROPERTY_TYPE.STRING,
               required_value: false,
-              calculated_value: false
+              calculated_value: false,
+              allow_multiple: false
             }
           ]
         }

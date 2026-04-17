@@ -81,7 +81,8 @@ describe('ArtifactService', () => {
         description: 'S3 Key',
         type_name: FEATURE_PROPERTY_TYPE.STRING,
         required_value: true,
-        calculated_value: false
+        calculated_value: false,
+        allow_multiple: false
       };
 
       const getFeaturePropertyByNameStub = sinon

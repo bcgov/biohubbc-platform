@@ -370,12 +370,12 @@ const INDEX_SUBMISSION_FEATURES_OPTIONS: IPublishOptions = {
 /**
  * Publish an index submission features job to the queue.
  *
- * Queues async search indexing for a submission's features. Uses the caller's
+ * Queues async deep property indexing/validation for a submission upload. Uses the caller's
  * DB connection via pg-boss's `db` option so the job insert participates in
  * the same transaction — if the caller rolls back, the job is never visible.
  *
  * @param {IDBConnection} connection Database connection for transactional job insert
- * @param {IIndexSubmissionFeaturesJobData} data Job data containing submissionId
+ * @param {IIndexSubmissionFeaturesJobData} data Job data containing submissionId and submissionUploadId
  * @param {IPublishOptions} [options={}] Job options
  * @return {*}  {Promise<PublishJobResult>} Result indicating success, duplicate, or error
  */

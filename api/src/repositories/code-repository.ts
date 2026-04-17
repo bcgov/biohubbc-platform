@@ -58,7 +58,8 @@ export class CodeRepository extends BaseRepository {
               'description', fp.description,
               'type_name', fpt.name,
               'required_value', ftp.required_value,
-              'calculated_value', fp.calculated_value
+              'calculated_value', fp.calculated_value,
+              'allow_multiple', ftp.allow_multiple
             )
             ORDER BY ftp.sort
           ) FILTER (WHERE ftp.feature_type_property_id IS NOT NULL),
@@ -106,7 +107,8 @@ export class CodeRepository extends BaseRepository {
       fp.description,
       fpt.name as type_name,
       ftp.required_value,
-      fp.calculated_value
+      fp.calculated_value,
+      ftp.allow_multiple
     FROM
       feature_type_property ftp
     INNER JOIN

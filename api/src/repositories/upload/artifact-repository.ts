@@ -6,6 +6,117 @@ import { BaseRepository } from '../base-repository';
 
 export class ArtifactRepository extends BaseRepository {
   /**
+   * Insert artifact records in bulk with upsert semantics and return ids for all input keys.
+   * Existing records are updated with the latest status/checksum/upload metadata.
+   *
+   * @param {CreateArtifact[]} artifacts
+   * @returns {Promise<Array<{ artifact_id: string; bucket: string; object_key: string }>>}
+   */
+  async insertArtifacts(
+    artifacts: CreateArtifact[]
+  ): Promise<Array<{ artifact_id: string; bucket: string; object_key: string }>> {
+    if (!artifacts.length) {
+      return [];
+    }
+
+    const buckets = artifacts.map((artifact) => artifact.bucket);
+    const artifactStatuses = artifacts.map((artifact) => artifact.artifact_status);
+    const objectKeys = artifacts.map((artifact) => artifact.object_key);
+    const byteSizes = artifacts.map((artifact) => artifact.byte_size);
+    const checksums = artifacts.map((artifact) => artifact.checksum_sha256 ?? null);
+    const uploadedAts = artifacts.map((artifact) => artifact.uploaded_at ?? null);
+    const formats = artifacts.map((artifact) => artifact.format);
+
+    const sqlStatement = SQL`
+      WITH input_rows AS (
+        SELECT *
+        FROM UNNEST(
+          ${buckets}::text[],
+          ${artifactStatuses}::artifact_status[],
+          ${objectKeys}::text[],
+          ${byteSizes}::integer[],
+          ${checksums}::text[],
+          ${uploadedAts}::timestamptz[],
+          ${formats}::text[]
+        ) AS t(
+          bucket,
+          artifact_status,
+          object_key,
+          byte_size,
+          checksum_sha256,
+          uploaded_at,
+          format
+        )
+      ),
+      distinct_input AS (
+        SELECT DISTINCT ON (bucket, object_key)
+          bucket,
+          artifact_status,
+          object_key,
+          byte_size,
+          checksum_sha256,
+          uploaded_at,
+          format
+        FROM input_rows
+        ORDER BY bucket, object_key
+      ),
+      upserted AS (
+        INSERT INTO artifact (
+          bucket,
+          object_key,
+          byte_size,
+          artifact_status,
+          checksum_sha256,
+          uploaded_at,
+          format
+        )
+        SELECT
+          di.bucket,
+          di.object_key,
+          di.byte_size,
+          di.artifact_status,
+          di.checksum_sha256,
+          di.uploaded_at,
+          di.format
+        FROM distinct_input di
+        ON CONFLICT (bucket, object_key)
+        DO UPDATE SET
+          byte_size = EXCLUDED.byte_size,
+          artifact_status = EXCLUDED.artifact_status,
+          checksum_sha256 = COALESCE(EXCLUDED.checksum_sha256, artifact.checksum_sha256),
+          uploaded_at = COALESCE(EXCLUDED.uploaded_at, artifact.uploaded_at),
+          format = EXCLUDED.format
+        RETURNING artifact_id, bucket, object_key
+      )
+      SELECT
+        artifact_id,
+        bucket,
+        object_key
+      FROM upserted;
+    `;
+
+    const response = await this.connection.sql(
+      sqlStatement,
+      z.object({
+        artifact_id: z.string().uuid(),
+        bucket: z.string(),
+        object_key: z.string()
+      })
+    );
+
+    const expectedKeyCount = new Set(artifacts.map((artifact) => `${artifact.bucket}|${artifact.object_key}`)).size;
+
+    if (response.rowCount !== expectedKeyCount) {
+      throw new ApiExecuteSQLError('Failed to insert artifact records', [
+        'ArtifactRepository->insertArtifacts',
+        `rowCount was ${response.rowCount}, expected ${expectedKeyCount}`
+      ]);
+    }
+
+    return response.rows;
+  }
+
+  /**
    * Get a single artifact by ID.
    *
    * @param {string} artifactId - The ID of the artifact to retrieve.

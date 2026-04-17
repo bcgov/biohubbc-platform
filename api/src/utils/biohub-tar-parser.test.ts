@@ -5,7 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as tar from 'tar-stream';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
-import { streamCodesets, streamFeatures, streamMedia } from './biohub-tar-parser';
+import { streamCodesets, streamFeatures, streamMedia, streamSubmissionArchive } from './biohub-tar-parser';
 
 chai.use(sinonChai);
 
@@ -50,11 +50,13 @@ describe('biohub-tar-parser', () => {
           name: 'codes/agency.json',
           content: JSON.stringify({
             agency: {
+              key: 'agency',
               label: 'Agency',
               external_id: 'agency',
               description: 'Agency codes',
               codes: {
                 x: {
+                  key: 'x',
                   label: 'X',
                   external_id: 'x',
                   description: 'Code X'
@@ -320,6 +322,67 @@ describe('biohub-tar-parser', () => {
 
       expect(result.uploadedCount).to.equal(3);
       expect(batchSizes).to.deep.equal([2, 1]);
+    });
+  });
+
+  describe('streamSubmissionArchive', () => {
+    it('streams features, codesets, and media in one pass', async () => {
+      const tarBuffer = await createTestTar([
+        {
+          name: 'features/dataset.json',
+          content: JSON.stringify([{ id: 'feature-1', type: 'dataset', properties: {}, content: [], parent: null }])
+        },
+        {
+          name: 'codes/agency.json',
+          content: JSON.stringify({
+            agency: {
+              key: 'agency',
+              label: 'Agency',
+              external_id: 'agency',
+              description: 'Agency codes',
+              codes: {
+                x: {
+                  key: 'x',
+                  label: 'X',
+                  external_id: 'x',
+                  description: 'Code X'
+                }
+              }
+            }
+          })
+        },
+        { name: 'files/photo.jpg', content: 'jpeg-data' }
+      ]);
+
+      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+
+      const featureBatchSizes: number[] = [];
+      let codesetPayloadCount = 0;
+      let mediaPayloadCount = 0;
+      const result = await streamSubmissionArchive(bufferToStream(tarBuffer), {
+        objectStorageService: new ObjectStorageService(),
+        s3KeyPrefix: 'submissions/42/media',
+        featureBatchSize: 100,
+        mediaBatchSize: 100,
+        mediaMaxBatchBytes: 1024 * 1024,
+        mediaConcurrency: 2,
+        ingestFeatureBatch: async (blocks) => {
+          featureBatchSizes.push(blocks.length);
+        },
+        ingestCodesets: async () => {
+          codesetPayloadCount += 1;
+        },
+        ingestMediaBatch: async (uploadedFiles) => {
+          mediaPayloadCount += uploadedFiles.length;
+        }
+      });
+
+      expect(result.featureCount).to.equal(1);
+      expect(result.uploadedCount).to.equal(1);
+      expect(result.codesetFileCount).to.equal(1);
+      expect(featureBatchSizes).to.deep.equal([1]);
+      expect(codesetPayloadCount).to.equal(1);
+      expect(mediaPayloadCount).to.equal(1);
     });
   });
 });
