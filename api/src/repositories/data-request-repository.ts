@@ -31,7 +31,7 @@ export class DataRequestRepository extends BaseRepository {
         'dr.ticket_id',
         'dr.policy_id',
         'p.status as status',
-        'dr.create_date'
+        'dr.create_date as create_date'
       )
       .join('policy as p', 'p.policy_id', 'dr.policy_id')
       .whereNull('dr.record_end_date')
@@ -68,7 +68,7 @@ export class DataRequestRepository extends BaseRepository {
         'dr.ticket_id',
         'dr.policy_id',
         'p.status as status',
-        'dr.create_date'
+        'dr.create_date as create_date'
       )
       .join('policy as p', 'p.policy_id', 'dr.policy_id')
       .join('team_member as tm', 'tm.team_id', 'dr.team_id')
@@ -133,7 +133,7 @@ export class DataRequestRepository extends BaseRepository {
         'dr.ticket_id',
         'dr.policy_id',
         'p.status as status',
-        'dr.create_date'
+        'dr.create_date as create_date'
       )
       .join('policy as p', 'p.policy_id', 'dr.policy_id')
       .where('dr.data_request_id', dataRequestId)
@@ -177,7 +177,7 @@ export class DataRequestRepository extends BaseRepository {
         'dr.ticket_id',
         'dr.policy_id',
         'p.status as status',
-        'dr.create_date'
+        'dr.create_date as create_date'
       )
       .join('policy as p', 'p.policy_id', 'dr.policy_id')
       .where('dr.data_request_id', dataRequestId)
@@ -206,7 +206,7 @@ export class DataRequestRepository extends BaseRepository {
         'dr.ticket_id',
         'dr.policy_id',
         'p.status as status',
-        'dr.create_date'
+        'dr.create_date as create_date'
       )
       .join('policy as p', 'p.policy_id', 'dr.policy_id')
       .where('dr.policy_id', policyId)
@@ -239,7 +239,7 @@ export class DataRequestRepository extends BaseRepository {
         dr.ticket_id,
         dr.policy_id,
         p.status AS status,
-        dr.create_date
+        dr.create_date AS create_date
       FROM inserted_data_request dr
       JOIN policy p ON p.policy_id = dr.policy_id
       WHERE p.record_end_date IS NULL;
@@ -324,7 +324,7 @@ export class DataRequestRepository extends BaseRepository {
         'dr.ticket_id',
         'dr.policy_id',
         'p.status as status',
-        'dr.create_date'
+        'dr.create_date as create_date'
       )
       .join('policy as p', 'p.policy_id', 'dr.policy_id')
       .where('dr.ticket_id', ticketId)
