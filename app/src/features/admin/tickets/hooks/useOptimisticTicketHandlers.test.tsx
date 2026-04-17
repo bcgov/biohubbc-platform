@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
-import { ITicketWithHistory } from 'interfaces/useTicketsApi.interface';
+import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { useOptimisticTicketHandlers } from './useOptimisticTicketHandlers';
 
 const mockUpdateTicketStatus = vi.fn();
@@ -20,7 +20,7 @@ const baseDataRequest: DataRequestResponse = {
   create_date: '2026-03-01T00:00:00.000Z'
 };
 
-const baseTicket: ITicketWithHistory = {
+const baseTicket: ITicketExtended = {
   ticket_id: '11111111-1111-1111-1111-111111111111',
   ticket_slug: '04900001',
   subject: 'Ticket subject',
@@ -63,7 +63,7 @@ describe('useOptimisticTicketHandlers', () => {
   });
 
   it('shows snackbar and blocks close confirmation when ticket has requested data requests', () => {
-    const ticketWithUnaddressedDataRequest: ITicketWithHistory = {
+    const ticketWithUnaddressedDataRequest: ITicketExtended = {
       ...baseTicket,
       data_requests: [baseDataRequest]
     };
@@ -87,7 +87,7 @@ describe('useOptimisticTicketHandlers', () => {
   });
 
   it('opens close confirmation when all data requests are actioned', () => {
-    const ticketWithActionedDataRequest: ITicketWithHistory = {
+    const ticketWithActionedDataRequest: ITicketExtended = {
       ...baseTicket,
       data_requests: [
         {

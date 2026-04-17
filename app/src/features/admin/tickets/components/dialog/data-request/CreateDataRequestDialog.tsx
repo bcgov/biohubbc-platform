@@ -81,13 +81,17 @@ export const CreateDataRequestDialog = (props: ICreateDataRequestDialogProps) =>
         ),
         initialValues: {
           reason: initialReason,
-          system_user_ids: [],
           system_users: []
         },
         validationSchema: CreateDataRequestDialogYup
       }}
       onCancel={onCancel}
-      onSave={onSave}
+      onSave={(values) =>
+        onSave({
+          reason: values.reason,
+          system_user_ids: values.system_users.map((user) => user.system_user_id)
+        })
+      }
     />
   );
 };

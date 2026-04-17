@@ -3,7 +3,7 @@ import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
 import { ITicketContext } from 'contexts/ticketContext';
 import { useTicketContext } from 'hooks/useContext';
 import { DataLoader } from 'hooks/useDataLoader';
-import { ITicketWithHistory } from 'interfaces/useTicketsApi.interface';
+import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
 import { TicketDetailPage, TicketDetailPageContent } from './TicketDetailPage';
@@ -18,14 +18,27 @@ vi.mock('./hooks/useTicketComment', () => ({
 }));
 
 vi.mock('./detail/header/TicketHeader', () => ({
-  TicketHeader: ({ ticket }: { ticket: ITicketWithHistory }) => (
+  TicketHeader: ({ ticket }: { ticket: ITicketExtended }) => (
     <div data-testid="ticket-header">{ticket.ticket_slug}</div>
   )
 }));
 
 vi.mock('./detail/timeline/TicketTimeline', () => ({
-  TicketTimeline: ({ history, isLoading }: { history: Array<{ create_date: string }>; isLoading: boolean }) => (
-    <div data-testid="ticket-timeline" data-loading={String(isLoading)} data-history={JSON.stringify(history)} />
+  TicketTimeline: ({ ticket, isLoading }: { ticket: ITicketExtended | undefined; isLoading: boolean }) => (
+    <div
+      data-testid="ticket-timeline"
+      data-loading={String(isLoading)}
+      data-ticket-id={ticket?.ticket_id ?? ''}
+      data-events={
+        JSON.stringify(
+          [
+            ...(ticket?.statuses ?? []),
+            ...(ticket?.comments ?? []),
+            ...(ticket?.data_requests ?? [])
+          ].sort((a, b) => new Date(a.create_date).getTime() - new Date(b.create_date).getTime())
+        )
+      }
+    />
   )
 }));
 
@@ -71,7 +84,7 @@ afterEach(() => {
 const mockUseTicketContext = useTicketContext as Mock;
 const mockUseTicketComment = useTicketComment as Mock;
 
-const baseTicket: ITicketWithHistory = {
+const baseTicket: ITicketExtended = {
   ticket_id: '11111111-1111-1111-1111-111111111111',
   ticket_slug: '04900042',
   subject: 'Test Ticket',
@@ -136,7 +149,7 @@ const baseTicket: ITicketWithHistory = {
 const setComment = vi.fn();
 const onAddComment = vi.fn().mockResolvedValue(undefined);
 
-const renderContent = (ticket: ITicketWithHistory | undefined, isLoading = false) =>
+const renderContent = (ticket: ITicketExtended | undefined, isLoading = false) =>
   render(
     <TicketDetailPageContent
       ticket={ticket}
@@ -148,8 +161,8 @@ const renderContent = (ticket: ITicketWithHistory | undefined, isLoading = false
     />
   );
 
-const makeTicketContext = (ticket: ITicketWithHistory | undefined, isLoading = false): ITicketContext => {
-  const ticketDataLoader: DataLoader<[string], ITicketWithHistory, unknown> = {
+const makeTicketContext = (ticket: ITicketExtended | undefined, isLoading = false): ITicketContext => {
+  const ticketDataLoader: DataLoader<[string], ITicketExtended, unknown> = {
     data: ticket,
     error: undefined,
     isLoading,
@@ -181,19 +194,16 @@ describe('TicketDetailPageContent', () => {
     expect(screen.getByTestId('ticket-sidebar')).toHaveAttribute('data-data-request-count', '1');
   });
 
-  it('passes chronologically sorted history to timeline', () => {
+  it('passes ticket data to timeline', () => {
     renderContent(baseTicket);
 
     const timeline = screen.getByTestId('ticket-timeline');
-    const history = JSON.parse(timeline.getAttribute('data-history') ?? '[]') as Array<{ create_date: string }>;
-    const createDates = history.map((entry) => entry.create_date);
+    const events = JSON.parse(timeline.getAttribute('data-events') ?? '[]') as Array<{ create_date: string }>;
 
-    expect(createDates).toEqual([
-      '2026-02-24T00:00:00.000Z',
-      '2026-02-24T10:00:00.000Z',
-      '2026-02-24T12:00:00.000Z',
-      '2026-02-25T00:00:00.000Z'
-    ]);
+    expect(timeline).toHaveAttribute('data-ticket-id', baseTicket.ticket_id);
+    expect(events).toHaveLength(
+      baseTicket.statuses.length + baseTicket.comments.length + baseTicket.data_requests.length
+    );
     expect(timeline).toHaveAttribute('data-loading', 'false');
   });
 

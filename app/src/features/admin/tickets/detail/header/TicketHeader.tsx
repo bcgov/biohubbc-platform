@@ -7,7 +7,7 @@ import Typography from '@mui/material/Typography';
 import { PageHeader } from 'components/header/PageHeader';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext } from 'hooks/useContext';
-import { ITicketWithHistory, TicketStatus } from 'interfaces/useTicketsApi.interface';
+import { ITicketExtended, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { Link as RouterLink } from 'react-router-dom';
 import { EditTicketDialog } from '../../components/dialog/edit/EditTicketDialog';
 import { useOptimisticTicketHandlers } from '../../hooks/useOptimisticTicketHandlers';
@@ -15,7 +15,7 @@ import { useTicketEditDialog } from '../../hooks/useTicketEditDialog';
 import { TicketHeaderSubtitle } from './TicketHeaderSubtitle';
 
 interface ITicketHeaderProps {
-  ticket: ITicketWithHistory;
+  ticket: ITicketExtended;
 }
 
 /**

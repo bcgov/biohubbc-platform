@@ -14,15 +14,13 @@ interface ICreateDataRequestFormProps {
 
 export interface ICreateDataRequestFormValues {
   reason: string;
-  system_user_ids: number[];
   system_users: IAvailableUser[];
 }
 
 /**
  * Form body for creating a ticket data request.
  *
- * Manages selected team members through Formik fields and keeps
- * `system_users` and `system_user_ids` synchronized.
+ * Manages selected team members through Formik field `system_users`.
  *
  * @param {ICreateDataRequestFormProps} props - Form props.
  * @returns {JSX.Element}
@@ -56,10 +54,6 @@ export const CreateDataRequestForm = (props: ICreateDataRequestFormProps) => {
     ];
 
     setFieldValue('system_users', nextSystemUsers);
-    setFieldValue(
-      'system_user_ids',
-      nextSystemUsers.map((user) => user.system_user_id)
-    );
   };
 
   const handleRemoveMember = (teamMemberId: string) => {
@@ -67,10 +61,6 @@ export const CreateDataRequestForm = (props: ICreateDataRequestFormProps) => {
     const nextSystemUsers = values.system_users.filter((user) => user.system_user_id !== removeUserId);
 
     setFieldValue('system_users', nextSystemUsers);
-    setFieldValue(
-      'system_user_ids',
-      nextSystemUsers.map((user) => user.system_user_id)
-    );
   };
 
   return (

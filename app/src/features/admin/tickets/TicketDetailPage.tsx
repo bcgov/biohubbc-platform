@@ -4,7 +4,7 @@ import Stack from '@mui/material/Stack';
 import { LoadingGuard } from 'components/loading/LoadingGuard';
 import { PageSection } from 'components/section/PageSection';
 import { useTicketContext } from 'hooks/useContext';
-import { ITicketWithHistory } from 'interfaces/useTicketsApi.interface';
+import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { Dispatch, SetStateAction } from 'react';
 import { TicketComment } from './detail/comment/TicketComment';
 import { TicketHeader } from './detail/header/TicketHeader';
@@ -12,10 +12,9 @@ import { TicketSidebar } from './detail/sidebar/TicketSidebar';
 import { TicketSkeleton } from './detail/skeleton/TicketSkeleton';
 import { TicketTimeline } from './detail/timeline/TicketTimeline';
 import { useTicketComment } from './hooks/useTicketComment';
-import { sortChronological } from './utils/sortChronological';
 
 export interface ITicketDetailPageContentProps {
-  ticket: ITicketWithHistory | undefined;
+  ticket: ITicketExtended | undefined;
   isLoading: boolean;
   comment: string;
   setComment: Dispatch<SetStateAction<string>>;
@@ -49,14 +48,7 @@ export const TicketDetailPageContent = (props: ITicketDetailPageContentProps) =>
                 alignItems: 'flex-start'
               }}>
               <Stack spacing={4} sx={{ flex: '1 1 0', minWidth: { xs: '100%', md: 560 } }}>
-                <TicketTimeline
-                  history={[
-                    ...(ticket?.statuses ?? []),
-                    ...(ticket?.comments ?? []),
-                    ...(ticket?.data_requests ?? [])
-                  ].sort(sortChronological)}
-                  isLoading={isLoading}
-                />
+                <TicketTimeline ticket={ticket} isLoading={isLoading} />
                 {ticket?.status === 'open' && (
                   <TicketComment
                     comment={comment}

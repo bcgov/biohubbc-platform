@@ -9,7 +9,7 @@ import {
   ITicket,
   ITicketCommentLog,
   ITicketReference,
-  ITicketWithHistory,
+  ITicketExtended,
   IUpdateTicketRequest,
   TicketStatus
 } from 'interfaces/useTicketsApi.interface';
@@ -41,10 +41,10 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * Get a single ticket by ID.
    *
    * @param {string} ticketId
-   * @return {*} {Promise<ITicketWithHistory>}
+   * @return {*} {Promise<ITicketExtended>}
    */
-  const getTicketForAdmin = async (ticketId: string): Promise<ITicketWithHistory> => {
-    const { data } = await axios.get<ITicketWithHistory>(`/api/administrative/tickets/${ticketId}`);
+  const getTicketForAdmin = async (ticketId: string): Promise<ITicketExtended> => {
+    const { data } = await axios.get<ITicketExtended>(`/api/administrative/tickets/${ticketId}`);
 
     return data;
   };
@@ -159,10 +159,10 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * Get a single ticket by ID.
    *
    * @param {string} ticketId
-   * @return {*} {Promise<ITicketWithHistory>}
+   * @return {*} {Promise<ITicketExtended>}
    */
-  const getTicketForUser = async (ticketId: string): Promise<ITicketWithHistory> => {
-    const { data } = await axios.get<ITicketWithHistory>(`/api/tickets/${ticketId}`);
+  const getTicketForUser = async (ticketId: string): Promise<ITicketExtended> => {
+    const { data } = await axios.get<ITicketExtended>(`/api/tickets/${ticketId}`);
 
     return data;
   };

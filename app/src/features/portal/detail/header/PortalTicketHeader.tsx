@@ -6,11 +6,11 @@ import Typography from '@mui/material/Typography';
 import { PageHeader } from 'components/header/PageHeader';
 import { TicketHeaderSubtitle } from 'features/admin/tickets/detail/header/TicketHeaderSubtitle';
 import { useDialogContext } from 'hooks/useContext';
-import { ITicketWithHistory } from 'interfaces/useTicketsApi.interface';
+import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { Link as RouterLink } from 'react-router-dom';
 
 interface IPortalTicketHeaderProps {
-  ticket: ITicketWithHistory;
+  ticket: ITicketExtended;
 }
 
 /**

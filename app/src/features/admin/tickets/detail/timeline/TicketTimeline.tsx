@@ -14,22 +14,18 @@ import { transformPolicyJsonToApi } from 'features/admin/policies/utils/policyTr
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import { DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
 import { IPolicy, PolicyStatus } from 'interfaces/usePoliciesApi.interface';
-import { ITicketStatusHistory } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
 import { getRelativeTimeLabel } from 'utils/date';
+import {
+  ICommentTimelineEvent,
+  IDataRequestTimelineEvent,
+  IStatusTimelineEvent,
+  ITicketTimelineProps,
+  ITimelineEvent
+} from './TicketTimeline.interface';
 import { TicketCommentTimelineItem } from './item/TicketCommentTimelineItem';
 import { TicketDataRequestTimelineItem } from './item/TicketDataRequestTimelineItem';
-
-interface ITicketTimelineProps {
-  history: Array<ITicketStatusHistory | DataRequestResponse>;
-  isLoading: boolean;
-}
-
-const isDataRequestHistoryItem = (item: ITicketStatusHistory | DataRequestResponse): item is DataRequestResponse => {
-  return (item as DataRequestResponse).data_request_id !== undefined;
-};
 
 /**
  * Renders the timeline section for a ticket.
@@ -38,7 +34,7 @@ const isDataRequestHistoryItem = (item: ITicketStatusHistory | DataRequestRespon
  * @return {*}
  */
 export const TicketTimeline = (props: ITicketTimelineProps) => {
-  const { history, isLoading } = props;
+  const { ticket, isLoading } = props;
   const api = useApi();
   const dialogContext = useDialogContext();
   const { ticketDataLoader } = useTicketContext();
@@ -55,12 +51,43 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     dialogContext.setYesNoDialog({ open: false });
   };
 
-  if (!history.length) {
+  const timelineEvents: ITimelineEvent[] = ticket
+    ? [
+        ...ticket.statuses.map(
+          (status): IStatusTimelineEvent => ({
+            kind: 'status',
+            id: status.ticket_status_history_id,
+            create_date: status.create_date,
+            user_identifier: status.user_identifier,
+            status: status.status
+          })
+        ),
+        ...ticket.comments.map(
+          (comment): ICommentTimelineEvent => ({
+            kind: 'comment',
+            id: comment.ticket_comment_id,
+            create_date: comment.create_date,
+            user_identifier: comment.user_identifier,
+            comment: comment.comment
+          })
+        ),
+        ...ticket.data_requests.map(
+          (dataRequest): IDataRequestTimelineEvent => ({
+            kind: 'data_request',
+            id: dataRequest.data_request_id,
+            create_date: dataRequest.create_date,
+            dataRequest
+          })
+        )
+      ].toSorted((a, b) => new Date(a.create_date).getTime() - new Date(b.create_date).getTime())
+    : [];
+
+  if (!timelineEvents.length) {
     return null;
   }
 
   // The first "open" status is "opened"; later "open" statuses are "reopened".
-  const firstOpenStatusIndex = history.findIndex((item) => !isDataRequestHistoryItem(item) && item.status === 'open');
+  const firstOpenStatusIndex = timelineEvents.findIndex((item) => item.kind === 'status' && item.status === 'open');
 
   const handleDataRequestStatusUpdate = async (dataRequestId: string, policyId: string, policyStatus: PolicyStatus) => {
     try {
@@ -264,88 +291,84 @@ export const TicketTimeline = (props: ITicketTimelineProps) => {
     }
   };
 
-  const timelineItems: ICustomTimelineItem[] = history.map((item, index) => {
-    if (isDataRequestHistoryItem(item)) {
-      const itemId = item.data_request_id;
-      return {
-        id: itemId,
-        icon: <Icon path={TICKET_TIMELINE_ICONS.data_request} size={0.75} />,
-        children: (
-          <TicketDataRequestTimelineItem
-            dataRequest={item}
-            dateLabel={
-              getRelativeTimeLabel(item.create_date ?? '', {
-                maxRelativeDays: 30,
-                absoluteFormat: DATE_FORMAT.ShortMediumDateFormat
-              }) ?? ''
-            }
-            isUpdating={updatingDataRequestId === item.data_request_id}
-            onViewPolicy={handleOpenPolicyDialog}
-            onViewFinalizedPolicy={handleOpenViewPolicyDialog}
-            onApprove={(dataRequestId) =>
-              handleConfirmDataRequestStatusUpdate(dataRequestId, item.policy_id, PolicyStatus.APPROVED)
-            }
-            onDeny={(dataRequestId) =>
-              handleConfirmDataRequestStatusUpdate(dataRequestId, item.policy_id, PolicyStatus.DENIED)
-            }
-            onResetToReviewed={(dataRequestId) =>
-              handleConfirmResetToReviewed(dataRequestId, item.policy_id, item.status)
-            }
-          />
-        )
-      };
+  const timelineItems: ICustomTimelineItem[] = timelineEvents.map((item, index) => {
+    switch (item.kind) {
+      case 'data_request':
+        return {
+          id: item.id,
+          icon: <Icon path={TICKET_TIMELINE_ICONS.data_request} size={0.75} />,
+          children: (
+            <TicketDataRequestTimelineItem
+              dataRequest={item.dataRequest}
+              dateLabel={
+                getRelativeTimeLabel(item.create_date ?? '', {
+                  maxRelativeDays: 30,
+                  absoluteFormat: DATE_FORMAT.ShortMediumDateFormat
+                }) ?? ''
+              }
+              isUpdating={updatingDataRequestId === item.dataRequest.data_request_id}
+              onViewPolicy={handleOpenPolicyDialog}
+              onViewFinalizedPolicy={handleOpenViewPolicyDialog}
+              onApprove={(dataRequestId) =>
+                handleConfirmDataRequestStatusUpdate(dataRequestId, item.dataRequest.policy_id, PolicyStatus.APPROVED)
+              }
+              onDeny={(dataRequestId) =>
+                handleConfirmDataRequestStatusUpdate(dataRequestId, item.dataRequest.policy_id, PolicyStatus.DENIED)
+              }
+              onResetToReviewed={(dataRequestId) =>
+                handleConfirmResetToReviewed(dataRequestId, item.dataRequest.policy_id, item.dataRequest.status)
+              }
+            />
+          )
+        };
+
+      case 'comment':
+        return {
+          id: item.id,
+          icon: <Icon path={TICKET_TIMELINE_ICONS.comment} size={0.75} />,
+          children: (
+            <TicketCommentTimelineItem
+              author={item.user_identifier}
+              comment={item.comment}
+              dateLabel={
+                getRelativeTimeLabel(item.create_date, {
+                  maxRelativeDays: 30,
+                  absoluteFormat: DATE_FORMAT.ShortMediumDateFormat
+                }) ?? ''
+              }
+            />
+          )
+        };
+
+      case 'status': {
+        const isFirstOpenStatus = index === firstOpenStatusIndex;
+        let message = `${item.user_identifier} reopened the ticket`;
+
+        if (item.status === 'closed') {
+          message = `${item.user_identifier} closed the ticket`;
+        } else if (isFirstOpenStatus) {
+          message = `${item.user_identifier} opened the ticket`;
+        }
+
+        const statusKey: 'open' | 'closed' = item.status === 'closed' ? 'closed' : 'open';
+
+        return {
+          id: item.id,
+          icon: <Icon path={TICKET_TIMELINE_ICONS[statusKey]} size={0.75} />,
+          children: (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2">{message}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {getRelativeTimeLabel(item.create_date, {
+                  maxRelativeDays: 30,
+                  absoluteFormat: DATE_FORMAT.ShortMediumDateFormat
+                })}
+              </Typography>
+            </Box>
+          )
+        };
+      }
     }
-
-    const itemId = item.ticket_status_history_id ?? item.ticket_comment_id ?? `${item.create_date}-${index}`;
-    const isCommentEvent = Boolean(item.comment);
-
-    if (isCommentEvent) {
-      return {
-        id: itemId,
-        icon: <Icon path={TICKET_TIMELINE_ICONS.comment} size={0.75} />,
-        children: (
-          <TicketCommentTimelineItem
-            author={item.user_identifier}
-            comment={item.comment ?? ''}
-            dateLabel={
-              getRelativeTimeLabel(item.create_date, {
-                maxRelativeDays: 30,
-                absoluteFormat: DATE_FORMAT.ShortMediumDateFormat
-              }) ?? ''
-            }
-          />
-        )
-      };
-    }
-
-    const actor = item.user_identifier;
-    const isFirstOpenStatus = item.status === 'open' && index === firstOpenStatusIndex;
-
-    let message = `${actor} reopened the ticket`;
-
-    if (item.status === 'closed') {
-      message = `${actor} closed the ticket`;
-    } else if (isFirstOpenStatus) {
-      message = `${actor} opened the ticket`;
-    }
-
-    const statusKey: 'open' | 'closed' = item.status === 'closed' ? 'closed' : 'open';
-
-    return {
-      id: itemId,
-      icon: <Icon path={TICKET_TIMELINE_ICONS[statusKey]} size={0.75} />,
-      children: (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="body2">{message}</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {getRelativeTimeLabel(item.create_date, {
-              maxRelativeDays: 30,
-              absoluteFormat: DATE_FORMAT.ShortMediumDateFormat
-            })}
-          </Typography>
-        </Box>
-      )
-    };
   });
 
   return (
