@@ -1,7 +1,6 @@
 {
   "extension": ["ts"],
   "spec": "src/__integration__/system/*.integration.ts",
-  "require": "ts-node/register",
-  "node-option": ["no-experimental-strip-types"],
+  "require": "tsx/cjs",
   "timeout": 60000
 }

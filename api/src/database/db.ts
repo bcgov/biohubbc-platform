@@ -64,8 +64,12 @@ pg.types.setTypeParser(pg.types.builtins.NUMERIC, (stringValue: string) => {
   return parseFloat(stringValue);
 });
 
-// singleton pg pool instance used by the api
-let DBPool: pg.Pool | undefined;
+// Keep the pool singleton on globalThis so ESM/CJS loaders share one instance in dev.
+type DBGlobal = typeof globalThis & {
+  __biohub_db_pool__?: pg.Pool;
+};
+
+const dbGlobal = globalThis as DBGlobal;
 
 /**
  * Initializes the singleton pg pool instance used by the api.
@@ -73,7 +77,7 @@ let DBPool: pg.Pool | undefined;
  * @param {pg.PoolConfig} [poolConfig]
  */
 export const initDBPool = function (poolConfig?: pg.PoolConfig): void {
-  if (DBPool) {
+  if (dbGlobal.__biohub_db_pool__) {
     // the pool has already been initialized, do nothing
     return;
   }
@@ -81,7 +85,7 @@ export const initDBPool = function (poolConfig?: pg.PoolConfig): void {
   defaultLog.debug({ label: 'create db pool', message: 'pool config', poolConfig });
 
   try {
-    DBPool = new pg.Pool(poolConfig);
+    dbGlobal.__biohub_db_pool__ = new pg.Pool(poolConfig);
   } catch (error) {
     defaultLog.error({ label: 'create db pool', message: 'failed to create db pool', error });
     throw error;
@@ -96,7 +100,7 @@ export const initDBPool = function (poolConfig?: pg.PoolConfig): void {
  * @return {*}  {(pg.Pool | undefined)}
  */
 export const getDBPool = function (): pg.Pool | undefined {
-  return DBPool;
+  return dbGlobal.__biohub_db_pool__;
 };
 
 export interface IDBConnection {
