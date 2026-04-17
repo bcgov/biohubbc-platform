@@ -9,13 +9,6 @@ export const IngestionErrorCountRow = z.object({
 });
 
 /**
- * Total deep-validation error count row for one submission upload.
- */
-export const IngestionErrorTotalCountRow = z.object({
-  count: z.number()
-});
-
-/**
  * Deep-validation aggregated error summary row for diagnostics/logging.
  */
 export const IngestionErrorSummaryRow = z.object({
@@ -31,11 +24,6 @@ export const IngestionErrorSummaryRow = z.object({
  * Grouped deep-validation error count by code for one submission upload.
  */
 export type IngestionErrorCount = z.infer<typeof IngestionErrorCountRow>;
-
-/**
- * Total deep-validation error count for one submission upload.
- */
-export type IngestionErrorTotalCount = z.infer<typeof IngestionErrorTotalCountRow>;
 
 /**
  * Representative deep-validation aggregated error summary for diagnostics/logging.

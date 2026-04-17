@@ -1,10 +1,10 @@
 import SQL from 'sql-template-strings';
+import z from 'zod';
 import {
-  IngestionErrorCountRow,
-  IngestionErrorSummaryRow,
-  IngestionErrorTotalCountRow,
   IngestionErrorCount,
-  IngestionErrorSummary
+  IngestionErrorCountRow,
+  IngestionErrorSummary,
+  IngestionErrorSummaryRow
 } from '../models/submission-feature-property-ingestion';
 import { getLogger } from '../utils/logger';
 import { BaseRepository } from './base-repository';
@@ -1808,7 +1808,12 @@ export class SubmissionFeaturePropertyIngestionRepository extends BaseRepository
       WHERE submission_upload_id = ${submissionUploadId}::uuid;
     `;
 
-    const response = await this.connection.sql(sql, IngestionErrorTotalCountRow);
+    const response = await this.connection.sql(
+      sql,
+      z.object({
+        count: z.number()
+      })
+    );
     return response.rows[0]?.count ?? 0;
   }
 

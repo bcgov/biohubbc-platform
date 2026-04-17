@@ -1,4 +1,5 @@
 import PgBoss from 'pg-boss';
+import { TERMINAL_UPLOAD_STATUSES } from '../../constants/submission-upload';
 import { SubmissionUpload } from '../../models/submission-upload';
 import { SubmissionFeaturePropertyIngestionService } from '../../services/ingestion/submission-feature-property-ingestion-service';
 import { SubmissionFeaturePropertyValidationOutcome } from '../../services/ingestion/submission-feature-property-ingestion-service.interface';
@@ -19,8 +20,6 @@ export interface IIndexSubmissionFeaturesJobData {
 
 const defaultLog = getLogger('queue/jobs/index-submission-features-job');
 
-const TERMINAL_UPLOAD_STATUSES: SubmissionUpload['status'][] = ['indexed', 'invalid', 'failed'];
-
 /**
  * Return true when a submission upload status is terminal.
  *
@@ -28,7 +27,7 @@ const TERMINAL_UPLOAD_STATUSES: SubmissionUpload['status'][] = ['indexed', 'inva
  * @returns {boolean} True when status is terminal.
  */
 function isTerminalSubmissionUploadStatus(status: SubmissionUpload['status']): boolean {
-  return TERMINAL_UPLOAD_STATUSES.includes(status);
+  return TERMINAL_UPLOAD_STATUSES.has(status);
 }
 
 /**
