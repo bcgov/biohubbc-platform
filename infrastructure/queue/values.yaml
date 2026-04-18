@@ -58,6 +58,10 @@ app:
     fileMaxSize: 45m # Maximum size an individual log file can reach before a new file is created
     fileMaxFiles: "" # Either the maximum number of log files to keep (10) or the maximum number of days to keep log files (10d)
 
+  # Download pipeline — memory-impacting tuning knobs (DOWNLOAD_* prefix)
+  download:
+    featureBatchSize: 5000 # Rows per FETCH for streaming download cursors. Larger = fewer round trips, higher peak heap.
+
 # Openshift Resources
 # Can scale horizontally - pg-boss uses advisory locks to coordinate maintenance
 replicas: ""
