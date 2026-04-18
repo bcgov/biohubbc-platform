@@ -70,62 +70,56 @@ function isValidationFailure(error: unknown): boolean {
  * Initialize process-stage preconditions and record stage start.
  *
  * Flow:
+ * - Lock the submission-upload row to serialize concurrent starts.
  * - Read current submission-upload status to decide whether this job should run.
  * - Exit early for terminal/non-startable statuses to avoid duplicate or invalid transitions.
- * - Transition upload to `ingesting` in its own transaction.
- * - Mark validation record as `started` in its own transaction.
+ * - Transition upload to `ingesting`.
+ * - Mark validation record as `started`.
  *
- * Each phase uses a short-lived `withConnection` so progress is committed incrementally.
- * This keeps transaction lifetimes bounded and preserves partial progress across retries.
+ * Start gating and transition are committed in one short transaction so:
+ * - two workers cannot both start processing for the same submission_upload_id
+ * - status checks and transition are atomic
  *
  * @param {string} submissionUploadId Submission upload scope.
  * @param {string} jobId Job identifier.
  * @returns {Promise<boolean>} True when stage should proceed.
  */
 async function initializeProcessSubmissionFeaturesStage(submissionUploadId: string, jobId: string): Promise<boolean> {
-  // Step 1: Load current upload status for guard checks.
-  const currentUpload = await withConnection(async (connection) => {
+  return withConnection(async (connection) => {
     const submissionUploadService = new SubmissionUploadService(connection);
-    return submissionUploadService.getSubmissionUpload(submissionUploadId);
-  });
-
-  if (isTerminalSubmissionUploadStatus(currentUpload.status)) {
-    defaultLog.info({
-      label: 'initializeProcessSubmissionFeaturesStage',
-      message: 'Skipping process job because submission upload is terminal',
-      jobId,
-      submissionUploadId,
-      status: currentUpload.status
-    });
-
-    return false;
-  }
-
-  if (!isProcessStartableSubmissionUploadStatus(currentUpload.status)) {
-    defaultLog.warn({
-      label: 'initializeProcessSubmissionFeaturesStage',
-      message: 'Skipping process job because submission upload is not in a process-startable state',
-      jobId,
-      submissionUploadId,
-      status: currentUpload.status
-    });
-
-    return false;
-  }
-
-  // Step 2: Persist stage entry on upload row.
-  await withConnection(async (connection) => {
-    const submissionUploadService = new SubmissionUploadService(connection);
-    await submissionUploadService.transitionSubmissionUploadToIngesting(submissionUploadId);
-  });
-
-  // Step 3: Persist validation start marker for the current job.
-  await withConnection(async (connection) => {
     const submissionValidationService = new SubmissionValidationService(connection);
-    await submissionValidationService.updateSubmissionValidationStatus(jobId, 'started');
-  });
+    const currentUpload = await submissionUploadService.getSubmissionUploadWithLock(submissionUploadId);
 
-  return true;
+    if (isTerminalSubmissionUploadStatus(currentUpload.status)) {
+      defaultLog.info({
+        label: 'initializeProcessSubmissionFeaturesStage',
+        message: 'Skipping process job because submission upload is terminal',
+        jobId,
+        submissionUploadId,
+        status: currentUpload.status
+      });
+
+      return false;
+    }
+
+    if (!isProcessStartableSubmissionUploadStatus(currentUpload.status)) {
+      defaultLog.warn({
+        label: 'initializeProcessSubmissionFeaturesStage',
+        message: 'Skipping process job because submission upload is not in a process-startable state',
+        jobId,
+        submissionUploadId,
+        status: currentUpload.status
+      });
+
+      return false;
+    }
+
+    // Locked row + in-transaction write prevents duplicate concurrent starts.
+    await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'ingesting' });
+
+    await submissionValidationService.updateSubmissionValidationStatus(jobId, 'started');
+    return true;
+  });
 }
 
 /**
@@ -145,45 +139,42 @@ async function executeProcessSubmissionFeaturesIngestion(
   submissionUpload: SubmissionUpload,
   jobId: string
 ): Promise<ProcessSubmissionFeatureOutcome> {
-  return withConnection(async (connection) => {
-    // This transaction encapsulates archive ingestion and any DB writes performed by the ingestion service.
-    const ingestStart = Date.now();
-    const submissionIngestionService = new SubmissionIngestionService(connection);
+  const ingestStart = Date.now();
+  const submissionIngestionService = new SubmissionIngestionService();
 
-    try {
-      const ingestionResult = await submissionIngestionService.ingestSubmissionUpload(submissionUpload);
+  try {
+    const ingestionResult = await submissionIngestionService.ingestSubmissionUpload(submissionUpload);
 
-      defaultLog.debug({
-        label: 'executeProcessSubmissionFeaturesIngestion',
-        message: 'Completed submission archive ingestion',
-        jobId,
-        submissionUploadId: submissionUpload.submission_upload_id,
-        submissionId: submissionUpload.submission_id,
-        elapsedMs: Date.now() - ingestStart,
-        valid: ingestionResult.valid
-      });
+    defaultLog.debug({
+      label: 'executeProcessSubmissionFeaturesIngestion',
+      message: 'Completed submission archive ingestion',
+      jobId,
+      submissionUploadId: submissionUpload.submission_upload_id,
+      submissionId: submissionUpload.submission_id,
+      elapsedMs: Date.now() - ingestStart,
+      valid: ingestionResult.valid
+    });
 
-      if (!ingestionResult.valid) {
-        return {
-          status: 'invalid',
-          validationPayload: { errors: ingestionResult.errors },
-          errorCount: ingestionResult.errors.length
-        };
-      }
-
-      return { status: 'ok' };
-    } catch (error) {
-      if (isValidationFailure(error)) {
-        return {
-          status: 'invalid',
-          validationPayload: { error: toErrorMetadata(error) },
-          errorCount: 1
-        };
-      }
-
-      throw error;
+    if (!ingestionResult.valid) {
+      return {
+        status: 'invalid',
+        validationPayload: { errors: ingestionResult.errors },
+        errorCount: ingestionResult.errors.length
+      };
     }
-  });
+
+    return { status: 'ok' };
+  } catch (error) {
+    if (isValidationFailure(error)) {
+      return {
+        status: 'invalid',
+        validationPayload: { error: toErrorMetadata(error) },
+        errorCount: 1
+      };
+    }
+
+    throw error;
+  }
 }
 
 /**
@@ -324,23 +315,69 @@ async function executeIndexSubmissionFeaturesPublish(
  */
 async function runProcessSubmissionFeaturesStage(job: PgBoss.Job<SubmissionUpload>): Promise<void> {
   const submissionUpload = job.data;
-  const { submission_upload_id: submissionUploadId, submission_id: submissionId } = submissionUpload;
+  const {
+    submission_upload_id: submissionUploadId,
+    submission_id: submissionId,
+    upload_id: uploadId
+  } = submissionUpload;
+  const jobMetadata = job as PgBoss.JobWithMetadata<SubmissionUpload>;
+
+  defaultLog.debug({
+    label: 'runProcessSubmissionFeaturesStage',
+    message: 'Starting process-stage orchestration',
+    jobId: job.id,
+    submissionId,
+    submissionUploadId,
+    uploadId,
+    retryCount: jobMetadata.retryCount,
+    startedOn: jobMetadata.startedOn
+  });
 
   // Resolve stage eligibility and mark process stage as started.
   const shouldProcess = await initializeProcessSubmissionFeaturesStage(submissionUploadId, job.id);
   if (!shouldProcess) {
+    defaultLog.debug({
+      label: 'runProcessSubmissionFeaturesStage',
+      message: 'Process-stage orchestration exited early due to status guard',
+      jobId: job.id,
+      submissionId,
+      submissionUploadId
+    });
     return;
   }
 
   // Perform archive ingestion and map validation outcomes.
   const outcome = await executeProcessSubmissionFeaturesIngestion(submissionUpload, job.id);
+  defaultLog.debug({
+    label: 'runProcessSubmissionFeaturesStage',
+    message: 'Ingestion phase completed',
+    jobId: job.id,
+    submissionId,
+    submissionUploadId,
+    outcomeStatus: outcome.status
+  });
 
   if (outcome.status === 'ok') {
     // Indexing enqueue is required; if enqueue fails, process-stage completion must retry.
+    defaultLog.debug({
+      label: 'runProcessSubmissionFeaturesStage',
+      message: 'Publishing index submission features job',
+      jobId: job.id,
+      submissionId,
+      submissionUploadId
+    });
     await executeIndexSubmissionFeaturesPublish(submissionId, submissionUploadId, job.id);
   }
 
   // Persist final process-stage status transitions.
+  defaultLog.debug({
+    label: 'runProcessSubmissionFeaturesStage',
+    message: 'Persisting final process-stage status transitions',
+    jobId: job.id,
+    submissionId,
+    submissionUploadId,
+    outcomeStatus: outcome.status
+  });
   await finalizeProcessSubmissionFeaturesStage(submissionUpload, job.id, outcome);
 
   defaultLog.info({
@@ -390,16 +427,30 @@ async function cleanupFailedProcessSubmissionFeatures(submissionUploadId: string
  * @return {*}  {Promise<void>}
  */
 export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionUpload> = async (jobs) => {
+  defaultLog.debug({
+    label: 'processSubmissionFeaturesJobHandler',
+    message: 'Received process-submission-features worker batch',
+    batchSize: jobs.length
+  });
+
   for (const job of jobs) {
     const submissionUpload = job.data;
-    const { submission_upload_id: submissionUploadId, submission_id: submissionId } = submissionUpload;
+    const {
+      submission_upload_id: submissionUploadId,
+      submission_id: submissionId,
+      upload_id: uploadId
+    } = submissionUpload;
+    const jobMetadata = job as PgBoss.JobWithMetadata<SubmissionUpload>;
 
     defaultLog.info({
       label: 'processSubmissionFeaturesJobHandler',
       message: 'Processing submission features job',
       jobId: job.id,
       submissionUploadId,
-      submissionId
+      submissionId,
+      uploadId,
+      retryCount: jobMetadata.retryCount,
+      startedOn: jobMetadata.startedOn
     });
 
     try {
@@ -424,6 +475,8 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
         jobId: job.id,
         submissionUploadId,
         submissionId,
+        uploadId,
+        retryCount: jobMetadata.retryCount,
         error: toErrorMetadata(error)
       });
 
@@ -450,17 +503,28 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
  * @return {*}  {Promise<void>}
  */
 export const processSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<SubmissionUpload> = async (jobs) => {
+  defaultLog.debug({
+    label: 'processSubmissionFeaturesFailedHandler',
+    message: 'Received process-submission-features DLQ batch',
+    batchSize: jobs.length
+  });
+
   for (const job of jobs) {
-    const { submission_upload_id: submissionUploadId } = job.data;
+    const { submission_upload_id: submissionUploadId, submission_id: submissionId, upload_id: uploadId } = job.data;
 
     // Cast to access output field available on failed jobs
-    const jobOutput = (job as PgBoss.JobWithMetadata<SubmissionUpload>).output;
+    const failedJob = job as PgBoss.JobWithMetadata<SubmissionUpload>;
+    const jobOutput = failedJob.output;
 
     defaultLog.warn({
       label: 'processSubmissionFeaturesFailedHandler',
       message: 'Processing failed job from dead letter queue',
       jobId: job.id,
       submissionUploadId,
+      submissionId,
+      uploadId,
+      retryCount: failedJob.retryCount,
+      completedOn: failedJob.completedOn,
       output: jobOutput
     });
 
@@ -490,7 +554,7 @@ export const processSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<Submissi
 
       defaultLog.info({
         label: 'processSubmissionFeaturesFailedHandler',
-        message: 'Failed job status updated',
+        message: 'Marked submission upload as failed after retries were exhausted (DLQ handling complete)',
         jobId: job.id,
         submissionUploadId
       });

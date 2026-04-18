@@ -5,6 +5,7 @@ import { PassThrough, Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import * as tar from 'tar-stream';
 import { z, ZodError } from 'zod';
+import { UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES } from '../constants/upload';
 import { IngestionValidationError } from '../errors/submission-errors';
 import { IFlattenedBlock } from '../models/submission-feature';
 import { TarCodesets } from '../services/ingestion/submission-ingestion-codes-service.interface';
@@ -44,18 +45,130 @@ const FlattenedFeatureSchema: z.ZodType<IFlattenedBlock> = z.object({
 const defaultLog = getLogger('utils/biohub-tar-parser');
 
 /**
- * Collect all bytes from a readable stream.
+ * Collect all bytes from a readable stream with a strict max byte cap.
  *
  * @param {Readable} stream - Source stream to buffer.
+ * @param {number} maxBytes - Maximum bytes allowed before rejecting.
+ * @param {string} entryName - Entry name used for stable error context.
+ * @param {number} [expectedBytes] - Optional tar header size; when provided, a fixed
+ * buffer is allocated up-front to avoid a temporary `Buffer.concat` copy.
  * @returns {Promise<Buffer>} Buffer containing all chunks from `stream`.
  */
-function streamToBuffer(stream: Readable): Promise<Buffer> {
+function streamToBuffer(
+  stream: Readable,
+  maxBytes: number,
+  entryName: string,
+  expectedBytes?: number
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
+    const hasExpectedSize =
+      typeof expectedBytes === 'number' &&
+      Number.isFinite(expectedBytes) &&
+      expectedBytes >= 0 &&
+      expectedBytes <= maxBytes;
+    const fixedBuffer = hasExpectedSize ? Buffer.allocUnsafe(expectedBytes) : undefined;
     const chunks: Buffer[] = [];
-    stream.on('data', (chunk: Buffer) => chunks.push(chunk));
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
-    stream.on('error', reject);
+    let totalBytes = 0;
+    let fixedBufferOffset = 0;
+    let settled = false;
+
+    // Guard against duplicate resolve/reject paths (e.g., manual destroy + error event).
+    const fail = (error: unknown): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      reject(error);
+    };
+
+    stream.on('data', (chunk: Buffer | string) => {
+      const chunkBuffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      totalBytes += chunkBuffer.byteLength;
+
+      if (totalBytes > maxBytes) {
+        const error = new IngestionValidationError(
+          `Archive JSON entry exceeds max size: entry=${entryName}; maxBytes=${maxBytes}`
+        );
+        fail(error);
+        stream.destroy(error);
+        return;
+      }
+
+      if (fixedBuffer) {
+        if (fixedBufferOffset + chunkBuffer.byteLength > fixedBuffer.byteLength) {
+          const error = new IngestionValidationError(
+            `Archive JSON entry size mismatch: entry=${entryName}; entrySizeBytes=${
+              fixedBuffer.byteLength
+            }; streamedBytes=${fixedBufferOffset + chunkBuffer.byteLength}`
+          );
+          fail(error);
+          stream.destroy(error);
+          return;
+        }
+
+        chunkBuffer.copy(fixedBuffer, fixedBufferOffset);
+        fixedBufferOffset += chunkBuffer.byteLength;
+        return;
+      }
+
+      chunks.push(chunkBuffer);
+    });
+
+    stream.on('end', () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+
+      if (fixedBuffer) {
+        resolve(fixedBuffer.subarray(0, fixedBufferOffset));
+        return;
+      }
+
+      resolve(Buffer.concat(chunks));
+    });
+    stream.on('error', fail);
   });
+}
+
+/**
+ * Fail fast when tar header advertises JSON entry size above configured cap.
+ *
+ * @param {number | undefined} entrySizeBytes - Declared tar header size in bytes.
+ * @param {string} entryName - Entry name used for stable error context.
+ * @param {number} maxBytes - Maximum bytes allowed.
+ */
+function assertEntrySizeWithinLimit(entrySizeBytes: number | undefined, entryName: string, maxBytes: number): void {
+  if (typeof entrySizeBytes === 'number' && Number.isFinite(entrySizeBytes) && entrySizeBytes > maxBytes) {
+    throw new IngestionValidationError(
+      `Archive JSON entry exceeds max size: entry=${entryName}; entrySizeBytes=${entrySizeBytes}; maxBytes=${maxBytes}`
+    );
+  }
+}
+
+/**
+ * Parse one JSON tar entry with hard byte limits.
+ *
+ * Enforces two guards:
+ * - header-level check (`entrySizeBytes`) when available
+ * - streamed-byte check during buffering
+ *
+ * @param {Readable} stream - Tar entry stream.
+ * @param {string} entryName - Entry name used for stable error context.
+ * @param {number} entrySizeBytes - Tar header declared byte size.
+ * @returns {Promise<{ parsed: unknown; byteLength: number }>} Parsed payload and buffered byte length.
+ */
+async function parseJsonArchiveEntry(
+  stream: Readable,
+  entryName: string,
+  entrySizeBytes?: number
+): Promise<{ parsed: unknown; byteLength: number }> {
+  assertEntrySizeWithinLimit(entrySizeBytes, entryName, UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES);
+  const buffer = await streamToBuffer(stream, UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES, entryName, entrySizeBytes);
+  return {
+    parsed: JSON.parse(buffer.toString('utf-8')) as unknown,
+    byteLength: buffer.byteLength
+  };
 }
 
 /**
@@ -322,19 +435,23 @@ async function processMediaEntry(
  * - Buffers and parses JSON payloads for matching entries.
  * - Accepts either one object or an array payload and forwards each item through
  *   `ingestFeatureEntry` so caller-owned batching/validation rules stay centralized.
+ * - Computes a per-item byte estimate from the buffered JSON payload and forwards
+ *   it so callers can enforce byte-based batch flush thresholds.
  * - Returns `true` once the entry has been fully consumed and processed.
  *
- * @param {{ name?: string | null; type?: string | null }} header Tar entry header.
+ * @param {{ name?: string | null; type?: string | null; size?: number }} header Tar entry header.
  * @param {Readable} stream Tar entry data stream.
- * @param {{ ingestFeatureEntry: (entryValue: unknown, entryName: string) => Promise<void> }} options
+ * @param {{
+ *   ingestFeatureEntry: (entryValue: unknown, entryName: string, entryBytesEstimate: number) => Promise<void>;
+ * }} options
  * Feature processing callback and dependencies.
  * @returns {Promise<boolean>} True when the entry matched and was handled.
  */
 async function processFeatureArchiveEntry(
-  header: { name?: string | null; type?: string | null },
+  header: { name?: string | null; type?: string | null; size?: number },
   stream: Readable,
   options: {
-    ingestFeatureEntry: (entryValue: unknown, entryName: string) => Promise<void>;
+    ingestFeatureEntry: (entryValue: unknown, entryName: string, entryBytesEstimate: number) => Promise<void>;
   }
 ): Promise<boolean> {
   const resolvedFeatureEntryName = resolveScopedEntryName(header.name ?? '', 'features');
@@ -342,12 +459,12 @@ async function processFeatureArchiveEntry(
     return false;
   }
 
-  const buffer = await streamToBuffer(stream);
-  const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
-  const parsedEntries = Array.isArray(parsed) ? parsed : [parsed];
+  const parsedJson = await parseJsonArchiveEntry(stream, resolvedFeatureEntryName, header.size);
+  const parsedEntries = Array.isArray(parsedJson.parsed) ? parsedJson.parsed : [parsedJson.parsed];
+  const entryBytesEstimate = Math.max(1, Math.ceil(parsedJson.byteLength / parsedEntries.length));
 
   for (const parsedEntry of parsedEntries) {
-    await options.ingestFeatureEntry(parsedEntry, resolvedFeatureEntryName);
+    await options.ingestFeatureEntry(parsedEntry, resolvedFeatureEntryName, entryBytesEstimate);
   }
 
   return true;
@@ -362,7 +479,7 @@ async function processFeatureArchiveEntry(
  * - Validates/transforms through `extractCodesetsFromTarballEntry`.
  * - Persists via `ingestCodesets` and increments caller-owned counters.
  *
- * @param {{ name?: string | null; type?: string | null }} header Tar entry header.
+ * @param {{ name?: string | null; type?: string | null; size?: number }} header Tar entry header.
  * @param {Readable} stream Tar entry data stream.
  * @param {{
  *   ingestCodesets: (codesets: TarCodesets) => Promise<void>;
@@ -371,7 +488,7 @@ async function processFeatureArchiveEntry(
  * @returns {Promise<boolean>} True when the entry matched and was handled.
  */
 async function processCodesArchiveEntry(
-  header: { name?: string | null; type?: string | null },
+  header: { name?: string | null; type?: string | null; size?: number },
   stream: Readable,
   options: {
     ingestCodesets: (codesets: TarCodesets) => Promise<void>;
@@ -383,9 +500,8 @@ async function processCodesArchiveEntry(
     return false;
   }
 
-  const buffer = await streamToBuffer(stream);
-  const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
-  const codesets = extractCodesetsFromTarballEntry(parsed, resolvedCodesEntryName);
+  const parsedJson = await parseJsonArchiveEntry(stream, resolvedCodesEntryName, header.size);
+  const codesets = extractCodesetsFromTarballEntry(parsedJson.parsed, resolvedCodesEntryName);
   await options.ingestCodesets(codesets);
   options.onCodesetFileParsed();
   return true;
@@ -466,7 +582,7 @@ async function processConcurrentMediaArchiveEntry(
  * @param {TarNext} next Tar continuation callback.
  * @param {(err: unknown) => void} reject Error callback for asynchronous failures.
  * @param {{
- *   ingestFeatureEntry: (entryValue: unknown, entryName: string) => Promise<void>;
+ *   ingestFeatureEntry: (entryValue: unknown, entryName: string, entryBytesEstimate: number) => Promise<void>;
  *   ingestCodesets: (codesets: TarCodesets) => Promise<void>;
  *   onCodesetFileParsed: () => void;
  *   objectStorageService: StreamSubmissionArchiveOptions['objectStorageService'];
@@ -484,7 +600,7 @@ async function processSubmissionArchiveEntry(
   next: TarNext,
   reject: (err: unknown) => void,
   options: {
-    ingestFeatureEntry: (entryValue: unknown, entryName: string) => Promise<void>;
+    ingestFeatureEntry: (entryValue: unknown, entryName: string, entryBytesEstimate: number) => Promise<void>;
     ingestCodesets: (codesets: TarCodesets) => Promise<void>;
     onCodesetFileParsed: () => void;
     objectStorageService: StreamSubmissionArchiveOptions['objectStorageService'];
@@ -543,6 +659,7 @@ async function processSubmissionArchiveEntry(
  *
  * Processing rules:
  * - Only `features/*.json` file entries are parsed.
+ * - Each matched JSON file is size-capped by `UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES`.
  * - Non-feature entries are drained and ignored so extraction can continue.
  * - Each parsed entry may be a single object or an array of objects.
  * - Objects are validated against `IFlattenedBlock` shape (shallow validation only).
@@ -608,9 +725,8 @@ export async function streamFeatures(
           return;
         }
 
-        const buffer = await streamToBuffer(stream);
-        const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
-        const parsedEntries = Array.isArray(parsed) ? parsed : [parsed];
+        const parsedJson = await parseJsonArchiveEntry(stream, resolvedEntryName, header.size);
+        const parsedEntries = Array.isArray(parsedJson.parsed) ? parsedJson.parsed : [parsedJson.parsed];
 
         for (const parsedEntry of parsedEntries) {
           const block = extractFeatureFromTarballEntry(parsedEntry, resolvedEntryName);
@@ -652,6 +768,7 @@ export async function streamFeatures(
  *
  * Processing rules:
  * - Only `codes/*.json` file entries are parsed.
+ * - Each matched JSON file is size-capped by `UPLOAD_ARCHIVE_JSON_FILE_MAX_BYTES`.
  * - Each codes file is parsed and validated independently.
  * - Non-codes entries are drained and ignored.
  *
@@ -693,9 +810,8 @@ export async function streamCodesets(
           return;
         }
 
-        const buffer = await streamToBuffer(stream);
-        const parsed = JSON.parse(buffer.toString('utf-8')) as unknown;
-        const codesets = extractCodesetsFromTarballEntry(parsed, resolvedEntryName);
+        const parsedJson = await parseJsonArchiveEntry(stream, resolvedEntryName, header.size);
+        const codesets = extractCodesetsFromTarballEntry(parsedJson.parsed, resolvedEntryName);
 
         await ingestCodesets(codesets);
         next();
@@ -842,12 +958,15 @@ export async function streamMedia(
  *
  * Processing rules:
  * - `features/*.json` are parsed and batched to `ingestFeatureBatch`.
+ *   Batching is bounded by both `featureBatchSize` and `featureMaxBatchBytes`.
  * - `codes/*.json` are parsed and sent to `ingestCodesets`.
  * - `files/*` entries are streamed to object storage and batched to `ingestMediaBatch`.
+ * - Function resolves only after all in-flight media uploads complete and all
+ *   pending feature/media batches have been flushed.
  *
  * @param {Readable} inputStream
  * @param {StreamSubmissionArchiveOptions} options
- * @returns {Promise<{ featureCount: number; uploadedCount: number }>}
+ * @returns {Promise<{ featureCount: number; uploadedCount: number; codesetFileCount: number }>}
  */
 export async function streamSubmissionArchive(
   inputStream: Readable,
@@ -857,6 +976,7 @@ export async function streamSubmissionArchive(
     objectStorageService,
     s3KeyPrefix,
     featureBatchSize,
+    featureMaxBatchBytes,
     mediaBatchSize,
     mediaMaxBatchBytes,
     mediaConcurrency,
@@ -867,6 +987,9 @@ export async function streamSubmissionArchive(
 
   if (featureBatchSize < 1) {
     throw new Error('featureBatchSize must be greater than 0');
+  }
+  if (featureMaxBatchBytes < 1) {
+    throw new Error('featureMaxBatchBytes must be greater than 0');
   }
   if (mediaBatchSize < 1) {
     throw new Error('mediaBatchSize must be greater than 0');
@@ -885,6 +1008,9 @@ export async function streamSubmissionArchive(
   let codesetFileCount = 0;
   let mediaStateQueue: Promise<void> = Promise.resolve();
   let pendingFeatureBlocks: IFlattenedBlock[] = [];
+  // Byte estimate (derived from parsed JSON payload size) used to bound feature
+  // batch memory in addition to feature count.
+  let pendingFeatureBytes = 0;
   let pendingUploadedFiles: IUploadedMediaFile[] = [];
   let pendingUploadedBytes = 0;
   const inFlightMediaUploads = new Set<Promise<void>>();
@@ -899,6 +1025,7 @@ export async function streamSubmissionArchive(
 
     const currentBlocks = pendingFeatureBlocks;
     pendingFeatureBlocks = [];
+    pendingFeatureBytes = 0;
     await ingestFeatureBatch(currentBlocks);
   };
 
@@ -947,11 +1074,13 @@ export async function streamSubmissionArchive(
 
     extract.on('entry', (header, stream, next) => {
       processSubmissionArchiveEntry(header, stream, next, reject, {
-        ingestFeatureEntry: async (entryValue, entryName) => {
+        ingestFeatureEntry: async (entryValue, entryName, entryBytesEstimate) => {
           const block = extractFeatureFromTarballEntry(entryValue, entryName);
           pendingFeatureBlocks.push(block);
+          // Estimate, not exact retained heap size; sufficient for consistent flush gating.
+          pendingFeatureBytes += entryBytesEstimate;
           featureCount += 1;
-          if (pendingFeatureBlocks.length >= featureBatchSize) {
+          if (pendingFeatureBlocks.length >= featureBatchSize || pendingFeatureBytes >= featureMaxBatchBytes) {
             await flushPendingFeatures();
           }
         },

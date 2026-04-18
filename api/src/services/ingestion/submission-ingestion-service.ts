@@ -1,9 +1,15 @@
+import {
+  UPLOAD_ARCHIVE_MEDIA_CONCURRENCY,
+  UPLOAD_FEATURE_BATCH_MAX_BYTES,
+  UPLOAD_FEATURE_BATCH_SIZE
+} from '../../constants/upload';
+import { IDBConnection } from '../../database/db';
 import { IngestionValidationError } from '../../errors/submission-errors';
 import { SubmissionUpload } from '../../models/submission-upload';
+import { withConnection } from '../../queue/with-connection';
 import { streamSubmissionArchive } from '../../utils/biohub-tar-parser';
 import { getLogger } from '../../utils/logger';
 import { ContributorService } from '../contributor-service';
-import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
@@ -13,8 +19,6 @@ import { MEDIA_INGEST_BATCH_BYTES, MEDIA_INGEST_BATCH_FILES, MediaIngestionServi
 import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
 import { IValidationResult } from './submission-ingestion-service.interface';
 
-const FEATURE_INSERT_BATCH_SIZE = 10000;
-const SUBMISSION_ARCHIVE_MEDIA_CONCURRENCY = Number(process.env.SUBMISSION_ARCHIVE_MEDIA_CONCURRENCY ?? 2);
 const defaultLog = getLogger('services/ingestion/submission-ingestion-service');
 
 /**
@@ -22,16 +26,8 @@ const defaultLog = getLogger('services/ingestion/submission-ingestion-service');
  *
  * @export
  * @class SubmissionIngestionService
- * @extends {DBService}
  */
-export class SubmissionIngestionService extends DBService {
-  featureIngestionService = new SubmissionFeatureIngestionService(this.connection);
-  mediaIngestionService = new MediaIngestionService(this.connection);
-  codesetIngestionService = new CodesetIngestionService(this.connection);
-  contributorService = new ContributorService(this.connection);
-  uploadArchiveService = new UploadArchiveService(this.connection);
-  uploadArtifactService = new UploadArtifactService(this.connection);
-  artifactService = new ArtifactService(this.connection);
+export class SubmissionIngestionService {
   objectStorageService = new ObjectStorageService();
 
   /**
@@ -58,8 +54,21 @@ export class SubmissionIngestionService extends DBService {
       upload_id: uploadId
     } = submissionUpload;
     const startTime = Date.now();
+    let featureBatchCount = 0;
+    let codesetBatchCount = 0;
+    let mediaBatchCount = 0;
+    let featureRowsPersisted = 0;
+    let mediaFilesPersisted = 0;
+    let mediaBytesPersisted = 0;
 
     // Resolve the S3 key for the uploaded tarball: upload_id → upload_archive → artifact → object_key
+    defaultLog.debug({
+      label: 'ingestSubmissionUpload',
+      message: 'Starting submission upload ingestion',
+      submissionUploadId,
+      submissionId,
+      uploadId
+    });
     defaultLog.debug({
       label: 'ingestSubmissionUpload',
       message: 'Resolving tarball upload context',
@@ -67,7 +76,9 @@ export class SubmissionIngestionService extends DBService {
       submissionId,
       uploadId
     });
-    const { objectKey, uploadArchiveId } = await this.getTarballUploadContext(uploadId);
+    const { objectKey, uploadArchiveId } = await withConnection((connection) =>
+      this.getTarballUploadContext(connection, uploadId)
+    );
     defaultLog.debug({
       label: 'ingestSubmissionUpload',
       message: 'Resolved tarball upload context',
@@ -79,7 +90,10 @@ export class SubmissionIngestionService extends DBService {
     // Step 1: Remove previously-ingested feature rows for this submission upload attempt.
     // Retries can re-run after partial success; scoping by submission_upload_id ensures
     // we only reset rows produced by this upload attempt, not other uploads.
-    await this.featureIngestionService.deleteFeaturesBySubmissionUploadId(submissionUploadId);
+    await withConnection(async (connection) => {
+      const featureIngestionService = new SubmissionFeatureIngestionService(connection);
+      await featureIngestionService.deleteFeaturesBySubmissionUploadId(submissionUploadId);
+    });
     defaultLog.debug({
       label: 'ingestSubmissionUpload',
       message: 'Deleted existing features by submission upload id',
@@ -92,7 +106,10 @@ export class SubmissionIngestionService extends DBService {
     // - A retry may produce the same paths/artifacts, and pure-insert repository methods should not own conflict resolution.
     // - Marking rows inactive once up-front keeps repository inserts deterministic.
     // - Scope is all active rows for this upload so conflicts are fully avoided on retry.
-    await this.uploadArtifactService.deleteUploadArtifactsByUploadId(uploadId);
+    await withConnection(async (connection) => {
+      const uploadArtifactService = new UploadArtifactService(connection);
+      await uploadArtifactService.deleteUploadArtifactsByUploadId(uploadId);
+    });
     defaultLog.debug({
       label: 'ingestSubmissionUpload',
       message: 'Deleted existing archive-derived upload artifact rows by upload id',
@@ -100,8 +117,17 @@ export class SubmissionIngestionService extends DBService {
     });
 
     // Step 3: Resolve contributor context used by codeset ingestion callbacks.
-    const contributor = await this.contributorService.getContributorBySubmissionUploadId(submissionUploadId);
-    const contributorId = contributor.contributor_id;
+    const contributorId = await withConnection(async (connection) => {
+      const contributorService = new ContributorService(connection);
+      const contributor = await contributorService.getContributorBySubmissionUploadId(submissionUploadId);
+      return contributor.contributor_id;
+    });
+    defaultLog.debug({
+      label: 'ingestSubmissionUpload',
+      message: 'Resolved contributor context for codeset ingestion',
+      submissionUploadId,
+      contributorId
+    });
 
     // Step 4: Stream tarball once and fan out entry processing by folder:
     // - features/* -> feature ingestion service
@@ -109,27 +135,111 @@ export class SubmissionIngestionService extends DBService {
     // - files/*    -> media ingestion service
     // The parser handles batching/concurrency; callbacks persist scoped records.
     const tarStream = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
+    defaultLog.debug({
+      label: 'ingestSubmissionUpload',
+      message: 'Starting archive stream pass',
+      submissionUploadId,
+      submissionId,
+      uploadId,
+      uploadArchiveId,
+      objectKey,
+      featureBatchSize: UPLOAD_FEATURE_BATCH_SIZE,
+      featureMaxBatchBytes: UPLOAD_FEATURE_BATCH_MAX_BYTES,
+      mediaBatchSize: MEDIA_INGEST_BATCH_FILES,
+      mediaMaxBatchBytes: MEDIA_INGEST_BATCH_BYTES,
+      mediaConcurrency: UPLOAD_ARCHIVE_MEDIA_CONCURRENCY
+    });
+
     const { featureCount, uploadedCount, codesetFileCount } = await streamSubmissionArchive(tarStream, {
       objectStorageService: this.objectStorageService,
       s3KeyPrefix: `submissions/${submissionId}/uploads/${submissionUploadId}/media`,
-      featureBatchSize: FEATURE_INSERT_BATCH_SIZE,
+      featureBatchSize: UPLOAD_FEATURE_BATCH_SIZE,
+      featureMaxBatchBytes: UPLOAD_FEATURE_BATCH_MAX_BYTES,
       mediaBatchSize: MEDIA_INGEST_BATCH_FILES,
       mediaMaxBatchBytes: MEDIA_INGEST_BATCH_BYTES,
-      mediaConcurrency: SUBMISSION_ARCHIVE_MEDIA_CONCURRENCY,
+      mediaConcurrency: UPLOAD_ARCHIVE_MEDIA_CONCURRENCY,
       ingestFeatureBatch: async (featureBatch) => {
-        await this.featureIngestionService.ingestFeatureBatch(submissionId, submissionUploadId, featureBatch);
+        featureBatchCount += 1;
+        featureRowsPersisted += featureBatch.length;
+
+        await withConnection(async (connection) => {
+          const featureIngestionService = new SubmissionFeatureIngestionService(connection);
+          await featureIngestionService.ingestFeatureBatch(submissionId, submissionUploadId, featureBatch);
+        });
+
+        if (featureBatchCount === 1 || featureBatchCount % 25 === 0) {
+          defaultLog.debug({
+            label: 'ingestSubmissionUpload',
+            message: 'Persisted feature batch',
+            submissionUploadId,
+            featureBatchCount,
+            batchSize: featureBatch.length,
+            featureRowsPersisted
+          });
+        }
       },
       ingestCodesets: async (codesets) => {
-        await this.codesetIngestionService.persistContributorCodesets(contributorId, codesets);
+        codesetBatchCount += 1;
+
+        await withConnection(async (connection) => {
+          const codesetIngestionService = new CodesetIngestionService(connection);
+          await codesetIngestionService.persistContributorCodesets(contributorId, codesets);
+        });
+
+        defaultLog.debug({
+          label: 'ingestSubmissionUpload',
+          message: 'Persisted codeset payload',
+          submissionUploadId,
+          contributorId,
+          codesetBatchCount,
+          codesetKeyCount: Object.keys(codesets).length
+        });
       },
       ingestMediaBatch: async (mediaFiles) => {
-        await this.mediaIngestionService.persistUploadedMediaBatch(
-          uploadId,
-          uploadArchiveId,
-          submissionUploadId,
-          mediaFiles
-        );
+        mediaBatchCount += 1;
+        mediaFilesPersisted += mediaFiles.length;
+        const batchBytes = mediaFiles.reduce((total, mediaFile) => total + mediaFile.byteSize, 0);
+        mediaBytesPersisted += batchBytes;
+
+        await withConnection(async (connection) => {
+          const mediaIngestionService = new MediaIngestionService(connection);
+          await mediaIngestionService.persistUploadedMediaBatch(
+            uploadId,
+            uploadArchiveId,
+            submissionUploadId,
+            mediaFiles
+          );
+        });
+
+        if (mediaBatchCount === 1 || mediaBatchCount % 10 === 0) {
+          defaultLog.debug({
+            label: 'ingestSubmissionUpload',
+            message: 'Persisted media batch',
+            submissionUploadId,
+            mediaBatchCount,
+            batchSize: mediaFiles.length,
+            batchBytes,
+            mediaFilesPersisted,
+            mediaBytesPersisted
+          });
+        }
       }
+    });
+
+    defaultLog.info({
+      label: 'ingestSubmissionUpload',
+      message: 'Archive stream pass completed with ingestion counts',
+      submissionUploadId,
+      submissionId,
+      featureCount,
+      uploadedCount,
+      codesetFileCount,
+      featureBatchCount,
+      codesetBatchCount,
+      mediaBatchCount,
+      featureRowsPersisted,
+      mediaFilesPersisted,
+      mediaBytesPersisted
     });
 
     // Step 5: Guardrail validation for malformed/empty archives.
@@ -140,12 +250,18 @@ export class SubmissionIngestionService extends DBService {
 
     defaultLog.info({
       label: 'ingestSubmissionUpload',
-      message: 'Submission upload ingestion completed',
+      message: 'Submission upload ingestion completed successfully',
       submissionUploadId,
       submissionId,
       featureCount,
       uploadedCount,
       codesetFileCount,
+      featureBatchCount,
+      codesetBatchCount,
+      mediaBatchCount,
+      featureRowsPersisted,
+      mediaFilesPersisted,
+      mediaBytesPersisted,
       elapsedMs: Date.now() - startTime
     });
     return { valid: true, errors: [] };
@@ -156,17 +272,23 @@ export class SubmissionIngestionService extends DBService {
    * Traverses: upload -> upload_archive -> artifact -> object_key.
    *
    * @private
+   * @param {IDBConnection} connection
    * @param {string} uploadId - The upload ID
    * @returns {Promise<{ objectKey: string; uploadArchiveId: string }>}
    * @memberof SubmissionIngestionService
    */
-  private async getTarballUploadContext(uploadId: string): Promise<{ objectKey: string; uploadArchiveId: string }> {
-    const uploadArchives = await this.uploadArchiveService.getUploadArchivesByUploadId(uploadId);
+  private async getTarballUploadContext(
+    connection: IDBConnection,
+    uploadId: string
+  ): Promise<{ objectKey: string; uploadArchiveId: string }> {
+    const uploadArchiveService = new UploadArchiveService(connection);
+    const artifactService = new ArtifactService(connection);
+    const uploadArchives = await uploadArchiveService.getUploadArchivesByUploadId(uploadId);
     if (uploadArchives.length === 0) {
       throw new Error(`No archives found for upload ${uploadId}`);
     }
 
-    const artifact = await this.artifactService.getArtifact(uploadArchives[0].artifact_id);
+    const artifact = await artifactService.getArtifact(uploadArchives[0].artifact_id);
     return {
       objectKey: artifact.object_key,
       uploadArchiveId: uploadArchives[0].upload_archive_id

@@ -89,6 +89,13 @@ app:
     scaleStepIncrementBytes: "" # Optional override for UPLOAD_PART_SIZE_SCALE_STEP_INCREMENT_BYTES
     presignedUrlBatchSize: "" # Optional override for UPLOAD_PRESIGNED_URL_BATCH_SIZE
     presignedUrlExpirySeconds: "" # Optional override for UPLOAD_PRESIGNED_URL_EXPIRY_SECONDS
+
+  # Submission archive ingestion tuning
+  uploadIngestion:
+    featureBatchSize: "" # Optional override for UPLOAD_FEATURE_BATCH_SIZE
+    featureBatchMaxBytes: "52428800" # Flush feature batches when in-memory estimate reaches this size
+    mediaConcurrency: "" # Optional override for UPLOAD_ARCHIVE_MEDIA_CONCURRENCY
+    jsonFileMaxBytes: "104857600" # Max bytes for a single features/*.json or codes/*.json archive entry
     
   # ITIS SOLR
   itisSolr: "https://services.itis.gov"

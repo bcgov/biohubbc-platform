@@ -414,7 +414,7 @@ describe('SubmissionIngestionService pipeline (system)', function () {
   beforeEach(async () => {
     connection = getAPIUserDBConnection();
     await connection.open();
-    service = new SubmissionIngestionService(connection);
+    service = new SubmissionIngestionService();
     s3KeysToCleanup = [];
   });
 

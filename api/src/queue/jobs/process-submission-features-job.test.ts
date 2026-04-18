@@ -51,11 +51,13 @@ describe('process-submission-features-job', () => {
   describe('processSubmissionFeaturesJobHandler', () => {
     beforeEach(() => {
       stubConnections();
-      sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUpload').resolves({
+      sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadWithLock').resolves({
         ...defaultSubmissionUpload,
         status: 'uploaded'
       });
-      sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToIngesting').resolves();
+      sinon.stub(SubmissionUploadService.prototype, 'updateSubmissionUpload').resolves({
+        submission_upload_id: defaultSubmissionUpload.submission_upload_id
+      });
       sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToIngested').resolves();
       sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadToInvalid').resolves();
       sinon.stub(SubmissionUploadService.prototype, 'transitionSubmissionUploadStatus').resolves();
@@ -74,10 +76,9 @@ describe('process-submission-features-job', () => {
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);
 
-      const toIngestingStub = SubmissionUploadService.prototype
-        .transitionSubmissionUploadToIngesting as sinon.SinonStub;
+      const updateUploadStub = SubmissionUploadService.prototype.updateSubmissionUpload as sinon.SinonStub;
       const toIngestedStub = SubmissionUploadService.prototype.transitionSubmissionUploadToIngested as sinon.SinonStub;
-      expect(toIngestingStub.calledWith('test-sub-upload-id')).to.be.true;
+      expect(updateUploadStub.calledWith('test-sub-upload-id', { status: 'ingesting' })).to.be.true;
       expect(toIngestedStub.calledWith('test-sub-upload-id')).to.be.true;
       expect(publishStub.calledOnce).to.be.true;
       expect(publishStub.calledBefore(toIngestedStub)).to.be.true;
@@ -166,7 +167,7 @@ describe('process-submission-features-job', () => {
     });
 
     it('skips processing when current status is terminal', async () => {
-      (SubmissionUploadService.prototype.getSubmissionUpload as sinon.SinonStub).resolves({
+      (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves({
         ...defaultSubmissionUpload,
         status: 'indexed'
       });
@@ -178,20 +179,35 @@ describe('process-submission-features-job', () => {
       expect(ingestStub.called).to.be.false;
     });
 
-    it('skips processing when current status is failed terminal', async () => {
-      (SubmissionUploadService.prototype.getSubmissionUpload as sinon.SinonStub).resolves({
+    it('skips processing when current status is ingesting', async () => {
+      (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves({
         ...defaultSubmissionUpload,
-        status: 'failed'
+        status: 'ingesting'
       });
 
       const ingestStub = sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload');
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);
 
-      const toIngestingStub = SubmissionUploadService.prototype
-        .transitionSubmissionUploadToIngesting as sinon.SinonStub;
+      const updateUploadStub = SubmissionUploadService.prototype.updateSubmissionUpload as sinon.SinonStub;
       expect(ingestStub.called).to.be.false;
-      expect(toIngestingStub.called).to.be.false;
+      expect(updateUploadStub.called).to.be.false;
+    });
+
+    it('allows reprocessing when current status is failed', async () => {
+      (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves({
+        ...defaultSubmissionUpload,
+        status: 'failed'
+      });
+      sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').resolves({ valid: true, errors: [] });
+      sinon
+        .stub(publisher, 'publishIndexSubmissionFeaturesJob')
+        .resolves({ status: 'published', jobId: 'index-job-id' });
+
+      await processSubmissionFeaturesJobHandler([createMockJob()]);
+
+      const updateUploadStub = SubmissionUploadService.prototype.updateSubmissionUpload as sinon.SinonStub;
+      expect(updateUploadStub.calledWith('test-sub-upload-id', { status: 'ingesting' })).to.be.true;
     });
   });
 

@@ -55,6 +55,40 @@ describe('SubmissionUploadService', () => {
     });
   });
 
+  describe('getSubmissionUploadWithLock', () => {
+    it('should return a single submission_upload record', async () => {
+      const stub = sinon.stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadWithLock').resolves({
+        submission_upload_id: 'artifact-1',
+        submission_id: 123,
+        upload_id: 'upload-1',
+        status: 'uploaded',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      });
+
+      const result = await service.getSubmissionUploadWithLock('artifact-1');
+
+      expect(stub).to.have.been.calledWith('artifact-1');
+      expect(result).to.deep.equal({
+        submission_upload_id: 'artifact-1',
+        submission_id: 123,
+        upload_id: 'upload-1',
+        status: 'uploaded',
+        ticket_id: '11111111-1111-1111-1111-111111111111'
+      });
+    });
+
+    it('should throw an error if repository fails', async () => {
+      sinon.stub(SubmissionUploadRepository.prototype, 'getSubmissionUploadWithLock').throws(new Error('Query failed'));
+
+      try {
+        await service.getSubmissionUploadWithLock('artifact-1');
+        expect.fail('Expected error not thrown');
+      } catch (err) {
+        expect((err as Error).message).to.equal('Query failed');
+      }
+    });
+  });
+
   describe('getSubmissionUploadsBySubmissionId', () => {
     it('should return all submission_upload records', async () => {
       const mockSubmissionId = 1;
@@ -227,38 +261,6 @@ describe('SubmissionUploadService', () => {
       } catch (err) {
         expect(err).to.be.instanceOf(ApiConflictError);
       }
-    });
-  });
-
-  describe('transitionSubmissionUploadToIngesting', () => {
-    it('updates status from uploaded to ingesting', async () => {
-      sinon.stub(service, 'getSubmissionUpload').resolves({
-        submission_upload_id: 'artifact-1',
-        submission_id: 1,
-        upload_id: 'upload-1',
-        status: 'uploaded',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
-      });
-      const updateStub = sinon.stub(service, 'updateSubmissionUpload').resolves({
-        submission_upload_id: 'artifact-1'
-      });
-
-      await service.transitionSubmissionUploadToIngesting('artifact-1');
-      expect(updateStub).to.have.been.calledWith('artifact-1', { status: 'ingesting' });
-    });
-
-    it('no-ops when already ingesting', async () => {
-      sinon.stub(service, 'getSubmissionUpload').resolves({
-        submission_upload_id: 'artifact-1',
-        submission_id: 1,
-        upload_id: 'upload-1',
-        status: 'ingesting',
-        ticket_id: '11111111-1111-1111-1111-111111111111'
-      });
-      const updateStub = sinon.stub(service, 'updateSubmissionUpload');
-
-      await service.transitionSubmissionUploadToIngesting('artifact-1');
-      expect(updateStub.called).to.equal(false);
     });
   });
 

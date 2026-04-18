@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import { Readable } from 'node:stream';
 import sinon from 'sinon';
 import { getMockDBConnection } from '../../__mocks__/db';
+import * as db from '../../database/db';
 import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
 import { UploadArchive } from '../../models/upload-archive';
 import * as biohubTarParser from '../../utils/biohub-tar-parser';
@@ -46,6 +47,17 @@ describe('SubmissionIngestionService', () => {
       format: 'tar'
     };
 
+    beforeEach(() => {
+      sinon.stub(db, 'getAPIUserDBConnection').callsFake(() => {
+        const connection = getMockDBConnection();
+        connection.open = sinon.stub().resolves();
+        connection.commit = sinon.stub().resolves();
+        connection.rollback = sinon.stub().resolves();
+        connection.release = sinon.stub();
+        return connection;
+      });
+    });
+
     const setupTarballContext = () => {
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
       sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
@@ -53,8 +65,7 @@ describe('SubmissionIngestionService', () => {
     };
 
     it('streams archive in one pass and persists media/codes/features', async () => {
-      const dbConnection = getMockDBConnection();
-      const service = new SubmissionIngestionService(dbConnection);
+      const service = new SubmissionIngestionService();
       setupTarballContext();
 
       const deleteFeaturesStub = sinon
@@ -83,8 +94,7 @@ describe('SubmissionIngestionService', () => {
     });
 
     it('throws when archive stream parsing fails', async () => {
-      const dbConnection = getMockDBConnection();
-      const service = new SubmissionIngestionService(dbConnection);
+      const service = new SubmissionIngestionService();
       setupTarballContext();
 
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
@@ -103,8 +113,7 @@ describe('SubmissionIngestionService', () => {
     });
 
     it('throws when no upload archives exist for the upload id', async () => {
-      const dbConnection = getMockDBConnection();
-      const service = new SubmissionIngestionService(dbConnection);
+      const service = new SubmissionIngestionService();
 
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([]);
 
@@ -117,8 +126,7 @@ describe('SubmissionIngestionService', () => {
     });
 
     it('propagates archive processing failures', async () => {
-      const dbConnection = getMockDBConnection();
-      const service = new SubmissionIngestionService(dbConnection);
+      const service = new SubmissionIngestionService();
       setupTarballContext();
 
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
@@ -137,8 +145,7 @@ describe('SubmissionIngestionService', () => {
     });
 
     it('throws when archive has no features', async () => {
-      const dbConnection = getMockDBConnection();
-      const service = new SubmissionIngestionService(dbConnection);
+      const service = new SubmissionIngestionService();
       setupTarballContext();
 
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();

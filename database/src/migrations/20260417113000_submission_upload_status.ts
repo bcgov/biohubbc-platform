@@ -76,6 +76,16 @@ export async function up(knex: Knex): Promise<void> {
 
     COMMENT ON COLUMN upload_artifact.record_end_date IS
       'Soft-delete marker for upload_artifact rows. NULL indicates active record.';
+
+    --------------------------------------------------------------------------------
+    -- 3) Add partial index for active submission_feature rows by submission_upload_id
+    --------------------------------------------------------------------------------
+    CREATE INDEX IF NOT EXISTS submission_feature_idx5_active_submission_upload
+      ON submission_feature(submission_upload_id)
+      WHERE record_end_date IS NULL;
+
+    COMMENT ON INDEX submission_feature_idx5_active_submission_upload IS
+      'Partial index for active submission_feature rows by submission_upload_id.';
   `);
 }
 
@@ -146,5 +156,10 @@ export async function down(knex: Knex): Promise<void> {
 
     ALTER TABLE upload_artifact
       DROP COLUMN IF EXISTS record_end_date;
+
+    --------------------------------------------------------------------------------
+    -- 3) Revert submission_feature active-row partial index
+    --------------------------------------------------------------------------------
+    DROP INDEX IF EXISTS submission_feature_idx5_active_submission_upload;
   `);
 }

@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
+import { UPLOAD_JOB_BATCH_SIZE } from '../constants/upload';
 import { JobQueues } from './jobs';
 import * as computeScopeAnchorsJob from './jobs/compute-scope-anchors-job';
 import * as indexSubmissionFeaturesJob from './jobs/index-submission-features-job';
@@ -33,6 +34,7 @@ describe('worker', () => {
       expect(
         workStub.calledWith(
           JobQueues.PROCESS_SUBMISSION_FEATURES,
+          { batchSize: UPLOAD_JOB_BATCH_SIZE },
           processSubmissionFeaturesJob.processSubmissionFeaturesJobHandler
         )
       ).to.be.true;

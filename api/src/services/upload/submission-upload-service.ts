@@ -36,6 +36,20 @@ export class SubmissionUploadService extends DBService {
   }
 
   /**
+   * Retrieves and row-locks a single submission_upload record by its ID.
+   *
+   * Use this in transactional worker gates to prevent concurrent jobs from
+   * starting for the same submission_upload_id.
+   *
+   * @param {string} submissionUploadId The ID of the submission upload artifact
+   * @return {Promise<SubmissionUpload>} The locked submission upload record
+   * @memberof SubmissionUploadService
+   */
+  async getSubmissionUploadWithLock(submissionUploadId: string): Promise<SubmissionUpload> {
+    return this.submissionUploadRepository.getSubmissionUploadWithLock(submissionUploadId);
+  }
+
+  /**
    * Retrieves a submission_upload record only if it belongs to the submission identified by the given UUID.
    * Use this to validate path parameters (submissionId + submissionUploadId) before acting on an upload.
    *
@@ -149,26 +163,6 @@ export class SubmissionUploadService extends DBService {
     this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, nextStatus, allowedCurrentStatuses);
 
     await this.updateSubmissionUpload(submissionUploadId, { status: nextStatus });
-  }
-
-  /**
-   * Transition to ingesting when process stage starts.
-   * - uploaded -> ingesting
-   * - ingesting -> ingesting (no-op)
-   * - all other statuses -> conflict
-   *
-   * @param {string} submissionUploadId Submission upload scope.
-   * @returns {Promise<void>}
-   */
-  async transitionSubmissionUploadToIngesting(submissionUploadId: string): Promise<void> {
-    const current = await this.getSubmissionUpload(submissionUploadId);
-
-    if (current.status === 'ingesting') {
-      return;
-    }
-
-    this.assertSubmissionUploadStatusTransition(submissionUploadId, current.status, 'ingesting', ['uploaded']);
-    await this.updateSubmissionUpload(submissionUploadId, { status: 'ingesting' });
   }
 
   /**

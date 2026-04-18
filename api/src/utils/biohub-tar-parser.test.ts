@@ -363,6 +363,7 @@ describe('biohub-tar-parser', () => {
         objectStorageService: new ObjectStorageService(),
         s3KeyPrefix: 'submissions/42/media',
         featureBatchSize: 100,
+        featureMaxBatchBytes: 1024 * 1024,
         mediaBatchSize: 100,
         mediaMaxBatchBytes: 1024 * 1024,
         mediaConcurrency: 2,
@@ -383,6 +384,54 @@ describe('biohub-tar-parser', () => {
       expect(featureBatchSizes).to.deep.equal([1]);
       expect(codesetPayloadCount).to.equal(1);
       expect(mediaPayloadCount).to.equal(1);
+    });
+
+    it('flushes feature batches when byte threshold is reached', async () => {
+      const tarBuffer = await createTestTar([
+        {
+          name: 'features/dataset-a.json',
+          content: JSON.stringify([
+            {
+              id: 'feature-1',
+              type: 'dataset',
+              properties: { description: 'x'.repeat(200) },
+              content: [],
+              parent: null
+            }
+          ])
+        },
+        {
+          name: 'features/dataset-b.json',
+          content: JSON.stringify([
+            {
+              id: 'feature-2',
+              type: 'dataset',
+              properties: { description: 'y'.repeat(200) },
+              content: [],
+              parent: null
+            }
+          ])
+        }
+      ]);
+
+      const featureBatchSizes: number[] = [];
+      const result = await streamSubmissionArchive(bufferToStream(tarBuffer), {
+        objectStorageService: new ObjectStorageService(),
+        s3KeyPrefix: 'submissions/42/media',
+        featureBatchSize: 100,
+        featureMaxBatchBytes: 100,
+        mediaBatchSize: 100,
+        mediaMaxBatchBytes: 1024 * 1024,
+        mediaConcurrency: 2,
+        ingestFeatureBatch: async (blocks) => {
+          featureBatchSizes.push(blocks.length);
+        },
+        ingestCodesets: async () => undefined,
+        ingestMediaBatch: async () => undefined
+      });
+
+      expect(result.featureCount).to.equal(2);
+      expect(featureBatchSizes).to.deep.equal([1, 1]);
     });
   });
 });

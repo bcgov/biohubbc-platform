@@ -1,3 +1,4 @@
+import { UPLOAD_JOB_BATCH_SIZE } from '../constants/upload';
 import { SubmissionUpload } from '../models/submission-upload';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
@@ -60,7 +61,11 @@ export const registerWorkers = async (): Promise<void> => {
   });
 
   // Register process submission features job handler
-  await boss.work<SubmissionUpload>(JobQueues.PROCESS_SUBMISSION_FEATURES, processSubmissionFeaturesJobHandler);
+  await boss.work<SubmissionUpload>(
+    JobQueues.PROCESS_SUBMISSION_FEATURES,
+    { batchSize: UPLOAD_JOB_BATCH_SIZE },
+    processSubmissionFeaturesJobHandler
+  );
 
   // Register dead letter queue handler for failed jobs
   await boss.work<SubmissionUpload>(

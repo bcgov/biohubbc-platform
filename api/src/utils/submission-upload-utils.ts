@@ -43,7 +43,10 @@ const getMultipartPartSize = (normalizedBytes: number): number => {
   const s3PartCountFloor = Math.ceil(normalizedBytes / S3_MULTIPART_MAX_PARTS);
   // Fewer requests is typically better for large uploads.
   // Example: 1.34 GiB with TARGET_PARTS=10 -> target part size ~= 137 MiB.
-  const targetPartCountSize = Math.min(Math.ceil(normalizedBytes / UPLOAD_TARGET_PART_COUNT), UPLOAD_PART_SIZE_CAP_BYTES);
+  const targetPartCountSize = Math.min(
+    Math.ceil(normalizedBytes / UPLOAD_TARGET_PART_COUNT),
+    UPLOAD_PART_SIZE_CAP_BYTES
+  );
 
   // Gentle ramp after 20 MiB so files do not stay near-minimum part size for too long.
   // Example:

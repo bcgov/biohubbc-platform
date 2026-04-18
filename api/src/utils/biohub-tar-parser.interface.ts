@@ -52,6 +52,7 @@ export interface StreamSubmissionArchiveOptions {
   objectStorageService: ObjectStorageService;
   s3KeyPrefix: string;
   featureBatchSize: number;
+  featureMaxBatchBytes: number;
   mediaBatchSize: number;
   mediaMaxBatchBytes: number;
   mediaConcurrency: number;
