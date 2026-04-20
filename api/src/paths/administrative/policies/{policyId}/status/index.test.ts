@@ -20,7 +20,7 @@ describe('paths/administrative/policies/{policyId}/status', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const updatedPolicy: Policy = {
       policy_id: '11111111-1111-1111-1111-111111111111',

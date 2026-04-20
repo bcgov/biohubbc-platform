@@ -20,7 +20,7 @@ describe('paths/tickets/{ticketId}/data-request', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const createdDataRequest: DataRequest = {
       data_request_id: '11111111-1111-1111-1111-111111111111',
