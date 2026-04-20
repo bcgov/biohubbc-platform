@@ -32,7 +32,8 @@ describe('paths/administrative/tickets/{ticketId}', () => {
       }
     ],
     comments: [],
-    references: []
+    references: [],
+    data_requests: []
   };
 
   afterEach(() => {
