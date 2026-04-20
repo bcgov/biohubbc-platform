@@ -14,6 +14,20 @@ type DBConstantsGlobal = typeof globalThis & {
 const dbConstantsGlobal = globalThis as DBConstantsGlobal;
 
 /**
+ * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ */
+export const dbConstantsDependencies = {
+  getLogger: async () => {
+    const { getLogger } = await import('../utils/logger');
+    return getLogger;
+  },
+  getAPIUserDBConnection: async () => {
+    const { getAPIUserDBConnection } = await import('./db');
+    return getAPIUserDBConnection;
+  }
+};
+
+/**
  * Initializes the singleton db constants instance used by the api.
  *
  * @return {*}  {Promise<void>}
@@ -25,13 +39,13 @@ export const initDBConstants = async function (): Promise<void> {
   }
 
   // Lazy load logger to prevent circular dependencies
-  const { getLogger } = await import('../utils/logger');
+  const getLogger = await dbConstantsDependencies.getLogger();
 
   const defaultLog = getLogger('database/db');
 
   try {
     // Lazy load logger to prevent circular dependencies
-    const { getAPIUserDBConnection } = await import('./db');
+    const getAPIUserDBConnection = await dbConstantsDependencies.getAPIUserDBConnection();
 
     const connection = getAPIUserDBConnection();
 

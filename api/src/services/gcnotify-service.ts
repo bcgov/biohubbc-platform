@@ -63,6 +63,13 @@ export class GCNotifyService extends DBService {
   APP_HOST: string;
   adminEmail: string;
 
+  /**
+   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+   */
+  static dependencies = {
+    post: (...args: Parameters<typeof axios.post>) => axios.post(...args)
+  };
+
   constructor(connection: IDBConnection) {
     super(connection);
     this.SECURE_DOCUMENT_REQUEST_TEMPLATE = process.env.GCNOTIFY_REQUEST_ACCESS_SECURE_DOCUMENTS || '';
@@ -103,7 +110,7 @@ export class GCNotifyService extends DBService {
       }
     };
 
-    const response = await axios.post(this.EMAIL_URL, data, this.axiosConfig);
+    const response = await GCNotifyService.dependencies.post(this.EMAIL_URL, data, this.axiosConfig);
 
     const result = (response && response.data) || null;
 
@@ -163,7 +170,7 @@ export class GCNotifyService extends DBService {
       header: 'A request to access secured documents has been submitted.'
     };
 
-    const submitterEmailResponse = await axios.post(
+    const submitterEmailResponse = await GCNotifyService.dependencies.post(
       this.EMAIL_URL,
       {
         email_address: requestData.emailAddress,
@@ -173,7 +180,7 @@ export class GCNotifyService extends DBService {
       this.axiosConfig
     );
 
-    const adminEmailResponse = await axios.post(
+    const adminEmailResponse = await GCNotifyService.dependencies.post(
       this.EMAIL_URL,
       {
         email_address: this.adminEmail,
@@ -210,7 +217,7 @@ export class GCNotifyService extends DBService {
       }
     };
 
-    const response = await axios.post(this.SMS_URL, data, this.axiosConfig);
+    const response = await GCNotifyService.dependencies.post(this.SMS_URL, data, this.axiosConfig);
 
     const result = (response && response.data) || null;
 

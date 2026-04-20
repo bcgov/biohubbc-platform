@@ -12,7 +12,6 @@ import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { SearchFeatureRepository } from '../../repositories/search-feature-repository';
-import * as fileUtils from '../../utils/file-utils';
 import { TeamService } from '../access-policy/team-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
@@ -113,7 +112,7 @@ describe('DownloadService', () => {
       const createDownloadStub = sinon
         .stub(DownloadRepository.prototype, 'createDownload')
         .resolves({ download_id: 'dl-uuid-1' });
-      sinon.stub(fileUtils, 'getObjectStoreBucketName').returns('test-bucket');
+      sinon.stub(DownloadService.dependencies, 'getObjectStoreBucketName').returns('test-bucket');
       const insertArtifactStub = sinon
         .stub(ArtifactService.prototype, 'insertArtifact')
         .resolves({ artifact_id: 'art-uuid-1' });
@@ -138,7 +137,7 @@ describe('DownloadService', () => {
       const service = new DownloadService(mockDBConnection);
 
       sinon.stub(DownloadRepository.prototype, 'createDownload').resolves({ download_id: 'dl-uuid-1' });
-      sinon.stub(fileUtils, 'getObjectStoreBucketName').returns('test-bucket');
+      sinon.stub(DownloadService.dependencies, 'getObjectStoreBucketName').returns('test-bucket');
       sinon.stub(ArtifactService.prototype, 'insertArtifact').rejects(new Error('Artifact insert failed'));
 
       try {
@@ -154,7 +153,7 @@ describe('DownloadService', () => {
       const service = new DownloadService(mockDBConnection);
 
       sinon.stub(DownloadRepository.prototype, 'createDownload').resolves({ download_id: 'dl-uuid-1' });
-      sinon.stub(fileUtils, 'getObjectStoreBucketName').returns('test-bucket');
+      sinon.stub(DownloadService.dependencies, 'getObjectStoreBucketName').returns('test-bucket');
       sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves({ artifact_id: 'art-uuid-1' });
       sinon.stub(DownloadRepository.prototype, 'createDownloadArtifact').rejects(new Error('Link failed'));
 

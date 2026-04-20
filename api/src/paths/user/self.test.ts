@@ -5,11 +5,9 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 import { SYSTEM_ROLE } from '../../constants/roles';
-import * as db from '../../database/db';
 import { HTTP401, HTTPError } from '../../errors/http-error';
 import { SystemUserExtended } from '../../repositories/user-repository';
 import { UserService } from '../../services/user-service';
-import * as keycloakUtils from '../../utils/keycloak-utils';
 import * as self from './self';
 
 chai.use(sinonChai);
@@ -24,9 +22,9 @@ describe('upsertUser', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
-    sinon.stub(keycloakUtils, 'getUserGuid').returns(null);
-    sinon.stub(keycloakUtils, 'getUserIdentifier').returns('testuser');
+    sinon.stub(self.selfDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(self.selfDependencies, 'getUserGuid').returns(null);
+    sinon.stub(self.selfDependencies, 'getUserIdentifier').returns('testuser');
 
     try {
       const requestHandler = self.upsertUser();
@@ -44,9 +42,9 @@ describe('upsertUser', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
-    sinon.stub(keycloakUtils, 'getUserGuid').returns('123-456-789');
-    sinon.stub(keycloakUtils, 'getUserIdentifier').returns(null);
+    sinon.stub(self.selfDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(self.selfDependencies, 'getUserGuid').returns('123-456-789');
+    sinon.stub(self.selfDependencies, 'getUserIdentifier').returns(null);
 
     try {
       const requestHandler = self.upsertUser();
@@ -64,15 +62,15 @@ describe('upsertUser', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
-    sinon.stub(keycloakUtils, 'getUserGuid').returns('123-456-789');
-    sinon.stub(keycloakUtils, 'getUserIdentifier').returns('testuser');
-    sinon.stub(keycloakUtils, 'getUserIdentitySource').returns(SYSTEM_IDENTITY_SOURCE.IDIR);
-    sinon.stub(keycloakUtils, 'getDisplayName').returns('Test User');
-    sinon.stub(keycloakUtils, 'getEmail').returns('test@example.com');
-    sinon.stub(keycloakUtils, 'getGivenName').returns('Test');
-    sinon.stub(keycloakUtils, 'getFamilyName').returns('User');
-    sinon.stub(keycloakUtils, 'getAgency').returns(null);
+    sinon.stub(self.selfDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(self.selfDependencies, 'getUserGuid').returns('123-456-789');
+    sinon.stub(self.selfDependencies, 'getUserIdentifier').returns('testuser');
+    sinon.stub(self.selfDependencies, 'getUserIdentitySource').returns(SYSTEM_IDENTITY_SOURCE.IDIR);
+    sinon.stub(self.selfDependencies, 'getDisplayName').returns('Test User');
+    sinon.stub(self.selfDependencies, 'getEmail').returns('test@example.com');
+    sinon.stub(self.selfDependencies, 'getGivenName').returns('Test');
+    sinon.stub(self.selfDependencies, 'getFamilyName').returns('User');
+    sinon.stub(self.selfDependencies, 'getAgency').returns(null);
 
     const newUser = {
       system_user_id: 1,
@@ -115,15 +113,15 @@ describe('upsertUser', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
-    sinon.stub(keycloakUtils, 'getUserGuid').returns('123-456-789');
-    sinon.stub(keycloakUtils, 'getUserIdentifier').returns('testuser');
-    sinon.stub(keycloakUtils, 'getUserIdentitySource').returns(SYSTEM_IDENTITY_SOURCE.IDIR);
-    sinon.stub(keycloakUtils, 'getDisplayName').returns('Updated Name');
-    sinon.stub(keycloakUtils, 'getEmail').returns('updated@example.com');
-    sinon.stub(keycloakUtils, 'getGivenName').returns('Updated');
-    sinon.stub(keycloakUtils, 'getFamilyName').returns('Name');
-    sinon.stub(keycloakUtils, 'getAgency').returns(null);
+    sinon.stub(self.selfDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(self.selfDependencies, 'getUserGuid').returns('123-456-789');
+    sinon.stub(self.selfDependencies, 'getUserIdentifier').returns('testuser');
+    sinon.stub(self.selfDependencies, 'getUserIdentitySource').returns(SYSTEM_IDENTITY_SOURCE.IDIR);
+    sinon.stub(self.selfDependencies, 'getDisplayName').returns('Updated Name');
+    sinon.stub(self.selfDependencies, 'getEmail').returns('updated@example.com');
+    sinon.stub(self.selfDependencies, 'getGivenName').returns('Updated');
+    sinon.stub(self.selfDependencies, 'getFamilyName').returns('Name');
+    sinon.stub(self.selfDependencies, 'getAgency').returns(null);
 
     const updatedUser = {
       system_user_id: 1,
@@ -165,15 +163,15 @@ describe('upsertUser', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
-    sinon.stub(keycloakUtils, 'getUserGuid').returns('123-456-789');
-    sinon.stub(keycloakUtils, 'getUserIdentifier').returns('testuser');
-    sinon.stub(keycloakUtils, 'getUserIdentitySource').returns(SYSTEM_IDENTITY_SOURCE.IDIR);
-    sinon.stub(keycloakUtils, 'getDisplayName').returns('Expired User');
-    sinon.stub(keycloakUtils, 'getEmail').returns('expired@example.com');
-    sinon.stub(keycloakUtils, 'getGivenName').returns('Expired');
-    sinon.stub(keycloakUtils, 'getFamilyName').returns('User');
-    sinon.stub(keycloakUtils, 'getAgency').returns(null);
+    sinon.stub(self.selfDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(self.selfDependencies, 'getUserGuid').returns('123-456-789');
+    sinon.stub(self.selfDependencies, 'getUserIdentifier').returns('testuser');
+    sinon.stub(self.selfDependencies, 'getUserIdentitySource').returns(SYSTEM_IDENTITY_SOURCE.IDIR);
+    sinon.stub(self.selfDependencies, 'getDisplayName').returns('Expired User');
+    sinon.stub(self.selfDependencies, 'getEmail').returns('expired@example.com');
+    sinon.stub(self.selfDependencies, 'getGivenName').returns('Expired');
+    sinon.stub(self.selfDependencies, 'getFamilyName').returns('User');
+    sinon.stub(self.selfDependencies, 'getAgency').returns(null);
 
     const http401Error = new HTTP401('User account is expired or inactive');
     sinon.stub(UserService.prototype, 'upsertSelf').rejects(http401Error);
@@ -196,15 +194,15 @@ describe('upsertUser', () => {
 
     const expectedError = new Error('cannot process query');
 
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
-    sinon.stub(keycloakUtils, 'getUserGuid').returns('123-456-789');
-    sinon.stub(keycloakUtils, 'getUserIdentifier').returns('testuser');
-    sinon.stub(keycloakUtils, 'getUserIdentitySource').returns(SYSTEM_IDENTITY_SOURCE.IDIR);
-    sinon.stub(keycloakUtils, 'getDisplayName').returns('Test User');
-    sinon.stub(keycloakUtils, 'getEmail').returns('test@example.com');
-    sinon.stub(keycloakUtils, 'getGivenName').returns('Test');
-    sinon.stub(keycloakUtils, 'getFamilyName').returns('User');
-    sinon.stub(keycloakUtils, 'getAgency').returns(null);
+    sinon.stub(self.selfDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(self.selfDependencies, 'getUserGuid').returns('123-456-789');
+    sinon.stub(self.selfDependencies, 'getUserIdentifier').returns('testuser');
+    sinon.stub(self.selfDependencies, 'getUserIdentitySource').returns(SYSTEM_IDENTITY_SOURCE.IDIR);
+    sinon.stub(self.selfDependencies, 'getDisplayName').returns('Test User');
+    sinon.stub(self.selfDependencies, 'getEmail').returns('test@example.com');
+    sinon.stub(self.selfDependencies, 'getGivenName').returns('Test');
+    sinon.stub(self.selfDependencies, 'getFamilyName').returns('User');
+    sinon.stub(self.selfDependencies, 'getAgency').returns(null);
     sinon.stub(UserService.prototype, 'upsertSelf').rejects(expectedError);
 
     try {

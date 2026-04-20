@@ -42,6 +42,13 @@ export class DownloadService extends DBService {
   searchFeatureService: SearchFeatureService;
   artifactService: ArtifactService;
 
+  /**
+   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+   */
+  static dependencies = {
+    getObjectStoreBucketName
+  };
+
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
@@ -74,7 +81,7 @@ export class DownloadService extends DBService {
       .replace(/\.\d{3}/, '');
     const { format } = payload;
     const artifact = await this.artifactService.insertArtifact({
-      bucket: getObjectStoreBucketName(),
+      bucket: DownloadService.dependencies.getObjectStoreBucketName(),
       object_key: `downloads/${downloadId.download_id}/download-${timestamp}.${format}`,
       byte_size: null,
       artifact_status: ArtifactStatusEnum.PENDING,

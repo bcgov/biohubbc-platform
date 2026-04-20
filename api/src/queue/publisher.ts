@@ -14,6 +14,15 @@ import { getPgBoss } from './pg-boss-service';
 const defaultLog = getLogger('queue/publisher');
 
 /**
+ * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ */
+export const publisherDependencies = {
+  getPgBoss,
+  createSubmissionValidationService: (connection: IDBConnection) => new SubmissionValidationService(connection),
+  createDownloadService: (connection: IDBConnection) => new DownloadService(connection)
+};
+
+/**
  * Options for publishing a job.
  */
 export interface IPublishOptions {
@@ -106,7 +115,7 @@ export const publishProcessSubmissionFeaturesJob = async (
   const { submission_upload_id: submissionUploadId, submission_id: submissionId } = submissionUpload;
 
   try {
-    const submissionValidationService = new SubmissionValidationService(connection);
+    const submissionValidationService = publisherDependencies.createSubmissionValidationService(connection);
 
     // Check for existing validation record by submission_upload_id
     const existingValidation = await submissionValidationService.getSubmissionValidationBySubmissionUploadId(
@@ -139,7 +148,7 @@ export const publishProcessSubmissionFeaturesJob = async (
       });
     }
 
-    const boss = getPgBoss();
+    const boss = publisherDependencies.getPgBoss();
     const mergedOptions = { ...PROCESS_SUBMISSION_FEATURES_OPTIONS, ...options };
 
     // Ensure queue exists before sending jobs
@@ -214,7 +223,7 @@ export const publishMalwareScanJob = async (
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
   try {
-    const boss = getPgBoss();
+    const boss = publisherDependencies.getPgBoss();
     const mergedOptions = { ...MALWARE_SCAN_OPTIONS, ...options };
 
     await boss.createQueue(JobQueues.MALWARE_SCAN);
@@ -282,7 +291,7 @@ export const publishProcessDownloadJob = async (
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
   try {
-    const downloadService = new DownloadService(connection);
+    const downloadService = publisherDependencies.createDownloadService(connection);
 
     // Check if download exists
     const download = await downloadService.findDownloadById(data.downloadId);
@@ -303,7 +312,7 @@ export const publishProcessDownloadJob = async (
       return { status: 'duplicate', message: 'Job already exists for this download' };
     }
 
-    const boss = getPgBoss();
+    const boss = publisherDependencies.getPgBoss();
     const mergedOptions = { ...PROCESS_DOWNLOAD_OPTIONS, ...options };
 
     await boss.createQueue(JobQueues.PROCESS_DOWNLOAD);
@@ -385,7 +394,7 @@ export const publishIndexSubmissionFeaturesJob = async (
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
   try {
-    const boss = getPgBoss();
+    const boss = publisherDependencies.getPgBoss();
     const mergedOptions = { ...INDEX_SUBMISSION_FEATURES_OPTIONS, ...options };
 
     await boss.createQueue(JobQueues.INDEX_SUBMISSION_FEATURES);
@@ -460,7 +469,7 @@ export const publishComputeScopeAnchorsJob = async (
   options: IPublishOptions = {}
 ): Promise<PublishJobResult> => {
   try {
-    const boss = getPgBoss();
+    const boss = publisherDependencies.getPgBoss();
     const mergedOptions = { ...COMPUTE_SCOPE_ANCHORS_OPTIONS, ...options };
 
     await boss.createQueue(JobQueues.COMPUTE_SCOPE_ANCHORS);

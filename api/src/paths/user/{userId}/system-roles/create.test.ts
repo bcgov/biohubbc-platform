@@ -27,7 +27,7 @@ describe('getAddSystemRolesHandler', () => {
       roles: [1]
     };
 
-    sinon.stub(db, 'getDBConnection').returns({
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns({
       ...dbConnectionObj,
       systemUserId: () => {
         return 20;
@@ -57,7 +57,7 @@ describe('getAddSystemRolesHandler', () => {
       roles: null
     };
 
-    sinon.stub(db, 'getDBConnection').returns({
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns({
       ...dbConnectionObj,
       systemUserId: () => {
         return 20;
@@ -78,7 +78,7 @@ describe('getAddSystemRolesHandler', () => {
   it('re-throws the error thrown by UserService.addUserSystemRoles', async () => {
     const dbConnectionObj = getMockDBConnection();
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -142,7 +142,7 @@ describe('getAddSystemRolesHandler', () => {
       rowCount: 1
     });
 
-    sinon.stub(db, 'getDBConnection').returns({
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns({
       ...dbConnectionObj,
       sql: mockQuery
     });
@@ -195,7 +195,7 @@ describe('getAddSystemRolesHandler', () => {
       rowCount: 1
     });
 
-    sinon.stub(db, 'getDBConnection').returns({
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns({
       ...dbConnectionObj,
       sql: mockQuery
     });

@@ -7,6 +7,14 @@ import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('request-handlers/security/authorization');
 
+/**
+ * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ */
+export const authorizationDependencies = {
+  getAPIUserDBConnection,
+  authorizeRequest: (req: Request) => authorizeRequest(req)
+};
+
 export type AuthorizationSchemeCallback = (req: Request) => AuthorizationScheme;
 
 /**
@@ -23,7 +31,7 @@ export function authorizeRequestHandler(authorizationSchemeCallback: Authorizati
   return async (req, _, next) => {
     req.authorization_scheme = authorizationSchemeCallback(req);
 
-    const isAuthorized = await authorizeRequest(req);
+    const isAuthorized = await authorizationDependencies.authorizeRequest(req);
 
     if (!isAuthorized) {
       defaultLog.warn({ label: 'authorize', message: 'User is not authorized' });
@@ -45,7 +53,7 @@ export function authorizeRequestHandler(authorizationSchemeCallback: Authorizati
  * @return {*}  {Promise<boolean>}
  */
 export const authorizeRequest = async (req: Request): Promise<boolean> => {
-  const connection = getAPIUserDBConnection();
+  const connection = authorizationDependencies.getAPIUserDBConnection();
 
   try {
     const authorizationScheme: AuthorizationScheme = req.authorization_scheme;

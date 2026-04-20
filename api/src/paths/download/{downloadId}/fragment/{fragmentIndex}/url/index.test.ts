@@ -19,7 +19,7 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
     it('should return 200 with signed URL when download is ready and user is authorized', async () => {
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 5 });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockDownload = {
         download_id: 'aaaa0000-0000-0000-0000-000000000001',
@@ -50,7 +50,7 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
 
       const dbConnectionObj = getMockDBConnection();
 
-      sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
       sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').resolves(mockDownload as any);
       sinon.stub(DownloadService.prototype, 'getFragmentSignedUrl').resolves('https://s3.example.com/signed-url');
 
@@ -68,7 +68,7 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
     it('should return 200 for owned download fragment when user is authorized', async () => {
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 5 });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockDownload = {
         download_id: 'aaaa0000-0000-0000-0000-000000000001',
@@ -94,7 +94,7 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
     it('should throw HTTP403 when unauthenticated user accesses owned download fragment', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
       sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').rejects(new HTTP403('Access denied'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -115,7 +115,7 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
     it('should throw HTTP404 when download not found', async () => {
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 5 });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
       sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').rejects(new HTTP404('Download not found'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -137,7 +137,7 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
     it('should throw HTTP403 when authenticated user is not authorized for the download', async () => {
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 5 });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
       sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').rejects(new HTTP403('Access denied'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -159,7 +159,7 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
     it('should throw HTTP403 when unauthenticated user tries to access non-anonymous download', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
       sinon.stub(DownloadService.prototype, 'getAuthorizedDownload').rejects(new HTTP403('Access denied'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -180,7 +180,7 @@ describe('paths/download/{downloadId}/fragment/{fragmentIndex}/url/index', () =>
     it('should throw HTTP409 when download is not ready', async () => {
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 5 });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockDownload = {
         download_id: 'aaaa0000-0000-0000-0000-000000000001',

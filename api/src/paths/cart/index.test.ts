@@ -23,7 +23,7 @@ describe('cart', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
 
       const requestHandler = createCart();
@@ -45,7 +45,7 @@ describe('cart', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const fakeCart: CartWithFeaturesResponse = {
         cart: {
@@ -85,7 +85,7 @@ describe('cart', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      const apiDBStub = sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+      const apiDBStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
       const fakeCart: CartWithFeaturesResponse = {
         cart: {
@@ -124,7 +124,7 @@ describe('cart', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       sinon.stub(CartService.prototype, 'createCart').rejects(new Error('Service error'));
 

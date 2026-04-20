@@ -22,7 +22,7 @@ describe('getTeamMembers', () => {
       }
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { teamId: 'team-1' };
@@ -48,7 +48,7 @@ describe('getTeamMembers', () => {
     };
 
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const getMembersStub = sinon.stub(TeamMemberService.prototype, 'getTeamMembersWithUsers').resolves(mockMembers);
     const getMembersCountStub = sinon.stub(TeamMemberService.prototype, 'getTeamMembersWithUsersCount').resolves(1);
 
@@ -72,7 +72,7 @@ describe('getTeamMembers', () => {
 
   it('should add team member', async () => {
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const createdTeamMember: TeamMemberWithUser = {
       team_member_id: 'tm-1',
       system_user_id: 42,
@@ -100,7 +100,7 @@ describe('getTeamMembers', () => {
 
   it('should delete all team members for a team', async () => {
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     // Stub the new service method
     const deleteAllStub = sinon.stub(TeamMemberService.prototype, 'deleteAllTeamMembers').resolves();

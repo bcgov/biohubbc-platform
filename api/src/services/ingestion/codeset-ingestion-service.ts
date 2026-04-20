@@ -27,6 +27,13 @@ export class CodesetIngestionService extends DBService {
   contributorCodesetCodeService = new ContributorCodesetCodeService(this.connection);
 
   /**
+   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+   */
+  static dependencies = {
+    streamCodesets
+  };
+
+  /**
    * Creates an instance of CodesetIngestionService.
    *
    * @param {IDBConnection} connection
@@ -46,7 +53,7 @@ export class CodesetIngestionService extends DBService {
     const contributor = await this.contributorService.getContributorBySubmissionUploadId(submissionUploadId);
     const tarStream = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
 
-    await streamCodesets(tarStream, async (codesets) => {
+    await CodesetIngestionService.dependencies.streamCodesets(tarStream, async (codesets) => {
       await this.persistContributorCodesets(contributor.contributor_id, codesets);
     });
   }

@@ -28,7 +28,7 @@ describe('taxon', () => {
     it('returns an empty array if no species are found', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const getSpeciesFromIdsStub = sinon.stub(ItisService.prototype, 'searchItisByTerm').resolves([]);
 
@@ -50,7 +50,7 @@ describe('taxon', () => {
     it('returns an array of species', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mock1 = { id: '1', commonNames: ['something'], scientificName: 'string' } as unknown as any;
       const mock2 = { id: '2', commonNames: null, scientificName: 'string' } as unknown as any;
@@ -75,7 +75,7 @@ describe('taxon', () => {
     it('catches error, and re-throws error', async () => {
       const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       sinon.stub(ItisService.prototype, 'searchItisByTerm').rejects(new Error('a test error'));
 

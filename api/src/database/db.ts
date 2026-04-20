@@ -72,6 +72,25 @@ type DBGlobal = typeof globalThis & {
 const dbGlobal = globalThis as DBGlobal;
 
 /**
+ * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ */
+export const dbDependencies = {
+  getDBPool: () => getDBPool(),
+  getDBConnection: (_keycloakToken: object): IDBConnection => {
+    throw new Error('dbDependencies.getDBConnection is not initialized');
+  },
+  getAPIUserDBConnection: (): IDBConnection => {
+    throw new Error('dbDependencies.getAPIUserDBConnection is not initialized');
+  },
+  getServiceAccountDBConnection: (_systemUser: SystemUser): IDBConnection => {
+    throw new Error('dbDependencies.getServiceAccountDBConnection is not initialized');
+  },
+  getUserGuid,
+  getUserIdentitySource,
+  getServiceClientSystemUser
+};
+
+/**
  * Initializes the singleton pg pool instance used by the api.
  *
  * @param {pg.PoolConfig} [poolConfig]
@@ -201,7 +220,7 @@ export interface IDBConnection {
  * @param {object} keycloakToken
  * @return {*} {IDBConnection}
  */
-export const getDBConnection = function (keycloakToken: object): IDBConnection {
+const getDBConnectionInternal = function (keycloakToken: object): IDBConnection {
   if (!keycloakToken) {
     throw Error('Keycloak token is undefined');
   }
@@ -227,7 +246,7 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
       return;
     }
 
-    const pool = getDBPool();
+    const pool = dbDependencies.getDBPool();
 
     if (!pool) {
       throw Error('DBPool is not initialized');
@@ -456,11 +475,11 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
    * Sets the _systemUserId if successful.
    */
   const _setUserContext = async () => {
-    const userGuid = getUserGuid(_token);
+    const userGuid = dbDependencies.getUserGuid(_token);
 
     // Check if this is a known service client - if so, use SYSTEM identity source
-    let userIdentitySource = getUserIdentitySource(_token);
-    const serviceClientUser = getServiceClientSystemUser(_token);
+    let userIdentitySource = dbDependencies.getUserIdentitySource(_token);
+    const serviceClientUser = dbDependencies.getServiceClientSystemUser(_token);
     if (serviceClientUser) {
       // This is a known service client, use SYSTEM identity source
       userIdentitySource = SYSTEM_IDENTITY_SOURCE.SYSTEM;
@@ -501,6 +520,12 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
   };
 };
 
+dbDependencies.getDBConnection = (keycloakToken: object) => getDBConnectionInternal(keycloakToken);
+
+export const getDBConnection = function (keycloakToken: object): IDBConnection {
+  return dbDependencies.getDBConnection(keycloakToken);
+};
+
 /**
  * Returns an IDBConnection where the system user context is set to the API's system user.
  *
@@ -509,7 +534,7 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
  *
  * @return {*}  {IDBConnection}
  */
-export const getAPIUserDBConnection = (): IDBConnection => {
+const getAPIUserDBConnectionInternal = (): IDBConnection => {
   return getDBConnection({
     preferred_username: `${getDbUsername()}@${SYSTEM_IDENTITY_SOURCE.DATABASE}`,
     identity_provider: SYSTEM_IDENTITY_SOURCE.DATABASE
@@ -525,11 +550,23 @@ export const getAPIUserDBConnection = (): IDBConnection => {
  * @param {SystemUser} systemUser
  * @return {*}  {IDBConnection}
  */
-export const getServiceAccountDBConnection = (systemUser: SystemUser): IDBConnection => {
+const getServiceAccountDBConnectionInternal = (systemUser: SystemUser): IDBConnection => {
   return getDBConnection({
     preferred_username: systemUser.user_guid,
     identity_provider: SYSTEM_IDENTITY_SOURCE.SYSTEM
   });
+};
+
+dbDependencies.getAPIUserDBConnection = () => getAPIUserDBConnectionInternal();
+dbDependencies.getServiceAccountDBConnection = (systemUser: SystemUser) =>
+  getServiceAccountDBConnectionInternal(systemUser);
+
+export const getAPIUserDBConnection = (): IDBConnection => {
+  return dbDependencies.getAPIUserDBConnection();
+};
+
+export const getServiceAccountDBConnection = (systemUser: SystemUser): IDBConnection => {
+  return dbDependencies.getServiceAccountDBConnection(systemUser);
 };
 
 /**

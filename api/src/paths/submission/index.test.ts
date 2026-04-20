@@ -44,7 +44,7 @@ describe('submission index', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
 
       const requestHandler = getSubmissions();
@@ -67,7 +67,7 @@ describe('submission index', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const submissionStub = sinon
         .stub(SubmissionService.prototype, 'getSubmissionsByUserId')
@@ -96,7 +96,7 @@ describe('submission index', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(SubmissionService.prototype, 'getSubmissionsByUserId').rejects(new Error('Service error'));
       sinon.stub(SubmissionService.prototype, 'getSubmissionsByUserIdCount').resolves(0);
 

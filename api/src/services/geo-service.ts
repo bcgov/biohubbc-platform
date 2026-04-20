@@ -2,6 +2,14 @@ import axios, { CancelTokenSource } from 'axios';
 import qs from 'qs';
 
 /**
+ * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ */
+export const geoServiceDependencies = {
+  get: (...args: Parameters<typeof axios.get>) => axios.get(...args),
+  post: (...args: Parameters<typeof axios.post>) => axios.post(...args)
+};
+
+/**
  * WGS 84
  *
  * Typically the default coordinate system for GeoJSON.
@@ -260,7 +268,7 @@ export class GeoService {
    * @memberof GeoService
    */
   async _externalGet(url: string, cancelTokenSource?: CancelTokenSource): Promise<unknown> {
-    const { data } = await axios.get(url, { cancelToken: cancelTokenSource?.token });
+    const { data } = await geoServiceDependencies.get(url, { cancelToken: cancelTokenSource?.token });
 
     return data;
   }
@@ -275,7 +283,7 @@ export class GeoService {
    * @memberof GeoService
    */
   async _externalPost(url: string, body: Record<string, any>, cancelTokenSource?: CancelTokenSource): Promise<unknown> {
-    const { data } = await axios.post(url, qs.stringify(body), {
+    const { data } = await geoServiceDependencies.post(url, qs.stringify(body), {
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       cancelToken: cancelTokenSource?.token
     });

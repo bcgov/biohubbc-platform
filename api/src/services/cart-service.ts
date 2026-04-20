@@ -20,6 +20,13 @@ export class CartService extends DBService {
   teamService: TeamService;
 
   /**
+   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+   */
+  static dependencies = {
+    publishProcessDownloadJob
+  };
+
+  /**
    * Initializes the CartService with a database connection.
    *
    * @param {IDBConnection} connection
@@ -173,7 +180,7 @@ export class CartService extends DBService {
     });
 
     // Publish download job for async processing
-    await publishProcessDownloadJob(this.connection, { downloadId: downloadId.download_id });
+    await CartService.dependencies.publishProcessDownloadJob(this.connection, { downloadId: downloadId.download_id });
 
     return downloadId;
   }

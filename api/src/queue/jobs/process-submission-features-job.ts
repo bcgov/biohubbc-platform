@@ -13,6 +13,22 @@ import { publishIndexSubmissionFeaturesJob } from '../publisher';
 const defaultLog = getLogger('queue/jobs/process-submission-features-job');
 
 /**
+ * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ */
+export const processSubmissionFeaturesJobDependencies = {
+  getAPIUserDBConnection,
+  publishIndexSubmissionFeaturesJob,
+  createSubmissionValidationService: (connection: ReturnType<typeof getAPIUserDBConnection>) =>
+    new SubmissionValidationService(connection),
+  createSubmissionUploadService: (connection: ReturnType<typeof getAPIUserDBConnection>) =>
+    new SubmissionUploadService(connection),
+  createSubmissionIngestionService: (connection: ReturnType<typeof getAPIUserDBConnection>) =>
+    new SubmissionIngestionService(connection),
+  createUploadArchiveService: (connection: ReturnType<typeof getAPIUserDBConnection>) =>
+    new UploadArchiveService(connection)
+};
+
+/**
  * Serialize unknown thrown values into structured log-safe metadata.
  *
  * @param {unknown} error - Unknown thrown value.
@@ -64,7 +80,7 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
     const submissionUpload = job.data;
     const { submission_upload_id: submissionUploadId, submission_id: submissionId } = submissionUpload;
 
-    const connection = getAPIUserDBConnection();
+    const connection = processSubmissionFeaturesJobDependencies.getAPIUserDBConnection();
 
     try {
       await connection.open();
@@ -77,8 +93,10 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
         submissionId
       });
 
-      const submissionValidationService = new SubmissionValidationService(connection);
-      const submissionUploadService = new SubmissionUploadService(connection);
+      const submissionValidationService =
+        processSubmissionFeaturesJobDependencies.createSubmissionValidationService(connection);
+      const submissionUploadService =
+        processSubmissionFeaturesJobDependencies.createSubmissionUploadService(connection);
 
       // Commit 'started' status immediately so it's visible even if processing fails
       await submissionValidationService.updateSubmissionValidationStatus(job.id, 'started');
@@ -86,7 +104,8 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
       await connection.commit();
 
       // Process the submission (streaming shallow-ingestion).
-      const submissionIngestionService = new SubmissionIngestionService(connection);
+      const submissionIngestionService =
+        processSubmissionFeaturesJobDependencies.createSubmissionIngestionService(connection);
       const result = await submissionIngestionService.ingestSubmissionUpload(submissionUpload);
 
       if (!result.valid) {
@@ -110,7 +129,7 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
 
       // Update ingestion status to completed; deep validation is handled by indexing.
       // These updates are independent and can run concurrently within the same transaction.
-      const uploadArchiveService = new UploadArchiveService(connection);
+      const uploadArchiveService = processSubmissionFeaturesJobDependencies.createUploadArchiveService(connection);
       await Promise.all([
         submissionValidationService.updateSubmissionValidationStatus(job.id, 'completed'),
         submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'succeeded' }),
@@ -120,7 +139,9 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
       ]);
 
       // Publish indexing job. Status updates + enqueue happen in the same transaction/commit window.
-      const indexResult = await publishIndexSubmissionFeaturesJob(connection, { submissionId });
+      const indexResult = await processSubmissionFeaturesJobDependencies.publishIndexSubmissionFeaturesJob(connection, {
+        submissionId
+      });
       if (indexResult.status !== 'published') {
         defaultLog.warn({
           label: 'processSubmissionFeaturesJobHandler',
@@ -142,11 +163,13 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
       await connection.rollback();
 
       const errorMetadata = toErrorMetadata(error);
-      const submissionValidationService = new SubmissionValidationService(connection);
+      const submissionValidationService =
+        processSubmissionFeaturesJobDependencies.createSubmissionValidationService(connection);
 
       if (isValidationFailure(error)) {
         // Validation failure from ingestion parser/shape checks — permanent condition, don't retry.
-        const submissionUploadService = new SubmissionUploadService(connection);
+        const submissionUploadService =
+          processSubmissionFeaturesJobDependencies.createSubmissionUploadService(connection);
         await submissionValidationService.updateSubmissionValidationStatus(job.id, 'invalid', {
           error: errorMetadata
         });
@@ -166,7 +189,8 @@ export const processSubmissionFeaturesJobHandler: PgBoss.WorkHandler<SubmissionU
       }
 
       try {
-        const submissionUploadService = new SubmissionUploadService(connection);
+        const submissionUploadService =
+          processSubmissionFeaturesJobDependencies.createSubmissionUploadService(connection);
         await submissionUploadService.updateSubmissionUpload(submissionUploadId, { status: 'failed' });
         await connection.commit();
       } catch (statusError) {
@@ -221,13 +245,15 @@ export const processSubmissionFeaturesFailedHandler: PgBoss.WorkHandler<Submissi
       output: jobOutput
     });
 
-    const connection = getAPIUserDBConnection();
+    const connection = processSubmissionFeaturesJobDependencies.getAPIUserDBConnection();
 
     try {
       await connection.open();
 
-      const submissionValidationService = new SubmissionValidationService(connection);
-      const submissionUploadService = new SubmissionUploadService(connection);
+      const submissionValidationService =
+        processSubmissionFeaturesJobDependencies.createSubmissionValidationService(connection);
+      const submissionUploadService =
+        processSubmissionFeaturesJobDependencies.createSubmissionUploadService(connection);
 
       // Update validation status to failed (all retries exhausted)
       // Use submissionUploadId since DLQ job has a new job ID, not the original

@@ -28,7 +28,7 @@ describe('taxonomy/taxon/tsn/hierarchy', () => {
     it('returns an empty array if no species are found', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const getHierarchyForTSNsStub = sinon.stub(ItisService.prototype, 'getHierarchyForTSNs').resolves([]);
 
@@ -50,7 +50,7 @@ describe('taxonomy/taxon/tsn/hierarchy', () => {
     it('returns an array of species', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mock1 = {
         tsn: 1,

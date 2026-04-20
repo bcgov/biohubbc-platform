@@ -49,6 +49,14 @@ export type KeycloakUser = {
 const defaultLog = getLogger('services/keycloak-service');
 
 /**
+ * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ */
+export const keycloakServiceDependencies = {
+  post: (...args: Parameters<typeof axios.post>) => axios.post(...args),
+  get: <T = any>(...args: Parameters<typeof axios.get<T>>) => axios.get<T>(...args)
+};
+
+/**
  * Service for calling the Keycloak Gold Standard CSS API.
  *
  * API Swagger Doc: https://api.loginproxy.gov.bc.ca/openapi/swagger#/Users/get__environment__basic_business_bceid_users
@@ -94,7 +102,7 @@ export class KeycloakService {
    */
   async getKeycloakServiceToken(): Promise<string> {
     try {
-      const { data } = await axios.post(
+      const { data } = await keycloakServiceDependencies.post(
         `${this.keycloakHost}/realms/standard/protocol/openid-connect/token`,
         qs.stringify({
           grant_type: 'client_credentials',
@@ -123,7 +131,7 @@ export class KeycloakService {
    */
   async getKeycloakCssApiToken(): Promise<string> {
     try {
-      const { data } = await axios.post(
+      const { data } = await keycloakServiceDependencies.post(
         this.keycloakApiTokenUrl,
         qs.stringify({
           grant_type: 'client_credentials',
@@ -160,7 +168,7 @@ export class KeycloakService {
     const token = await this.getKeycloakCssApiToken();
 
     try {
-      const { data } = await axios.get<KeycloakIDIRUserResponse>(
+      const { data } = await keycloakServiceDependencies.get<KeycloakIDIRUserResponse>(
         `${this.keycloakApiHost}/${this.keycloakApiEnvironment}/idir/users?${qs.stringify({ guid: criteria.guid })}`,
         {
           headers: { authorization: `Bearer ${token}` }
