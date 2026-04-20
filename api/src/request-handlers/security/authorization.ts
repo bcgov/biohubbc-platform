@@ -9,8 +9,16 @@ const defaultLog = getLogger('request-handlers/security/authorization');
 
 /**
  * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ *
+ * Testing convention: for authorization-handler tests, stub this bag instead of
+ * stubbing imported module namespace exports directly.
  */
-export const authorizationDependencies = {
+export interface AuthorizationDependencies {
+  getAPIUserDBConnection: typeof getAPIUserDBConnection;
+  authorizeRequest: (req: Request) => Promise<boolean>;
+}
+
+export const authorizationDependencies: AuthorizationDependencies = {
   getAPIUserDBConnection,
   authorizeRequest: (req: Request) => authorizeRequest(req)
 };

@@ -30,7 +30,7 @@ export class SubmissionIngestionService extends DBService {
   /**
    * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
    */
-  static dependencies = {
+  static readonly dependencies = {
     streamFeatures
   };
 

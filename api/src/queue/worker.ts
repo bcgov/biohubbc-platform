@@ -27,8 +27,25 @@ const defaultLog = getLogger('queue/worker');
 
 /**
  * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ *
+ * Testing convention: worker registration tests should stub this bag instead of
+ * stubbing imported job modules directly.
  */
-export const workerDependencies = {
+export interface WorkerDependencies {
+  getPgBoss: typeof getPgBoss;
+  processSubmissionFeaturesJobHandler: typeof processSubmissionFeaturesJobHandler;
+  processSubmissionFeaturesFailedHandler: typeof processSubmissionFeaturesFailedHandler;
+  malwareScanJobHandler: typeof malwareScanJobHandler;
+  malwareScanFailedHandler: typeof malwareScanFailedHandler;
+  processDownloadJobHandler: typeof processDownloadJobHandler;
+  processDownloadFailedHandler: typeof processDownloadFailedHandler;
+  indexSubmissionFeaturesJobHandler: typeof indexSubmissionFeaturesJobHandler;
+  indexSubmissionFeaturesFailedHandler: typeof indexSubmissionFeaturesFailedHandler;
+  computeScopeAnchorsJobHandler: typeof computeScopeAnchorsJobHandler;
+  computeScopeAnchorsFailedHandler: typeof computeScopeAnchorsFailedHandler;
+}
+
+export const workerDependencies: WorkerDependencies = {
   getPgBoss,
   processSubmissionFeaturesJobHandler,
   processSubmissionFeaturesFailedHandler,

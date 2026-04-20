@@ -15,8 +15,17 @@ const defaultLog = getLogger('queue/publisher');
 
 /**
  * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ *
+ * Testing convention: for publisher behavior, prefer stubbing this bag so all
+ * queue-publish entry points use a single seam.
  */
-export const publisherDependencies = {
+export interface PublisherDependencies {
+  getPgBoss: typeof getPgBoss;
+  createSubmissionValidationService: (connection: IDBConnection) => SubmissionValidationService;
+  createDownloadService: (connection: IDBConnection) => DownloadService;
+}
+
+export const publisherDependencies: PublisherDependencies = {
   getPgBoss,
   createSubmissionValidationService: (connection: IDBConnection) => new SubmissionValidationService(connection),
   createDownloadService: (connection: IDBConnection) => new DownloadService(connection)

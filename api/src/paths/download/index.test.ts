@@ -13,6 +13,18 @@ import { SearchFeatureService } from '../../services/search-feature-service';
 
 chai.use(sinonChai);
 
+const stubPublishProcessDownloadJob = () =>
+  sinon.stub(path.downloadPathDependencies, 'publishProcessDownloadJob').resolves({
+    status: 'published',
+    jobId: 'job-1'
+  });
+
+const stubAnonymousCreateDownloadBase = (dbConnectionObj = getMockDBConnection(), matchingFeaturesCount = 1) => {
+  sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+  sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(matchingFeaturesCount);
+  return dbConnectionObj;
+};
+
 describe('paths/download/index', () => {
   afterEach(() => {
     sinon.restore();
@@ -20,10 +32,7 @@ describe('paths/download/index', () => {
 
   describe('createDownload', () => {
     it('should return 400 when no features match the filter criteria', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-      sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(0);
+      stubAnonymousCreateDownloadBase(getMockDBConnection(), 0);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -42,14 +51,9 @@ describe('paths/download/index', () => {
     });
 
     it('should return 201 with download_id on success', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-      sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(3);
+      stubAnonymousCreateDownloadBase(getMockDBConnection(), 3);
       sinon.stub(DownloadService.prototype, 'createDownload').resolves({ download_id: 'uuid-1' });
-      sinon
-        .stub(path.downloadPathDependencies, 'publishProcessDownloadJob')
-        .resolves({ status: 'published', jobId: 'job-1' });
+      stubPublishProcessDownloadJob();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -72,16 +76,11 @@ describe('paths/download/index', () => {
     });
 
     it('should pass search filters to createDownload', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-      sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(2);
+      stubAnonymousCreateDownloadBase(getMockDBConnection(), 2);
       const createDownloadStub = sinon
         .stub(DownloadService.prototype, 'createDownload')
         .resolves({ download_id: 'uuid-2' });
-      sinon
-        .stub(path.downloadPathDependencies, 'publishProcessDownloadJob')
-        .resolves({ status: 'published', jobId: 'job-1' });
+      stubPublishProcessDownloadJob();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -100,13 +99,10 @@ describe('paths/download/index', () => {
 
     it('should pass null systemUserId to getSearchFeaturesCount for anonymous users', async () => {
       const dbConnectionObj = getMockDBConnection();
-
       sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
       const getCountStub = sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(2);
       sinon.stub(DownloadService.prototype, 'createDownload').resolves({ download_id: 'uuid-1' });
-      sinon
-        .stub(path.downloadPathDependencies, 'publishProcessDownloadJob')
-        .resolves({ status: 'published', jobId: 'job-1' });
+      stubPublishProcessDownloadJob();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -152,9 +148,7 @@ describe('paths/download/index', () => {
       const getDBConnectionStub = sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(1);
       sinon.stub(DownloadService.prototype, 'createDownload').resolves({ download_id: 'uuid-1' });
-      sinon
-        .stub(path.downloadPathDependencies, 'publishProcessDownloadJob')
-        .resolves({ status: 'published', jobId: 'job-1' });
+      stubPublishProcessDownloadJob();
       sinon.stub(DownloadService.prototype, 'linkDownloadToNewTeam').resolves();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -177,9 +171,7 @@ describe('paths/download/index', () => {
         .returns(dbConnectionObj);
       sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(1);
       sinon.stub(DownloadService.prototype, 'createDownload').resolves({ download_id: 'uuid-1' });
-      sinon
-        .stub(path.downloadPathDependencies, 'publishProcessDownloadJob')
-        .resolves({ status: 'published', jobId: 'job-1' });
+      stubPublishProcessDownloadJob();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -248,14 +240,9 @@ describe('paths/download/index', () => {
     });
 
     it('should publish download job with download_id before commit', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
-      sinon.stub(SearchFeatureService.prototype, 'getSearchFeaturesCount').resolves(3);
+      stubAnonymousCreateDownloadBase(getMockDBConnection(), 3);
       sinon.stub(DownloadService.prototype, 'createDownload').resolves({ download_id: 'uuid-1' });
-      const publishStub = sinon
-        .stub(path.downloadPathDependencies, 'publishProcessDownloadJob')
-        .resolves({ status: 'published', jobId: 'job-1' });
+      const publishStub = stubPublishProcessDownloadJob();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 

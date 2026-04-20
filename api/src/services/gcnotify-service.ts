@@ -66,7 +66,7 @@ export class GCNotifyService extends DBService {
   /**
    * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
    */
-  static dependencies = {
+  static readonly dependencies = {
     post: (...args: Parameters<typeof axios.post>) => axios.post(...args)
   };
 

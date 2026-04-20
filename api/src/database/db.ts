@@ -73,8 +73,23 @@ const dbGlobal = globalThis as DBGlobal;
 
 /**
  * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ *
+ * Testing convention:
+ * - Prefer stubbing `dbDependencies` directly for DB connection seams.
+ * - Higher-level modules may expose local dependency bags, but DB-specific stubs should
+ *   target this bag unless a test intentionally verifies a higher-level seam.
  */
-export const dbDependencies = {
+export interface DBDependencies {
+  getDBPool: () => pg.Pool | undefined;
+  getDBConnection: (keycloakToken: object) => IDBConnection;
+  getAPIUserDBConnection: () => IDBConnection;
+  getServiceAccountDBConnection: (systemUser: SystemUser) => IDBConnection;
+  getUserGuid: typeof getUserGuid;
+  getUserIdentitySource: typeof getUserIdentitySource;
+  getServiceClientSystemUser: typeof getServiceClientSystemUser;
+}
+
+export const dbDependencies: DBDependencies = {
   getDBPool: () => getDBPool(),
   getDBConnection: (_keycloakToken: object): IDBConnection => {
     throw new Error('dbDependencies.getDBConnection is not initialized');

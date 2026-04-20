@@ -38,7 +38,7 @@ export class SecurityService extends DBService {
   /**
    * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
    */
-  static dependencies = {
+  static readonly dependencies = {
     getS3SignedURL
   };
 
