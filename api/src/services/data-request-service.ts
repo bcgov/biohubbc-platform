@@ -113,6 +113,7 @@ export class DataRequestService extends DBService {
    * @memberof DataRequestService
    */
   async createDataRequest(payload: CreateDataRequestPayload): Promise<DataRequest> {
+    // Non-administrative flow: create a new ticket first, then attach the request artifacts to that ticket.
     const ticketService = new TicketService(this.connection);
     const ticket = await ticketService.createTicket({
       subject: this._generateTicketSubject(payload.reason),
@@ -120,23 +121,27 @@ export class DataRequestService extends DBService {
       priority: 'medium'
     });
 
+    // Reuse the shared ticket-owned workflow once a ticket identifier is known.
     return this.createDataRequestForTicket(ticket.ticket_id, payload);
   }
 
   /**
    * Create a data request for an existing ticket.
    *
-   * @param {string} ticketId - Existing ticket id.
+   * @param {string} ticketId - Existing ticket identifier.
    * @param {CreateDataRequestPayload} payload - Ticket-owned create payload.
    * @return {Promise<DataRequest>} Created data request.
    * @memberof DataRequestService
    */
   async createDataRequestForTicket(ticketId: string, payload: CreateDataRequestPayload): Promise<DataRequest> {
+    // Administrative ticket-owned flow: do not create a ticket here.
+    // Create only request-scoped teams and artifacts linked to the provided ticket identifier.
     const [dataRequestTeam, policyTeam] = await Promise.all([
       this._createTeamWithMembers(payload.system_user_ids),
       this._createTeamWithMembers(payload.system_user_ids)
     ]);
 
+    // Policy starts in requested state and defaults to deny-all until reviewed/updated.
     const policy = await this.policyService.createPolicyWithStatements(
       {
         name: _generateDataRequestPolicyName(),
@@ -145,11 +150,17 @@ export class DataRequestService extends DBService {
       },
       [{ effect: PolicyEffect.DENY, submission_feature_urn: 'urn:*:*:*' }]
     );
+
+    // Explicitly associate the policy team with the policy so membership grants policy visibility/control.
     await this.teamPolicyService.createTeamPolicy({
       team_id: policyTeam.team_id,
       policy_id: policy.policy_id
     });
 
+    // Persist the data request record tied to:
+    // - provided ticket identifier
+    // - request team
+    // - generated policy
     const payloadWithIds: CreateDataRequest = {
       requested_by: payload.requested_by,
       reason: payload.reason,
@@ -214,6 +225,7 @@ export class DataRequestService extends DBService {
    */
   private async _createTeamWithMembers(systemUserIds: number[]): Promise<Team> {
     const team = await this.teamService.createTeam({ name: _generateDataRequestTeamName() });
+    // Remove duplicate incoming member identifiers to avoid duplicate team-member inserts.
     const uniqueMemberIds = Array.from(new Set(systemUserIds));
 
     await Promise.all(

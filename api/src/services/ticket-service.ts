@@ -48,6 +48,7 @@ export class TicketService extends DBService {
   async createTicket(ticket: CreateTicketRequest): Promise<Ticket> {
     const { systemUserIds, ...ticketData } = ticket;
 
+    // Ticket creation always provisions a dedicated ticket team plus a unique ticket slug.
     const [team, slug] = await Promise.all([
       this.createTicketTeam({ systemUserIds: systemUserIds ?? [] }),
       this.ticketRepository.getNextTicketSlug()
@@ -59,6 +60,7 @@ export class TicketService extends DBService {
       ticket_slug: slug
     });
 
+    // Initialize status history with the ticket's initial status.
     await this.ticketStatusService.insertTicketStatus(createdTicket.ticket_id, createdTicket.status);
 
     return createdTicket;
@@ -72,6 +74,8 @@ export class TicketService extends DBService {
    * @memberof TicketService
    */
   private async createTicketTeam({ systemUserIds }: { systemUserIds: number[] }): Promise<Team> {
+    // Ticket team membership is explicit input from ticket creation only.
+    // Data-request flows intentionally do not backfill requester identifiers onto ticket teams.
     const team = await this.teamService.createTeam({
       name: `Ticket Team ${v4()}`,
       description: 'Auto-generated team for ticket assignees.',
@@ -164,6 +168,7 @@ export class TicketService extends DBService {
    * @memberof TicketService
    */
   async updateTicket(ticketId: string, ticket: UpdateTicketRequest): Promise<Ticket> {
+    // Closing is gated by linked data-request workflow state.
     if (ticket.status === 'closed') {
       const dataRequests = await this.dataRequestService.findDataRequestsByTicketId(ticketId);
       this.assertCanCloseTicket(dataRequests.map((dataRequest) => dataRequest.status));
@@ -184,6 +189,7 @@ export class TicketService extends DBService {
 
     const updatedTicket = await this.ticketRepository.updateTicket(ticketId, updates);
 
+    // Record every explicit status change in status history.
     if (ticket.status !== undefined) {
       await this.ticketStatusService.insertTicketStatus(ticketId, ticket.status);
     }
@@ -200,6 +206,8 @@ export class TicketService extends DBService {
    * @memberof TicketService
    */
   private assertCanCloseTicket(dataRequestStatuses: PolicyStatus[]): void {
+    // Tickets can only be closed once linked requests are fully resolved.
+    // requested and reviewed are treated as "unaddressed".
     const blockedStatuses = new Set(['requested', 'reviewed']);
     const hasBlockedStatuses = dataRequestStatuses.some((status) => blockedStatuses.has(status));
 
@@ -216,6 +224,7 @@ export class TicketService extends DBService {
    * @memberof TicketService
    */
   async deleteTicket(ticketId: string): Promise<void> {
+    // Delete uses the same "unaddressed request" gate as close.
     const dataRequests = await this.dataRequestService.findDataRequestsByTicketId(ticketId);
     this.assertCanDeleteTicket(dataRequests.map((dataRequest) => dataRequest.status));
 
@@ -231,6 +240,7 @@ export class TicketService extends DBService {
    * @memberof TicketService
    */
   private assertCanDeleteTicket(dataRequestStatuses: PolicyStatus[]): void {
+    // Prevent deletion while linked requests are still in progress.
     const blockedStatuses = new Set(['requested', 'reviewed']);
     const hasBlockedStatuses = dataRequestStatuses.some((status) => blockedStatuses.has(status));
 

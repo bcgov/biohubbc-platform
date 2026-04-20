@@ -90,19 +90,23 @@ export class PolicyService extends DBService {
    * @memberof PolicyService
    */
   async updatePolicy(policyId: string, policyData: UpdatePolicy): Promise<Policy> {
+    // Updates that do not include a status value bypass workflow validation.
     if (policyData.status === undefined) {
       return this.policyRepository.updatePolicy(policyId, policyData);
     }
 
     const currentPolicy = await this.policyRepository.getPolicy(policyId);
+    // Status updates that keep the same current status are allowed.
     if (currentPolicy.status === policyData.status) {
       return this.policyRepository.updatePolicy(policyId, policyData);
     }
 
+    // Explicit approval requests are guarded: requests must be reviewed before approval.
     if (policyData.status === 'approved') {
       this.assertCanApproveRequest(currentPolicy.status);
     }
 
+    // Enforce lifecycle transition matrix for all status changes.
     this.assertValidStatusTransition(currentPolicy.status, policyData.status);
     return this.policyRepository.updatePolicy(policyId, policyData);
   }
@@ -116,6 +120,7 @@ export class PolicyService extends DBService {
    * @memberof PolicyService
    */
   private assertCanApproveRequest(current: PolicyStatus): void {
+    // Direct transitions from requested to approved are blocked by this branch workflow.
     const blockedStatuses = new Set(['requested']);
 
     if (blockedStatuses.has(current)) {
@@ -254,8 +259,10 @@ export class PolicyService extends DBService {
     policyData: UpdatePolicy,
     statements: CreatePolicyStatementPayload[]
   ): Promise<PolicyWithStatements> {
+    // Apply policy metadata and status changes first, including lifecycle validation.
     const policy = await this.updatePolicy(policyId, policyData);
 
+    // Capture existing statement and scope associations before replacement.
     const existingStatements = await this.policyStatementService.getPolicyStatements(policyId);
     const oldStatementIds = existingStatements.map((s) => s.policy_statement_id);
 
@@ -266,8 +273,10 @@ export class PolicyService extends DBService {
       existingStatements.map((stmt) => this.policyStatementService.deletePolicyStatement(stmt.policy_statement_id))
     );
 
+    // Rebuild statements and recreate security scopes from the incoming payload.
     const createdStatements = await this.createStatementsWithScopes(policyId, statements);
 
+    // Remove outdated scope mappings for teams linked to this policy.
     if (oldStatementIds.length > 0) {
       await this.securityScopeService.cleanupScopesForDeletedStatements(oldStatementIds, affectedTeamIds);
     }
@@ -288,6 +297,7 @@ export class PolicyService extends DBService {
     policyId: string,
     statements: CreatePolicyStatementPayload[]
   ): Promise<PolicyStatementWithConditions[]> {
+    // Create statements and nested conditions first.
     const createdStatements = await Promise.all(
       statements.map(async (stmt) => {
         const statement = await this.policyStatementService.createPolicyStatement({
@@ -311,6 +321,7 @@ export class PolicyService extends DBService {
       })
     );
 
+    // Materialize scope records after statement identifiers exist.
     for (const stmt of createdStatements) {
       await this.securityScopeService.createScopeForPolicyStatement(
         stmt.policy_statement_id,
