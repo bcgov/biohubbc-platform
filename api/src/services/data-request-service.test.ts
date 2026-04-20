@@ -6,11 +6,14 @@ import { getMockDBConnection } from '../__mocks__/db';
 import { CreateDataRequestPayload, DataRequest, UpdateDataRequest } from '../models/data-request';
 import { PolicyEffect } from '../models/policy-statement';
 import { TeamMemberWithUser } from '../models/team-member';
+import { TeamPolicy } from '../models/team-policy';
 import { DataRequestRepository } from '../repositories/data-request-repository';
 import { PolicyService } from './access-policy/policy-service';
 import { TeamMemberService } from './access-policy/team-member-service';
+import { TeamPolicyService } from './access-policy/team-policy-service';
 import { TeamService } from './access-policy/team-service';
 import { DataRequestService } from './data-request-service';
+import { TicketService } from './ticket-service';
 
 chai.use(sinonChai);
 
@@ -65,7 +68,44 @@ describe('DataRequestService', () => {
     expect(result).to.deep.equal([mockDataRequest]);
   });
 
-  it('createDataRequest creates team, requested policy, and request', async () => {
+  it('createDataRequest creates a ticket then delegates to createDataRequestForTicket', async () => {
+    const mockDB = getMockDBConnection();
+    const service = new DataRequestService(mockDB);
+
+    const payload: CreateDataRequestPayload = {
+      requested_by: mockDataRequest.requested_by,
+      reason: 'New research project',
+      system_user_ids: [2, 3]
+    };
+
+    const createTicketStub = sinon.stub(TicketService.prototype, 'createTicket').resolves({
+      ticket_id: mockDataRequest.ticket_id,
+      ticket_slug: '11000001',
+      subject: 'Data Request',
+      description: payload.reason,
+      team_id: '22222222-2222-2222-2222-222222222222',
+      create_date: '2026-04-17T00:00:00.000Z',
+      priority: 'medium',
+      status: 'open'
+    });
+    const createForTicketStub = sinon
+      .stub(DataRequestService.prototype, 'createDataRequestForTicket')
+      .resolves(mockDataRequest);
+
+    const result = await service.createDataRequest(payload);
+
+    expect(createTicketStub).to.have.been.calledOnceWith({
+      subject: 'Data Request - New research project',
+      description: payload.reason,
+      priority: 'medium'
+    });
+    expect(createForTicketStub).to.have.been.calledOnceWith(mockDataRequest.ticket_id, {
+      ...payload
+    });
+    expect(result).to.deep.equal(mockDataRequest);
+  });
+
+  it('createDataRequestForTicket creates separate teams, links policy team, and creates request', async () => {
     const mockDB = getMockDBConnection();
     const service = new DataRequestService(mockDB);
 
@@ -76,38 +116,70 @@ describe('DataRequestService', () => {
       status: 'requested' as const,
       statements: []
     };
+    const mockTeamPolicy: TeamPolicy = {
+      team_policy_id: '12341234-5678-90ab-cdef-123412341234',
+      team_id: 'c3d4e5f6-a7b8-9012-cdef-123456789012',
+      policy_id: mockPolicy.policy_id
+    };
 
     const payload: CreateDataRequestPayload = {
       requested_by: mockDataRequest.requested_by,
       reason: 'New research project',
-      ticket_id: mockDataRequest.ticket_id,
-      system_user_ids: [2, mockDataRequest.requested_by]
+      system_user_ids: [2, 3]
     };
+
+    const dataRequestTeamId = mockDataRequest.team_id;
+    const policyTeamId = mockTeamPolicy.team_id;
 
     sinon
       .stub(TeamService.prototype, 'createTeam')
-      .resolves({ team_id: mockDataRequest.team_id, name: 'test', description: null, member_count: 1 });
+      .onFirstCall()
+      .resolves({ team_id: dataRequestTeamId, name: 'dr-team', description: null, member_count: 0 })
+      .onSecondCall()
+      .resolves({ team_id: policyTeamId, name: 'policy-team', description: null, member_count: 0 });
+
     const createTeamMemberStub = sinon.stub(TeamMemberService.prototype, 'createTeamMember').resolves(mockTeamMember);
     const createPolicyStub = sinon.stub(PolicyService.prototype, 'createPolicyWithStatements').resolves(mockPolicy);
+    const createTeamPolicyStub = sinon.stub(TeamPolicyService.prototype, 'createTeamPolicy').resolves(mockTeamPolicy);
     const createRequestStub = sinon.stub(DataRequestRepository.prototype, 'createDataRequest').resolves({
       ...mockDataRequest,
+      team_id: dataRequestTeamId,
       policy_id: mockPolicy.policy_id
     });
     sinon.stub(DataRequestService.prototype, 'getDataRequestById').resolves({
       ...mockDataRequest,
+      team_id: dataRequestTeamId,
       policy_id: mockPolicy.policy_id,
       status: 'requested'
     });
 
-    const result = await service.createDataRequest(payload);
+    const result = await service.createDataRequestForTicket(mockDataRequest.ticket_id, payload);
 
     expect(createPolicyStub).to.have.been.calledOnce;
     expect(createPolicyStub.firstCall.args[0].status).to.equal('requested');
     expect(createPolicyStub.firstCall.args[1]).to.deep.equal([
       { effect: PolicyEffect.DENY, submission_feature_urn: 'urn:*:*:*' }
     ]);
+    expect(createTeamPolicyStub).to.have.been.calledOnceWith({
+      team_id: policyTeamId,
+      policy_id: mockPolicy.policy_id
+    });
     expect(createRequestStub).to.have.been.calledOnce;
-    expect(createTeamMemberStub).to.have.been.calledTwice;
+    expect(createRequestStub.firstCall.args[0]).to.deep.equal({
+      requested_by: payload.requested_by,
+      reason: payload.reason,
+      team_id: dataRequestTeamId,
+      ticket_id: mockDataRequest.ticket_id,
+      policy_id: mockPolicy.policy_id
+    });
+    expect(createTeamMemberStub).to.have.callCount(4);
+
+    for (const call of createTeamMemberStub.getCalls()) {
+      const args = call.args[0];
+      expect(args.system_user_id).to.be.oneOf([2, 3]);
+      expect(args.team_id).to.be.oneOf([dataRequestTeamId, policyTeamId]);
+    }
+
     expect(result.status).to.equal('requested');
   });
 

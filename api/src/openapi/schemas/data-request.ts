@@ -59,7 +59,7 @@ export const CreateDataRequestRequestSchema: OpenAPIV3.SchemaObject = {
     reason: { type: 'string', description: 'Reason for the data request' },
     system_user_ids: {
       type: 'array',
-      description: 'System user ids to add to the created data-request team',
+      description: 'System user ids to add to created data-request and policy-linked teams',
       items: { type: 'integer' }
     }
   }

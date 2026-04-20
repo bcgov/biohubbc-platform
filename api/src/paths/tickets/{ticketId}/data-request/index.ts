@@ -71,10 +71,9 @@ export function createTicketDataRequest(): RequestHandler {
 
       const dataRequestService = new DataRequestService(connection);
 
-      const dataRequest = await dataRequestService.createDataRequest({
+      const dataRequest = await dataRequestService.createDataRequestForTicket(ticketId, {
         requested_by: systemUserId,
         reason,
-        ticket_id: ticketId,
         system_user_ids
       });
 

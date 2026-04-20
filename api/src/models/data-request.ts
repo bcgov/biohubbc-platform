@@ -35,7 +35,6 @@ export type CreateDataRequest = z.infer<typeof CreateDataRequest>;
 export const CreateDataRequestPayload = z.object({
   requested_by: z.number().int(),
   reason: z.string(),
-  ticket_id: z.string().uuid(),
   system_user_ids: z.array(z.number().int())
 });
 export type CreateDataRequestPayload = z.infer<typeof CreateDataRequestPayload>;

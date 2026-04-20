@@ -33,7 +33,9 @@ describe('paths/tickets/{ticketId}/data-request', () => {
       create_date: '2026-04-17T00:00:00.000Z'
     };
 
-    const createStub = sinon.stub(DataRequestService.prototype, 'createDataRequest').resolves(createdDataRequest);
+    const createStub = sinon
+      .stub(DataRequestService.prototype, 'createDataRequestForTicket')
+      .resolves(createdDataRequest);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { ticketId: createdDataRequest.ticket_id };
@@ -41,10 +43,9 @@ describe('paths/tickets/{ticketId}/data-request', () => {
 
     await createTicketDataRequest()(mockReq, mockRes, mockNext);
 
-    expect(createStub).to.have.been.calledOnceWith({
+    expect(createStub).to.have.been.calledOnceWith(createdDataRequest.ticket_id, {
       requested_by: mockDBConnection.systemUserId(),
       reason: createdDataRequest.reason,
-      ticket_id: createdDataRequest.ticket_id,
       system_user_ids: [2, 3]
     });
     expect(mockRes.statusValue).to.equal(201);

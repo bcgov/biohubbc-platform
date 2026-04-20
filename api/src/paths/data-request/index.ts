@@ -2,7 +2,11 @@ import { Request, RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../database/db';
 import { DataRequestFilters } from '../../models/data-request';
-import { DataRequestListResponseSchema } from '../../openapi/schemas/data-request';
+import {
+  CreateDataRequestRequestSchema,
+  DataRequestListResponseSchema,
+  DataRequestResponseSchema
+} from '../../openapi/schemas/data-request';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { DataRequestService } from '../../services/data-request-service';
@@ -21,6 +25,19 @@ export const GET: Operation = [
     };
   }),
   findDataRequests()
+];
+
+export const POST: Operation = [
+  authorizeRequestHandler(() => {
+    return {
+      and: [
+        {
+          discriminator: 'SystemUser'
+        }
+      ]
+    };
+  }),
+  createDataRequest()
 ];
 
 GET.apiDoc = {
@@ -81,6 +98,34 @@ GET.apiDoc = {
   }
 };
 
+POST.apiDoc = {
+  description: 'Create a new data request',
+  tags: ['data-request'],
+  security: [
+    {
+      Bearer: []
+    }
+  ],
+  requestBody: {
+    content: {
+      'application/json': {
+        schema: CreateDataRequestRequestSchema
+      }
+    }
+  },
+  responses: {
+    201: {
+      description: 'Data request created successfully',
+      content: {
+        'application/json': {
+          schema: DataRequestResponseSchema
+        }
+      }
+    },
+    ...defaultErrorResponses
+  }
+};
+
 /**
  * Find data request records for teams the current user belongs to, optionally filtered by query params.
  *
@@ -104,6 +149,41 @@ export function findDataRequests(): RequestHandler {
       return res.status(200).json(dataRequests);
     } catch (error) {
       defaultLog.error({ label: 'findDataRequests', message: 'error', error });
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  };
+}
+
+/**
+ * Create a data request owned by the current user context.
+ *
+ * @returns {RequestHandler}
+ */
+export function createDataRequest(): RequestHandler {
+  return async (req, res) => {
+    const connection = getDBConnection(req.keycloak_token);
+
+    try {
+      await connection.open();
+
+      const systemUserId = connection.systemUserId();
+      const { reason, system_user_ids } = req.body;
+
+      const dataRequestService = new DataRequestService(connection);
+      const dataRequest = await dataRequestService.createDataRequest({
+        requested_by: systemUserId,
+        reason,
+        system_user_ids
+      });
+
+      await connection.commit();
+
+      return res.status(201).json(dataRequest);
+    } catch (error) {
+      defaultLog.error({ label: 'createDataRequest', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

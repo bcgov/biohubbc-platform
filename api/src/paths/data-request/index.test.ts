@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { findDataRequests } from '.';
+import { createDataRequest, findDataRequests } from '.';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import * as db from '../../database/db';
@@ -176,6 +176,37 @@ describe('data-request', () => {
         expect(mockDBConnection.rollback).to.have.been.calledOnce;
         expect(mockDBConnection.release).to.have.been.calledOnce;
       }
+    });
+  });
+
+  describe('createDataRequest', () => {
+    it('POST creates a data request without requiring ticketId in payload', async () => {
+      const mockDBConnection = getMockDBConnection({
+        systemUserId: () => mockNonAdminUser.system_user_id,
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+
+      const createStub = sinon.stub(DataRequestService.prototype, 'createDataRequest').resolves(mockDataRequest);
+
+      const requestHandler = createDataRequest();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.body = {
+        reason: 'Need secured data for analysis',
+        system_user_ids: [2, 3]
+      };
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(createStub).to.have.been.calledOnceWith({
+        requested_by: mockNonAdminUser.system_user_id,
+        reason: 'Need secured data for analysis',
+        system_user_ids: [2, 3]
+      });
+      expect(mockRes.statusValue).to.equal(201);
+      expect(mockRes.jsonValue).to.eql(mockDataRequest);
     });
   });
 });
