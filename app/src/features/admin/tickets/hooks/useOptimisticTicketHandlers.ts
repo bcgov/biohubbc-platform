@@ -1,17 +1,18 @@
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import { ITicket, ITicketWithHistory, TicketStatus } from 'interfaces/useTicketsApi.interface';
+import { PolicyStatus } from 'interfaces/usePoliciesApi.interface';
+import { ITicket, ITicketExtended, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { useCallback, useState } from 'react';
 
 interface IUseOptimisticTicketHandlersProps {
-  ticket: ITicketWithHistory;
+  ticket: ITicketExtended;
   userIdentifier?: string;
 }
 
 interface IHandleOptimisticTicketUpdateOptions {
-  buildOptimisticTicket: (currentTicket: ITicketWithHistory) => ITicketWithHistory;
+  buildOptimisticTicket: (currentTicket: ITicketExtended) => ITicketExtended;
   handleUpdate: () => Promise<ITicket>;
-  onCommit: (optimisticTicket: ITicketWithHistory, updatedTicket: ITicket) => void;
+  onCommit: (optimisticTicket: ITicketExtended, updatedTicket: ITicket) => void;
 }
 
 /**
@@ -30,7 +31,7 @@ export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersP
   const getCurrentTicket = useCallback(() => ticketDataLoader.data ?? ticket, [ticket, ticketDataLoader.data]);
 
   const applyOptimisticUpdate = useCallback(
-    (buildNextTicket: (current: ITicketWithHistory) => ITicketWithHistory) => {
+    (buildNextTicket: (current: ITicketExtended) => ITicketExtended) => {
       const previousTicket = getCurrentTicket();
       const optimisticTicket = buildNextTicket(previousTicket);
       ticketDataLoader.setData(optimisticTicket);
@@ -41,7 +42,7 @@ export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersP
   );
 
   const commitOptimisticUpdate = useCallback(
-    (optimisticTicket: ITicketWithHistory, updatedTicket: ITicket) => {
+    (optimisticTicket: ITicketExtended, updatedTicket: ITicket) => {
       ticketDataLoader.setData({
         ...optimisticTicket,
         ...updatedTicket,
@@ -54,7 +55,7 @@ export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersP
   );
 
   const rollbackOptimisticUpdate = useCallback(
-    (previousTicket: ITicketWithHistory) => {
+    (previousTicket: ITicketExtended) => {
       ticketDataLoader.setData(previousTicket);
     },
     [ticketDataLoader]
@@ -96,12 +97,12 @@ export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersP
   /**
    * Default optimistic commit strategy that preserves timeline/comments/references from optimistic state.
    *
-   * @param {ITicketWithHistory} optimisticTicket
+   * @param {ITicketExtended} optimisticTicket
    * @param {ITicket} updatedTicket
    * @return {*}
    */
   const handleCommitOptimisticUpdate = useCallback(
-    (optimisticTicket: ITicketWithHistory, updatedTicket: ITicket) => {
+    (optimisticTicket: ITicketExtended, updatedTicket: ITicket) => {
       commitOptimisticUpdate(optimisticTicket, updatedTicket);
     },
     [commitOptimisticUpdate]
@@ -157,9 +158,22 @@ export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersP
    */
   const requestStatusChange = useCallback(
     (nextStatus: TicketStatus) => {
+      const currentTicket = getCurrentTicket();
+      const hasUnaddressedDataRequests = currentTicket.data_requests.some(
+        (dataRequest) => dataRequest.status === PolicyStatus.REQUESTED || dataRequest.status === PolicyStatus.REVIEWED
+      );
+
+      if (nextStatus === 'closed' && hasUnaddressedDataRequests) {
+        dialogContext.setSnackbar({
+          open: true,
+          snackbarMessage: 'Cannot close tickets that have unaddressed data requests'
+        });
+        return;
+      }
+
       dialogContext.setYesNoDialog(buildStatusChangeDialogConfig(nextStatus, closeConfirmationDialog, updateStatus));
     },
-    [closeConfirmationDialog, dialogContext, updateStatus]
+    [closeConfirmationDialog, dialogContext, getCurrentTicket, updateStatus]
   );
 
   return {
@@ -170,7 +184,7 @@ export const useOptimisticTicketHandlers = (props: IUseOptimisticTicketHandlersP
   };
 };
 
-const buildOptimisticStatuses = (ticket: ITicketWithHistory, nextStatus: TicketStatus, userIdentifier?: string) => {
+const buildOptimisticStatuses = (ticket: ITicketExtended, nextStatus: TicketStatus, userIdentifier?: string) => {
   if (!userIdentifier) {
     return ticket.statuses;
   }
@@ -178,7 +192,7 @@ const buildOptimisticStatuses = (ticket: ITicketWithHistory, nextStatus: TicketS
   return [
     ...ticket.statuses,
     {
-      ticket_status_history_id: `optimistic-status-${Date.now()}`,
+      ticket_status_id: `optimistic-status-${Date.now()}`,
       ticket_id: ticket.ticket_id,
       user_identifier: userIdentifier,
       create_date: new Date().toISOString(),

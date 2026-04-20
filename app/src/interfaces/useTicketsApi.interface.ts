@@ -1,4 +1,5 @@
 import { ApiPaginationRequestOptions, ApiPaginationResponseParams } from 'types/pagination';
+import { DataRequestResponse } from './useDataRequestApi.interface';
 
 export type TicketStatus = 'open' | 'closed';
 export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
@@ -14,18 +15,8 @@ export interface ITicket {
   status: TicketStatus;
 }
 
-export interface ITicketStatusHistory {
-  ticket_status_history_id?: string | null;
-  ticket_comment_id?: string | null;
-  ticket_id: string;
-  user_identifier: string;
-  create_date: string;
-  status?: TicketStatus | null;
-  comment?: string | null;
-}
-
 export interface ITicketStatusLog {
-  ticket_status_history_id: string;
+  ticket_status_id: string;
   ticket_id: string;
   user_identifier: string;
   create_date: string;
@@ -62,16 +53,18 @@ export interface ITicketReference {
   create_date: string;
 }
 
-export interface ITicketWithHistory extends ITicket {
+export interface ITicketExtended extends ITicket {
   statuses: ITicketStatusLog[];
   comments: ITicketCommentLog[];
   references: ITicketReference[];
+  data_requests: DataRequestResponse[];
 }
 
 export interface ICreateTicketRequest {
   subject: string;
   description: string | null;
   priority: TicketPriority;
+  systemUserIds?: number[];
 }
 
 export interface IUpdateTicketRequest {
@@ -99,12 +92,7 @@ export interface IGetTicketsResponse {
   pagination: ApiPaginationResponseParams;
 }
 
-export interface IGetTicketsParams extends Partial<ApiPaginationRequestOptions> {
-  status?: TicketStatus;
-  search?: string;
-}
-
-export interface IGetUserTicketsParams extends Partial<ApiPaginationRequestOptions> {
+export interface ITicketsQueryParams extends Partial<ApiPaginationRequestOptions> {
   status?: TicketStatus;
   search?: string;
 }
