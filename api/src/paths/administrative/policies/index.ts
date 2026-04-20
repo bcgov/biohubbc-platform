@@ -2,7 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
-import { CreatePolicyRequest } from '../../../models/policy';
+import { CreatePolicyDefinition } from '../../../models/policy';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { paginationRequestQueryParamSchema } from '../../../openapi/schemas/pagination';
 import {
@@ -150,13 +150,16 @@ export function createPolicy(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
 
-    const { name, description, statements } = req.body as CreatePolicyRequest;
+    const { name, description, statements } = req.body as CreatePolicyDefinition;
 
     try {
       await connection.open();
 
       const policyService = new PolicyService(connection);
-      const response = await policyService.createPolicyWithStatements({ name, description }, statements);
+      const response = await policyService.createPolicyWithStatements(
+        { name, description, status: 'requested' },
+        statements
+      );
 
       await connection.commit();
 

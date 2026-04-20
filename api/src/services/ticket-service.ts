@@ -1,12 +1,14 @@
 import { v4 } from 'uuid';
 import { IDBConnection } from '../database/db';
 import { HTTP400 } from '../errors/http-error';
+import { PolicyStatus } from '../models/policy';
 import { Team } from '../models/team';
 import { CreateTicketRequest, Ticket, TicketFilters, TicketWithHistory, UpdateTicketRequest } from '../models/ticket';
 import { CreateTicketReferenceRequest, TicketReference } from '../models/ticket-reference';
 import { TicketRepository } from '../repositories/ticket-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
+import { DataRequestService } from './data-request-service';
 import { DBService } from './db-service';
 import { TicketCommentService } from './ticket-comment-service';
 import { TicketReferenceService } from './ticket-reference-service';
@@ -18,6 +20,7 @@ export class TicketService extends DBService {
   ticketCommentService: TicketCommentService;
   ticketStatusService: TicketStatusService;
   ticketReferenceService: TicketReferenceService;
+  dataRequestService: DataRequestService;
 
   /**
    * Creates an instance of TicketService.
@@ -32,6 +35,7 @@ export class TicketService extends DBService {
     this.ticketCommentService = new TicketCommentService(connection);
     this.ticketStatusService = new TicketStatusService(connection);
     this.ticketReferenceService = new TicketReferenceService(connection);
+    this.dataRequestService = new DataRequestService(connection);
   }
 
   /**
@@ -44,6 +48,7 @@ export class TicketService extends DBService {
   async createTicket(ticket: CreateTicketRequest): Promise<Ticket> {
     const { systemUserIds, ...ticketData } = ticket;
 
+    // Ticket creation always provisions a dedicated ticket team plus a unique ticket slug.
     const [team, slug] = await Promise.all([
       this.createTicketTeam({ systemUserIds: systemUserIds ?? [] }),
       this.ticketRepository.getNextTicketSlug()
@@ -55,6 +60,7 @@ export class TicketService extends DBService {
       ticket_slug: slug
     });
 
+    // Initialize status history with the ticket's initial status.
     await this.ticketStatusService.insertTicketStatus(createdTicket.ticket_id, createdTicket.status);
 
     return createdTicket;
@@ -68,6 +74,8 @@ export class TicketService extends DBService {
    * @memberof TicketService
    */
   private async createTicketTeam({ systemUserIds }: { systemUserIds: number[] }): Promise<Team> {
+    // Ticket team membership is explicit input from ticket creation only.
+    // Data-request flows intentionally do not backfill requester identifiers onto ticket teams.
     const team = await this.teamService.createTeam({
       name: `Ticket Team ${v4()}`,
       description: 'Auto-generated team for ticket assignees.',
@@ -85,14 +93,15 @@ export class TicketService extends DBService {
    * @memberof TicketService
    */
   async getTicket(ticketId: string): Promise<TicketWithHistory> {
-    const [ticket, statuses, comments, references] = await Promise.all([
+    const [ticket, statuses, comments, references, dataRequests] = await Promise.all([
       this.ticketRepository.getTicketById(ticketId),
       this.ticketStatusService.getTicketStatus(ticketId),
       this.ticketCommentService.getTicketComments(ticketId),
-      this.ticketReferenceService.getTicketReferencesForTicket(ticketId)
+      this.ticketReferenceService.getTicketReferencesForTicket(ticketId),
+      this.dataRequestService.findDataRequestsByTicketId(ticketId)
     ]);
 
-    return { ...ticket, statuses, comments, references };
+    return { ...ticket, statuses, comments, references, data_requests: dataRequests };
   }
 
   /**
@@ -159,6 +168,12 @@ export class TicketService extends DBService {
    * @memberof TicketService
    */
   async updateTicket(ticketId: string, ticket: UpdateTicketRequest): Promise<Ticket> {
+    // Closing is gated by linked data-request workflow state.
+    if (ticket.status === 'closed') {
+      const dataRequests = await this.dataRequestService.findDataRequestsByTicketId(ticketId);
+      this.assertCanCloseTicket(dataRequests.map((dataRequest) => dataRequest.status));
+    }
+
     const updates = Object.fromEntries(
       Object.entries({
         subject: ticket.subject,
@@ -174,11 +189,31 @@ export class TicketService extends DBService {
 
     const updatedTicket = await this.ticketRepository.updateTicket(ticketId, updates);
 
+    // Record every explicit status change in status history.
     if (ticket.status !== undefined) {
       await this.ticketStatusService.insertTicketStatus(ticketId, ticket.status);
     }
 
     return updatedTicket;
+  }
+
+  /**
+   * Assert that a ticket can be closed based on linked data-request statuses.
+   *
+   * @private
+   * @param {PolicyStatus[]} dataRequestStatuses - Linked statuses.
+   * @return {void}
+   * @memberof TicketService
+   */
+  private assertCanCloseTicket(dataRequestStatuses: PolicyStatus[]): void {
+    // Tickets can only be closed once linked requests are fully resolved.
+    // requested and reviewed are treated as "unaddressed".
+    const blockedStatuses = new Set(['requested', 'reviewed']);
+    const hasBlockedStatuses = dataRequestStatuses.some((status) => blockedStatuses.has(status));
+
+    if (hasBlockedStatuses) {
+      throw new HTTP400('Cannot close tickets that have unaddressed data requests');
+    }
   }
 
   /**
@@ -189,6 +224,28 @@ export class TicketService extends DBService {
    * @memberof TicketService
    */
   async deleteTicket(ticketId: string): Promise<void> {
+    // Delete uses the same "unaddressed request" gate as close.
+    const dataRequests = await this.dataRequestService.findDataRequestsByTicketId(ticketId);
+    this.assertCanDeleteTicket(dataRequests.map((dataRequest) => dataRequest.status));
+
     await this.ticketRepository.deleteTicket(ticketId);
+  }
+
+  /**
+   * Assert that a ticket can be deleted based on linked data-request statuses.
+   *
+   * @private
+   * @param {PolicyStatus[]} dataRequestStatuses - Linked statuses.
+   * @return {void}
+   * @memberof TicketService
+   */
+  private assertCanDeleteTicket(dataRequestStatuses: PolicyStatus[]): void {
+    // Prevent deletion while linked requests are still in progress.
+    const blockedStatuses = new Set(['requested', 'reviewed']);
+    const hasBlockedStatuses = dataRequestStatuses.some((status) => blockedStatuses.has(status));
+
+    if (hasBlockedStatuses) {
+      throw new HTTP400('Cannot delete tickets that have unaddressed data requests');
+    }
   }
 }

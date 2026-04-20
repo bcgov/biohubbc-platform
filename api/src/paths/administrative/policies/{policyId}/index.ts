@@ -2,7 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
-import { UpdatePolicyRequest } from '../../../../models/policy';
+import { CreatePolicyDefinition } from '../../../../models/policy';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { PolicyWithStatementsSchema, UpdatePolicyRequestSchema } from '../../../../openapi/schemas/policy';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
@@ -154,13 +154,17 @@ export function updatePolicy(): RequestHandler {
     const connection = getDBConnection(req['keycloak_token']);
 
     const policyId = req.params.policyId;
-    const { name, description, statements } = req.body as UpdatePolicyRequest;
+    const { name, description, status, statements } = req.body as CreatePolicyDefinition;
 
     try {
       await connection.open();
 
       const policyService = new PolicyService(connection);
-      const response = await policyService.updatePolicyWithStatements(policyId, { name, description }, statements);
+      const response = await policyService.updatePolicyWithStatements(
+        policyId,
+        { name, description, status },
+        statements
+      );
 
       await connection.commit();
 

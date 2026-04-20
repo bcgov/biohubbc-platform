@@ -19,7 +19,7 @@ describe('PolicyRepository', () => {
     it('returns a policy record on success', async () => {
       const mockQueryResponse = {
         rowCount: 1,
-        rows: [{ policy_id: 1, name: 'Policy', description: 'Test policy' }]
+        rows: [{ policy_id: 1, name: 'Policy', description: 'Test policy', status: 'approved' }]
       } as unknown as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
@@ -27,9 +27,9 @@ describe('PolicyRepository', () => {
       });
 
       const repository = new PolicyRepository(mockDBConnection);
-      const result = await repository.insertPolicy({ name: 'Policy', description: 'Test policy' });
+      const result = await repository.insertPolicy({ name: 'Policy', description: 'Test policy', status: 'requested' });
 
-      expect(result).to.eql({ policy_id: 1, name: 'Policy', description: 'Test policy' });
+      expect(result).to.eql({ policy_id: 1, name: 'Policy', description: 'Test policy', status: 'approved' });
     });
 
     it('throws error if insert fails', async () => {
@@ -42,7 +42,7 @@ describe('PolicyRepository', () => {
       const repository = new PolicyRepository(mockDBConnection);
 
       try {
-        await repository.insertPolicy({ name: 'Policy', description: 'Test policy' });
+        await repository.insertPolicy({ name: 'Policy', description: 'Test policy', status: 'requested' });
         expect.fail();
       } catch (error) {
         expect((error as ApiExecuteSQLError).message).to.equal('Failed to insert policy');
@@ -54,7 +54,7 @@ describe('PolicyRepository', () => {
     it('returns a policy record by ID', async () => {
       const mockResponse = {
         rowCount: 1,
-        rows: [{ policy_id: 1, name: 'Policy', description: 'Test' }]
+        rows: [{ policy_id: 1, name: 'Policy', description: 'Test', status: 'approved' }]
       } as unknown as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
@@ -64,7 +64,7 @@ describe('PolicyRepository', () => {
       const repository = new PolicyRepository(mockDBConnection);
       const result = await repository.getPolicy('1');
 
-      expect(result).to.eql({ policy_id: 1, name: 'Policy', description: 'Test' });
+      expect(result).to.eql({ policy_id: 1, name: 'Policy', description: 'Test', status: 'approved' });
     });
 
     it('throws error if not found', async () => {
@@ -86,8 +86,8 @@ describe('PolicyRepository', () => {
   describe('getPolicies', () => {
     it('returns multiple policies', async () => {
       const mockRows = [
-        { policy_id: 1, name: 'Policy1', description: 'Test1' },
-        { policy_id: 2, name: 'Policy2', description: 'Test2' }
+        { policy_id: 1, name: 'Policy1', description: 'Test1', status: 'approved' },
+        { policy_id: 2, name: 'Policy2', description: 'Test2', status: 'approved' }
       ];
       const mockResponse = {
         rowCount: 2,
@@ -106,8 +106,18 @@ describe('PolicyRepository', () => {
   describe('getPolicies', () => {
     it('returns paginated policies', async () => {
       const mockPolicies: Policy[] = [
-        { policy_id: '11111111-1111-1111-1111-111111111111', name: 'Policy1', description: 'Test1' },
-        { policy_id: '22222222-2222-2222-2222-222222222222', name: 'Policy2', description: 'Test2' }
+        {
+          policy_id: '11111111-1111-1111-1111-111111111111',
+          name: 'Policy1',
+          description: 'Test1',
+          status: 'approved'
+        },
+        {
+          policy_id: '22222222-2222-2222-2222-222222222222',
+          name: 'Policy2',
+          description: 'Test2',
+          status: 'approved'
+        }
       ];
 
       const mockResponse = {
@@ -124,7 +134,7 @@ describe('PolicyRepository', () => {
     });
 
     it('filters by search term', async () => {
-      const mockPolicies = [{ policy_id: '1', name: 'Telemetry Policy', description: 'Test' }];
+      const mockPolicies = [{ policy_id: '1', name: 'Telemetry Policy', description: 'Test', status: 'approved' }];
 
       const mockResponse = {
         rowCount: 1,
@@ -186,7 +196,9 @@ describe('PolicyRepository', () => {
 
   describe('getPoliciesThatAuthorizeFeatureAccessByUrn', () => {
     it('returns policies matching URN and user', async () => {
-      const mockRows = [{ policy_id: 1, name: 'Telemetry', description: 'Access telemetry features' }];
+      const mockRows = [
+        { policy_id: 1, name: 'Telemetry', description: 'Access telemetry features', status: 'approved' }
+      ];
       const mockResponse = {
         rowCount: 1,
         rows: mockRows
@@ -208,7 +220,7 @@ describe('PolicyRepository', () => {
 
   describe('updatePolicy', () => {
     it('returns updated policy record', async () => {
-      const mockRows = [{ policy_id: 1, name: 'Updated', description: 'Updated desc' }];
+      const mockRows = [{ policy_id: 1, name: 'Updated', description: 'Updated desc', status: 'approved' }];
       const mockResponse = {
         rowCount: 1,
         rows: mockRows
