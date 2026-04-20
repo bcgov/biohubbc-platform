@@ -1,0 +1,15 @@
+replicas: 1
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 1Gi
+  limits:
+    cpu: "1"
+    memory: 2Gi
+
+clamd:
+  logVerbose: true
+  streamMaxLength: 4000M
+  maxFileSize: 4000M
+  maxScanSize: 4000M
