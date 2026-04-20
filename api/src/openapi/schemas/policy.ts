@@ -291,3 +291,20 @@ export const UpdatePolicyRequestSchema: OpenAPIV3.SchemaObject = {
     }
   }
 };
+
+/**
+ * Schema for status-only policy update request body.
+ */
+export const UpdatePolicyStatusRequestSchema: OpenAPIV3.SchemaObject = {
+  title: 'UpdatePolicyStatusRequest',
+  type: 'object',
+  additionalProperties: false,
+  required: ['status'],
+  properties: {
+    status: {
+      type: 'string',
+      enum: ['requested', 'reviewed', 'approved', 'denied'],
+      description: 'Lifecycle state for the policy'
+    }
+  }
+};
