@@ -192,6 +192,33 @@ describe('DownloadRepository', () => {
     });
   });
 
+  describe('getDownloadById', () => {
+    it('returns the download record when found', async () => {
+      const row = { download_id: 'aaaa0000-0000-0000-0000-000000000001', download_status: DownloadStatusEnum.PENDING };
+      const sqlStub = sinon.stub().resolves(mockQueryResult([row], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const download = await repo.getDownloadById('aaaa0000-0000-0000-0000-000000000001');
+
+      expect(download).to.equal(row);
+    });
+
+    it('throws ApiExecuteSQLError when no row is returned', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+
+      try {
+        await repo.getDownloadById('aaaa0000-0000-0000-0000-000000000001');
+        expect.fail('expected throw');
+      } catch (err: any) {
+        expect(err.message).to.equal('Download not found');
+      }
+    });
+  });
+
   describe('findDownloadById', () => {
     it('SQL includes create_date in SELECT', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));

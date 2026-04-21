@@ -3,9 +3,11 @@ import archiver from 'archiver';
 import { PassThrough } from 'node:stream';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
+import { ApiConflictError } from '../../errors/api-error';
 import {
   DownloadArtifactInfo,
   DownloadFeatureSummary,
+  DownloadRecord,
   DownloadSource,
   ParquetFeatureData
 } from '../../models/download';
@@ -91,6 +93,56 @@ export class DownloadPipelineService extends DBService {
     }
 
     return this.downloadRepository.updateDownloadStatus(downloadId, status, { ...metadata, ...timestamps });
+  }
+
+  /**
+   * Validate a download status transition against an allowed current-status set.
+   *
+   * Pure business-rule assertion; no I/O.
+   */
+  private assertDownloadStatusTransition(
+    downloadId: string,
+    currentStatus: DownloadRecord['download_status'],
+    nextStatus: DownloadStatusEnum,
+    allowedCurrentStatuses: DownloadStatusEnum[]
+  ): void {
+    if (!allowedCurrentStatuses.includes(currentStatus as DownloadStatusEnum)) {
+      throw new ApiConflictError('Invalid download status transition', [
+        'DownloadPipelineService->transitionDownloadStatus',
+        { downloadId, currentStatus, nextStatus, allowedCurrentStatuses }
+      ]);
+    }
+  }
+
+  /**
+   * Transition a download from one of `allowedCurrentStatuses` to `nextStatus`.
+   *
+   * Fetches the download, asserts the transition is allowed, then writes the new status
+   * plus timestamps via the existing generic `updateDownloadStatus`. The state machine
+   * lives in the service; the repository stays a thin CRUD wrapper. Illegal transitions
+   * (including retries of already-terminal jobs) throw `ApiConflictError` and bubble up
+   * to the pg-boss DLQ.
+   */
+  async transitionDownloadStatus(
+    downloadId: string,
+    nextStatus: DownloadStatusEnum,
+    allowedCurrentStatuses: DownloadStatusEnum[],
+    errorMetadata?: { error?: string }
+  ): Promise<void> {
+    const download = await this.downloadRepository.getDownloadById(downloadId);
+
+    this.assertDownloadStatusTransition(downloadId, download.download_status, nextStatus, allowedCurrentStatuses);
+
+    const now = new Date().toISOString();
+    const timestamps: { started_at?: string; completed_at?: string } = {};
+    if (nextStatus === DownloadStatusEnum.PROCESSING) {
+      timestamps.started_at = now;
+    }
+    if (nextStatus === DownloadStatusEnum.READY || nextStatus === DownloadStatusEnum.FAILED) {
+      timestamps.completed_at = now;
+    }
+
+    await this.downloadRepository.updateDownloadStatus(downloadId, nextStatus, { ...errorMetadata, ...timestamps });
   }
 
   /**

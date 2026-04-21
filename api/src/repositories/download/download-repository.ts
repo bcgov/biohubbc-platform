@@ -171,6 +171,26 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
+   * Get a download record by ID, throwing if not found.
+   *
+   * `get*` throws on missing row (codebase convention — companion to `findDownloadById`).
+   *
+   * @throws {ApiExecuteSQLError} when no download matches the given ID.
+   */
+  async getDownloadById(downloadId: string): Promise<DownloadRecord> {
+    const download = await this.findDownloadById(downloadId);
+
+    if (!download) {
+      throw new ApiExecuteSQLError('Download not found', [
+        'DownloadRepository->getDownloadById',
+        `no download with id ${downloadId}`
+      ]);
+    }
+
+    return download;
+  }
+
+  /**
    * Get paginated download records accessible to a user, with total count.
    *
    * Uses COUNT(*) OVER() window function to get the total count in the same query,

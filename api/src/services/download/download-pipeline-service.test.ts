@@ -5,6 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
+import { ApiConflictError } from '../../errors/api-error';
 import {
   DownloadArtifactInfo,
   DownloadFeatureData,
@@ -268,6 +269,108 @@ describe('DownloadPipelineService', () => {
       expect(uploadStreamStub.firstCall.args[3]).to.equal(
         'downloads/aaaa0000-0000-0000-0000-000000000042/biohub-aaaa0000-0000-0000-0000-000000000042-part-2.zip'
       );
+    });
+  });
+
+  describe('transitionDownloadStatus', () => {
+    const downloadId = 'aaaa0000-0000-0000-0000-000000000042';
+
+    it('propagates getDownloadById throw when download does not exist (does NOT call updateDownloadStatus)', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon.stub(DownloadRepository.prototype, 'getDownloadById').rejects(new Error('Download not found'));
+      const updateStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
+
+      try {
+        await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
+        expect.fail('expected throw');
+      } catch (err: any) {
+        expect(err.message).to.equal('Download not found');
+      }
+
+      expect(updateStub.called).to.be.false;
+    });
+
+    it('throws ApiConflictError when current status is not in allowedCurrentStatuses (illegal transition)', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadById')
+        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
+      const updateStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
+
+      try {
+        await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
+        expect.fail('expected throw');
+      } catch (err: any) {
+        expect(err).to.be.instanceOf(ApiConflictError);
+        expect(err.message).to.equal('Invalid download status transition');
+      }
+
+      expect(updateStub.called).to.be.false;
+    });
+
+    it('calls updateDownloadStatus with started_at set for pending→processing', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadById')
+        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PENDING }));
+      const updateStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
+
+      await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
+
+      expect(updateStub.calledOnce).to.be.true;
+      expect(updateStub.firstCall.args[0]).to.equal(downloadId);
+      expect(updateStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
+      const metadata = updateStub.firstCall.args[2] as { started_at?: string; completed_at?: string };
+      expect(metadata.started_at).to.be.a('string');
+      expect(new Date(metadata.started_at!).toISOString()).to.equal(metadata.started_at);
+      expect(metadata.completed_at).to.be.undefined;
+    });
+
+    it('calls updateDownloadStatus with completed_at set for processing→ready', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadById')
+        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
+      const updateStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
+
+      await service.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
+
+      const metadata = updateStub.firstCall.args[2] as { started_at?: string; completed_at?: string };
+      expect(metadata.started_at).to.be.undefined;
+      expect(metadata.completed_at).to.be.a('string');
+    });
+
+    it('passes completed_at and error metadata for processing→failed', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadById')
+        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
+      const updateStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
+
+      await service.transitionDownloadStatus(
+        downloadId,
+        DownloadStatusEnum.FAILED,
+        [DownloadStatusEnum.PENDING, DownloadStatusEnum.PROCESSING],
+        { error: 'job failed after all retries' }
+      );
+
+      const metadata = updateStub.firstCall.args[2] as {
+        error?: string;
+        started_at?: string;
+        completed_at?: string;
+      };
+      expect(metadata.error).to.equal('job failed after all retries');
+      expect(metadata.completed_at).to.be.a('string');
     });
   });
 
