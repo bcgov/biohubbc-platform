@@ -89,8 +89,6 @@ export interface DBDependencies {
   getServiceClientSystemUser: typeof getServiceClientSystemUser;
 }
 
-export let dbDependencies: DBDependencies;
-
 /**
  * Initializes the singleton pg pool instance used by the api.
  *
@@ -556,7 +554,7 @@ const getServiceAccountDBConnectionInternal = (systemUser: SystemUser): IDBConne
   });
 };
 
-dbDependencies = {
+export const dbDependencies: DBDependencies = {
   getDBPool,
   getDBConnection: getDBConnectionInternal,
   getAPIUserDBConnection: getAPIUserDBConnectionInternal,
