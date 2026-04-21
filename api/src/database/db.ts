@@ -89,21 +89,7 @@ export interface DBDependencies {
   getServiceClientSystemUser: typeof getServiceClientSystemUser;
 }
 
-export const dbDependencies: DBDependencies = {
-  getDBPool: () => getDBPool(),
-  getDBConnection: (_keycloakToken: object): IDBConnection => {
-    throw new Error('dbDependencies.getDBConnection is not initialized');
-  },
-  getAPIUserDBConnection: (): IDBConnection => {
-    throw new Error('dbDependencies.getAPIUserDBConnection is not initialized');
-  },
-  getServiceAccountDBConnection: (_systemUser: SystemUser): IDBConnection => {
-    throw new Error('dbDependencies.getServiceAccountDBConnection is not initialized');
-  },
-  getUserGuid,
-  getUserIdentitySource,
-  getServiceClientSystemUser
-};
+export let dbDependencies: DBDependencies;
 
 /**
  * Initializes the singleton pg pool instance used by the api.
@@ -535,8 +521,6 @@ const getDBConnectionInternal = function (keycloakToken: object): IDBConnection 
   };
 };
 
-dbDependencies.getDBConnection = (keycloakToken: object) => getDBConnectionInternal(keycloakToken);
-
 export const getDBConnection = function (keycloakToken: object): IDBConnection {
   return dbDependencies.getDBConnection(keycloakToken);
 };
@@ -572,9 +556,15 @@ const getServiceAccountDBConnectionInternal = (systemUser: SystemUser): IDBConne
   });
 };
 
-dbDependencies.getAPIUserDBConnection = () => getAPIUserDBConnectionInternal();
-dbDependencies.getServiceAccountDBConnection = (systemUser: SystemUser) =>
-  getServiceAccountDBConnectionInternal(systemUser);
+dbDependencies = {
+  getDBPool,
+  getDBConnection: getDBConnectionInternal,
+  getAPIUserDBConnection: getAPIUserDBConnectionInternal,
+  getServiceAccountDBConnection: getServiceAccountDBConnectionInternal,
+  getUserGuid,
+  getUserIdentitySource,
+  getServiceClientSystemUser
+};
 
 export const getAPIUserDBConnection = (): IDBConnection => {
   return dbDependencies.getAPIUserDBConnection();

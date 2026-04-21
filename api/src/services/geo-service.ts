@@ -5,8 +5,8 @@ import qs from 'qs';
  * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
  */
 export const geoServiceDependencies = {
-  get: (...args: Parameters<typeof axios.get>) => axios.get(...args),
-  post: (...args: Parameters<typeof axios.post>) => axios.post(...args)
+  get: axios.get,
+  post: axios.post
 };
 
 /**

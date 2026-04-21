@@ -9,7 +9,7 @@ const defaultLog = getLogger('services/itis-service');
  * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
  */
 export const itisServiceDependencies = {
-  get: <T = any>(...args: Parameters<typeof axios.get<T>>) => axios.get<T>(...args)
+  get: axios.get
 };
 
 export type ItisSolrSearchResponse = {

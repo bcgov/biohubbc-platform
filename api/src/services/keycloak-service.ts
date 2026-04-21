@@ -52,8 +52,8 @@ const defaultLog = getLogger('services/keycloak-service');
  * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
  */
 export const keycloakServiceDependencies = {
-  post: (...args: Parameters<typeof axios.post>) => axios.post(...args),
-  get: <T = any>(...args: Parameters<typeof axios.get<T>>) => axios.get<T>(...args)
+  post: axios.post,
+  get: axios.get
 };
 
 /**
