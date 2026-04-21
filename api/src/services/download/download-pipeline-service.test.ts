@@ -4,9 +4,10 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
+import { createMockDownloadRecord } from '../../__mocks__/download';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { ApiConflictError } from '../../errors/api-error';
-import { DownloadFeatureData, DownloadFeatureSummary, DownloadRecord, DownloadSource } from '../../models/download';
+import { DownloadFeatureData, DownloadFeatureSummary, DownloadSource } from '../../models/download';
 import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
@@ -25,23 +26,6 @@ chai.use(sinonChai);
 describe('DownloadPipelineService', () => {
   afterEach(() => {
     sinon.restore();
-  });
-
-  // Helper: create a mock download record
-  const createMockDownloadRecord = (overrides?: Partial<DownloadRecord>): DownloadRecord => ({
-    download_id: 'aaaa0000-0000-0000-0000-000000000042',
-    download_status: DownloadStatusEnum.PROCESSING,
-    format: 'csv',
-    metadata: null,
-    started_at: null,
-    completed_at: null,
-    downloaded_at: null,
-    total_fragments: 1,
-    completed_fragments: 0,
-    estimated_total_size_bytes: null,
-    fragment_size_bytes: String(FRAGMENT_SIZE_THRESHOLD),
-    create_date: '2025-01-01T00:00:00Z',
-    ...overrides
   });
 
   // Shared helpers for fragment-related tests

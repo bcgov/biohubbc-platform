@@ -21,7 +21,7 @@ import { defaultPoolConfig, getAPIUserDBConnection, getKnex, IDBConnection, init
 import { ApiConflictError } from '../../errors/api-error';
 import { ParquetFeatureData } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
-import { DownloadRepository } from '../../repositories/download/download-repository';
+import { BaseFeatureRow, DownloadRepository } from '../../repositories/download/download-repository';
 import { CartService } from '../../services/cart-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadService } from '../../services/download/download-service';
@@ -78,6 +78,22 @@ function assembleFeatureData(
       parent_uuid: baseRow.parent_uuid
     };
   });
+}
+
+/**
+ * Helper: stub @dsnp/parquetjs ParquetWriter.openStream and ObjectStorageService.uploadStream.
+ *
+ * The Parquet writer is replaced with a no-op that never writes to the stream,
+ * so the PassThrough receives zero bytes (hash = SHA-256 of empty input, byteCount = 0).
+ * The upload is stubbed to resolve without consuming the stream. The real SQL paths
+ * for ArtifactService.insertArtifact and DownloadRepository.createDownloadArtifact
+ * remain unstubbed — those are exactly the idempotency contracts we verify.
+ */
+function stubParquetAndUpload(): { uploadStub: sinon.SinonStub } {
+  const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves() };
+  sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
+  const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+  return { uploadStub };
 }
 
 describe('Download Parquet pipeline (integration)', function () {
@@ -358,20 +374,7 @@ describe('Download Parquet pipeline (integration)', function () {
     featureTypeName: string,
     properties: CsvPropertyDefinition[]
   ): Promise<ParquetFeatureData[]> {
-    const JSONB_FALLBACK_TYPES = new Set(['array', 'object', 'artifact_key']);
-    const typedPropertyTypes = [
-      ...new Set(properties.map((p) => p.feature_property_type_name).filter((t) => !JSONB_FALLBACK_TYPES.has(t)))
-    ];
-    const allRows: ParquetFeatureData[] = [];
-
-    for await (const baseBatch of downloadRepo.streamFeatureBaseByCartIdAndType(cartId, featureTypeName, 100)) {
-      const ids = baseBatch.map((r) => r.submission_feature_id);
-      const typedRows =
-        typedPropertyTypes.length > 0 ? await downloadRepo.fetchTypedPropertyRows(ids, typedPropertyTypes) : [];
-      allRows.push(...assembleFeatureData(baseBatch, typedRows, properties));
-    }
-
-    return allRows;
+    return hydrateFromStream(downloadRepo.streamFeatureBaseByCartIdAndType(cartId, featureTypeName, 100), properties);
   }
 
   /**
@@ -385,21 +388,28 @@ describe('Download Parquet pipeline (integration)', function () {
     featureTypeName: string,
     properties: CsvPropertyDefinition[]
   ): Promise<ParquetFeatureData[]> {
+    const searchSql = 'SELECT submission_feature_id FROM submission_feature WHERE submission_id = $1';
+    return hydrateFromStream(
+      downloadRepo.streamFeatureBaseBySearchQueryAndType(downloadId, searchSql, [submissionId], featureTypeName, 100),
+      properties
+    );
+  }
+
+  /**
+   * Helper: consume a base-feature-row stream and hydrate each batch with typed property values.
+   * Collects the result into a flat array — fine for test-sized datasets.
+   */
+  async function hydrateFromStream(
+    stream: AsyncGenerator<BaseFeatureRow[]>,
+    properties: CsvPropertyDefinition[]
+  ): Promise<ParquetFeatureData[]> {
     const JSONB_FALLBACK_TYPES = new Set(['array', 'object', 'artifact_key']);
     const typedPropertyTypes = [
       ...new Set(properties.map((p) => p.feature_property_type_name).filter((t) => !JSONB_FALLBACK_TYPES.has(t)))
     ];
-    const searchSql = 'SELECT submission_feature_id FROM submission_feature WHERE submission_id = $1';
-    const searchBindings = [submissionId];
     const allRows: ParquetFeatureData[] = [];
 
-    for await (const baseBatch of downloadRepo.streamFeatureBaseBySearchQueryAndType(
-      downloadId,
-      searchSql,
-      searchBindings,
-      featureTypeName,
-      100
-    )) {
+    for await (const baseBatch of stream) {
       const ids = baseBatch.map((r) => r.submission_feature_id);
       const typedRows =
         typedPropertyTypes.length > 0 ? await downloadRepo.fetchTypedPropertyRows(ids, typedPropertyTypes) : [];
@@ -407,22 +417,6 @@ describe('Download Parquet pipeline (integration)', function () {
     }
 
     return allRows;
-  }
-
-  /**
-   * Helper: stub @dsnp/parquetjs ParquetWriter.openStream and ObjectStorageService.uploadStream.
-   *
-   * The Parquet writer is replaced with a no-op that never writes to the stream,
-   * so the PassThrough receives zero bytes (hash = SHA-256 of empty input, byteCount = 0).
-   * The upload is stubbed to resolve without consuming the stream. The real SQL paths
-   * for ArtifactService.insertArtifact and DownloadRepository.createDownloadArtifact
-   * remain unstubbed — those are exactly the idempotency contracts we verify.
-   */
-  function stubParquetAndUpload(): { uploadStub: sinon.SinonStub } {
-    const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves() };
-    sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
-    const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
-    return { uploadStub };
   }
 
   // ── Tests ────────────────────────────────────────────────────────────

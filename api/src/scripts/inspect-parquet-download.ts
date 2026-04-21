@@ -342,7 +342,7 @@ async function populateTypedProperties(
         await db('biohub.submission_feature_property_string').insert({
           submission_feature_id: submissionFeatureId,
           feature_type_property_id: prop.feature_type_property_id,
-          value: String(value),
+          value: typeof value === 'object' ? JSON.stringify(value) : String(value),
           create_user: SYSTEM_USER_ID
         });
         break;
@@ -413,7 +413,9 @@ async function readS3ToBuffer(storage: ObjectStorageService, key: string): Promi
   return Buffer.concat(chunks);
 }
 
-main().catch((error) => {
+try {
+  await main();
+} catch (error) {
   console.error('[inspect-parquet] failed:', error);
   process.exit(1);
-});
+}

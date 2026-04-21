@@ -311,35 +311,17 @@ describe('Download Worker', function () {
     return { downloadId: download.download_id };
   }
 
-  it('should process a parquet download job and upload per-type files to S3', async () => {
-    // 1. Create test data covering all three axes:
-    //    - dataset: spatial (has geometry)
-    //    - sample_site: spatial (has geometry)
-    //    - file: non-spatial, artifact_key-bearing
-    const submissionId = await createTestSubmission();
-
-    const datasetFeatureId = await createTestFeature(submissionId, 'dataset', {
-      name: 'Parquet Integration Test Dataset',
-      start_date: '2024-01-01T00:00:00.000Z',
-      end_date: '2024-12-31T00:00:00.000Z',
-      geometry: { type: 'Point', coordinates: [-124.856, 54.321] }
-    });
-
-    const sampleSiteFeatureId = await createTestFeature(
-      submissionId,
-      'sample_site',
-      {
-        name: 'Parquet Test Site',
-        description: 'Integration test sample site',
-        geometry: { type: 'Point', coordinates: [-130.849, 56.207] }
-      },
-      datasetFeatureId
-    );
-
-    // Seed an S3-backed artifact + `file` feature so the Parquet file includes an
-    // artifact_key column with a real round-trippable value.
-    const artifactSourceKey = `${TEST_PREFIX}/parquet-test-file-${Date.now()}.bin`;
-    const artifactSourceBytes = Buffer.from('source-file-content-for-parquet-round-trip');
+  /**
+   * Upload a buffer to S3, insert the matching artifact row, and create a `file` feature
+   * whose `artifact_key` points at the uploaded object. Tracks s3 key + artifact id for cleanup.
+   */
+  async function seedFileFeatureWithArtifact(
+    submissionId: number,
+    datasetFeatureId: number,
+    opts: { keyPrefix: string; bufferContent: string; filename: string }
+  ): Promise<{ fileFeatureId: number; artifactSourceKey: string }> {
+    const artifactSourceKey = `${TEST_PREFIX}/${opts.keyPrefix}-${Date.now()}.bin`;
+    const artifactSourceBytes = Buffer.from(opts.bufferContent);
     await storageService.uploadBuffer(
       BucketType.MAIN,
       artifactSourceBytes,
@@ -367,9 +349,45 @@ describe('Download Worker', function () {
     const fileFeatureId = await createTestFeature(
       submissionId,
       'file',
-      { properties: { artifact_key: artifactSourceKey, filename: 'parquet-test.bin' } },
+      { properties: { artifact_key: artifactSourceKey, filename: opts.filename } },
       datasetFeatureId
     );
+
+    return { fileFeatureId, artifactSourceKey };
+  }
+
+  it('should process a parquet download job and upload per-type files to S3', async () => {
+    // 1. Create test data covering all three axes:
+    //    - dataset: spatial (has geometry)
+    //    - sample_site: spatial (has geometry)
+    //    - file: non-spatial, artifact_key-bearing
+    const submissionId = await createTestSubmission();
+
+    const datasetFeatureId = await createTestFeature(submissionId, 'dataset', {
+      name: 'Parquet Integration Test Dataset',
+      start_date: '2024-01-01T00:00:00.000Z',
+      end_date: '2024-12-31T00:00:00.000Z',
+      geometry: { type: 'Point', coordinates: [-124.856, 54.321] }
+    });
+
+    const sampleSiteFeatureId = await createTestFeature(
+      submissionId,
+      'sample_site',
+      {
+        name: 'Parquet Test Site',
+        description: 'Integration test sample site',
+        geometry: { type: 'Point', coordinates: [-130.849, 56.207] }
+      },
+      datasetFeatureId
+    );
+
+    // Seed an S3-backed artifact + `file` feature so the Parquet file includes an
+    // artifact_key column with a real round-trippable value.
+    const { fileFeatureId, artifactSourceKey } = await seedFileFeatureWithArtifact(submissionId, datasetFeatureId, {
+      keyPrefix: 'parquet-test-file',
+      bufferContent: 'source-file-content-for-parquet-round-trip',
+      filename: 'parquet-test.bin'
+    });
 
     // Fetch the uuid for each feature for row-level assertions below
     const featureUuidRows = await db('biohub.submission_feature')
@@ -529,36 +547,11 @@ describe('Download Worker', function () {
       datasetFeatureId
     );
 
-    const artifactSourceKey = `${TEST_PREFIX}/parquet-retry-file-${Date.now()}.bin`;
-    const artifactSourceBytes = Buffer.from('retry-test-source-file-content');
-    await storageService.uploadBuffer(
-      BucketType.MAIN,
-      artifactSourceBytes,
-      'application/octet-stream',
-      artifactSourceKey
-    );
-    createdS3Keys.push(artifactSourceKey);
-
-    const bucketName = process.env.OBJECT_STORE_BUCKET_NAME!;
-    const [sourceArtifact] = await db('biohub.artifact')
-      .insert({
-        bucket: bucketName,
-        object_key: artifactSourceKey,
-        byte_size: artifactSourceBytes.length,
-        artifact_status: 'uploaded',
-        uploaded_at: new Date().toISOString(),
-        format: 'tar',
-        create_user: SYSTEM_USER_ID
-      })
-      .returning('artifact_id');
-    createdArtifactIds.push(sourceArtifact.artifact_id);
-
-    const fileFeatureId = await createTestFeature(
-      submissionId,
-      'file',
-      { properties: { artifact_key: artifactSourceKey, filename: 'retry.bin' } },
-      datasetFeatureId
-    );
+    const { fileFeatureId } = await seedFileFeatureWithArtifact(submissionId, datasetFeatureId, {
+      keyPrefix: 'parquet-retry-file',
+      bufferContent: 'retry-test-source-file-content',
+      filename: 'retry.bin'
+    });
 
     // Run 1
     const { downloadId } = await createDownloadAndProcess([datasetFeatureId, sampleSiteFeatureId, fileFeatureId], {
@@ -964,17 +957,10 @@ describe.skip('DownloadPipelineService download pipeline (system)', function () 
   }
 
   /**
-   * Helper: create a cart-backed download and run the full pipeline, returning the resulting zip.
+   * Helper: run the three-phase pipeline for an already-created download, assert READY,
+   * and return the resulting zip.
    */
-  async function executeAndGetZip(featureIds: number[]): Promise<{ zip: AdmZip; downloadId: string }> {
-    const systemUserId = connection.systemUserId();
-    const cartResponse = await cartService.createCart(systemUserId, featureIds);
-    const { download_id } = await crudService.createDownload({
-      cartId: cartResponse.cart.cart_id,
-      format: 'csv'
-    });
-
-    // Run the three-phase pipeline within the test transaction
+  async function runPipelineAndGetZip(download_id: string): Promise<{ zip: AdmZip; downloadId: string }> {
     await service.planDownloadIfNeeded(download_id);
     const fragments = await service.getFragmentsToProcess(download_id);
     for (const fragment of fragments) {
@@ -991,6 +977,20 @@ describe.skip('DownloadPipelineService download pipeline (system)', function () 
     expect(allFragments.length).to.be.greaterThanOrEqual(1);
     const zip = await downloadAndTrackZip(allFragments[0].s3_key as string);
     return { zip, downloadId: download_id };
+  }
+
+  /**
+   * Helper: create a cart-backed download and run the full pipeline, returning the resulting zip.
+   */
+  async function executeAndGetZip(featureIds: number[]): Promise<{ zip: AdmZip; downloadId: string }> {
+    const systemUserId = connection.systemUserId();
+    const cartResponse = await cartService.createCart(systemUserId, featureIds);
+    const { download_id } = await crudService.createDownload({
+      cartId: cartResponse.cart.cart_id,
+      format: 'csv'
+    });
+
+    return runPipelineAndGetZip(download_id);
   }
 
   it('should produce correct CSV for populated and empty dataset features', async () => {
@@ -1280,23 +1280,7 @@ describe.skip('DownloadPipelineService download pipeline (system)', function () 
     filters: Record<string, unknown>
   ): Promise<{ zip: AdmZip; downloadId: string }> {
     const { download_id } = await crudService.createDownload({ filters, format: 'csv' });
-
-    // Run the three-phase pipeline within the test transaction
-    await service.planDownloadIfNeeded(download_id);
-    const fragments = await service.getFragmentsToProcess(download_id);
-    for (const fragment of fragments) {
-      await service.processFragment(fragment, download_id);
-    }
-    await service.finalizeDownload(download_id);
-
-    const download = await crudService.findDownloadById(download_id);
-    expect(download).to.not.be.null;
-    expect(download!.download_status).to.equal(DownloadStatusEnum.READY);
-
-    const allFragments = await crudService.getFragmentsByDownloadId(download_id);
-    expect(allFragments.length).to.be.greaterThanOrEqual(1);
-    const zip = await downloadAndTrackZip(allFragments[0].s3_key as string);
-    return { zip, downloadId: download_id };
+    return runPipelineAndGetZip(download_id);
   }
 
   it('should process a filter-based download through the full pipeline', async () => {

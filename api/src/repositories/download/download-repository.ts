@@ -1,4 +1,5 @@
 import { Knex } from 'knex';
+import { QueryResultRow } from 'pg';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { DOWNLOAD_FEATURE_BATCH_SIZE, FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
@@ -464,10 +465,9 @@ export class DownloadRepository extends BaseRepository {
     cartId: string,
     batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<DownloadFeatureSummary[]> {
-    const cursorName = `dl_cart_cursor_${cartId.replace(/[^a-z0-9_]/gi, '_')}`;
-
-    await this.connection.query(
-      `DECLARE ${cursorName} CURSOR FOR
+    yield* this.streamWithCursor<DownloadFeatureSummary>({
+      cursorName: `dl_cart_cursor_${cartId.replace(/[^a-z0-9_]/gi, '_')}`,
+      declareSql: `
         SELECT
           sf.submission_feature_id,
           sf.submission_id,
@@ -478,20 +478,9 @@ export class DownloadRepository extends BaseRepository {
         INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
         WHERE csf.cart_id = $1
         ORDER BY ft.name, sf.submission_feature_id`,
-      [cartId]
-    );
-
-    try {
-      while (true) {
-        const result = await this.connection.query<DownloadFeatureSummary>(`FETCH ${batchSize} FROM ${cursorName}`);
-        if (result.rows.length === 0) {
-          break;
-        }
-        yield result.rows;
-      }
-    } finally {
-      await this.connection.query(`CLOSE ${cursorName}`);
-    }
+      bindings: [cartId],
+      batchSize
+    });
   }
 
   /**
@@ -514,10 +503,9 @@ export class DownloadRepository extends BaseRepository {
     searchBindings: any[],
     batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<DownloadFeatureSummary[]> {
-    const cursorName = `dl_filter_cursor_${downloadId.replace(/[^a-z0-9_]/gi, '_')}`;
-
-    await this.connection.query(
-      `DECLARE ${cursorName} CURSOR FOR
+    yield* this.streamWithCursor<DownloadFeatureSummary>({
+      cursorName: `dl_filter_cursor_${downloadId.replace(/[^a-z0-9_]/gi, '_')}`,
+      declareSql: `
         SELECT
           sf.submission_feature_id,
           sf.submission_id,
@@ -527,20 +515,9 @@ export class DownloadRepository extends BaseRepository {
         INNER JOIN feature_type ft ON sf.feature_type_id = ft.feature_type_id
         WHERE sf.submission_feature_id IN (${searchSql})
         ORDER BY ft.name, sf.submission_feature_id`,
-      searchBindings
-    );
-
-    try {
-      while (true) {
-        const result = await this.connection.query<DownloadFeatureSummary>(`FETCH ${batchSize} FROM ${cursorName}`);
-        if (result.rows.length === 0) {
-          break;
-        }
-        yield result.rows;
-      }
-    } finally {
-      await this.connection.query(`CLOSE ${cursorName}`);
-    }
+      bindings: searchBindings,
+      batchSize
+    });
   }
 
   /**
@@ -721,13 +698,12 @@ export class DownloadRepository extends BaseRepository {
     featureTypeName: string,
     batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<BaseFeatureRow[]> {
-    const cursorName = `dl_pq_cart_cursor_${cartId.replaceAll(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replaceAll(
-      /[^a-z0-9_]/gi,
-      '_'
-    )}`;
-
-    await this.connection.query(
-      `DECLARE ${cursorName} CURSOR FOR
+    yield* this.streamWithCursor<BaseFeatureRow>({
+      cursorName: `dl_pq_cart_cursor_${cartId.replaceAll(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replaceAll(
+        /[^a-z0-9_]/gi,
+        '_'
+      )}`,
+      declareSql: `
         SELECT
           sf.submission_feature_id,
           sf.uuid,
@@ -740,22 +716,9 @@ export class DownloadRepository extends BaseRepository {
         LEFT JOIN submission_feature parent_sf ON sf.parent_submission_feature_id = parent_sf.submission_feature_id
         WHERE csf.cart_id = $1 AND ft.name = $2
         ORDER BY sf.submission_feature_id`,
-      [cartId, featureTypeName]
-    );
-
-    try {
-      while (true) {
-        const result = await this.connection.query<BaseFeatureRow>(`FETCH ${batchSize} FROM ${cursorName}`);
-
-        if (result.rows.length === 0) {
-          break;
-        }
-
-        yield result.rows;
-      }
-    } finally {
-      await this.connection.query(`CLOSE ${cursorName}`);
-    }
+      bindings: [cartId, featureTypeName],
+      batchSize
+    });
   }
 
   /**
@@ -781,17 +744,16 @@ export class DownloadRepository extends BaseRepository {
     featureTypeName: string,
     batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<BaseFeatureRow[]> {
-    const cursorName = `dl_pq_filter_cursor_${downloadId.replaceAll(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replaceAll(
-      /[^a-z0-9_]/gi,
-      '_'
-    )}`;
-
     // featureTypeName is the last positional parameter after all search bindings
     const allBindings = [...searchBindings, featureTypeName];
     const typeParamIndex = allBindings.length;
 
-    await this.connection.query(
-      `DECLARE ${cursorName} CURSOR FOR
+    yield* this.streamWithCursor<BaseFeatureRow>({
+      cursorName: `dl_pq_filter_cursor_${downloadId.replaceAll(/[^a-z0-9_]/gi, '_')}_${featureTypeName.replaceAll(
+        /[^a-z0-9_]/gi,
+        '_'
+      )}`,
+      declareSql: `
         SELECT
           sf.submission_feature_id,
           sf.uuid,
@@ -803,17 +765,36 @@ export class DownloadRepository extends BaseRepository {
         LEFT JOIN submission_feature parent_sf ON sf.parent_submission_feature_id = parent_sf.submission_feature_id
         WHERE sf.submission_feature_id IN (${searchSql}) AND ft.name = $${typeParamIndex}
         ORDER BY sf.submission_feature_id`,
-      allBindings
-    );
+      bindings: allBindings,
+      batchSize
+    });
+  }
+
+  /**
+   * Shared cursor streaming loop for large result sets.
+   *
+   * DECLARE the cursor, FETCH batches until exhausted, CLOSE on exit.
+   * Caller supplies the cursor name, the inner SELECT (without the DECLARE ... CURSOR FOR prefix),
+   * and the parameter bindings.
+   *
+   * Must be called within an open transaction — Postgres cursors require tx context.
+   */
+  private async *streamWithCursor<T extends QueryResultRow>(opts: {
+    cursorName: string;
+    declareSql: string;
+    bindings: any[];
+    batchSize: number;
+  }): AsyncGenerator<T[]> {
+    const { cursorName, declareSql, bindings, batchSize } = opts;
+
+    await this.connection.query(`DECLARE ${cursorName} CURSOR FOR ${declareSql}`, bindings);
 
     try {
       while (true) {
-        const result = await this.connection.query<BaseFeatureRow>(`FETCH ${batchSize} FROM ${cursorName}`);
-
+        const result = await this.connection.query<T>(`FETCH ${batchSize} FROM ${cursorName}`);
         if (result.rows.length === 0) {
           break;
         }
-
         yield result.rows;
       }
     } finally {
