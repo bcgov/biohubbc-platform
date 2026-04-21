@@ -14,7 +14,7 @@ export interface IOptimisticMutationConfig<TState, TApiResult> {
   optimisticState: TState;
   mutation: (context: IOptimisticMutationContext<TState>) => Promise<TApiResult>;
   onSuccess?: (result: TApiResult, context: IOptimisticMutationContext<TState>) => void;
-  onRollback?: (context: IOptimisticMutationContext<TState>) => void;
+  onRollback?: (error: unknown, context: IOptimisticMutationContext<TState>) => void;
 }
 
 /**
@@ -55,7 +55,7 @@ export const useOptimisticMutation = <TState>(setup: IOptimisticMutationSetup<TS
         return result;
       } catch (error) {
         setDataRef.current(currentState);
-        config.onRollback?.(context);
+        config.onRollback?.(error, context);
         throw error;
       }
     },

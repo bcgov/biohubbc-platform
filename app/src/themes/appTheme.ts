@@ -257,6 +257,11 @@ const appTheme = createTheme({
         }
       }
     },
+    MuiListItemIcon: {
+      styleOverrides: {
+        root: {}
+      }
+    },
     MuiLink: {
       styleOverrides: {
         root: {

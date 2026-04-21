@@ -5,6 +5,7 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
+import { useOptimisticDataLoader } from 'hooks/useOptimisticDataLoader';
 import { DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
 import { ITeamMember } from 'interfaces/useTeamsApi.interface';
 import { ITicketAssignee, ITicketReference, TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
@@ -38,6 +39,8 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
   const [isAssigneeDialogOpen, setIsAssigneeDialogOpen] = useState(false);
 
   const teamMembersLoader = useDataLoader((currentTeamId: string) => api.teams.getTeamMembers(currentTeamId));
+  const optimisticTeamMembersLoader = useOptimisticDataLoader(teamMembersLoader);
+  const optimisticTicketLoader = useOptimisticDataLoader(ticketDataLoader);
 
   useEffect(() => {
     if (!teamId) {
@@ -87,22 +90,20 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
       return;
     }
 
-    const removedMember = members.find((member) => member.team_member_id === teamMemberId);
-
-    try {
-      handleMemberRemove(teamMemberId);
-      await api.teams.deleteTeamMember(teamId, teamMemberId);
-    } catch (error) {
-      if (removedMember) {
-        handleMemberAdd(removedMember);
+    await optimisticTeamMembersLoader.refresh((currentData) => ({
+      optimisticState: {
+        ...currentData,
+        members: currentData.members.filter((member) => member.team_member_id !== teamMemberId)
+      },
+      mutation: () => api.teams.deleteTeamMember(teamId, teamMemberId),
+      onRollback: (error) => {
+        const apiError = error as APIError;
+        dialogContext.setSnackbar({
+          open: true,
+          snackbarMessage: apiError.message
+        });
       }
-
-      const apiError = error as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message
-      });
-    }
+    }));
   };
 
   /**
@@ -123,27 +124,22 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
       return;
     }
 
-    try {
-      const updatedAssignee = await api.tickets.updateTicketAssigneeStatus(ticketId, ticketSystemUserId, { status });
-      const currentTicket = ticketDataLoader.data;
-
-      if (currentTicket) {
-        ticketDataLoader.setData({
-          ...currentTicket,
-          assignees: currentTicket.assignees.map((assignee) =>
-            assignee.ticket_system_user_id === ticketSystemUserId
-              ? { ...assignee, status: updatedAssignee.status }
-              : assignee
-          )
+    await optimisticTicketLoader.refresh((currentTicket) => ({
+      optimisticState: {
+        ...currentTicket,
+        assignees: currentTicket.assignees.map((assignee) =>
+          assignee.ticket_system_user_id === ticketSystemUserId ? { ...assignee, status } : assignee
+        )
+      },
+      mutation: () => api.tickets.updateTicketAssigneeStatus(ticketId, ticketSystemUserId, { status }),
+      onRollback: (error) => {
+        const apiError = error as APIError;
+        dialogContext.setSnackbar({
+          open: true,
+          snackbarMessage: apiError.message
         });
       }
-    } catch (error) {
-      const apiError = error as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message
-      });
-    }
+    }));
   };
 
   /**
@@ -160,23 +156,20 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
       return;
     }
 
-    try {
-      await api.tickets.deleteTicketAssignee(ticketId, ticketSystemUserId);
-      const currentTicket = ticketDataLoader.data;
-
-      if (currentTicket) {
-        ticketDataLoader.setData({
-          ...currentTicket,
-          assignees: currentTicket.assignees.filter((assignee) => assignee.ticket_system_user_id !== ticketSystemUserId)
+    await optimisticTicketLoader.refresh((currentTicket) => ({
+      optimisticState: {
+        ...currentTicket,
+        assignees: currentTicket.assignees.filter((assignee) => assignee.ticket_system_user_id !== ticketSystemUserId)
+      },
+      mutation: () => api.tickets.deleteTicketAssignee(ticketId, ticketSystemUserId),
+      onRollback: (error) => {
+        const apiError = error as APIError;
+        dialogContext.setSnackbar({
+          open: true,
+          snackbarMessage: apiError.message
         });
       }
-    } catch (error) {
-      const apiError = error as APIError;
-      dialogContext.setSnackbar({
-        open: true,
-        snackbarMessage: apiError.message
-      });
-    }
+    }));
   };
 
   /**
@@ -241,9 +234,6 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
           open={isAssigneeDialogOpen}
           ticketId={ticketId}
           onClose={() => setIsAssigneeDialogOpen(false)}
-          onAssigned={async () => {
-            await ticketDataLoader.refresh(ticketId);
-          }}
         />
       ) : null}
     </Stack>
