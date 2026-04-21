@@ -466,7 +466,7 @@ export class DownloadRepository extends BaseRepository {
     batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<DownloadFeatureSummary[]> {
     yield* this.streamWithCursor<DownloadFeatureSummary>({
-      cursorName: `dl_cart_cursor_${cartId.replace(/[^a-z0-9_]/gi, '_')}`,
+      cursorName: `dl_cart_cursor_${cartId.replaceAll(/[^a-z0-9_]/gi, '_')}`,
       declareSql: `
         SELECT
           sf.submission_feature_id,
@@ -504,7 +504,7 @@ export class DownloadRepository extends BaseRepository {
     batchSize = DOWNLOAD_FEATURE_BATCH_SIZE
   ): AsyncGenerator<DownloadFeatureSummary[]> {
     yield* this.streamWithCursor<DownloadFeatureSummary>({
-      cursorName: `dl_filter_cursor_${downloadId.replace(/[^a-z0-9_]/gi, '_')}`,
+      cursorName: `dl_filter_cursor_${downloadId.replaceAll(/[^a-z0-9_]/gi, '_')}`,
       declareSql: `
         SELECT
           sf.submission_feature_id,

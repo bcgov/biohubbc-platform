@@ -342,7 +342,7 @@ async function populateTypedProperties(
         await db('biohub.submission_feature_property_string').insert({
           submission_feature_id: submissionFeatureId,
           feature_type_property_id: prop.feature_type_property_id,
-          value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+          value: typeof value === 'string' ? value : JSON.stringify(value),
           create_user: SYSTEM_USER_ID
         });
         break;
