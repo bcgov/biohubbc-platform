@@ -1,9 +1,11 @@
 import { AxiosInstance } from 'axios';
 import {
   IPolicy,
+  IPolicySummary,
   IPoliciesResponse,
   ICreatePolicyRequest,
-  IUpdatePolicyRequest
+  IUpdatePolicyRequest,
+  IUpdatePolicyStatusRequest
 } from 'interfaces/usePoliciesApi.interface';
 import { ApiPaginationRequestOptions, ApiSearchParams } from 'types/pagination';
 
@@ -69,6 +71,19 @@ const usePoliciesApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Update policy lifecycle status.
+   *
+   * @param {string} policyId
+   * @param {IUpdatePolicyStatusRequest} payload
+   * @return {*} {Promise<IPolicy>}
+   */
+  const updatePolicyStatus = async (policyId: string, payload: IUpdatePolicyStatusRequest): Promise<IPolicySummary> => {
+    const { data } = await axios.patch(`/api/administrative/policies/${policyId}/status`, payload);
+
+    return data;
+  };
+
+  /**
    * Delete a policy.
    *
    * @param {string} policyId
@@ -83,6 +98,7 @@ const usePoliciesApi = (axios: AxiosInstance) => {
     getPolicy,
     createPolicy,
     updatePolicy,
+    updatePolicyStatus,
     deletePolicy
   };
 };
