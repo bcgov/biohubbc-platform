@@ -19,7 +19,7 @@ describe('codes', () => {
     it('should throw a 500 error when error occurs in api', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const requestHandler = codes.getAllCodes();
 
@@ -41,7 +41,7 @@ describe('codes', () => {
     it('should return 200 on success', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const requestHandler = codes.getAllCodes();
 

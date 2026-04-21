@@ -9,7 +9,7 @@ import { APIError } from 'hooks/api/useAxios';
 import { useCartContext, useDialogContext } from 'hooks/useContext';
 import { SearchFeatureResultWithRelevancy } from 'interfaces/useSearchApi.interface';
 import { useCallback, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { SearchResultCardLayout } from '../../layout/list/SearchResultCardLayout';
 import { SearchResultTableLayout } from '../../layout/table/SearchResultTableLayout';
 import { SEARCH_RESULT_OPTION_VIEW } from '../../SearchResultPage';
@@ -26,7 +26,6 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload, onClick
   const { features, addToCart, removeFromCart } = useCartContext();
   const dialogContext = useDialogContext();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
   const hasResults = rows.length > 0;
   const hasSecuredResults = rows.some((r) => r.is_secured);
@@ -64,7 +63,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload, onClick
       hasNoData={!hasResults}
       hasNoDataFallback={
         <Box display="flex" justifyContent="center" alignItems="center" minHeight={300} p={2}>
-          <Typography variant="h4" color="textSecondary">
+          <Typography variant="h4" color="text.secondary">
             No results found
           </Typography>
         </Box>
@@ -74,7 +73,7 @@ export const SearchResultOptions = ({ rows, isLoading, view, onDownload, onClick
           <AlertBanner
             icon={<Icon path={mdiLock} size={0.875} />}
             action={
-              <Button color="inherit" size="small" onClick={() => navigate(`/data-request?${searchParams.toString()}`)}>
+              <Button color="inherit" size="small" onClick={() => navigate('/portal/ticket')}>
                 Request Access
               </Button>
             }

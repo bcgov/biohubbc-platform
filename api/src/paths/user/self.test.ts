@@ -5,14 +5,48 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 import { SYSTEM_ROLE } from '../../constants/roles';
-import * as db from '../../database/db';
 import { HTTP401, HTTPError } from '../../errors/http-error';
 import { SystemUserExtended } from '../../repositories/user-repository';
 import { UserService } from '../../services/user-service';
-import * as keycloakUtils from '../../utils/keycloak-utils';
 import * as self from './self';
 
 chai.use(sinonChai);
+
+type SelfDependencyStubOptions = {
+  dbConnectionObj?: ReturnType<typeof getMockDBConnection>;
+  userGuid?: string | null;
+  userIdentifier?: string | null;
+  userIdentitySource?: SYSTEM_IDENTITY_SOURCE;
+  displayName?: string | null;
+  email?: string | null;
+  givenName?: string | null;
+  familyName?: string | null;
+  agency?: string | null;
+};
+
+const stubSelfDependencies = ({
+  dbConnectionObj = getMockDBConnection(),
+  userGuid = '123-456-789',
+  userIdentifier = 'testuser',
+  userIdentitySource = SYSTEM_IDENTITY_SOURCE.IDIR,
+  displayName = 'Test User',
+  email = 'test@example.com',
+  givenName = 'Test',
+  familyName = 'User',
+  agency = null
+}: SelfDependencyStubOptions = {}) => {
+  sinon.stub(self.selfDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
+  sinon.stub(self.selfDependencies, 'getUserGuid').returns(userGuid);
+  sinon.stub(self.selfDependencies, 'getUserIdentifier').returns(userIdentifier);
+  sinon.stub(self.selfDependencies, 'getUserIdentitySource').returns(userIdentitySource);
+  sinon.stub(self.selfDependencies, 'getDisplayName').returns(displayName);
+  sinon.stub(self.selfDependencies, 'getEmail').returns(email);
+  sinon.stub(self.selfDependencies, 'getGivenName').returns(givenName);
+  sinon.stub(self.selfDependencies, 'getFamilyName').returns(familyName);
+  sinon.stub(self.selfDependencies, 'getAgency').returns(agency);
+
+  return dbConnectionObj;
+};
 
 describe('upsertUser', () => {
   afterEach(() => {
@@ -20,13 +54,9 @@ describe('upsertUser', () => {
   });
 
   it('should throw a 400 error when user GUID is missing from token', async () => {
-    const dbConnectionObj = getMockDBConnection();
+    stubSelfDependencies({ userGuid: null });
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
-    sinon.stub(keycloakUtils, 'getUserGuid').returns(null);
-    sinon.stub(keycloakUtils, 'getUserIdentifier').returns('testuser');
 
     try {
       const requestHandler = self.upsertUser();
@@ -40,13 +70,9 @@ describe('upsertUser', () => {
   });
 
   it('should throw a 400 error when user identifier is missing from token', async () => {
-    const dbConnectionObj = getMockDBConnection();
+    stubSelfDependencies({ userIdentifier: null });
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
-    sinon.stub(keycloakUtils, 'getUserGuid').returns('123-456-789');
-    sinon.stub(keycloakUtils, 'getUserIdentifier').returns(null);
 
     try {
       const requestHandler = self.upsertUser();
@@ -60,19 +86,9 @@ describe('upsertUser', () => {
   });
 
   it('should create a new user and return 201 when user does not exist', async () => {
-    const dbConnectionObj = getMockDBConnection();
+    stubSelfDependencies();
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
-    sinon.stub(keycloakUtils, 'getUserGuid').returns('123-456-789');
-    sinon.stub(keycloakUtils, 'getUserIdentifier').returns('testuser');
-    sinon.stub(keycloakUtils, 'getUserIdentitySource').returns(SYSTEM_IDENTITY_SOURCE.IDIR);
-    sinon.stub(keycloakUtils, 'getDisplayName').returns('Test User');
-    sinon.stub(keycloakUtils, 'getEmail').returns('test@example.com');
-    sinon.stub(keycloakUtils, 'getGivenName').returns('Test');
-    sinon.stub(keycloakUtils, 'getFamilyName').returns('User');
-    sinon.stub(keycloakUtils, 'getAgency').returns(null);
 
     const newUser = {
       system_user_id: 1,
@@ -111,19 +127,14 @@ describe('upsertUser', () => {
   });
 
   it('should update existing user and return 200 when user exists and is active', async () => {
-    const dbConnectionObj = getMockDBConnection();
+    stubSelfDependencies({
+      displayName: 'Updated Name',
+      email: 'updated@example.com',
+      givenName: 'Updated',
+      familyName: 'Name'
+    });
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
-    sinon.stub(keycloakUtils, 'getUserGuid').returns('123-456-789');
-    sinon.stub(keycloakUtils, 'getUserIdentifier').returns('testuser');
-    sinon.stub(keycloakUtils, 'getUserIdentitySource').returns(SYSTEM_IDENTITY_SOURCE.IDIR);
-    sinon.stub(keycloakUtils, 'getDisplayName').returns('Updated Name');
-    sinon.stub(keycloakUtils, 'getEmail').returns('updated@example.com');
-    sinon.stub(keycloakUtils, 'getGivenName').returns('Updated');
-    sinon.stub(keycloakUtils, 'getFamilyName').returns('Name');
-    sinon.stub(keycloakUtils, 'getAgency').returns(null);
 
     const updatedUser = {
       system_user_id: 1,
@@ -161,19 +172,14 @@ describe('upsertUser', () => {
   });
 
   it('should throw a 401 error when user is expired', async () => {
-    const dbConnectionObj = getMockDBConnection();
+    stubSelfDependencies({
+      displayName: 'Expired User',
+      email: 'expired@example.com',
+      givenName: 'Expired',
+      familyName: 'User'
+    });
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
-    sinon.stub(keycloakUtils, 'getUserGuid').returns('123-456-789');
-    sinon.stub(keycloakUtils, 'getUserIdentifier').returns('testuser');
-    sinon.stub(keycloakUtils, 'getUserIdentitySource').returns(SYSTEM_IDENTITY_SOURCE.IDIR);
-    sinon.stub(keycloakUtils, 'getDisplayName').returns('Expired User');
-    sinon.stub(keycloakUtils, 'getEmail').returns('expired@example.com');
-    sinon.stub(keycloakUtils, 'getGivenName').returns('Expired');
-    sinon.stub(keycloakUtils, 'getFamilyName').returns('User');
-    sinon.stub(keycloakUtils, 'getAgency').returns(null);
 
     const http401Error = new HTTP401('User account is expired or inactive');
     sinon.stub(UserService.prototype, 'upsertSelf').rejects(http401Error);
@@ -190,21 +196,12 @@ describe('upsertUser', () => {
   });
 
   it('should throw an error when a failure occurs', async () => {
-    const dbConnectionObj = getMockDBConnection();
+    stubSelfDependencies();
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
     const expectedError = new Error('cannot process query');
 
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
-    sinon.stub(keycloakUtils, 'getUserGuid').returns('123-456-789');
-    sinon.stub(keycloakUtils, 'getUserIdentifier').returns('testuser');
-    sinon.stub(keycloakUtils, 'getUserIdentitySource').returns(SYSTEM_IDENTITY_SOURCE.IDIR);
-    sinon.stub(keycloakUtils, 'getDisplayName').returns('Test User');
-    sinon.stub(keycloakUtils, 'getEmail').returns('test@example.com');
-    sinon.stub(keycloakUtils, 'getGivenName').returns('Test');
-    sinon.stub(keycloakUtils, 'getFamilyName').returns('User');
-    sinon.stub(keycloakUtils, 'getAgency').returns(null);
     sinon.stub(UserService.prototype, 'upsertSelf').rejects(expectedError);
 
     try {

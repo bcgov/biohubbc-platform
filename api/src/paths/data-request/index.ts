@@ -5,7 +5,7 @@ import { DataRequestFilters } from '../../models/data-request';
 import {
   CreateDataRequestRequestSchema,
   DataRequestListResponseSchema,
-  DataRequestWithStatusResponseSchema
+  DataRequestResponseSchema
 } from '../../openapi/schemas/data-request';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
@@ -26,6 +26,7 @@ export const GET: Operation = [
   }),
   findDataRequests()
 ];
+
 export const POST: Operation = [
   authorizeRequestHandler(() => {
     return {
@@ -79,8 +80,8 @@ GET.apiDoc = {
       required: false,
       schema: {
         type: 'string',
-        enum: ['REQUESTED', 'APPROVED', 'DENIED'],
-        description: 'Filter by request status'
+        enum: ['requested', 'reviewed', 'approved', 'denied'],
+        description: 'Filter by derived policy workflow status'
       }
     }
   ],
@@ -117,7 +118,7 @@ POST.apiDoc = {
       description: 'Data request created successfully',
       content: {
         'application/json': {
-          schema: DataRequestWithStatusResponseSchema
+          schema: DataRequestResponseSchema
         }
       }
     },
@@ -141,7 +142,7 @@ export function findDataRequests(): RequestHandler {
       const systemUserId = connection.systemUserId();
 
       const dataRequestService = new DataRequestService(connection);
-      const dataRequests = await dataRequestService.findDataRequestsBySystemUserId(systemUserId, filters);
+      const dataRequests = await dataRequestService.findDataRequestsByTeamMembership([systemUserId], filters);
 
       await connection.commit();
 
@@ -157,7 +158,7 @@ export function findDataRequests(): RequestHandler {
 }
 
 /**
- * Creates a new data request.
+ * Create a data request owned by the current user context.
  *
  * @returns {RequestHandler}
  */
@@ -169,14 +170,13 @@ export function createDataRequest(): RequestHandler {
       await connection.open();
 
       const systemUserId = connection.systemUserId();
-      const { team_id: teamId, reason } = req.body;
+      const { reason, system_user_ids } = req.body;
 
       const dataRequestService = new DataRequestService(connection);
-
       const dataRequest = await dataRequestService.createDataRequest({
         requested_by: systemUserId,
         reason,
-        team_id: teamId
+        system_user_ids
       });
 
       await connection.commit();

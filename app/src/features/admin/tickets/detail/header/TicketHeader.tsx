@@ -7,7 +7,7 @@ import Typography from '@mui/material/Typography';
 import { PageHeader } from 'components/header/PageHeader';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext } from 'hooks/useContext';
-import { ITicketWithHistory, TicketStatus } from 'interfaces/useTicketsApi.interface';
+import { ITicketExtended, TicketStatus } from 'interfaces/useTicketsApi.interface';
 import { Link as RouterLink } from 'react-router-dom';
 import { EditTicketDialog } from '../../components/dialog/edit/EditTicketDialog';
 import { useOptimisticTicketHandlers } from '../../hooks/useOptimisticTicketHandlers';
@@ -15,7 +15,7 @@ import { useTicketEditDialog } from '../../hooks/useTicketEditDialog';
 import { TicketHeaderSubtitle } from './TicketHeaderSubtitle';
 
 interface ITicketHeaderProps {
-  ticket: ITicketWithHistory;
+  ticket: ITicketExtended;
 }
 
 /**
@@ -75,14 +75,15 @@ export const TicketHeader = (props: ITicketHeaderProps) => {
         buttons={
           <Stack direction="row" spacing={1}>
             <Button
+              size="small"
               color={statusActionButtonColor}
-              variant="outlined"
+              variant="contained"
               onClick={handleStatusActionClick}
               disabled={isSavingStatus || isSavingTicket}
               data-testid={statusActionButtonTestId}>
               {statusActionButtonLabel}
             </Button>
-            <Button variant="outlined" onClick={openEditDialog} data-testid="edit-ticket-button">
+            <Button size="small" variant="outlined" onClick={openEditDialog} data-testid="edit-ticket-button">
               Edit
             </Button>
           </Stack>

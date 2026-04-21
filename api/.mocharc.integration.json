@@ -1,7 +1,5 @@
 {
   "extension": ["ts"],
   "spec": "src/__integration__/db/*.integration.ts",
-  "require": "ts-node/register",
-  "node-option": ["no-experimental-strip-types"],
   "exit": true
 }

@@ -3,13 +3,12 @@ import {
   ICreateTicketCommentRequest,
   ICreateTicketReferenceRequest,
   ICreateTicketRequest,
-  IGetTicketsParams,
   IGetTicketsResponse,
-  IGetUserTicketsParams,
   ITicket,
   ITicketCommentLog,
   ITicketReference,
-  ITicketWithHistory,
+  ITicketExtended,
+  ITicketsQueryParams,
   IUpdateTicketRequest,
   TicketStatus
 } from 'interfaces/useTicketsApi.interface';
@@ -25,10 +24,10 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   /**
    * Get tickets using optional filters and pagination options.
    *
-   * @param {IGetTicketsParams} [params]
+   * @param {ITicketsQueryParams} [params]
    * @return {*} {Promise<IGetTicketsResponse>}
    */
-  const getTicketsForAdmin = async (params?: IGetTicketsParams): Promise<IGetTicketsResponse> => {
+  const getTicketsForAdmin = async (params?: ITicketsQueryParams): Promise<IGetTicketsResponse> => {
     const { data } = await axios.get('/api/administrative/tickets', {
       params,
       paramsSerializer: (params) => qs.stringify(params)
@@ -41,10 +40,10 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * Get a single ticket by ID.
    *
    * @param {string} ticketId
-   * @return {*} {Promise<ITicketWithHistory>}
+   * @return {*} {Promise<ITicketExtended>}
    */
-  const getTicketForAdmin = async (ticketId: string): Promise<ITicketWithHistory> => {
-    const { data } = await axios.get<ITicketWithHistory>(`/api/administrative/tickets/${ticketId}`);
+  const getTicketForAdmin = async (ticketId: string): Promise<ITicketExtended> => {
+    const { data } = await axios.get<ITicketExtended>(`/api/administrative/tickets/${ticketId}`);
 
     return data;
   };
@@ -143,10 +142,10 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   /**
    * Get tickets accessible to the current user via team membership.
    *
-   * @param {IGetUserTicketsParams} [params]
+   * @param {ITicketsQueryParams} [params]
    * @return {*} {Promise<IGetTicketsResponse>}
    */
-  const getTicketsForUser = async (params?: IGetUserTicketsParams): Promise<IGetTicketsResponse> => {
+  const getTicketsForUser = async (params?: ITicketsQueryParams): Promise<IGetTicketsResponse> => {
     const { data } = await axios.get('/api/tickets', {
       params,
       paramsSerializer: (params) => qs.stringify(params)
@@ -159,10 +158,10 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * Get a single ticket by ID.
    *
    * @param {string} ticketId
-   * @return {*} {Promise<ITicketWithHistory>}
+   * @return {*} {Promise<ITicketExtended>}
    */
-  const getTicketForUser = async (ticketId: string): Promise<ITicketWithHistory> => {
-    const { data } = await axios.get<ITicketWithHistory>(`/api/tickets/${ticketId}`);
+  const getTicketForUser = async (ticketId: string): Promise<ITicketExtended> => {
+    const { data } = await axios.get<ITicketExtended>(`/api/tickets/${ticketId}`);
 
     return data;
   };

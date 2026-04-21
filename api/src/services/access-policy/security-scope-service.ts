@@ -19,6 +19,14 @@ const defaultLog = getLogger('security-scope-service');
 export class SecurityScopeService extends DBService {
   securityScopeRepository: SecurityScopeRepository;
 
+  /**
+   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+   */
+  static readonly dependencies = {
+    publishComputeScopeAnchorsJob,
+    computeScopeHash
+  };
+
   constructor(connection: IDBConnection) {
     super(connection);
     this.securityScopeRepository = new SecurityScopeRepository(connection);
@@ -39,7 +47,7 @@ export class SecurityScopeService extends DBService {
    * @returns The security_scope_id (new or existing)
    */
   async createScopeForPolicyStatement(policyStatementId: string, urn: string): Promise<string> {
-    const scopeHash = computeScopeHash(urn);
+    const scopeHash = SecurityScopeService.dependencies.computeScopeHash(urn);
 
     const inserted = await this.securityScopeRepository.insertSecurityScope(scopeHash);
 
@@ -47,7 +55,9 @@ export class SecurityScopeService extends DBService {
       // New scope — create mapping and schedule anchor computation
       await this.securityScopeRepository.insertPolicyStatementScope(policyStatementId, inserted.security_scope_id);
 
-      await publishComputeScopeAnchorsJob(this.connection, { securityScopeId: inserted.security_scope_id });
+      await SecurityScopeService.dependencies.publishComputeScopeAnchorsJob(this.connection, {
+        securityScopeId: inserted.security_scope_id
+      });
 
       defaultLog.info({
         label: 'createScopeForPolicyStatement',
@@ -66,7 +76,9 @@ export class SecurityScopeService extends DBService {
     const existing = await this.securityScopeRepository.getSecurityScopeByScopeHash(scopeHash);
     await this.securityScopeRepository.insertPolicyStatementScope(policyStatementId, existing.security_scope_id);
 
-    await publishComputeScopeAnchorsJob(this.connection, { securityScopeId: existing.security_scope_id });
+    await SecurityScopeService.dependencies.publishComputeScopeAnchorsJob(this.connection, {
+      securityScopeId: existing.security_scope_id
+    });
 
     defaultLog.info({
       label: 'createScopeForPolicyStatement',
@@ -108,7 +120,9 @@ export class SecurityScopeService extends DBService {
       const orphaned = await this.securityScopeRepository.findOrphanedScopeIds(scopeIds);
 
       for (const scope of orphaned) {
-        await publishComputeScopeAnchorsJob(this.connection, { securityScopeId: scope.security_scope_id });
+        await SecurityScopeService.dependencies.publishComputeScopeAnchorsJob(this.connection, {
+          securityScopeId: scope.security_scope_id
+        });
       }
     }
   }
@@ -158,7 +172,9 @@ export class SecurityScopeService extends DBService {
     }
 
     for (const scope of scopes) {
-      await publishComputeScopeAnchorsJob(this.connection, { securityScopeId: scope.security_scope_id });
+      await SecurityScopeService.dependencies.publishComputeScopeAnchorsJob(this.connection, {
+        securityScopeId: scope.security_scope_id
+      });
     }
   }
 
