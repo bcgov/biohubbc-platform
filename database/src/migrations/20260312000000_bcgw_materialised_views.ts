@@ -328,7 +328,8 @@ SELECT
     t.itis_scientific_name AS scientific_name,
     t.common_name AS common_name,
     COALESCE(ccc_sex.label, (sf.data->>'sex')::text) AS sex,
-    COALESCE(ccc_life_stage.label, (sf.data->>'life_stage')::text) AS life_stage
+    COALESCE(ccc_life_stage.label, (sf.data->>'life_stage')::text) AS life_stage,
+    'N' AS SECURED
 FROM biohub.submission_feature sf
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
@@ -360,6 +361,7 @@ WHERE ft.name = 'species_observation'
     COMMENT ON COLUMN bcgw.observations_public.common_name IS 'Common name from taxon table linked via ITIS TSN';
     COMMENT ON COLUMN bcgw.observations_public.sex IS 'Sex label from contributor codeset codes (male, female, unknown) matched by contributor_codeset_code_id';
     COMMENT ON COLUMN bcgw.observations_public.life_stage IS 'Life stage label from contributor codeset codes (adult, juvenile, etc.) matched by contributor_codeset_code_id';
+    COMMENT ON COLUMN bcgw.observations_public.SECURED IS 'The indicator of whether the feature is secured (Y) or not (N)';
   `);
 
   await knex.raw(`
@@ -485,7 +487,8 @@ SELECT
     t.itis_scientific_name AS scientific_name,
     t.common_name AS common_name,
     COALESCE(ccc_sex.label, (sf.data->>'sex')::text) AS sex,
-    COALESCE(ccc_life_stage.label, (sf.data->>'life_stage')::text) AS life_stage
+    COALESCE(ccc_life_stage.label, (sf.data->>'life_stage')::text) AS life_stage,
+    'N' AS SECURED
 FROM biohub.submission_feature sf
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
@@ -517,6 +520,7 @@ WHERE ft.name = 'species_observation'
     COMMENT ON COLUMN bcgw.incidental_public.common_name IS 'Common name from taxon table linked via ITIS TSN';
     COMMENT ON COLUMN bcgw.incidental_public.sex IS 'Sex label from contributor codeset codes (male, female, unknown) matched by contributor_codeset_code_id';
     COMMENT ON COLUMN bcgw.incidental_public.life_stage IS 'Life stage label from contributor codeset codes (adult, juvenile, etc.) matched by contributor_codeset_code_id';
+    COMMENT ON COLUMN bcgw.incidental_public.SECURED IS 'The indicator of whether the feature is secured (Y) or not (N)';
   `);
 
   await knex.raw(`
