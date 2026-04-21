@@ -28,6 +28,13 @@ export class SubmissionIngestionService extends DBService {
   objectStorageService = new ObjectStorageService();
 
   /**
+   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+   */
+  static readonly dependencies = {
+    streamFeatures
+  };
+
+  /**
    * Ingest a submission archive using streaming shallow-ingestion.
    * Deep validation and reference resolution are deferred to the indexing workflow.
    *
@@ -82,9 +89,13 @@ export class SubmissionIngestionService extends DBService {
   private async ingestFeatures(objectKey: string, submissionId: number, submissionUploadId: string): Promise<void> {
     const tarStream = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
 
-    const { featureCount } = await streamFeatures(tarStream, FEATURE_INSERT_BATCH_SIZE, async (featureBatch) => {
-      await this.featureIngestionService.ingestFeatureBatch(submissionId, submissionUploadId, featureBatch);
-    });
+    const { featureCount } = await SubmissionIngestionService.dependencies.streamFeatures(
+      tarStream,
+      FEATURE_INSERT_BATCH_SIZE,
+      async (featureBatch) => {
+        await this.featureIngestionService.ingestFeatureBatch(submissionId, submissionUploadId, featureBatch);
+      }
+    );
 
     if (featureCount === 0) {
       throw new IngestionValidationError('No feature entries were found under features/ in the archive');

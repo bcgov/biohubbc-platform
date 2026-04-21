@@ -43,7 +43,7 @@ describe('search', () => {
       rollback: sinon.stub().resolves(),
       release: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: 'moose habitat', page: '1', limit: '2' };
@@ -69,7 +69,7 @@ describe('search', () => {
       rollback: sinon.stub().resolves(),
       release: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: 'moose', feature_type_name: 'dataset', page: '1', limit: '2' };
@@ -96,7 +96,7 @@ describe('search', () => {
       rollback: sinon.stub().resolves(),
       release: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: 'wildlife', page: '2', limit: '5' };
@@ -122,7 +122,7 @@ describe('search', () => {
       rollback: sinon.stub().resolves(),
       release: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { page: '1', limit: '2' };
@@ -148,7 +148,7 @@ describe('search', () => {
       rollback: sinon.stub().resolves(),
       release: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: 'test', page: '1', limit: '2' };

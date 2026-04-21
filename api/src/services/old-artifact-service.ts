@@ -22,6 +22,15 @@ export class ArtifactService extends DBService {
   artifactRepository: ArtifactRepository;
   submissionFeatureService: SubmissionFeatureService;
 
+  /**
+   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+   */
+  static readonly dependencies = {
+    generateSubmissionFeatureS3FileKey,
+    uploadFileToS3,
+    deleteFileFromS3
+  };
+
   constructor(connection: IDBConnection) {
     super(connection);
 
@@ -55,7 +64,7 @@ export class ArtifactService extends DBService {
     const artifactFeatureSubmission = await this.submissionFeatureService.getSubmissionFeatureByUuid(artifactUploadKey);
 
     // Generate S3 key
-    const artifactS3Key = generateSubmissionFeatureS3FileKey({
+    const artifactS3Key = ArtifactService.dependencies.generateSubmissionFeatureS3FileKey({
       submissionId: artifactFeatureSubmission.submission_id,
       submissionFeatureId: artifactFeatureSubmission.submission_feature_id
     });
@@ -78,7 +87,7 @@ export class ArtifactService extends DBService {
     ]);
 
     // Upload artifact to S3
-    await uploadFileToS3(file, artifactS3Key, { filename: file.originalname });
+    await ArtifactService.dependencies.uploadFileToS3(file, artifactS3Key, { filename: file.originalname });
 
     return artifactFeatureSubmission;
   }
@@ -163,7 +172,7 @@ export class ArtifactService extends DBService {
 
         await this.artifactRepository.deleteArtifactByUUID(uuid);
 
-        await deleteFileFromS3(artifact.key);
+        await ArtifactService.dependencies.deleteFileFromS3(artifact.key);
       }
     } catch (error) {
       throw new ApiGeneralError(`Issue deleting artifact: ${uuid}`, [error as ApiError]);

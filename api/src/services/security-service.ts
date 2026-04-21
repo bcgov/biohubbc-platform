@@ -35,6 +35,13 @@ export class SecurityService extends DBService {
   userService: UserService;
   securityScopeService: SecurityScopeService;
 
+  /**
+   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+   */
+  static readonly dependencies = {
+    getS3SignedURL
+  };
+
   constructor(connection: IDBConnection) {
     super(connection);
 
@@ -269,7 +276,7 @@ export class SecurityService extends DBService {
 
     const artifact = await this.artifactService.getArtifactById(artifactId);
 
-    return getS3SignedURL(artifact.key);
+    return SecurityService.dependencies.getS3SignedURL(artifact.key);
   }
 
   /**

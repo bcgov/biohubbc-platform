@@ -25,7 +25,7 @@ describe('intake', () => {
     it('throws error if validationService returns false', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const validateSubmissionFeaturesStub = sinon
         .stub(ValidationService.prototype, 'validateSubmissionFeatures')
@@ -59,7 +59,7 @@ describe('intake', () => {
     it('should return 200 on success', async () => {
       const dbConnectionObj = getMockDBConnection();
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const validateSubmissionFeaturesStub = sinon
         .stub(ValidationService.prototype, 'validateSubmissionFeatures')

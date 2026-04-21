@@ -21,7 +21,7 @@ describe('users', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const mockResponse: SystemUserExtended[] = [
         {

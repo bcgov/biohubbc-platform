@@ -18,7 +18,7 @@ describe('updateSystemRolesHandler', () => {
   it('re-throws the error thrown by UserService.deleteUserSystemRoles', async () => {
     const dbConnectionObj = getMockDBConnection();
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -81,7 +81,7 @@ describe('updateSystemRolesHandler', () => {
     mockQuery.onCall(0).resolves({ rows: [], rowCount: 1 });
     mockQuery.onCall(1).resolves(null);
 
-    sinon.stub(db, 'getDBConnection').returns({
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns({
       ...dbConnectionObj,
       systemUserId: () => {
         return 20;
@@ -137,7 +137,7 @@ describe('updateSystemRolesHandler', () => {
       roles: [1]
     };
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     sinon.stub(UserService.prototype, 'getUserById').resolves({
       system_user_id: 1,
@@ -191,7 +191,7 @@ describe('updateSystemRolesHandler', () => {
       rowCount: 1
     });
 
-    sinon.stub(db, 'getDBConnection').returns({
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns({
       ...dbConnectionObj,
       sql: mockQuery
     });

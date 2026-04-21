@@ -23,7 +23,7 @@ describe('paths/administrative/tickets/{ticketId}/comment/{ticketCommentId}', ()
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const updatedComment: TicketComment = {
       ticket_comment_id: ticketCommentId,
@@ -58,7 +58,7 @@ describe('paths/administrative/tickets/{ticketId}/comment/{ticketCommentId}', ()
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const deleteCommentStub = sinon.stub(TicketCommentService.prototype, 'deleteTicketCommentByTicketId').resolves();
 

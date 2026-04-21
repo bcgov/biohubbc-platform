@@ -19,7 +19,7 @@ describe('getSubmissionFeatureSignedUrl', () => {
   it('throws error if submissionService throws error', async () => {
     const dbConnectionObj = getMockDBConnection();
 
-    const getDBConnectionStub = sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    const getDBConnectionStub = sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const getSubmissionFeatureSignedUrlStub = sinon
       .stub(SubmissionFeatureService.prototype, 'getSubmissionFeatureSignedUrl')
@@ -59,7 +59,7 @@ describe('getSubmissionFeatureSignedUrl', () => {
   it('should return 200 on success', async () => {
     const dbConnectionObj = getMockDBConnection();
 
-    const getAPIUserDBConnectionStub = sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    const getAPIUserDBConnectionStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const mockResponse = [] as unknown as any;
 

@@ -4,7 +4,6 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
 import { Cart, CartFeatureListResponse, CartStatus, CartSubmissionFeature, UpdateCart } from '../models/cart';
-import * as publisher from '../queue/publisher';
 import { CartRepository } from '../repositories/cart-repository';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { TeamService } from './access-policy/team-service';
@@ -259,7 +258,7 @@ describe('CartService', () => {
       const createDownloadTeamStub = sinon.stub(DownloadService.prototype, 'createDownloadTeam').resolves();
       const updateCartStub = sinon.stub(CartRepository.prototype, 'updateCart').resolves();
       const publishStub = sinon
-        .stub(publisher, 'publishProcessDownloadJob')
+        .stub(CartService.dependencies, 'publishProcessDownloadJob')
         .resolves({ status: 'published', jobId: 'job-1' });
 
       const result = await service.checkoutCart('cart-1', 42);
@@ -296,7 +295,9 @@ describe('CartService', () => {
       const createTeamStub = sinon.stub(TeamService.prototype, 'createTeam');
       const createDownloadTeamStub = sinon.stub(DownloadService.prototype, 'createDownloadTeam');
       const updateCartStub = sinon.stub(CartRepository.prototype, 'updateCart').resolves();
-      sinon.stub(publisher, 'publishProcessDownloadJob').resolves({ status: 'published', jobId: 'job-1' });
+      sinon
+        .stub(CartService.dependencies, 'publishProcessDownloadJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
 
       await service.checkoutCart('cart-1', null);
 
@@ -323,7 +324,7 @@ describe('CartService', () => {
       const createDownloadStub = sinon.stub(DownloadService.prototype, 'createDownload');
       const createTeamStub = sinon.stub(TeamService.prototype, 'createTeam');
       const updateCartStub = sinon.stub(CartRepository.prototype, 'updateCart');
-      const publishStub = sinon.stub(publisher, 'publishProcessDownloadJob');
+      const publishStub = sinon.stub(CartService.dependencies, 'publishProcessDownloadJob');
 
       try {
         await service.checkoutCart('cart-1', 42);
@@ -355,7 +356,9 @@ describe('CartService', () => {
         member_count: 0
       });
       sinon.stub(CartRepository.prototype, 'updateCart').resolves();
-      sinon.stub(publisher, 'publishProcessDownloadJob').resolves({ status: 'published', jobId: 'job-1' });
+      sinon
+        .stub(CartService.dependencies, 'publishProcessDownloadJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
 
       await service.checkoutCart('cart-1', 7, 500 * 1024 * 1024);
 
@@ -374,7 +377,7 @@ describe('CartService', () => {
       sinon.stub(DownloadService.prototype, 'createDownload').rejects(new Error('DB error'));
       const createDownloadTeamStub = sinon.stub(DownloadService.prototype, 'createDownloadTeam');
       const updateCartStub = sinon.stub(CartRepository.prototype, 'updateCart');
-      const publishStub = sinon.stub(publisher, 'publishProcessDownloadJob');
+      const publishStub = sinon.stub(CartService.dependencies, 'publishProcessDownloadJob');
 
       try {
         await service.checkoutCart('cart-1', 42);

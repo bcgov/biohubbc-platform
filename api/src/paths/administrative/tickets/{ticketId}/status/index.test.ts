@@ -20,7 +20,7 @@ describe('paths/administrative/tickets/{ticketId}/status', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const updatedTicket: Ticket = {
       ticket_id: '11111111-1111-1111-1111-111111111111',

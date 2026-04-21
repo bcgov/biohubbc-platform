@@ -20,7 +20,7 @@ describe('getSignedUrl', () => {
       const dbConnectionObj = getMockDBConnection({
         systemUserId: () => 1000
       });
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const getSignedURLStub = sinon
         .stub(SecurityService.prototype, 'getSecuredArtifactBasedOnRulesAndPermissions')
@@ -56,7 +56,7 @@ describe('getSignedUrl', () => {
       const dbConnectionObj = getMockDBConnection({
         systemUserId: () => 1000
       });
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const getS3SignedURLStub = sinon
         .stub(SecurityService.prototype, 'getSecuredArtifactBasedOnRulesAndPermissions')
