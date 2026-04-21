@@ -23,6 +23,7 @@ import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { CodeService } from '../code-service';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { SearchFeatureService } from '../search-feature-service';
+import { ArtifactService } from '../upload/artifact-service';
 import { DownloadPipelineService } from './download-pipeline-service';
 
 chai.use(sinonChai);
@@ -820,13 +821,23 @@ describe('DownloadPipelineService', () => {
       }
     }
 
+    // Stubs all downstream effects used by every writeFeatureTypeParquet test so
+    // each test only asserts the behavior it cares about.
+    const stubParquetPipeline = () => {
+      const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves() };
+      const openStreamStub = sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
+      const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+      const insertArtifactStub = sinon
+        .stub(ArtifactService.prototype, 'insertArtifact')
+        .resolves({ artifact_id: 'bbbb0000-0000-0000-0000-000000000001' });
+      const linkStub = sinon.stub(DownloadRepository.prototype, 'createDownloadArtifact').resolves();
+      return { mockWriter, openStreamStub, uploadStub, insertArtifactStub, linkStub };
+    };
+
     it('streams features to Parquet via cart path', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
-
-      const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves() };
-      sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
-      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+      const { mockWriter } = stubParquetPipeline();
 
       const baseBatch = [
         {
@@ -842,13 +853,12 @@ describe('DownloadPipelineService', () => {
         .stub(DownloadRepository.prototype, 'fetchTypedPropertyRows')
         .resolves([{ submission_feature_id: 1, name: 'species', value: 'bear' }]);
 
-      await service.writeFeatureTypeParquet(
-        TEST_DOWNLOAD_ID,
-        TEST_SOURCE_CART,
-        TEST_ARTIFACT,
-        mockProperties,
-        'observation'
-      );
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: TEST_SOURCE_CART,
+        properties: mockProperties,
+        featureTypeName: 'observation'
+      });
 
       expect(mockWriter.appendRow).to.have.been.calledOnce;
       expect(mockWriter.close).to.have.been.calledOnce;
@@ -857,10 +867,7 @@ describe('DownloadPipelineService', () => {
     it('streams features to Parquet via filter path', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
-
-      const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves() };
-      sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
-      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+      const { mockWriter } = stubParquetPipeline();
 
       const mockSubquery = {
         toSQL: () => ({ toNative: () => ({ sql: 'SELECT 1', bindings: [5] }) })
@@ -883,13 +890,12 @@ describe('DownloadPipelineService', () => {
         .stub(DownloadRepository.prototype, 'fetchTypedPropertyRows')
         .resolves([{ submission_feature_id: 1, name: 'species', value: 'moose' }]);
 
-      await service.writeFeatureTypeParquet(
-        TEST_DOWNLOAD_ID,
-        TEST_SOURCE_FILTER,
-        TEST_ARTIFACT,
-        mockProperties,
-        'observation'
-      );
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: TEST_SOURCE_FILTER,
+        properties: mockProperties,
+        featureTypeName: 'observation'
+      });
 
       expect(streamStub).to.have.been.calledOnce;
       expect(streamStub.firstCall.args[0]).to.equal(TEST_DOWNLOAD_ID);
@@ -897,44 +903,37 @@ describe('DownloadPipelineService', () => {
       expect(mockWriter.close).to.have.been.calledOnce;
     });
 
-    it('uses correct S3 key format: {object_key}/{featureTypeName}/data.parquet', async () => {
+    it('uses deterministic S3 key downloads/{downloadId}/{featureTypeName}/data.parquet', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
-
-      const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves() };
-      sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
-      const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+      const { uploadStub } = stubParquetPipeline();
 
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
 
-      await service.writeFeatureTypeParquet(
-        TEST_DOWNLOAD_ID,
-        TEST_SOURCE_CART,
-        TEST_ARTIFACT,
-        mockProperties,
-        'observation'
-      );
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: TEST_SOURCE_CART,
+        properties: mockProperties,
+        featureTypeName: 'observation'
+      });
 
       expect(uploadStub).to.have.been.calledOnce;
-      expect(uploadStub.firstCall.args[3]).to.equal(`${TEST_ARTIFACT.object_key}/observation/data.parquet`);
+      expect(uploadStub.firstCall.args[3]).to.equal(`downloads/${TEST_DOWNLOAD_ID}/observation/data.parquet`);
     });
 
     it('includes GeoParquet metadata when feature type has spatial properties', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
+      const { openStreamStub } = stubParquetPipeline();
 
-      const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves() };
-      const openStreamStub = sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
-      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
 
-      await service.writeFeatureTypeParquet(
-        TEST_DOWNLOAD_ID,
-        TEST_SOURCE_CART,
-        TEST_ARTIFACT,
-        mockSpatialProperties,
-        'observation'
-      );
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: TEST_SOURCE_CART,
+        properties: mockSpatialProperties,
+        featureTypeName: 'observation'
+      });
 
       expect(openStreamStub).to.have.been.calledOnce;
       const writerOptions = openStreamStub.firstCall.args[2] as any;
@@ -945,23 +944,90 @@ describe('DownloadPipelineService', () => {
     it('omits GeoParquet metadata when feature type has no spatial properties', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
+      const { openStreamStub } = stubParquetPipeline();
 
-      const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves() };
-      const openStreamStub = sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
-      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
 
-      await service.writeFeatureTypeParquet(
-        TEST_DOWNLOAD_ID,
-        TEST_SOURCE_CART,
-        TEST_ARTIFACT,
-        mockProperties,
-        'observation'
-      );
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: TEST_SOURCE_CART,
+        properties: mockProperties,
+        featureTypeName: 'observation'
+      });
 
       expect(openStreamStub).to.have.been.calledOnce;
       const writerOptions = openStreamStub.firstCall.args[2] as any;
       expect(writerOptions).to.deep.equal({});
+    });
+
+    it('inserts artifact with uploaded status, parquet format, and deterministic S3 key', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      const { insertArtifactStub } = stubParquetPipeline();
+
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
+
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: TEST_SOURCE_CART,
+        properties: mockProperties,
+        featureTypeName: 'observation'
+      });
+
+      expect(insertArtifactStub).to.have.been.calledOnce;
+      const payload = insertArtifactStub.firstCall.args[0];
+      expect(payload.artifact_status).to.equal('uploaded');
+      expect(payload.format).to.equal('parquet');
+      expect(payload.object_key).to.equal(`downloads/${TEST_DOWNLOAD_ID}/observation/data.parquet`);
+      expect(payload.uploaded_at).to.be.a('string');
+      expect(new Date(payload.uploaded_at!).toISOString()).to.equal(payload.uploaded_at);
+    });
+
+    it('inserts artifact with SHA-256 hex checksum and byte_size computed by the hash stream', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      const { insertArtifactStub, uploadStub } = stubParquetPipeline();
+
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
+
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: TEST_SOURCE_CART,
+        properties: mockProperties,
+        featureTypeName: 'observation'
+      });
+
+      // uploadStream receives the hash-count transform (not the raw passThrough), proving the digest stream is in the pipeline
+      expect(uploadStub).to.have.been.calledOnce;
+      const uploadedStream = uploadStub.firstCall.args[1];
+      expect(uploadedStream).to.exist;
+
+      const payload = insertArtifactStub.firstCall.args[0];
+      expect(payload.checksum_sha256).to.be.a('string');
+      expect(payload.checksum_sha256).to.have.lengthOf(64);
+      expect(payload.checksum_sha256).to.match(/^[0-9a-f]{64}$/);
+      expect(payload.byte_size).to.equal(0); // zero-feature test → empty Parquet bytes piped via mock writer
+    });
+
+    it('inserts the download_artifact link after the artifact row is created', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DownloadPipelineService(mockDBConnection);
+      const { insertArtifactStub, linkStub } = stubParquetPipeline();
+
+      sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
+
+      await service.writeFeatureTypeParquet({
+        downloadId: TEST_DOWNLOAD_ID,
+        source: TEST_SOURCE_CART,
+        properties: mockProperties,
+        featureTypeName: 'observation'
+      });
+
+      expect(insertArtifactStub).to.have.been.calledOnce;
+      expect(linkStub).to.have.been.calledOnce;
+      expect(linkStub.firstCall.args[0]).to.equal(TEST_DOWNLOAD_ID);
+      expect(linkStub.firstCall.args[1]).to.equal('bbbb0000-0000-0000-0000-000000000001');
+      expect(linkStub).to.have.been.calledAfter(insertArtifactStub);
     });
   });
 

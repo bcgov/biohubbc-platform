@@ -83,13 +83,12 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
         for (const featureTypeName of featureTypes) {
           await withConnection(async (connection) => {
             const properties = schemaLookup.get(featureTypeName) ?? [];
-            return new DownloadPipelineService(connection).writeFeatureTypeParquet(
+            return new DownloadPipelineService(connection).writeFeatureTypeParquet({
               downloadId,
-              metadata.source,
-              metadata.artifact,
+              source: metadata.source,
               properties,
               featureTypeName
-            );
+            });
           });
         }
 

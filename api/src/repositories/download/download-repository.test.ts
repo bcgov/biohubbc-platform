@@ -145,21 +145,27 @@ describe('DownloadRepository', () => {
       expect(sqlValues).to.include('bbbb0000-0000-0000-0000-000000000001');
     });
 
-    it('throws ApiExecuteSQLError when rowCount is not 1', async () => {
+    it('uses ON CONFLICT ... WHERE record_end_date IS NULL DO NOTHING for retry idempotency', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.createDownloadArtifact('aaaa0000-0000-0000-0000-000000000001', 'bbbb0000-0000-0000-0000-000000000001');
+
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('ON CONFLICT');
+      expect(sqlText).to.include('record_end_date IS NULL');
+      expect(sqlText).to.include('DO NOTHING');
+    });
+
+    it('does not throw when rowCount is 0 (conflict — link already exists)', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
+      await repo.createDownloadArtifact('aaaa0000-0000-0000-0000-000000000001', 'bbbb0000-0000-0000-0000-000000000001');
 
-      try {
-        await repo.createDownloadArtifact(
-          'aaaa0000-0000-0000-0000-000000000001',
-          'bbbb0000-0000-0000-0000-000000000001'
-        );
-        expect.fail('Expected error');
-      } catch (err: any) {
-        expect(err.message).to.equal('Failed to link artifact to download');
-      }
+      expect(sqlStub).to.have.been.calledOnce;
     });
   });
 

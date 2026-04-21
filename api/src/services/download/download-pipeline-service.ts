@@ -4,6 +4,7 @@ import { PassThrough } from 'node:stream';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
+import { ArtifactStatusEnum } from '../../models/artifact';
 import {
   DownloadArtifactInfo,
   DownloadFeatureSummary,
@@ -22,12 +23,15 @@ import {
   flattenFeatureWithParent,
   getOutputFilename
 } from '../../utils/csv-utils';
+import { getObjectStoreBucketName } from '../../utils/file-utils';
+import { createHashCountStream } from '../../utils/hash-stream';
 import { getLogger } from '../../utils/logger';
 import { buildGeoParquetMetadata, buildParquetSchema, featureToRow } from '../../utils/parquet-utils';
 import { CodeService } from '../code-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { SearchFeatureService } from '../search-feature-service';
+import { ArtifactService } from '../upload/artifact-service';
 
 const defaultLog = getLogger('services/download-pipeline-service');
 
@@ -60,12 +64,14 @@ export class DownloadPipelineService extends DBService {
   downloadRepository: DownloadRepository;
   fragmentRepository: DownloadFragmentRepository;
   searchFeatureService: SearchFeatureService;
+  artifactService: ArtifactService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
     this.fragmentRepository = new DownloadFragmentRepository(connection);
     this.searchFeatureService = new SearchFeatureService(connection);
+    this.artifactService = new ArtifactService(connection);
   }
 
   /**
@@ -393,48 +399,52 @@ export class DownloadPipelineService extends DBService {
   }
 
   /**
-   * Stream a single feature type to a Parquet file on S3.
+   * Stream a single feature type to a Parquet file on S3, recording the artifact
+   * with authoritative checksum and byte size.
    *
-   * Each feature type gets its own Parquet file with a schema derived from
-   * feature_type_property definitions. The star-schema design keeps files
-   * independent — parent data lives in its own file, joined by parent_uuid.
+   * The S3 key is deterministic: `downloads/{downloadId}/{featureTypeName}/data.parquet`.
+   * Retries overwrite the same key — S3 is idempotent on overwrites, and the
+   * artifact / download_artifact inserts use ON CONFLICT DO NOTHING. A retried
+   * feature type converges to the same DB + S3 state as a first-time success.
    *
-   * Pipeline: cursor → hydrateFeatureBatch → featureToRow → writer.appendRow → S3
+   * Pipeline: cursor → hydrateFeatureBatch → featureToRow → writer → passThrough →
+   * hash-count transform → S3 multipart upload. The hash transform captures
+   * sha256Hex + byteCount from the exact bytes uploaded; hashing after the fact
+   * would require re-downloading the S3 object.
    *
-   * Code and taxon properties arrive pre-resolved from the cursor JOIN:
-   * code → contributor_codeset_code.label, taxon → taxon.itis_scientific_name.
-   * Parquet files are standalone — GIS consumers have no database access.
+   * Writes the artifact row (`format='parquet'`, `artifact_status='uploaded'`, real
+   * checksum + byte_size + uploaded_at) and the download_artifact link inside the
+   * caller's transaction — the worker wraps each feature type in its own
+   * `withConnection`, so a mid-job retry replays the whole per-type transaction.
    *
-   * Zero disk usage: @dsnp/parquetjs streams to a PassThrough piped to S3 multipart upload.
-   * Prevents pod OOM kills and ephemeral storage exhaustion.
+   * Code and taxon properties arrive pre-resolved from the cursor JOIN. Parquet
+   * files are standalone — GIS consumers have no database access.
    *
-   * @param {string} downloadId - The download ID.
-   * @param {DownloadSource} source - The download source (cart or filters).
-   * @param {DownloadArtifactInfo} artifact - The artifact info (S3 key prefix).
-   * @param {CsvPropertyDefinition[]} properties - Schema property definitions for this feature type.
-   * @param {string} featureTypeName - The feature type to stream.
-   * @return {Promise<void>}
-   * @memberof DownloadPipelineService
+   * Zero disk usage: streams through PassThrough → hash → S3 multipart upload.
    */
-  async writeFeatureTypeParquet(
-    downloadId: string,
-    source: DownloadSource,
-    artifact: DownloadArtifactInfo,
-    properties: CsvPropertyDefinition[],
-    featureTypeName: string
-  ): Promise<void> {
+  async writeFeatureTypeParquet(payload: {
+    downloadId: string;
+    source: DownloadSource;
+    properties: CsvPropertyDefinition[];
+    featureTypeName: string;
+  }): Promise<void> {
+    const { downloadId, source, properties, featureTypeName } = payload;
+
     const spatialColumns = properties
       .filter((p) => p.feature_property_type_name === 'spatial')
       .map((p) => p.feature_property_name);
     const schema = buildParquetSchema(properties);
-    const s3Key = `${artifact.object_key}/${featureTypeName}/data.parquet`;
+    const s3Key = `downloads/${downloadId}/${featureTypeName}/data.parquet`;
 
-    // Create streaming pipeline: Parquet writer → passThrough → S3 multipart upload
+    // Pipeline: Parquet writer → passThrough → hash+count transform → S3 multipart upload
     const passThrough = new PassThrough();
+    const { transform: hashCountTransform, getResult } = createHashCountStream();
+    passThrough.pipe(hashCountTransform);
+
     const objectStorageService = new ObjectStorageService();
     const uploadPromise = objectStorageService.uploadStream(
       BucketType.MAIN,
-      passThrough,
+      hashCountTransform,
       'application/octet-stream',
       s3Key
     );
@@ -478,6 +488,23 @@ export class DownloadPipelineService extends DBService {
 
     await writer.close();
     await uploadPromise;
+
+    const { sha256Hex, byteCount } = getResult();
+
+    // Record the artifact with the bytes we just uploaded. insertArtifact is
+    // idempotent on (bucket, object_key) — on retry it returns the existing
+    // artifact_id rather than inserting a duplicate.
+    const { artifact_id } = await this.artifactService.insertArtifact({
+      bucket: getObjectStoreBucketName(),
+      object_key: s3Key,
+      byte_size: byteCount,
+      artifact_status: ArtifactStatusEnum.UPLOADED,
+      checksum_sha256: sha256Hex,
+      uploaded_at: new Date().toISOString(),
+      format: 'parquet'
+    });
+
+    await this.downloadRepository.createDownloadArtifact(downloadId, artifact_id);
   }
 
   /**

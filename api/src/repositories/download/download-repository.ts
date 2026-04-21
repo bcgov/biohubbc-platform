@@ -115,28 +115,21 @@ export class DownloadRepository extends BaseRepository {
   /**
    * Link an artifact to a download via the download_artifact join table.
    *
-   * Downloads are tracked as formal artifacts from the moment they're requested.
-   * The artifact is created as 'pending' (no file yet) and linked here.
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {string} artifactId - The artifact ID.
-   * @return {Promise<void>}
-   * @memberof DownloadRepository
+   * Idempotent — the Parquet pipeline writes one download_artifact per feature-type
+   * Parquet file, and a retry of the same feature type must not produce duplicate
+   * links. The `ON CONFLICT … WHERE record_end_date IS NULL DO NOTHING` clause
+   * matches the table's partial unique index so a re-insert on a still-active link
+   * is a silent no-op. A first-time insert returns rowCount=1; a conflict returns
+   * rowCount=0 — both are valid outcomes and neither throws.
    */
   async createDownloadArtifact(downloadId: string, artifactId: string): Promise<void> {
     const sql = SQL`
       INSERT INTO download_artifact (download_id, artifact_id)
-      VALUES (${downloadId}, ${artifactId});
+      VALUES (${downloadId}, ${artifactId})
+      ON CONFLICT (download_id, artifact_id) WHERE record_end_date IS NULL DO NOTHING;
     `;
 
-    const response = await this.connection.sql(sql);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to link artifact to download', [
-        'DownloadRepository->createDownloadArtifact',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
+    await this.connection.sql(sql);
   }
 
   /**

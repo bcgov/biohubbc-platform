@@ -300,14 +300,14 @@ describe('process-download-job', () => {
       await processDownloadJobHandler([createMockJob('dl-1')]);
 
       // First call: observation with its properties
-      expect(writeStub.firstCall.args[0]).to.equal('dl-1');
-      expect(writeStub.firstCall.args[3]).to.deep.equal(obsProps);
-      expect(writeStub.firstCall.args[4]).to.equal('observation');
+      expect(writeStub.firstCall.args[0].downloadId).to.equal('dl-1');
+      expect(writeStub.firstCall.args[0].properties).to.deep.equal(obsProps);
+      expect(writeStub.firstCall.args[0].featureTypeName).to.equal('observation');
 
       // Second call: survey with its properties
-      expect(writeStub.secondCall.args[0]).to.equal('dl-1');
-      expect(writeStub.secondCall.args[3]).to.deep.equal(surveyProps);
-      expect(writeStub.secondCall.args[4]).to.equal('survey');
+      expect(writeStub.secondCall.args[0].downloadId).to.equal('dl-1');
+      expect(writeStub.secondCall.args[0].properties).to.deep.equal(surveyProps);
+      expect(writeStub.secondCall.args[0].featureTypeName).to.equal('survey');
     });
 
     it('passes empty array when feature type has no schema entry', async () => {
@@ -347,8 +347,8 @@ describe('process-download-job', () => {
 
       await processDownloadJobHandler([createMockJob('dl-1')]);
 
-      expect(writeStub.firstCall.args[3]).to.deep.equal([]);
-      expect(writeStub.firstCall.args[4]).to.equal('unknown_type');
+      expect(writeStub.firstCall.args[0].properties).to.deep.equal([]);
+      expect(writeStub.firstCall.args[0].featureTypeName).to.equal('unknown_type');
     });
   });
 
