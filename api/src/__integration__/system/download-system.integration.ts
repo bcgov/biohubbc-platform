@@ -340,7 +340,12 @@ describe('Download Worker', function () {
     // artifact_key column with a real round-trippable value.
     const artifactSourceKey = `${TEST_PREFIX}/parquet-test-file-${Date.now()}.bin`;
     const artifactSourceBytes = Buffer.from('source-file-content-for-parquet-round-trip');
-    await storageService.uploadBuffer(BucketType.MAIN, artifactSourceBytes, 'application/octet-stream', artifactSourceKey);
+    await storageService.uploadBuffer(
+      BucketType.MAIN,
+      artifactSourceBytes,
+      'application/octet-stream',
+      artifactSourceKey
+    );
     createdS3Keys.push(artifactSourceKey);
 
     const bucketName = process.env.OBJECT_STORE_BUCKET_NAME!;
@@ -526,7 +531,12 @@ describe('Download Worker', function () {
 
     const artifactSourceKey = `${TEST_PREFIX}/parquet-retry-file-${Date.now()}.bin`;
     const artifactSourceBytes = Buffer.from('retry-test-source-file-content');
-    await storageService.uploadBuffer(BucketType.MAIN, artifactSourceBytes, 'application/octet-stream', artifactSourceKey);
+    await storageService.uploadBuffer(
+      BucketType.MAIN,
+      artifactSourceBytes,
+      'application/octet-stream',
+      artifactSourceKey
+    );
     createdS3Keys.push(artifactSourceKey);
 
     const bucketName = process.env.OBJECT_STORE_BUCKET_NAME!;
@@ -551,10 +561,9 @@ describe('Download Worker', function () {
     );
 
     // Run 1
-    const { downloadId } = await createDownloadAndProcess(
-      [datasetFeatureId, sampleSiteFeatureId, fileFeatureId],
-      { format: 'parquet' }
-    );
+    const { downloadId } = await createDownloadAndProcess([datasetFeatureId, sampleSiteFeatureId, fileFeatureId], {
+      format: 'parquet'
+    });
 
     // Track per-type S3 keys for cleanup (same set expected after both runs)
     const run1DatasetKey = `downloads/${downloadId}/dataset/data.parquet`;

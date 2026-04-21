@@ -1,6 +1,6 @@
 import PgBoss from 'pg-boss';
-import { getAPIUserDBConnection } from '../../database/db';
 import { PROCESS_START_STATUSES, TERMINAL_DOWNLOAD_STATUSES } from '../../constants/download-status';
+import { getAPIUserDBConnection } from '../../database/db';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
@@ -78,9 +78,7 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
       // Status is neither a start state nor terminal — something unexpected.
       // Surface it: throw puts the job in the DLQ where someone can triage.
       if (!PROCESS_START_STATUSES.includes(currentStatus)) {
-        throw new Error(
-          `Download ${downloadId} in unexpected status '${currentStatus}' — cannot start processing`
-        );
+        throw new Error(`Download ${downloadId} in unexpected status '${currentStatus}' — cannot start processing`);
       }
 
       // Transition → processing. Accepts PROCESSING as a source because a
