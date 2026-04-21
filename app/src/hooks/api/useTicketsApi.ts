@@ -1,14 +1,17 @@
 import { AxiosInstance } from 'axios';
 import {
   ICreateTicketCommentRequest,
+  ICreateTicketAssigneeRequest,
   ICreateTicketReferenceRequest,
   ICreateTicketRequest,
   IGetTicketsResponse,
+  ITicketAssignee,
   ITicket,
   ITicketCommentLog,
   ITicketReference,
   ITicketExtended,
   ITicketsQueryParams,
+  IUpdateTicketAssigneeStatusRequest,
   IUpdateTicketRequest,
   TicketStatus
 } from 'interfaces/useTicketsApi.interface';
@@ -166,6 +169,48 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Assign a system user to a ticket.
+   *
+   * @param {string} ticketId
+   * @param {ICreateTicketAssigneeRequest} payload
+   * @return {*} {Promise<ITicketAssignee>}
+   */
+  const createTicketAssignee = async (ticketId: string, payload: ICreateTicketAssigneeRequest): Promise<ITicketAssignee> => {
+    const { data } = await axios.post(`/api/tickets/${ticketId}/system-user`, payload);
+
+    return data;
+  };
+
+  /**
+   * Update ticket assignee status.
+   *
+   * @param {string} ticketId
+   * @param {string} ticketSystemUserId
+   * @param {IUpdateTicketAssigneeStatusRequest} payload
+   * @return {*} {Promise<ITicketAssignee>}
+   */
+  const updateTicketAssigneeStatus = async (
+    ticketId: string,
+    ticketSystemUserId: string,
+    payload: IUpdateTicketAssigneeStatusRequest
+  ): Promise<ITicketAssignee> => {
+    const { data } = await axios.patch(`/api/tickets/${ticketId}/system-user/${ticketSystemUserId}`, payload);
+
+    return data;
+  };
+
+  /**
+   * Remove a ticket assignee (soft delete).
+   *
+   * @param {string} ticketId
+   * @param {string} ticketSystemUserId
+   * @return {*} {Promise<void>}
+   */
+  const deleteTicketAssignee = async (ticketId: string, ticketSystemUserId: string): Promise<void> => {
+    await axios.delete(`/api/tickets/${ticketId}/system-user/${ticketSystemUserId}`);
+  };
+
   return {
     getTicketsForAdmin,
     getTicketForAdmin,
@@ -177,6 +222,9 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     createTicketReference,
     deleteTicketReference,
     getTicketsForUser,
-    getTicketForUser
+    getTicketForUser,
+    createTicketAssignee,
+    updateTicketAssigneeStatus,
+    deleteTicketAssignee
   };
 };

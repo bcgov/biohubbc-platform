@@ -19,7 +19,7 @@ interface ITicketTeamDialogProps {
 }
 
 /**
- * Dialog for managing ticket assignees.
+ * Dialog for managing ticket participants.
  *
  * @param {ITicketTeamDialogProps} props
  * @return {*}
@@ -114,7 +114,7 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
     [api.teams, memberSystemUserIds, onMemberAdd, onMemberRemove, showApiError, teamId]
   );
 
-  const handleRemoveAssignee = useCallback(
+  const handleRemoveParticipant = useCallback(
     async (teamMemberId: string) => {
       if (!teamId) {
         return;
@@ -142,7 +142,7 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
     <OkDialog
       open={open}
       onClose={onClose}
-      dialogTitle="Assignees"
+      dialogTitle="Participants"
       dialogText=""
       okButtonLabel="Done"
       okButtonProps={{ size: 'large', disabled: isSubmitting }}
@@ -155,7 +155,7 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
           isSubmitting={isSubmitting}
           onSearch={handleAvailableUserSearch}
           onSelectUser={handleSelectUser}
-          onRemoveAssignee={handleRemoveAssignee}
+          onRemoveParticipant={handleRemoveParticipant}
         />
       }
     />

@@ -13,6 +13,7 @@ import { DBService } from './db-service';
 import { TicketCommentService } from './ticket-comment-service';
 import { TicketReferenceService } from './ticket-reference-service';
 import { TicketStatusService } from './ticket-status-service';
+import { TicketSystemUserService } from './ticket-system-user-service';
 
 export class TicketService extends DBService {
   teamService: TeamService;
@@ -21,6 +22,7 @@ export class TicketService extends DBService {
   ticketStatusService: TicketStatusService;
   ticketReferenceService: TicketReferenceService;
   dataRequestService: DataRequestService;
+  ticketSystemUserService: TicketSystemUserService;
 
   /**
    * Creates an instance of TicketService.
@@ -36,6 +38,7 @@ export class TicketService extends DBService {
     this.ticketStatusService = new TicketStatusService(connection);
     this.ticketReferenceService = new TicketReferenceService(connection);
     this.dataRequestService = new DataRequestService(connection);
+    this.ticketSystemUserService = new TicketSystemUserService(connection);
   }
 
   /**
@@ -93,15 +96,16 @@ export class TicketService extends DBService {
    * @memberof TicketService
    */
   async getTicket(ticketId: string): Promise<TicketWithHistory> {
-    const [ticket, statuses, comments, references, dataRequests] = await Promise.all([
+    const [ticket, statuses, comments, references, dataRequests, assignees] = await Promise.all([
       this.ticketRepository.getTicketById(ticketId),
       this.ticketStatusService.getTicketStatus(ticketId),
       this.ticketCommentService.getTicketComments(ticketId),
       this.ticketReferenceService.getTicketReferencesForTicket(ticketId),
-      this.dataRequestService.findDataRequestsByTicketId(ticketId)
+      this.dataRequestService.findDataRequestsByTicketId(ticketId),
+      this.ticketSystemUserService.getActiveTicketAssignees(ticketId)
     ]);
 
-    return { ...ticket, statuses, comments, references, data_requests: dataRequests };
+    return { ...ticket, statuses, comments, references, data_requests: dataRequests, assignees };
   }
 
   /**

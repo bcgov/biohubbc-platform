@@ -150,6 +150,27 @@ export class TicketRepository extends BaseRepository {
   }
 
   /**
+   * Get a single active ticket by UUID, or null if none exists.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @return {Promise<Ticket | null>}
+   * @memberof TicketRepository
+   */
+  async getTicketByIdOrNull(ticketId: string): Promise<Ticket | null> {
+    const knex = getKnex();
+    const query = knex
+      .table('ticket')
+      .select(TICKET_COLUMNS)
+      .where('ticket_id', ticketId)
+      .whereNull('record_end_date')
+      .first();
+
+    const response = await this.connection.knex(query, Ticket);
+
+    return response.rows[0] ?? null;
+  }
+
+  /**
    * List active tickets with optional filters.
    *
    * @param {TicketFilters} [filters] - Optional list filters.

@@ -61,6 +61,10 @@ vi.mock('./detail/sidebar/TicketSidebar', () => ({
   )
 }));
 
+vi.mock('./detail/sidebar/TicketAssignmentResponsePrompt', () => ({
+  TicketAssignmentResponsePrompt: () => <div data-testid="ticket-assignment-response-prompt" />
+}));
+
 vi.mock('./detail/skeleton/TicketSkeleton', () => ({
   TicketSkeleton: () => <div data-testid="ticket-skeleton" />
 }));
@@ -126,6 +130,7 @@ const baseTicket: ITicketExtended = {
       create_date: '2026-02-25T00:00:00.000Z'
     }
   ],
+  assignees: [],
   data_requests: [
     {
       data_request_id: 'dr-1',

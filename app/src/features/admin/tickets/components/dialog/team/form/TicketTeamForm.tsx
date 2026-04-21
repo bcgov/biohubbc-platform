@@ -14,17 +14,17 @@ interface ITicketTeamFormProps {
   isSubmitting: boolean;
   onSearch: (search: string) => void;
   onSelectUser: (option: SidebarOption | null) => void;
-  onRemoveAssignee: (teamMemberId: string) => void;
+  onRemoveParticipant: (teamMemberId: string) => void;
 }
 
 /**
- * Form content for managing ticket assignees.
+ * Form content for managing ticket participants.
  *
  * @param {ITicketTeamFormProps} props
  * @return {*}
  */
 export const TicketTeamForm = (props: ITicketTeamFormProps) => {
-  const { options, isLoading, members, isSubmitting, onSearch, onSelectUser, onRemoveAssignee } = props;
+  const { options, isLoading, members, isSubmitting, onSearch, onSelectUser, onRemoveParticipant } = props;
 
   return (
     <Stack spacing={2} sx={{ mt: 1 }}>
@@ -48,7 +48,7 @@ export const TicketTeamForm = (props: ITicketTeamFormProps) => {
               <IconButton
                 size="small"
                 aria-label={`remove ${member.user_identifier}`}
-                onClick={() => onRemoveAssignee(member.team_member_id)}
+                onClick={() => onRemoveParticipant(member.team_member_id)}
                 disabled={isSubmitting}>
                 <Icon path={mdiClose} size={0.65} />
               </IconButton>

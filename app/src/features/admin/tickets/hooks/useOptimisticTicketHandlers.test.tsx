@@ -32,6 +32,7 @@ const baseTicket: ITicketExtended = {
   statuses: [],
   comments: [],
   references: [],
+  assignees: [],
   data_requests: []
 };
 

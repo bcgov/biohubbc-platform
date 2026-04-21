@@ -51,7 +51,9 @@ describe('useTicketsApi', () => {
       status: 'open',
       statuses,
       comments,
-      references
+      references,
+      data_requests: [],
+      assignees: []
     };
 
     mock.onGet(`/api/administrative/tickets/${apiTicket.ticket_id}`).reply(200, apiTicket);
@@ -236,7 +238,9 @@ describe('useTicketsApi', () => {
       status: 'open',
       statuses: [],
       comments: [],
-      references: []
+      references: [],
+      data_requests: [],
+      assignees: []
     };
 
     mock.onGet(`/api/tickets/${ticketId}`).reply(200, apiTicket);
@@ -244,5 +248,49 @@ describe('useTicketsApi', () => {
     const result = await useTicketsApi(axios).getTicketForUser(ticketId);
 
     expect(result).toEqual(apiTicket);
+  });
+
+  it('createTicketAssignee posts payload and returns assignee', async () => {
+    const ticketId = '11111111-1111-1111-1111-111111111111';
+    const payload = { system_user_id: 12, status: 'requested' as const };
+    const assignee = {
+      ticket_system_user_id: '22222222-2222-2222-2222-222222222222',
+      ticket_id: ticketId,
+      system_user_id: 12,
+      status: 'requested'
+    };
+
+    mock.onPost(`/api/tickets/${ticketId}/system-user`, payload).reply(201, assignee);
+
+    const result = await useTicketsApi(axios).createTicketAssignee(ticketId, payload);
+
+    expect(result).toEqual(assignee);
+  });
+
+  it('updateTicketAssigneeStatus patches payload and returns assignee', async () => {
+    const ticketId = '11111111-1111-1111-1111-111111111111';
+    const ticketSystemUserId = '33333333-3333-3333-3333-333333333333';
+    const payload = { status: 'started' as const };
+    const assignee = {
+      ticket_system_user_id: ticketSystemUserId,
+      ticket_id: ticketId,
+      system_user_id: 12,
+      status: 'started'
+    };
+
+    mock.onPatch(`/api/tickets/${ticketId}/system-user/${ticketSystemUserId}`, payload).reply(200, assignee);
+
+    const result = await useTicketsApi(axios).updateTicketAssigneeStatus(ticketId, ticketSystemUserId, payload);
+
+    expect(result).toEqual(assignee);
+  });
+
+  it('deleteTicketAssignee calls delete endpoint', async () => {
+    const ticketId = '11111111-1111-1111-1111-111111111111';
+    const ticketSystemUserId = '33333333-3333-3333-3333-333333333333';
+
+    mock.onDelete(`/api/tickets/${ticketId}/system-user/${ticketSystemUserId}`).reply(204);
+
+    await expect(useTicketsApi(axios).deleteTicketAssignee(ticketId, ticketSystemUserId)).resolves.toBeUndefined();
   });
 });

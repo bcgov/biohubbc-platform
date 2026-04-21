@@ -15,6 +15,7 @@ import { DataRequestService } from './data-request-service';
 import { TicketReferenceService } from './ticket-reference-service';
 import { TicketService } from './ticket-service';
 import { TicketStatusService } from './ticket-status-service';
+import { TicketSystemUserService } from './ticket-system-user-service';
 
 chai.use(sinonChai);
 
@@ -186,6 +187,7 @@ describe('TicketService', () => {
         .stub(TicketReferenceService.prototype, 'getTicketReferencesForTicket')
         .resolves(referenceLog);
       const getDataRequestLogStub = sinon.stub(DataRequestService.prototype, 'findDataRequestsByTicketId').resolves([]);
+      const getAssigneesStub = sinon.stub(TicketSystemUserService.prototype, 'getActiveTicketAssignees').resolves([]);
 
       const result = await service.getTicket(mockTicket.ticket_id);
 
@@ -194,12 +196,14 @@ describe('TicketService', () => {
       expect(getCommentLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getReferenceLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getDataRequestLogStub).to.have.been.calledWith(mockTicket.ticket_id);
+      expect(getAssigneesStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(result).to.eql({
         ...mockTicket,
         statuses: statusLog,
         comments: commentLog,
         references: referenceLog,
-        data_requests: []
+        data_requests: [],
+        assignees: []
       });
     });
   });

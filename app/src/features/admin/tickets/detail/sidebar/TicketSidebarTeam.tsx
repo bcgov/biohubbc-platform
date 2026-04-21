@@ -11,23 +11,23 @@ interface ITicketSidebarTeamProps {
   members: ITeamMember[];
   isLoading: boolean;
   onOpenDialog: () => void;
-  onRemoveAssignee: (teamMemberId: string) => Promise<void> | void;
+  onRemoveParticipant: (teamMemberId: string) => Promise<void> | void;
 }
 
 /**
- * Assignee section for the ticket sidebar.
+ * Participants section for the ticket sidebar.
  *
  * @param {ITicketSidebarTeamProps} props
  * @return {*}
  */
 export const TicketSidebarTeam = (props: ITicketSidebarTeamProps) => {
-  const { members, isLoading, onOpenDialog, onRemoveAssignee } = props;
+  const { members, isLoading, onOpenDialog, onRemoveParticipant } = props;
   const shouldCollapseMembers = members.length > 3;
   const visibleMembers = shouldCollapseMembers ? members.slice(0, 2) : members;
   const remainingMembersCount = members.length - visibleMembers.length;
 
   return (
-    <TicketSidebarSection label="Assignees" onAdd={onOpenDialog}>
+    <TicketSidebarSection label="Participants" onAdd={onOpenDialog}>
       <LoadingGuard
         isLoading={isLoading}
         isLoadingFallback={
@@ -37,9 +37,9 @@ export const TicketSidebarTeam = (props: ITicketSidebarTeamProps) => {
           </Stack>
         }
         hasNoData={!members.length}
-        hasNoDataFallback={
+          hasNoDataFallback={
           <Typography variant="body2" color="textSecondary">
-            No assignees
+            No participants
           </Typography>
         }>
         <Stack spacing={0.75}>
@@ -47,7 +47,7 @@ export const TicketSidebarTeam = (props: ITicketSidebarTeamProps) => {
             <TicketSidebarItem
               key={member.team_member_id}
               label={member.user_identifier}
-              onRemove={() => onRemoveAssignee(member.team_member_id)}
+              onRemove={() => onRemoveParticipant(member.team_member_id)}
             />
           ))}
           {shouldCollapseMembers ? (

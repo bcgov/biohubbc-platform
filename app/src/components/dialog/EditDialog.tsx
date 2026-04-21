@@ -1,5 +1,5 @@
 import Button from '@mui/material/Button';
-import Dialog from '@mui/material/Dialog';
+import Dialog, { DialogProps } from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -66,6 +66,13 @@ export interface IEditDialogProps<T> {
    * Prop to track if the dialog should be in a 'loading' state
    */
   isLoading?: boolean;
+
+  /**
+   * Optional maximum width forwarded to MUI Dialog.
+   *
+   * @memberof IEditDialogProps
+   */
+  maxWidth?: DialogProps['maxWidth'];
 }
 
 /**
@@ -94,6 +101,7 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
       {(formikProps) => (
         <Dialog
           open={props.open ?? false}
+          maxWidth={props.maxWidth}
           aria-labelledby="edit-dialog-title"
           aria-describedby="edit-dialog-description">
           <DialogTitle id="edit-dialog-title">{props.dialogTitle}</DialogTitle>

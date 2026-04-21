@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DataRequest } from './data-request';
+import { TicketSystemUserWithUser } from './ticket-system-user';
 import { TicketComment } from './ticket-comment';
 import { TicketReference } from './ticket-reference';
 import { TicketStatus as TicketStatusRecord } from './ticket-status';
@@ -60,6 +61,7 @@ export const TicketWithHistory = Ticket.extend({
   statuses: z.array(TicketStatusRecord),
   comments: z.array(TicketComment),
   references: z.array(TicketReference),
-  data_requests: z.array(DataRequest)
+  data_requests: z.array(DataRequest),
+  assignees: z.array(TicketSystemUserWithUser)
 });
 export type TicketWithHistory = z.infer<typeof TicketWithHistory>;

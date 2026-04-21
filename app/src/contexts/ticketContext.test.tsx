@@ -39,7 +39,9 @@ const mockTicket = {
   status: 'open',
   statuses: [],
   comments: [],
-  references: []
+  references: [],
+  data_requests: [],
+  assignees: []
 };
 
 type ProviderHarness = {

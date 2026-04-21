@@ -81,7 +81,7 @@ export const CreateDataRequestForm = (props: ICreateDataRequestFormProps) => {
         isSubmitting={isSubmitting}
         onSearch={onSearchUsers}
         onSelectUser={handleSelectUser}
-        onRemoveAssignee={handleRemoveMember}
+        onRemoveParticipant={handleRemoveMember}
       />
     </Stack>
   );

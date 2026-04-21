@@ -1,6 +1,7 @@
 import { OpenAPIV3 } from 'openapi-types';
 import { DataRequestResponseSchema } from './data-request';
 import { paginationResponseSchema } from './pagination';
+import { TicketSystemUserWithUserSchema } from './ticket-system-user';
 
 const TicketPriorityEnum = ['low', 'medium', 'high', 'critical'];
 const TicketStatusEnum = ['open', 'closed'];
@@ -76,7 +77,8 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
     'statuses',
     'comments',
     'references',
-    'data_requests'
+    'data_requests',
+    'assignees'
   ],
   properties: {
     ticket_id: { type: 'string', format: 'uuid' },
@@ -113,6 +115,10 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
     data_requests: {
       type: 'array',
       items: DataRequestResponseSchema
+    },
+    assignees: {
+      type: 'array',
+      items: TicketSystemUserWithUserSchema
     }
   }
 };
