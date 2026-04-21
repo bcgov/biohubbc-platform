@@ -100,6 +100,7 @@ const insertRecord = async (knex: Knex) => {
 
   // Sample Sites and their children
   const animalIds: number[] = [];
+  const ecologicalUnitIds: number[] = [];
   const sampleSiteObservations: { sampleSiteId: number; observationIds: number[] }[] = [];
   const sampleSitePromises = Array.from({ length: 10 }).map(async () => {
     const parent_submission_feature_id2 = await insertSampleSiteRecord(knex, {
@@ -159,7 +160,21 @@ const insertRecord = async (knex: Knex) => {
     })
   );
 
-  // Wait for all sample sites, incidental observations, and telemetry to complete concurrently
+  // Create ecological units with no parent feature.
+  const ecologicalUnitPromises = Array.from({ length: 7 }).map((_, i) =>
+    insertEcologicalUnitRecord(knex, {
+      submission_id,
+      submission_upload_id,
+      parent_submission_feature_id: null,
+      values: ['telkwa', 'tweedsmuir', 'calendar', 'maxhamish', 'rainbows', 'muskwa', 'gataga'],
+      valueIndex: i
+    })
+  );
+
+  // Wait for all sample sites, incidental observations, ecological units, and telemetry to complete concurrently
+  const ecologicalUnitResults = await Promise.all(ecologicalUnitPromises);
+  ecologicalUnitIds.push(...ecologicalUnitResults);
+
   await Promise.all([...sampleSitePromises, ...telemetryPromises, ...incidentalObservationPromises]);
 
   // Seed submission_feature_feature table
@@ -172,7 +187,7 @@ const insertRecord = async (knex: Knex) => {
     }
   }
 
-  // Ensure each deployment is linked to at least one animal
+  // Ensure each deployment is linked to exactly one animal
   for (let i = 0; i < deployments.length; i++) {
     const deployment = deployments[i];
     const animalId = animalIds[i % animalIds.length]; // Distribute animals across deployments
@@ -180,17 +195,16 @@ const insertRecord = async (knex: Knex) => {
       INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
       VALUES (${animalId}, ${deployment.id})
     `);
-  }
 
-  // Link additional animals to random deployments
-  for (let i = deployments.length; i < animalIds.length; i++) {
-    const animalId = animalIds[i];
-    const randomDeployment = deployments[Math.floor(Math.random() * deployments.length)];
+    // Update deployment's animal_identifier to match the linked animal's identifier
     await knex.raw(`
-      INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
-      VALUES (${animalId}, ${randomDeployment.id})
+      UPDATE submission_feature
+      SET data = jsonb_set(data, '{animal_identifier}', (SELECT data->'animal_identifier' FROM submission_feature WHERE submission_feature_id = ${animalId}))
+      WHERE submission_feature_id = ${deployment.id}
     `);
   }
+
+  // Note: Extra animals beyond the number of deployments are not linked to any deployment
 
   // Link some observations to their sample sites
   for (const { sampleSiteId, observationIds } of sampleSiteObservations) {
@@ -203,6 +217,17 @@ const insertRecord = async (knex: Knex) => {
       await knex.raw(`
         INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
         VALUES (${sampleSiteId}, ${observationId})
+      `);
+    }
+  }
+
+  // Link ecological units to animals
+  for (const ecologicalUnitId of ecologicalUnitIds) {
+    if (animalIds.length > 0) {
+      const randomAnimalId = animalIds[Math.floor(Math.random() * animalIds.length)];
+      await knex.raw(`
+        INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
+        VALUES (${ecologicalUnitId}, ${randomAnimalId})
       `);
     }
   }
@@ -474,6 +499,37 @@ export const insertObservationRecord = async (
   return submission_feature_id;
 };
 
+export const insertEcologicalUnitRecord = async (
+  knex: Knex,
+  options: {
+    submission_id: number;
+    submission_upload_id: string;
+    parent_submission_feature_id: number | null;
+    values: string[];
+    valueIndex: number;
+  }
+): Promise<number> => {
+  const response = await knex.raw(
+    `${insertSubmissionFeature({
+      submission_id: options.submission_id,
+      submission_upload_id: options.submission_upload_id,
+      parent_submission_feature_id: options.parent_submission_feature_id,
+      feature_type: 'ecological_unit',
+      data: {
+        ecological_unit_type: 'population_unit',
+        ecological_unit_value: options.values[options.valueIndex]
+      }
+    })}`
+  );
+  const submission_feature_id = response.rows[0].submission_feature_id;
+
+  // Add search indices for the ecological unit properties
+  await knex.raw(`${insertSearchString({ submission_feature_id, propertyName: 'ecological_unit_type' })}`);
+  await knex.raw(`${insertSearchString({ submission_feature_id, propertyName: 'ecological_unit_value' })}`);
+
+  return submission_feature_id;
+};
+
 const insertAnimalRecord = async (
   knex: Knex,
   options: { submission_id: number; submission_upload_id: string; parent_submission_feature_id: number }
@@ -581,7 +637,8 @@ export const insertSubmissionFeature = (options: {
     | 'telemetry_deployment'
     | 'telemetry_device'
     | 'measurement'
-    | 'codeset';
+    | 'codeset'
+    | 'ecological_unit';
   data: { [key: string]: any };
 }) => `
     INSERT INTO submission_feature
@@ -607,7 +664,7 @@ export const insertSubmissionFeature = (options: {
     RETURNING submission_feature_id;
 `;
 
-const insertSearchString = (options: { submission_feature_id: number }) => `
+const insertSearchString = (options: { submission_feature_id: number; propertyName?: string }) => `
     INSERT INTO search_string
     (
         submission_feature_id,
@@ -617,7 +674,7 @@ const insertSearchString = (options: { submission_feature_id: number }) => `
     values
     (
         ${options.submission_feature_id},
-        (select feature_property_id from feature_property where name = 'name'),
+        (select feature_property_id from feature_property where name = '${options.propertyName || 'name'}'),
         $$${faker.lorem.words(3)}$$
     );
 `;

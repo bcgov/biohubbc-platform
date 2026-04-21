@@ -56,30 +56,66 @@ related_animals AS (
       ON (sf.data->>'sex')::int = ccc.contributor_codeset_code_id
     WHERE ft_animal.name = 'animal'
       AND sf.record_end_date IS NULL
+),
+
+related_ecological_units AS (
+    SELECT
+        deployment_id,
+        MIN(ecological_unit_value) AS ecological_unit_value
+    FROM (
+        -- Ecological units linked to animals via submission_feature_feature
+        SELECT
+            ra.deployment_id,
+            sf_eu.data->>'ecological_unit_value' AS ecological_unit_value
+        FROM related_animals ra
+        JOIN biohub.submission_feature_feature sff
+          ON (sff.source_feature_id = ra.animal_feature_id AND sff.target_feature_id != ra.animal_feature_id)
+          OR (sff.target_feature_id = ra.animal_feature_id AND sff.source_feature_id != ra.animal_feature_id)
+        JOIN biohub.submission_feature sf_eu
+          ON (sff.source_feature_id = sf_eu.submission_feature_id OR sff.target_feature_id = sf_eu.submission_feature_id)
+        JOIN biohub.feature_type ft_eu
+          ON sf_eu.feature_type_id = ft_eu.feature_type_id
+          AND ft_eu.name = 'ecological_unit'
+        WHERE sf_eu.record_end_date IS NULL
+
+        UNION
+
+        -- Ecological units with animal as parent
+        SELECT
+            ra.deployment_id,
+            sf_eu.data->>'ecological_unit_value' AS ecological_unit_value
+        FROM related_animals ra
+        JOIN biohub.submission_feature sf_eu
+          ON sf_eu.parent_submission_feature_id = ra.animal_feature_id
+        JOIN biohub.feature_type ft_eu
+          ON sf_eu.feature_type_id = ft_eu.feature_type_id
+          AND ft_eu.name = 'ecological_unit'
+        WHERE sf_eu.record_end_date IS NULL
+    ) AS combined_ecological_units
+    GROUP BY deployment_id
 )
 
 SELECT
     sf.submission_feature_id AS Feature_ID,
+    t.common_name AS common_name,
+    t.itis_scientific_name AS scientific_name,
     d.animal_id,
+    ra.sex AS animal_sex,
+    reu.ecological_unit_value AS pop_unit,
     d.device_key,
     (sf.data->>'timestamp')::timestamptz AS DATETIME,
     EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz)::int AS YEAR,
     (sf.data->>'latitude')::numeric AS Latitude,
     (sf.data->>'longitude')::numeric AS Longitude,
     (sf.data->>'dop')::numeric AS dop,
-    ra.taxon_id::int AS animal_taxon_id,
-    ra.sex AS animal_sex,
-    ra.animal_identifier AS animal_identifier,
-    t.itis_scientific_name AS species_scientific_name,
-    t.common_name AS species_english_name,
     CASE
       WHEN EXISTS (
         SELECT 1
         FROM biohub.submission_feature_security sfs
         WHERE sfs.submission_feature_id = sf.submission_feature_id
-      ) THEN 'Secured'
-      ELSE 'Open'
-    END AS SECURITY
+      ) THEN 'Y'
+      ELSE 'N'
+    END AS SECURED
 
 FROM biohub.submission_feature sf
 JOIN biohub.feature_type ft
@@ -90,6 +126,9 @@ LEFT JOIN deployments d
 
 LEFT JOIN related_animals ra
   ON ra.deployment_id = d.submission_feature_id
+
+LEFT JOIN related_ecological_units reu
+  ON reu.deployment_id = d.submission_feature_id
 
 LEFT JOIN biohub.taxon t
   ON t.itis_tsn = ra.taxon_id::int
@@ -108,12 +147,11 @@ WHERE ft.name = 'telemetry'
     COMMENT ON COLUMN bcgw.telemetry_all.dop IS 'The dilution of precision';
     COMMENT ON COLUMN bcgw.telemetry_all.device_key IS 'The vendor and device serial';
     COMMENT ON COLUMN bcgw.telemetry_all.animal_id IS 'The identifier of the animal wearing the telemetry device';
-    COMMENT ON COLUMN bcgw.telemetry_all.animal_taxon_id IS 'Taxon ID loaded from the linked animal feature via submission_feature_feature relationships';
     COMMENT ON COLUMN bcgw.telemetry_all.animal_sex IS 'Sex loaded from the linked animal feature via submission_feature_feature relationships';
-    COMMENT ON COLUMN bcgw.telemetry_all.animal_identifier IS 'Identifier of the animal that the telemetry device is deployed on';
-    COMMENT ON COLUMN bcgw.telemetry_all.species_scientific_name IS 'Scientific name from taxon table linked via ITIS TSN';
-    COMMENT ON COLUMN bcgw.telemetry_all.species_english_name IS 'Common English name from taxon table linked via ITIS TSN';
-    COMMENT ON COLUMN bcgw.telemetry_all.SECURITY IS 'The security status of the feature';
+    COMMENT ON COLUMN bcgw.telemetry_all.scientific_name IS 'Scientific name from taxon table linked via ITIS TSN';
+    COMMENT ON COLUMN bcgw.telemetry_all.common_name IS 'Common English name from taxon table linked via ITIS TSN';
+    COMMENT ON COLUMN bcgw.telemetry_all.pop_unit IS 'Ecological unit value linked to the animal';
+    COMMENT ON COLUMN bcgw.telemetry_all.SECURED IS 'The indicator of whether the feature is secured (Y) or not (N)';
   `);
 
   await knex.raw(`
@@ -146,11 +184,11 @@ related_features AS (
 ),
 related_animals AS (
     SELECT
-      rf.deployment_id,
-      sf.submission_feature_id,
-      sf.data->>'taxon_id' AS taxon_id,
-      COALESCE(ccc.label, sf.data->>'sex') AS sex,
-      sf.data->>'animal_identifier' AS animal_identifier
+        rf.deployment_id,
+        sf.submission_feature_id AS animal_feature_id,
+        sf.data->>'taxon_id' AS taxon_id,
+        COALESCE(ccc.label, sf.data->>'sex') AS sex,
+        sf.data->>'animal_identifier' AS animal_identifier
     FROM related_features rf
     JOIN biohub.submission_feature sf
       ON sf.submission_feature_id = rf.related_feature_id
@@ -160,22 +198,58 @@ related_animals AS (
       ON (sf.data->>'sex')::int = ccc.contributor_codeset_code_id
     WHERE ft_animal.name = 'animal'
       AND sf.record_end_date IS NULL
+),
+
+related_ecological_units AS (
+    SELECT
+        deployment_id,
+        MIN(ecological_unit_value) AS ecological_unit_value
+    FROM (
+        -- Ecological units linked to animals via submission_feature_feature
+        SELECT
+            ra.deployment_id,
+            sf_eu.data->>'ecological_unit_value' AS ecological_unit_value
+        FROM related_animals ra
+        JOIN biohub.submission_feature_feature sff
+          ON (sff.source_feature_id = ra.animal_feature_id AND sff.target_feature_id != ra.animal_feature_id)
+          OR (sff.target_feature_id = ra.animal_feature_id AND sff.source_feature_id != ra.animal_feature_id)
+        JOIN biohub.submission_feature sf_eu
+          ON (sff.source_feature_id = sf_eu.submission_feature_id OR sff.target_feature_id = sf_eu.submission_feature_id)
+        JOIN biohub.feature_type ft_eu
+          ON sf_eu.feature_type_id = ft_eu.feature_type_id
+          AND ft_eu.name = 'ecological_unit'
+        WHERE sf_eu.record_end_date IS NULL
+
+        UNION
+
+        -- Ecological units with animal as parent
+        SELECT
+            ra.deployment_id,
+            sf_eu.data->>'ecological_unit_value' AS ecological_unit_value
+        FROM related_animals ra
+        JOIN biohub.submission_feature sf_eu
+          ON sf_eu.parent_submission_feature_id = ra.animal_feature_id
+        JOIN biohub.feature_type ft_eu
+          ON sf_eu.feature_type_id = ft_eu.feature_type_id
+          AND ft_eu.name = 'ecological_unit'
+        WHERE sf_eu.record_end_date IS NULL
+    ) AS combined_ecological_units
+    GROUP BY deployment_id
 )
 SELECT
     sf.submission_feature_id AS Feature_ID,
+    t.common_name AS common_name,
+    t.itis_scientific_name AS scientific_name,
     d.animal_id,
+    ra.sex AS animal_sex,
+    reu.ecological_unit_value AS pop_unit,
     d.device_key,
     (sf.data->>'timestamp')::timestamptz AS DATETIME,
     (EXTRACT(YEAR FROM (sf.data->>'timestamp')::timestamptz))::int AS YEAR,
     (sf.data->>'latitude')::numeric AS Latitude,
     (sf.data->>'longitude')::numeric AS Longitude,
     (sf.data->>'dop')::numeric AS dop,
-    ra.taxon_id::int AS animal_taxon_id,
-    ra.sex AS animal_sex,
-    ra.animal_identifier AS animal_identifier,
-    t.itis_scientific_name AS species_scientific_name,
-    t.common_name AS species_english_name,
-    'Open' AS SECURITY
+    'N' AS SECURED
 FROM biohub.submission_feature sf
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
@@ -183,6 +257,8 @@ LEFT JOIN deployments d
   ON d.submission_feature_id = sf.parent_submission_feature_id
 LEFT JOIN related_animals ra
   ON ra.deployment_id = d.submission_feature_id
+LEFT JOIN related_ecological_units reu
+  ON reu.deployment_id = d.submission_feature_id
 LEFT JOIN biohub.taxon t
   ON t.itis_tsn = ra.taxon_id::int
 WHERE ft.name = 'telemetry'
@@ -203,11 +279,11 @@ WHERE ft.name = 'telemetry'
     COMMENT ON COLUMN bcgw.telemetry_public.dop IS 'The dilution of precision';
     COMMENT ON COLUMN bcgw.telemetry_public.device_key IS 'The vendor and device serial';
     COMMENT ON COLUMN bcgw.telemetry_public.animal_id IS 'The identifier of the animal wearing the telemetry device';
-    COMMENT ON COLUMN bcgw.telemetry_public.animal_taxon_id IS 'Taxon ID loaded from the linked animal feature via submission_feature_feature relationships';
     COMMENT ON COLUMN bcgw.telemetry_public.animal_sex IS 'Sex loaded from the linked animal feature via submission_feature_feature relationships';
-    COMMENT ON COLUMN bcgw.telemetry_public.animal_identifier IS 'Identifier of the animal that the telemetry device is deployed on';
-    COMMENT ON COLUMN bcgw.telemetry_public.species_scientific_name IS 'Scientific name from taxon table linked via ITIS TSN';
-    COMMENT ON COLUMN bcgw.telemetry_public.species_english_name IS 'Common English name from taxon table linked via ITIS TSN';
+    COMMENT ON COLUMN bcgw.telemetry_public.scientific_name IS 'Scientific name from taxon table linked via ITIS TSN';
+    COMMENT ON COLUMN bcgw.telemetry_public.common_name IS 'Common English name from taxon table linked via ITIS TSN';
+    COMMENT ON COLUMN bcgw.telemetry_public.pop_unit IS 'Ecological unit value linked to the animal';
+    COMMENT ON COLUMN bcgw.telemetry_public.SECURED IS 'The indicator of whether the feature is secured (Y) or not (N)';
   `);
 
   await knex.raw(`
@@ -334,9 +410,9 @@ SELECT
         SELECT 1
         FROM biohub.submission_feature_security sfs
         WHERE sfs.submission_feature_id = sf.submission_feature_id
-      ) THEN 'Secured'
-      ELSE 'Open'
-    END AS SECURITY
+      ) THEN 'Y'
+      ELSE 'N'
+    END AS SECURED
 FROM biohub.submission_feature sf
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
@@ -364,7 +440,7 @@ WHERE ft.name = 'species_observation'
     COMMENT ON COLUMN bcgw.observations_all.common_name IS 'Common name from taxon table linked via ITIS TSN';
     COMMENT ON COLUMN bcgw.observations_all.sex IS 'Sex label from contributor codeset codes (male, female, unknown) matched by contributor_codeset_code_id';
     COMMENT ON COLUMN bcgw.observations_all.life_stage IS 'Life stage label from contributor codeset codes (adult, juvenile, etc.) matched by contributor_codeset_code_id';
-    COMMENT ON COLUMN bcgw.observations_all.SECURITY IS 'The security status of the feature';
+    COMMENT ON COLUMN bcgw.observations_all.SECURED IS 'The indicator of whether the feature is secured (Y) or not (N)';
   `);
 
   await knex.raw(`
@@ -491,9 +567,9 @@ SELECT
         SELECT 1
         FROM biohub.submission_feature_security sfs
         WHERE sfs.submission_feature_id = sf.submission_feature_id
-      ) THEN 'Secured'
-      ELSE 'Open'
-    END AS SECURITY
+      ) THEN 'Y'
+      ELSE 'N'
+    END AS SECURED
 FROM biohub.submission_feature sf
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
@@ -521,7 +597,7 @@ WHERE ft.name = 'species_observation'
     COMMENT ON COLUMN bcgw.incidental_all.common_name IS 'Common name from taxon table linked via ITIS TSN';
     COMMENT ON COLUMN bcgw.incidental_all.sex IS 'Sex label from contributor codeset codes (male, female, unknown) matched by contributor_codeset_code_id';
     COMMENT ON COLUMN bcgw.incidental_all.life_stage IS 'Life stage label from contributor codeset codes (adult, juvenile, etc.) matched by contributor_codeset_code_id';
-    COMMENT ON COLUMN bcgw.incidental_all.SECURITY IS 'The security status of the feature';
+    COMMENT ON COLUMN bcgw.incidental_all.SECURED IS 'The indicator of whether the feature is secured (Y) or not (N)';
   `);
 }
 
