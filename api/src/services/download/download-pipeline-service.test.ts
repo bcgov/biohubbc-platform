@@ -788,7 +788,11 @@ describe('DownloadPipelineService', () => {
     // Stubs all downstream effects used by every writeFeatureTypeParquet test so
     // each test only asserts the behavior it cares about.
     const stubParquetPipeline = () => {
-      const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves() };
+      const mockWriter = {
+        appendRow: sinon.stub().resolves(),
+        close: sinon.stub().resolves(),
+        setMetadata: sinon.stub()
+      };
       const openStreamStub = sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
       const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
       const insertArtifactStub = sinon
@@ -885,10 +889,10 @@ describe('DownloadPipelineService', () => {
       expect(uploadStub.firstCall.args[3]).to.equal(`downloads/${TEST_DOWNLOAD_ID}/observation/data.parquet`);
     });
 
-    it('includes GeoParquet metadata when feature type has spatial properties', async () => {
+    it('sets GeoParquet metadata on the writer when feature type has spatial properties', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
-      const { openStreamStub } = stubParquetPipeline();
+      const { mockWriter } = stubParquetPipeline();
 
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
 
@@ -899,16 +903,15 @@ describe('DownloadPipelineService', () => {
         featureTypeName: 'observation'
       });
 
-      expect(openStreamStub).to.have.been.calledOnce;
-      const writerOptions = openStreamStub.firstCall.args[2] as any;
-      expect(writerOptions).to.have.property('metadata');
-      expect(writerOptions.metadata).to.have.property('geo').that.is.a('string');
+      expect(mockWriter.setMetadata).to.have.been.calledOnce;
+      expect(mockWriter.setMetadata.firstCall.args[0]).to.equal('geo');
+      expect(mockWriter.setMetadata.firstCall.args[1]).to.be.a('string');
     });
 
-    it('omits GeoParquet metadata when feature type has no spatial properties', async () => {
+    it('does not set GeoParquet metadata when feature type has no spatial properties', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DownloadPipelineService(mockDBConnection);
-      const { openStreamStub } = stubParquetPipeline();
+      const { mockWriter } = stubParquetPipeline();
 
       sinon.stub(DownloadRepository.prototype, 'streamFeatureBaseByCartIdAndType').returns(mockBaseCursor([]));
 
@@ -919,9 +922,7 @@ describe('DownloadPipelineService', () => {
         featureTypeName: 'observation'
       });
 
-      expect(openStreamStub).to.have.been.calledOnce;
-      const writerOptions = openStreamStub.firstCall.args[2] as any;
-      expect(writerOptions).to.deep.equal({});
+      expect(mockWriter.setMetadata).to.not.have.been.called;
     });
 
     it('inserts artifact with uploaded status, parquet format, and deterministic S3 key', async () => {

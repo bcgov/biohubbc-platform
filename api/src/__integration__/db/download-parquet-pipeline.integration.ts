@@ -12,8 +12,10 @@
 // Run: make test-db
 // Requires: make web (database must be running with seed data)
 
+import * as parquetjs from '@dsnp/parquetjs';
 import { expect } from 'chai';
 import { randomInt } from 'node:crypto';
+import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, getKnex, IDBConnection, initDBPool } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
@@ -23,6 +25,7 @@ import { DownloadRepository } from '../../repositories/download/download-reposit
 import { CartService } from '../../services/cart-service';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
 import { DownloadService } from '../../services/download/download-service';
+import { ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { CsvPropertyDefinition } from '../../utils/csv-utils';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
@@ -100,6 +103,7 @@ describe('Download Parquet pipeline (integration)', function () {
   });
 
   afterEach(async () => {
+    sinon.restore();
     await connection.rollback();
     connection.release();
   });
@@ -403,6 +407,22 @@ describe('Download Parquet pipeline (integration)', function () {
     }
 
     return allRows;
+  }
+
+  /**
+   * Helper: stub @dsnp/parquetjs ParquetWriter.openStream and ObjectStorageService.uploadStream.
+   *
+   * The Parquet writer is replaced with a no-op that never writes to the stream,
+   * so the PassThrough receives zero bytes (hash = SHA-256 of empty input, byteCount = 0).
+   * The upload is stubbed to resolve without consuming the stream. The real SQL paths
+   * for ArtifactService.insertArtifact and DownloadRepository.createDownloadArtifact
+   * remain unstubbed — those are exactly the idempotency contracts we verify.
+   */
+  function stubParquetAndUpload(): { uploadStub: sinon.SinonStub } {
+    const mockWriter = { appendRow: sinon.stub().resolves(), close: sinon.stub().resolves() };
+    sinon.stub(parquetjs.ParquetWriter, 'openStream').resolves(mockWriter as any);
+    const uploadStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+    return { uploadStub };
   }
 
   // ── Tests ────────────────────────────────────────────────────────────
@@ -738,6 +758,156 @@ describe('Download Parquet pipeline (integration)', function () {
       } catch (error) {
         expect(error).to.be.instanceOf(ApiConflictError);
       }
+    });
+  });
+
+  describe('writeFeatureTypeParquet — artifact + download_artifact rows', () => {
+    // ParquetWriter is stubbed — no properties are resolved against typed tables, so
+    // an empty property list is safe and minimizes test surface area.
+    const emptyProperties: CsvPropertyDefinition[] = [];
+
+    it('inserts one artifact + one download_artifact row for a single feature type', async () => {
+      stubParquetAndUpload();
+
+      const submissionId = await createTestSubmission(connection);
+      const datasetId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Happy path dataset' });
+      const downloadId = await createCartDownload([datasetId]);
+      const source = await downloadRepo.getDownloadSource(downloadId);
+
+      await pipelineService.writeFeatureTypeParquet({
+        downloadId,
+        source,
+        properties: emptyProperties,
+        featureTypeName: 'dataset'
+      });
+
+      const artifactRows = await connection.sql(SQL`
+        SELECT artifact.artifact_id, artifact.bucket, artifact.object_key, artifact.byte_size,
+               artifact.checksum_sha256, artifact.artifact_status, artifact.format, artifact.uploaded_at
+        FROM artifact
+        INNER JOIN download_artifact ON download_artifact.artifact_id = artifact.artifact_id
+        WHERE download_artifact.download_id = ${downloadId}
+          AND download_artifact.record_end_date IS NULL;
+      `);
+      expect(artifactRows.rowCount).to.equal(1);
+
+      const artifact = artifactRows.rows[0];
+      expect(artifact.format).to.equal('parquet');
+      expect(artifact.artifact_status).to.equal('uploaded');
+      expect(artifact.object_key).to.equal(`downloads/${downloadId}/dataset/data.parquet`);
+      expect(artifact.bucket).to.be.a('string').and.have.length.greaterThan(0);
+      expect(artifact.checksum_sha256).to.match(/^[0-9a-f]{64}$/);
+      expect(Number(artifact.byte_size)).to.be.at.least(0);
+      expect(artifact.uploaded_at).to.not.be.null;
+
+      // Explicit FK linkage: download_artifact.artifact_id matches artifact.artifact_id
+      const linkRows = await connection.sql(SQL`
+        SELECT artifact_id, download_id
+        FROM download_artifact
+        WHERE download_id = ${downloadId}
+          AND record_end_date IS NULL;
+      `);
+      expect(linkRows.rowCount).to.equal(1);
+      expect(linkRows.rows[0].artifact_id).to.equal(artifact.artifact_id);
+      expect(linkRows.rows[0].download_id).to.equal(downloadId);
+
+      // download status untouched — writeFeatureTypeParquet does not transition status
+      const download = await downloadService.findDownloadById(downloadId);
+      expect(download!.download_status).to.equal(DownloadStatusEnum.PENDING);
+    });
+
+    it('is idempotent on retry — second call does not create a duplicate artifact or download_artifact row', async () => {
+      stubParquetAndUpload();
+
+      const submissionId = await createTestSubmission(connection);
+      const datasetId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Retry dataset' });
+      const downloadId = await createCartDownload([datasetId]);
+      const source = await downloadRepo.getDownloadSource(downloadId);
+
+      // Call 1
+      await pipelineService.writeFeatureTypeParquet({
+        downloadId,
+        source,
+        properties: emptyProperties,
+        featureTypeName: 'dataset'
+      });
+
+      const afterFirst = await connection.sql(SQL`
+        SELECT artifact.artifact_id, artifact.checksum_sha256, artifact.byte_size
+        FROM artifact
+        INNER JOIN download_artifact ON download_artifact.artifact_id = artifact.artifact_id
+        WHERE download_artifact.download_id = ${downloadId}
+          AND download_artifact.record_end_date IS NULL;
+      `);
+      expect(afterFirst.rowCount).to.equal(1);
+      const firstArtifactId = afterFirst.rows[0].artifact_id;
+      const firstChecksum = afterFirst.rows[0].checksum_sha256;
+      const firstByteSize = afterFirst.rows[0].byte_size;
+
+      // Call 2 — same download, same feature type
+      await pipelineService.writeFeatureTypeParquet({
+        downloadId,
+        source,
+        properties: emptyProperties,
+        featureTypeName: 'dataset'
+      });
+
+      const afterSecond = await connection.sql(SQL`
+        SELECT artifact.artifact_id, artifact.checksum_sha256, artifact.byte_size
+        FROM artifact
+        INNER JOIN download_artifact ON download_artifact.artifact_id = artifact.artifact_id
+        WHERE download_artifact.download_id = ${downloadId}
+          AND download_artifact.record_end_date IS NULL;
+      `);
+      // Idempotency: same row count, same artifact_id, unchanged checksum + byte_size
+      expect(afterSecond.rowCount).to.equal(1);
+      expect(afterSecond.rows[0].artifact_id).to.equal(firstArtifactId);
+      expect(afterSecond.rows[0].checksum_sha256).to.equal(firstChecksum);
+      expect(String(afterSecond.rows[0].byte_size)).to.equal(String(firstByteSize));
+    });
+
+    it('inserts one artifact + one download_artifact row per feature type when the download has multiple types', async () => {
+      stubParquetAndUpload();
+
+      const submissionId = await createTestSubmission(connection);
+      const datasetId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Multi DS' });
+      const captureId = await createTestFeature(connection, submissionId, 'capture', { comment: 'Multi cap' });
+      const downloadId = await createCartDownload([datasetId, captureId]);
+      const source = await downloadRepo.getDownloadSource(downloadId);
+
+      await pipelineService.writeFeatureTypeParquet({
+        downloadId,
+        source,
+        properties: emptyProperties,
+        featureTypeName: 'dataset'
+      });
+      await pipelineService.writeFeatureTypeParquet({
+        downloadId,
+        source,
+        properties: emptyProperties,
+        featureTypeName: 'capture'
+      });
+
+      const artifactRows = await connection.sql(SQL`
+        SELECT artifact.artifact_id, artifact.object_key, download_artifact.download_id
+        FROM artifact
+        INNER JOIN download_artifact ON download_artifact.artifact_id = artifact.artifact_id
+        WHERE download_artifact.download_id = ${downloadId}
+          AND download_artifact.record_end_date IS NULL
+        ORDER BY artifact.object_key;
+      `);
+      expect(artifactRows.rowCount).to.equal(2);
+      const objectKeys = artifactRows.rows.map((r: any) => r.object_key);
+      expect(objectKeys).to.deep.equal([
+        `downloads/${downloadId}/capture/data.parquet`,
+        `downloads/${downloadId}/dataset/data.parquet`
+      ]);
+      // Both rows link to the same download
+      for (const row of artifactRows.rows) {
+        expect(row.download_id).to.equal(downloadId);
+      }
+      // The two artifact_ids are distinct
+      expect(artifactRows.rows[0].artifact_id).to.not.equal(artifactRows.rows[1].artifact_id);
     });
   });
 });

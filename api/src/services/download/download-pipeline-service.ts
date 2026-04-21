@@ -397,14 +397,20 @@ export class DownloadPipelineService extends DBService {
       s3Key
     );
 
-    // Open Parquet writer with optional GeoParquet metadata for spatial types
-    const writerOptions: any = {};
-    if (spatialColumns.length > 0) {
-      writerOptions.metadata = { geo: buildGeoParquetMetadata(spatialColumns) };
-    }
     // PassThrough implements write()/end() but @dsnp/parquetjs types expect fs.WriteStream.
     // The runtime only calls write() and end() — safe to cast.
-    const writer = await ParquetWriter.openStream(schema, passThrough as any, writerOptions);
+    const writer = await ParquetWriter.openStream(schema, passThrough as any);
+
+    // GeoParquet 1.0 metadata must be attached via setMetadata(), not the openStream
+    // options bag: @dsnp/parquetjs silently discards `opts.metadata` — the writer
+    // constructor initializes `userMetadata = {}` without reading the option (see
+    // node_modules/@dsnp/parquetjs/dist/lib/writer.js:107). setMetadata() writes to
+    // userMetadata, which is emitted to the footer on close(). Without this call,
+    // GeoParquet-aware readers (DuckDB spatial, GeoPandas, ogr2ogr) cannot detect
+    // the geometry column, CRS, or WKB encoding.
+    if (spatialColumns.length > 0) {
+      writer.setMetadata('geo', buildGeoParquetMetadata(spatialColumns));
+    }
 
     // Open cursor for the appropriate source (cart or search filters)
     let cursor: AsyncGenerator<any[]>;
