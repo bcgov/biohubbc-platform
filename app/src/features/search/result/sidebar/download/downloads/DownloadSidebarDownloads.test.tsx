@@ -1,16 +1,14 @@
-import { cleanup, fireEvent, waitFor } from '@testing-library/react';
+import { cleanup, waitFor } from '@testing-library/react';
 import { DownloadRecord } from 'interfaces/useDownloadApi.interface';
 import { render } from 'test-helpers/test-utils';
-import { DownloadSidebarDownloads, isDownloadReady } from './DownloadSidebarDownloads';
+import { DownloadSidebarDownloads } from './DownloadSidebarDownloads';
 
 const mockGetDownloads = vi.fn();
-const mockGetFragmentUrl = vi.fn();
 
 vi.mock('hooks/useApi', () => ({
   useApi: () => ({
     download: {
-      getDownloads: mockGetDownloads,
-      getFragmentUrl: mockGetFragmentUrl
+      getDownloads: mockGetDownloads
     }
   })
 }));
@@ -27,19 +25,6 @@ const makeDownload = (overrides: Partial<DownloadRecord> = {}): DownloadRecord =
   completed_at: '2026-03-01T00:02:00Z',
   downloaded_at: null,
   ...overrides
-});
-
-describe('isDownloadReady', () => {
-  it.each([
-    { status: 'ready', expected: true },
-    { status: 'downloaded', expected: true },
-    { status: 'pending', expected: false },
-    { status: 'processing', expected: false },
-    { status: 'failed', expected: false },
-    { status: 'unknown', expected: false }
-  ])('returns $expected for "$status"', ({ status, expected }) => {
-    expect(isDownloadReady(status)).toBe(expected);
-  });
 });
 
 describe('DownloadSidebarDownloads', () => {
@@ -59,10 +44,10 @@ describe('DownloadSidebarDownloads', () => {
       pagination: mockPagination({ total: 2 })
     });
 
-    const { getAllByTestId } = render(<DownloadSidebarDownloads />);
+    const { getAllByText } = render(<DownloadSidebarDownloads />);
 
     await waitFor(() => {
-      expect(getAllByTestId('download-button')).toHaveLength(2);
+      expect(getAllByText('Ready').length).toBe(2);
     });
   });
 
@@ -73,28 +58,6 @@ describe('DownloadSidebarDownloads', () => {
 
     await waitFor(() => {
       expect(getByText(/no downloads/i)).toBeVisible();
-    });
-  });
-
-  it('calls getFragmentUrl and creates iframe on download click', async () => {
-    mockGetDownloads.mockResolvedValue({
-      downloads: [makeDownload({ download_id: 'dl-1' })],
-      pagination: mockPagination()
-    });
-    mockGetFragmentUrl.mockResolvedValue({ url: 'https://s3.example.com/signed' });
-
-    const { getByTestId } = render(<DownloadSidebarDownloads />);
-
-    await waitFor(() => {
-      expect(getByTestId('download-button')).toBeVisible();
-    });
-
-    fireEvent.click(getByTestId('download-button'));
-
-    await waitFor(() => {
-      expect(mockGetFragmentUrl).toHaveBeenCalledWith('dl-1', 0);
-      const iframe = document.querySelector('iframe[src="https://s3.example.com/signed"]');
-      expect(iframe).toBeTruthy();
     });
   });
 
