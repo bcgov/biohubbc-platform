@@ -11,7 +11,9 @@ export const PolicyStatementExpression = z.object({
 
 export type PolicyStatementExpression = z.infer<typeof PolicyStatementExpression>;
 
-export interface CreatePolicyStatementExpression {
-  policy_statement_id: string;
-  expression_id: string;
-}
+export const CreatePolicyStatementExpression = PolicyStatementExpression.pick({
+  policy_statement_id: true,
+  expression_id: true
+});
+
+export type CreatePolicyStatementExpression = z.infer<typeof CreatePolicyStatementExpression>;

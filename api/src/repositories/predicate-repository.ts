@@ -3,35 +3,21 @@ import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { TypedPredicate } from '../models/expression-tree';
-import { Predicate, PredicateResolveInput, ReadPredicateNodeRow } from '../models/predicate';
+import { PredicateHashRow, PredicateResolveInput, ReadPredicateNodeRow } from '../models/predicate';
 import { BaseRepository } from './base-repository';
 
 /**
- * Persistence repository for predicate anchors, payload rows, and runtime-shaped predicate reads.
- *
- * Responsibilities are intentionally split across two access patterns:
- *
- * - Write-side:
- *   - insert predicate anchors by deterministic hash,
- *   - fetch existing anchors by hash when needed for dedup orchestration in service,
- *   - write exactly one typed payload row for newly inserted anchors.
- * - Read-side:
- *   - return predicate leaves already shaped like runtime `ExpressionTreePredicate`
- *     nodes using SQL JSON construction,
- *   - validate that shape in TypeScript via Zod (`ExpressionTreePredicate`).
- *
- * This keeps repositories data-access-focused while avoiding large manual mapper
- * trees in TypeScript.
+ * Query repository for predicate anchor rows, typed payload rows, and predicate read projections.
  */
 export class PredicateRepository extends BaseRepository {
   /**
    * Insert a predicate anchor by normalized predicate hash.
    *
    * @param {PredicateResolveInput} payload - Predicate attributes including normalized hash.
-   * @return {(Promise<Predicate | undefined>)} Inserted predicate row, or undefined on conflict.
+   * @return {(Promise<PredicateHashRow | undefined>)} Inserted predicate row, or undefined on conflict.
    * @throws {ApiExecuteSQLError} If insert returns an unexpected row count.
    */
-  async insertPredicateAnchor(payload: PredicateResolveInput): Promise<Predicate | undefined> {
+  async insertPredicateAnchor(payload: PredicateResolveInput): Promise<PredicateHashRow | undefined> {
     const sql = SQL`
       INSERT INTO predicate (
         feature_type_property_id,
@@ -51,7 +37,7 @@ export class PredicateRepository extends BaseRepository {
         feature_property_type_id,
         predicate_hash;
     `;
-    const response = await this.connection.sql(sql, Predicate);
+    const response = await this.connection.sql(sql, PredicateHashRow);
     const rowCount = response.rowCount ?? 0;
 
     if (rowCount > 1) {
@@ -68,17 +54,18 @@ export class PredicateRepository extends BaseRepository {
    * Fetch one active predicate anchor by normalized hash.
    *
    * @param {string} predicateHash - Normalized predicate hash.
-   * @return {(Promise<Predicate | undefined>)} Matching active predicate row, when present.
+   * @return {(Promise<PredicateHashRow | undefined>)} Matching active predicate row, when present.
    * @throws {ApiExecuteSQLError} If more than one active row is found.
    */
-  async getPredicateByHash(predicateHash: string): Promise<Predicate | undefined> {
+  async getPredicateByHash(predicateHash: string): Promise<PredicateHashRow | undefined> {
     const knex = getKnex();
     const query = knex('predicate')
       .select(['predicate_id', 'feature_type_property_id', 'feature_property_type_id', 'predicate_hash'])
       .where('predicate_hash', predicateHash)
-      .whereNull('record_end_date');
+      .whereNull('record_end_date')
+      .limit(1);
 
-    const response = await this.connection.knex(query, Predicate);
+    const response = await this.connection.knex(query, PredicateHashRow);
     const rowCount = response.rowCount ?? 0;
 
     if (rowCount > 1) {
@@ -98,9 +85,9 @@ export class PredicateRepository extends BaseRepository {
    * rows only (`record_end_date IS NULL`).
    *
    * @param {string[]} predicateHashes - Normalized predicate hashes.
-   * @return {Promise<Predicate[]>} Matched active predicate rows.
+   * @return {Promise<PredicateHashRow[]>} Matched active predicate rows.
    */
-  async getPredicatesByHashes(predicateHashes: string[]): Promise<Predicate[]> {
+  async getPredicatesByHashes(predicateHashes: string[]): Promise<PredicateHashRow[]> {
     if (predicateHashes.length === 0) {
       return [];
     }
@@ -111,7 +98,7 @@ export class PredicateRepository extends BaseRepository {
       .whereIn('predicate_hash', [...new Set(predicateHashes)])
       .whereNull('record_end_date');
 
-    const response = await this.connection.knex(query, Predicate);
+    const response = await this.connection.knex(query, PredicateHashRow);
     return response.rows;
   }
 
@@ -214,7 +201,7 @@ export class PredicateRepository extends BaseRepository {
    * branches in TypeScript.
    *
    * @param {string[]} predicateIds - Predicate identifiers to fetch.
-   * @return {*} Knex query builder for read predicate nodes.
+   * @return {Knex.QueryBuilder} Knex query builder returning `ReadPredicateNodeRow`-shaped rows.
    */
   private buildReadPredicateQuery(predicateIds: string[]) {
     const knex = getKnex();
@@ -513,6 +500,18 @@ export class PredicateRepository extends BaseRepository {
     const query = this.buildReadPredicateQuery(predicateIds);
     const response = await this.connection.knex(query, ReadPredicateNodeRow);
     const rows = response.rows;
+    const seenIds = new Set<string>();
+
+    for (const row of rows) {
+      if (seenIds.has(row.predicate_id)) {
+        throw new ApiExecuteSQLError('Duplicate predicate read rows detected', [
+          'PredicateRepository->readPredicateNodes',
+          { predicateId: row.predicate_id }
+        ]);
+      }
+      seenIds.add(row.predicate_id);
+    }
+
     const byId = new Map<string, ReadPredicateNodeRow>(rows.map((row) => [row.predicate_id, row]));
 
     return predicateIds.map((predicateId) => {

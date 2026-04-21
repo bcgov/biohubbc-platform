@@ -766,7 +766,12 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN security_rule_expression.update_user IS 'The id of the user who last updated the record.';
     COMMENT ON COLUMN security_rule_expression.revision_count IS 'Revision count used for concurrency control.';
 
+    --------------------------------------------------------------------------------
     -- AUDIT / JOURNAL TRIGGERS
+    --
+    -- Convention in this codebase: operational tables use tr_audit_trigger +
+    -- tr_journal_trigger to keep create/update metadata and append journal rows.
+    --------------------------------------------------------------------------------
     --------------------------------------------------------------------------------
 
     CREATE TRIGGER audit_expression
@@ -874,6 +879,18 @@ export async function down(knex: Knex): Promise<void> {
   await knex.raw(`
     SET SEARCH_PATH = biohub, public;
 
+    --------------------------------------------------------------------------------
+    -- DOWN order notes:
+    -- 1) Drop triggers first (they depend on tables).
+    -- 2) Drop indexes.
+    -- 3) Drop tables in dependency order (children before parents).
+    -- 4) Drop enum types last.
+    --------------------------------------------------------------------------------
+
+    --------------------------------------------------------------------------------
+    -- DROP TRIGGERS
+    --------------------------------------------------------------------------------
+
     DROP TRIGGER IF EXISTS journal_security_rule_expression ON security_rule_expression;
     DROP TRIGGER IF EXISTS audit_security_rule_expression ON security_rule_expression;
     DROP TRIGGER IF EXISTS journal_policy_statement_condition_expression ON policy_statement_condition_expression;
@@ -904,6 +921,10 @@ export async function down(knex: Knex): Promise<void> {
     DROP TRIGGER IF EXISTS audit_predicate ON predicate;
     DROP TRIGGER IF EXISTS journal_expression ON expression;
     DROP TRIGGER IF EXISTS audit_expression ON expression;
+
+    --------------------------------------------------------------------------------
+    -- DROP INDEXES
+    --------------------------------------------------------------------------------
 
     DROP INDEX IF EXISTS security_rule_expression_nuk1;
     DROP INDEX IF EXISTS security_rule_expression_idx3;
@@ -984,6 +1005,10 @@ export async function down(knex: Knex): Promise<void> {
     DROP INDEX IF EXISTS predicate_idx1;
     DROP INDEX IF EXISTS predicate_idx3;
 
+    --------------------------------------------------------------------------------
+    -- DROP TABLES
+    --------------------------------------------------------------------------------
+
     DROP TABLE IF EXISTS security_rule_expression;
     DROP TABLE IF EXISTS policy_statement_expression;
     DROP TABLE IF EXISTS policy_statement_condition_expression;
@@ -1000,6 +1025,10 @@ export async function down(knex: Knex): Promise<void> {
     DROP TABLE IF EXISTS expression_clause;
     DROP TABLE IF EXISTS predicate;
     DROP TABLE IF EXISTS expression;
+
+    --------------------------------------------------------------------------------
+    -- DROP ENUM TYPES
+    --------------------------------------------------------------------------------
 
     DROP TYPE IF EXISTS logical_operator_type;
     DROP TYPE IF EXISTS code_operator_type;

@@ -9,6 +9,11 @@ const defaultLog = getLogger('services/feature-type-property');
 export class FeatureTypePropertyService extends DBService {
   featureTypePropertyRepository: FeatureTypePropertyRepository;
 
+  /**
+   * Build a feature-type-property service.
+   *
+   * @param {IDBConnection} connection - Active database connection.
+   */
   constructor(connection: IDBConnection) {
     super(connection);
     this.featureTypePropertyRepository = new FeatureTypePropertyRepository(connection);
@@ -17,9 +22,8 @@ export class FeatureTypePropertyService extends DBService {
   /**
    * Get a feature property record by canonical feature-property name.
    *
-   * @param {string} featurePropertyName
-   * @return {*}  {Promise<FeatureTypeProperty>}
-   * @memberof FeatureTypePropertyService
+   * @param {string} featurePropertyName - Canonical feature-property name.
+   * @return {Promise<FeatureTypeProperty>} Matched feature-type-property row.
    */
   async getFeaturePropertyByName(featurePropertyName: string): Promise<FeatureTypeProperty> {
     defaultLog.debug({ message: 'getFeaturePropertyByName' });
@@ -30,9 +34,8 @@ export class FeatureTypePropertyService extends DBService {
   /**
    * Get a feature property record by feature_type_property_id.
    *
-   * @param {number} featureTypePropertyId
-   * @return {*}  {Promise<FeatureTypeProperty>}
-   * @memberof FeatureTypePropertyService
+   * @param {number} featureTypePropertyId - Feature type property identifier.
+   * @return {Promise<FeatureTypeProperty>} Matched feature-type-property row.
    */
   async getFeaturePropertyByFeatureTypePropertyId(featureTypePropertyId: number): Promise<FeatureTypeProperty> {
     defaultLog.debug({ message: 'getFeaturePropertyByFeatureTypePropertyId' });

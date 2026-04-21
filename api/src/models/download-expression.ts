@@ -13,7 +13,9 @@ export const DownloadExpression = z.object({
 
 export type DownloadExpression = z.infer<typeof DownloadExpression>;
 
-export interface CreateDownloadExpression {
-  download_id: string;
-  expression_id: string;
-}
+export const CreateDownloadExpression = DownloadExpression.pick({
+  download_id: true,
+  expression_id: true
+});
+
+export type CreateDownloadExpression = z.infer<typeof CreateDownloadExpression>;

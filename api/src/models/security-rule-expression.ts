@@ -13,7 +13,9 @@ export const SecurityRuleExpression = z.object({
 
 export type SecurityRuleExpression = z.infer<typeof SecurityRuleExpression>;
 
-export interface CreateSecurityRuleExpression {
-  security_rule_id: number;
-  expression_id: string;
-}
+export const CreateSecurityRuleExpression = SecurityRuleExpression.pick({
+  security_rule_id: true,
+  expression_id: true
+});
+
+export type CreateSecurityRuleExpression = z.infer<typeof CreateSecurityRuleExpression>;

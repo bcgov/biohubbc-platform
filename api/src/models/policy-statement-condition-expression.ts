@@ -13,7 +13,9 @@ export const PolicyStatementConditionExpression = z.object({
 
 export type PolicyStatementConditionExpression = z.infer<typeof PolicyStatementConditionExpression>;
 
-export interface CreatePolicyStatementConditionExpression {
-  policy_statement_condition_id: string;
-  expression_id: string;
-}
+export const CreatePolicyStatementConditionExpression = PolicyStatementConditionExpression.pick({
+  policy_statement_condition_id: true,
+  expression_id: true
+});
+
+export type CreatePolicyStatementConditionExpression = z.infer<typeof CreatePolicyStatementConditionExpression>;

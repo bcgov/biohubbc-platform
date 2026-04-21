@@ -4,6 +4,12 @@ import { CreatePolicyStatementExpression, PolicyStatementExpression } from '../m
 import { BaseRepository } from './base-repository';
 
 export class PolicyStatementExpressionRepository extends BaseRepository {
+  /**
+   * Soft delete all active expression links for a policy statement by setting `record_end_date`.
+   *
+   * @param {string} policyStatementId - Policy statement identifier.
+   * @return {Promise<PolicyStatementExpression[]>} Soft-deleted link rows.
+   */
   async deletePolicyStatementExpressionsByPolicyStatementId(
     policyStatementId: string
   ): Promise<PolicyStatementExpression[]> {
@@ -20,6 +26,13 @@ export class PolicyStatementExpressionRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * Insert a policy-statement-to-expression link row.
+   *
+   * @param {CreatePolicyStatementExpression} payload - Link payload.
+   * @return {Promise<PolicyStatementExpression>} Inserted link row.
+   * @throws {ApiExecuteSQLError} If the insert does not affect exactly one row.
+   */
   async insertPolicyStatementExpression(payload: CreatePolicyStatementExpression): Promise<PolicyStatementExpression> {
     const knex = getKnex();
     const query = knex('policy_statement_expression')
@@ -38,6 +51,14 @@ export class PolicyStatementExpressionRepository extends BaseRepository {
     return response.rows[0];
   }
 
+  /**
+   * Fetch one active policy-statement-expression link by id.
+   *
+   * @param {string} policyStatementExpressionId - Link identifier.
+   * @return {Promise<PolicyStatementExpression>} Matching active link row.
+   * @throws {ApiNotFoundError} If no active row exists for the provided id.
+   * @throws {ApiExecuteSQLError} If more than one active row is returned.
+   */
   async getPolicyStatementExpressionById(policyStatementExpressionId: string): Promise<PolicyStatementExpression> {
     const knex = getKnex();
     const query = knex('policy_statement_expression')
@@ -64,6 +85,12 @@ export class PolicyStatementExpressionRepository extends BaseRepository {
     return response.rows[0];
   }
 
+  /**
+   * Fetch all active expression links for a policy statement.
+   *
+   * @param {string} policyStatementId - Policy statement identifier.
+   * @return {Promise<PolicyStatementExpression[]>} Active link rows.
+   */
   async getPolicyStatementExpressionsByPolicyStatementId(
     policyStatementId: string
   ): Promise<PolicyStatementExpression[]> {
@@ -77,6 +104,12 @@ export class PolicyStatementExpressionRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * Fetch all active policy-statement links that reference an expression.
+   *
+   * @param {string} expressionId - Expression identifier.
+   * @return {Promise<PolicyStatementExpression[]>} Active link rows.
+   */
   async getPolicyStatementExpressionsByExpressionId(expressionId: string): Promise<PolicyStatementExpression[]> {
     const knex = getKnex();
     const query = knex('policy_statement_expression')

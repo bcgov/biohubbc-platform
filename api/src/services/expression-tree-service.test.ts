@@ -6,11 +6,7 @@ import { ApiExecuteSQLError } from '../errors/api-error';
 import { ExpressionClauseRepository } from '../repositories/expression-clause-repository';
 import { ExpressionRepository } from '../repositories/expression-repository';
 import { PredicateRepository } from '../repositories/predicate-repository';
-import { PolicyStatementConditionExpressionService } from './access-policy/policy-statement-condition-expression-service';
-import { PolicyStatementExpressionService } from './access-policy/policy-statement-expression-service';
-import { DownloadExpressionService } from './download/download-expression-service';
 import { ExpressionTreeService } from './expression-tree-service';
-import { SecurityRuleExpressionService } from './security-rule-expression-service';
 
 describe('ExpressionTreeService', () => {
   afterEach(() => {
@@ -247,76 +243,6 @@ describe('ExpressionTreeService', () => {
 
       expect(original.expression_id).to.equal('expr-1');
       expect(changed.expression_id).to.equal('expr-2');
-    });
-  });
-
-  describe('replaceOwnerExpressionTree', () => {
-    it('rebuilds and repoints owner links', async () => {
-      const service = new ExpressionTreeService(getMockDBConnection());
-
-      sinon.stub(service, 'writeExpressionTree').resolves({ expression_id: 'expr-2' });
-      const replaceDownloadExpressionStub = sinon
-        .stub(DownloadExpressionService.prototype, 'replaceDownloadExpression')
-        .resolves({} as any);
-      const replacePolicyConditionExpressionStub = sinon
-        .stub(PolicyStatementConditionExpressionService.prototype, 'replacePolicyStatementConditionExpression')
-        .resolves({} as any);
-      const replacePolicyExpressionStub = sinon
-        .stub(PolicyStatementExpressionService.prototype, 'replacePolicyStatementExpression')
-        .resolves({} as any);
-      const replaceSecurityRuleExpressionStub = sinon
-        .stub(SecurityRuleExpressionService.prototype, 'replaceSecurityRuleExpression')
-        .resolves({} as any);
-
-      await service.replaceDownloadExpressionTree('download-1', {
-        type: 'expression',
-        operator: 'AND',
-        clauses: [
-          {
-            type: 'predicate',
-            feature_type_property_id: 1,
-            predicate: { type: 'string', operator: 'Equals', value: 'elk' }
-          }
-        ]
-      });
-      await service.replacePolicyStatementConditionExpressionTree('psc-1', {
-        type: 'expression',
-        operator: 'AND',
-        clauses: [
-          {
-            type: 'predicate',
-            feature_type_property_id: 1,
-            predicate: { type: 'string', operator: 'Equals', value: 'elk' }
-          }
-        ]
-      });
-      await service.replacePolicyStatementExpressionTree('ps-1', {
-        type: 'expression',
-        operator: 'AND',
-        clauses: [
-          {
-            type: 'predicate',
-            feature_type_property_id: 1,
-            predicate: { type: 'string', operator: 'Equals', value: 'elk' }
-          }
-        ]
-      });
-      await service.replaceSecurityRuleExpressionTree(42, {
-        type: 'expression',
-        operator: 'AND',
-        clauses: [
-          {
-            type: 'predicate',
-            feature_type_property_id: 1,
-            predicate: { type: 'string', operator: 'Equals', value: 'elk' }
-          }
-        ]
-      });
-
-      expect(replaceDownloadExpressionStub.calledOnceWithExactly('download-1', 'expr-2')).to.equal(true);
-      expect(replacePolicyConditionExpressionStub.calledOnceWithExactly('psc-1', 'expr-2')).to.equal(true);
-      expect(replacePolicyExpressionStub.calledOnceWithExactly('ps-1', 'expr-2')).to.equal(true);
-      expect(replaceSecurityRuleExpressionStub.calledOnceWithExactly(42, 'expr-2')).to.equal(true);
     });
   });
 

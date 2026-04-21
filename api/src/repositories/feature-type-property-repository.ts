@@ -7,9 +7,10 @@ export class FeatureTypePropertyRepository extends BaseRepository {
   /**
    * Get a feature property record by canonical feature-property name.
    *
-   * @param {string} featurePropertyName
-   * @return {*}  {Promise<FeatureTypeProperty>}
-   * @memberof FeatureTypePropertyRepository
+   * @param {string} featurePropertyName - Canonical feature-property name.
+   * @return {Promise<FeatureTypeProperty>} Matching feature-type-property row.
+   * @throws {ApiNotFoundError} If no active feature property matches the name.
+   * @throws {ApiExecuteSQLError} If more than one active row is returned.
    */
   async getFeaturePropertyByName(featurePropertyName: string): Promise<FeatureTypeProperty> {
     const sqlStatement = SQL`
@@ -60,9 +61,10 @@ export class FeatureTypePropertyRepository extends BaseRepository {
   /**
    * Get a feature property record by feature_type_property_id.
    *
-   * @param {number} featureTypePropertyId
-   * @return {*}  {Promise<FeatureTypeProperty>}
-   * @memberof FeatureTypePropertyRepository
+   * @param {number} featureTypePropertyId - Feature type property identifier.
+   * @return {Promise<FeatureTypeProperty>} Matching feature-type-property row.
+   * @throws {ApiNotFoundError} If no active row exists for the id.
+   * @throws {ApiExecuteSQLError} If more than one active row is returned.
    */
   async getFeaturePropertyByFeatureTypePropertyId(featureTypePropertyId: number): Promise<FeatureTypeProperty> {
     const sqlStatement = SQL`

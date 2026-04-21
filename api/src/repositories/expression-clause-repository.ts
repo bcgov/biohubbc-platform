@@ -4,6 +4,16 @@ import { CreateExpressionClause, ExpressionClause } from '../models/expression-c
 import { BaseRepository } from './base-repository';
 
 export class ExpressionClauseRepository extends BaseRepository {
+  /**
+   * Insert a batch of expression clauses.
+   *
+   * Clause rows are expected to be pre-resolved to anchor ids and include the
+   * final clause order (`sequence`) for the owning expression.
+   *
+   * @param {CreateExpressionClause[]} payloads - Clause rows to insert.
+   * @return {Promise<ExpressionClause[]>} Inserted clause rows.
+   * @throws {ApiExecuteSQLError} If the insert does not affect all payload rows.
+   */
   async insertExpressionClauses(payloads: CreateExpressionClause[]): Promise<ExpressionClause[]> {
     if (payloads.length === 0) {
       return [];
@@ -26,6 +36,12 @@ export class ExpressionClauseRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * Fetch all active clauses for an expression in sequence order.
+   *
+   * @param {string} expressionId - Parent expression identifier.
+   * @return {Promise<ExpressionClause[]>} Active ordered clause rows.
+   */
   async getExpressionClausesByExpressionId(expressionId: string): Promise<ExpressionClause[]> {
     const knex = getKnex();
     const query = knex('expression_clause')

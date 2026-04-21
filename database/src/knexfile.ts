@@ -24,7 +24,7 @@ export default {
       directory: './migrations'
     },
     seeds: {
-      directory: ['./seeds', './procedures']
+      directory: ['./seeds']
     }
   },
   production: {
@@ -48,7 +48,7 @@ export default {
     },
     seeds: {
       // In production, do not run seeds
-      directory: ['./procedures']
+      directory: []
     }
   }
 };

@@ -1,11 +1,11 @@
 import type { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
-  await knex.raw(`--sql
+  await knex.raw(`
     SET SEARCH_PATH = biohub, public;
 
     --------------------------------------------------------------------------------
-    -- Cross-table / recursive invariants in deferred constraint triggers.
+    -- VALIDATE PREDICATE RESOLUTION
     --------------------------------------------------------------------------------
 
     CREATE OR REPLACE FUNCTION fn_validate_predicate_resolution()
@@ -122,6 +122,10 @@ export async function up(knex: Knex): Promise<void> {
     END;
     $$;
 
+    --------------------------------------------------------------------------------
+    -- VALIDATE EXPRESSION ACYCLICITY
+    --------------------------------------------------------------------------------
+
     CREATE OR REPLACE FUNCTION fn_validate_expression_tree_acyclic()
       RETURNS trigger
       LANGUAGE plpgsql
@@ -160,6 +164,10 @@ export async function up(knex: Knex): Promise<void> {
     END;
     $$;
 
+    --------------------------------------------------------------------------------
+    -- VALIDATE OWNER ATTACHMENTS (ROOT EXPRESSIONS ONLY)
+    --------------------------------------------------------------------------------
+
     CREATE OR REPLACE FUNCTION fn_validate_owner_expression_root()
       RETURNS trigger
       LANGUAGE plpgsql
@@ -194,6 +202,10 @@ export async function up(knex: Knex): Promise<void> {
       RETURN NULL;
     END;
     $$;
+
+    --------------------------------------------------------------------------------
+    -- CONSTRAINT TRIGGERS
+    --------------------------------------------------------------------------------
 
     CREATE CONSTRAINT TRIGGER validate_predicate_resolution_from_predicate
       AFTER INSERT OR UPDATE OR DELETE ON predicate
@@ -258,8 +270,18 @@ export async function up(knex: Knex): Promise<void> {
 }
 
 export async function down(knex: Knex): Promise<void> {
-  await knex.raw(`--sql
+  await knex.raw(`
     SET SEARCH_PATH = biohub, public;
+
+    --------------------------------------------------------------------------------
+    -- DOWN order notes:
+    -- 1) Drop constraint triggers.
+    -- 2) Drop validation functions.
+    --------------------------------------------------------------------------------
+
+    --------------------------------------------------------------------------------
+    -- DROP CONSTRAINT TRIGGERS
+    --------------------------------------------------------------------------------
 
     DROP TRIGGER IF EXISTS validate_predicate_resolution_from_predicate ON predicate;
     DROP TRIGGER IF EXISTS validate_predicate_resolution_from_predicate_string ON predicate_string;
@@ -275,6 +297,10 @@ export async function down(knex: Knex): Promise<void> {
     DROP TRIGGER IF EXISTS validate_download_expression_root ON download_expression;
     DROP TRIGGER IF EXISTS validate_policy_statement_condition_expression_root ON policy_statement_condition_expression;
     DROP TRIGGER IF EXISTS validate_security_rule_expression_root ON security_rule_expression;
+
+    --------------------------------------------------------------------------------
+    -- DROP VALIDATION FUNCTIONS
+    --------------------------------------------------------------------------------
 
     DROP FUNCTION IF EXISTS fn_validate_expression_tree_acyclic();
     DROP FUNCTION IF EXISTS fn_validate_owner_expression_root();

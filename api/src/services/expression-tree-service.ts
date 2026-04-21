@@ -22,11 +22,7 @@ import { PredicateFeaturePropertyTypeName, ReadPredicateNodeRow } from '../model
 import { ExpressionClauseRepository } from '../repositories/expression-clause-repository';
 import { ExpressionRepository } from '../repositories/expression-repository';
 import { PredicateRepository } from '../repositories/predicate-repository';
-import { PolicyStatementConditionExpressionService } from './access-policy/policy-statement-condition-expression-service';
-import { PolicyStatementExpressionService } from './access-policy/policy-statement-expression-service';
 import { DBService } from './db-service';
-import { DownloadExpressionService } from './download/download-expression-service';
-import { SecurityRuleExpressionService } from './security-rule-expression-service';
 
 const predicateTypeMap: Record<TypedPredicate['type'], PredicateFeaturePropertyTypeName> = {
   string: FEATURE_PROPERTY_TYPE.STRING,
@@ -38,26 +34,48 @@ const predicateTypeMap: Record<TypedPredicate['type'], PredicateFeaturePropertyT
   code: FEATURE_PROPERTY_TYPE.CODE
 };
 
+/**
+ * Service for writing and reading reusable expression trees.
+ *
+ * Core responsibilities:
+ * 1. Normalize and hash expression/predicate nodes deterministically.
+ * 2. Reuse existing anchors by hash when possible (dedupe by semantic identity).
+ * 3. Insert missing expression/predicate anchors and clause edges when needed.
+ * 4. Reconstruct a stored expression tree back into API shape.
+ * Important design detail:
+ * Hashes are semantic, not positional row IDs. This lets us share immutable
+ * expression fragments across requests while preserving full tree
+ * structure through `expression_clause` ordering.
+ */
 export class ExpressionTreeService extends DBService {
   expressionRepository: ExpressionRepository;
   expressionClauseRepository: ExpressionClauseRepository;
   predicateRepository: PredicateRepository;
-  downloadExpressionService: DownloadExpressionService;
-  policyStatementConditionExpressionService: PolicyStatementConditionExpressionService;
-  policyStatementExpressionService: PolicyStatementExpressionService;
-  securityRuleExpressionService: SecurityRuleExpressionService;
 
+  /**
+   * Build an expression-tree lifecycle service.
+   *
+   * @param {IDBConnection} connection - Active database connection.
+   */
   constructor(connection: IDBConnection) {
     super(connection);
     this.expressionRepository = new ExpressionRepository(connection);
     this.expressionClauseRepository = new ExpressionClauseRepository(connection);
     this.predicateRepository = new PredicateRepository(connection);
-    this.downloadExpressionService = new DownloadExpressionService(connection);
-    this.policyStatementConditionExpressionService = new PolicyStatementConditionExpressionService(connection);
-    this.policyStatementExpressionService = new PolicyStatementExpressionService(connection);
-    this.securityRuleExpressionService = new SecurityRuleExpressionService(connection);
   }
 
+  /**
+   * Persist an expression tree and return the resolved root expression id.
+   *
+   * Flow:
+   * 1. Compute deterministic hashes for all nodes in the tree.
+   * 2. Load existing expression/predicate ids by those hashes in bulk.
+   * 3. Resolve recursively, inserting only missing anchors/clauses.
+   *
+   * @param {ExpressionTree} tree - Root expression tree payload to persist.
+   * @return {Promise<{ expression_id: string }>} Resolved root expression id.
+   * @memberof ExpressionTreeService
+   */
   async writeExpressionTree(tree: ExpressionTree): Promise<{ expression_id: string }> {
     const hashedTree = this.buildHashedTreeFromExpression(tree);
     const { predicateIdsByHash, expressionIdsByHash } = await this.loadExistingIdsByHash(hashedTree);
@@ -65,55 +83,32 @@ export class ExpressionTreeService extends DBService {
     return { expression_id: expressionId };
   }
 
-  private async replaceOwnerExpressionTree(
-    tree: ExpressionTree,
-    replaceOwnerLink: (expressionId: string) => Promise<unknown>
-  ): Promise<{ expression_id: string }> {
-    const { expression_id } = await this.writeExpressionTree(tree);
-    await replaceOwnerLink(expression_id);
-    return { expression_id };
-  }
-
-  async replaceDownloadExpressionTree(downloadId: string, tree: ExpressionTree): Promise<{ expression_id: string }> {
-    return this.replaceOwnerExpressionTree(tree, (expressionId) =>
-      this.downloadExpressionService.replaceDownloadExpression(downloadId, expressionId)
-    );
-  }
-
-  async replacePolicyStatementConditionExpressionTree(
-    policyStatementConditionId: string,
-    tree: ExpressionTree
-  ): Promise<{ expression_id: string }> {
-    return this.replaceOwnerExpressionTree(tree, (expressionId) =>
-      this.policyStatementConditionExpressionService.replacePolicyStatementConditionExpression(
-        policyStatementConditionId,
-        expressionId
-      )
-    );
-  }
-
-  async replacePolicyStatementExpressionTree(
-    policyStatementId: string,
-    tree: ExpressionTree
-  ): Promise<{ expression_id: string }> {
-    return this.replaceOwnerExpressionTree(tree, (expressionId) =>
-      this.policyStatementExpressionService.replacePolicyStatementExpression(policyStatementId, expressionId)
-    );
-  }
-
-  async replaceSecurityRuleExpressionTree(
-    securityRuleId: number,
-    tree: ExpressionTree
-  ): Promise<{ expression_id: string }> {
-    return this.replaceOwnerExpressionTree(tree, (expressionId) =>
-      this.securityRuleExpressionService.replaceSecurityRuleExpression(securityRuleId, expressionId)
-    );
-  }
-
+  /**
+   * Read a stored expression tree by root expression id.
+   *
+   * @param {string} expressionId - Root expression identifier.
+   * @return {Promise<ExpressionTree>} Reconstructed API tree.
+   * @memberof ExpressionTreeService
+   */
   async readExpressionTree(expressionId: string): Promise<ExpressionTree> {
     return this.reconstructExpressionTreeFromStorage(expressionId, new Set<string>());
   }
 
+  /**
+   * Reconstruct an expression node recursively from storage rows.
+   *
+   * This routine:
+   * 1. Guards against cycles during traversal (defensive check in service layer).
+   * 2. Loads expression anchor + ordered clause links.
+   * 3. Hydrates predicate clauses in batch per expression node.
+   * 4. Re-enters recursively for child expression clauses.
+   *
+   * @private
+   * @param {string} expressionId - Expression id to reconstruct.
+   * @param {Set<string>} visitedExpressionIds - Path-local set used for cycle detection.
+   * @return {Promise<ExpressionTreeExpression>} Reconstructed expression node.
+   * @memberof ExpressionTreeService
+   */
   private async reconstructExpressionTreeFromStorage(
     expressionId: string,
     visitedExpressionIds: Set<string>
@@ -128,8 +123,10 @@ export class ExpressionTreeService extends DBService {
     const nextVisitedExpressionIds = new Set(visitedExpressionIds);
     nextVisitedExpressionIds.add(expressionId);
 
+    // Anchor row (operator) for this expression node.
     const expression = await this.expressionRepository.getExpressionById(expressionId);
 
+    // Ordered edges to either predicates or child expressions.
     const links = await this.expressionClauseRepository.getExpressionClausesByExpressionId(expressionId);
 
     if (links.length === 0) {
@@ -141,6 +138,7 @@ export class ExpressionTreeService extends DBService {
 
     const predicateIds = links.map((link) => link.predicate_id).filter((value): value is string => !!value);
 
+    // Batch-read all predicate payload rows referenced by this expression node.
     const readPredicates = await this.predicateRepository.readPredicateNodes(predicateIds);
     const predicatesById = new Map(readPredicates.map((row) => [row.predicate_id, row]));
 
@@ -174,6 +172,7 @@ export class ExpressionTreeService extends DBService {
 
       readClauses.push({
         sequence: link.sequence,
+        // Recurse into child expression branch.
         clause: await this.reconstructExpressionTreeFromStorage(link.child_expression_id, nextVisitedExpressionIds)
       });
     }
@@ -181,10 +180,22 @@ export class ExpressionTreeService extends DBService {
     return {
       type: 'expression',
       operator: expression.operator,
+      // Storage is expected to be ordered by sequence, but sort defensively.
       clauses: readClauses.sort((a, b) => a.sequence - b.sequence).map((entry) => entry.clause)
     };
   }
 
+  /**
+   * Deterministically stringify arbitrary JSON-like values.
+   *
+   * Keys are sorted recursively so semantically equivalent objects hash to the same value
+   * regardless of source key order.
+   *
+   * @private
+   * @param {unknown} value - Value to stringify.
+   * @return {string} Stable JSON-like string.
+   * @memberof ExpressionTreeService
+   */
   private stableStringify(value: unknown): string {
     if (value === null) {
       return 'null';
@@ -202,18 +213,59 @@ export class ExpressionTreeService extends DBService {
     return JSON.stringify(value);
   }
 
+  /**
+   * Compute a SHA-256 hex digest for a normalized identity string.
+   *
+   * @private
+   * @param {string} value - Canonical identity string.
+   * @return {string} SHA-256 hash in hex form.
+   * @memberof ExpressionTreeService
+   */
   private computeHash(value: string): string {
     return createHash('sha256').update(value).digest('hex');
   }
 
+  /**
+   * Normalize case-insensitive text before hashing.
+   *
+   * Uses NFKC normalization and lower-casing so equivalent Unicode forms and case
+   * variants collapse to the same semantic identity.
+   *
+   * @private
+   * @param {string} value - Source string.
+   * @return {string} Normalized string.
+   * @memberof ExpressionTreeService
+   */
   private normalizeCaseInsensitiveText(value: string): string {
     return value.normalize('NFKC').toLowerCase();
   }
 
+  /**
+   * Check whether a string operator should hash case-insensitively.
+   *
+   * @private
+   * @param {Extract<TypedPredicate, { type: 'string' }>['operator']} operator - String operator.
+   * @return {boolean} True when values should be normalized to case-insensitive form.
+   * @memberof ExpressionTreeService
+   */
   private isCaseInsensitiveStringOperator(operator: Extract<TypedPredicate, { type: 'string' }>['operator']): boolean {
     return operator === 'ILike';
   }
 
+  /**
+   * Build canonical predicate identity text used for semantic hashing.
+   *
+   * Canonicalization is type-aware:
+   * - string: supports case-insensitive normalization for ILike.
+   * - number: normalized through JS number stringify.
+   * - geometry/object-like values: stabilized via sorted-key stringify.
+   * - optional values (e.g., Exists): serialized as empty markers.
+   *
+   * @private
+   * @param {Extract<ExpressionTreeClause, { type: 'predicate' }>} clause - Predicate clause.
+   * @return {string} Canonical identity string for hash input.
+   * @memberof ExpressionTreeService
+   */
   private buildNormalizedPredicateIdentityForHash(
     clause: Extract<ExpressionTreeClause, { type: 'predicate' }>
   ): string {
@@ -265,6 +317,18 @@ export class ExpressionTreeService extends DBService {
     }
   }
 
+  /**
+   * Build canonical expression identity text used for semantic hashing.
+   *
+   * Clauses are represented as ordered hash references (sequence + type + child hash),
+   * so parent expression identity captures tree shape and clause order.
+   *
+   * @private
+   * @param {LogicalOperator} operator - Expression operator.
+   * @param {ExpressionHashClause[]} clauses - Ordered hashed child references.
+   * @return {string} Canonical identity string for hash input.
+   * @memberof ExpressionTreeService
+   */
   private buildNormalizedExpressionIdentityForHash(operator: LogicalOperator, clauses: ExpressionHashClause[]): string {
     return this.stableStringify({
       type: 'expression',
@@ -273,6 +337,17 @@ export class ExpressionTreeService extends DBService {
     });
   }
 
+  /**
+   * Convert an expression tree into a structurally equivalent tree with hashes at every node.
+   *
+   * Predicate hashes are derived from normalized predicate identities.
+   * Expression hashes are derived from operator + ordered child hash references.
+   *
+   * @private
+   * @param {ExpressionTreeExpression} expression - Expression tree node.
+   * @return {ExpressionTreeExpressionWithHash} Hashed expression node.
+   * @memberof ExpressionTreeService
+   */
   private buildHashedTreeFromExpression(expression: ExpressionTreeExpression): ExpressionTreeExpressionWithHash {
     const hashedClauses: ExpressionTreeClauseWithHash[] = expression.clauses.map(
       (clause): ExpressionTreeClauseWithHash => {
@@ -284,6 +359,7 @@ export class ExpressionTreeService extends DBService {
           };
         }
 
+        // Recurse for child expressions first so child hashes are available.
         return this.buildHashedTreeFromExpression(clause);
       }
     );
@@ -304,6 +380,18 @@ export class ExpressionTreeService extends DBService {
     };
   }
 
+  /**
+   * Collect all predicate and expression hashes from a hashed tree.
+   *
+   * Used to perform bulk lookups of existing anchors before recursive resolve.
+   *
+   * @private
+   * @param {ExpressionTreeExpressionWithHash} expression - Root hashed expression.
+   * @param {Set<string>} predicateHashes - Accumulator for predicate hashes.
+   * @param {Set<string>} expressionHashes - Accumulator for expression hashes.
+   * @return {void}
+   * @memberof ExpressionTreeService
+   */
   private collectTreeHashes(
     expression: ExpressionTreeExpressionWithHash,
     predicateHashes: Set<string>,
@@ -321,6 +409,17 @@ export class ExpressionTreeService extends DBService {
     }
   }
 
+  /**
+   * Load existing predicate/expression ids by hash in bulk.
+   *
+   * This reduces write path chatter by front-loading hash lookups once per tree.
+   *
+   * @private
+   * @param {ExpressionTreeExpressionWithHash} root - Root hashed tree.
+   * @return {Promise<{ predicateIdsByHash: Map<string, string>; expressionIdsByHash: Map<string, string> }>}
+   * Hash-index maps for existing anchors.
+   * @memberof ExpressionTreeService
+   */
   private async loadExistingIdsByHash(
     root: ExpressionTreeExpressionWithHash
   ): Promise<{ predicateIdsByHash: Map<string, string>; expressionIdsByHash: Map<string, string> }> {
@@ -328,6 +427,7 @@ export class ExpressionTreeService extends DBService {
     const expressionHashes = new Set<string>();
     this.collectTreeHashes(root, predicateHashes, expressionHashes);
 
+    // Parallel hash lookups for both anchor types.
     const [existingPredicates, existingExpressions] = await Promise.all([
       this.predicateRepository.getPredicatesByHashes([...predicateHashes]),
       this.expressionRepository.getExpressionsByHashes([...expressionHashes])
@@ -339,6 +439,21 @@ export class ExpressionTreeService extends DBService {
     };
   }
 
+  /**
+   * Resolve a predicate clause to a predicate id (reuse-or-insert).
+   *
+   * Concurrency-safe flow:
+   * 1. Reuse preloaded id when present.
+   * 2. Attempt insert anchor by hash.
+   * 3. If insert won, write typed payload row and return.
+   * 4. If insert lost race (conflict), read existing anchor by hash and return.
+   *
+   * @private
+   * @param {ExpressionTreePredicateWithHash} clause - Hashed predicate clause.
+   * @param {Map<string, string>} predicateIdsByHash - Mutable in-memory hash->id cache.
+   * @return {Promise<string>} Resolved predicate id.
+   * @memberof ExpressionTreeService
+   */
   private async resolvePredicateNode(
     clause: ExpressionTreePredicateWithHash,
     predicateIdsByHash: Map<string, string>
@@ -355,6 +470,7 @@ export class ExpressionTreeService extends DBService {
     });
 
     if (insertedPredicate) {
+      // Payload write is only needed on first creation of the predicate anchor.
       await this.predicateRepository.writePredicatePayload(insertedPredicate.predicate_id, clause.predicate);
       predicateIdsByHash.set(clause.hash, insertedPredicate.predicate_id);
       return insertedPredicate.predicate_id;
@@ -372,6 +488,22 @@ export class ExpressionTreeService extends DBService {
     return existingPredicate.predicate_id;
   }
 
+  /**
+   * Resolve an expression node to an expression id (reuse-or-insert), recursively.
+   *
+   * Steps:
+   * 1. Reuse existing anchor when hash is already known.
+   * 2. Resolve child clauses (predicate ids / child expression ids).
+   * 3. Insert expression anchor by hash (or fetch on conflict).
+   * 4. Insert clause edges only when this call inserted a new anchor.
+   *
+   * @private
+   * @param {ExpressionTreeExpressionWithHash} expression - Hashed expression node.
+   * @param {Map<string, string>} predicateIdsByHash - Mutable predicate hash cache.
+   * @param {Map<string, string>} expressionIdsByHash - Mutable expression hash cache.
+   * @return {Promise<string>} Resolved expression id.
+   * @memberof ExpressionTreeService
+   */
   private async resolveExpressionNode(
     expression: ExpressionTreeExpressionWithHash,
     predicateIdsByHash: Map<string, string>,
@@ -395,6 +527,7 @@ export class ExpressionTreeService extends DBService {
         continue;
       }
 
+      // Resolve child expression first so we can write a child edge by id.
       const childExpressionId = await this.resolveExpressionNode(clause, predicateIdsByHash, expressionIdsByHash);
       resolvedClauses.push({
         sequence: index + 1,
@@ -420,6 +553,7 @@ export class ExpressionTreeService extends DBService {
     expressionIdsByHash.set(expression.hash, resolvedExpression.expression_id);
 
     if (insertedExpression) {
+      // Clauses are immutable for a given semantic hash; write only on first insert.
       await this.expressionClauseRepository.insertExpressionClauses(
         resolvedClauses.map((clause) => ({
           expression_id: resolvedExpression.expression_id,
@@ -431,6 +565,19 @@ export class ExpressionTreeService extends DBService {
     return resolvedExpression.expression_id;
   }
 
+  /**
+   * Parse and validate a repository predicate read row into API predicate node shape.
+   *
+   * Integrity expectations from SQL read shape:
+   * - payload_count must equal 1
+   * - predicate_node must be present and parse as ExpressionTreePredicate
+   *
+   * @private
+   * @param {ReadPredicateNodeRow} row - Read row from predicate repository.
+   * @param {string} predicateId - Predicate id for diagnostics.
+   * @return {ExpressionTreePredicate} Parsed predicate node.
+   * @memberof ExpressionTreeService
+   */
   private parseReadPredicateRow(row: ReadPredicateNodeRow, predicateId: string): ExpressionTreePredicate {
     if (row.payload_count !== 1 || !row.predicate_node) {
       throw new ApiExecuteSQLError('Invalid predicate payload integrity', [
