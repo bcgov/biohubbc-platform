@@ -13,14 +13,24 @@ const defaultLog = getLogger('paths/tickets/{ticketId}/system-user/{ticketSystem
 
 export const PATCH: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ discriminator: 'SystemUser' }]
+    and: [
+      {
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        discriminator: 'SystemRole'
+      }
+    ]
   })),
   patchTicketSystemUser()
 ];
 
 export const DELETE: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ discriminator: 'SystemUser' }]
+    and: [
+      {
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        discriminator: 'SystemRole'
+      }
+    ]
   })),
   deleteTicketSystemUser()
 ];
@@ -105,11 +115,20 @@ DELETE.apiDoc = {
   }
 };
 
-const buildActor = (req: Parameters<RequestHandler>[0], systemUserId: number) => ({
-  systemUserId,
-  isSystemAdmin: req.system_user?.role_names.includes(SYSTEM_ROLE.SYSTEM_ADMIN) ?? false
-});
-
+/**
+ * Build the PATCH request handler for updating a ticket assignee status.
+ *
+ * Behavior:
+ * - opens a request-scoped DB transaction
+ * - delegates validation and update logic to `TicketSystemUserService`
+ * - commits on success and returns the updated assignee row
+ * - rolls back and rethrows on failure
+ *
+ * Authorization:
+ * - enforced at route middleware level (SystemRole: SYSTEM_ADMIN)
+ *
+ * @return {RequestHandler} Express handler for PATCH /tickets/{ticketId}/system-user/{ticketSystemUserId}
+ */
 export function patchTicketSystemUser(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
@@ -123,8 +142,7 @@ export function patchTicketSystemUser(): RequestHandler {
       const ticketSystemUser = await ticketSystemUserService.updateTicketAssigneeStatus(
         req.params.ticketId,
         req.params.ticketSystemUserId,
-        payload,
-        buildActor(req, connection.systemUserId())
+        payload
       );
 
       await connection.commit();
@@ -140,6 +158,20 @@ export function patchTicketSystemUser(): RequestHandler {
   };
 }
 
+/**
+ * Build the DELETE request handler for soft-deleting a ticket assignee row.
+ *
+ * Behavior:
+ * - opens a request-scoped DB transaction
+ * - delegates existence checks and soft-delete mutation to `TicketSystemUserService`
+ * - commits on success and returns HTTP 204
+ * - rolls back and rethrows on failure
+ *
+ * Authorization:
+ * - enforced at route middleware level (SystemRole: SYSTEM_ADMIN)
+ *
+ * @return {RequestHandler} Express handler for DELETE /tickets/{ticketId}/system-user/{ticketSystemUserId}
+ */
 export function deleteTicketSystemUser(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
@@ -149,11 +181,7 @@ export function deleteTicketSystemUser(): RequestHandler {
 
       const ticketSystemUserService = new TicketSystemUserService(connection);
 
-      await ticketSystemUserService.deleteTicketAssignee(
-        req.params.ticketId,
-        req.params.ticketSystemUserId,
-        buildActor(req, connection.systemUserId())
-      );
+      await ticketSystemUserService.deleteTicketAssignee(req.params.ticketId, req.params.ticketSystemUserId);
 
       await connection.commit();
 

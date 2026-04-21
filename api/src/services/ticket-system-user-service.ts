@@ -1,7 +1,7 @@
 import { IDBConnection } from '../database/db';
-import { HTTP403, HTTP404, HTTP409 } from '../errors/http-error';
+import { HTTP404, HTTP409 } from '../errors/http-error';
 import {
-  CreateTicketSystemUserRequest,
+  CreateTicketSystemUser,
   TicketSystemUser,
   TicketSystemUserWithUser,
   UpdateTicketSystemUserStatusRequest
@@ -11,16 +11,26 @@ import { TicketSystemUserRepository } from '../repositories/ticket-system-user-r
 import { DBService } from './db-service';
 import { UserService } from './user-service';
 
-interface TicketAssigneeActor {
-  systemUserId: number;
-  isSystemAdmin: boolean;
-}
-
+/**
+ * Domain service for ticket assignee lifecycle management.
+ *
+ * This service encapsulates:
+ * - assignment creation validation (ticket and user existence, duplicate prevention)
+ * - status updates for existing assignee rows
+ * - assignee removal for existing rows
+ * - retrieval of active assignee payloads for ticket detail responses
+ */
 export class TicketSystemUserService extends DBService {
   ticketRepository: TicketRepository;
   ticketSystemUserRepository: TicketSystemUserRepository;
   userService: UserService;
 
+  /**
+   * Creates an instance of TicketSystemUserService.
+   *
+   * @param {IDBConnection} connection - Active request-scoped DB connection.
+   * @memberof TicketSystemUserService
+   */
   constructor(connection: IDBConnection) {
     super(connection);
     this.ticketRepository = new TicketRepository(connection);
@@ -28,41 +38,85 @@ export class TicketSystemUserService extends DBService {
     this.userService = new UserService(connection);
   }
 
-  async createTicketAssignee(
-    ticketId: string,
-    payload: CreateTicketSystemUserRequest,
-    actor: TicketAssigneeActor
-  ): Promise<TicketSystemUser> {
-    if (!actor.isSystemAdmin) {
-      throw new HTTP403('Only system administrators can assign users to a ticket');
+  /**
+   * Create one or more explicit assignee rows for a ticket.
+   *
+   * Behavior:
+   * - verifies the ticket exists
+   * - verifies each target system user exists
+   * - rejects duplicate system user ids within the request payload
+   * - rejects duplicate active assignment for each ticket/user pair
+   * - inserts rows into `ticket_system_user`
+   *
+   * Note:
+   * - route-level authorization enforces admin-only access for this operation.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @param {CreateTicketSystemUser[]} payload - Assignment payloads.
+   * @return {Promise<TicketSystemUser[]>} Newly created assignment rows.
+   * @throws {HTTP404} When ticket or user does not exist.
+   * @throws {HTTP409} When duplicate users are provided or an active assignment already exists.
+   * @memberof TicketSystemUserService
+   */
+  async createTicketAssignees(ticketId: string, payload: CreateTicketSystemUser[]): Promise<TicketSystemUser[]> {
+    await this.ticketRepository.getTicketById(ticketId);
+
+    const uniqueSystemUserIds = new Set(payload.map((assignee) => assignee.system_user_id));
+
+    if (uniqueSystemUserIds.size !== payload.length) {
+      throw new HTTP409('Duplicate system users provided in assignment payload');
     }
 
-    await this.ensureTicketExists(ticketId);
-    await this.userService.getUserById(payload.system_user_id);
+    await Promise.all(payload.map((assignee) => this.userService.getUserById(assignee.system_user_id)));
 
-    const existing = await this.ticketSystemUserRepository.getActiveTicketSystemUserByTicketAndSystemUser(
-      ticketId,
-      payload.system_user_id
+    await Promise.all(
+      payload.map(async (assignee) => {
+        const existing = await this.ticketSystemUserRepository.getActiveTicketSystemUserByTicketAndSystemUser(
+          ticketId,
+          assignee.system_user_id
+        );
+
+        if (existing) {
+          throw new HTTP409('System user is already actively assigned to this ticket');
+        }
+      })
     );
 
-    if (existing) {
-      throw new HTTP409('System user is already actively assigned to this ticket');
-    }
-
-    return this.ticketSystemUserRepository.insertTicketSystemUser({
-      ticket_id: ticketId,
-      system_user_id: payload.system_user_id,
-      status: payload.status
-    });
+    return Promise.all(
+      payload.map((assignee) =>
+        this.ticketSystemUserRepository.insertTicketSystemUser({
+          ticket_id: ticketId,
+          system_user_id: assignee.system_user_id,
+          status: assignee.status
+        })
+      )
+    );
   }
 
+  /**
+   * Update assignee lifecycle status for an existing assignment.
+   *
+   * Behavior:
+   * - verifies ticket exists
+   * - verifies active assignee row exists
+   * - applies status update on active row
+   *
+   * Note:
+   * - route-level authorization enforces admin-only access for this operation.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @param {string} ticketSystemUserId - ticket_system_user UUID.
+   * @param {UpdateTicketSystemUserStatusRequest} payload - New status payload.
+   * @return {Promise<TicketSystemUser>} Updated assignment row.
+   * @throws {HTTP404} When ticket or assignee row is not found.
+   * @memberof TicketSystemUserService
+   */
   async updateTicketAssigneeStatus(
     ticketId: string,
     ticketSystemUserId: string,
-    payload: UpdateTicketSystemUserStatusRequest,
-    actor: TicketAssigneeActor
+    payload: UpdateTicketSystemUserStatusRequest
   ): Promise<TicketSystemUser> {
-    await this.ensureTicketExists(ticketId);
+    await this.ticketRepository.getTicketById(ticketId);
 
     const existing = await this.ticketSystemUserRepository.getActiveTicketSystemUserById(ticketId, ticketSystemUserId);
 
@@ -70,23 +124,30 @@ export class TicketSystemUserService extends DBService {
       throw new HTTP404('Ticket assignee not found');
     }
 
-    const isOwner = existing.system_user_id === actor.systemUserId;
-
-    if (!actor.isSystemAdmin && !isOwner) {
-      throw new HTTP403('You are not authorized to update this ticket assignee');
-    }
-
     return this.ticketSystemUserRepository.updateTicketSystemUserStatus(ticketId, ticketSystemUserId, {
       status: payload.status
     });
   }
 
-  async deleteTicketAssignee(ticketId: string, ticketSystemUserId: string, actor: TicketAssigneeActor): Promise<void> {
-    if (!actor.isSystemAdmin) {
-      throw new HTTP403('Only system administrators can remove ticket assignees');
-    }
-
-    await this.ensureTicketExists(ticketId);
+  /**
+   * Soft delete an assignee row for a ticket.
+   *
+   * Behavior:
+   * - verifies ticket exists
+   * - verifies active assignee row exists
+   * - marks row ended via `record_end_date`
+   *
+   * Note:
+   * - route-level authorization enforces admin-only access for this operation.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @param {string} ticketSystemUserId - ticket_system_user UUID.
+   * @return {Promise<void>}
+   * @throws {HTTP404} When ticket or assignee row is not found.
+   * @memberof TicketSystemUserService
+   */
+  async deleteTicketAssignee(ticketId: string, ticketSystemUserId: string): Promise<void> {
+    await this.ticketRepository.getTicketById(ticketId);
 
     const existing = await this.ticketSystemUserRepository.getActiveTicketSystemUserById(ticketId, ticketSystemUserId);
 
@@ -97,15 +158,14 @@ export class TicketSystemUserService extends DBService {
     await this.ticketSystemUserRepository.softDeleteTicketSystemUser(ticketId, ticketSystemUserId);
   }
 
+  /**
+   * Return active assignees for a ticket with nested system user details.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @return {Promise<TicketSystemUserWithUser[]>} Active assignment rows with user payload.
+   * @memberof TicketSystemUserService
+   */
   async getActiveTicketAssignees(ticketId: string): Promise<TicketSystemUserWithUser[]> {
     return this.ticketSystemUserRepository.getActiveTicketSystemUsersByTicketId(ticketId);
-  }
-
-  private async ensureTicketExists(ticketId: string): Promise<void> {
-    const ticket = await this.ticketRepository.getTicketByIdOrNull(ticketId);
-
-    if (!ticket) {
-      throw new HTTP404('Ticket not found');
-    }
   }
 }

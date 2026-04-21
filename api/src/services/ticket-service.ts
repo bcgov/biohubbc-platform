@@ -89,13 +89,14 @@ export class TicketService extends DBService {
   }
 
   /**
-   * Get a ticket by its UUID with separate status and comment logs.
+   * Get a ticket by its UUID with related history and assignment collections.
    *
    * @param {string} ticketId - Ticket UUID.
-   * @return {Promise<TicketWithHistory>} The requested ticket including status and comment logs.
+   * @return {Promise<TicketWithHistory>} Ticket core fields with status log, comments, references, data requests, and assignees.
    * @memberof TicketService
    */
   async getTicket(ticketId: string): Promise<TicketWithHistory> {
+    // Read all timeline/relationship collections in parallel to keep detail view latency predictable.
     const [ticket, statuses, comments, references, dataRequests, assignees] = await Promise.all([
       this.ticketRepository.getTicketById(ticketId),
       this.ticketStatusService.getTicketStatus(ticketId),

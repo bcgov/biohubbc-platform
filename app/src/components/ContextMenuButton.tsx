@@ -1,7 +1,6 @@
 import IconButton from '@mui/material/IconButton';
 import Divider from '@mui/material/Divider';
 import ListItemIcon from '@mui/material/ListItemIcon';
-import ListSubheader from '@mui/material/ListSubheader';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import { ReactNode, useMemo, useState } from 'react';
@@ -15,7 +14,6 @@ export interface IContextMenuItem {
 
 export interface IContextMenuItemGroup {
   groupId: string;
-  groupLabel?: string;
   items: IContextMenuItem[];
 }
 
@@ -62,16 +60,6 @@ export const ContextMenuButton = (props: IContextMenuButtonProps) => {
 
       <Menu anchorEl={anchorEl} open={open} onClose={() => setAnchorEl(null)}>
         {resolvedGroups.flatMap((group, groupIndex) => [
-          ...(group.groupLabel
-            ? [
-                <ListSubheader
-                  key={`${group.groupId}-label`}
-                  disableSticky
-                  sx={{ fontSize: '0.5rem', lineHeight: 1.2, textTransform: 'uppercase' }}>
-                  {group.groupLabel}
-                </ListSubheader>
-              ]
-            : []),
           ...group.items.map((item) => (
             <MenuItem
               key={`${group.groupId}-${item.label}`}

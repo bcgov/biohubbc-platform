@@ -4,14 +4,37 @@ import {
   CreateTicketSystemUser,
   TicketSystemUser,
   TicketSystemUserWithUser,
-  UpdateTicketSystemUserStatus
+  UpdateTicketSystemUserStatusRequest
 } from '../models/ticket-system-user';
 import { BaseRepository } from './base-repository';
 
 const TICKET_SYSTEM_USER_COLUMNS = ['ticket_system_user_id', 'ticket_id', 'system_user_id', 'status'] as const;
 
+/**
+ * Persistence layer for ticket assignee records (`ticket_system_user`).
+ *
+ * Responsibilities:
+ * - create and update assignee lifecycle status rows
+ * - enforce active-row lookups (excluding soft-deleted records)
+ * - join assignee rows to user profile information for API payloads
+ */
 export class TicketSystemUserRepository extends BaseRepository {
-  async insertTicketSystemUser(ticketSystemUser: CreateTicketSystemUser): Promise<TicketSystemUser> {
+  /**
+   * Insert a new ticket assignee row.
+   *
+   * Behavior:
+   * - writes a single active `ticket_system_user` record
+   * - returns canonical assignment columns from the inserted row
+   * - throws when the insert does not affect exactly one row
+   *
+   * @param {{ ticket_id: string } & CreateTicketSystemUser} ticketSystemUser - Assignment payload including ticket id.
+   * @return {Promise<TicketSystemUser>} Inserted assignee row.
+   * @throws {ApiExecuteSQLError} When rowCount is not exactly one.
+   * @memberof TicketSystemUserRepository
+   */
+  async insertTicketSystemUser(
+    ticketSystemUser: { ticket_id: string } & CreateTicketSystemUser
+  ): Promise<TicketSystemUser> {
     const knex = getKnex();
     const query = knex
       .table('ticket_system_user')
@@ -34,6 +57,16 @@ export class TicketSystemUserRepository extends BaseRepository {
     return response.rows[0];
   }
 
+  /**
+   * Find an active assignee by ticket id and system user id.
+   *
+   * Active means `record_end_date IS NULL`.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @param {number} systemUserId - System user id.
+   * @return {Promise<TicketSystemUser | null>} Matching active assignee, or null when not found.
+   * @memberof TicketSystemUserRepository
+   */
   async getActiveTicketSystemUserByTicketAndSystemUser(
     ticketId: string,
     systemUserId: number
@@ -52,6 +85,16 @@ export class TicketSystemUserRepository extends BaseRepository {
     return response.rows[0] ?? null;
   }
 
+  /**
+   * Find an active assignee by ticket id and ticket_system_user id.
+   *
+   * Active means `record_end_date IS NULL`.
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @param {string} ticketSystemUserId - ticket_system_user UUID.
+   * @return {Promise<TicketSystemUser | null>} Matching active assignee, or null when not found.
+   * @memberof TicketSystemUserRepository
+   */
   async getActiveTicketSystemUserById(ticketId: string, ticketSystemUserId: string): Promise<TicketSystemUser | null> {
     const knex = getKnex();
     const query = knex
@@ -67,10 +110,25 @@ export class TicketSystemUserRepository extends BaseRepository {
     return response.rows[0] ?? null;
   }
 
+  /**
+   * Update lifecycle status for a single active assignee row.
+   *
+   * Behavior:
+   * - updates status only when the row is active (`record_end_date IS NULL`)
+   * - returns updated canonical assignment columns
+   * - throws when zero or multiple rows are affected
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @param {string} ticketSystemUserId - ticket_system_user UUID.
+   * @param {UpdateTicketSystemUserStatusRequest} update - New status payload.
+   * @return {Promise<TicketSystemUser>} Updated assignee row.
+   * @throws {ApiExecuteSQLError} When rowCount is not exactly one.
+   * @memberof TicketSystemUserRepository
+   */
   async updateTicketSystemUserStatus(
     ticketId: string,
     ticketSystemUserId: string,
-    update: UpdateTicketSystemUserStatus
+    update: UpdateTicketSystemUserStatusRequest
   ): Promise<TicketSystemUser> {
     const knex = getKnex();
     const query = knex
@@ -95,6 +153,19 @@ export class TicketSystemUserRepository extends BaseRepository {
     return response.rows[0];
   }
 
+  /**
+   * Soft delete an active assignee row by setting `record_end_date`.
+   *
+   * Behavior:
+   * - targets only active rows (`record_end_date IS NULL`)
+   * - throws when zero or multiple rows are affected
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @param {string} ticketSystemUserId - ticket_system_user UUID.
+   * @return {Promise<void>}
+   * @throws {ApiExecuteSQLError} When rowCount is not exactly one.
+   * @memberof TicketSystemUserRepository
+   */
   async softDeleteTicketSystemUser(ticketId: string, ticketSystemUserId: string): Promise<void> {
     const knex = getKnex();
     const query = knex
@@ -117,6 +188,18 @@ export class TicketSystemUserRepository extends BaseRepository {
     }
   }
 
+  /**
+   * List all active assignees for a ticket with embedded system user fields.
+   *
+   * Behavior:
+   * - filters to active assignee rows only
+   * - joins `ticket_system_user` to `system_user`
+   * - orders display by display_name fallback user_identifier for stable UI presentation
+   *
+   * @param {string} ticketId - Ticket UUID.
+   * @return {Promise<TicketSystemUserWithUser[]>} Active assignee rows with nested user payload.
+   * @memberof TicketSystemUserRepository
+   */
   async getActiveTicketSystemUsersByTicketId(ticketId: string): Promise<TicketSystemUserWithUser[]> {
     const knex = getKnex();
     const query = knex

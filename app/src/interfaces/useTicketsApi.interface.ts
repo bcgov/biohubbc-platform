@@ -102,7 +102,7 @@ export interface ICreateTicketReferenceRequest {
   references: ICreateTicketReference[];
 }
 
-export interface ICreateTicketAssigneeRequest {
+export interface ICreateTicketAssignee {
   system_user_id: number;
   status: TicketSystemUserStatus;
 }

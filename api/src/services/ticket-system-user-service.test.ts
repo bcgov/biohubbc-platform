@@ -3,7 +3,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
 import { IDBConnection } from '../database/db';
-import { HTTP403, HTTP404, HTTP409 } from '../errors/http-error';
+import { HTTP404, HTTP409 } from '../errors/http-error';
 import { TicketSystemUser } from '../models/ticket-system-user';
 import { TicketRepository } from '../repositories/ticket-repository';
 import { TicketSystemUserRepository } from '../repositories/ticket-system-user-repository';
@@ -35,118 +35,62 @@ describe('TicketSystemUserService', () => {
     sinon.restore();
   });
 
-  it('createTicketAssignee creates assignment for system admin', async () => {
-    sinon.stub(TicketRepository.prototype, 'getTicketByIdOrNull').resolves({} as never);
+  it('createTicketAssignees creates assignments for system admin', async () => {
+    sinon.stub(TicketRepository.prototype, 'getTicketById').resolves({} as never);
     sinon.stub(UserService.prototype, 'getUserById').resolves({} as never);
     sinon.stub(TicketSystemUserRepository.prototype, 'getActiveTicketSystemUserByTicketAndSystemUser').resolves(null);
     const insertStub = sinon.stub(TicketSystemUserRepository.prototype, 'insertTicketSystemUser').resolves(assignment);
 
-    const result = await service.createTicketAssignee(
-      ticketId,
-      { system_user_id: assignment.system_user_id, status: 'requested' },
-      { systemUserId: 1, isSystemAdmin: true }
-    );
+    const result = await service.createTicketAssignees(ticketId, [
+      {
+        system_user_id: assignment.system_user_id,
+        status: 'requested'
+      }
+    ]);
 
     expect(insertStub).to.have.been.calledOnce;
-    expect(result).to.eql(assignment);
+    expect(result).to.eql([assignment]);
   });
 
-  it('createTicketAssignee rejects non-system-admin', async () => {
-    try {
-      await service.createTicketAssignee(
-        ticketId,
-        { system_user_id: assignment.system_user_id, status: 'requested' },
-        { systemUserId: 1, isSystemAdmin: false }
-      );
-      expect.fail('Expected create to throw');
-    } catch (error) {
-      expect(error).to.be.instanceOf(HTTP403);
-    }
-  });
-
-  it('createTicketAssignee rejects duplicate active assignment', async () => {
-    sinon.stub(TicketRepository.prototype, 'getTicketByIdOrNull').resolves({} as never);
+  it('createTicketAssignees rejects duplicate active assignment', async () => {
+    sinon.stub(TicketRepository.prototype, 'getTicketById').resolves({} as never);
     sinon.stub(UserService.prototype, 'getUserById').resolves({} as never);
     sinon
       .stub(TicketSystemUserRepository.prototype, 'getActiveTicketSystemUserByTicketAndSystemUser')
       .resolves(assignment);
 
     try {
-      await service.createTicketAssignee(
-        ticketId,
-        { system_user_id: assignment.system_user_id, status: 'requested' },
-        { systemUserId: 1, isSystemAdmin: true }
-      );
+      await service.createTicketAssignees(ticketId, [
+        {
+          system_user_id: assignment.system_user_id,
+          status: 'requested'
+        }
+      ]);
       expect.fail('Expected create to throw');
     } catch (error) {
       expect(error).to.be.instanceOf(HTTP409);
     }
   });
 
-  it('updateTicketAssigneeStatus allows owner to patch', async () => {
-    sinon.stub(TicketRepository.prototype, 'getTicketByIdOrNull').resolves({} as never);
+  it('updateTicketAssigneeStatus updates assignee status', async () => {
+    sinon.stub(TicketRepository.prototype, 'getTicketById').resolves({} as never);
     sinon.stub(TicketSystemUserRepository.prototype, 'getActiveTicketSystemUserById').resolves(assignment);
     const updateStub = sinon
       .stub(TicketSystemUserRepository.prototype, 'updateTicketSystemUserStatus')
       .resolves({ ...assignment, status: 'started' });
 
-    const result = await service.updateTicketAssigneeStatus(
-      ticketId,
-      ticketSystemUserId,
-      { status: 'started' },
-      { systemUserId: 7, isSystemAdmin: false }
-    );
+    const result = await service.updateTicketAssigneeStatus(ticketId, ticketSystemUserId, { status: 'started' });
 
     expect(updateStub).to.have.been.calledWith(ticketId, ticketSystemUserId, { status: 'started' });
     expect(result.status).to.equal('started');
   });
 
-  it('updateTicketAssigneeStatus allows system admin to patch', async () => {
-    sinon.stub(TicketRepository.prototype, 'getTicketByIdOrNull').resolves({} as never);
-    sinon.stub(TicketSystemUserRepository.prototype, 'getActiveTicketSystemUserById').resolves(assignment);
-    const updateStub = sinon
-      .stub(TicketSystemUserRepository.prototype, 'updateTicketSystemUserStatus')
-      .resolves({ ...assignment, status: 'blocked' });
-
-    const result = await service.updateTicketAssigneeStatus(
-      ticketId,
-      ticketSystemUserId,
-      { status: 'blocked' },
-      { systemUserId: 99, isSystemAdmin: true }
-    );
-
-    expect(updateStub).to.have.been.calledWith(ticketId, ticketSystemUserId, { status: 'blocked' });
-    expect(result.status).to.equal('blocked');
-  });
-
-  it('updateTicketAssigneeStatus rejects non-owner non-admin', async () => {
-    sinon.stub(TicketRepository.prototype, 'getTicketByIdOrNull').resolves({} as never);
-    sinon.stub(TicketSystemUserRepository.prototype, 'getActiveTicketSystemUserById').resolves(assignment);
-
-    try {
-      await service.updateTicketAssigneeStatus(
-        ticketId,
-        ticketSystemUserId,
-        { status: 'started' },
-        { systemUserId: 99, isSystemAdmin: false }
-      );
-      expect.fail('Expected patch to throw');
-    } catch (error) {
-      expect(error).to.be.instanceOf(HTTP403);
-    }
-  });
-
   it('updateTicketAssigneeStatus returns 404 when row not found', async () => {
-    sinon.stub(TicketRepository.prototype, 'getTicketByIdOrNull').resolves({} as never);
+    sinon.stub(TicketRepository.prototype, 'getTicketById').resolves({} as never);
     sinon.stub(TicketSystemUserRepository.prototype, 'getActiveTicketSystemUserById').resolves(null);
 
     try {
-      await service.updateTicketAssigneeStatus(
-        ticketId,
-        ticketSystemUserId,
-        { status: 'started' },
-        { systemUserId: 99, isSystemAdmin: true }
-      );
+      await service.updateTicketAssigneeStatus(ticketId, ticketSystemUserId, { status: 'started' });
       expect.fail('Expected patch to throw');
     } catch (error) {
       expect(error).to.be.instanceOf(HTTP404);
@@ -154,11 +98,11 @@ describe('TicketSystemUserService', () => {
   });
 
   it('deleteTicketAssignee soft deletes assignment for system admin', async () => {
-    sinon.stub(TicketRepository.prototype, 'getTicketByIdOrNull').resolves({} as never);
+    sinon.stub(TicketRepository.prototype, 'getTicketById').resolves({} as never);
     sinon.stub(TicketSystemUserRepository.prototype, 'getActiveTicketSystemUserById').resolves(assignment);
     const deleteStub = sinon.stub(TicketSystemUserRepository.prototype, 'softDeleteTicketSystemUser').resolves();
 
-    await service.deleteTicketAssignee(ticketId, ticketSystemUserId, { systemUserId: 1, isSystemAdmin: true });
+    await service.deleteTicketAssignee(ticketId, ticketSystemUserId);
 
     expect(deleteStub).to.have.been.calledWith(ticketId, ticketSystemUserId);
   });

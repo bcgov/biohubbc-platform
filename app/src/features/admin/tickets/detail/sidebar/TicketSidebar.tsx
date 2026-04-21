@@ -82,7 +82,7 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
   };
 
   // Optimistically remove, persist deletion, and rollback if API delete fails.
-  const handleRemoveParticipant = async (teamMemberId: string) => {
+  const handleRemoveUser = async (teamMemberId: string) => {
     if (!teamId) {
       return;
     }
@@ -222,7 +222,7 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
         members={members}
         isLoading={teamMembersLoader.isLoading}
         onOpenDialog={() => setIsParticipantsDialogOpen(true)}
-        onRemoveParticipant={handleRemoveParticipant}
+        onRemoveUser={handleRemoveUser}
       />
       <TicketSidebarDataRequests dataRequests={dataRequests ?? []} />
       <TicketSidebarUploads />

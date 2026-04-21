@@ -250,9 +250,9 @@ describe('useTicketsApi', () => {
     expect(result).toEqual(apiTicket);
   });
 
-  it('createTicketAssignee posts payload and returns assignee', async () => {
+  it('createTicketAssignees posts payload and returns assignees', async () => {
     const ticketId = '11111111-1111-1111-1111-111111111111';
-    const payload = { system_user_id: 12, status: 'requested' as const };
+    const payload = [{ system_user_id: 12, status: 'requested' as const }];
     const assignee = {
       ticket_system_user_id: '22222222-2222-2222-2222-222222222222',
       ticket_id: ticketId,
@@ -260,11 +260,11 @@ describe('useTicketsApi', () => {
       status: 'requested'
     };
 
-    mock.onPost(`/api/tickets/${ticketId}/system-user`, payload).reply(201, assignee);
+    mock.onPost(`/api/tickets/${ticketId}/system-user`, payload).reply(201, [assignee]);
 
-    const result = await useTicketsApi(axios).createTicketAssignee(ticketId, payload);
+    const result = await useTicketsApi(axios).createTicketAssignees(ticketId, payload);
 
-    expect(result).toEqual(assignee);
+    expect(result).toEqual([assignee]);
   });
 
   it('updateTicketAssigneeStatus patches payload and returns assignee', async () => {

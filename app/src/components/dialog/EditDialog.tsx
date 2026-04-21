@@ -69,8 +69,6 @@ export interface IEditDialogProps<T> {
 
   /**
    * Optional maximum width forwarded to MUI Dialog.
-   *
-   * @memberof IEditDialogProps
    */
   maxWidth?: DialogProps['maxWidth'];
 }

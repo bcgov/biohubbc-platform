@@ -20,7 +20,8 @@ export interface IDropdownButtonItemGroup {
   items: IDropdownButtonItem[];
 }
 
-export interface IDropdownButtonProps extends Omit<ButtonProps, 'children' | 'onClick' | 'onSelect' | 'value'> {
+export interface IDropdownButtonProps
+  extends Omit<ButtonProps, 'children' | 'onClick' | 'onSelect' | 'value' | 'className'> {
   value: string;
   itemGroups: IDropdownButtonItemGroup[];
   onSelect: (value: string) => void;
@@ -45,7 +46,6 @@ export const DropdownButton = (props: IDropdownButtonProps) => {
   return (
     <>
       <Button
-        className="DropdownButton-root"
         variant="outlined"
         size={size}
         {...buttonProps}

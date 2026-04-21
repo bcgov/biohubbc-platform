@@ -21,7 +21,7 @@ export const TicketSystemUserWithUser = TicketSystemUser.extend({
 });
 export type TicketSystemUserWithUser = z.infer<typeof TicketSystemUserWithUser>;
 
-export interface CreateTicketSystemUserRequest {
+export interface CreateTicketSystemUser {
   system_user_id: number;
   status: TicketSystemUserStatus;
 }
@@ -29,9 +29,3 @@ export interface CreateTicketSystemUserRequest {
 export interface UpdateTicketSystemUserStatusRequest {
   status: TicketSystemUserStatus;
 }
-
-export interface CreateTicketSystemUser extends CreateTicketSystemUserRequest {
-  ticket_id: string;
-}
-
-export interface UpdateTicketSystemUserStatus extends UpdateTicketSystemUserStatusRequest {}

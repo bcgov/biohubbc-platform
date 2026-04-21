@@ -7,7 +7,7 @@ export const TicketSystemUserStatusSchema: OpenAPIV3.SchemaObject = {
   enum: TicketSystemUserStatusEnum
 };
 
-export const CreateTicketSystemUserRequestSchema: OpenAPIV3.SchemaObject = {
+export const CreateTicketSystemUserSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
   required: ['system_user_id', 'status'],
@@ -15,6 +15,11 @@ export const CreateTicketSystemUserRequestSchema: OpenAPIV3.SchemaObject = {
     system_user_id: { type: 'integer' },
     status: TicketSystemUserStatusSchema
   }
+};
+
+export const CreateTicketSystemUsersRequestSchema: OpenAPIV3.SchemaObject = {
+  type: 'array',
+  items: CreateTicketSystemUserSchema
 };
 
 export const UpdateTicketSystemUserStatusRequestSchema: OpenAPIV3.SchemaObject = {

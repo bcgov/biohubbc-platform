@@ -140,8 +140,6 @@ const appTheme = createTheme({
     MuiButton: {
       defaultProps: {
         disableElevation: true,
-        disableTouchRipple: true,
-        disableFocusRipple: true,
         disableRipple: true
       },
       styleOverrides: {
@@ -221,18 +219,6 @@ const appTheme = createTheme({
             borderWidth: 1,
             borderColor: 'currentColor',
             backgroundColor: alpha(theme.palette.primary.main, theme.palette.action.hoverOpacity)
-          },
-          '&.DropdownButton-root': {
-            transition: 'none',
-            '&:hover': {
-              borderWidth: 1,
-              borderColor: 'currentColor',
-              backgroundColor: theme.palette.grey[50]
-            },
-            '&:active': {
-              boxShadow: 'none',
-              backgroundColor: theme.palette.grey[50]
-            }
           },
           '&.Mui-disabled': {
             color: theme.palette.action.disabled,

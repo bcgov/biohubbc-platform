@@ -36,7 +36,7 @@ export const TicketSidebarAssignees = (props: ITicketSidebarAssigneesProps) => {
             No assignees
           </Typography>
         }>
-        <Stack spacing={1.25}>
+        <Stack spacing={1}>
           {assignees.map((assignee) => {
             const isCurrentUserAssignment = currentSystemUserId === assignee.system_user_id;
             return (

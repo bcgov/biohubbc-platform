@@ -1,7 +1,7 @@
 import { AxiosInstance } from 'axios';
 import {
   ICreateTicketCommentRequest,
-  ICreateTicketAssigneeRequest,
+  ICreateTicketAssignee,
   ICreateTicketReferenceRequest,
   ICreateTicketRequest,
   IGetTicketsResponse,
@@ -170,13 +170,16 @@ export const useTicketsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Assign a system user to a ticket.
+   * Assign one or more system users to a ticket.
    *
    * @param {string} ticketId
-   * @param {ICreateTicketAssigneeRequest} payload
-   * @return {*} {Promise<ITicketAssignee>}
+   * @param {ICreateTicketAssignee[]} payload
+   * @return {*} {Promise<ITicketAssignee[]>}
    */
-  const createTicketAssignee = async (ticketId: string, payload: ICreateTicketAssigneeRequest): Promise<ITicketAssignee> => {
+  const createTicketAssignees = async (
+    ticketId: string,
+    payload: ICreateTicketAssignee[]
+  ): Promise<ITicketAssignee[]> => {
     const { data } = await axios.post(`/api/tickets/${ticketId}/system-user`, payload);
 
     return data;
@@ -223,7 +226,7 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     deleteTicketReference,
     getTicketsForUser,
     getTicketForUser,
-    createTicketAssignee,
+    createTicketAssignees,
     updateTicketAssigneeStatus,
     deleteTicketAssignee
   };

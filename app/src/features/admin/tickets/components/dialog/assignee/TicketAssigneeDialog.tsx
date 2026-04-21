@@ -60,13 +60,12 @@ export const TicketAssigneeDialog = (props: ITicketAssigneeDialogProps) => {
       try {
         setIsSubmitting(true);
 
-        await Promise.all(
-          values.assignees.map((assignee) =>
-            api.tickets.createTicketAssignee(ticketId, {
-              system_user_id: assignee.system_user_id,
-              status: assignee.status
-            })
-          )
+        await api.tickets.createTicketAssignees(
+          ticketId,
+          values.assignees.map((assignee) => ({
+            system_user_id: assignee.system_user_id,
+            status: assignee.status
+          }))
         );
 
         await onAssigned();

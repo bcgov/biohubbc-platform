@@ -1,11 +1,11 @@
-import { mdiDotsVertical } from '@mdi/js';
+import { mdiCheck, mdiDotsVertical, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
-import { TICKET_ASSIGNEE_STATUS_COLORS } from 'constants/ticket';
 import { ContextMenuButton, IContextMenuItem } from 'components/ContextMenuButton';
+import { TICKET_ASSIGNEE_STATUS_COLORS } from 'constants/ticket';
 import { ITicketAssignee, TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
 
 interface ITicketSidebarAssigneeCardProps {
@@ -15,13 +15,6 @@ interface ITicketSidebarAssigneeCardProps {
   onRemoveAssignee: (ticketSystemUserId: string) => Promise<void> | void;
   onUpdateAssigneeStatus: (ticketSystemUserId: string, status: TicketSystemUserStatus) => Promise<void> | void;
 }
-
-const statusOptions: Array<{ value: TicketSystemUserStatus; label: string }> = [
-  { value: 'requested', label: 'Requested' },
-  { value: 'started', label: 'Started' },
-  { value: 'blocked', label: 'Blocked' },
-  { value: 'resolved', label: 'Resolved' }
-];
 
 /**
  * Sidebar card row for a ticket assignee.
@@ -33,6 +26,13 @@ const statusOptions: Array<{ value: TicketSystemUserStatus; label: string }> = [
  */
 export const TicketSidebarAssigneeCard = (props: ITicketSidebarAssigneeCardProps) => {
   const { assignee, isSystemAdmin, isCurrentUserAssignment, onRemoveAssignee, onUpdateAssigneeStatus } = props;
+
+  const statusOptions: { value: TicketSystemUserStatus; label: string }[] = [
+    { value: 'requested', label: 'Requested' },
+    { value: 'started', label: 'Started' },
+    { value: 'blocked', label: 'Blocked' },
+    { value: 'resolved', label: 'Resolved' }
+  ];
 
   const getAssigneeStatusColor = (status: TicketSystemUserStatus) => TICKET_ASSIGNEE_STATUS_COLORS[status];
 
@@ -57,6 +57,7 @@ export const TicketSidebarAssigneeCard = (props: ITicketSidebarAssigneeCardProps
   const statusContextMenuItems: IContextMenuItem[] = canUpdateStatus
     ? statusOptions.map((statusOption) => ({
         label: statusOption.label,
+        icon: <Icon path={mdiCheck} size={0.7} />,
         onClick: () => onUpdateAssigneeStatus(assignee.ticket_system_user_id, statusOption.value),
         disabled: statusOption.value === assignee.status
       }))
@@ -65,6 +66,7 @@ export const TicketSidebarAssigneeCard = (props: ITicketSidebarAssigneeCardProps
     ? [
         {
           label: 'Delete',
+          icon: <Icon path={mdiTrashCanOutline} size={0.7} />,
           onClick: () => onRemoveAssignee(assignee.ticket_system_user_id)
         }
       ]

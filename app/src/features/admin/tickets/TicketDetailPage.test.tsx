@@ -61,10 +61,6 @@ vi.mock('./detail/sidebar/TicketSidebar', () => ({
   )
 }));
 
-vi.mock('./detail/sidebar/TicketAssignmentResponsePrompt', () => ({
-  TicketAssignmentResponsePrompt: () => <div data-testid="ticket-assignment-response-prompt" />
-}));
-
 vi.mock('./detail/skeleton/TicketSkeleton', () => ({
   TicketSkeleton: () => <div data-testid="ticket-skeleton" />
 }));

@@ -14,7 +14,7 @@ describe('paths/tickets/{ticketId}/system-user', () => {
     sinon.restore();
   });
 
-  it('POST creates ticket assignee', async () => {
+  it('POST creates ticket assignees in bulk', async () => {
     const mockDBConnection = getMockDBConnection({
       systemUserId: () => 1,
       commit: sinon.stub(),
@@ -31,17 +31,17 @@ describe('paths/tickets/{ticketId}/system-user', () => {
       status: 'requested'
     };
 
-    const createStub = sinon.stub(TicketSystemUserService.prototype, 'createTicketAssignee').resolves(created);
+    const createStub = sinon.stub(TicketSystemUserService.prototype, 'createTicketAssignees').resolves([created]);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { ticketId: created.ticket_id };
-    mockReq.body = { system_user_id: created.system_user_id, status: created.status };
+    mockReq.body = [{ system_user_id: created.system_user_id, status: created.status }];
     mockReq.system_user = { system_user_id: 1, role_names: ['System Administrator'] } as never;
 
     await createTicketSystemUser()(mockReq, mockRes, mockNext);
 
-    expect(createStub).to.have.been.calledWith(created.ticket_id, mockReq.body, { systemUserId: 1, isSystemAdmin: true });
+    expect(createStub).to.have.been.calledWith(created.ticket_id, mockReq.body);
     expect(mockRes.statusValue).to.equal(201);
-    expect(mockRes.jsonValue).to.eql(created);
+    expect(mockRes.jsonValue).to.eql([created]);
   });
 });

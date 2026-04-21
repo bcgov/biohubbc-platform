@@ -5,26 +5,30 @@ import Stack from '@mui/material/Stack';
 import { LabelledCard } from 'components/card/LabelledCard';
 import { SearchAutocomplete } from 'features/search/result/sidebar/search/components/section/autocomplete/SearchAutocomplete';
 import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
-import { ITeamMember } from 'interfaces/useTeamsApi.interface';
 
-interface ITicketTeamFormProps {
+export interface ITeamFormUser {
+  id: string;
+  label: string;
+}
+
+interface ITeamFormProps {
   options: SidebarOption[];
   isLoading: boolean;
-  members: ITeamMember[];
+  users: ITeamFormUser[];
   isSubmitting: boolean;
   onSearch: (search: string) => void;
   onSelectUser: (option: SidebarOption | null) => void;
-  onRemoveParticipant: (teamMemberId: string) => void;
+  onRemoveUser: (userId: string) => void;
 }
 
 /**
- * Form content for managing ticket participants.
+ * Reusable team/user selection form with search and removable selected users.
  *
- * @param {ITicketTeamFormProps} props
+ * @param {ITeamFormProps} props
  * @return {*}
  */
-export const TicketTeamForm = (props: ITicketTeamFormProps) => {
-  const { options, isLoading, members, isSubmitting, onSearch, onSelectUser, onRemoveParticipant } = props;
+export const TeamForm = (props: ITeamFormProps) => {
+  const { options, isLoading, users, isSubmitting, onSearch, onSelectUser, onRemoveUser } = props;
 
   return (
     <Stack spacing={2} sx={{ mt: 1 }}>
@@ -40,15 +44,15 @@ export const TicketTeamForm = (props: ITicketTeamFormProps) => {
       />
 
       <Stack spacing={1.25}>
-        {members.map((member) => (
+        {users.map((user) => (
           <LabelledCard
-            key={member.team_member_id}
-            label={member.user_identifier}
+            key={user.id}
+            label={user.label}
             action={
               <IconButton
                 size="small"
-                aria-label={`remove ${member.user_identifier}`}
-                onClick={() => onRemoveParticipant(member.team_member_id)}
+                aria-label={`remove ${user.label}`}
+                onClick={() => onRemoveUser(user.id)}
                 disabled={isSubmitting}>
                 <Icon path={mdiClose} size={0.65} />
               </IconButton>

@@ -1,7 +1,7 @@
 import { Knex } from 'knex';
 import { SQL } from 'sql-template-strings';
 import { getKnex } from '../database/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { CreateTicketPayload, Ticket, TicketFilters, TicketSlug, UpdateTicketRequest } from '../models/ticket';
 import { ApiPaginationOptions } from '../zod-schema/pagination';
 import { BaseRepository } from './base-repository';
@@ -128,9 +128,15 @@ export class TicketRepository extends BaseRepository {
   /**
    * Get a single active ticket by UUID.
    *
+   * Behavior:
+   * - returns one active row (`record_end_date IS NULL`)
+   * - throws `ApiNotFoundError` when no active row exists
+   * - throws `ApiExecuteSQLError` when an unexpected row count is returned
+   *
    * @param {string} ticketId - Ticket UUID.
    * @return {Promise<Ticket>} Matching ticket record.
-   * @throws {ApiExecuteSQLError} If exactly one active ticket is not found.
+   * @throws {ApiNotFoundError} If no matching active ticket exists.
+   * @throws {ApiExecuteSQLError} If an unexpected row count is returned.
    * @memberof TicketRepository
    */
   async getTicketById(ticketId: string): Promise<Ticket> {
@@ -138,6 +144,10 @@ export class TicketRepository extends BaseRepository {
     const query = knex.table('ticket').select(TICKET_COLUMNS).where('ticket_id', ticketId).whereNull('record_end_date');
 
     const response = await this.connection.knex(query, Ticket);
+
+    if (response.rowCount === 0) {
+      throw new ApiNotFoundError('Ticket not found', ['TicketRepository->getTicketById', { ticketId }]);
+    }
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get ticket record', [
@@ -147,27 +157,6 @@ export class TicketRepository extends BaseRepository {
     }
 
     return response.rows[0];
-  }
-
-  /**
-   * Get a single active ticket by UUID, or null if none exists.
-   *
-   * @param {string} ticketId - Ticket UUID.
-   * @return {Promise<Ticket | null>}
-   * @memberof TicketRepository
-   */
-  async getTicketByIdOrNull(ticketId: string): Promise<Ticket | null> {
-    const knex = getKnex();
-    const query = knex
-      .table('ticket')
-      .select(TICKET_COLUMNS)
-      .where('ticket_id', ticketId)
-      .whereNull('record_end_date')
-      .first();
-
-    const response = await this.connection.knex(query, Ticket);
-
-    return response.rows[0] ?? null;
   }
 
   /**

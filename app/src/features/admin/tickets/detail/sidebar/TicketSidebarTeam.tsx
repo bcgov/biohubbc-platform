@@ -11,7 +11,7 @@ interface ITicketSidebarTeamProps {
   members: ITeamMember[];
   isLoading: boolean;
   onOpenDialog: () => void;
-  onRemoveParticipant: (teamMemberId: string) => Promise<void> | void;
+  onRemoveUser: (teamMemberId: string) => Promise<void> | void;
 }
 
 /**
@@ -21,7 +21,7 @@ interface ITicketSidebarTeamProps {
  * @return {*}
  */
 export const TicketSidebarTeam = (props: ITicketSidebarTeamProps) => {
-  const { members, isLoading, onOpenDialog, onRemoveParticipant } = props;
+  const { members, isLoading, onOpenDialog, onRemoveUser } = props;
   const shouldCollapseMembers = members.length > 3;
   const visibleMembers = shouldCollapseMembers ? members.slice(0, 2) : members;
   const remainingMembersCount = members.length - visibleMembers.length;
@@ -47,7 +47,7 @@ export const TicketSidebarTeam = (props: ITicketSidebarTeamProps) => {
             <TicketSidebarItem
               key={member.team_member_id}
               label={member.user_identifier}
-              onRemove={() => onRemoveParticipant(member.team_member_id)}
+              onRemove={() => onRemoveUser(member.team_member_id)}
             />
           ))}
           {shouldCollapseMembers ? (

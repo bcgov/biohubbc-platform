@@ -43,8 +43,7 @@ describe('paths/tickets/{ticketId}/system-user/{ticketSystemUserId}', () => {
     expect(patchStub).to.have.been.calledWith(
       updated.ticket_id,
       updated.ticket_system_user_id,
-      { status: 'started' },
-      { systemUserId: 7, isSystemAdmin: false }
+      { status: 'started' }
     );
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql(updated);
@@ -72,8 +71,7 @@ describe('paths/tickets/{ticketId}/system-user/{ticketSystemUserId}', () => {
 
     expect(deleteStub).to.have.been.calledWith(
       mockReq.params.ticketId,
-      mockReq.params.ticketSystemUserId,
-      { systemUserId: 1, isSystemAdmin: true }
+      mockReq.params.ticketSystemUserId
     );
     expect(mockRes.statusValue).to.equal(204);
   });

@@ -2,9 +2,12 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
-import { CreateTicketSystemUserRequest } from '../../../../models/ticket-system-user';
+import { CreateTicketSystemUser } from '../../../../models/ticket-system-user';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { CreateTicketSystemUserRequestSchema, TicketSystemUserSchema } from '../../../../openapi/schemas/ticket-system-user';
+import {
+  CreateTicketSystemUsersRequestSchema,
+  TicketSystemUserSchema
+} from '../../../../openapi/schemas/ticket-system-user';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { TicketSystemUserService } from '../../../../services/ticket-system-user-service';
 import { getLogger } from '../../../../utils/logger';
@@ -13,13 +16,18 @@ const defaultLog = getLogger('paths/tickets/{ticketId}/system-user');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => ({
-    and: [{ discriminator: 'SystemUser' }]
+    and: [
+      {
+        validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+        discriminator: 'SystemRole'
+      }
+    ]
   })),
   createTicketSystemUser()
 ];
 
 POST.apiDoc = {
-  description: 'Create a ticket assignee',
+  description: 'Create ticket assignees in bulk',
   tags: ['tickets'],
   security: [{ Bearer: [] }],
   parameters: [
@@ -37,27 +45,25 @@ POST.apiDoc = {
   requestBody: {
     content: {
       'application/json': {
-        schema: CreateTicketSystemUserRequestSchema
+        schema: CreateTicketSystemUsersRequestSchema
       }
     }
   },
   responses: {
     201: {
-      description: 'Ticket assignee created successfully',
+      description: 'Ticket assignees created successfully',
       content: {
         'application/json': {
-          schema: TicketSystemUserSchema
+          schema: {
+            type: 'array',
+            items: TicketSystemUserSchema
+          }
         }
       }
     },
     ...defaultErrorResponses
   }
 };
-
-const buildActor = (req: Parameters<RequestHandler>[0], systemUserId: number) => ({
-  systemUserId,
-  isSystemAdmin: req.system_user?.role_names.includes(SYSTEM_ROLE.SYSTEM_ADMIN) ?? false
-});
 
 export function createTicketSystemUser(): RequestHandler {
   return async (req, res) => {
@@ -67,17 +73,13 @@ export function createTicketSystemUser(): RequestHandler {
       await connection.open();
 
       const ticketSystemUserService = new TicketSystemUserService(connection);
-      const payload = req.body as CreateTicketSystemUserRequest;
+      const payload = req.body as CreateTicketSystemUser[];
 
-      const ticketSystemUser = await ticketSystemUserService.createTicketAssignee(
-        req.params.ticketId,
-        payload,
-        buildActor(req, connection.systemUserId())
-      );
+      const ticketSystemUsers = await ticketSystemUserService.createTicketAssignees(req.params.ticketId, payload);
 
       await connection.commit();
 
-      return res.status(201).json(ticketSystemUser);
+      return res.status(201).json(ticketSystemUsers);
     } catch (error) {
       defaultLog.error({ label: 'createTicketSystemUser', message: 'error', error });
       await connection.rollback();
