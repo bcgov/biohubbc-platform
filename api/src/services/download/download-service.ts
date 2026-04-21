@@ -38,13 +38,6 @@ export class DownloadService extends DBService {
   teamService: TeamService;
   searchFeatureService: SearchFeatureService;
 
-  /**
-   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
-   */
-  static readonly dependencies = {
-    getObjectStoreBucketName
-  };
-
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
