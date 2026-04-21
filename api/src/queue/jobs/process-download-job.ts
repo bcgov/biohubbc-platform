@@ -1,5 +1,6 @@
 import PgBoss from 'pg-boss';
 import { getAPIUserDBConnection } from '../../database/db';
+import { PROCESS_START_STATUSES, TERMINAL_DOWNLOAD_STATUSES } from '../../constants/download-status';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
@@ -18,23 +19,25 @@ export interface IProcessDownloadJobData {
 }
 
 /**
- * Process download job handler.
+ * Parquet-only worker for packaging selected features into per-feature-type
+ * Parquet files on S3.
  *
- * Branches on `download.format` to select the processing pipeline:
+ * Shape: terminal guard → start-status guard → transition-to-processing →
+ * per-type Parquet write → transition-to-ready.
  *
- * - **Parquet**: Streams from typed property tables into per-feature-type Parquet
- *   files on S3. Each feature type gets its own file because different types have
- *   different column schemas. Each type write runs in its own transaction so
- *   completed types survive retries (S3 writes are idempotent).
+ * The upfront status guard keeps spurious retries quiet (pg-boss re-firing a
+ * completed job hits the terminal branch and exits silently, no throw, no
+ * DLQ). Unexpected statuses surface as a throw so they land in the DLQ where
+ * someone can triage.
  *
- * - **CSV/zip (fragment pipeline)**: Streams from JSONB into fragmented zip
- *   archives. Fragments are planned, processed, and finalized independently.
- *
- * Each phase runs in its own `withConnection` to bound transaction lifetime
- * and allow partial progress to survive pg-boss retries.
- *
- * @param {PgBoss.Job<IProcessDownloadJobData>[]} jobs The jobs to process
- * @return {*}  {Promise<void>}
+ * Retry semantics:
+ * - Per-phase `withConnection` means completed phases survive retries — S3 overwrites
+ *   are idempotent; artifact + download_artifact inserts use ON CONFLICT DO NOTHING.
+ * - `PROCESSING` is in `PROCESS_START_STATUSES` and in the pending→processing
+ *   transition's allowed sources, so mid-job retries re-enter cleanly after a
+ *   worker crash.
+ * - Disallowing `ready` as a source for the processing→ready transition means a
+ *   bug that drops us into the final transition mid-flight throws loudly.
  */
 export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobData> = async (jobs) => {
   for (const job of jobs) {
@@ -48,91 +51,77 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
     });
 
     try {
-      // Phase 1: Fetch the download record to determine which pipeline to use
-      const download = await withConnection(async (connection) => {
-        return new DownloadRepository(connection).findDownloadById(downloadId);
-      });
+      // Fetch once, up front, to drive the status guards.
+      const download = await withConnection(async (connection) =>
+        new DownloadRepository(connection).findDownloadById(downloadId)
+      );
 
       if (!download) {
         throw new Error(`Download ${downloadId} not found`);
       }
 
-      if (download.format === 'parquet') {
-        // --- Parquet pipeline ---
-        // Streams from typed property tables into per-feature-type Parquet files.
+      const currentStatus = download.download_status;
 
-        // Mark download as PROCESSING so started_at is recorded
+      // Already complete — pg-boss re-fired a finished job, or the DLQ ran after
+      // a late success. Nothing to do; exit cleanly so we don't fight the state.
+      if (TERMINAL_DOWNLOAD_STATUSES.includes(currentStatus)) {
+        defaultLog.info({
+          label: 'processDownloadJobHandler',
+          message: 'Download already in terminal status — skipping',
+          jobId: job.id,
+          downloadId,
+          downloadStatus: currentStatus
+        });
+        continue;
+      }
+
+      // Status is neither a start state nor terminal — something unexpected.
+      // Surface it: throw puts the job in the DLQ where someone can triage.
+      if (!PROCESS_START_STATUSES.includes(currentStatus)) {
+        throw new Error(
+          `Download ${downloadId} in unexpected status '${currentStatus}' — cannot start processing`
+        );
+      }
+
+      // Transition → processing. Accepts PROCESSING as a source because a
+      // mid-job retry after a crash re-enters this block with the row already
+      // in processing; the transition is a no-op re-entry.
+      await withConnection(async (connection) => {
+        await new DownloadPipelineService(connection).transitionDownloadStatus(
+          downloadId,
+          DownloadStatusEnum.PROCESSING,
+          [DownloadStatusEnum.PENDING, DownloadStatusEnum.PROCESSING]
+        );
+      });
+
+      const source = await withConnection(async (connection) =>
+        new DownloadRepository(connection).getDownloadSource(downloadId)
+      );
+
+      const { schemaLookup, featureTypes } = await withConnection(async (connection) =>
+        new DownloadPipelineService(connection).resolveParquetSchema(downloadId, source)
+      );
+
+      // Write one Parquet file per feature type. Each write runs in its own transaction
+      // so completed types survive retries — S3 overwrites are idempotent, and the
+      // artifact + download_artifact inserts use ON CONFLICT DO NOTHING.
+      for (const featureTypeName of featureTypes) {
         await withConnection(async (connection) => {
-          await new DownloadPipelineService(connection).updateDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING);
-        });
-
-        // Resolve source + artifact info for S3 key construction
-        const metadata = await withConnection(async (connection) => {
-          return new DownloadPipelineService(connection).getDownloadMetadata(downloadId);
-        });
-
-        // Build schema lookup and discover which feature types are in this download
-        const { schemaLookup, featureTypes } = await withConnection(async (connection) => {
-          return new DownloadPipelineService(connection).resolveParquetSchema(downloadId, metadata.source);
-        });
-
-        // Write each feature type to its own Parquet file.
-        // Different feature types have different column schemas — each gets its own file.
-        // Each write is its own transaction so completed types survive retries.
-        // S3 writes are idempotent — re-uploading the same key is safe.
-        for (const featureTypeName of featureTypes) {
-          await withConnection(async (connection) => {
-            const properties = schemaLookup.get(featureTypeName) ?? [];
-            return new DownloadPipelineService(connection).writeFeatureTypeParquet({
-              downloadId,
-              source: metadata.source,
-              properties,
-              featureTypeName
-            });
+          const properties = schemaLookup.get(featureTypeName) ?? [];
+          await new DownloadPipelineService(connection).writeFeatureTypeParquet({
+            downloadId,
+            source,
+            properties,
+            featureTypeName
           });
-        }
-
-        // Finalize: mark artifact as uploaded, download as READY
-        await withConnection(async (connection) => {
-          return new DownloadPipelineService(connection).finalizeParquetDownload(downloadId);
-        });
-      } else {
-        // --- Fragment pipeline (CSV/zip) ---
-        // Streams from JSONB into fragmented zip archives.
-
-        // Plan fragments and get the list of work to do
-        const fragments = await withConnection(async (connection) => {
-          const pipelineService = new DownloadPipelineService(connection);
-          await pipelineService.planDownloadIfNeeded(downloadId);
-          return pipelineService.getFragmentsToProcess(downloadId);
-        });
-
-        // Mark download as PROCESSING so started_at is recorded
-        await withConnection(async (connection) => {
-          const pipelineService = new DownloadPipelineService(connection);
-          await pipelineService.updateDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING);
-        });
-
-        // Process each fragment
-        for (const fragment of fragments) {
-          // Mark fragment as PROCESSING for UI
-          await withConnection(async (connection) => {
-            const pipelineService = new DownloadPipelineService(connection);
-            await pipelineService.markFragmentProcessing(fragment.download_fragment_id);
-          });
-
-          await withConnection(async (connection) => {
-            const pipelineService = new DownloadPipelineService(connection);
-            await pipelineService.processFragment(fragment, downloadId);
-          });
-        }
-
-        // Finalize the parent download record
-        await withConnection(async (connection) => {
-          const pipelineService = new DownloadPipelineService(connection);
-          await pipelineService.finalizeDownload(downloadId);
         });
       }
+
+      await withConnection(async (connection) => {
+        await new DownloadPipelineService(connection).transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
+          DownloadStatusEnum.PROCESSING
+        ]);
+      });
 
       defaultLog.info({
         label: 'processDownloadJobHandler',
@@ -148,8 +137,7 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
         downloadId,
         error
       });
-
-      throw error; // pg-boss will handle retry based on configuration
+      throw error; // pg-boss retries per queue config; terminal failure lands in DLQ
     }
   }
 };
@@ -157,17 +145,17 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
 /**
  * Dead Letter Queue handler for failed download jobs.
  *
- * This handler is called after all retries are exhausted. It updates the
- * download status to 'failed' with error details.
+ * Mirror-image terminal guard: if the download is already in a terminal status
+ * (success happened before retries exhausted, or a previous DLQ firing already
+ * marked it failed), exit silently. Missing download is also a no-op — nothing
+ * to transition, and throwing would put pg-boss in a DLQ retry loop.
  *
- * @param {PgBoss.Job<IProcessDownloadJobData>[]} jobs The failed jobs
- * @return {*}  {Promise<void>}
+ * Otherwise transitions the download to `failed` with the job output as error
+ * metadata.
  */
 export const processDownloadFailedHandler: PgBoss.WorkHandler<IProcessDownloadJobData> = async (jobs) => {
   for (const job of jobs) {
     const { downloadId } = job.data;
-
-    // Cast to access output field available on failed jobs
     const jobOutput = (job as PgBoss.JobWithMetadata<IProcessDownloadJobData>).output;
 
     defaultLog.warn({
@@ -183,12 +171,37 @@ export const processDownloadFailedHandler: PgBoss.WorkHandler<IProcessDownloadJo
     try {
       await connection.open();
 
-      const pipelineService = new DownloadPipelineService(connection);
+      const download = await new DownloadRepository(connection).findDownloadById(downloadId);
 
-      // Update download status to failed (all retries exhausted)
-      await pipelineService.updateDownloadStatus(downloadId, DownloadStatusEnum.FAILED, {
-        error: typeof jobOutput === 'string' ? jobOutput : 'Job failed after all retries'
-      });
+      if (!download) {
+        defaultLog.warn({
+          label: 'processDownloadFailedHandler',
+          message: 'Download not found — skipping DLQ transition',
+          jobId: job.id,
+          downloadId
+        });
+        await connection.commit();
+        continue;
+      }
+
+      if (TERMINAL_DOWNLOAD_STATUSES.includes(download.download_status)) {
+        defaultLog.info({
+          label: 'processDownloadFailedHandler',
+          message: 'Download already in terminal status — skipping DLQ transition',
+          jobId: job.id,
+          downloadId,
+          downloadStatus: download.download_status
+        });
+        await connection.commit();
+        continue;
+      }
+
+      await new DownloadPipelineService(connection).transitionDownloadStatus(
+        downloadId,
+        DownloadStatusEnum.FAILED,
+        [DownloadStatusEnum.PENDING, DownloadStatusEnum.PROCESSING],
+        { error: typeof jobOutput === 'string' ? jobOutput : 'Job failed after all retries' }
+      );
 
       await connection.commit();
 
@@ -200,7 +213,6 @@ export const processDownloadFailedHandler: PgBoss.WorkHandler<IProcessDownloadJo
       });
     } catch (error) {
       await connection.rollback();
-
       defaultLog.error({
         label: 'processDownloadFailedHandler',
         message: 'Failed to update failed download job status',
@@ -208,7 +220,6 @@ export const processDownloadFailedHandler: PgBoss.WorkHandler<IProcessDownloadJo
         downloadId,
         error
       });
-
       throw error;
     } finally {
       connection.release();

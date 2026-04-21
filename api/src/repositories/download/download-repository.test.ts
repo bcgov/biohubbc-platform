@@ -526,48 +526,6 @@ describe('DownloadRepository', () => {
     });
   });
 
-  describe('getDownloadArtifact', () => {
-    it('returns artifact_id and object_key from download_artifact JOIN artifact', async () => {
-      const sqlStub = sinon
-        .stub()
-        .resolves(
-          mockQueryResult(
-            [{ artifact_id: 'bbbb0000-0000-0000-0000-000000000001', object_key: 'downloads/some-file.parquet' }],
-            1
-          )
-        );
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.getDownloadArtifact('aaaa0000-0000-0000-0000-000000000001');
-
-      expect(result).to.deep.equal({
-        artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
-        object_key: 'downloads/some-file.parquet'
-      });
-
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('download_artifact');
-      expect(sqlText).to.include('artifact');
-      expect(sqlText).to.include('object_key');
-    });
-
-    it('throws ApiExecuteSQLError when not found', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-
-      try {
-        await repo.getDownloadArtifact('bad-id');
-        expect.fail('Expected error');
-      } catch (err: any) {
-        expect(err.message).to.equal('Download artifact not found');
-      }
-    });
-  });
-
   describe('listDownloadFeatureTypesByCartId', () => {
     it('returns ordered feature type names with DISTINCT', async () => {
       const sqlStub = sinon
@@ -900,46 +858,6 @@ describe('DownloadRepository', () => {
       expect(result).to.have.length(2);
       expect(result.find((r) => r.name === 'site_name')?.value).to.equal('Alpha');
       expect(result.find((r) => r.name === 'count')?.value).to.equal(42);
-    });
-  });
-
-  describe('updateArtifactStatusByDownloadId', () => {
-    it('updates artifact status via download_artifact join', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      await repo.updateArtifactStatusByDownloadId(
-        'aaaa0000-0000-0000-0000-000000000001',
-        'uploaded',
-        '2025-01-01T00:01:00Z'
-      );
-
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('UPDATE artifact');
-      expect(sqlText).to.include('download_artifact');
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include('uploaded');
-      expect(sqlValues).to.include('2025-01-01T00:01:00Z');
-    });
-
-    it('throws when no artifact found for download', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-
-      try {
-        await repo.updateArtifactStatusByDownloadId(
-          'aaaa0000-0000-0000-0000-000000000001',
-          'uploaded',
-          '2025-01-01T00:01:00Z'
-        );
-        expect.fail('Expected an error');
-      } catch (error) {
-        expect((error as Error).message).to.include('Failed to update artifact status');
-      }
     });
   });
 });

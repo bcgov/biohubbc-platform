@@ -6,13 +6,7 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { ApiConflictError } from '../../errors/api-error';
-import {
-  DownloadArtifactInfo,
-  DownloadFeatureData,
-  DownloadFeatureSummary,
-  DownloadRecord,
-  DownloadSource
-} from '../../models/download';
+import { DownloadFeatureData, DownloadFeatureSummary, DownloadRecord, DownloadSource } from '../../models/download';
 import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { FEATURE_PROPERTY_TYPE } from '../../models/feature-property';
@@ -388,6 +382,9 @@ describe('DownloadPipelineService', () => {
       });
 
       sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([readyFragment]);
+      sinon
+        .stub(DownloadRepository.prototype, 'findDownloadById')
+        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
       const updateCountsStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadFragmentCounts').resolves();
       const updateStatusStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
 
@@ -415,6 +412,9 @@ describe('DownloadPipelineService', () => {
       });
 
       sinon.stub(DownloadFragmentRepository.prototype, 'getFragmentsByDownloadId').resolves([fragment1, fragment2]);
+      sinon
+        .stub(DownloadRepository.prototype, 'findDownloadById')
+        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
       const updateCountsStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadFragmentCounts').resolves();
       const updateStatusStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
 
@@ -675,48 +675,12 @@ describe('DownloadPipelineService', () => {
 
   // Shared test data for Parquet tests
   const TEST_DOWNLOAD_ID = 'aaaa0000-0000-0000-0000-000000000042';
-  const TEST_ARTIFACT: DownloadArtifactInfo = {
-    artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
-    object_key: 'downloads/aaaa0000-0000-0000-0000-000000000042'
-  };
   const TEST_SOURCE_CART: DownloadSource = {
     cart_id: 'cccc0000-0000-0000-0000-000000000001',
     filters: null,
     create_user: 1
   };
   const TEST_SOURCE_FILTER: DownloadSource = { cart_id: null, filters: { keyword: 'moose' }, create_user: 5 };
-
-  describe('getDownloadMetadata', () => {
-    it('returns combined source and artifact info', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      const getSourceStub = sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(TEST_SOURCE_CART);
-      const getArtifactStub = sinon.stub(DownloadRepository.prototype, 'getDownloadArtifact').resolves(TEST_ARTIFACT);
-
-      const result = await service.getDownloadMetadata(TEST_DOWNLOAD_ID);
-
-      expect(getSourceStub).to.have.been.calledOnceWith(TEST_DOWNLOAD_ID);
-      expect(getArtifactStub).to.have.been.calledOnceWith(TEST_DOWNLOAD_ID);
-      expect(result.source).to.deep.equal(TEST_SOURCE_CART);
-      expect(result.artifact).to.deep.equal(TEST_ARTIFACT);
-    });
-
-    it('propagates errors from getDownloadArtifact', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(TEST_SOURCE_CART);
-      sinon.stub(DownloadRepository.prototype, 'getDownloadArtifact').rejects(new Error('Artifact not found'));
-
-      try {
-        await service.getDownloadMetadata(TEST_DOWNLOAD_ID);
-        expect.fail('Expected an error');
-      } catch (error) {
-        expect((error as Error).message).to.equal('Artifact not found');
-      }
-    });
-  });
 
   describe('resolveParquetSchema', () => {
     const mockCodes: FeatureTypeWithProperties[] = [
@@ -1028,42 +992,6 @@ describe('DownloadPipelineService', () => {
       expect(linkStub.firstCall.args[0]).to.equal(TEST_DOWNLOAD_ID);
       expect(linkStub.firstCall.args[1]).to.equal('bbbb0000-0000-0000-0000-000000000001');
       expect(linkStub).to.have.been.calledAfter(insertArtifactStub);
-    });
-  });
-
-  describe('finalizeParquetDownload', () => {
-    it('updates artifact status to uploaded and download status to READY', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      const updateArtifactStub = sinon
-        .stub(DownloadRepository.prototype, 'updateArtifactStatusByDownloadId')
-        .resolves();
-      const updateDownloadStub = sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
-
-      await service.finalizeParquetDownload(TEST_DOWNLOAD_ID);
-
-      expect(updateArtifactStub).to.have.been.calledOnce;
-      expect(updateArtifactStub.firstCall.args[0]).to.equal(TEST_DOWNLOAD_ID);
-      expect(updateArtifactStub.firstCall.args[1]).to.equal('uploaded');
-      expect(updateDownloadStub).to.have.been.calledOnce;
-      expect(updateDownloadStub.firstCall.args[1]).to.equal(DownloadStatusEnum.READY);
-    });
-
-    it('passes ISO timestamp to artifact status update', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const service = new DownloadPipelineService(mockDBConnection);
-
-      const updateArtifactStub = sinon
-        .stub(DownloadRepository.prototype, 'updateArtifactStatusByDownloadId')
-        .resolves();
-      sinon.stub(DownloadRepository.prototype, 'updateDownloadStatus').resolves();
-
-      await service.finalizeParquetDownload(TEST_DOWNLOAD_ID);
-
-      const timestamp = updateArtifactStub.firstCall.args[2] as string;
-      // Verify it's a valid ISO timestamp
-      expect(new Date(timestamp).toISOString()).to.equal(timestamp);
     });
   });
 });

@@ -4,7 +4,9 @@ import PgBoss from 'pg-boss';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
+import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import * as db from '../../database/db';
+import { DownloadRecord } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from '../../repositories/download/download-repository';
 import { DownloadPipelineService } from '../../services/download/download-pipeline-service';
@@ -43,240 +45,86 @@ describe('process-download-job', () => {
     return mockDBConnection;
   };
 
-  describe('processDownloadJobHandler — format branching', () => {
-    it('routes to parquet pipeline when format is "parquet"', async () => {
-      // Verifies: format === 'parquet' triggers parquet-specific service methods
-      setupMockConnection();
-
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves({
-        download_id: 'dl-1',
-        download_status: DownloadStatusEnum.PENDING,
-        format: 'parquet',
-        metadata: null,
-        started_at: null,
-        completed_at: null,
-        downloaded_at: null,
-        total_fragments: 0,
-        completed_fragments: 0,
-        estimated_total_size_bytes: null,
-        fragment_size_bytes: '104857600',
-        create_date: '2025-01-01T00:00:00Z'
-      });
-
-      const updateStatusStub = sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
-
-      const metadataStub = sinon.stub(DownloadPipelineService.prototype, 'getDownloadMetadata').resolves({
-        source: { cart_id: 'cart-1', filters: null, create_user: 1 },
-        artifact: { artifact_id: 'art-1', object_key: 'downloads/dl-1' }
-      });
-
-      const schemaLookup = new Map<string, CsvPropertyDefinition[]>();
-      schemaLookup.set('observation', [{ feature_property_name: 'count', feature_property_type_name: 'number' }]);
-      schemaLookup.set('survey', [{ feature_property_name: 'name', feature_property_type_name: 'string' }]);
-
-      const schemaStub = sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
-        schemaLookup,
-        featureTypes: ['observation', 'survey']
-      });
-
-      const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
-      const finalizeStub = sinon.stub(DownloadPipelineService.prototype, 'finalizeParquetDownload').resolves();
-
-      // Fragment pipeline methods should NOT be called
-      const planStub = sinon.stub(DownloadPipelineService.prototype, 'planDownloadIfNeeded').resolves();
-
-      await processDownloadJobHandler([createMockJob('dl-1')]);
-
-      // Parquet pipeline methods called
-      expect(updateStatusStub).to.have.been.calledOnce;
-      expect(metadataStub).to.have.been.calledOnceWith('dl-1');
-      expect(schemaStub).to.have.been.calledOnce;
-      expect(writeStub).to.have.been.calledTwice;
-      expect(finalizeStub).to.have.been.calledOnceWith('dl-1');
-
-      // Fragment pipeline methods NOT called
-      expect(planStub).not.to.have.been.called;
-    });
-
-    it('routes to fragment pipeline when format is "csv"', async () => {
-      // Verifies: format !== 'parquet' preserves the existing fragment-based pipeline
-      setupMockConnection();
-
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves({
-        download_id: 'dl-2',
-        download_status: DownloadStatusEnum.PENDING,
-        format: 'csv',
-        metadata: null,
-        started_at: null,
-        completed_at: null,
-        downloaded_at: null,
-        total_fragments: 0,
-        completed_fragments: 0,
-        estimated_total_size_bytes: null,
-        fragment_size_bytes: '104857600',
-        create_date: '2025-01-01T00:00:00Z'
-      });
-
-      const planStub = sinon.stub(DownloadPipelineService.prototype, 'planDownloadIfNeeded').resolves();
-      sinon.stub(DownloadPipelineService.prototype, 'getFragmentsToProcess').resolves([]);
-      sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
-      const finalizeStub = sinon.stub(DownloadPipelineService.prototype, 'finalizeDownload').resolves();
-
-      // Parquet pipeline methods should NOT be called
-      const metadataStub = sinon.stub(DownloadPipelineService.prototype, 'getDownloadMetadata');
-      const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet');
-
-      await processDownloadJobHandler([createMockJob('dl-2')]);
-
-      // Fragment pipeline methods called
-      expect(planStub).to.have.been.calledOnce;
-      expect(finalizeStub).to.have.been.calledOnce;
-
-      // Parquet pipeline methods NOT called
-      expect(metadataStub).not.to.have.been.called;
-      expect(writeStub).not.to.have.been.called;
-    });
-
-    it('throws when download record not found', async () => {
-      setupMockConnection();
-
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(null);
-
-      try {
-        await processDownloadJobHandler([createMockJob('nonexistent-id')]);
-        expect.fail('Expected an error to be thrown');
-      } catch (error) {
-        expect((error as Error).message).to.equal('Download nonexistent-id not found');
-      }
-    });
+  const createMockDownloadRecord = (overrides?: Partial<DownloadRecord>): DownloadRecord => ({
+    download_id: 'dl-1',
+    download_status: DownloadStatusEnum.PENDING,
+    format: 'parquet',
+    metadata: null,
+    started_at: null,
+    completed_at: null,
+    downloaded_at: null,
+    total_fragments: 1,
+    completed_fragments: 0,
+    estimated_total_size_bytes: null,
+    fragment_size_bytes: String(FRAGMENT_SIZE_THRESHOLD),
+    create_date: '2026-01-01T00:00:00.000Z',
+    ...overrides
   });
 
-  describe('processDownloadJobHandler — parquet pipeline orchestration', () => {
-    it('calls phases in correct order: status → metadata → schema → per-type write → finalize', async () => {
-      // Verifies: Parquet phases are orchestrated in the correct sequence
+  describe('processDownloadJobHandler', () => {
+    it('transitions pending → processing → ready for a download with 3 feature types', async () => {
       setupMockConnection();
 
-      const callOrder: string[] = [];
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
 
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves({
-        download_id: 'dl-1',
-        download_status: DownloadStatusEnum.PENDING,
-        format: 'parquet',
-        metadata: null,
-        started_at: null,
-        completed_at: null,
-        downloaded_at: null,
-        total_fragments: 0,
-        completed_fragments: 0,
-        estimated_total_size_bytes: null,
-        fragment_size_bytes: '104857600',
-        create_date: '2025-01-01T00:00:00Z'
-      });
-
-      sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').callsFake(async () => {
-        callOrder.push('updateStatus');
-      });
-
-      sinon.stub(DownloadPipelineService.prototype, 'getDownloadMetadata').callsFake(async () => {
-        callOrder.push('getMetadata');
-        return {
-          source: { cart_id: 'cart-1', filters: null, create_user: 1 },
-          artifact: { artifact_id: 'art-1', object_key: 'downloads/dl-1' }
-        };
-      });
+      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      const source = { cart_id: 'cart-1', filters: null, create_user: 1 };
+      sinon.stub(DownloadRepository.prototype, 'getDownloadSource').resolves(source);
 
       const schemaLookup = new Map<string, CsvPropertyDefinition[]>();
-      schemaLookup.set('observation', [{ feature_property_name: 'count', feature_property_type_name: 'number' }]);
-
-      sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').callsFake(async () => {
-        callOrder.push('resolveSchema');
-        return { schemaLookup, featureTypes: ['observation'] };
-      });
-
-      sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').callsFake(async () => {
-        callOrder.push('writeParquet');
-      });
-
-      sinon.stub(DownloadPipelineService.prototype, 'finalizeParquetDownload').callsFake(async () => {
-        callOrder.push('finalize');
-      });
-
-      await processDownloadJobHandler([createMockJob('dl-1')]);
-
-      expect(callOrder).to.deep.equal(['updateStatus', 'getMetadata', 'resolveSchema', 'writeParquet', 'finalize']);
-    });
-
-    it('writes each feature type in its own withConnection', async () => {
-      // Verifies: Per-type connection isolation — each writeFeatureTypeParquet call
-      // gets its own transaction so completed types survive retries
-      const mockDBConnection = setupMockConnection();
-
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves({
-        download_id: 'dl-1',
-        download_status: DownloadStatusEnum.PENDING,
-        format: 'parquet',
-        metadata: null,
-        started_at: null,
-        completed_at: null,
-        downloaded_at: null,
-        total_fragments: 0,
-        completed_fragments: 0,
-        estimated_total_size_bytes: null,
-        fragment_size_bytes: '104857600',
-        create_date: '2025-01-01T00:00:00Z'
-      });
-
-      sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
-      sinon.stub(DownloadPipelineService.prototype, 'getDownloadMetadata').resolves({
-        source: { cart_id: 'cart-1', filters: null, create_user: 1 },
-        artifact: { artifact_id: 'art-1', object_key: 'downloads/dl-1' }
-      });
-
-      const schemaLookup = new Map<string, CsvPropertyDefinition[]>();
-      schemaLookup.set('observation', [{ feature_property_name: 'count', feature_property_type_name: 'number' }]);
-      schemaLookup.set('survey', [{ feature_property_name: 'name', feature_property_type_name: 'string' }]);
-      schemaLookup.set('dataset', [{ feature_property_name: 'title', feature_property_type_name: 'string' }]);
+      schemaLookup.set('a', [{ feature_property_name: 'one', feature_property_type_name: 'string' }]);
+      schemaLookup.set('b', [{ feature_property_name: 'two', feature_property_type_name: 'string' }]);
+      schemaLookup.set('c', [{ feature_property_name: 'three', feature_property_type_name: 'string' }]);
 
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
         schemaLookup,
-        featureTypes: ['observation', 'survey', 'dataset']
+        featureTypes: ['a', 'b', 'c']
       });
 
-      sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
-      sinon.stub(DownloadPipelineService.prototype, 'finalizeParquetDownload').resolves();
+      const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
 
       await processDownloadJobHandler([createMockJob('dl-1')]);
 
-      // 1 (findDownload) + 1 (updateStatus) + 1 (metadata) + 1 (schema) + 3 (per-type writes) + 1 (finalize) = 8
-      expect((mockDBConnection.open as sinon.SinonStub).callCount).to.equal(8);
-      expect((mockDBConnection.commit as sinon.SinonStub).callCount).to.equal(8);
-      expect((mockDBConnection.release as sinon.SinonStub).callCount).to.equal(8);
+      // Two status transitions: first to PROCESSING, then to READY
+      expect(transitionStub).to.have.been.calledTwice;
+      expect(transitionStub.firstCall.args[0]).to.equal('dl-1');
+      expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
+      expect(transitionStub.firstCall.args[2]).to.deep.equal([
+        DownloadStatusEnum.PENDING,
+        DownloadStatusEnum.PROCESSING
+      ]);
+
+      expect(transitionStub.secondCall.args[0]).to.equal('dl-1');
+      expect(transitionStub.secondCall.args[1]).to.equal(DownloadStatusEnum.READY);
+      expect(transitionStub.secondCall.args[2]).to.deep.equal([DownloadStatusEnum.PROCESSING]);
+
+      // writeFeatureTypeParquet called once per feature type, in order
+      expect(writeStub).to.have.been.calledThrice;
+      expect(writeStub.firstCall.args[0]).to.deep.include({
+        downloadId: 'dl-1',
+        source,
+        featureTypeName: 'a'
+      });
+      expect(writeStub.secondCall.args[0]).to.deep.include({
+        downloadId: 'dl-1',
+        source,
+        featureTypeName: 'b'
+      });
+      expect(writeStub.thirdCall.args[0]).to.deep.include({
+        downloadId: 'dl-1',
+        source,
+        featureTypeName: 'c'
+      });
     });
 
-    it('passes correct properties from schemaLookup to writeFeatureTypeParquet', async () => {
-      // Verifies: Each feature type receives its own property definitions from the schema
+    it('calls writeFeatureTypeParquet with the properties looked up from schemaLookup for each feature type', async () => {
       setupMockConnection();
 
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves({
-        download_id: 'dl-1',
-        download_status: DownloadStatusEnum.PENDING,
-        format: 'parquet',
-        metadata: null,
-        started_at: null,
-        completed_at: null,
-        downloaded_at: null,
-        total_fragments: 0,
-        completed_fragments: 0,
-        estimated_total_size_bytes: null,
-        fragment_size_bytes: '104857600',
-        create_date: '2025-01-01T00:00:00Z'
-      });
-
-      sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
-
-      const source = { cart_id: 'cart-1', filters: null, create_user: 1 };
-      const artifact = { artifact_id: 'art-1', object_key: 'downloads/dl-1' };
-      sinon.stub(DownloadPipelineService.prototype, 'getDownloadMetadata').resolves({ source, artifact });
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
+      sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadSource')
+        .resolves({ cart_id: 'cart-1', filters: null, create_user: 1 });
 
       const obsProps: CsvPropertyDefinition[] = [
         { feature_property_name: 'count', feature_property_type_name: 'number' }
@@ -295,87 +143,120 @@ describe('process-download-job', () => {
       });
 
       const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
-      sinon.stub(DownloadPipelineService.prototype, 'finalizeParquetDownload').resolves();
 
       await processDownloadJobHandler([createMockJob('dl-1')]);
 
-      // First call: observation with its properties
-      expect(writeStub.firstCall.args[0].downloadId).to.equal('dl-1');
-      expect(writeStub.firstCall.args[0].properties).to.deep.equal(obsProps);
       expect(writeStub.firstCall.args[0].featureTypeName).to.equal('observation');
+      expect(writeStub.firstCall.args[0].properties).to.deep.equal(obsProps);
 
-      // Second call: survey with its properties
-      expect(writeStub.secondCall.args[0].downloadId).to.equal('dl-1');
-      expect(writeStub.secondCall.args[0].properties).to.deep.equal(surveyProps);
       expect(writeStub.secondCall.args[0].featureTypeName).to.equal('survey');
+      expect(writeStub.secondCall.args[0].properties).to.deep.equal(surveyProps);
     });
 
-    it('passes empty array when feature type has no schema entry', async () => {
-      // Verifies: Missing schema entry defaults to empty properties (schemaLookup.get() ?? [])
+    it('skips writeFeatureTypeParquet and still transitions to READY when featureTypes is empty', async () => {
       setupMockConnection();
 
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves({
-        download_id: 'dl-1',
-        download_status: DownloadStatusEnum.PENDING,
-        format: 'parquet',
-        metadata: null,
-        started_at: null,
-        completed_at: null,
-        downloaded_at: null,
-        total_fragments: 0,
-        completed_fragments: 0,
-        estimated_total_size_bytes: null,
-        fragment_size_bytes: '104857600',
-        create_date: '2025-01-01T00:00:00Z'
-      });
-
-      sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
-      sinon.stub(DownloadPipelineService.prototype, 'getDownloadMetadata').resolves({
-        source: { cart_id: 'cart-1', filters: null, create_user: 1 },
-        artifact: { artifact_id: 'art-1', object_key: 'downloads/dl-1' }
-      });
-
-      // Schema lookup has no entry for 'unknown_type'
-      const schemaLookup = new Map<string, CsvPropertyDefinition[]>();
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
+      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadSource')
+        .resolves({ cart_id: 'cart-1', filters: null, create_user: 1 });
       sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
-        schemaLookup,
-        featureTypes: ['unknown_type']
+        schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
+        featureTypes: []
       });
 
       const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
-      sinon.stub(DownloadPipelineService.prototype, 'finalizeParquetDownload').resolves();
 
       await processDownloadJobHandler([createMockJob('dl-1')]);
 
-      expect(writeStub.firstCall.args[0].properties).to.deep.equal([]);
-      expect(writeStub.firstCall.args[0].featureTypeName).to.equal('unknown_type');
+      expect(writeStub).to.not.have.been.called;
+
+      // Still transitioned pending → processing and processing → ready
+      expect(transitionStub).to.have.been.calledTwice;
+      expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
+      expect(transitionStub.secondCall.args[1]).to.equal(DownloadStatusEnum.READY);
     });
-  });
 
-  describe('processDownloadJobHandler — error handling', () => {
-    it('re-throws parquet pipeline errors for pg-boss retry', async () => {
-      // Verifies: Errors propagate to pg-boss for automatic retry
-      const mockDBConnection = setupMockConnection();
+    it('enters processing cleanly when a mid-job retry finds the download already in PROCESSING', async () => {
+      setupMockConnection();
 
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves({
-        download_id: 'dl-1',
-        download_status: DownloadStatusEnum.PENDING,
-        format: 'parquet',
-        metadata: null,
-        started_at: null,
-        completed_at: null,
-        downloaded_at: null,
-        total_fragments: 0,
-        completed_fragments: 0,
-        estimated_total_size_bytes: null,
-        fragment_size_bytes: '104857600',
-        create_date: '2025-01-01T00:00:00Z'
+      sinon
+        .stub(DownloadRepository.prototype, 'findDownloadById')
+        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
+
+      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadSource')
+        .resolves({ cart_id: 'cart-1', filters: null, create_user: 1 });
+      sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
+        schemaLookup: new Map<string, CsvPropertyDefinition[]>(),
+        featureTypes: []
       });
 
-      sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
+      await processDownloadJobHandler([createMockJob('dl-1')]);
+
+      expect(transitionStub).to.have.been.calledTwice;
+      expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
+    });
+
+    for (const terminalStatus of [DownloadStatusEnum.READY, DownloadStatusEnum.FAILED, DownloadStatusEnum.DOWNLOADED]) {
+      it(`skips silently when status is terminal (${terminalStatus})`, async () => {
+        setupMockConnection();
+
+        sinon
+          .stub(DownloadRepository.prototype, 'findDownloadById')
+          .resolves(createMockDownloadRecord({ download_status: terminalStatus }));
+
+        const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+        const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
+
+        await processDownloadJobHandler([createMockJob('dl-1')]);
+
+        // No work done — guard returned early
+        expect(transitionStub).to.not.have.been.called;
+        expect(writeStub).to.not.have.been.called;
+      });
+    }
+
+    it('throws when findDownloadById returns null', async () => {
+      setupMockConnection();
+
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(null);
+
+      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      const writeStub = sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').resolves();
+
+      try {
+        await processDownloadJobHandler([createMockJob('dl-1')]);
+        expect.fail('Expected an error to be thrown');
+      } catch (error) {
+        expect((error as Error).message).to.equal('Download dl-1 not found');
+      }
+
+      expect(transitionStub).to.not.have.been.called;
+      expect(writeStub).to.not.have.been.called;
+    });
+
+    it('propagates error from writeFeatureTypeParquet without transitioning to READY', async () => {
+      setupMockConnection();
+
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(createMockDownloadRecord());
+      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+      sinon
+        .stub(DownloadRepository.prototype, 'getDownloadSource')
+        .resolves({ cart_id: 'cart-1', filters: null, create_user: 1 });
+
+      const schemaLookup = new Map<string, CsvPropertyDefinition[]>();
+      schemaLookup.set('a', []);
+
+      sinon.stub(DownloadPipelineService.prototype, 'resolveParquetSchema').resolves({
+        schemaLookup,
+        featureTypes: ['a']
+      });
 
       const testError = new Error('S3 upload failed');
-      sinon.stub(DownloadPipelineService.prototype, 'getDownloadMetadata').rejects(testError);
+      sinon.stub(DownloadPipelineService.prototype, 'writeFeatureTypeParquet').rejects(testError);
 
       try {
         await processDownloadJobHandler([createMockJob('dl-1')]);
@@ -384,107 +265,9 @@ describe('process-download-job', () => {
         expect(error).to.equal(testError);
       }
 
-      // withConnection rolls back the failed phase
-      expect((mockDBConnection.rollback as sinon.SinonStub).called).to.be.true;
-    });
-
-    it('re-throws fragment pipeline errors for pg-boss retry', async () => {
-      // Verifies: Fragment pipeline errors still propagate after format branching
-      const mockDBConnection = setupMockConnection();
-
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves({
-        download_id: 'dl-1',
-        download_status: DownloadStatusEnum.PENDING,
-        format: 'csv',
-        metadata: null,
-        started_at: null,
-        completed_at: null,
-        downloaded_at: null,
-        total_fragments: 0,
-        completed_fragments: 0,
-        estimated_total_size_bytes: null,
-        fragment_size_bytes: '104857600',
-        create_date: '2025-01-01T00:00:00Z'
-      });
-
-      const testError = new Error('Fragment planning failed');
-      sinon.stub(DownloadPipelineService.prototype, 'planDownloadIfNeeded').rejects(testError);
-
-      try {
-        await processDownloadJobHandler([createMockJob('dl-1')]);
-        expect.fail('Expected an error to be thrown');
-      } catch (error) {
-        expect(error).to.equal(testError);
-      }
-
-      expect((mockDBConnection.rollback as sinon.SinonStub).called).to.be.true;
-    });
-  });
-
-  describe('processDownloadJobHandler — fragment pipeline (regression)', () => {
-    it('calls each phase with correct downloadId', async () => {
-      // Verifies: Handler orchestrates plan → process → finalize with correct downloadId
-      setupMockConnection();
-
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves({
-        download_id: 'aaaa0000-0000-0000-0000-000000000123',
-        download_status: DownloadStatusEnum.PENDING,
-        format: 'csv',
-        metadata: null,
-        started_at: null,
-        completed_at: null,
-        downloaded_at: null,
-        total_fragments: 0,
-        completed_fragments: 0,
-        estimated_total_size_bytes: null,
-        fragment_size_bytes: '104857600',
-        create_date: '2025-01-01T00:00:00Z'
-      });
-
-      const planStub = sinon.stub(DownloadPipelineService.prototype, 'planDownloadIfNeeded').resolves();
-      sinon.stub(DownloadPipelineService.prototype, 'getFragmentsToProcess').resolves([]);
-      sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
-      const finalizeStub = sinon.stub(DownloadPipelineService.prototype, 'finalizeDownload').resolves();
-
-      const mockJobs = [createMockJob('aaaa0000-0000-0000-0000-000000000123', 'job-abc')];
-      await processDownloadJobHandler(mockJobs);
-
-      expect(planStub).to.have.been.calledOnce;
-      expect(planStub.firstCall.args[0]).to.equal('aaaa0000-0000-0000-0000-000000000123');
-      expect(finalizeStub).to.have.been.calledOnce;
-      expect(finalizeStub.firstCall.args[0]).to.equal('aaaa0000-0000-0000-0000-000000000123');
-    });
-
-    it('sets download status to PROCESSING before processing fragments', async () => {
-      // Verifies: started_at is populated by setting PROCESSING status before fragment loop
-      setupMockConnection();
-
-      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves({
-        download_id: 'aaaa0000-0000-0000-0000-000000000123',
-        download_status: DownloadStatusEnum.PENDING,
-        format: 'csv',
-        metadata: null,
-        started_at: null,
-        completed_at: null,
-        downloaded_at: null,
-        total_fragments: 0,
-        completed_fragments: 0,
-        estimated_total_size_bytes: null,
-        fragment_size_bytes: '104857600',
-        create_date: '2025-01-01T00:00:00Z'
-      });
-
-      sinon.stub(DownloadPipelineService.prototype, 'planDownloadIfNeeded').resolves();
-      sinon.stub(DownloadPipelineService.prototype, 'getFragmentsToProcess').resolves([]);
-      const updateStatusStub = sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
-      sinon.stub(DownloadPipelineService.prototype, 'finalizeDownload').resolves();
-
-      const mockJobs = [createMockJob('aaaa0000-0000-0000-0000-000000000123')];
-      await processDownloadJobHandler(mockJobs);
-
-      expect(updateStatusStub).to.have.been.calledOnce;
-      expect(updateStatusStub.firstCall.args[0]).to.equal('aaaa0000-0000-0000-0000-000000000123');
-      expect(updateStatusStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
+      // Only the first transition (to PROCESSING) was called; the READY transition never runs
+      expect(transitionStub).to.have.been.calledOnce;
+      expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.PROCESSING);
     });
   });
 
@@ -497,60 +280,105 @@ describe('process-download-job', () => {
         output
       } as PgBoss.JobWithMetadata<IProcessDownloadJobData>);
 
-    it('updates status to failed using downloadId', async () => {
-      // Verifies: DLQ handler uses downloadId to update status to failed
+    const setupDLQMocks = () => {
       const mockDBConnection = getMockDBConnection();
       mockDBConnection.open = sinon.stub().resolves();
-      mockDBConnection.commit = sinon.stub().resolves();
+      const commitStub = sinon.stub().resolves();
+      const rollbackStub = sinon.stub().resolves();
+      mockDBConnection.commit = commitStub;
+      mockDBConnection.rollback = rollbackStub;
       mockDBConnection.release = sinon.stub();
 
       sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
+      return { commitStub, rollbackStub };
+    };
 
-      const updateStatusByIdStub = sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
+    it('transitions to failed with error metadata for a string job output', async () => {
+      setupDLQMocks();
 
-      const mockJobs = [createMockFailedJob('aaaa0000-0000-0000-0000-000000000123', 'dlq-job-id')];
-      await processDownloadFailedHandler(mockJobs);
+      sinon
+        .stub(DownloadRepository.prototype, 'findDownloadById')
+        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
 
-      expect(updateStatusByIdStub).to.have.been.calledOnce;
-      expect(updateStatusByIdStub.firstCall.args[0]).to.equal('aaaa0000-0000-0000-0000-000000000123');
-      expect(updateStatusByIdStub.firstCall.args[1]).to.equal(DownloadStatusEnum.FAILED);
+      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+
+      await processDownloadFailedHandler([createMockFailedJob('dl-1', 'dlq-job-id', 'something went wrong')]);
+
+      expect(transitionStub).to.have.been.calledOnce;
+      expect(transitionStub.firstCall.args[0]).to.equal('dl-1');
+      expect(transitionStub.firstCall.args[1]).to.equal(DownloadStatusEnum.FAILED);
+      expect(transitionStub.firstCall.args[2]).to.deep.equal([
+        DownloadStatusEnum.PENDING,
+        DownloadStatusEnum.PROCESSING
+      ]);
+      expect(transitionStub.firstCall.args[3]).to.deep.equal({ error: 'something went wrong' });
     });
 
-    it('passes string error from job output when available', async () => {
-      // Verifies: Handler extracts string error from job output
-      const mockDBConnection = getMockDBConnection();
-      mockDBConnection.open = sinon.stub().resolves();
-      mockDBConnection.commit = sinon.stub().resolves();
-      mockDBConnection.release = sinon.stub();
+    it('uses generic error message when job output is not a string', async () => {
+      setupDLQMocks();
 
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
+      sinon
+        .stub(DownloadRepository.prototype, 'findDownloadById')
+        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
 
-      const updateStatusByIdStub = sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
+      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
 
-      const errorOutput = 'Database connection failed';
-      const mockJobs = [createMockFailedJob('aaaa0000-0000-0000-0000-000000000123', 'dlq-job-id', errorOutput)];
-      await processDownloadFailedHandler(mockJobs);
+      await processDownloadFailedHandler([createMockFailedJob('dl-1', 'dlq-job-id', { whatever: 'obj' })]);
 
-      expect(updateStatusByIdStub.firstCall.args[2]).to.deep.equal({ error: 'Database connection failed' });
+      expect(transitionStub.firstCall.args[3]).to.deep.equal({ error: 'Job failed after all retries' });
     });
 
-    it('uses default error message when job output is not a string', async () => {
-      // Verifies: Handler uses default message when output is null/object
-      const mockDBConnection = getMockDBConnection();
-      mockDBConnection.open = sinon.stub().resolves();
-      mockDBConnection.commit = sinon.stub().resolves();
-      mockDBConnection.release = sinon.stub();
+    for (const terminalStatus of [DownloadStatusEnum.READY, DownloadStatusEnum.FAILED, DownloadStatusEnum.DOWNLOADED]) {
+      it(`skips silently when the download is already in terminal status (${terminalStatus})`, async () => {
+        const { commitStub, rollbackStub } = setupDLQMocks();
 
-      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
+        sinon
+          .stub(DownloadRepository.prototype, 'findDownloadById')
+          .resolves(createMockDownloadRecord({ download_status: terminalStatus }));
 
-      const updateStatusByIdStub = sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
+        const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
 
-      const mockJobs = [createMockFailedJob('aaaa0000-0000-0000-0000-000000000123', 'dlq-job-id', { some: 'object' })];
-      await processDownloadFailedHandler(mockJobs);
+        await processDownloadFailedHandler([createMockFailedJob('dl-1', 'dlq-job-id', 'anything')]);
 
-      expect(updateStatusByIdStub.firstCall.args[2]).to.deep.equal({
-        error: 'Job failed after all retries'
+        expect(transitionStub).to.not.have.been.called;
+        expect(commitStub).to.have.been.calledOnce;
+        expect(rollbackStub).to.not.have.been.called;
       });
+    }
+
+    it('skips silently when the download is not found', async () => {
+      const { commitStub, rollbackStub } = setupDLQMocks();
+
+      sinon.stub(DownloadRepository.prototype, 'findDownloadById').resolves(null);
+
+      const transitionStub = sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').resolves();
+
+      await processDownloadFailedHandler([createMockFailedJob('dl-1', 'dlq-job-id', 'anything')]);
+
+      expect(transitionStub).to.not.have.been.called;
+      expect(commitStub).to.have.been.calledOnce;
+      expect(rollbackStub).to.not.have.been.called;
+    });
+
+    it('rethrows unexpected errors from transitionDownloadStatus', async () => {
+      const { commitStub, rollbackStub } = setupDLQMocks();
+
+      sinon
+        .stub(DownloadRepository.prototype, 'findDownloadById')
+        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.PROCESSING }));
+
+      const testError = new Error('unexpected');
+      sinon.stub(DownloadPipelineService.prototype, 'transitionDownloadStatus').rejects(testError);
+
+      try {
+        await processDownloadFailedHandler([createMockFailedJob('dl-1', 'dlq-job-id', 'anything')]);
+        expect.fail('Expected an error to be thrown');
+      } catch (error) {
+        expect(error).to.equal(testError);
+      }
+
+      expect(rollbackStub).to.have.been.calledOnce;
+      expect(commitStub).to.not.have.been.called;
     });
   });
 });

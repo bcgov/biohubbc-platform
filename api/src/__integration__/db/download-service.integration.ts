@@ -136,13 +136,13 @@ describe('Download services (integration)', function () {
     });
   });
 
-  describe('updateDownloadStatus', () => {
+  describe('transitionDownloadStatus', () => {
     it('should set started_at only when transitioning to processing', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Test' });
       const { download_id } = await createCartDownload([featureId]);
 
-      await service.updateDownloadStatus(download_id, DownloadStatusEnum.PROCESSING);
+      await service.transitionDownloadStatus(download_id, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
 
       const afterProcessing = await crudService.findDownloadById(download_id);
       expect(afterProcessing!.download_status).to.equal(DownloadStatusEnum.PROCESSING);
@@ -151,7 +151,7 @@ describe('Download services (integration)', function () {
 
       const firstStartedAt = afterProcessing!.started_at;
 
-      await service.updateDownloadStatus(download_id, DownloadStatusEnum.READY);
+      await service.transitionDownloadStatus(download_id, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
 
       const afterReady = await crudService.findDownloadById(download_id);
       expect(afterReady!.download_status).to.equal(DownloadStatusEnum.READY);
@@ -190,12 +190,12 @@ describe('Download services (integration)', function () {
       expect(initial!.completed_at).to.be.null;
       expect(initial!.downloaded_at).to.be.null;
 
-      await service.updateDownloadStatus(download_id, DownloadStatusEnum.PROCESSING);
+      await service.transitionDownloadStatus(download_id, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
       const processing = await crudService.findDownloadById(download_id);
       expect(processing!.download_status).to.equal(DownloadStatusEnum.PROCESSING);
       expect(processing!.started_at).to.not.be.null;
 
-      await service.updateDownloadStatus(download_id, DownloadStatusEnum.READY);
+      await service.transitionDownloadStatus(download_id, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
       const ready = await crudService.findDownloadById(download_id);
       expect(ready!.download_status).to.equal(DownloadStatusEnum.READY);
       expect(ready!.completed_at).to.not.be.null;

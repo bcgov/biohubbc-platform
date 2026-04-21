@@ -5,13 +5,7 @@ import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
 import { ApiConflictError } from '../../errors/api-error';
 import { ArtifactStatusEnum } from '../../models/artifact';
-import {
-  DownloadArtifactInfo,
-  DownloadFeatureSummary,
-  DownloadRecord,
-  DownloadSource,
-  ParquetFeatureData
-} from '../../models/download';
+import { DownloadFeatureSummary, DownloadRecord, DownloadSource, ParquetFeatureData } from '../../models/download';
 import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
@@ -72,33 +66,6 @@ export class DownloadPipelineService extends DBService {
     this.fragmentRepository = new DownloadFragmentRepository(connection);
     this.searchFeatureService = new SearchFeatureService(connection);
     this.artifactService = new ArtifactService(connection);
-  }
-
-  /**
-   * Update download status by download ID.
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {DownloadStatusEnum} status - The new status.
-   * @param {object} [metadata] - Optional metadata (error).
-   * @return {Promise<void>}
-   * @memberof DownloadPipelineService
-   */
-  async updateDownloadStatus(
-    downloadId: string,
-    status: DownloadStatusEnum,
-    metadata?: { error?: string }
-  ): Promise<void> {
-    const now = new Date().toISOString();
-    const timestamps: { started_at?: string; completed_at?: string } = {};
-
-    if (status === DownloadStatusEnum.PROCESSING) {
-      timestamps.started_at = now;
-    }
-    if (status === DownloadStatusEnum.READY || status === DownloadStatusEnum.FAILED) {
-      timestamps.completed_at = now;
-    }
-
-    return this.downloadRepository.updateDownloadStatus(downloadId, status, { ...metadata, ...timestamps });
   }
 
   /**
@@ -328,7 +295,7 @@ export class DownloadPipelineService extends DBService {
     const readyCount = fragments.filter((f) => f.fragment_status === DownloadStatusEnum.READY).length;
     await this.downloadRepository.updateDownloadFragmentCounts(downloadId, fragments.length, readyCount);
 
-    await this.updateDownloadStatus(downloadId, DownloadStatusEnum.READY);
+    await this.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
   }
 
   /**
@@ -343,25 +310,6 @@ export class DownloadPipelineService extends DBService {
     await this.fragmentRepository.updateFragmentStatus(fragmentId, DownloadStatusEnum.PROCESSING, {
       started_at: now
     });
-  }
-
-  /**
-   * Resolve download source and artifact info for the Parquet pipeline.
-   *
-   * Combines two lookups into a single call so the job handler doesn't
-   * need to manage the source/artifact pair separately.
-   *
-   * @param {string} downloadId - The download ID.
-   * @return {Promise<{ source: DownloadSource; artifact: DownloadArtifactInfo }>}
-   * @memberof DownloadPipelineService
-   */
-  async getDownloadMetadata(downloadId: string): Promise<{ source: DownloadSource; artifact: DownloadArtifactInfo }> {
-    const [source, artifact] = await Promise.all([
-      this.downloadRepository.getDownloadSource(downloadId),
-      this.downloadRepository.getDownloadArtifact(downloadId)
-    ]);
-
-    return { source, artifact };
   }
 
   /**
@@ -577,22 +525,6 @@ export class DownloadPipelineService extends DBService {
         parent_uuid: baseRow.parent_uuid
       };
     });
-  }
-
-  /**
-   * Finalize a Parquet download after all feature types are written.
-   *
-   * Updates the linked artifact to 'uploaded' (file is now on S3) and
-   * sets the download status to 'ready' (available for consumer retrieval).
-   *
-   * @param {string} downloadId - The download ID.
-   * @return {Promise<void>}
-   * @memberof DownloadPipelineService
-   */
-  async finalizeParquetDownload(downloadId: string): Promise<void> {
-    const now = new Date().toISOString();
-    await this.downloadRepository.updateArtifactStatusByDownloadId(downloadId, 'uploaded', now);
-    await this.updateDownloadStatus(downloadId, DownloadStatusEnum.READY);
   }
 
   /**

@@ -6,7 +6,6 @@ import { getKnex } from '../../database/db';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import {
   CreateDownload,
-  DownloadArtifactInfo,
   DownloadFeatureSummary,
   DownloadId,
   DownloadListRecord,
@@ -652,36 +651,6 @@ export class DownloadRepository extends BaseRepository {
   }
 
   /**
-   * Get the artifact info (S3 object key) linked to a download.
-   *
-   * The Parquet pipeline needs the S3 key to know where to write the output file.
-   * JOINs through download_artifact to the artifact table.
-   *
-   * @param {string} downloadId - The download ID.
-   * @return {Promise<DownloadArtifactInfo>}
-   * @memberof DownloadRepository
-   */
-  async getDownloadArtifact(downloadId: string): Promise<DownloadArtifactInfo> {
-    const sql = SQL`
-      SELECT a.artifact_id, a.object_key
-      FROM download_artifact da
-      INNER JOIN artifact a ON da.artifact_id = a.artifact_id
-      WHERE da.download_id = ${downloadId};
-    `;
-
-    const response = await this.connection.sql(sql, DownloadArtifactInfo);
-
-    if (response.rowCount === 0) {
-      throw new ApiExecuteSQLError('Download artifact not found', [
-        'DownloadRepository->getDownloadArtifact',
-        'rowCount was 0, expected 1'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
    * List distinct feature type names for a cart-based download.
    *
    * Used by the Parquet pipeline to iterate over each feature type
@@ -729,38 +698,6 @@ export class DownloadRepository extends BaseRepository {
     const response = await this.connection.knex(query, z.object({ feature_type_name: z.string() }));
 
     return response.rows.map((r) => r.feature_type_name);
-  }
-
-  /**
-   * Update the artifact status for a download's linked artifact.
-   *
-   * Uses a JOIN-UPDATE through download_artifact so the pipeline only needs
-   * the download_id — avoids passing artifact_id through the call chain.
-   *
-   * @param {string} downloadId - The download ID.
-   * @param {string} status - The new artifact status (e.g. 'uploaded').
-   * @param {string} uploadedAt - ISO timestamp for uploaded_at.
-   * @return {Promise<void>}
-   * @memberof DownloadRepository
-   */
-  async updateArtifactStatusByDownloadId(downloadId: string, status: string, uploadedAt: string): Promise<void> {
-    const sql = SQL`
-      UPDATE artifact a
-      SET artifact_status = ${status}, uploaded_at = ${uploadedAt}::timestamptz
-      FROM download_artifact da
-      WHERE da.download_id = ${downloadId}
-        AND da.artifact_id = a.artifact_id
-        AND da.record_end_date IS NULL;
-    `;
-
-    const response = await this.connection.sql(sql);
-
-    if (response.rowCount === 0) {
-      throw new ApiExecuteSQLError('Failed to update artifact status for download', [
-        'DownloadRepository->updateArtifactStatusByDownloadId',
-        'rowCount was 0, expected at least 1'
-      ]);
-    }
   }
 
   /**

@@ -16,6 +16,7 @@ import { expect } from 'chai';
 import { randomInt } from 'node:crypto';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, getKnex, IDBConnection, initDBPool } from '../../database/db';
+import { ApiConflictError } from '../../errors/api-error';
 import { ParquetFeatureData } from '../../models/download';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from '../../repositories/download/download-repository';
@@ -708,8 +709,10 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(initial!.started_at).to.be.null;
       expect(initial!.completed_at).to.be.null;
 
-      // Transition to processing
-      await pipelineService.updateDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING);
+      // pending → processing: started_at populated, completed_at still null
+      await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.PROCESSING, [
+        DownloadStatusEnum.PENDING
+      ]);
       const processing = await downloadService.findDownloadById(downloadId);
       expect(processing!.download_status).to.equal(DownloadStatusEnum.PROCESSING);
       expect(processing!.started_at).to.not.be.null;
@@ -717,12 +720,24 @@ describe('Download Parquet pipeline (integration)', function () {
 
       const firstStartedAt = processing!.started_at;
 
-      // Transition to ready
-      await pipelineService.updateDownloadStatus(downloadId, DownloadStatusEnum.READY);
+      // processing → ready: completed_at populated, started_at unchanged
+      await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
+        DownloadStatusEnum.PROCESSING
+      ]);
       const ready = await downloadService.findDownloadById(downloadId);
       expect(ready!.download_status).to.equal(DownloadStatusEnum.READY);
       expect(ready!.started_at).to.equal(firstStartedAt);
       expect(ready!.completed_at).to.not.be.null;
+
+      // Illegal transition: retrying processing → ready on a READY download throws ApiConflictError
+      try {
+        await pipelineService.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [
+          DownloadStatusEnum.PROCESSING
+        ]);
+        expect.fail('Expected ApiConflictError for illegal transition from READY');
+      } catch (error) {
+        expect(error).to.be.instanceOf(ApiConflictError);
+      }
     });
   });
 });
