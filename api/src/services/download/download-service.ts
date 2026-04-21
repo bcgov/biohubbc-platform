@@ -1,7 +1,6 @@
 import { SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP404, HTTP409, HTTP500 } from '../../errors/http-error';
-import { ArtifactStatusEnum } from '../../models/artifact';
 import {
   CreateDownload,
   DownloadFeatureSummary,
@@ -13,13 +12,11 @@ import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
 import { DownloadRepository } from '../../repositories/download/download-repository';
-import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { ApiPaginationOptions } from '../../zod-schema/pagination';
 import { TeamService } from '../access-policy/team-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { SearchFeatureService } from '../search-feature-service';
-import { ArtifactService } from '../upload/artifact-service';
 
 /**
  * Request-time service for downloads.
@@ -40,7 +37,6 @@ export class DownloadService extends DBService {
   fragmentRepository: DownloadFragmentRepository;
   teamService: TeamService;
   searchFeatureService: SearchFeatureService;
-  artifactService: ArtifactService;
 
   /**
    * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
@@ -55,44 +51,28 @@ export class DownloadService extends DBService {
     this.fragmentRepository = new DownloadFragmentRepository(connection);
     this.teamService = new TeamService(connection);
     this.searchFeatureService = new SearchFeatureService(connection);
-    this.artifactService = new ArtifactService(connection);
   }
 
   /**
-   * Create a new download record with a pending artifact.
+   * Create a new download request.
    *
-   * Downloads are tracked as formal artifacts from the moment they're requested.
-   * A pending artifact is created (no file yet — the pipeline writes the file in
-   * a follow-up ticket) and linked via download_artifact. The S3 key includes a
-   * timestamp to prevent local filename collisions when a user downloads multiple
-   * times: `downloads/{downloadId}/download-{timestamp}.{format}`. The artifact
-   * table's UNIQUE (bucket, object_key) constraint ensures idempotency on retry.
+   * The returned download row is in `pending` status; the worker picks it up
+   * via pg-boss (enqueued by the route handler) and writes one Parquet file
+   * per feature type to S3, inserting one `artifact` + one `download_artifact`
+   * row per file with real byte_size + checksum at the moment the file lands.
+   *
+   * Stub "pending" artifact rows are intentionally NOT created here — creating
+   * them at request time presented a false "this download has a file" signal
+   * before any bytes were written, and forced a second UPDATE once the worker
+   * filled in byte_size/checksum. The worker is now the single owner of
+   * artifact writes.
    *
    * @param {CreateDownload} payload - The download record to create.
    * @return {Promise<DownloadId>} The created record ID.
    * @memberof DownloadService
    */
   async createDownload(payload: CreateDownload): Promise<DownloadId> {
-    const downloadId = await this.downloadRepository.createDownload(payload);
-
-    const timestamp = new Date()
-      .toISOString()
-      .replace(/:/g, '')
-      .replace(/\.\d{3}/, '');
-    const { format } = payload;
-    const artifact = await this.artifactService.insertArtifact({
-      bucket: DownloadService.dependencies.getObjectStoreBucketName(),
-      object_key: `downloads/${downloadId.download_id}/download-${timestamp}.${format}`,
-      byte_size: null,
-      artifact_status: ArtifactStatusEnum.PENDING,
-      checksum_sha256: null,
-      uploaded_at: null,
-      format
-    });
-
-    await this.downloadRepository.createDownloadArtifact(downloadId.download_id, artifact.artifact_id);
-
-    return downloadId;
+    return this.downloadRepository.createDownload(payload);
   }
 
   /**

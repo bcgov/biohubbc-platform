@@ -5,7 +5,7 @@
 // Tests the repository methods that power DownloadPipelineService.streamParquetForType:
 //   listDownloadFeatureTypesByCartId  →  streamFeatureBaseByCartIdAndType  →  fetchTypedPropertyRows
 //
-// Also covers: getDownloadArtifact, updateArtifactStatusByDownloadId, status transitions.
+// Also covers: status transitions.
 //
 // Uses a transaction that is ROLLED BACK after each test, so no data is persisted.
 //
@@ -424,21 +424,6 @@ describe('Download Parquet pipeline (integration)', function () {
     });
   });
 
-  describe('getDownloadArtifact', () => {
-    it('should return artifact_id and object_key for a download', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Artifact Test' });
-      const downloadId = await createCartDownload([featureId]);
-
-      const artifact = await downloadRepo.getDownloadArtifact(downloadId);
-
-      expect(artifact.artifact_id).to.be.a('string');
-      expect(artifact.artifact_id).to.match(/^[0-9a-f-]{36}$/);
-      expect(artifact.object_key).to.include(`downloads/${downloadId}/download-`);
-      expect(artifact.object_key).to.match(/\.parquet$/);
-    });
-  });
-
   describe('cursor + hydration', () => {
     it('should hydrate string, number, and datetime properties from typed tables', async () => {
       const submissionId = await createTestSubmission(connection);
@@ -738,40 +723,6 @@ describe('Download Parquet pipeline (integration)', function () {
       expect(ready!.download_status).to.equal(DownloadStatusEnum.READY);
       expect(ready!.started_at).to.equal(firstStartedAt);
       expect(ready!.completed_at).to.not.be.null;
-    });
-  });
-
-  describe('updateArtifactStatusByDownloadId', () => {
-    it('should update artifact status via download_id JOIN', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Artifact Status' });
-      const downloadId = await createCartDownload([featureId]);
-
-      // Verify initial artifact status is pending
-      const beforeRows = await connection.sql(SQL`
-        SELECT a.artifact_status, a.uploaded_at
-        FROM artifact a
-        JOIN download_artifact da ON da.artifact_id = a.artifact_id
-        WHERE da.download_id = ${downloadId}
-          AND da.record_end_date IS NULL;
-      `);
-      expect(beforeRows.rows[0].artifact_status).to.equal('pending');
-      expect(beforeRows.rows[0].uploaded_at).to.be.null;
-
-      // Update artifact status via download_id JOIN
-      const now = new Date().toISOString();
-      await downloadRepo.updateArtifactStatusByDownloadId(downloadId, 'uploaded', now);
-
-      // Verify artifact status is updated
-      const afterRows = await connection.sql(SQL`
-        SELECT a.artifact_status, a.uploaded_at
-        FROM artifact a
-        JOIN download_artifact da ON da.artifact_id = a.artifact_id
-        WHERE da.download_id = ${downloadId}
-          AND da.record_end_date IS NULL;
-      `);
-      expect(afterRows.rows[0].artifact_status).to.equal('uploaded');
-      expect(afterRows.rows[0].uploaded_at).to.not.be.null;
     });
   });
 });

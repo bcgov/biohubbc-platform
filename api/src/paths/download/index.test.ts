@@ -93,7 +93,7 @@ describe('paths/download/index', () => {
 
       expect(createDownloadStub.firstCall.args[0]).to.deep.equal({
         filters: { feature_types: ['dataset'] },
-        format: 'csv'
+        format: 'parquet'
       });
     });
 
