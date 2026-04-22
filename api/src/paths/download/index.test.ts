@@ -93,7 +93,7 @@ describe('paths/download/index', () => {
 
       expect(createDownloadStub.firstCall.args[0]).to.deep.equal({
         filters: { feature_types: ['dataset'] },
-        format: 'csv'
+        format: 'parquet'
       });
     });
 
@@ -313,7 +313,7 @@ describe('paths/download/index', () => {
         {
           download_id: 'uuid-1',
           download_status: 'ready',
-          format: 'csv',
+          format: 'parquet',
           metadata: null,
           started_at: '2026-01-01',
           completed_at: '2026-01-01',

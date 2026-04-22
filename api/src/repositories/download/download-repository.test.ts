@@ -4,6 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
+import { ApiNotFoundError } from '../../errors/api-error';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from './download-repository';
 
@@ -22,7 +23,7 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownload({ format: 'csv' });
+      await repo.createDownload({ format: 'parquet' });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlText = sqlStub.firstCall.args[0].text;
@@ -41,7 +42,7 @@ describe('DownloadRepository', () => {
 
       const repo = new DownloadRepository(mockDBConnection);
       const filters = { keyword: 'moose' };
-      await repo.createDownload({ filters, format: 'csv' });
+      await repo.createDownload({ filters, format: 'parquet' });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlText = sqlStub.firstCall.args[0].text;
@@ -57,7 +58,7 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownload({ format: 'csv' });
+      await repo.createDownload({ format: 'parquet' });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlValues = sqlStub.firstCall.args[0].values;
@@ -73,7 +74,7 @@ describe('DownloadRepository', () => {
 
       const repo = new DownloadRepository(mockDBConnection);
       const cartId = 'cccc0000-0000-0000-0000-000000000001';
-      await repo.createDownload({ cartId, format: 'csv' });
+      await repo.createDownload({ cartId, format: 'parquet' });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlValues = sqlStub.firstCall.args[0].values;
@@ -87,13 +88,13 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownload({ filters: { keyword: 'moose' }, format: 'csv' });
+      await repo.createDownload({ filters: { keyword: 'moose' }, format: 'parquet' });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlValues = sqlStub.firstCall.args[0].values;
       // cart_id is second-to-last parameter (format is last)
       expect(sqlValues[sqlValues.length - 2]).to.be.null;
-      expect(sqlValues[sqlValues.length - 1]).to.equal('csv');
+      expect(sqlValues[sqlValues.length - 1]).to.equal('parquet');
     });
   });
 
@@ -145,21 +146,27 @@ describe('DownloadRepository', () => {
       expect(sqlValues).to.include('bbbb0000-0000-0000-0000-000000000001');
     });
 
-    it('throws ApiExecuteSQLError when rowCount is not 1', async () => {
+    it('uses ON CONFLICT ... WHERE record_end_date IS NULL DO NOTHING for retry idempotency', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      await repo.createDownloadArtifact('aaaa0000-0000-0000-0000-000000000001', 'bbbb0000-0000-0000-0000-000000000001');
+
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('ON CONFLICT');
+      expect(sqlText).to.include('record_end_date IS NULL');
+      expect(sqlText).to.include('DO NOTHING');
+    });
+
+    it('does not throw when rowCount is 0 (conflict — link already exists)', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
+      await repo.createDownloadArtifact('aaaa0000-0000-0000-0000-000000000001', 'bbbb0000-0000-0000-0000-000000000001');
 
-      try {
-        await repo.createDownloadArtifact(
-          'aaaa0000-0000-0000-0000-000000000001',
-          'bbbb0000-0000-0000-0000-000000000001'
-        );
-        expect.fail('Expected error');
-      } catch (err: any) {
-        expect(err.message).to.equal('Failed to link artifact to download');
-      }
+      expect(sqlStub).to.have.been.calledOnce;
     });
   });
 
@@ -189,6 +196,34 @@ describe('DownloadRepository', () => {
       expect(sqlStub).to.have.been.calledOnce;
       const sqlValues = sqlStub.firstCall.args[0].values;
       expect(sqlValues).to.include(DownloadStatusEnum.FAILED);
+    });
+  });
+
+  describe('getDownloadById', () => {
+    it('returns the download record when found', async () => {
+      const row = { download_id: 'aaaa0000-0000-0000-0000-000000000001', download_status: DownloadStatusEnum.PENDING };
+      const sqlStub = sinon.stub().resolves(mockQueryResult([row], 1));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+      const download = await repo.getDownloadById('aaaa0000-0000-0000-0000-000000000001');
+
+      expect(download).to.equal(row);
+    });
+
+    it('throws ApiNotFoundError when no row is returned', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadRepository(mockDBConnection);
+
+      try {
+        await repo.getDownloadById('aaaa0000-0000-0000-0000-000000000001');
+        expect.fail('expected throw');
+      } catch (err: any) {
+        expect(err).to.be.instanceOf(ApiNotFoundError);
+        expect(err.message).to.equal('Download not found');
+      }
     });
   });
 
@@ -490,48 +525,6 @@ describe('DownloadRepository', () => {
       const result = await repo.isDownloadClaimedByTeam('aaaa0000-0000-0000-0000-000000000001');
 
       expect(result).to.be.false;
-    });
-  });
-
-  describe('getDownloadArtifact', () => {
-    it('returns artifact_id and object_key from download_artifact JOIN artifact', async () => {
-      const sqlStub = sinon
-        .stub()
-        .resolves(
-          mockQueryResult(
-            [{ artifact_id: 'bbbb0000-0000-0000-0000-000000000001', object_key: 'downloads/some-file.parquet' }],
-            1
-          )
-        );
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      const result = await repo.getDownloadArtifact('aaaa0000-0000-0000-0000-000000000001');
-
-      expect(result).to.deep.equal({
-        artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
-        object_key: 'downloads/some-file.parquet'
-      });
-
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('download_artifact');
-      expect(sqlText).to.include('artifact');
-      expect(sqlText).to.include('object_key');
-    });
-
-    it('throws ApiExecuteSQLError when not found', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-
-      try {
-        await repo.getDownloadArtifact('bad-id');
-        expect.fail('Expected error');
-      } catch (err: any) {
-        expect(err.message).to.equal('Download artifact not found');
-      }
     });
   });
 
@@ -867,46 +860,6 @@ describe('DownloadRepository', () => {
       expect(result).to.have.length(2);
       expect(result.find((r) => r.name === 'site_name')?.value).to.equal('Alpha');
       expect(result.find((r) => r.name === 'count')?.value).to.equal(42);
-    });
-  });
-
-  describe('updateArtifactStatusByDownloadId', () => {
-    it('updates artifact status via download_artifact join', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 1));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-      await repo.updateArtifactStatusByDownloadId(
-        'aaaa0000-0000-0000-0000-000000000001',
-        'uploaded',
-        '2025-01-01T00:01:00Z'
-      );
-
-      expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text;
-      expect(sqlText).to.include('UPDATE artifact');
-      expect(sqlText).to.include('download_artifact');
-      const sqlValues = sqlStub.firstCall.args[0].values;
-      expect(sqlValues).to.include('uploaded');
-      expect(sqlValues).to.include('2025-01-01T00:01:00Z');
-    });
-
-    it('throws when no artifact found for download', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const repo = new DownloadRepository(mockDBConnection);
-
-      try {
-        await repo.updateArtifactStatusByDownloadId(
-          'aaaa0000-0000-0000-0000-000000000001',
-          'uploaded',
-          '2025-01-01T00:01:00Z'
-        );
-        expect.fail('Expected an error');
-      } catch (error) {
-        expect((error as Error).message).to.include('Failed to update artifact status');
-      }
     });
   });
 });
