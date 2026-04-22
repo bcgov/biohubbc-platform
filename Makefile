@@ -265,7 +265,7 @@ test-sys: | run-minio run-clamav run-queue ## Runs system integration tests (nee
 	@echo "Running system integration tests"
 	@echo "==============================================="
 ifdef SPEC
-	@docker compose exec api npx mocha --no-config --require ts-node/register --extension ts --timeout 60000 "src/__integration__/system/$(SPEC).integration.ts"
+	@docker compose exec api npm run test:sys:file -- "src/__integration__/system/$(SPEC).integration.ts"
 else
 	@docker compose exec api npm run test:sys
 endif

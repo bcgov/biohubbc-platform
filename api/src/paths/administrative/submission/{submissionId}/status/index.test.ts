@@ -22,7 +22,7 @@ describe('getSubmissionUploadStatus', () => {
       }
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { submissionId: '1' };
@@ -45,7 +45,7 @@ describe('getSubmissionUploadStatus', () => {
       release: sinon.stub()
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const submissionId = 123;
 

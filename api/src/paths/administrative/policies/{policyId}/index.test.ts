@@ -25,7 +25,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         }
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -46,12 +46,13 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockPolicy: PolicyWithStatements = {
         policy_id: '123',
         name: 'Test Policy',
         description: 'Test description',
+        status: 'approved',
         statements: [
           {
             policy_statement_id: 's1',
@@ -91,7 +92,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         }
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -112,12 +113,13 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockUpdatedPolicy: PolicyWithStatements = {
         policy_id: '123',
         name: 'Updated Policy',
         description: 'Updated description',
+        status: 'approved',
         statements: [
           {
             policy_statement_id: 's1',
@@ -141,6 +143,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
       mockReq.body = {
         name: 'Updated Policy',
         description: 'Updated description',
+        status: 'reviewed',
         statements: [
           {
             effect: PolicyEffect.DENY,
@@ -155,7 +158,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
 
       expect(updatePolicyWithStatementsStub).to.have.been.calledOnceWith(
         '123',
-        { name: 'Updated Policy', description: 'Updated description' },
+        { name: 'Updated Policy', description: 'Updated description', status: 'reviewed' },
         [{ effect: PolicyEffect.DENY, submission_feature_urn: 'urn:*:telemetry:*' }]
       );
       expect(mockRes.statusValue).to.equal(200);
@@ -169,12 +172,13 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockUpdatedPolicy: PolicyWithStatements = {
         policy_id: '123',
         name: 'Policy No Statements',
         description: null,
+        status: 'approved',
         statements: []
       };
 
@@ -198,7 +202,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
 
       expect(updatePolicyWithStatementsStub).to.have.been.calledOnceWith(
         '123',
-        { name: 'Policy No Statements', description: undefined },
+        { name: 'Policy No Statements', description: undefined, status: undefined },
         []
       );
       expect(mockRes.statusValue).to.equal(200);
@@ -214,7 +218,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         }
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -235,7 +239,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const deletePolicyStub = sinon.stub(PolicyService.prototype, 'deletePolicy').resolves();
 

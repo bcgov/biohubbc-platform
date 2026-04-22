@@ -1,16 +1,16 @@
 import { useApi } from 'hooks/useApi';
 import useDataLoader, { DataLoader } from 'hooks/useDataLoader';
-import { ITicketWithHistory } from 'interfaces/useTicketsApi.interface';
+import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import React, { PropsWithChildren, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router';
 
 export interface ITicketContext {
   ticketId: string;
-  ticketDataLoader: DataLoader<[string], ITicketWithHistory, unknown>;
+  ticketDataLoader: DataLoader<[string], ITicketExtended, unknown>;
 }
 
 export const TicketContext = React.createContext<ITicketContext | undefined>(undefined);
-type TicketFetcher = (ticketId: string) => Promise<ITicketWithHistory>;
+type TicketFetcher = (ticketId: string) => Promise<ITicketExtended>;
 
 /**
  * Reads and validates the route-level ticket identifier.

@@ -1,4 +1,3 @@
-import { UPLOAD_JOB_BATCH_SIZE } from '../constants/upload';
 import { SubmissionUpload } from '../models/submission-upload';
 import { getLogger } from '../utils/logger';
 import { JobQueues } from './jobs';
@@ -27,6 +26,40 @@ import { getPgBoss } from './pg-boss-service';
 const defaultLog = getLogger('queue/worker');
 
 /**
+ * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ *
+ * Testing convention: worker registration tests should stub this bag instead of
+ * stubbing imported job modules directly.
+ */
+export interface WorkerDependencies {
+  getPgBoss: typeof getPgBoss;
+  processSubmissionFeaturesJobHandler: typeof processSubmissionFeaturesJobHandler;
+  processSubmissionFeaturesFailedHandler: typeof processSubmissionFeaturesFailedHandler;
+  malwareScanJobHandler: typeof malwareScanJobHandler;
+  malwareScanFailedHandler: typeof malwareScanFailedHandler;
+  processDownloadJobHandler: typeof processDownloadJobHandler;
+  processDownloadFailedHandler: typeof processDownloadFailedHandler;
+  indexSubmissionFeaturesJobHandler: typeof indexSubmissionFeaturesJobHandler;
+  indexSubmissionFeaturesFailedHandler: typeof indexSubmissionFeaturesFailedHandler;
+  computeScopeAnchorsJobHandler: typeof computeScopeAnchorsJobHandler;
+  computeScopeAnchorsFailedHandler: typeof computeScopeAnchorsFailedHandler;
+}
+
+export const workerDependencies: WorkerDependencies = {
+  getPgBoss,
+  processSubmissionFeaturesJobHandler,
+  processSubmissionFeaturesFailedHandler,
+  malwareScanJobHandler,
+  malwareScanFailedHandler,
+  processDownloadJobHandler,
+  processDownloadFailedHandler,
+  indexSubmissionFeaturesJobHandler,
+  indexSubmissionFeaturesFailedHandler,
+  computeScopeAnchorsJobHandler,
+  computeScopeAnchorsFailedHandler
+};
+
+/**
  * Register all job handlers with pg-boss.
  *
  * Add new job handler registrations here as they are created.
@@ -34,7 +67,7 @@ const defaultLog = getLogger('queue/worker');
  * @return {*}  {Promise<void>}
  */
 export const registerWorkers = async (): Promise<void> => {
-  const boss = getPgBoss();
+  const boss = workerDependencies.getPgBoss();
 
   // Create dead letter queue first (must exist before main queue references it)
   await boss.createQueue(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
@@ -63,21 +96,20 @@ export const registerWorkers = async (): Promise<void> => {
   // Register process submission features job handler
   await boss.work<SubmissionUpload>(
     JobQueues.PROCESS_SUBMISSION_FEATURES,
-    { batchSize: UPLOAD_JOB_BATCH_SIZE },
-    processSubmissionFeaturesJobHandler
+    workerDependencies.processSubmissionFeaturesJobHandler
   );
 
   // Register dead letter queue handler for failed jobs
   await boss.work<SubmissionUpload>(
     JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED,
-    processSubmissionFeaturesFailedHandler
+    workerDependencies.processSubmissionFeaturesFailedHandler
   );
 
   // Register malware scan job handler
-  await boss.work<IMalwareScanJobData>(JobQueues.MALWARE_SCAN, malwareScanJobHandler);
+  await boss.work<IMalwareScanJobData>(JobQueues.MALWARE_SCAN, workerDependencies.malwareScanJobHandler);
 
   // Register dead letter queue handler for failed malware scan jobs
-  await boss.work<IMalwareScanJobData>(JobQueues.MALWARE_SCAN_FAILED, malwareScanFailedHandler);
+  await boss.work<IMalwareScanJobData>(JobQueues.MALWARE_SCAN_FAILED, workerDependencies.malwareScanFailedHandler);
 
   // Create dead letter queue first (must exist before main queue references it)
   await boss.createQueue(JobQueues.PROCESS_DOWNLOAD_FAILED);
@@ -91,10 +123,13 @@ export const registerWorkers = async (): Promise<void> => {
   });
 
   // Register process download job handler
-  await boss.work<IProcessDownloadJobData>(JobQueues.PROCESS_DOWNLOAD, processDownloadJobHandler);
+  await boss.work<IProcessDownloadJobData>(JobQueues.PROCESS_DOWNLOAD, workerDependencies.processDownloadJobHandler);
 
   // Register dead letter queue handler for failed download jobs
-  await boss.work<IProcessDownloadJobData>(JobQueues.PROCESS_DOWNLOAD_FAILED, processDownloadFailedHandler);
+  await boss.work<IProcessDownloadJobData>(
+    JobQueues.PROCESS_DOWNLOAD_FAILED,
+    workerDependencies.processDownloadFailedHandler
+  );
 
   // Create dead letter queue first (must exist before main queue references it)
   await boss.createQueue(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
@@ -110,13 +145,13 @@ export const registerWorkers = async (): Promise<void> => {
   // Register index submission features job handler
   await boss.work<IIndexSubmissionFeaturesJobData>(
     JobQueues.INDEX_SUBMISSION_FEATURES,
-    indexSubmissionFeaturesJobHandler
+    workerDependencies.indexSubmissionFeaturesJobHandler
   );
 
   // Register dead letter queue handler for failed index submission features jobs
   await boss.work<IIndexSubmissionFeaturesJobData>(
     JobQueues.INDEX_SUBMISSION_FEATURES_FAILED,
-    indexSubmissionFeaturesFailedHandler
+    workerDependencies.indexSubmissionFeaturesFailedHandler
   );
 
   // Create dead letter queue first (must exist before main queue references it)
@@ -131,12 +166,15 @@ export const registerWorkers = async (): Promise<void> => {
   });
 
   // Register compute scope anchors job handler
-  await boss.work<IComputeScopeAnchorsJobData>(JobQueues.COMPUTE_SCOPE_ANCHORS, computeScopeAnchorsJobHandler);
+  await boss.work<IComputeScopeAnchorsJobData>(
+    JobQueues.COMPUTE_SCOPE_ANCHORS,
+    workerDependencies.computeScopeAnchorsJobHandler
+  );
 
   // Register dead letter queue handler for failed compute scope anchors jobs
   await boss.work<IComputeScopeAnchorsJobData>(
     JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED,
-    computeScopeAnchorsFailedHandler
+    workerDependencies.computeScopeAnchorsFailedHandler
   );
 
   defaultLog.info({

@@ -35,7 +35,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     mockDBConnection.commit = commitStub;
     mockDBConnection.release = releaseStub;
 
-    sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     const indexStub = sinon.stub(SearchFeatureService.prototype, 'indexFeaturesBySubmissionId').resolves();
 
@@ -54,7 +54,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     mockDBConnection.rollback = rollbackStub;
     mockDBConnection.release = releaseStub;
 
-    sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     const testError = new Error('Indexing failed');
     sinon.stub(SearchFeatureService.prototype, 'indexFeaturesBySubmissionId').rejects(testError);
@@ -80,7 +80,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
     mockDBConnection.commit = commitStub;
     mockDBConnection.release = releaseStub;
 
-    sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
     const indexStub = sinon.stub(SearchFeatureService.prototype, 'indexFeaturesBySubmissionId').resolves();
 
@@ -93,7 +93,7 @@ describe('indexSubmissionFeaturesJobHandler', () => {
   });
 
   it('should handle empty jobs array', async () => {
-    const getConnectionStub = sinon.stub(db, 'getAPIUserDBConnection');
+    const getConnectionStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
 
     await indexSubmissionFeaturesJobHandler([]);
 
@@ -107,7 +107,7 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
   });
 
   it('should log failure with error output without throwing', async () => {
-    const getConnectionStub = sinon.stub(db, 'getAPIUserDBConnection');
+    const getConnectionStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
 
     const job = {
       id: 'job-1',
@@ -123,7 +123,7 @@ describe('indexSubmissionFeaturesFailedHandler', () => {
   });
 
   it('should log default message when output is null', async () => {
-    const getConnectionStub = sinon.stub(db, 'getAPIUserDBConnection');
+    const getConnectionStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection');
 
     const job = {
       id: 'job-2',

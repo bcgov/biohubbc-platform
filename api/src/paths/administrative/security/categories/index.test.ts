@@ -33,7 +33,7 @@ describe('administrative/security/categories', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
 
       const requestHandler = getSecurityCategories();
@@ -56,7 +56,7 @@ describe('administrative/security/categories', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const withRuleCountStub = sinon
         .stub(SecurityService.prototype, 'getSecurityCategoriesWithRuleCount')
@@ -90,7 +90,7 @@ describe('administrative/security/categories', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const withRuleCountStub = sinon
         .stub(SecurityService.prototype, 'getSecurityCategoriesWithRuleCount')
@@ -117,7 +117,7 @@ describe('administrative/security/categories', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(SecurityService.prototype, 'getSecurityCategoriesWithRuleCount').rejects(new Error('Service error'));
 
       const requestHandler = getSecurityCategories();

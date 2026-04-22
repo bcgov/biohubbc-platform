@@ -1,45 +1,32 @@
 import { z } from 'zod';
-import { PolicyEffect } from './policy-statement';
-import { PolicyConditionOperator } from './policy-statement-condition';
+import { CreatePolicyStatementPayload } from './policy-statement';
+
+export const PolicyStatus = z.enum(['requested', 'reviewed', 'approved', 'denied']);
+export type PolicyStatus = z.infer<typeof PolicyStatus>;
 
 export const Policy = z.object({
   policy_id: z.string().uuid(),
   name: z.string().max(100),
-  description: z.string().max(1000).nullable()
+  description: z.string().max(1000).nullable(),
+  status: PolicyStatus
 });
-
 export type Policy = z.infer<typeof Policy>;
 
-export interface CreatePolicy {
+export const CreatePolicy = Policy.pick({
+  name: true,
+  status: true
+}).extend({
+  description: z.string().max(1000).optional(),
+  record_end_date: z.string().optional()
+});
+export type CreatePolicy = z.infer<typeof CreatePolicy>;
+
+export const UpdatePolicy = CreatePolicy.partial();
+export type UpdatePolicy = z.infer<typeof UpdatePolicy>;
+
+export interface CreatePolicyDefinition {
   name: string;
   description?: string;
-  record_end_date?: string;
-}
-
-export interface UpdatePolicy {
-  name?: string;
-  description?: string;
-  record_end_date?: string;
-}
-
-export interface PolicyStatementRequest {
-  effect: PolicyEffect;
-  submission_feature_urn: string;
-  conditions?: {
-    operator: PolicyConditionOperator;
-    key: string;
-    value: unknown;
-  }[];
-}
-
-export interface CreatePolicyRequest {
-  name: string;
-  description?: string;
-  statements: PolicyStatementRequest[];
-}
-
-export interface UpdatePolicyRequest {
-  name: string;
-  description?: string;
-  statements: PolicyStatementRequest[];
+  status?: PolicyStatus;
+  statements: CreatePolicyStatementPayload[];
 }

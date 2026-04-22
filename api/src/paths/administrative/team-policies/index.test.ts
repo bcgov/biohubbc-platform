@@ -22,7 +22,7 @@ describe('team-policies', () => {
 
       mockReq.query = { page: '1', limit: '10' };
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const mockTeamPolicies: TeamPolicyDetails[] = [
         {
@@ -56,7 +56,7 @@ describe('team-policies', () => {
 
       mockReq.query = { page: '1', limit: '10', sort: 'team_name', order: 'desc' };
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const getAllTeamPoliciesStub = sinon.stub(TeamPolicyService.prototype, 'getAllTeamPolicies').resolves([]);
       const getAllTeamPoliciesCountStub = sinon
@@ -94,7 +94,7 @@ describe('team-policies', () => {
         policy_id: '33333333-3333-3333-3333-333333333333'
       };
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const mockResponse: TeamPolicy = {
         team_policy_id: '11111111-1111-1111-1111-111111111111',

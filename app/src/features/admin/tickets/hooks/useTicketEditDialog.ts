@@ -1,12 +1,12 @@
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useTicketContext } from 'hooks/useContext';
-import { ITicketWithHistory, IUpdateTicketRequest } from 'interfaces/useTicketsApi.interface';
+import { ITicketExtended, IUpdateTicketRequest } from 'interfaces/useTicketsApi.interface';
 import { useState } from 'react';
 import { useOptimisticTicketHandlers } from './useOptimisticTicketHandlers';
 
 interface IUseTicketEditDialogProps {
-  ticket: ITicketWithHistory;
+  ticket: ITicketExtended;
 }
 
 /**
@@ -35,7 +35,7 @@ export const useTicketEditDialog = (props: IUseTicketEditDialogProps) => {
     try {
       setIsSavingTicket(true);
 
-      const nextTicket: ITicketWithHistory = {
+      const nextTicket: ITicketExtended = {
         ...ticket,
         subject: payload.subject ?? ticket.subject,
         description: payload.description === undefined ? ticket.description : payload.description,

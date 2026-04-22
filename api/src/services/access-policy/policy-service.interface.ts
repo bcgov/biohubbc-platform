@@ -1,6 +1,6 @@
 import { Policy } from '../../models/policy';
-import { PolicyEffect, PolicyStatement } from '../../models/policy-statement';
-import { PolicyConditionOperator, PolicyStatementCondition } from '../../models/policy-statement-condition';
+import { PolicyStatement } from '../../models/policy-statement';
+import { PolicyStatementCondition } from '../../models/policy-statement-condition';
 
 /**
  * Optional filters when querying policies.
@@ -29,17 +29,4 @@ export interface PolicyStatementWithConditions extends PolicyStatement {
  */
 export interface PolicyWithStatements extends Policy {
   statements: PolicyStatementWithConditions[];
-}
-
-/**
- * Input for creating a policy statement with conditions.
- */
-export interface CreatePolicyStatementInput {
-  effect: PolicyEffect;
-  submission_feature_urn: string;
-  conditions?: {
-    operator: PolicyConditionOperator;
-    key: string;
-    value: unknown;
-  }[];
 }

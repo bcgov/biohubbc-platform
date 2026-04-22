@@ -4,16 +4,19 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
+import { DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
 import { ITeamMember } from 'interfaces/useTeamsApi.interface';
 import { ITicketReference } from 'interfaces/useTicketsApi.interface';
 import { useEffect, useState } from 'react';
+import { TicketSidebarDataRequests } from './TicketSidebarDataRequests';
 import { TicketSidebarReferences } from './TicketSidebarReferences';
-import { TicketSidebarSection } from './TicketSidebarSection';
 import { TicketSidebarTeam } from './TicketSidebarTeam';
+import { TicketSidebarUploads } from './TicketSidebarUploads';
 
 interface ITicketSidebarProps {
   teamId?: string;
   references?: ITicketReference[];
+  dataRequests?: DataRequestResponse[];
 }
 
 /**
@@ -23,7 +26,7 @@ interface ITicketSidebarProps {
  * @return {*}
  */
 export const TicketSidebar = (props: ITicketSidebarProps) => {
-  const { teamId, references } = props;
+  const { teamId, references, dataRequests } = props;
   const api = useApi();
   const dialogContext = useDialogContext();
   const [isAssigneesDialogOpen, setIsAssigneesDialogOpen] = useState(false);
@@ -43,8 +46,8 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
   // Optimistically insert a member into local state unless already present.
   const handleMemberAdd = (member: ITeamMember) => {
     const currentData = teamMembersLoader.data;
-
     if (!currentData) {
+      teamMembersLoader.setData({ members: [member] });
       return;
     }
 
@@ -104,8 +107,8 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
         onOpenDialog={() => setIsAssigneesDialogOpen(true)}
         onRemoveAssignee={handleRemoveAssignee}
       />
-      <TicketSidebarSection label="Data Requests" />
-      <TicketSidebarSection label="Uploads" />
+      <TicketSidebarDataRequests dataRequests={dataRequests ?? []} />
+      <TicketSidebarUploads />
       <TicketSidebarReferences references={references ?? []} />
 
       <TicketTeamDialog

@@ -19,7 +19,7 @@ describe('index', () => {
 
     it('propogates and re-throws errors', async () => {
       const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const getSubmissionFeatureByIdStub = sinon
         .stub(SubmissionFeatureService.prototype, 'getSubmissionFeatureById')
@@ -46,7 +46,7 @@ describe('index', () => {
 
     it('should return 200 on success', async () => {
       const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockFeature: SubmissionFeature = {
         submission_feature_id: 1,
