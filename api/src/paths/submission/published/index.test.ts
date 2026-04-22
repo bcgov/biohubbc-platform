@@ -22,7 +22,7 @@ describe('list', () => {
       }
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -43,7 +43,7 @@ describe('list', () => {
       release: sinon.stub()
     });
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 

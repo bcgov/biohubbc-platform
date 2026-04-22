@@ -30,7 +30,7 @@ describe('paths/administrative/tickets/{ticketId}/comment', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const createCommentStub = sinon
       .stub(TicketCommentService.prototype, 'createTicketComment')
       .resolves(createdComment);

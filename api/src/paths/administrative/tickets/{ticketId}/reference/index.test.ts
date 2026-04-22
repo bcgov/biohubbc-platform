@@ -38,7 +38,7 @@ describe('paths/administrative/tickets/{ticketId}/reference', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const createReferenceStub = sinon
       .stub(TicketService.prototype, 'createTicketReference')
       .resolves(createdReferences);

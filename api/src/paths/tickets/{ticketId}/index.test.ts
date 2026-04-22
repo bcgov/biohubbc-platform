@@ -45,7 +45,7 @@ describe('paths/tickets/{ticketId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       const getTicketStub = sinon.stub(TicketService.prototype, 'getTicket').resolves(mockTicketWithHistory);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -64,7 +64,7 @@ describe('paths/tickets/{ticketId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const fetchError = new Error('ticket not found');
       sinon.stub(TicketService.prototype, 'getTicket').rejects(fetchError);

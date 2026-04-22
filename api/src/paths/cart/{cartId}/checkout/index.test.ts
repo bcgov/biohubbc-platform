@@ -23,7 +23,7 @@ describe('cart/{cartId}/checkout', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
 
       const requestHandler = checkoutCart();
@@ -48,7 +48,7 @@ describe('cart/{cartId}/checkout', () => {
         release: sinon.stub(),
         systemUserId: sinon.stub().returns(42)
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const fakeResult: DownloadId = { download_id: 'dl-uuid-1234' };
       const checkoutCartStub = sinon.stub(CartService.prototype, 'checkoutCart').resolves(fakeResult);
@@ -73,7 +73,7 @@ describe('cart/{cartId}/checkout', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      const apiDBStub = sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+      const apiDBStub = sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
       const fakeResult: DownloadId = { download_id: 'dl-uuid-anon' };
       const checkoutCartStub = sinon.stub(CartService.prototype, 'checkoutCart').resolves(fakeResult);
@@ -100,7 +100,7 @@ describe('cart/{cartId}/checkout', () => {
         release: sinon.stub(),
         systemUserId: sinon.stub().returns(42)
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const fakeResult: DownloadId = { download_id: 'dl-uuid-frag' };
       const checkoutCartStub = sinon.stub(CartService.prototype, 'checkoutCart').resolves(fakeResult);
@@ -124,7 +124,7 @@ describe('cart/{cartId}/checkout', () => {
         release: sinon.stub(),
         systemUserId: sinon.stub().returns(42)
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(CartService.prototype, 'checkoutCart').rejects(new Error('Checkout failed'));
 
       const requestHandler = checkoutCart();

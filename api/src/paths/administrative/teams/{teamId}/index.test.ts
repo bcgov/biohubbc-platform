@@ -22,7 +22,7 @@ describe('getTeam', () => {
       }
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { teamId: 'team-1' };
@@ -46,7 +46,7 @@ describe('getTeam', () => {
     };
 
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     sinon.stub(TeamService.prototype, 'getTeam').resolves(mockTeam);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -71,7 +71,7 @@ describe('updateTeam', () => {
       }
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { teamId: 'team-1' };
@@ -96,7 +96,7 @@ describe('updateTeam', () => {
     };
 
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const updateStub = sinon.stub(TeamService.prototype, 'updateTeam').resolves(mockTeam);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -128,7 +128,7 @@ describe('deleteTeam', () => {
       }
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { teamId: 'team-1' };
@@ -145,7 +145,7 @@ describe('deleteTeam', () => {
 
   it('should return 200 on successful delete', async () => {
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const deleteStub = sinon.stub(TeamService.prototype, 'deleteTeam').resolves();
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();

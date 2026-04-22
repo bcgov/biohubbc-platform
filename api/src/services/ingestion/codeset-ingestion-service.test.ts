@@ -4,7 +4,6 @@ import { Readable } from 'node:stream';
 import sinon from 'sinon';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { IngestionValidationError } from '../../errors/submission-errors';
-import * as biohubTarParser from '../../utils/biohub-tar-parser';
 import { ContributorCodesetCodeService } from '../contributor-codeset-code-service';
 import { ContributorCodesetService } from '../contributor-codeset-service';
 import { ContributorService } from '../contributor-service';
@@ -35,7 +34,7 @@ describe('CodesetIngestionService', () => {
         .stub(ContributorCodesetCodeService.prototype, 'createContributorCodesetCodes')
         .resolves([]);
 
-      sinon.stub(biohubTarParser, 'streamCodesets').callsFake(async (_stream, onCodesets) => {
+      sinon.stub(CodesetIngestionService.dependencies, 'streamCodesets').callsFake(async (_stream, onCodesets) => {
         const codes: Record<string, { label: string; description: string; external_id: string }> = {};
         for (let index = 0; index < 10001; index += 1) {
           codes[`key-${index}`] = {
@@ -70,7 +69,7 @@ describe('CodesetIngestionService', () => {
         .stub(ContributorService.prototype, 'getContributorBySubmissionUploadId')
         .resolves({ contributor_id: 123 } as any);
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
-      sinon.stub(biohubTarParser, 'streamCodesets').rejects(new Error('codeset stream failed'));
+      sinon.stub(CodesetIngestionService.dependencies, 'streamCodesets').rejects(new Error('codeset stream failed'));
 
       try {
         await service.ingestCodesets('archive/key.tar', 'submission-upload-1');
@@ -88,7 +87,9 @@ describe('CodesetIngestionService', () => {
         .stub(ContributorService.prototype, 'getContributorBySubmissionUploadId')
         .resolves({ contributor_id: 123 } as any);
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
-      sinon.stub(biohubTarParser, 'streamCodesets').rejects(new Error('Codeset entry failed shallow validation'));
+      sinon
+        .stub(CodesetIngestionService.dependencies, 'streamCodesets')
+        .rejects(new Error('Codeset entry failed shallow validation'));
 
       try {
         await service.ingestCodesets('archive/key.tar', 'submission-upload-1');
@@ -111,7 +112,7 @@ describe('CodesetIngestionService', () => {
         .stub(ContributorCodesetCodeService.prototype, 'getContributorCodesetCodesByContributorCodesetIds')
         .resolves([]);
       sinon.stub(ContributorCodesetService.prototype, 'createCodeset').rejects(new Error('create codeset failed'));
-      sinon.stub(biohubTarParser, 'streamCodesets').callsFake(async (_stream, onCodesets) => {
+      sinon.stub(CodesetIngestionService.dependencies, 'streamCodesets').callsFake(async (_stream, onCodesets) => {
         await onCodesets({
           agency: {
             label: 'Agency',
@@ -169,7 +170,7 @@ describe('CodesetIngestionService', () => {
         .stub(ContributorCodesetCodeService.prototype, 'createContributorCodesetCodes')
         .resolves([]);
 
-      sinon.stub(biohubTarParser, 'streamCodesets').callsFake(async (_stream, onCodesets) => {
+      sinon.stub(CodesetIngestionService.dependencies, 'streamCodesets').callsFake(async (_stream, onCodesets) => {
         await onCodesets({
           agency: {
             codes: {
@@ -203,7 +204,7 @@ describe('CodesetIngestionService', () => {
         contributor_codeset_id: 50
       } as any);
 
-      sinon.stub(biohubTarParser, 'streamCodesets').callsFake(async (_stream, onCodesets) => {
+      sinon.stub(CodesetIngestionService.dependencies, 'streamCodesets').callsFake(async (_stream, onCodesets) => {
         await onCodesets({
           agency: {
             codes: {

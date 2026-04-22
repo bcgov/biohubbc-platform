@@ -13,10 +13,7 @@ import { SecurityStatusEnum } from '../../models/security-status';
 import { SubmissionUploadReviewStatus } from '../../models/submission-upload-review-status';
 import { Upload, UploadStatusEnum } from '../../models/upload';
 import { UploadArchive } from '../../models/upload-archive';
-import * as publisher from '../../queue/publisher';
 import { ICreateSubmission, ISubmissionModel } from '../../repositories/submission-repository';
-import * as fileUtils from '../../utils/file-utils';
-import * as submissionUploadUtils from '../../utils/submission-upload-utils';
 import { SubmissionService } from '../submission-service';
 import { TicketService } from '../ticket-service';
 import { ArtifactSecurityService } from './artifact-security-service';
@@ -89,7 +86,7 @@ describe('UploadIngestionService', () => {
         ],
         partCount: 2
       };
-      sinon.stub(submissionUploadUtils, 'generateMultipartUploadPresignedUrls').resolves(mockPresigned);
+      sinon.stub(UploadIngestionService.dependencies, 'generateMultipartUploadPresignedUrls').resolves(mockPresigned);
 
       sinon.stub(UploadService.prototype, 'updateUpload').resolves({ upload_id: mockUploadId });
 
@@ -191,7 +188,7 @@ describe('UploadIngestionService', () => {
         .stub(UploadArchiveService.prototype, 'insertUploadArchive')
         .resolves({ upload_archive_id: 'upload-archive-999' });
       sinon
-        .stub(submissionUploadUtils, 'generateMultipartUploadPresignedUrls')
+        .stub(UploadIngestionService.dependencies, 'generateMultipartUploadPresignedUrls')
         .rejects(new Error('S3 error: failed to generate presigned URLs'));
 
       try {
@@ -237,7 +234,7 @@ describe('UploadIngestionService', () => {
       sinon
         .stub(UploadArchiveService.prototype, 'insertUploadArchive')
         .resolves({ upload_archive_id: mockUploadArchiveId });
-      sinon.stub(submissionUploadUtils, 'generateMultipartUploadPresignedUrls').resolves({
+      sinon.stub(UploadIngestionService.dependencies, 'generateMultipartUploadPresignedUrls').resolves({
         uploadId: mockS3UploadId,
         presignedUrls: [{ partNumber: 1, url: 'https://s3-url-append', partSizeBytes: mockBytes }],
         partCount: 1
@@ -307,7 +304,9 @@ describe('UploadIngestionService', () => {
     ];
 
     beforeEach(() => {
-      sinon.stub(publisher, 'publishMalwareScanJob').resolves({ status: 'published', jobId: 'job-1' });
+      sinon
+        .stub(UploadIngestionService.dependencies, 'publishMalwareScanJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
     });
 
     it('should complete upload successfully and enqueue security artifacts', async () => {
@@ -322,12 +321,14 @@ describe('UploadIngestionService', () => {
       sinon.stub(UploadArchiveService.prototype, 'updateUploadArchivesByUploadId').resolves(mockUploadArchiveRecords);
 
       const s3ClientStub = { send: sinon.stub().resolves({ ETag: 'etag' }) };
-      sinon.stub(fileUtils, 'getSecurityS3Client').returns(s3ClientStub as unknown as S3Client);
-      sinon.stub(fileUtils, 'getSecurityObjectStoreBucketName').returns('security-bucket');
+      sinon
+        .stub(UploadIngestionService.dependencies, 'getSecurityS3Client')
+        .returns(s3ClientStub as unknown as S3Client);
+      sinon.stub(UploadIngestionService.dependencies, 'getSecurityObjectStoreBucketName').returns('security-bucket');
 
       await service.completeArchiveUpload(mockParams);
 
-      const publishStub = publisher.publishMalwareScanJob as sinon.SinonStub;
+      const publishStub = UploadIngestionService.dependencies.publishMalwareScanJob as sinon.SinonStub;
       expect(publishStub.callCount).to.equal(mockSecurityRecords.length);
       expect(publishStub.firstCall.args[1]).to.deep.equal({ artifactSecurityId: 'artifact-security-1' });
       expect(publishStub.secondCall.args[1]).to.deep.equal({ artifactSecurityId: 'artifact-security-2' });
@@ -483,8 +484,8 @@ describe('UploadIngestionService', () => {
         send: sinon.stub().rejects(new Error('S3 API error: Access Denied'))
       };
 
-      sinon.stub(fileUtils, 'getSecurityS3Client').returns(fakeS3Client as S3Client);
-      sinon.stub(fileUtils, 'getSecurityObjectStoreBucketName').returns('security-bucket');
+      sinon.stub(UploadIngestionService.dependencies, 'getSecurityS3Client').returns(fakeS3Client as S3Client);
+      sinon.stub(UploadIngestionService.dependencies, 'getSecurityObjectStoreBucketName').returns('security-bucket');
 
       try {
         await service.completeArchiveUpload(mockParams);
@@ -493,7 +494,7 @@ describe('UploadIngestionService', () => {
         expect((err as Error).message).to.include('S3 API error');
 
         // Verify no malware jobs were published since S3 failed before job publishing
-        const publishStub = publisher.publishMalwareScanJob as sinon.SinonStub;
+        const publishStub = UploadIngestionService.dependencies.publishMalwareScanJob as sinon.SinonStub;
         expect(publishStub.called).to.be.false;
       }
     });

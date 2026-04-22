@@ -69,7 +69,7 @@ describe('data-request', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
 
       const requestHandler = findDataRequests();
@@ -92,7 +92,7 @@ describe('data-request', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockNonAdminUser);
 
       const stub = sinon
@@ -124,7 +124,7 @@ describe('data-request', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockNonAdminUser);
 
       const stub = sinon
@@ -161,7 +161,7 @@ describe('data-request', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockAdminUser);
       sinon.stub(DataRequestService.prototype, 'findDataRequestsByTeamMembership').rejects(new Error('Service error'));
 
@@ -180,6 +180,28 @@ describe('data-request', () => {
   });
 
   describe('createDataRequest', () => {
+    it('throws error if DB connection fails to open', async () => {
+      const mockDBConnection = getMockDBConnection({
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
+
+      const requestHandler = createDataRequest();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail('Expected handler to throw');
+      } catch (error) {
+        expect((error as ApiError).message).to.equal('DB open failed');
+        expect(mockDBConnection.rollback).to.have.been.calledOnce;
+        expect(mockDBConnection.release).to.have.been.calledOnce;
+      }
+    });
+
     it('POST creates a data request without requiring ticketId in payload', async () => {
       const mockDBConnection = getMockDBConnection({
         systemUserId: () => mockNonAdminUser.system_user_id,
@@ -187,7 +209,7 @@ describe('data-request', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const createStub = sinon.stub(DataRequestService.prototype, 'createDataRequest').resolves(mockDataRequest);
 
@@ -205,8 +227,38 @@ describe('data-request', () => {
         reason: 'Need secured data for analysis',
         system_user_ids: [2, 3]
       });
+      expect(mockDBConnection.commit).to.have.been.calledOnce;
+      expect(mockDBConnection.release).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.equal(201);
       expect(mockRes.jsonValue).to.eql(mockDataRequest);
+    });
+
+    it('rolls back and rethrows if service throws', async () => {
+      const mockDBConnection = getMockDBConnection({
+        systemUserId: () => mockNonAdminUser.system_user_id,
+        commit: sinon.stub(),
+        rollback: sinon.stub(),
+        release: sinon.stub()
+      });
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
+
+      sinon.stub(DataRequestService.prototype, 'createDataRequest').rejects(new Error('Service error'));
+
+      const requestHandler = createDataRequest();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.body = {
+        reason: 'Test',
+        system_user_ids: [2, 3]
+      };
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail('Expected handler to throw');
+      } catch (error) {
+        expect((error as ApiError).message).to.equal('Service error');
+        expect(mockDBConnection.rollback).to.have.been.calledOnce;
+        expect(mockDBConnection.release).to.have.been.calledOnce;
+      }
     });
   });
 });

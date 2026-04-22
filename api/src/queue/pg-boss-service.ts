@@ -4,6 +4,13 @@ import { getPgBossConfig } from './pg-boss-config';
 
 const defaultLog = getLogger('queue/pg-boss-service');
 
+/**
+ * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+ */
+export const pgBossDependencies = {
+  getPgBossConfig
+};
+
 let boss: PgBoss | null = null;
 
 /**
@@ -16,7 +23,7 @@ export const initPgBoss = async (): Promise<PgBoss> => {
     return boss;
   }
 
-  const config = getPgBossConfig();
+  const config = pgBossDependencies.getPgBossConfig();
   boss = new PgBoss(config);
 
   boss.on('error', (error) => {

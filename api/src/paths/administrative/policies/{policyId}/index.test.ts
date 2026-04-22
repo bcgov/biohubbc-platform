@@ -25,7 +25,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         }
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -46,7 +46,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockPolicy: PolicyWithStatements = {
         policy_id: '123',
@@ -92,7 +92,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         }
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -113,7 +113,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockUpdatedPolicy: PolicyWithStatements = {
         policy_id: '123',
@@ -172,7 +172,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const mockUpdatedPolicy: PolicyWithStatements = {
         policy_id: '123',
@@ -218,7 +218,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         }
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -239,7 +239,7 @@ describe('paths/administrative/policies/{policyId}/index', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const deletePolicyStub = sinon.stub(PolicyService.prototype, 'deletePolicy').resolves();
 

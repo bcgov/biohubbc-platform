@@ -33,7 +33,7 @@ describe('administrative/security/reasons', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
 
       const requestHandler = getSecurityReasons();
@@ -56,7 +56,7 @@ describe('administrative/security/reasons', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const withFeatureCountStub = sinon
         .stub(SecurityService.prototype, 'getSecurityRulesWithFeatureCount')
@@ -90,7 +90,7 @@ describe('administrative/security/reasons', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const withFeatureCountStub = sinon
         .stub(SecurityService.prototype, 'getSecurityRulesWithFeatureCount')
@@ -117,7 +117,7 @@ describe('administrative/security/reasons', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(SecurityService.prototype, 'getSecurityRulesWithFeatureCount').rejects(new Error('Service error'));
 
       const requestHandler = getSecurityReasons();

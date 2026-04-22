@@ -6,8 +6,7 @@ import * as computeScopeAnchorsJob from './jobs/compute-scope-anchors-job';
 import * as indexSubmissionFeaturesJob from './jobs/index-submission-features-job';
 import * as malwareScanJob from './jobs/malware-scan-job';
 import * as processSubmissionFeaturesJob from './jobs/process-submission-features-job';
-import * as pgBossService from './pg-boss-service';
-import { registerWorkers } from './worker';
+import { registerWorkers, workerDependencies } from './worker';
 
 describe('worker', () => {
   afterEach(() => {
@@ -20,7 +19,7 @@ describe('worker', () => {
       const createQueueStub = sinon.stub().resolves();
       const mockBoss = { work: workStub, createQueue: createQueueStub };
 
-      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
       await registerWorkers();
 
@@ -34,7 +33,7 @@ describe('worker', () => {
       const createQueueStub = sinon.stub().resolves();
       const mockBoss = { work: workStub, createQueue: createQueueStub };
 
-      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
       await registerWorkers();
 
@@ -48,7 +47,7 @@ describe('worker', () => {
       const createQueueStub = sinon.stub().resolves();
       const mockBoss = { work: workStub, createQueue: createQueueStub };
 
-      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
       await registerWorkers();
 
@@ -72,7 +71,7 @@ describe('worker', () => {
       const createQueueStub = sinon.stub().resolves();
       const mockBoss = { work: workStub, createQueue: createQueueStub };
 
-      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
       await registerWorkers();
 
@@ -90,7 +89,7 @@ describe('worker', () => {
       const createQueueStub = sinon.stub().resolves();
       const mockBoss = { work: workStub, createQueue: createQueueStub };
 
-      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
       await registerWorkers();
 
@@ -104,7 +103,7 @@ describe('worker', () => {
       const createQueueStub = sinon.stub().resolves();
       const mockBoss = { work: workStub, createQueue: createQueueStub };
 
-      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
       await registerWorkers();
 
@@ -121,7 +120,7 @@ describe('worker', () => {
       const createQueueStub = sinon.stub().resolves();
       const mockBoss = { work: workStub, createQueue: createQueueStub };
 
-      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
       await registerWorkers();
 
@@ -137,7 +136,7 @@ describe('worker', () => {
       const createQueueStub = sinon.stub().resolves();
       const mockBoss = { work: workStub, createQueue: createQueueStub };
 
-      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
       await registerWorkers();
 
@@ -154,7 +153,7 @@ describe('worker', () => {
       const createQueueStub = sinon.stub().resolves();
       const mockBoss = { work: workStub, createQueue: createQueueStub };
 
-      sinon.stub(pgBossService, 'getPgBoss').returns(mockBoss as any);
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
 
       await registerWorkers();
 

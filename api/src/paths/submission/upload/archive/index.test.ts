@@ -21,7 +21,7 @@ describe('archive upload handler', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const mockUploadResponse: PresignedUploadUrlResponse = {
       submissionId: 'mock-submission-uuid',
@@ -80,7 +80,7 @@ describe('archive upload handler', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const error = new Error('Upload failed');
     sinon.stub(UploadIngestionService.prototype, 'startArchiveUpload').rejects(error);
@@ -115,7 +115,7 @@ describe('archive upload handler', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const startArchiveUploadStub = sinon.stub(UploadIngestionService.prototype, 'startArchiveUpload').resolves({
       submissionId: 'mock-submission-uuid',

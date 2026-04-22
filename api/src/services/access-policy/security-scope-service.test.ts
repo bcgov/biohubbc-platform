@@ -4,9 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { SecurityScope } from '../../models/security-scope';
-import * as publisher from '../../queue/publisher';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
-import * as scopeHashUtil from '../../utils/scope-hash';
 import { SecurityScopeService } from './security-scope-service';
 
 chai.use(sinonChai);
@@ -31,7 +29,7 @@ describe('SecurityScopeService', () => {
     const securityScopeId = '22222222-2222-2222-2222-222222222222';
 
     beforeEach(() => {
-      sinon.stub(scopeHashUtil, 'computeScopeHash').returns(scopeHash);
+      sinon.stub(SecurityScopeService.dependencies, 'computeScopeHash').returns(scopeHash);
     });
 
     it('creates a new scope, mapping, and publishes anchor job when scope_hash is new', async () => {
@@ -39,12 +37,12 @@ describe('SecurityScopeService', () => {
       const insertStub = sinon.stub(SecurityScopeRepository.prototype, 'insertSecurityScope').resolves(newScope);
       const mappingStub = sinon.stub(SecurityScopeRepository.prototype, 'insertPolicyStatementScope').resolves();
       const publishStub = sinon
-        .stub(publisher, 'publishComputeScopeAnchorsJob')
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
 
       const result = await service.createScopeForPolicyStatement(policyStatementId, urn);
 
-      expect(scopeHashUtil.computeScopeHash).to.have.been.calledWith(urn);
+      expect(SecurityScopeService.dependencies.computeScopeHash).to.have.been.calledWith(urn);
       expect(insertStub).to.have.been.calledWith(scopeHash);
       expect(mappingStub).to.have.been.calledWith(policyStatementId, securityScopeId);
       expect(publishStub).to.have.been.calledOnceWith(mockDBConnection, { securityScopeId });
@@ -59,7 +57,7 @@ describe('SecurityScopeService', () => {
         .resolves(existingScope);
       const mappingStub = sinon.stub(SecurityScopeRepository.prototype, 'insertPolicyStatementScope').resolves();
       const publishStub = sinon
-        .stub(publisher, 'publishComputeScopeAnchorsJob')
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
 
       const result = await service.createScopeForPolicyStatement(policyStatementId, urn);
@@ -76,7 +74,9 @@ describe('SecurityScopeService', () => {
       const newScope: SecurityScope = { security_scope_id: securityScopeId, scope_hash: scopeHash };
       sinon.stub(SecurityScopeRepository.prototype, 'insertSecurityScope').resolves(newScope);
       const mappingStub = sinon.stub(SecurityScopeRepository.prototype, 'insertPolicyStatementScope').resolves();
-      sinon.stub(publisher, 'publishComputeScopeAnchorsJob').resolves({ status: 'published', jobId: 'job-1' });
+      sinon
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+        .resolves({ status: 'published', jobId: 'job-1' });
 
       await service.createScopeForPolicyStatement(policyStatementId, urn);
 
@@ -100,7 +100,7 @@ describe('SecurityScopeService', () => {
         .stub(SecurityScopeRepository.prototype, 'findOrphanedScopeIds')
         .resolves([{ security_scope_id: 'scope-1' }]);
       const publishStub = sinon
-        .stub(publisher, 'publishComputeScopeAnchorsJob')
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
 
       await service.cleanupScopesForDeletedStatements(['ps-1', 'ps-2'], ['team-a', 'team-b']);
@@ -132,7 +132,7 @@ describe('SecurityScopeService', () => {
       // No scopes are orphaned — all still referenced by other statements
       sinon.stub(SecurityScopeRepository.prototype, 'findOrphanedScopeIds').resolves([]);
       const publishStub = sinon
-        .stub(publisher, 'publishComputeScopeAnchorsJob')
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
 
       await service.cleanupScopesForDeletedStatements(['ps-1'], ['team-a']);
@@ -147,7 +147,7 @@ describe('SecurityScopeService', () => {
       sinon.stub(SecurityScopeRepository.prototype, 'insertTeamSecurityScopesFromPolicyChain').resolves();
       const orphanStub = sinon.stub(SecurityScopeRepository.prototype, 'findOrphanedScopeIds');
       const publishStub = sinon
-        .stub(publisher, 'publishComputeScopeAnchorsJob')
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
 
       await service.cleanupScopesForDeletedStatements(['ps-1'], ['team-a']);
@@ -188,7 +188,7 @@ describe('SecurityScopeService', () => {
         .stub(SecurityScopeRepository.prototype, 'findScopeIdsMatchingSubmission')
         .resolves([{ security_scope_id: 'scope-1' }, { security_scope_id: 'scope-2' }]);
       const publishStub = sinon
-        .stub(publisher, 'publishComputeScopeAnchorsJob')
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
 
       await service.triggerAnchorComputationForSubmission(42);
@@ -202,7 +202,7 @@ describe('SecurityScopeService', () => {
     it('does not publish when no scopes match the submission', async () => {
       const findStub = sinon.stub(SecurityScopeRepository.prototype, 'findScopeIdsMatchingSubmission').resolves([]);
       const publishStub = sinon
-        .stub(publisher, 'publishComputeScopeAnchorsJob')
+        .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
         .resolves({ status: 'published', jobId: 'job-1' });
 
       await service.triggerAnchorComputationForSubmission(999);

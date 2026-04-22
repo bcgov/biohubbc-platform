@@ -35,7 +35,7 @@ describe('searchProperties', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.body = {
@@ -73,7 +73,7 @@ describe('searchProperties', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.body = {
@@ -111,7 +111,7 @@ describe('searchProperties', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.body = {
@@ -151,7 +151,7 @@ describe('searchProperties', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.body = {
@@ -184,7 +184,7 @@ describe('searchProperties', () => {
       release: sinon.stub().resolves(),
       open: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.body = {

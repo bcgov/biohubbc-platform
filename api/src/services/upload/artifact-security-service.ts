@@ -22,6 +22,14 @@ export class ArtifactSecurityService extends DBService {
   uploadArtifactSecurityRepository: ArtifactSecurityRepository;
 
   /**
+   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+   */
+  static readonly dependencies = {
+    publishProcessSubmissionFeaturesJob,
+    getClamAvScanner: _getClamAvScanner
+  };
+
+  /**
    * Initialize the artifact security service and its repository dependency.
    *
    * @param {IDBConnection} connection - Active database connection for service operations.
@@ -112,7 +120,7 @@ export class ArtifactSecurityService extends DBService {
     const submissionUploadService = new SubmissionUploadService(this.connection);
     const submissionUpload = await submissionUploadService.getSubmissionUploadByUploadId(uploadArchive.upload_id);
 
-    await publishProcessSubmissionFeaturesJob(this.connection, submissionUpload);
+    await ArtifactSecurityService.dependencies.publishProcessSubmissionFeaturesJob(this.connection, submissionUpload);
   }
 
   /**
@@ -298,7 +306,7 @@ export class ArtifactSecurityService extends DBService {
 
     const fileStream = await storageService.getFileStream(bucketType, objectKey);
 
-    const clamAvScanner = await _getClamAvScanner();
+    const clamAvScanner = await ArtifactSecurityService.dependencies.getClamAvScanner();
     const clamavScanResult = await clamAvScanner.scanStream(fileStream);
     const isInfected = Boolean((clamavScanResult as { isInfected?: boolean }).isInfected);
 

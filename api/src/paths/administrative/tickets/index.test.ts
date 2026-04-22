@@ -31,7 +31,7 @@ describe('paths/administrative/tickets', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     sinon.stub(TicketService.prototype, 'createTicket').resolves(mockTicket);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -49,7 +49,7 @@ describe('paths/administrative/tickets', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const listStub = sinon.stub(TicketService.prototype, 'getTickets').resolves([mockTicket]);
     const countStub = sinon.stub(TicketService.prototype, 'getTicketsCount').resolves(21);
 
@@ -92,7 +92,7 @@ describe('paths/administrative/tickets', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const listStub = sinon.stub(TicketService.prototype, 'getTickets').resolves([mockTicket]);
     const countStub = sinon.stub(TicketService.prototype, 'getTicketsCount').resolves(1);
 

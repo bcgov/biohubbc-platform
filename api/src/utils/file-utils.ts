@@ -22,6 +22,20 @@ import { getLogger } from './logger';
 
 const defaultLog = getLogger('/api/src/utils/file-utils');
 
+const getOptionalEnv = (key: string): string | undefined => {
+  const value = process.env[key];
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  if (!normalized || normalized === 'undefined' || normalized === 'null') {
+    return undefined;
+  }
+
+  return normalized;
+};
+
 export interface IDatasetS3FileKey {
   datasetUUID: string;
   fileName: string;
@@ -56,7 +70,7 @@ export const _getClamAvScanner = async (): Promise<NodeClam> => {
  * @returns {*} {string} The internal object store URL
  */
 export const getObjectStoreUrl = (): string => {
-  const url = process.env.OBJECT_STORE_URL || 'https://nrs.objectstore.gov.bc.ca';
+  const url = getOptionalEnv('OBJECT_STORE_URL') || 'https://nrs.objectstore.gov.bc.ca';
   if (!['https://', 'http://'].some((protocol) => url.toLowerCase().startsWith(protocol))) {
     return `https://${url}`;
   }
@@ -69,7 +83,7 @@ export const getObjectStoreUrl = (): string => {
  * @returns {*} {string} The quarantine object store URL
  */
 export const getQuarantineObjectStoreUrl = (): string => {
-  const url = process.env.QUARANTINE_OBJECT_STORE_URL || getObjectStoreUrl();
+  const url = getOptionalEnv('QUARANTINE_OBJECT_STORE_URL') || getObjectStoreUrl();
   if (!['https://', 'http://'].some((protocol) => url.toLowerCase().startsWith(protocol))) {
     return `https://${url}`;
   }
@@ -83,7 +97,9 @@ export const getQuarantineObjectStoreUrl = (): string => {
  */
 export const getQuarantineObjectStoreUrlPublic = (): string => {
   const url =
-    process.env.QUARANTINE_OBJECT_STORE_URL_PUBLIC || process.env.QUARANTINE_OBJECT_STORE_URL || getObjectStoreUrl();
+    getOptionalEnv('QUARANTINE_OBJECT_STORE_URL_PUBLIC') ||
+    getOptionalEnv('QUARANTINE_OBJECT_STORE_URL') ||
+    getObjectStoreUrl();
   if (!['https://', 'http://'].some((protocol) => url.toLowerCase().startsWith(protocol))) {
     return `https://${url}`;
   }
@@ -130,7 +146,7 @@ export const getSecurityS3Client = (): S3Client => {
  * @returns {*} {string} The object store bucket name
  */
 export const getObjectStoreBucketName = (): string => {
-  return process.env.OBJECT_STORE_BUCKET_NAME || '';
+  return getOptionalEnv('OBJECT_STORE_BUCKET_NAME') || '';
 };
 
 /**
@@ -139,7 +155,7 @@ export const getObjectStoreBucketName = (): string => {
  * @returns {*} {string} The security object store bucket name
  */
 export const getSecurityObjectStoreBucketName = (): string => {
-  return process.env.QUARANTINE_OBJECT_STORE_BUCKET_NAME || '';
+  return getOptionalEnv('QUARANTINE_OBJECT_STORE_BUCKET_NAME') || '';
 };
 
 /**
@@ -178,7 +194,7 @@ export const getS3HostUrl = (key?: string): string => {
  * @returns {*} {string} The S3 key prefix
  */
 export const getS3KeyPrefix = (): string => {
-  return process.env.S3_KEY_PREFIX || 'biohub';
+  return getOptionalEnv('S3_KEY_PREFIX') || 'biohub';
 };
 
 /**

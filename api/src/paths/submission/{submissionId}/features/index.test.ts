@@ -18,7 +18,7 @@ describe('getSubmissionFeatures', () => {
 
   it('throws error and rolls back if SubmissionService throws', async () => {
     const connection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(connection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(connection);
     sinon.stub(connection, 'open').resolves();
     sinon.stub(connection, 'commit').resolves();
     sinon.stub(connection, 'rollback').resolves();
@@ -46,7 +46,7 @@ describe('getSubmissionFeatures', () => {
 
   it('returns 200 with paginated features on success', async () => {
     const connection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(connection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(connection);
     sinon.stub(connection, 'open').resolves();
     sinon.stub(connection, 'commit').resolves();
     sinon.stub(connection, 'rollback').resolves();
@@ -73,7 +73,7 @@ describe('getSubmissionFeatures', () => {
 
   it('passes search to service methods', async () => {
     const connection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(connection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(connection);
     sinon.stub(connection, 'open').resolves();
     sinon.stub(connection, 'commit').resolves();
     sinon.stub(connection, 'rollback').resolves();
@@ -110,7 +110,7 @@ describe('getSubmissionFeatures', () => {
 
   it('releases connection even if commit fails', async () => {
     const connection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(connection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(connection);
     sinon.stub(connection, 'open').resolves();
     sinon.stub(connection, 'commit').rejects(new Error('Commit failed'));
     sinon.stub(connection, 'rollback').resolves();
