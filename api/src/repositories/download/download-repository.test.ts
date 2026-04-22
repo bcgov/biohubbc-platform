@@ -241,6 +241,8 @@ describe('DownloadRepository', () => {
       const sqlText = builtQuery.toString();
       expect(sqlText).to.not.include('download_feature');
       expect(sqlText).to.not.include('feature_count');
+      expect(sqlText).to.include('join "team" as "t" on "t"."team_id" = "dt"."team_id"');
+      expect(sqlText).to.include('"t"."record_end_date" is null');
     });
 
     it('returns paginated results when pagination is provided', async () => {
@@ -430,9 +432,11 @@ describe('DownloadRepository', () => {
 
       expect(result).to.be.true;
       expect(sqlStub).to.have.been.calledOnce;
-      const sqlText = sqlStub.firstCall.args[0].text;
+      const sqlText = sqlStub.firstCall.args[0].text.toLowerCase();
       expect(sqlText).to.include('download_team');
+      expect(sqlText).to.include('join team t on t.team_id = dt.team_id');
       expect(sqlText).to.include('team_member');
+      expect(sqlText).to.include('t.record_end_date is null');
       expect(sqlText).to.not.include('download_share');
       expect(sqlText).to.not.include('d.system_user_id');
     });

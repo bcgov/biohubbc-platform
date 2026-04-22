@@ -208,9 +208,11 @@ export class DownloadRepository extends BaseRepository {
       ])
       .from('download as d')
       .innerJoin('download_team as dt', 'dt.download_id', 'd.download_id')
+      .innerJoin('team as t', 't.team_id', 'dt.team_id')
       .innerJoin('team_member as tm', 'tm.team_id', 'dt.team_id')
       .where('tm.system_user_id', systemUserId)
       .whereNull('dt.record_end_date')
+      .whereNull('t.record_end_date')
       .whereNull('tm.record_end_date');
 
     if (pagination) {
@@ -603,10 +605,12 @@ export class DownloadRepository extends BaseRepository {
       SELECT EXISTS (
         SELECT 1
         FROM download_team dt
+        JOIN team t ON t.team_id = dt.team_id
         JOIN team_member tm ON tm.team_id = dt.team_id
         WHERE dt.download_id = ${downloadId}
           AND tm.system_user_id = ${systemUserId}
           AND dt.record_end_date IS NULL
+          AND t.record_end_date IS NULL
           AND tm.record_end_date IS NULL
       ) AS authorized;
     `;
