@@ -4,6 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
+import { ApiNotFoundError } from '../../errors/api-error';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadRepository } from './download-repository';
 
@@ -22,7 +23,7 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownload({ format: 'csv' });
+      await repo.createDownload({ format: 'parquet' });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlText = sqlStub.firstCall.args[0].text;
@@ -41,7 +42,7 @@ describe('DownloadRepository', () => {
 
       const repo = new DownloadRepository(mockDBConnection);
       const filters = { keyword: 'moose' };
-      await repo.createDownload({ filters, format: 'csv' });
+      await repo.createDownload({ filters, format: 'parquet' });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlText = sqlStub.firstCall.args[0].text;
@@ -57,7 +58,7 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownload({ format: 'csv' });
+      await repo.createDownload({ format: 'parquet' });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlValues = sqlStub.firstCall.args[0].values;
@@ -73,7 +74,7 @@ describe('DownloadRepository', () => {
 
       const repo = new DownloadRepository(mockDBConnection);
       const cartId = 'cccc0000-0000-0000-0000-000000000001';
-      await repo.createDownload({ cartId, format: 'csv' });
+      await repo.createDownload({ cartId, format: 'parquet' });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlValues = sqlStub.firstCall.args[0].values;
@@ -87,13 +88,13 @@ describe('DownloadRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadRepository(mockDBConnection);
-      await repo.createDownload({ filters: { keyword: 'moose' }, format: 'csv' });
+      await repo.createDownload({ filters: { keyword: 'moose' }, format: 'parquet' });
 
       expect(sqlStub).to.have.been.calledOnce;
       const sqlValues = sqlStub.firstCall.args[0].values;
       // cart_id is second-to-last parameter (format is last)
       expect(sqlValues[sqlValues.length - 2]).to.be.null;
-      expect(sqlValues[sqlValues.length - 1]).to.equal('csv');
+      expect(sqlValues[sqlValues.length - 1]).to.equal('parquet');
     });
   });
 
@@ -210,7 +211,7 @@ describe('DownloadRepository', () => {
       expect(download).to.equal(row);
     });
 
-    it('throws ApiExecuteSQLError when no row is returned', async () => {
+    it('throws ApiNotFoundError when no row is returned', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
@@ -220,6 +221,7 @@ describe('DownloadRepository', () => {
         await repo.getDownloadById('aaaa0000-0000-0000-0000-000000000001');
         expect.fail('expected throw');
       } catch (err: any) {
+        expect(err).to.be.instanceOf(ApiNotFoundError);
         expect(err.message).to.equal('Download not found');
       }
     });

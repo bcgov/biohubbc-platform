@@ -60,7 +60,7 @@ describe('DownloadService', () => {
         {
           download_id: 'aaaa0000-0000-0000-0000-000000000001',
           download_status: 'ready' as const,
-          format: 'csv',
+          format: 'parquet',
           metadata: null,
           started_at: '2025-01-01T00:00:00Z',
           completed_at: '2025-01-01T00:01:00Z',

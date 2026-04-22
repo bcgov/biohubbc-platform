@@ -72,6 +72,14 @@ export class DownloadPipelineService extends DBService {
    * Validate a download status transition against an allowed current-status set.
    *
    * Pure business-rule assertion; no I/O.
+   *
+   * @param {string} downloadId - The download ID (for error context).
+   * @param {DownloadRecord['download_status']} currentStatus - The download's current status.
+   * @param {DownloadStatusEnum} nextStatus - The status being transitioned to.
+   * @param {DownloadStatusEnum[]} allowedCurrentStatuses - Statuses from which `nextStatus` is reachable.
+   * @return {void}
+   * @throws {ApiConflictError} if `currentStatus` is not in `allowedCurrentStatuses`.
+   * @memberof DownloadPipelineService
    */
   private assertDownloadStatusTransition(
     downloadId: string,
@@ -95,6 +103,15 @@ export class DownloadPipelineService extends DBService {
    * lives in the service; the repository stays a thin CRUD wrapper. Illegal transitions
    * (including retries of already-terminal jobs) throw `ApiConflictError` and bubble up
    * to the pg-boss DLQ.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {DownloadStatusEnum} nextStatus - Target status.
+   * @param {DownloadStatusEnum[]} allowedCurrentStatuses - Statuses from which `nextStatus` is reachable.
+   * @param {{ error?: string }} [errorMetadata] - Optional error metadata (used for FAILED transitions).
+   * @return {Promise<void>}
+   * @throws {ApiNotFoundError} if the download does not exist.
+   * @throws {ApiConflictError} if the current status is not in `allowedCurrentStatuses`.
+   * @memberof DownloadPipelineService
    */
   async transitionDownloadStatus(
     downloadId: string,
@@ -369,6 +386,14 @@ export class DownloadPipelineService extends DBService {
    * files are standalone — GIS consumers have no database access.
    *
    * Zero disk usage: streams through PassThrough → hash → S3 multipart upload.
+   *
+   * @param {object} payload
+   * @param {string} payload.downloadId - The download ID.
+   * @param {DownloadSource} payload.source - The download source (cart or filters).
+   * @param {CsvPropertyDefinition[]} payload.properties - Schema property definitions for this feature type.
+   * @param {string} payload.featureTypeName - The feature type to stream.
+   * @return {Promise<void>}
+   * @memberof DownloadPipelineService
    */
   async writeFeatureTypeParquet(payload: {
     downloadId: string;

@@ -17,18 +17,32 @@ export const pgBossDependencies = {
 // module (including this one) with its own module-scoped state. Storing the
 // instance on globalThis ensures both graphs resolve to the same pg-boss.
 const GLOBAL_KEY = Symbol.for('biohub.pgBoss');
-type GlobalWithPgBoss = typeof globalThis & { [GLOBAL_KEY]?: PgBoss | null };
+const GLOBAL_INIT_KEY = Symbol.for('biohub.pgBoss.init');
+type GlobalWithPgBoss = typeof globalThis & {
+  [GLOBAL_KEY]?: PgBoss | null;
+  [GLOBAL_INIT_KEY]?: Promise<PgBoss> | null;
+};
 const globalRef = globalThis as GlobalWithPgBoss;
 
 const getBoss = (): PgBoss | null => globalRef[GLOBAL_KEY] ?? null;
 const setBoss = (value: PgBoss | null): void => {
   globalRef[GLOBAL_KEY] = value;
 };
+const getInitPromise = (): Promise<PgBoss> | null => globalRef[GLOBAL_INIT_KEY] ?? null;
+const setInitPromise = (value: Promise<PgBoss> | null): void => {
+  globalRef[GLOBAL_INIT_KEY] = value;
+};
 
 /**
  * Initialize the pg-boss singleton instance.
  *
- * @return {*}  {Promise<PgBoss>}
+ * Concurrent callers share a single in-flight init promise. Without this guard,
+ * two near-simultaneous calls would both see the singleton as null and each
+ * construct + start their own `PgBoss`, leaving two running instances with the
+ * only-one-wins semantics of `setBoss` — but the loser would still be connected
+ * and consuming jobs until the process exits.
+ *
+ * @return {*}  {Promise<PgBoss>} The pg-boss singleton instance.
  */
 export const initPgBoss = async (): Promise<PgBoss> => {
   const existing = getBoss();
@@ -36,18 +50,35 @@ export const initPgBoss = async (): Promise<PgBoss> => {
     return existing;
   }
 
-  const config = pgBossDependencies.getPgBossConfig();
-  const boss = new PgBoss(config);
+  const inFlight = getInitPromise();
+  if (inFlight) {
+    return inFlight;
+  }
 
-  boss.on('error', (error) => {
-    defaultLog.error({ label: 'pg-boss', message: 'error', error });
-  });
+  const initPromise = (async () => {
+    const config = pgBossDependencies.getPgBossConfig();
+    const boss = new PgBoss(config);
 
-  await boss.start();
-  setBoss(boss);
-  defaultLog.info({ label: 'pg-boss', message: 'started' });
+    boss.on('error', (error) => {
+      defaultLog.error({ label: 'pg-boss', message: 'error', error });
+    });
 
-  return boss;
+    await boss.start();
+    setBoss(boss);
+    defaultLog.info({ label: 'pg-boss', message: 'started' });
+
+    return boss;
+  })();
+
+  setInitPromise(initPromise);
+
+  try {
+    return await initPromise;
+  } catch (error) {
+    // Clear the cached promise on failure so a later caller can retry.
+    setInitPromise(null);
+    throw error;
+  }
 };
 
 /**
@@ -74,6 +105,7 @@ export const stopPgBoss = async (): Promise<void> => {
   if (boss) {
     await boss.stop();
     setBoss(null);
+    setInitPromise(null);
     defaultLog.info({ label: 'pg-boss', message: 'stopped' });
   }
 };

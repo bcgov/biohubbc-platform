@@ -38,6 +38,9 @@ export interface IProcessDownloadJobData {
  *   worker crash.
  * - Disallowing `ready` as a source for the processing→ready transition means a
  *   bug that drops us into the final transition mid-flight throws loudly.
+ *
+ * @param {PgBoss.Job<IProcessDownloadJobData>[]} jobs - The jobs to process.
+ * @return {Promise<void>}
  */
 export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobData> = async (jobs) => {
   for (const job of jobs) {
@@ -150,6 +153,9 @@ export const processDownloadJobHandler: PgBoss.WorkHandler<IProcessDownloadJobDa
  *
  * Otherwise transitions the download to `failed` with the job output as error
  * metadata.
+ *
+ * @param {PgBoss.Job<IProcessDownloadJobData>[]} jobs - The failed jobs (post-retry).
+ * @return {Promise<void>}
  */
 export const processDownloadFailedHandler: PgBoss.WorkHandler<IProcessDownloadJobData> = async (jobs) => {
   for (const job of jobs) {

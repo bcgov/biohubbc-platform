@@ -4,7 +4,7 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { DOWNLOAD_FEATURE_BATCH_SIZE, FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { getKnex } from '../../database/db';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import {
   CreateDownload,
   DownloadFeatureSummary,
@@ -121,6 +121,11 @@ export class DownloadRepository extends BaseRepository {
    * matches the table's partial unique index so a re-insert on a still-active link
    * is a silent no-op. A first-time insert returns rowCount=1; a conflict returns
    * rowCount=0 — both are valid outcomes and neither throws.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {string} artifactId - The artifact ID.
+   * @return {Promise<void>}
+   * @memberof DownloadRepository
    */
   async createDownloadArtifact(downloadId: string, artifactId: string): Promise<void> {
     const sql = SQL`
@@ -168,13 +173,16 @@ export class DownloadRepository extends BaseRepository {
    *
    * `get*` throws on missing row (codebase convention — companion to `findDownloadById`).
    *
-   * @throws {ApiExecuteSQLError} when no download matches the given ID.
+   * @param {string} downloadId - The download ID.
+   * @return {Promise<DownloadRecord>}
+   * @throws {ApiNotFoundError} when no download matches the given ID.
+   * @memberof DownloadRepository
    */
   async getDownloadById(downloadId: string): Promise<DownloadRecord> {
     const download = await this.findDownloadById(downloadId);
 
     if (!download) {
-      throw new ApiExecuteSQLError('Download not found', [
+      throw new ApiNotFoundError('Download not found', [
         'DownloadRepository->getDownloadById',
         `no download with id ${downloadId}`
       ]);
@@ -778,6 +786,15 @@ export class DownloadRepository extends BaseRepository {
    * and the parameter bindings.
    *
    * Must be called within an open transaction — Postgres cursors require tx context.
+   *
+   * @template T - Row shape yielded by the cursor.
+   * @param {object} opts
+   * @param {string} opts.cursorName - Postgres cursor name (caller is responsible for uniqueness).
+   * @param {string} opts.declareSql - Inner SELECT for the cursor.
+   * @param {any[]} opts.bindings - Parameter bindings for the SELECT.
+   * @param {number} opts.batchSize - Rows per FETCH.
+   * @yields {T[]} Batches of rows.
+   * @memberof DownloadRepository
    */
   private async *streamWithCursor<T extends QueryResultRow>(opts: {
     cursorName: string;

@@ -83,7 +83,7 @@ describe('Download services (integration)', function () {
     return crudService.createDownload({
       cartId: cartResponse.cart.cart_id,
       fragmentSizeBytes,
-      format: 'csv'
+      format: 'parquet'
     });
   }
 
@@ -109,7 +109,7 @@ describe('Download services (integration)', function () {
 
     it('should create a filter-based download with filters set and cart_id null', async () => {
       const filters = { keyword: 'test-keyword' };
-      const result = await crudService.createDownload({ filters, format: 'csv' });
+      const result = await crudService.createDownload({ filters, format: 'parquet' });
 
       const row = await connection.sql(SQL`
         SELECT cart_id, filters FROM download WHERE download_id = ${result.download_id};
@@ -125,7 +125,7 @@ describe('Download services (integration)', function () {
       try {
         await connection.sql(SQL`
           INSERT INTO download (download_status, fragment_size_bytes, cart_id, filters, format, create_user)
-          VALUES ('pending', 524288000, NULL, NULL, 'csv', ${connection.systemUserId()});
+          VALUES ('pending', 524288000, NULL, NULL, 'parquet', ${connection.systemUserId()});
         `);
         expect.fail('Expected CHECK constraint violation');
       } catch (error: any) {
@@ -253,7 +253,7 @@ describe('Download services (integration)', function () {
         VALUES (${cartId}, ${openFeatureId}, ${systemUserId}), (${cartId}, ${securedFeatureId}, ${systemUserId});
       `);
 
-      const { download_id } = await crudService.createDownload({ cartId, format: 'csv' });
+      const { download_id } = await crudService.createDownload({ cartId, format: 'parquet' });
 
       const result = await crudService.getDownloadFeatures(download_id);
 
@@ -290,7 +290,7 @@ describe('Download services (integration)', function () {
       await createTestFeature(connection, submissionId, 'species_observation', { taxon_id: 1234, count: 1 });
 
       const filters = { feature_types: ['dataset'] };
-      const { download_id } = await crudService.createDownload({ filters, format: 'csv' });
+      const { download_id } = await crudService.createDownload({ filters, format: 'parquet' });
 
       const result = await crudService.getDownloadFeatures(download_id);
 
@@ -315,7 +315,7 @@ describe('Download services (integration)', function () {
       // Cart download includes only the observation
       const cartDl = await createCartDownload([cartFeat]);
       // Filter download matches only datasets
-      const filterDl = await crudService.createDownload({ filters: { feature_types: ['dataset'] }, format: 'csv' });
+      const filterDl = await crudService.createDownload({ filters: { feature_types: ['dataset'] }, format: 'parquet' });
 
       const cartResult = await crudService.getDownloadFeatures(cartDl.download_id);
       expect(cartResult).to.have.length(1);
@@ -335,7 +335,7 @@ describe('Download services (integration)', function () {
       const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Size B' });
 
       const filters = { feature_types: ['dataset'] };
-      const { download_id } = await crudService.createDownload({ filters, format: 'csv' });
+      const { download_id } = await crudService.createDownload({ filters, format: 'parquet' });
 
       const totalBytes = await service.estimateDownloadSize(download_id);
 
@@ -382,7 +382,7 @@ describe('Download services (integration)', function () {
       const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'CursorFilter B' });
 
       const filters = { feature_types: ['dataset'] };
-      const { download_id } = await crudService.createDownload({ filters, format: 'csv' });
+      const { download_id } = await crudService.createDownload({ filters, format: 'parquet' });
 
       const downloadRepo = new DownloadRepository(connection);
       const searchService = new SearchFeatureService(connection);

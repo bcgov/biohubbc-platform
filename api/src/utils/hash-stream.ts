@@ -14,6 +14,10 @@ import { Transform, type TransformCallback } from 'node:stream';
  * Call `getResult()` only after the stream has ended; calling it earlier returns
  * a partial digest over the bytes seen so far (the underlying `Hash` is final-
  * ized by the call).
+ *
+ * @return {{ transform: Transform; getResult: () => { sha256Hex: string; byteCount: number } }}
+ *   The pass-through `transform` to pipe through, and a `getResult` closure that
+ *   returns the final sha256 hex digest and total byte count.
  */
 export function createHashCountStream(): {
   transform: Transform;
