@@ -3,12 +3,9 @@ import archiver from 'archiver';
 import { PassThrough } from 'node:stream';
 import { FRAGMENT_SIZE_THRESHOLD } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
-import {
-  DownloadArtifactInfo,
-  DownloadFeatureSummary,
-  DownloadSource,
-  ParquetFeatureData
-} from '../../models/download';
+import { ApiConflictError } from '../../errors/api-error';
+import { ArtifactStatusEnum } from '../../models/artifact';
+import { DownloadFeatureSummary, DownloadRecord, DownloadSource, ParquetFeatureData } from '../../models/download';
 import { DownloadFragmentRecord } from '../../models/download-fragment';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadFragmentRepository } from '../../repositories/download/download-fragment-repository';
@@ -20,12 +17,15 @@ import {
   flattenFeatureWithParent,
   getOutputFilename
 } from '../../utils/csv-utils';
+import { getObjectStoreBucketName } from '../../utils/file-utils';
+import { createHashCountStream } from '../../utils/hash-stream';
 import { getLogger } from '../../utils/logger';
 import { buildGeoParquetMetadata, buildParquetSchema, featureToRow } from '../../utils/parquet-utils';
 import { CodeService } from '../code-service';
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { SearchFeatureService } from '../search-feature-service';
+import { ArtifactService } from '../upload/artifact-service';
 
 const defaultLog = getLogger('services/download-pipeline-service');
 
@@ -58,39 +58,81 @@ export class DownloadPipelineService extends DBService {
   downloadRepository: DownloadRepository;
   fragmentRepository: DownloadFragmentRepository;
   searchFeatureService: SearchFeatureService;
+  artifactService: ArtifactService;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.downloadRepository = new DownloadRepository(connection);
     this.fragmentRepository = new DownloadFragmentRepository(connection);
     this.searchFeatureService = new SearchFeatureService(connection);
+    this.artifactService = new ArtifactService(connection);
   }
 
   /**
-   * Update download status by download ID.
+   * Validate a download status transition against an allowed current-status set.
    *
-   * @param {string} downloadId - The download ID.
-   * @param {DownloadStatusEnum} status - The new status.
-   * @param {object} [metadata] - Optional metadata (error).
-   * @return {Promise<void>}
+   * Pure business-rule assertion; no I/O.
+   *
+   * @param {string} downloadId - The download ID (for error context).
+   * @param {DownloadRecord['download_status']} currentStatus - The download's current status.
+   * @param {DownloadStatusEnum} nextStatus - The status being transitioned to.
+   * @param {DownloadStatusEnum[]} allowedCurrentStatuses - Statuses from which `nextStatus` is reachable.
+   * @return {void}
+   * @throws {ApiConflictError} if `currentStatus` is not in `allowedCurrentStatuses`.
    * @memberof DownloadPipelineService
    */
-  async updateDownloadStatus(
+  private assertDownloadStatusTransition(
     downloadId: string,
-    status: DownloadStatusEnum,
-    metadata?: { error?: string }
+    currentStatus: DownloadRecord['download_status'],
+    nextStatus: DownloadStatusEnum,
+    allowedCurrentStatuses: DownloadStatusEnum[]
+  ): void {
+    if (!allowedCurrentStatuses.includes(currentStatus as DownloadStatusEnum)) {
+      throw new ApiConflictError('Invalid download status transition', [
+        'DownloadPipelineService->transitionDownloadStatus',
+        { downloadId, currentStatus, nextStatus, allowedCurrentStatuses }
+      ]);
+    }
+  }
+
+  /**
+   * Transition a download from one of `allowedCurrentStatuses` to `nextStatus`.
+   *
+   * Fetches the download, asserts the transition is allowed, then writes the new status
+   * plus timestamps via the existing generic `updateDownloadStatus`. The state machine
+   * lives in the service; the repository stays a thin CRUD wrapper. Illegal transitions
+   * (including retries of already-terminal jobs) throw `ApiConflictError` and bubble up
+   * to the pg-boss DLQ.
+   *
+   * @param {string} downloadId - The download ID.
+   * @param {DownloadStatusEnum} nextStatus - Target status.
+   * @param {DownloadStatusEnum[]} allowedCurrentStatuses - Statuses from which `nextStatus` is reachable.
+   * @param {{ error?: string }} [errorMetadata] - Optional error metadata (used for FAILED transitions).
+   * @return {Promise<void>}
+   * @throws {ApiNotFoundError} if the download does not exist.
+   * @throws {ApiConflictError} if the current status is not in `allowedCurrentStatuses`.
+   * @memberof DownloadPipelineService
+   */
+  async transitionDownloadStatus(
+    downloadId: string,
+    nextStatus: DownloadStatusEnum,
+    allowedCurrentStatuses: DownloadStatusEnum[],
+    errorMetadata?: { error?: string }
   ): Promise<void> {
+    const download = await this.downloadRepository.getDownloadById(downloadId);
+
+    this.assertDownloadStatusTransition(downloadId, download.download_status, nextStatus, allowedCurrentStatuses);
+
     const now = new Date().toISOString();
     const timestamps: { started_at?: string; completed_at?: string } = {};
-
-    if (status === DownloadStatusEnum.PROCESSING) {
+    if (nextStatus === DownloadStatusEnum.PROCESSING) {
       timestamps.started_at = now;
     }
-    if (status === DownloadStatusEnum.READY || status === DownloadStatusEnum.FAILED) {
+    if (nextStatus === DownloadStatusEnum.READY || nextStatus === DownloadStatusEnum.FAILED) {
       timestamps.completed_at = now;
     }
 
-    return this.downloadRepository.updateDownloadStatus(downloadId, status, { ...metadata, ...timestamps });
+    await this.downloadRepository.updateDownloadStatus(downloadId, nextStatus, { ...errorMetadata, ...timestamps });
   }
 
   /**
@@ -270,7 +312,7 @@ export class DownloadPipelineService extends DBService {
     const readyCount = fragments.filter((f) => f.fragment_status === DownloadStatusEnum.READY).length;
     await this.downloadRepository.updateDownloadFragmentCounts(downloadId, fragments.length, readyCount);
 
-    await this.updateDownloadStatus(downloadId, DownloadStatusEnum.READY);
+    await this.transitionDownloadStatus(downloadId, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
   }
 
   /**
@@ -285,25 +327,6 @@ export class DownloadPipelineService extends DBService {
     await this.fragmentRepository.updateFragmentStatus(fragmentId, DownloadStatusEnum.PROCESSING, {
       started_at: now
     });
-  }
-
-  /**
-   * Resolve download source and artifact info for the Parquet pipeline.
-   *
-   * Combines two lookups into a single call so the job handler doesn't
-   * need to manage the source/artifact pair separately.
-   *
-   * @param {string} downloadId - The download ID.
-   * @return {Promise<{ source: DownloadSource; artifact: DownloadArtifactInfo }>}
-   * @memberof DownloadPipelineService
-   */
-  async getDownloadMetadata(downloadId: string): Promise<{ source: DownloadSource; artifact: DownloadArtifactInfo }> {
-    const [source, artifact] = await Promise.all([
-      this.downloadRepository.getDownloadSource(downloadId),
-      this.downloadRepository.getDownloadArtifact(downloadId)
-    ]);
-
-    return { source, artifact };
   }
 
   /**
@@ -341,60 +364,78 @@ export class DownloadPipelineService extends DBService {
   }
 
   /**
-   * Stream a single feature type to a Parquet file on S3.
+   * Stream a single feature type to a Parquet file on S3, recording the artifact
+   * with authoritative checksum and byte size.
    *
-   * Each feature type gets its own Parquet file with a schema derived from
-   * feature_type_property definitions. The star-schema design keeps files
-   * independent — parent data lives in its own file, joined by parent_uuid.
+   * The S3 key is deterministic: `downloads/{downloadId}/{featureTypeName}/data.parquet`.
+   * Retries overwrite the same key — S3 is idempotent on overwrites, and the
+   * artifact / download_artifact inserts use ON CONFLICT DO NOTHING. A retried
+   * feature type converges to the same DB + S3 state as a first-time success.
    *
-   * Pipeline: cursor → hydrateFeatureBatch → featureToRow → writer.appendRow → S3
+   * Pipeline: cursor → hydrateFeatureBatch → featureToRow → writer → passThrough →
+   * hash-count transform → S3 multipart upload. The hash transform captures
+   * sha256Hex + byteCount from the exact bytes uploaded; hashing after the fact
+   * would require re-downloading the S3 object.
    *
-   * Code and taxon properties arrive pre-resolved from the cursor JOIN:
-   * code → contributor_codeset_code.label, taxon → taxon.itis_scientific_name.
-   * Parquet files are standalone — GIS consumers have no database access.
+   * Writes the artifact row (`format='parquet'`, `artifact_status='uploaded'`, real
+   * checksum + byte_size + uploaded_at) and the download_artifact link inside the
+   * caller's transaction — the worker wraps each feature type in its own
+   * `withConnection`, so a mid-job retry replays the whole per-type transaction.
    *
-   * Zero disk usage: @dsnp/parquetjs streams to a PassThrough piped to S3 multipart upload.
-   * Prevents pod OOM kills and ephemeral storage exhaustion.
+   * Code and taxon properties arrive pre-resolved from the cursor JOIN. Parquet
+   * files are standalone — GIS consumers have no database access.
    *
-   * @param {string} downloadId - The download ID.
-   * @param {DownloadSource} source - The download source (cart or filters).
-   * @param {DownloadArtifactInfo} artifact - The artifact info (S3 key prefix).
-   * @param {CsvPropertyDefinition[]} properties - Schema property definitions for this feature type.
-   * @param {string} featureTypeName - The feature type to stream.
+   * Zero disk usage: streams through PassThrough → hash → S3 multipart upload.
+   *
+   * @param {object} payload
+   * @param {string} payload.downloadId - The download ID.
+   * @param {DownloadSource} payload.source - The download source (cart or filters).
+   * @param {CsvPropertyDefinition[]} payload.properties - Schema property definitions for this feature type.
+   * @param {string} payload.featureTypeName - The feature type to stream.
    * @return {Promise<void>}
    * @memberof DownloadPipelineService
    */
-  async writeFeatureTypeParquet(
-    downloadId: string,
-    source: DownloadSource,
-    artifact: DownloadArtifactInfo,
-    properties: CsvPropertyDefinition[],
-    featureTypeName: string
-  ): Promise<void> {
+  async writeFeatureTypeParquet(payload: {
+    downloadId: string;
+    source: DownloadSource;
+    properties: CsvPropertyDefinition[];
+    featureTypeName: string;
+  }): Promise<void> {
+    const { downloadId, source, properties, featureTypeName } = payload;
+
     const spatialColumns = properties
       .filter((p) => p.feature_property_type_name === 'spatial')
       .map((p) => p.feature_property_name);
     const schema = buildParquetSchema(properties);
-    const s3Key = `${artifact.object_key}/${featureTypeName}/data.parquet`;
+    const s3Key = `downloads/${downloadId}/${featureTypeName}/data.parquet`;
 
-    // Create streaming pipeline: Parquet writer → passThrough → S3 multipart upload
+    // Pipeline: Parquet writer → passThrough → hash+count transform → S3 multipart upload
     const passThrough = new PassThrough();
+    const { transform: hashCountTransform, getResult } = createHashCountStream();
+    passThrough.pipe(hashCountTransform);
+
     const objectStorageService = new ObjectStorageService();
     const uploadPromise = objectStorageService.uploadStream(
       BucketType.MAIN,
-      passThrough,
+      hashCountTransform,
       'application/octet-stream',
       s3Key
     );
 
-    // Open Parquet writer with optional GeoParquet metadata for spatial types
-    const writerOptions: any = {};
-    if (spatialColumns.length > 0) {
-      writerOptions.metadata = { geo: buildGeoParquetMetadata(spatialColumns) };
-    }
     // PassThrough implements write()/end() but @dsnp/parquetjs types expect fs.WriteStream.
     // The runtime only calls write() and end() — safe to cast.
-    const writer = await ParquetWriter.openStream(schema, passThrough as any, writerOptions);
+    const writer = await ParquetWriter.openStream(schema, passThrough as any);
+
+    // GeoParquet 1.0 metadata must be attached via setMetadata(), not the openStream
+    // options bag: @dsnp/parquetjs silently discards `opts.metadata` — the writer
+    // constructor initializes `userMetadata = {}` without reading the option (see
+    // node_modules/@dsnp/parquetjs/dist/lib/writer.js:107). setMetadata() writes to
+    // userMetadata, which is emitted to the footer on close(). Without this call,
+    // GeoParquet-aware readers (DuckDB spatial, GeoPandas, ogr2ogr) cannot detect
+    // the geometry column, CRS, or WKB encoding.
+    if (spatialColumns.length > 0) {
+      writer.setMetadata('geo', buildGeoParquetMetadata(spatialColumns));
+    }
 
     // Open cursor for the appropriate source (cart or search filters)
     let cursor: AsyncGenerator<any[]>;
@@ -426,6 +467,23 @@ export class DownloadPipelineService extends DBService {
 
     await writer.close();
     await uploadPromise;
+
+    const { sha256Hex, byteCount } = getResult();
+
+    // Record the artifact with the bytes we just uploaded. insertArtifact is
+    // idempotent on (bucket, object_key) — on retry it returns the existing
+    // artifact_id rather than inserting a duplicate.
+    const { artifact_id } = await this.artifactService.insertArtifact({
+      bucket: getObjectStoreBucketName(),
+      object_key: s3Key,
+      byte_size: byteCount,
+      artifact_status: ArtifactStatusEnum.UPLOADED,
+      checksum_sha256: sha256Hex,
+      uploaded_at: new Date().toISOString(),
+      format: 'parquet'
+    });
+
+    await this.downloadRepository.createDownloadArtifact(downloadId, artifact_id);
   }
 
   /**
@@ -498,22 +556,6 @@ export class DownloadPipelineService extends DBService {
         parent_uuid: baseRow.parent_uuid
       };
     });
-  }
-
-  /**
-   * Finalize a Parquet download after all feature types are written.
-   *
-   * Updates the linked artifact to 'uploaded' (file is now on S3) and
-   * sets the download status to 'ready' (available for consumer retrieval).
-   *
-   * @param {string} downloadId - The download ID.
-   * @return {Promise<void>}
-   * @memberof DownloadPipelineService
-   */
-  async finalizeParquetDownload(downloadId: string): Promise<void> {
-    const now = new Date().toISOString();
-    await this.downloadRepository.updateArtifactStatusByDownloadId(downloadId, 'uploaded', now);
-    await this.updateDownloadStatus(downloadId, DownloadStatusEnum.READY);
   }
 
   /**

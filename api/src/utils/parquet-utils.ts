@@ -138,8 +138,16 @@ export function featureToRow(
       case 'object':
         row[prop.feature_property_name] = JSON.stringify(value);
         break;
+      case 'datetime':
+        // db.ts installs a global pg type parser that returns TIMESTAMP / TIMESTAMPTZ
+        // as raw strings rather than Date objects. @dsnp/parquetjs's
+        // toPrimitive_TIMESTAMP_MILLIS hits its `string` branch and calls parseInt,
+        // which eats only the leading year digits (e.g. "2024-01-01..." → 2024 ms).
+        // Converting to a Date here lets the writer use its Date branch (getTime()).
+        row[prop.feature_property_name] = value instanceof Date ? value : new Date(value as string);
+        break;
       default:
-        // string, number, boolean, datetime, code, taxon, artifact_key — pass through directly
+        // string, number, boolean, code, taxon, artifact_key — pass through directly
         row[prop.feature_property_name] = value;
         break;
     }
