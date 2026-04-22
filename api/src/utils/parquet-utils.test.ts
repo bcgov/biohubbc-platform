@@ -186,13 +186,27 @@ describe('parquet-utils', () => {
       expect(row['active']).to.equal(true);
     });
 
-    it('should pass through datetime values directly', () => {
+    it('should convert datetime strings to Date for parquet TIMESTAMP_MILLIS encoding', () => {
+      // pg returns TIMESTAMP / TIMESTAMPTZ as strings (db.ts type parsers). parquetjs
+      // needs Date instances — its TIMESTAMP_MILLIS writer falls back to parseInt()
+      // on strings and eats only the leading year digits.
       const properties: CsvPropertyDefinition[] = [
         { feature_property_name: 'created', feature_property_type_name: 'datetime' }
       ];
       const row = featureToRow(makeFeature({ created: '2024-01-01T00:00:00Z' }), properties);
 
-      expect(row['created']).to.equal('2024-01-01T00:00:00Z');
+      expect(row['created']).to.be.instanceOf(Date);
+      expect((row['created'] as Date).getTime()).to.equal(new Date('2024-01-01T00:00:00Z').getTime());
+    });
+
+    it('should pass datetime Date instances through unchanged', () => {
+      const properties: CsvPropertyDefinition[] = [
+        { feature_property_name: 'created', feature_property_type_name: 'datetime' }
+      ];
+      const date = new Date('2024-06-15T12:30:00Z');
+      const row = featureToRow(makeFeature({ created: date }), properties);
+
+      expect(row['created']).to.equal(date);
     });
 
     it('should pass through code values directly (pre-resolved label)', () => {
