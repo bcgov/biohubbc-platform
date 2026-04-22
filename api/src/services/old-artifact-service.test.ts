@@ -10,7 +10,6 @@ import { Artifact, ArtifactRepository } from '../repositories/artifact-repositor
 import { SearchFeatureRepository } from '../repositories/search-feature-repository';
 import { SecurityRepository } from '../repositories/security-repository';
 import { SubmissionFeatureRecord } from '../repositories/submission-repository';
-import * as fileUtils from '../utils/file-utils';
 import { CodeService } from './code-service';
 import { ArtifactService } from './old-artifact-service';
 import { SubmissionFeatureService } from './submission-feature-service';
@@ -72,7 +71,7 @@ describe('ArtifactService', () => {
         .stub(SearchFeatureRepository.prototype, 'insertSearchableStringRecords')
         .resolves();
 
-      const uploadFileToS3Stub = sinon.stub(fileUtils, 'uploadFileToS3').resolves();
+      const uploadFileToS3Stub = sinon.stub(ArtifactService.dependencies, 'uploadFileToS3').resolves();
 
       const s3FeaturePropertyRecord: FeatureTypeProperty = {
         feature_type_property_id: 1,
@@ -236,7 +235,9 @@ describe('ArtifactService', () => {
         RequestCharged: 'requester',
         VersionId: '123456'
       };
-      const deleteFileFromS3Stub = sinon.stub(fileUtils, 'deleteFileFromS3').resolves(mockDeleteResponse);
+      const deleteFileFromS3Stub = sinon
+        .stub(ArtifactService.dependencies, 'deleteFileFromS3')
+        .resolves(mockDeleteResponse);
 
       await artifactService.deleteArtifact('uuid');
       expect(getStub).to.be.called;
@@ -260,7 +261,9 @@ describe('ArtifactService', () => {
         RequestCharged: 'requester',
         VersionId: '123456'
       };
-      const deleteFileFromS3Stub = sinon.stub(fileUtils, 'deleteFileFromS3').resolves(mockDeleteResponse);
+      const deleteFileFromS3Stub = sinon
+        .stub(ArtifactService.dependencies, 'deleteFileFromS3')
+        .resolves(mockDeleteResponse);
 
       await artifactService.deleteArtifact('uuid');
       expect(getStub).to.be.called;
@@ -287,7 +290,9 @@ describe('ArtifactService', () => {
         RequestCharged: 'requester',
         VersionId: '123456'
       };
-      const deleteFileFromS3Stub = sinon.stub(fileUtils, 'deleteFileFromS3').resolves(mockDeleteResponse);
+      const deleteFileFromS3Stub = sinon
+        .stub(ArtifactService.dependencies, 'deleteFileFromS3')
+        .resolves(mockDeleteResponse);
 
       try {
         await artifactService.deleteArtifact('uuid');

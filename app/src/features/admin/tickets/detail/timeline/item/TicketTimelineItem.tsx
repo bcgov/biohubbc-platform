@@ -53,10 +53,18 @@ export const TicketTimelineItem = (props: PropsWithChildren<ITicketTimelineItemP
         ) : null}
       </Box>
 
-      {children ? <Box sx={{ p: 2.5 }}>{children}</Box> : null}
+      {children ? <Box sx={{ p: 2, pb: 4 }}>{children}</Box> : null}
 
       {actions ? (
-        <Box sx={{ px: 2.5, pb: 2, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>{actions}</Box>
+        <Box
+          sx={{
+            p: 2,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: 1
+          }}>
+          {actions}
+        </Box>
       ) : null}
     </Paper>
   );

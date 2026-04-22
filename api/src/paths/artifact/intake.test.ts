@@ -19,7 +19,7 @@ describe('intakeArtifact', () => {
   it('should throw a 400 error when no file included in request', async () => {
     const dbConnectionObj = getMockDBConnection();
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -47,7 +47,7 @@ describe('intakeArtifact', () => {
   it('should throw a 400 error when more than 1 file uploaded', async () => {
     const dbConnectionObj = getMockDBConnection();
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -90,7 +90,7 @@ describe('intakeArtifact', () => {
   it('catches and re-throws an error if artifact processing fails', async () => {
     const dbConnectionObj = getMockDBConnection();
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -133,7 +133,7 @@ describe('intakeArtifact', () => {
   it('should return 200 on success', async () => {
     const dbConnectionObj = getMockDBConnection();
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 

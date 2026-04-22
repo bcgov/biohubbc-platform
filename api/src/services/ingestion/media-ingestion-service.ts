@@ -21,6 +21,14 @@ export class MediaIngestionService extends DBService {
   artifactService = new ArtifactService(this.connection);
   uploadArtifactService = new UploadArtifactService(this.connection);
 
+  /**
+   * Mutable dependency bag used by tests to avoid stubbing module namespace exports under ESM.
+   */
+  static readonly dependencies = {
+    streamMedia,
+    getObjectStoreBucketName
+  };
+
   constructor(connection: IDBConnection) {
     super(connection);
   }
@@ -90,7 +98,7 @@ export class MediaIngestionService extends DBService {
     // - for each uploaded file we persist DB records in bounded batches
     const tarStream = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
 
-    await streamMedia(tarStream, {
+    await MediaIngestionService.dependencies.streamMedia(tarStream, {
       objectStorageService: this.objectStorageService,
       s3KeyPrefix,
       batchSize: MEDIA_INGEST_BATCH_FILES,
@@ -100,7 +108,7 @@ export class MediaIngestionService extends DBService {
           // Step 1: create artifact stub first (pending status) so we have artifact_id
           // for linkage and auditability even before post-upload metadata is flushed.
           const artifact = await this.artifactService.insertArtifact({
-            bucket: getObjectStoreBucketName(),
+            bucket: MediaIngestionService.dependencies.getObjectStoreBucketName(),
             object_key: mediaFile.s3Key,
             byte_size: mediaFile.byteSize,
             artifact_status: ArtifactStatusEnum.PENDING,

@@ -1,9 +1,8 @@
-import axios from 'axios';
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../errors/api-error';
-import { ItisService, ItisSolrSearchResponseHierarchy } from './itis-service';
+import { ItisService, ItisSolrSearchResponseHierarchy, itisServiceDependencies } from './itis-service';
 
 chai.use(sinonChai);
 
@@ -22,7 +21,7 @@ describe('ItisService', () => {
         .stub(ItisService.prototype, 'getItisSolrTermSearchUrl')
         .resolves('url');
 
-      const axiosStub = sinon.stub(axios, 'get').resolves(mockAxiosResponse);
+      const axiosStub = sinon.stub(itisServiceDependencies, 'get').resolves(mockAxiosResponse);
 
       const itisService = new ItisService();
 
@@ -59,7 +58,7 @@ describe('ItisService', () => {
         .stub(ItisService.prototype, 'getItisSolrTermSearchUrl')
         .resolves('url');
 
-      const axiosStub = sinon.stub(axios, 'get').resolves(mockAxiosResponse);
+      const axiosStub = sinon.stub(itisServiceDependencies, 'get').resolves(mockAxiosResponse);
 
       const itisService = new ItisService();
 
@@ -80,7 +79,7 @@ describe('ItisService', () => {
     });
 
     it('catches and re-throws an error', async () => {
-      sinon.stub(axios, 'get').rejects(new Error('a test error'));
+      sinon.stub(itisServiceDependencies, 'get').rejects(new Error('a test error'));
 
       const itisService = new ItisService();
       const getItisSolrTermSearchUrlStub = sinon
@@ -106,7 +105,7 @@ describe('ItisService', () => {
 
       const getItisSolrTsnSearchUrlStub = sinon.stub(ItisService.prototype, 'getItisSolrTsnSearchUrl').resolves('url');
 
-      const axiosStub = sinon.stub(axios, 'get').resolves(mockAxiosResponse);
+      const axiosStub = sinon.stub(itisServiceDependencies, 'get').resolves(mockAxiosResponse);
 
       const itisService = new ItisService();
 
@@ -141,7 +140,7 @@ describe('ItisService', () => {
 
       const getItisSolrTsnSearchUrlStub = sinon.stub(ItisService.prototype, 'getItisSolrTsnSearchUrl').resolves('url');
 
-      const axiosStub = sinon.stub(axios, 'get').resolves(mockAxiosResponse);
+      const axiosStub = sinon.stub(itisServiceDependencies, 'get').resolves(mockAxiosResponse);
 
       const itisService = new ItisService();
 
@@ -166,7 +165,7 @@ describe('ItisService', () => {
     });
 
     it('catches and re-throws an error', async () => {
-      sinon.stub(axios, 'get').rejects(new Error('a test error'));
+      sinon.stub(itisServiceDependencies, 'get').rejects(new Error('a test error'));
 
       const itisService = new ItisService();
       const getItisSolrTsnSearchUrlStub = sinon.stub(ItisService.prototype, 'getItisSolrTsnSearchUrl').resolves('url');
@@ -201,7 +200,7 @@ describe('ItisService', () => {
         .stub(ItisService.prototype, 'getItisSolrTsnHierarchyUrl')
         .returns('url');
 
-      const axiosStub = sinon.stub(axios, 'get').resolves(mockAxiosResponse);
+      const axiosStub = sinon.stub(itisServiceDependencies, 'get').resolves(mockAxiosResponse);
 
       const itisService = new ItisService();
 
@@ -223,7 +222,7 @@ describe('ItisService', () => {
 
     it('catches and re-throws an error', async () => {
       const mockTsns = [1, 2];
-      sinon.stub(axios, 'get').rejects(new Error('a test error'));
+      sinon.stub(itisServiceDependencies, 'get').rejects(new Error('a test error'));
 
       const itisService = new ItisService();
       const getItisSolrTsnHierarchyUrlStub = sinon

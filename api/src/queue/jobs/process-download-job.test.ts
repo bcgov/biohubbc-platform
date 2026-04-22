@@ -39,7 +39,7 @@ describe('process-download-job', () => {
     mockDBConnection.commit = sinon.stub().resolves();
     mockDBConnection.rollback = sinon.stub().resolves();
     mockDBConnection.release = sinon.stub();
-    sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
     return mockDBConnection;
   };
 
@@ -504,7 +504,7 @@ describe('process-download-job', () => {
       mockDBConnection.commit = sinon.stub().resolves();
       mockDBConnection.release = sinon.stub();
 
-      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
       const updateStatusByIdStub = sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
 
@@ -523,7 +523,7 @@ describe('process-download-job', () => {
       mockDBConnection.commit = sinon.stub().resolves();
       mockDBConnection.release = sinon.stub();
 
-      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
       const updateStatusByIdStub = sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
 
@@ -541,7 +541,7 @@ describe('process-download-job', () => {
       mockDBConnection.commit = sinon.stub().resolves();
       mockDBConnection.release = sinon.stub();
 
-      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
       const updateStatusByIdStub = sinon.stub(DownloadPipelineService.prototype, 'updateDownloadStatus').resolves();
 

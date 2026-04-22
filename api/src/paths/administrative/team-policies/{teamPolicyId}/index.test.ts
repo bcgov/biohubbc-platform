@@ -23,7 +23,7 @@ describe('team-policies/{teamPolicyId}', () => {
         teamPolicyId: '11111111-1111-1111-1111-111111111111'
       };
 
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(TeamPolicyService.prototype, 'deleteTeamPolicy').resolves();
 
       const requestHandler = teamPolicyEndpoint.deleteTeamPolicy();

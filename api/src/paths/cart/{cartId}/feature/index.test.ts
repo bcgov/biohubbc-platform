@@ -23,7 +23,7 @@ describe('cart/{cartId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
 
       const requestHandler = getCartSubmissionFeatures();
@@ -46,7 +46,7 @@ describe('cart/{cartId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const fakeFeatures: CartSubmissionFeature[] = [
         {
@@ -91,7 +91,7 @@ describe('cart/{cartId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const fakeFeatures: CartSubmissionFeature[] = [];
 
@@ -118,7 +118,7 @@ describe('cart/{cartId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const matchingFeature: CartSubmissionFeature = {
         cart_submission_feature_id: 'uuid-1',
@@ -151,7 +151,7 @@ describe('cart/{cartId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').resolves();
 
       sinon
@@ -179,7 +179,7 @@ describe('cart/{cartId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').resolves();
 
       sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves([]);
@@ -210,7 +210,7 @@ describe('cart/{cartId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
 
       const requestHandler = createCartSubmissionFeatures();
@@ -235,7 +235,7 @@ describe('cart/{cartId}', () => {
         release: sinon.stub(),
         systemUserId: sinon.stub().returns(42)
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const addStub = sinon.stub(CartSubmissionFeatureService.prototype, 'createCartSubmissionFeatures').resolves();
       sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves([]);
@@ -262,7 +262,7 @@ describe('cart/{cartId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getAPIUserDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(mockDBConnection);
 
       const addStub = sinon.stub(CartSubmissionFeatureService.prototype, 'createCartSubmissionFeatures').resolves();
       sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves([]);
@@ -287,7 +287,7 @@ describe('cart/{cartId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       sinon.stub(CartSubmissionFeatureService.prototype, 'createCartSubmissionFeatures').resolves();
       sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves([]);
@@ -313,7 +313,7 @@ describe('cart/{cartId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').resolves();
 
       sinon
@@ -343,7 +343,7 @@ describe('cart/{cartId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
 
       const requestHandler = clearCartSubmissionFeatures();
@@ -366,7 +366,7 @@ describe('cart/{cartId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       sinon.stub(CartSubmissionFeatureService.prototype, 'clearCart').resolves();
       sinon.stub(CartSubmissionFeatureService.prototype, 'getCartSubmissionFeatures').resolves([]);
@@ -391,7 +391,7 @@ describe('cart/{cartId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').resolves();
 
       sinon.stub(CartSubmissionFeatureService.prototype, 'clearCart').rejects(new Error('Clear error'));

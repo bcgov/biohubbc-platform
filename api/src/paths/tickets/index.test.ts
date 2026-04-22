@@ -37,7 +37,7 @@ describe('paths/tickets', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const getTeamIdsStub = sinon.stub(TeamMemberService.prototype, 'getTeamIdsBySystemUserId').resolves(teamIds);
       const listStub = sinon.stub(TicketService.prototype, 'getTickets').resolves([mockTicket]);
@@ -68,7 +68,7 @@ describe('paths/tickets', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       sinon.stub(TeamMemberService.prototype, 'getTeamIdsBySystemUserId').resolves([]);
       const listStub = sinon.stub(TicketService.prototype, 'getTickets').resolves([]);
@@ -93,7 +93,7 @@ describe('paths/tickets', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const fetchError = new Error('service failure');
       sinon.stub(TeamMemberService.prototype, 'getTeamIdsBySystemUserId').rejects(fetchError);
