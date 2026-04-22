@@ -9,15 +9,15 @@ export const DownloadExportArtifactRecord = z.object({
 export type DownloadExportArtifactRecord = z.infer<typeof DownloadExportArtifactRecord>;
 
 /**
- * Join-readback shape returned by `DownloadExportRepository.getDownloadExportArtifactsByExportId`.
+ * Join-readback shape returned by `DownloadExportRepository.listDownloadExportArtifactsByExportId`.
  *
  * Adds `byte_size` + `object_key` from the `artifact` row so the service layer can
  * build presigned URLs and size-reporting responses without a second round-trip.
- * `byte_size` stays nullable because `artifact.byte_size` is nullable upstream
- * (pending artifacts created before the file lands have no size yet).
+ * The repo query filters `WHERE a.byte_size IS NOT NULL` so this shape can type
+ * `byte_size` as non-null — pending/unuploaded artifacts never surface here.
  */
 export const DownloadExportArtifactWithFile = DownloadExportArtifactRecord.extend({
-  byte_size: z.string().nullable(),
+  byte_size: z.string(),
   object_key: z.string()
 });
 export type DownloadExportArtifactWithFile = z.infer<typeof DownloadExportArtifactWithFile>;

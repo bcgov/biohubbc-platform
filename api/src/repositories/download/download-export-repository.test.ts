@@ -124,13 +124,13 @@ describe('DownloadExportRepository', () => {
     });
   });
 
-  describe('getDownloadExportsByDownloadId', () => {
+  describe('listDownloadExportsByDownloadId', () => {
     it('SQL contains LEFT JOIN, COUNT for part_count, and ORDER BY create_date DESC', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadExportRepository(mockDBConnection);
-      await repo.getDownloadExportsByDownloadId(DOWNLOAD_ID);
+      await repo.listDownloadExportsByDownloadId(DOWNLOAD_ID);
 
       const sqlText = sqlStub.firstCall.args[0].text;
       expect(sqlText).to.include('LEFT JOIN');
@@ -147,7 +147,7 @@ describe('DownloadExportRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadExportRepository(mockDBConnection);
-      const result = await repo.getDownloadExportsByDownloadId(DOWNLOAD_ID);
+      const result = await repo.listDownloadExportsByDownloadId(DOWNLOAD_ID);
 
       expect(result).to.have.lengthOf(0);
     });
@@ -250,13 +250,13 @@ describe('DownloadExportRepository', () => {
     });
   });
 
-  describe('getDownloadExportArtifactsByExportId', () => {
+  describe('listDownloadExportArtifactsByExportId', () => {
     it('SQL contains JOIN to artifact and ORDER BY chunk_id ASC', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([]));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadExportRepository(mockDBConnection);
-      await repo.getDownloadExportArtifactsByExportId(EXPORT_ID);
+      await repo.listDownloadExportArtifactsByExportId(EXPORT_ID);
 
       const sqlText = sqlStub.firstCall.args[0].text;
       expect(sqlText).to.match(/JOIN\s+artifact/i);
@@ -271,7 +271,7 @@ describe('DownloadExportRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadExportRepository(mockDBConnection);
-      const result = await repo.getDownloadExportArtifactsByExportId(EXPORT_ID);
+      const result = await repo.listDownloadExportArtifactsByExportId(EXPORT_ID);
 
       expect(result).to.have.lengthOf(0);
     });

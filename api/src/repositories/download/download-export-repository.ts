@@ -107,7 +107,7 @@ export class DownloadExportRepository extends BaseRepository {
    * (their `part_count` resolves to 0). Bounded by `download_id` FK — tens of
    * exports per download at worst.
    */
-  async getDownloadExportsByDownloadId(downloadId: string): Promise<DownloadExportListRow[]> {
+  async listDownloadExportsByDownloadId(downloadId: string): Promise<DownloadExportListRow[]> {
     const sql = SQL`
       SELECT
         de.download_export_id,
@@ -191,10 +191,12 @@ export class DownloadExportRepository extends BaseRepository {
    * List an export's part-zip artifacts with their file metadata.
    *
    * JOIN to `artifact` surfaces `byte_size` + `object_key` so the service can
-   * build the detail endpoint's `parts[]` shape in a single round-trip.
+   * build the detail endpoint's `parts[]` shape in a single round-trip. Filters
+   * `a.byte_size IS NOT NULL` so pending/unuploaded artifacts never leak through
+   * to the response — the service-facing type is thus strictly non-null.
    * Ordered by `chunk_id` ASC — consumers render Part 1, Part 2, … in sequence.
    */
-  async getDownloadExportArtifactsByExportId(exportId: string): Promise<DownloadExportArtifactWithFile[]> {
+  async listDownloadExportArtifactsByExportId(exportId: string): Promise<DownloadExportArtifactWithFile[]> {
     const sql = SQL`
       SELECT
         dea.download_export_artifact_id,
@@ -207,6 +209,7 @@ export class DownloadExportRepository extends BaseRepository {
       INNER JOIN artifact a ON a.artifact_id = dea.artifact_id
       WHERE dea.download_export_id = ${exportId}
         AND dea.record_end_date IS NULL
+        AND a.byte_size IS NOT NULL
       ORDER BY dea.chunk_id ASC;
     `;
 
