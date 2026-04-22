@@ -103,40 +103,6 @@ const appTheme = createTheme({
         }
       }
     },
-    MuiButtonGroup: {
-      styleOverrides: {
-        root: ({ theme }) => ({
-          '& .MuiButton-contained': {
-            boxShadow: 'none',
-            '&:hover': {
-              boxShadow: 'none'
-            },
-            '&:active': {
-              boxShadow: 'none'
-            }
-          },
-          '& .MuiButton-root': {
-            padding: 0
-          },
-          '& .MuiButtonGroup-firstButton.MuiButton-sizeSmall': {
-            paddingLeft: theme.spacing(1.5),
-            paddingRight: theme.spacing(1.5)
-          },
-          '& .MuiButtonGroup-lastButton.MuiButton-sizeSmall': {
-            paddingLeft: theme.spacing(0.75),
-            paddingRight: theme.spacing(0.75)
-          },
-          '& .MuiButtonGroup-lastButton.MuiButton-sizeMedium': {
-            paddingLeft: theme.spacing(1.25),
-            paddingRight: theme.spacing(1.25)
-          },
-          '& .MuiButtonGroup-lastButton.MuiButton-sizeLarge': {
-            paddingLeft: theme.spacing(1.5),
-            paddingRight: theme.spacing(1.5)
-          }
-        })
-      }
-    },
     MuiButton: {
       defaultProps: {
         disableElevation: true,
@@ -170,7 +136,7 @@ const appTheme = createTheme({
         }),
         sizeSmall: ({ theme }) => ({
           minHeight: 32,
-          padding: theme.spacing(0, 1.5),
+          padding: theme.spacing(0.5, 1.5),
           fontSize: '0.8125rem',
           '& .MuiButton-startIcon > *:nth-of-type(1), & .MuiButton-endIcon > *:nth-of-type(1)': {
             fontSize: '1rem'

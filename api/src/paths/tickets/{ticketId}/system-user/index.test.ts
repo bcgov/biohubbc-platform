@@ -22,7 +22,7 @@ describe('paths/tickets/{ticketId}/system-user', () => {
       release: sinon.stub()
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const created: TicketSystemUser = {
       ticket_system_user_id: '22222222-2222-2222-2222-222222222222',

@@ -36,7 +36,8 @@ export const PortalTicketSidebar = (props: IPortalTicketSidebarProps) => {
   }, [teamId, teamMembersLoader]);
 
   const members: ITeamMember[] = teamMembersLoader.data?.members ?? [];
-  const assigneeStatusLabel = (status: ITicketAssignee['status']) => status.charAt(0).toUpperCase() + status.slice(1);
+  const getAssigneeStatusLabel = (status: ITicketAssignee['status']) =>
+    status.charAt(0).toUpperCase() + status.slice(1);
 
   return (
     <Stack spacing={5}>
@@ -48,7 +49,7 @@ export const PortalTicketSidebar = (props: IPortalTicketSidebarProps) => {
             {(assignees ?? []).map((assignee) => (
               <TicketSidebarItem
                 key={assignee.ticket_system_user_id}
-                label={`${assignee.system_user.display_name ?? assignee.system_user.user_identifier} (${assigneeStatusLabel(
+                label={`${assignee.system_user.display_name ?? assignee.system_user.user_identifier} (${getAssigneeStatusLabel(
                   assignee.status
                 )})`}
               />

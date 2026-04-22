@@ -36,7 +36,7 @@ export const TicketDetailPageContent = (props: ITicketDetailPageContentProps) =>
       <>
         {ticket ? <TicketHeader ticket={ticket} /> : null}
 
-        <Container maxWidth="xl" sx={{ py: 2 }}>
+        <Container maxWidth="xl" sx={{ py: 4 }}>
           <PageSection id="ticket-detail-content" label="Ticket Details">
             <Stack
               sx={{

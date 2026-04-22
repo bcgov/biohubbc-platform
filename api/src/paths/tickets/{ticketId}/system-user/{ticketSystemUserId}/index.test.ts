@@ -22,7 +22,7 @@ describe('paths/tickets/{ticketId}/system-user/{ticketSystemUserId}', () => {
       release: sinon.stub()
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
     const updated: TicketSystemUser = {
       ticket_system_user_id: '22222222-2222-2222-2222-222222222222',
@@ -53,7 +53,7 @@ describe('paths/tickets/{ticketId}/system-user/{ticketSystemUserId}', () => {
       release: sinon.stub()
     });
 
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const deleteStub = sinon.stub(TicketSystemUserService.prototype, 'deleteTicketAssignee').resolves();
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();

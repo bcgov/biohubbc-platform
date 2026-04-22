@@ -113,7 +113,7 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
    * context state so assignees update immediately in the sidebar.
    *
    * @param {string} ticketSystemUserId
-   * @param {'requested' | 'started' | 'blocked' | 'resolved'} status
+   * @param {TicketSystemUserStatus} status
    * @return {Promise<void>}
    */
   const handleUpdateAssigneeStatus = async (
