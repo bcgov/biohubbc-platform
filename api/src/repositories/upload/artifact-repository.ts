@@ -6,15 +6,13 @@ import { BaseRepository } from '../base-repository';
 
 export class ArtifactRepository extends BaseRepository {
   /**
-   * Insert artifact records in bulk with upsert semantics and return ids for all input keys.
-   * Existing records are updated with the latest status/checksum/upload metadata.
+   * Insert artifact records in bulk without mutating existing rows and return
+   * the persisted records for all input keys.
    *
    * @param {CreateArtifact[]} artifacts
-   * @returns {Promise<Array<{ artifact_id: string; bucket: string; object_key: string }>>}
+   * @returns {Promise<Artifact[]>}
    */
-  async insertArtifacts(
-    artifacts: CreateArtifact[]
-  ): Promise<Array<{ artifact_id: string; bucket: string; object_key: string }>> {
+  async insertArtifacts(artifacts: CreateArtifact[]): Promise<Artifact[]> {
     if (!artifacts.length) {
       return [];
     }
@@ -48,19 +46,7 @@ export class ArtifactRepository extends BaseRepository {
           format
         )
       ),
-      distinct_input AS (
-        SELECT DISTINCT ON (bucket, object_key)
-          bucket,
-          artifact_status,
-          object_key,
-          byte_size,
-          checksum_sha256,
-          uploaded_at,
-          format
-        FROM input_rows
-        ORDER BY bucket, object_key
-      ),
-      upserted AS (
+      inserted AS (
         INSERT INTO artifact (
           bucket,
           object_key,
@@ -71,45 +57,33 @@ export class ArtifactRepository extends BaseRepository {
           format
         )
         SELECT
-          di.bucket,
-          di.object_key,
-          di.byte_size,
-          di.artifact_status,
-          di.checksum_sha256,
-          di.uploaded_at,
-          di.format
-        FROM distinct_input di
-        ON CONFLICT (bucket, object_key)
-        DO UPDATE SET
-          byte_size = EXCLUDED.byte_size,
-          artifact_status = EXCLUDED.artifact_status,
-          checksum_sha256 = COALESCE(EXCLUDED.checksum_sha256, artifact.checksum_sha256),
-          uploaded_at = COALESCE(EXCLUDED.uploaded_at, artifact.uploaded_at),
-          format = EXCLUDED.format
-        RETURNING artifact_id, bucket, object_key
+          i.bucket,
+          i.object_key,
+          i.byte_size,
+          i.artifact_status,
+          i.checksum_sha256,
+          i.uploaded_at,
+          i.format
+        FROM input_rows i
+        ON CONFLICT (bucket, object_key) DO NOTHING
+        RETURNING artifact_id
       )
       SELECT
-        artifact_id,
-        bucket,
-        object_key
-      FROM upserted;
+        a.artifact_id,
+        a.artifact_status,
+        a.bucket,
+        a.object_key,
+        a.byte_size,
+        a.checksum_sha256,
+        a.uploaded_at,
+        a.format
+      FROM artifact a
+      INNER JOIN input_rows i
+        ON i.bucket = a.bucket
+        AND i.object_key = a.object_key;
     `;
 
-    const response = await this.connection.sql(
-      sqlStatement,
-      z.object({
-        artifact_id: z.string().uuid(),
-        bucket: z.string(),
-        object_key: z.string()
-      })
-    );
-
-    if (response.rowCount !== artifacts.length) {
-      throw new ApiExecuteSQLError('Failed to insert artifact records', [
-        'ArtifactRepository->insertArtifacts',
-        `rowCount was ${response.rowCount}, expected ${artifacts.length}`
-      ]);
-    }
+    const response = await this.connection.sql(sqlStatement, Artifact);
 
     return response.rows;
   }

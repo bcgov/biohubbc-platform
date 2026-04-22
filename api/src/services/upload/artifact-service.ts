@@ -1,4 +1,5 @@
 import { IDBConnection } from '../../database/db';
+import { ApiConflictError } from '../../errors/api-error';
 import { Artifact, BatchUpdateArtifact, CreateArtifact, UpdateArtifact } from '../../models/artifact';
 import { ArtifactRepository } from '../../repositories/upload/artifact-repository';
 import { DBService } from '../db-service';
@@ -50,15 +51,33 @@ export class ArtifactService extends DBService {
   }
 
   /**
-   * Inserts artifact records in bulk with upsert semantics.
+   * Inserts artifact records in bulk.
    *
    * @param {CreateArtifact[]} artifacts
-   * @returns {Promise<Array<{ artifact_id: string; bucket: string; object_key: string }>>}
+   * @returns {Promise<Artifact[]>}
    * @memberof ArtifactService
    */
-  async insertArtifacts(
-    artifacts: CreateArtifact[]
-  ): Promise<Array<{ artifact_id: string; bucket: string; object_key: string }>> {
+  async insertArtifacts(artifacts: CreateArtifact[]): Promise<Artifact[]> {
+    const seenKeys = new Set<string>();
+    const duplicateKeys = new Set<string>();
+
+    for (const artifact of artifacts) {
+      const compositeKey = `${artifact.bucket}\0${artifact.object_key}`;
+      if (seenKeys.has(compositeKey)) {
+        duplicateKeys.add(`${artifact.bucket}/${artifact.object_key}`);
+        continue;
+      }
+
+      seenKeys.add(compositeKey);
+    }
+
+    if (duplicateKeys.size > 0) {
+      throw new ApiConflictError('Duplicate artifact keys in bulk insert payload', [
+        'ArtifactService->insertArtifacts',
+        { duplicateKeys: [...duplicateKeys] }
+      ]);
+    }
+
     return this.artifactRepository.insertArtifacts(artifacts);
   }
 

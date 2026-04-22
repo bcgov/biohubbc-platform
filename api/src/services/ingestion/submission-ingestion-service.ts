@@ -21,6 +21,14 @@ import { IValidationResult } from './submission-ingestion-service.interface';
 
 const defaultLog = getLogger('services/ingestion/submission-ingestion-service');
 
+export interface SubmissionIngestionDependencies {
+  streamSubmissionArchive: typeof streamSubmissionArchive;
+}
+
+export const submissionIngestionDependencies: SubmissionIngestionDependencies = {
+  streamSubmissionArchive
+};
+
 /**
  * Service for ingesting submission archives via streaming shallow-ingestion.
  *
@@ -129,6 +137,13 @@ export class SubmissionIngestionService {
       contributorId
     });
 
+    // Resolve feature-type id mapping once per ingestion run so feature batches do
+    // not re-query the mapping for every callback invocation.
+    const activeFeatureTypeMap = await withConnection(async (connection) => {
+      const featureIngestionService = new SubmissionFeatureIngestionService(connection);
+      return featureIngestionService.getActiveFeatureTypeMap();
+    });
+
     // Step 4: Stream tarball once and fan out entry processing by folder:
     // - features/* -> feature ingestion service
     // - codes/*    -> codeset ingestion service
@@ -150,81 +165,87 @@ export class SubmissionIngestionService {
       mediaConcurrency: UPLOAD_ARCHIVE_MEDIA_CONCURRENCY
     });
 
-    const { featureCount, uploadedCount, codesetFileCount } = await streamSubmissionArchive(tarStream, {
-      objectStorageService: this.objectStorageService,
-      s3KeyPrefix: `submissions/${submissionId}/uploads/${submissionUploadId}/media`,
-      featureBatchSize: UPLOAD_FEATURE_BATCH_SIZE,
-      featureMaxBatchBytes: UPLOAD_FEATURE_BATCH_MAX_BYTES,
-      mediaBatchSize: MEDIA_INGEST_BATCH_FILES,
-      mediaMaxBatchBytes: MEDIA_INGEST_BATCH_BYTES,
-      mediaConcurrency: UPLOAD_ARCHIVE_MEDIA_CONCURRENCY,
-      ingestFeatureBatch: async (featureBatch) => {
-        featureBatchCount += 1;
-        featureRowsPersisted += featureBatch.length;
+    const { featureCount, uploadedCount, codesetFileCount } =
+      await submissionIngestionDependencies.streamSubmissionArchive(tarStream, {
+        objectStorageService: this.objectStorageService,
+        s3KeyPrefix: `submissions/${submissionId}/uploads/${submissionUploadId}/media`,
+        featureBatchSize: UPLOAD_FEATURE_BATCH_SIZE,
+        featureMaxBatchBytes: UPLOAD_FEATURE_BATCH_MAX_BYTES,
+        mediaBatchSize: MEDIA_INGEST_BATCH_FILES,
+        mediaMaxBatchBytes: MEDIA_INGEST_BATCH_BYTES,
+        mediaConcurrency: UPLOAD_ARCHIVE_MEDIA_CONCURRENCY,
+        ingestFeatureBatch: async (featureBatch) => {
+          featureBatchCount += 1;
+          featureRowsPersisted += featureBatch.length;
 
-        await withConnection(async (connection) => {
-          const featureIngestionService = new SubmissionFeatureIngestionService(connection);
-          await featureIngestionService.ingestFeatureBatch(submissionId, submissionUploadId, featureBatch);
-        });
+          await withConnection(async (connection) => {
+            const featureIngestionService = new SubmissionFeatureIngestionService(connection);
+            await featureIngestionService.ingestFeatureBatch(
+              submissionId,
+              submissionUploadId,
+              featureBatch,
+              activeFeatureTypeMap
+            );
+          });
 
-        if (featureBatchCount === 1 || featureBatchCount % 25 === 0) {
+          if (featureBatchCount === 1 || featureBatchCount % 25 === 0) {
+            defaultLog.debug({
+              label: 'ingestSubmissionUpload',
+              message: 'Persisted feature batch',
+              submissionUploadId,
+              featureBatchCount,
+              batchSize: featureBatch.length,
+              featureRowsPersisted
+            });
+          }
+        },
+        ingestCodesets: async (codesets) => {
+          codesetBatchCount += 1;
+
+          await withConnection(async (connection) => {
+            const codesetIngestionService = new CodesetIngestionService(connection);
+            await codesetIngestionService.persistContributorCodesets(contributorId, codesets);
+          });
+
           defaultLog.debug({
             label: 'ingestSubmissionUpload',
-            message: 'Persisted feature batch',
+            message: 'Persisted codeset payload',
             submissionUploadId,
-            featureBatchCount,
-            batchSize: featureBatch.length,
-            featureRowsPersisted
+            contributorId,
+            codesetBatchCount,
+            codesetKeyCount: Object.keys(codesets).length
           });
-        }
-      },
-      ingestCodesets: async (codesets) => {
-        codesetBatchCount += 1;
+        },
+        ingestMediaBatch: async (mediaFiles) => {
+          mediaBatchCount += 1;
+          mediaFilesPersisted += mediaFiles.length;
+          const batchBytes = mediaFiles.reduce((total, mediaFile) => total + mediaFile.byteSize, 0);
+          mediaBytesPersisted += batchBytes;
 
-        await withConnection(async (connection) => {
-          const codesetIngestionService = new CodesetIngestionService(connection);
-          await codesetIngestionService.persistContributorCodesets(contributorId, codesets);
-        });
-
-        defaultLog.debug({
-          label: 'ingestSubmissionUpload',
-          message: 'Persisted codeset payload',
-          submissionUploadId,
-          contributorId,
-          codesetBatchCount,
-          codesetKeyCount: Object.keys(codesets).length
-        });
-      },
-      ingestMediaBatch: async (mediaFiles) => {
-        mediaBatchCount += 1;
-        mediaFilesPersisted += mediaFiles.length;
-        const batchBytes = mediaFiles.reduce((total, mediaFile) => total + mediaFile.byteSize, 0);
-        mediaBytesPersisted += batchBytes;
-
-        await withConnection(async (connection) => {
-          const mediaIngestionService = new MediaIngestionService(connection);
-          await mediaIngestionService.persistUploadedMediaBatch(
-            uploadId,
-            uploadArchiveId,
-            submissionUploadId,
-            mediaFiles
-          );
-        });
-
-        if (mediaBatchCount === 1 || mediaBatchCount % 10 === 0) {
-          defaultLog.debug({
-            label: 'ingestSubmissionUpload',
-            message: 'Persisted media batch',
-            submissionUploadId,
-            mediaBatchCount,
-            batchSize: mediaFiles.length,
-            batchBytes,
-            mediaFilesPersisted,
-            mediaBytesPersisted
+          await withConnection(async (connection) => {
+            const mediaIngestionService = new MediaIngestionService(connection);
+            await mediaIngestionService.persistUploadedMediaBatch(
+              uploadId,
+              uploadArchiveId,
+              submissionUploadId,
+              mediaFiles
+            );
           });
+
+          if (mediaBatchCount === 1 || mediaBatchCount % 10 === 0) {
+            defaultLog.debug({
+              label: 'ingestSubmissionUpload',
+              message: 'Persisted media batch',
+              submissionUploadId,
+              mediaBatchCount,
+              batchSize: mediaFiles.length,
+              batchBytes,
+              mediaFilesPersisted,
+              mediaBytesPersisted
+            });
+          }
         }
-      }
-    });
+      });
 
     defaultLog.info({
       label: 'ingestSubmissionUpload',

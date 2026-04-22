@@ -2,13 +2,10 @@ import { IDBConnection } from '../../database/db';
 import { IngestionValidationError } from '../../errors/submission-errors';
 import { CreateContributorCodeset } from '../../models/contributor-codeset';
 import { CreateContributorCodesetCode } from '../../models/contributor-codeset-code';
-import { streamCodesets } from '../../utils/biohub-tar-parser';
 import { normalizeOptionalText } from '../../utils/normalize';
 import { ContributorCodesetCodeService } from '../contributor-codeset-code-service';
 import { ContributorCodesetService } from '../contributor-codeset-service';
-import { ContributorService } from '../contributor-service';
 import { DBService } from '../db-service';
-import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import type { TarCodesets } from './submission-ingestion-codes-service.interface';
 
 const CONTRIBUTOR_CODE_INSERT_BATCH_SIZE = 10000;
@@ -21,8 +18,6 @@ type ExistingContributorCodesetMap = Map<string, ExistingContributorCodeset>;
  * Ingest contributor codesets/codes parsed from tarball entries.
  */
 export class CodesetIngestionService extends DBService {
-  objectStorageService = new ObjectStorageService();
-  contributorService = new ContributorService(this.connection);
   contributorCodesetService = new ContributorCodesetService(this.connection);
   contributorCodesetCodeService = new ContributorCodesetCodeService(this.connection);
 
@@ -33,23 +28,6 @@ export class CodesetIngestionService extends DBService {
    */
   constructor(connection: IDBConnection) {
     super(connection);
-  }
-
-  /**
-   * Stream codeset JSON payloads from the tarball and persist contributor codesets/codes as they are read.
-   *
-   * @param {string} objectKey
-   * @param {string} submissionUploadId
-   * @return {Promise<void>}
-   */
-  async ingestCodesets(objectKey: string, submissionUploadId: string): Promise<void> {
-    const contributor = await this.contributorService.getContributorBySubmissionUploadId(submissionUploadId);
-    const contributorId = contributor.contributor_id;
-    const tarStream = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
-
-    await streamCodesets(tarStream, async (codesets) => {
-      await this.persistContributorCodesets(contributorId, codesets);
-    });
   }
 
   /**

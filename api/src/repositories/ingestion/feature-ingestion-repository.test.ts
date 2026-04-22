@@ -36,67 +36,6 @@ describe('FeatureIngestionRepository', () => {
     });
   });
 
-  describe('insertSubmissionFeatureRecords', () => {
-    it('should build SQL with active feature type join and bigint data_byte_size cast', async () => {
-      const records: CreateSubmissionFeatureIngestionRecord[] = [
-        {
-          submissionId: 1,
-          submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-          sourceId: 'feature-1',
-          featureTypeName: 'dataset',
-          data: {
-            id: 'feature-1',
-            type: 'dataset',
-            properties: { name: 'Dataset 1' },
-            content: [],
-            parent: null
-          },
-          dataByteSize: 123
-        }
-      ];
-
-      const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
-        expect(sqlStatement.text).to.include('::bigint[]');
-        expect(sqlStatement.text).to.include('ft.name = staged.feature_type_name AND ft.record_end_date IS NULL');
-        return Promise.resolve({ rowCount: 1, rows: [], command: '', oid: 0, fields: [] });
-      });
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
-
-      await ingestionRepository.insertSubmissionFeatureRecords(records);
-
-      expect(sqlStub).to.have.been.calledOnce;
-    });
-
-    it('does not throw when inserted row count does not match records length', async () => {
-      const records: CreateSubmissionFeatureIngestionRecord[] = [
-        {
-          submissionId: 1,
-          submissionUploadId: '550e8400-e29b-41d4-a716-446655440000',
-          sourceId: 'feature-1',
-          featureTypeName: 'dataset',
-          data: {
-            id: 'feature-1',
-            type: 'dataset',
-            properties: { name: 'Dataset 1' },
-            content: [],
-            parent: null
-          },
-          dataByteSize: 123
-        }
-      ];
-
-      const sqlStub = sinon.stub();
-      sqlStub.onFirstCall().resolves({ rowCount: 0, rows: [], command: '', oid: 0, fields: [] });
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
-
-      await ingestionRepository.insertSubmissionFeatureRecords(records);
-
-      expect(sqlStub).to.have.been.calledOnce;
-    });
-  });
-
   describe('insertSubmissionFeatureRecordsByTypeId', () => {
     it('should build SQL with direct feature_type_id insert and bigint data_byte_size cast', async () => {
       const records = [
@@ -210,27 +149,6 @@ describe('FeatureIngestionRepository', () => {
       });
 
       expect(response).to.eql(mockResponse);
-    });
-  });
-
-  describe('updateSubmissionFeatureParent', () => {
-    it('should update the parent submission feature id successfully', async () => {
-      const mockQueryResponse: QueryResult<never> = {
-        rowCount: 1,
-        rows: [],
-        command: '',
-        oid: 0,
-        fields: []
-      };
-
-      const sqlStub = sinon.stub().resolves(mockQueryResponse);
-      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
-
-      const ingestionRepository = new FeatureIngestionRepository(mockDBConnection);
-
-      await ingestionRepository.updateSubmissionFeatureParent(10, 5);
-
-      expect(sqlStub).to.have.been.calledOnce;
     });
   });
 

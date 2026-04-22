@@ -2,7 +2,7 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { ApiExecuteSQLError } from '../../errors/api-error';
 import { FeatureTypeWithProperties } from '../../models/feature-type';
-import { CreateSubmissionFeatureIngestionRecord, InsertSubmissionFeatureRecord } from '../../models/submission-feature';
+import { InsertSubmissionFeatureRecord } from '../../models/submission-feature';
 import { BaseRepository } from '../base-repository';
 
 const ActiveFeatureTypeRow = z.object({
@@ -43,66 +43,6 @@ export class FeatureIngestionRepository extends BaseRepository {
     const response = await this.connection.sql(sqlStatement, ActiveFeatureTypeRow);
 
     return response.rows;
-  }
-
-  /**
-   * Bulk insert submission feature rows (raw payload persisted in `data`).
-   *
-   * @param {CreateSubmissionFeatureIngestionRecord[]} records
-   * @return {Promise<number>} Inserted row count.
-   * @memberof FeatureIngestionRepository
-   */
-  async insertSubmissionFeatureRecords(records: CreateSubmissionFeatureIngestionRecord[]): Promise<number> {
-    if (!records.length) {
-      return 0;
-    }
-
-    const submissionIds = records.map((record) => record.submissionId);
-    const submissionUploadIds = records.map((record) => record.submissionUploadId);
-    const sourceIds = records.map((record) => record.sourceId);
-    const featureTypeNames = records.map((record) => record.featureTypeName);
-    const dataValues = records.map((record) => JSON.stringify(record.data));
-    const dataByteSizes = records.map((record) => record.dataByteSize);
-
-    const sqlStatement = SQL`
-      INSERT INTO submission_feature (
-        submission_id,
-        submission_upload_id,
-        parent_submission_feature_id,
-        source_id,
-        feature_type_id,
-        data,
-        data_byte_size
-      )
-      SELECT
-        staged.submission_id,
-        staged.submission_upload_id,
-        NULL,
-        staged.source_id,
-        ft.feature_type_id,
-        parsed.data,
-        staged.data_byte_size
-      FROM unnest(
-        ${submissionIds}::integer[],
-        ${submissionUploadIds}::uuid[],
-        ${sourceIds}::text[],
-        ${featureTypeNames}::text[],
-        ${dataValues}::text[],
-        ${dataByteSizes}::bigint[]
-      ) AS staged(
-        submission_id,
-        submission_upload_id,
-        source_id,
-        feature_type_name,
-        data_text,
-        data_byte_size
-      )
-      INNER JOIN feature_type ft ON ft.name = staged.feature_type_name AND ft.record_end_date IS NULL
-      CROSS JOIN LATERAL (SELECT staged.data_text::jsonb AS data) parsed;
-    `;
-
-    const response = await this.connection.sql(sqlStatement);
-    return response.rowCount ?? 0;
   }
 
   /**
@@ -237,24 +177,6 @@ export class FeatureIngestionRepository extends BaseRepository {
     }
 
     return response.rows[0];
-  }
-
-  /**
-   * Update the parent reference for a submission feature.
-   *
-   * @param {number} submissionFeatureId The ID of the feature to update.
-   * @param {number} parentSubmissionFeatureId The ID of the parent feature.
-   * @return {*}  {Promise<void>}
-   * @memberof FeatureIngestionRepository
-   */
-  async updateSubmissionFeatureParent(submissionFeatureId: number, parentSubmissionFeatureId: number): Promise<void> {
-    const sqlStatement = SQL`
-      UPDATE submission_feature
-      SET parent_submission_feature_id = ${parentSubmissionFeatureId}
-      WHERE submission_feature_id = ${submissionFeatureId};
-    `;
-
-    await this.connection.sql(sqlStatement);
   }
 
   /**

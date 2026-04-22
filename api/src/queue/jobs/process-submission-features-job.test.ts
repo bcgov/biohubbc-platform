@@ -11,9 +11,9 @@ import { SubmissionIngestionService } from '../../services/ingestion/submission-
 import { SubmissionValidationService } from '../../services/submission-validation-service';
 import { SubmissionUploadService } from '../../services/upload/submission-upload-service';
 import { UploadArchiveService } from '../../services/upload/upload-archive-service';
-import * as publisher from '../publisher';
 import {
   processSubmissionFeaturesFailedHandler,
+  processSubmissionFeaturesJobDependencies,
   processSubmissionFeaturesJobHandler
 } from './process-submission-features-job';
 
@@ -38,7 +38,7 @@ describe('process-submission-features-job', () => {
     } as PgBoss.Job<SubmissionUpload>);
 
   const stubConnections = () => {
-    sinon.stub(db, 'getAPIUserDBConnection').callsFake(() => {
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').callsFake(() => {
       const conn = getMockDBConnection();
       conn.open = sinon.stub().resolves();
       conn.commit = sinon.stub().resolves();
@@ -71,7 +71,7 @@ describe('process-submission-features-job', () => {
     it('transitions uploaded -> ingesting -> ingested and publishes index job', async () => {
       sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').resolves({ valid: true, errors: [] });
       const publishStub = sinon
-        .stub(publisher, 'publishIndexSubmissionFeaturesJob')
+        .stub(processSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob')
         .resolves({ status: 'published', jobId: 'index-job-id' });
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);
@@ -87,7 +87,7 @@ describe('process-submission-features-job', () => {
     it('rethrows when enqueue returns error and does not mark upload ingested', async () => {
       sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').resolves({ valid: true, errors: [] });
       sinon
-        .stub(publisher, 'publishIndexSubmissionFeaturesJob')
+        .stub(processSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob')
         .resolves({ status: 'error', message: 'pg-boss unavailable' });
 
       try {
@@ -113,7 +113,7 @@ describe('process-submission-features-job', () => {
         errors: [{ message: 'bad data' } as any]
       });
 
-      const publishStub = sinon.stub(publisher, 'publishIndexSubmissionFeaturesJob');
+      const publishStub = sinon.stub(processSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob');
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);
 
@@ -179,19 +179,21 @@ describe('process-submission-features-job', () => {
       expect(ingestStub.called).to.be.false;
     });
 
-    it('skips processing when current status is ingesting', async () => {
+    it('allows reprocessing when current status is ingesting', async () => {
       (SubmissionUploadService.prototype.getSubmissionUploadWithLock as sinon.SinonStub).resolves({
         ...defaultSubmissionUpload,
         status: 'ingesting'
       });
 
-      const ingestStub = sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload');
+      sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').resolves({ valid: true, errors: [] });
+      sinon
+        .stub(processSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob')
+        .resolves({ status: 'published', jobId: 'index-job-id' });
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);
 
       const updateUploadStub = SubmissionUploadService.prototype.updateSubmissionUpload as sinon.SinonStub;
-      expect(ingestStub.called).to.be.false;
-      expect(updateUploadStub.called).to.be.false;
+      expect(updateUploadStub.calledWith('test-sub-upload-id', { status: 'ingesting' })).to.be.true;
     });
 
     it('allows reprocessing when current status is failed', async () => {
@@ -201,7 +203,7 @@ describe('process-submission-features-job', () => {
       });
       sinon.stub(SubmissionIngestionService.prototype, 'ingestSubmissionUpload').resolves({ valid: true, errors: [] });
       sinon
-        .stub(publisher, 'publishIndexSubmissionFeaturesJob')
+        .stub(processSubmissionFeaturesJobDependencies, 'publishIndexSubmissionFeaturesJob')
         .resolves({ status: 'published', jobId: 'index-job-id' });
 
       await processSubmissionFeaturesJobHandler([createMockJob()]);

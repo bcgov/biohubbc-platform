@@ -15,6 +15,14 @@ import { ProcessSubmissionFeatureOutcome } from './process-submission-features-j
 
 const defaultLog = getLogger('queue/jobs/process-submission-features-job');
 
+export interface ProcessSubmissionFeaturesJobDependencies {
+  publishIndexSubmissionFeaturesJob: typeof publishIndexSubmissionFeaturesJob;
+}
+
+export const processSubmissionFeaturesJobDependencies: ProcessSubmissionFeaturesJobDependencies = {
+  publishIndexSubmissionFeaturesJob
+};
+
 /**
  * Return true when a submission upload status is terminal.
  *
@@ -271,7 +279,9 @@ async function executeIndexSubmissionFeaturesPublish(
   await withConnection(async (connection) => {
     // Enqueue downstream indexing and treat enqueue failures as retryable job failures.
     const publishStart = Date.now();
-    const indexResult = await publishIndexSubmissionFeaturesJob(connection, { submissionId });
+    const indexResult = await processSubmissionFeaturesJobDependencies.publishIndexSubmissionFeaturesJob(connection, {
+      submissionId
+    });
 
     if (indexResult.status === 'error') {
       defaultLog.error({

@@ -14,4 +14,4 @@ export const TERMINAL_UPLOAD_STATUSES: SubmissionUpload['status'][] = ['indexed'
  * Used by process-stage initialization guards to allow first-run (`uploaded`)
  * and explicit retry (`failed`) while rejecting all other states.
  */
-export const PROCESS_START_STATUSES: SubmissionUpload['status'][] = ['uploaded', 'failed'];
+export const PROCESS_START_STATUSES: SubmissionUpload['status'][] = ['uploaded', 'ingesting', 'failed'];

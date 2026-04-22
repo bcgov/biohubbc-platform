@@ -3,12 +3,10 @@ import mime from 'mime';
 import { IDBConnection } from '../../database/db';
 import { ArtifactStatusEnum, CreateArtifact } from '../../models/artifact';
 import { CreateUploadArtifact, UploadArtifactRoleEnum } from '../../models/upload-artifact';
-import { streamMedia } from '../../utils/biohub-tar-parser';
 import { IUploadedMediaFile } from '../../utils/biohub-tar-parser.interface';
 import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { getLogger } from '../../utils/logger';
 import { DBService } from '../db-service';
-import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArtifactService } from '../upload/upload-artifact-service';
 
@@ -24,84 +22,14 @@ export const MEDIA_INGEST_BATCH_FILES = Number(
 const defaultLog = getLogger('services/ingestion/media-ingestion-service');
 
 /**
- * Ingest media files from tarball to object storage and artifact tables.
+ * Persist uploaded media metadata into artifact and upload_artifact tables.
  */
 export class MediaIngestionService extends DBService {
-  objectStorageService = new ObjectStorageService();
   artifactService = new ArtifactService(this.connection);
   uploadArtifactService = new UploadArtifactService(this.connection);
 
   constructor(connection: IDBConnection) {
     super(connection);
-  }
-
-  /**
-   * Upload media files and persist artifact plus upload_artifact rows.
-   *
-   * @param {string} objectKey
-   * @param {number} submissionId
-   * @param {string} submissionUploadId
-   * @param {string} uploadId
-   * @param {string} uploadArchiveId
-   * @return {Promise<void>}
-   */
-  async ingestMediaFiles(
-    objectKey: string,
-    submissionId: number,
-    submissionUploadId: string,
-    uploadId: string,
-    uploadArchiveId: string
-  ): Promise<void> {
-    const startTime = Date.now();
-
-    defaultLog.debug({
-      label: 'ingestMediaFiles',
-      message: 'Starting media ingestion',
-      submissionId,
-      submissionUploadId,
-      uploadId,
-      uploadArchiveId,
-      objectKey
-    });
-
-    // Scope uploaded media under submission + submission upload so each upload attempt
-    // lands in a deterministic, isolated key namespace.
-    const s3KeyPrefix = `submissions/${submissionId}/uploads/${submissionUploadId}/media`;
-
-    // Stream tar media in a single pass:
-    // - bytes are uploaded to object storage by streamMedia
-    // - for each uploaded file we persist DB records in bounded batches
-    defaultLog.debug({
-      label: 'ingestMediaFiles',
-      message: 'Opening tar stream for media pass',
-      submissionUploadId,
-      objectKey
-    });
-    const tarStream = await this.objectStorageService.getFileStream(BucketType.MAIN, objectKey);
-
-    const { uploadedCount } = await streamMedia(tarStream, {
-      objectStorageService: this.objectStorageService,
-      s3KeyPrefix,
-      batchSize: MEDIA_INGEST_BATCH_FILES,
-      maxBatchBytes: MEDIA_INGEST_BATCH_BYTES,
-      ingestMediaBatch: async (mediaFiles) =>
-        this.persistUploadedMediaBatch(uploadId, uploadArchiveId, submissionUploadId, mediaFiles)
-    });
-
-    defaultLog.debug({
-      label: 'ingestMediaFiles',
-      message: 'Completed tar media stream pass',
-      submissionUploadId,
-      uploadedCount
-    });
-
-    defaultLog.info({
-      label: 'ingestMediaFiles',
-      message: 'Completed media ingestion',
-      submissionUploadId,
-      uploadedCount,
-      elapsedMs: Date.now() - startTime
-    });
   }
 
   /**

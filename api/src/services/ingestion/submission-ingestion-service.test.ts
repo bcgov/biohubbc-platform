@@ -6,14 +6,13 @@ import { getMockDBConnection } from '../../__mocks__/db';
 import * as db from '../../database/db';
 import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
 import { UploadArchive } from '../../models/upload-archive';
-import * as biohubTarParser from '../../utils/biohub-tar-parser';
 import { ContributorService } from '../contributor-service';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
 import { UploadArtifactService } from '../upload/upload-artifact-service';
 import { SubmissionFeatureIngestionService } from './submission-feature-ingestion-service';
-import { SubmissionIngestionService } from './submission-ingestion-service';
+import { SubmissionIngestionService, submissionIngestionDependencies } from './submission-ingestion-service';
 
 describe('SubmissionIngestionService', () => {
   afterEach(() => {
@@ -48,7 +47,7 @@ describe('SubmissionIngestionService', () => {
     };
 
     beforeEach(() => {
-      sinon.stub(db, 'getAPIUserDBConnection').callsFake(() => {
+      sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').callsFake(() => {
         const connection = getMockDBConnection();
         connection.open = sinon.stub().resolves();
         connection.commit = sinon.stub().resolves();
@@ -62,6 +61,7 @@ describe('SubmissionIngestionService', () => {
       sinon.stub(UploadArchiveService.prototype, 'getUploadArchivesByUploadId').resolves([mockUploadArchive]);
       sinon.stub(ArtifactService.prototype, 'getArtifact').resolves(mockArtifact);
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
+      sinon.stub(SubmissionFeatureIngestionService.prototype, 'getActiveFeatureTypeMap').resolves(new Map());
     };
 
     it('streams archive in one pass and persists media/codes/features', async () => {
@@ -77,7 +77,7 @@ describe('SubmissionIngestionService', () => {
       const contributorByUploadStub = sinon
         .stub(ContributorService.prototype, 'getContributorBySubmissionUploadId')
         .resolves({ contributor_id: 99 } as any);
-      const streamArchiveStub = sinon.stub(biohubTarParser, 'streamSubmissionArchive').resolves({
+      const streamArchiveStub = sinon.stub(submissionIngestionDependencies, 'streamSubmissionArchive').resolves({
         featureCount: 1,
         uploadedCount: 2,
         codesetFileCount: 1
@@ -102,7 +102,9 @@ describe('SubmissionIngestionService', () => {
       sinon
         .stub(ContributorService.prototype, 'getContributorBySubmissionUploadId')
         .resolves({ contributor_id: 99 } as any);
-      sinon.stub(biohubTarParser, 'streamSubmissionArchive').rejects(new Error('archive stream failed'));
+      sinon
+        .stub(submissionIngestionDependencies, 'streamSubmissionArchive')
+        .rejects(new Error('archive stream failed'));
 
       try {
         await service.ingestSubmissionUpload(mockSubmissionUpload);
@@ -134,7 +136,9 @@ describe('SubmissionIngestionService', () => {
       sinon
         .stub(ContributorService.prototype, 'getContributorBySubmissionUploadId')
         .resolves({ contributor_id: 99 } as any);
-      sinon.stub(biohubTarParser, 'streamSubmissionArchive').rejects(new Error('archive persist failed'));
+      sinon
+        .stub(submissionIngestionDependencies, 'streamSubmissionArchive')
+        .rejects(new Error('archive persist failed'));
 
       try {
         await service.ingestSubmissionUpload(mockSubmissionUpload);
@@ -153,9 +157,11 @@ describe('SubmissionIngestionService', () => {
       sinon
         .stub(ContributorService.prototype, 'getContributorBySubmissionUploadId')
         .resolves({ contributor_id: 99 } as any);
-      sinon
-        .stub(biohubTarParser, 'streamSubmissionArchive')
-        .resolves({ featureCount: 0, uploadedCount: 0, codesetFileCount: 0 });
+      sinon.stub(submissionIngestionDependencies, 'streamSubmissionArchive').resolves({
+        featureCount: 0,
+        uploadedCount: 0,
+        codesetFileCount: 0
+      });
 
       try {
         await service.ingestSubmissionUpload(mockSubmissionUpload);

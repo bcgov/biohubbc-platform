@@ -33,21 +33,6 @@ export interface UploadMediaEntryOptions {
   onUploaded: () => void;
 }
 
-export interface ProcessMediaEntryOptions {
-  objectStorageService: ObjectStorageService;
-  s3KeyPrefix: string;
-  ingestMediaFile: (uploadedFile: IUploadedMediaFile) => Promise<void>;
-  onUploaded: () => void;
-}
-
-export interface StreamMediaOptions {
-  objectStorageService: ObjectStorageService;
-  s3KeyPrefix: string;
-  batchSize: number;
-  maxBatchBytes: number;
-  ingestMediaBatch: (uploadedFiles: IUploadedMediaFile[]) => Promise<void>;
-}
-
 export interface StreamSubmissionArchiveOptions {
   objectStorageService: ObjectStorageService;
   s3KeyPrefix: string;

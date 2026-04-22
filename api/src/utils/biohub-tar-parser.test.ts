@@ -1,11 +1,11 @@
 import chai, { expect } from 'chai';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as tar from 'tar-stream';
 import { BucketType, ObjectStorageService } from '../services/object-storage/object-storage-service';
-import { streamCodesets, streamFeatures, streamMedia, streamSubmissionArchive } from './biohub-tar-parser';
+import { streamSubmissionArchive } from './biohub-tar-parser';
 
 chai.use(sinonChai);
 
@@ -34,295 +34,6 @@ function bufferToStream(buffer: Buffer): Readable {
 describe('biohub-tar-parser', () => {
   afterEach(() => {
     sinon.restore();
-  });
-
-  describe('streamFeatures', () => {
-    it('streams features in bounded batches and skips non-feature entries', async () => {
-      const tarBuffer = await createTestTar([
-        {
-          name: 'features/dataset.json',
-          content: JSON.stringify([
-            { id: 'feature-1', type: 'dataset', properties: { name: 'Dataset A' }, content: [], parent: null },
-            { id: 'feature-2', type: 'sample_site', properties: { name: 'Site A' }, content: [], parent: 'feature-1' }
-          ])
-        },
-        {
-          name: 'codes/agency.json',
-          content: JSON.stringify({
-            agency: {
-              key: 'agency',
-              label: 'Agency',
-              external_id: 'agency',
-              description: 'Agency codes',
-              codes: {
-                x: {
-                  key: 'x',
-                  label: 'X',
-                  external_id: 'x',
-                  description: 'Code X'
-                }
-              }
-            }
-          })
-        },
-        { name: 'files/photo.jpg', content: 'binary-data' }
-      ]);
-
-      const batches: Array<{ id: string }>[] = [];
-      const result = await streamFeatures(bufferToStream(tarBuffer), 1, async (batch) => {
-        batches.push(batch as Array<{ id: string }>);
-      });
-
-      expect(result.featureCount).to.equal(2);
-      expect(batches).to.have.length(2);
-      expect(batches[0][0].id).to.equal('feature-1');
-      expect(batches[1][0].id).to.equal('feature-2');
-    });
-
-    it('throws on shallow-validation failures', async () => {
-      const tarBuffer = await createTestTar([
-        {
-          name: 'features/bad.json',
-          content: JSON.stringify([{ type: 'dataset', properties: { name: 'Missing id' } }])
-        }
-      ]);
-
-      try {
-        await streamFeatures(bufferToStream(tarBuffer), 10000, async () => undefined);
-        expect.fail('expected streamFeatures to throw');
-      } catch (error) {
-        expect((error as Error).message).to.include('Feature entry failed shallow validation');
-        expect((error as Error).message).to.include('entry=features/bad.json');
-        expect((error as Error).message).to.include('id');
-      }
-    });
-
-    it('flushes a final partial batch at end-of-stream', async () => {
-      const tarBuffer = await createTestTar([
-        {
-          name: 'features/dataset.json',
-          content: JSON.stringify([
-            { id: 'feature-1', type: 'dataset', properties: { name: 'A' }, content: [], parent: null },
-            { id: 'feature-2', type: 'dataset', properties: { name: 'B' }, content: [], parent: null },
-            { id: 'feature-3', type: 'dataset', properties: { name: 'C' }, content: [], parent: null }
-          ])
-        }
-      ]);
-
-      const batchSizes: number[] = [];
-      await streamFeatures(bufferToStream(tarBuffer), 2, async (batch) => {
-        batchSizes.push(batch.length);
-      });
-
-      expect(batchSizes).to.deep.equal([2, 1]);
-    });
-
-    it('propagates invalid JSON parse failures', async () => {
-      const tarBuffer = await createTestTar([{ name: 'features/bad.json', content: '{ not valid json' }]);
-
-      try {
-        await streamFeatures(bufferToStream(tarBuffer), 10000, async () => undefined);
-        expect.fail('expected streamFeatures to throw');
-      } catch (error) {
-        expect(error).to.be.instanceOf(Error);
-      }
-    });
-
-    it('propagates batch callback errors', async () => {
-      const tarBuffer = await createTestTar([
-        {
-          name: 'features/dataset.json',
-          content: JSON.stringify([
-            { id: 'feature-1', type: 'dataset', properties: { name: 'A' }, content: [], parent: null }
-          ])
-        }
-      ]);
-
-      try {
-        await streamFeatures(bufferToStream(tarBuffer), 10000, async () => {
-          throw new Error('batch insert failed');
-        });
-        expect.fail('expected streamFeatures to throw');
-      } catch (error) {
-        expect((error as Error).message).to.equal('batch insert failed');
-      }
-    });
-  });
-
-  describe('streamCodesets', () => {
-    it('streams and parses codes/*.json payloads independently', async () => {
-      const tarBuffer = await createTestTar([
-        {
-          name: 'codes/agency.json',
-          content: JSON.stringify({
-            agency: {
-              key: 'agency',
-              label: 'Agency',
-              external_id: 'agency',
-              description: 'Agency codes',
-              codes: {
-                aarde: {
-                  key: 'aarde',
-                  label: 'Aarde Environmental Ltd.',
-                  external_id: 'aarde',
-                  description: 'Aarde Environmental Ltd.'
-                }
-              }
-            }
-          })
-        },
-        {
-          name: 'features/dataset.json',
-          content: JSON.stringify([{ id: 'feature-1', type: 'dataset', properties: {} }])
-        }
-      ]);
-
-      const payloads: Record<string, unknown>[] = [];
-      await streamCodesets(bufferToStream(tarBuffer), async (codesets) => {
-        payloads.push(codesets as unknown as Record<string, unknown>);
-      });
-
-      expect(payloads).to.have.length(1);
-      expect(payloads[0]).to.have.property('agency');
-    });
-
-    it('throws on shallow-validation failures for malformed codesets', async () => {
-      const tarBuffer = await createTestTar([
-        {
-          name: 'codes/agency.json',
-          content: JSON.stringify({
-            categories: 'invalid-categories'
-          })
-        }
-      ]);
-
-      try {
-        await streamCodesets(bufferToStream(tarBuffer), async () => undefined);
-        expect.fail('expected streamCodesets to throw');
-      } catch (error) {
-        expect((error as Error).message).to.include('Codeset entry failed shallow validation');
-        expect((error as Error).message).to.include('entry=codes/agency.json');
-        expect((error as Error).message).to.include('categories');
-      }
-    });
-  });
-
-  describe('streamMedia', () => {
-    it('streams media entries to object storage and reports uploaded files', async () => {
-      const tarBuffer = await createTestTar([
-        { name: 'files/photo.jpg', content: 'jpeg-data' },
-        { name: 'files/report.pdf', content: 'pdf-data' },
-        {
-          name: 'features/dataset.json',
-          content: JSON.stringify([{ id: 'feature-1', type: 'dataset', properties: {} }])
-        }
-      ]);
-
-      const uploadStreamStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
-      const uploaded: Array<{
-        fileName: string;
-        s3Key: string;
-        path: string;
-        byteSize: number;
-        checksumSha256: string;
-      }> = [];
-
-      const result = await streamMedia(bufferToStream(tarBuffer), {
-        objectStorageService: new ObjectStorageService(),
-        s3KeyPrefix: 'submissions/42/media',
-        batchSize: 2,
-        maxBatchBytes: 1024,
-        ingestMediaBatch: async (uploadedFiles) => {
-          uploaded.push(...uploadedFiles);
-        }
-      });
-
-      expect(result.uploadedCount).to.equal(2);
-      expect(uploadStreamStub.callCount).to.equal(2);
-      expect(uploadStreamStub.firstCall.args[0]).to.equal(BucketType.MAIN);
-      expect(uploaded.map((item) => item.fileName)).to.deep.equal(['photo.jpg', 'report.pdf']);
-      expect(uploaded[0].s3Key).to.equal('submissions/42/media/photo.jpg');
-      expect(uploaded[0].byteSize).to.equal(Buffer.byteLength('jpeg-data'));
-      expect(uploaded[0].path).to.equal('photo.jpg');
-      expect(uploaded[0].checksumSha256).to.equal(createHash('sha256').update('jpeg-data').digest('hex'));
-    });
-
-    it('preserves nested files/ paths in uploaded object keys', async () => {
-      const tarBuffer = await createTestTar([{ name: 'files/nested/path/report.pdf', content: 'pdf-data' }]);
-
-      const uploadStreamStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
-      const uploaded: Array<{
-        fileName: string;
-        s3Key: string;
-        path: string;
-        byteSize: number;
-        checksumSha256: string;
-      }> = [];
-
-      const result = await streamMedia(bufferToStream(tarBuffer), {
-        objectStorageService: new ObjectStorageService(),
-        s3KeyPrefix: 'submissions/42/media',
-        batchSize: 2,
-        maxBatchBytes: 1024,
-        ingestMediaBatch: async (uploadedFiles) => {
-          uploaded.push(...uploadedFiles);
-        }
-      });
-
-      expect(result.uploadedCount).to.equal(1);
-      expect(uploadStreamStub.calledOnce).to.be.true;
-      expect(uploaded[0].fileName).to.equal('report.pdf');
-      expect(uploaded[0].s3Key).to.equal('submissions/42/media/nested/path/report.pdf');
-      expect(uploaded[0].path).to.equal('nested/path/report.pdf');
-    });
-
-    it('flushes uploaded media in bounded batches', async () => {
-      const tarBuffer = await createTestTar([
-        { name: 'files/photo-1.jpg', content: 'one' },
-        { name: 'files/photo-2.jpg', content: 'two' },
-        { name: 'files/photo-3.jpg', content: 'three' }
-      ]);
-
-      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
-
-      const batchSizes: number[] = [];
-      const result = await streamMedia(bufferToStream(tarBuffer), {
-        objectStorageService: new ObjectStorageService(),
-        s3KeyPrefix: 'submissions/42/media',
-        batchSize: 2,
-        maxBatchBytes: 1024,
-        ingestMediaBatch: async (uploadedFiles) => {
-          batchSizes.push(uploadedFiles.length);
-        }
-      });
-
-      expect(result.uploadedCount).to.equal(3);
-      expect(batchSizes).to.deep.equal([2, 1]);
-    });
-
-    it('flushes uploaded media when cumulative bytes exceed threshold', async () => {
-      const tarBuffer = await createTestTar([
-        { name: 'files/photo-1.jpg', content: 'aaaa' },
-        { name: 'files/photo-2.jpg', content: 'bbbb' },
-        { name: 'files/photo-3.jpg', content: 'cccc' }
-      ]);
-
-      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
-
-      const batchSizes: number[] = [];
-      const result = await streamMedia(bufferToStream(tarBuffer), {
-        objectStorageService: new ObjectStorageService(),
-        s3KeyPrefix: 'submissions/42/media',
-        batchSize: 100,
-        maxBatchBytes: 8,
-        ingestMediaBatch: async (uploadedFiles) => {
-          batchSizes.push(uploadedFiles.length);
-        }
-      });
-
-      expect(result.uploadedCount).to.equal(3);
-      expect(batchSizes).to.deep.equal([2, 1]);
-    });
   });
 
   describe('streamSubmissionArchive', () => {
@@ -354,7 +65,7 @@ describe('biohub-tar-parser', () => {
         { name: 'files/photo.jpg', content: 'jpeg-data' }
       ]);
 
-      sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
+      const uploadStreamStub = sinon.stub(ObjectStorageService.prototype, 'uploadStream').resolves();
 
       const featureBatchSizes: number[] = [];
       let codesetPayloadCount = 0;
@@ -378,6 +89,8 @@ describe('biohub-tar-parser', () => {
         }
       });
 
+      expect(uploadStreamStub.calledOnce).to.be.true;
+      expect(uploadStreamStub.firstCall.args[0]).to.equal(BucketType.MAIN);
       expect(result.featureCount).to.equal(1);
       expect(result.uploadedCount).to.equal(1);
       expect(result.codesetFileCount).to.equal(1);
@@ -432,6 +145,33 @@ describe('biohub-tar-parser', () => {
 
       expect(result.featureCount).to.equal(2);
       expect(featureBatchSizes).to.deep.equal([1, 1]);
+    });
+
+    it('throws on malformed feature payloads', async () => {
+      const tarBuffer = await createTestTar([
+        {
+          name: 'features/bad.json',
+          content: JSON.stringify([{ type: 'dataset', properties: { name: 'Missing id' } }])
+        }
+      ]);
+
+      try {
+        await streamSubmissionArchive(bufferToStream(tarBuffer), {
+          objectStorageService: new ObjectStorageService(),
+          s3KeyPrefix: 'submissions/42/media',
+          featureBatchSize: 100,
+          featureMaxBatchBytes: 1024 * 1024,
+          mediaBatchSize: 100,
+          mediaMaxBatchBytes: 1024 * 1024,
+          mediaConcurrency: 2,
+          ingestFeatureBatch: async () => undefined,
+          ingestCodesets: async () => undefined,
+          ingestMediaBatch: async () => undefined
+        });
+        expect.fail('expected streamSubmissionArchive to throw');
+      } catch (error) {
+        expect((error as Error).message).to.include('Feature entry failed shallow validation');
+      }
     });
   });
 });

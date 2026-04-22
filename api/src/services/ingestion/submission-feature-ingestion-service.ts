@@ -37,19 +37,20 @@ export class SubmissionFeatureIngestionService extends DBService {
    * @param {number} submissionId
    * @param {string} submissionUploadId
    * @param {IFlattenedBlock[]} features
+   * @param {Map<string, number>} activeFeatureTypeMap
    * @returns {Promise<void>}
    * @memberof SubmissionFeatureIngestionService
    */
   async ingestFeatureBatch(
     submissionId: number,
     submissionUploadId: string,
-    features: IFlattenedBlock[]
+    features: IFlattenedBlock[],
+    activeFeatureTypeMap: Map<string, number>
   ): Promise<void> {
     if (!features.length) {
       return;
     }
 
-    const activeFeatureTypeMap = await this.getActiveFeatureTypeMap();
     let droppedUnknownTypeCount = 0;
 
     const records = features.flatMap((feature) => {
@@ -106,7 +107,7 @@ export class SubmissionFeatureIngestionService extends DBService {
    * @returns {Promise<Map<string, number>>}
    * @memberof SubmissionFeatureIngestionService
    */
-  private async getActiveFeatureTypeMap(): Promise<Map<string, number>> {
+  async getActiveFeatureTypeMap(): Promise<Map<string, number>> {
     this.activeFeatureTypeMapPromise ??= this.ingestionRepository
       .getActiveFeatureTypeMap()
       .then((rows) => new Map(rows.map((row) => [row.name, row.feature_type_id])));
