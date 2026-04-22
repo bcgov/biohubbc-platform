@@ -153,6 +153,51 @@ describe('DownloadExportRepository', () => {
     });
   });
 
+  describe('listDownloadExportsByDownloadIds', () => {
+    it('short-circuits to [] without hitting the DB when no ids are supplied', async () => {
+      const sqlStub = sinon.stub();
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadExportRepository(mockDBConnection);
+      const result = await repo.listDownloadExportsByDownloadIds([]);
+
+      expect(result).to.deep.equal([]);
+      expect(sqlStub).not.to.have.been.called;
+    });
+
+    it('SQL uses ANY($1) over the id array, groups by download_export_id, and orders rows deterministically', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const ids = [DOWNLOAD_ID, 'aaaa0000-0000-0000-0000-000000000002'];
+      const repo = new DownloadExportRepository(mockDBConnection);
+      await repo.listDownloadExportsByDownloadIds(ids);
+
+      expect(sqlStub).to.have.been.calledOnce;
+      const sqlText = sqlStub.firstCall.args[0].text;
+      expect(sqlText).to.include('ANY(');
+      expect(sqlText).to.include('GROUP BY de.download_export_id');
+      expect(sqlText).to.match(/ORDER BY[\s\S]*download_id[\s\S]*ASC[\s\S]*create_date[\s\S]*DESC/i);
+
+      const sqlValues = sqlStub.firstCall.args[0].values;
+      expect(sqlValues[0]).to.deep.equal(ids);
+    });
+
+    it('returns the repository rows as returned by the Zod-validated query', async () => {
+      const row = {
+        ...mockExportRow,
+        part_count: 3
+      };
+      const sqlStub = sinon.stub().resolves(mockQueryResult([row]));
+      const mockDBConnection = getMockDBConnection({ sql: sqlStub });
+
+      const repo = new DownloadExportRepository(mockDBConnection);
+      const result = await repo.listDownloadExportsByDownloadIds([DOWNLOAD_ID]);
+
+      expect(result).to.deep.equal([row]);
+    });
+  });
+
   describe('updateDownloadExportStatus', () => {
     const processingPayloadRowCount = mockQueryResult([], 1);
 

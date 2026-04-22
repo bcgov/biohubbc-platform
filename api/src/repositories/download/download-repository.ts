@@ -10,7 +10,7 @@ import {
   DownloadArtifactInfo,
   DownloadFeatureSummary,
   DownloadId,
-  DownloadListRecord,
+  DownloadListRecordBase,
   DownloadListRow,
   DownloadRecord,
   DownloadSource,
@@ -227,13 +227,13 @@ export class DownloadRepository extends BaseRepository {
    *
    * @param {number} systemUserId - The user ID.
    * @param {ApiPaginationOptions} [pagination] - Optional pagination/sort options.
-   * @return {Promise<{ downloads: DownloadListRecord[]; count: number }>}
+   * @return {Promise<{ downloads: DownloadListRecordBase[]; count: number }>}
    * @memberof DownloadRepository
    */
   async getDownloadsByTeamMembership(
     systemUserId: number,
     pagination?: ApiPaginationOptions
-  ): Promise<{ downloads: DownloadListRecord[]; count: number }> {
+  ): Promise<{ downloads: DownloadListRecordBase[]; count: number }> {
     const knex = getKnex();
 
     const query = knex
@@ -272,7 +272,7 @@ export class DownloadRepository extends BaseRepository {
 
     const count = response.rows[0]?.total_count ?? 0;
     // Strip the total_count column from each row before returning
-    const downloads: DownloadListRecord[] = response.rows.map(({ total_count: _total_count, ...rest }) => rest);
+    const downloads: DownloadListRecordBase[] = response.rows.map(({ total_count: _total_count, ...rest }) => rest);
 
     return { downloads, count };
   }

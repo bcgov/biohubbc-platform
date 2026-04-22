@@ -134,6 +134,46 @@ export class DownloadExportRepository extends BaseRepository {
   }
 
   /**
+   * Batch variant of `listDownloadExportsByDownloadId` keyed by an array of
+   * download ids. Used by `DownloadService.getDownloadsByTeamMembership` to
+   * attach `exports[]` to each row in a page without N+1 — one query serves
+   * the entire page.
+   *
+   * Ordered by `download_id` then `create_date DESC` so the caller can split
+   * the flat rows into per-download slices while preserving the reverse-
+   * chronological order the UI expects.
+   */
+  async listDownloadExportsByDownloadIds(downloadIds: string[]): Promise<DownloadExportListRow[]> {
+    if (downloadIds.length === 0) {
+      return [];
+    }
+
+    const sql = SQL`
+      SELECT
+        de.download_export_id,
+        de.download_id,
+        de.format,
+        de.status,
+        de.mode,
+        de.max_part_size_bytes,
+        de.started_at,
+        de.completed_at,
+        de.error_message,
+        COALESCE(COUNT(dea.download_export_artifact_id), 0)::int AS part_count
+      FROM download_export de
+      LEFT JOIN download_export_artifact dea
+        ON dea.download_export_id = de.download_export_id
+       AND dea.record_end_date IS NULL
+      WHERE de.download_id = ANY(${downloadIds})
+      GROUP BY de.download_export_id
+      ORDER BY de.download_id ASC, de.create_date DESC;
+    `;
+
+    const response = await this.connection.sql(sql, DownloadExportListRow);
+    return response.rows;
+  }
+
+  /**
    * Update export status with optional timestamp + error-message bookkeeping.
    *
    * Mirrors `DownloadRepository.updateDownloadStatus` — COALESCE keeps previous
