@@ -24,7 +24,7 @@ const mockExportRecord = {
   format: 'csv',
   status: DownloadStatusEnum.PENDING,
   mode: 'per_feature_type' as const,
-  chunk_size_bytes: '524288000',
+  max_part_size_bytes: '524288000',
   started_at: null,
   completed_at: null,
   error_message: null
@@ -69,7 +69,7 @@ describe('DownloadExportService', () => {
       });
     });
 
-    it('applies default chunk_size_bytes "524288000" when the request omits it', async () => {
+    it('applies default max_part_size_bytes "524288000" when the request omits it', async () => {
       sinon
         .stub(DownloadService.prototype, 'getAuthorizedDownload')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
@@ -80,10 +80,10 @@ describe('DownloadExportService', () => {
       const service = new DownloadExportService(getMockDBConnection());
       await service.createDownloadExport(DOWNLOAD_ID, SYSTEM_USER_ID, {});
 
-      expect(repoStub.firstCall.args[0].chunk_size_bytes).to.equal('524288000');
+      expect(repoStub.firstCall.args[0].max_part_size_bytes).to.equal('524288000');
     });
 
-    it('forwards a user-supplied chunk_size_bytes verbatim', async () => {
+    it('forwards a user-supplied max_part_size_bytes verbatim', async () => {
       sinon
         .stub(DownloadService.prototype, 'getAuthorizedDownload')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
@@ -92,9 +92,9 @@ describe('DownloadExportService', () => {
         .resolves(mockExportRecord);
 
       const service = new DownloadExportService(getMockDBConnection());
-      await service.createDownloadExport(DOWNLOAD_ID, SYSTEM_USER_ID, { chunk_size_bytes: '10485760' });
+      await service.createDownloadExport(DOWNLOAD_ID, SYSTEM_USER_ID, { max_part_size_bytes: '10485760' });
 
-      expect(repoStub.firstCall.args[0].chunk_size_bytes).to.equal('10485760');
+      expect(repoStub.firstCall.args[0].max_part_size_bytes).to.equal('10485760');
     });
 
     it('hard-codes format "csv" and mode "per_feature_type"; forwards download_id', async () => {

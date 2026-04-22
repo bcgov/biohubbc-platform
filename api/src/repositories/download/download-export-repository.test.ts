@@ -19,7 +19,7 @@ const mockExportRow = {
   format: 'csv',
   status: 'pending',
   mode: 'per_feature_type',
-  chunk_size_bytes: '524288000',
+  max_part_size_bytes: '524288000',
   started_at: null,
   completed_at: null,
   error_message: null
@@ -29,7 +29,7 @@ const validPayload: CreateDownloadExportPayload = {
   download_id: DOWNLOAD_ID,
   format: 'csv',
   mode: 'per_feature_type',
-  chunk_size_bytes: '524288000'
+  max_part_size_bytes: '524288000'
 };
 
 describe('DownloadExportRepository', () => {
@@ -38,7 +38,7 @@ describe('DownloadExportRepository', () => {
   });
 
   describe('createDownloadExport', () => {
-    it('INSERT values include download_id, csv format, per_feature_type mode, and chunk_size_bytes; returns full record', async () => {
+    it('INSERT values include download_id, csv format, per_feature_type mode, and max_part_size_bytes; returns full record', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([mockExportRow], 1));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
@@ -50,7 +50,7 @@ describe('DownloadExportRepository', () => {
       expect(sqlText).to.include('download_export');
       expect(sqlText).to.include('RETURNING');
       expect(sqlText).to.include('mode');
-      expect(sqlText).to.include('chunk_size_bytes');
+      expect(sqlText).to.include('max_part_size_bytes');
 
       const sqlValues = sqlStub.firstCall.args[0].values;
       expect(sqlValues).to.include(DOWNLOAD_ID);

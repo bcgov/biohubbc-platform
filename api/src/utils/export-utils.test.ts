@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
-import { buildPartZipKey, parseFeatureTypeFromParquetKey, shouldRollChunk } from './export-utils';
+import { buildPartZipKey, parseFeatureTypeFromParquetKey, shouldRollPart } from './export-utils';
 
 describe('export-utils', () => {
   describe('parseFeatureTypeFromParquetKey', () => {
@@ -51,17 +51,17 @@ describe('export-utils', () => {
     });
   });
 
-  describe('shouldRollChunk', () => {
+  describe('shouldRollPart', () => {
     it('returns false when under the threshold', () => {
-      expect(shouldRollChunk(100n, 500n)).to.be.false;
+      expect(shouldRollPart(100n, 500n)).to.be.false;
     });
 
     it('returns true at the exact threshold (>= semantics)', () => {
-      expect(shouldRollChunk(500n, 500n)).to.be.true;
+      expect(shouldRollPart(500n, 500n)).to.be.true;
     });
 
     it('returns true over the threshold', () => {
-      expect(shouldRollChunk(501n, 500n)).to.be.true;
+      expect(shouldRollPart(501n, 500n)).to.be.true;
     });
   });
 });

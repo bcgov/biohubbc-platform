@@ -15,7 +15,7 @@ import {
   escapeCsvField,
   flattenFeatureBySchema
 } from '../../utils/csv-utils';
-import { buildPartZipKey, parseFeatureTypeFromParquetKey, shouldRollChunk } from '../../utils/export-utils';
+import { buildPartZipKey, parseFeatureTypeFromParquetKey, shouldRollPart } from '../../utils/export-utils';
 import { _getS3Client, getObjectStoreBucketName } from '../../utils/file-utils';
 import { createHashCountStream } from '../../utils/hash-stream';
 import { CodeService } from '../code-service';
@@ -42,7 +42,7 @@ export interface FileFeatureRef {
 /**
  * Per-part archiver bundle held open while rows stream into the current zip.
  *
- * The pipeline rolls to a new part once `chunkSizeBytes` is crossed; one of
+ * The pipeline rolls to a new part once `maxPartSizeBytes` is crossed; one of
  * these is active at a time, plus up to N already-finalized bundles tracked by
  * part index so the orchestrator can finalize in order.
  */
@@ -61,9 +61,9 @@ export interface PartArchiverBundle {
  * (`processDownloadExportJobHandler`). Reads the per-feature-type Parquet
  * artifacts already produced by the parent download pipeline, converts rows to
  * CSV, and rolls them into one or more part-zips whose size is bounded by the
- * per-export `chunk_size_bytes` — a read-side knob so the same download can be
- * re-exported at different part sizes without re-running the expensive Parquet
- * pipeline.
+ * per-export `max_part_size_bytes` — a read-side knob so the same download can
+ * be re-exported at different part sizes without re-running the expensive
+ * Parquet pipeline.
  *
  * Request-time operations (CRUD, auth, presigned URLs) live in
  * `DownloadExportService`.
@@ -192,7 +192,7 @@ export class DownloadExportPipelineService extends DBService {
    * into a usable subset.
    *
    * Part-rolling rule: uncompressed CSV bytes written to the current part are
-   * tracked on the bundle's `byteCount`. Once that crosses `chunkSizeBytes`
+   * tracked on the bundle's `byteCount`. Once that crosses `maxPartSizeBytes`
    * the method closes the current entry, returns with `finalPart > currentPart`,
    * and the orchestrator finalizes the old part and creates the next bundle
    * before re-calling this method to drain what's left of the feature type's
@@ -203,7 +203,7 @@ export class DownloadExportPipelineService extends DBService {
     downloadId: string;
     featureTypeName: string;
     properties: CsvPropertyDefinition[];
-    chunkSizeBytes: bigint;
+    maxPartSizeBytes: bigint;
     archiverByPart: Map<number, PartArchiverBundle>;
     currentPart: number;
     resumeCursor?: Awaited<ReturnType<ParquetReader['getCursor']>>;
@@ -223,7 +223,7 @@ export class DownloadExportPipelineService extends DBService {
     pendingCursor?: Awaited<ReturnType<ParquetReader['getCursor']>>;
     pendingChunkIndex?: number;
   }> {
-    const { downloadId, featureTypeName, properties, chunkSizeBytes, archiverByPart } = params;
+    const { downloadId, featureTypeName, properties, maxPartSizeBytes, archiverByPart } = params;
     let { currentPart } = params;
 
     // Reuse the reader + cursor across roll-overs so we don't re-fetch the
@@ -309,7 +309,7 @@ export class DownloadExportPipelineService extends DBService {
         await writeLine(currentEntry, line);
         currentBundle().byteCount += lineBytes;
 
-        if (shouldRollChunk(currentBundle().byteCount, chunkSizeBytes)) {
+        if (shouldRollPart(currentBundle().byteCount, maxPartSizeBytes)) {
           // Close the current entry, step the part pointer + chunk counter,
           // and return so the orchestrator can finalize the just-closed part
           // zip and open a new archiver bundle before we resume. chunkIndex
@@ -478,7 +478,7 @@ export class DownloadExportPipelineService extends DBService {
    *  2. Resolve the download + per-type schema lookup.
    *  3. For each feature type in order, stream Parquet rows into the current
    *     part's CSV chunks. Roll to a new part once the per-export
-   *     `chunk_size_bytes` is crossed.
+   *     `max_part_size_bytes` is crossed.
    *  4. Finalize every open part via `writePartZip`, in index order.
    *  5. Transition PROCESSING → READY.
    *
@@ -503,7 +503,7 @@ export class DownloadExportPipelineService extends DBService {
     const schemaLookup = await this.buildSchemaLookup();
     const featureTypes = await this.listExportFeatureTypes(download.download_id);
 
-    const chunkSizeBytes = BigInt(exportRecord.chunk_size_bytes);
+    const maxPartSizeBytes = BigInt(exportRecord.max_part_size_bytes);
     const archiverByPart = new Map<number, PartArchiverBundle>();
     let currentPart = 1;
 
@@ -539,7 +539,7 @@ export class DownloadExportPipelineService extends DBService {
             downloadId: download.download_id,
             featureTypeName,
             properties,
-            chunkSizeBytes,
+            maxPartSizeBytes,
             archiverByPart,
             currentPart,
             resumeReader: pendingReader,

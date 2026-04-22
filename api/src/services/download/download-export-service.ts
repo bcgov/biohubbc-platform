@@ -9,12 +9,12 @@ import { BucketType, ObjectStorageService } from '../object-storage/object-stora
 import { DownloadService } from './download-service';
 
 /**
- * Default chunk size — matches `download.fragment_size_bytes` default (500 MB).
+ * Default max part size — matches `download.fragment_size_bytes` default (500 MB).
  * Changes here MUST coordinate with the DB column default in migration
  * `20260422133033_download_export_chunk_size_and_mode.ts` and with
  * `FRAGMENT_SIZE_THRESHOLD` in `constants/download`.
  */
-const DEFAULT_CHUNK_SIZE_BYTES = '524288000';
+const DEFAULT_MAX_PART_SIZE_BYTES = '524288000';
 
 /**
  * Shape of a single entry in the detail endpoint's `parts[]` response.
@@ -52,8 +52,8 @@ export class DownloadExportService extends DBService {
   /**
    * Create a CSV export for a ready download.
    *
-   * `chunk_size_bytes` lives per-export so a single download can be re-exported
-   * at different chunk sizes without re-running the Parquet pipeline —
+   * `max_part_size_bytes` lives per-export so a single download can be re-exported
+   * at different part sizes without re-running the Parquet pipeline —
    * `download.fragment_size_bytes` is the write-side knob, this is the read-side
    * knob. `format` is hard-coded to `'csv'` and `mode` to `'per_feature_type'`
    * here because this ticket ships the single-shape contract; a future
@@ -89,7 +89,7 @@ export class DownloadExportService extends DBService {
       download_id: downloadId,
       format: 'csv',
       mode: 'per_feature_type',
-      chunk_size_bytes: request.chunk_size_bytes ?? DEFAULT_CHUNK_SIZE_BYTES
+      max_part_size_bytes: request.max_part_size_bytes ?? DEFAULT_MAX_PART_SIZE_BYTES
     });
   }
 

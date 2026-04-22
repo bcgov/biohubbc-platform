@@ -1,32 +1,33 @@
 import { OpenAPIV3 } from 'openapi-types';
 
 /**
- * 5 MiB — S3 multipart upload minimum part size. Below this, a chunk can't
+ * 5 MiB — S3 multipart upload minimum part size. Below this, a part-zip can't
  * upload as its own S3 object.
  */
-const MIN_CHUNK_SIZE_BYTES = 5 * 1024 * 1024;
+const MIN_PART_SIZE_BYTES = 5 * 1024 * 1024;
 
 /**
  * 5 GiB — single-zip practical ceiling.
  */
-const MAX_CHUNK_SIZE_BYTES = 5 * 1024 * 1024 * 1024;
+const MAX_PART_SIZE_BYTES = 5 * 1024 * 1024 * 1024;
 
 /**
  * Body schema for `POST /api/download/:downloadId/export`.
  *
- * `chunk_size_bytes` is optional. When provided, the route layer enforces the
- * 5 MiB–5 GiB bounds via the integer min/max (out-of-range → 400). When
+ * `max_part_size_bytes` is optional. When provided, the route layer enforces
+ * the 5 MiB–5 GiB bounds via the integer min/max (out-of-range → 400). When
  * omitted, the service applies the 500 MB default.
  */
 export const CreateDownloadExportRequestSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    chunk_size_bytes: {
+    max_part_size_bytes: {
       type: 'integer',
-      minimum: MIN_CHUNK_SIZE_BYTES,
-      maximum: MAX_CHUNK_SIZE_BYTES,
-      description: 'Size threshold in bytes used to split each logical CSV into chunks. 5 MiB–5 GiB.'
+      minimum: MIN_PART_SIZE_BYTES,
+      maximum: MAX_PART_SIZE_BYTES,
+      description:
+        'Maximum size in bytes of each exported part-zip. The pipeline rolls to a new part once a part reaches this threshold. 5 MiB–5 GiB.'
     }
   }
 };
@@ -43,7 +44,7 @@ export const DownloadExportResponseSchema: OpenAPIV3.SchemaObject = {
     'format',
     'status',
     'mode',
-    'chunk_size_bytes',
+    'max_part_size_bytes',
     'started_at',
     'completed_at',
     'error_message'
@@ -62,7 +63,7 @@ export const DownloadExportResponseSchema: OpenAPIV3.SchemaObject = {
       enum: ['per_feature_type', 'denormalized'],
       description: "Export shape. Always 'per_feature_type' in this release."
     },
-    chunk_size_bytes: { type: 'string', format: 'int64' },
+    max_part_size_bytes: { type: 'string', format: 'int64' },
     started_at: { type: 'string', nullable: true },
     completed_at: { type: 'string', nullable: true },
     error_message: { type: 'string', nullable: true }

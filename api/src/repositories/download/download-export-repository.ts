@@ -22,21 +22,21 @@ export class DownloadExportRepository extends BaseRepository {
    *
    * Returns the full `DownloadExportRecord` rather than just the ID (unlike the
    * sibling `DownloadRepository.createDownload` which returns `DownloadId` only).
-   * Callers need `status`, `chunk_size_bytes`, and `mode` back immediately to
+   * Callers need `status`, `max_part_size_bytes`, and `mode` back immediately to
    * build the HTTP response and publish the background job — returning the full
    * record here skips a redundant SELECT round-trip.
    */
   async createDownloadExport(payload: CreateDownloadExportPayload): Promise<DownloadExportRecord> {
     const sql = SQL`
-      INSERT INTO download_export (download_id, format, mode, chunk_size_bytes)
-      VALUES (${payload.download_id}, ${payload.format}, ${payload.mode}, ${payload.chunk_size_bytes})
+      INSERT INTO download_export (download_id, format, mode, max_part_size_bytes)
+      VALUES (${payload.download_id}, ${payload.format}, ${payload.mode}, ${payload.max_part_size_bytes})
       RETURNING
         download_export_id,
         download_id,
         format,
         status,
         mode,
-        chunk_size_bytes,
+        max_part_size_bytes,
         started_at,
         completed_at,
         error_message;
@@ -68,7 +68,7 @@ export class DownloadExportRepository extends BaseRepository {
         format,
         status,
         mode,
-        chunk_size_bytes,
+        max_part_size_bytes,
         started_at,
         completed_at,
         error_message
@@ -115,7 +115,7 @@ export class DownloadExportRepository extends BaseRepository {
         de.format,
         de.status,
         de.mode,
-        de.chunk_size_bytes,
+        de.max_part_size_bytes,
         de.started_at,
         de.completed_at,
         de.error_message,

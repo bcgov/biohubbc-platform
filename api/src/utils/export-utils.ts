@@ -40,12 +40,12 @@ export function buildPartZipKey(downloadId: string, exportId: string, partIndex:
 }
 
 /**
- * Decide whether the current CSV byte count should roll over to a new part.
+ * Decide whether the current byte count should roll over to a new part.
  *
  * Single crossing check — the part is "full" once `currentByteCount` has
- * reached `chunkSizeBytes`. Extracted so the boundary decision is testable
+ * reached `maxPartSizeBytes`. Extracted so the boundary decision is testable
  * without spinning up the whole streaming pipeline.
  */
-export function shouldRollChunk(currentByteCount: bigint, chunkSizeBytes: bigint): boolean {
-  return currentByteCount >= chunkSizeBytes;
+export function shouldRollPart(currentByteCount: bigint, maxPartSizeBytes: bigint): boolean {
+  return currentByteCount >= maxPartSizeBytes;
 }

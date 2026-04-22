@@ -92,10 +92,10 @@ GET.apiDoc = {
  * present but row rolled back) and no orphaned exports (row committed but job
  * never sent).
  *
- * Client bounds on `chunk_size_bytes` are enforced by the OpenAPI body schema
+ * Client bounds on `max_part_size_bytes` are enforced by the OpenAPI body schema
  * (min 5 MiB, max 5 GiB → 400). The JSON body is an integer for client
  * ergonomics; widened to string here before hitting the service, because the
- * model stores `chunk_size_bytes` as `bigint` → `z.string()`.
+ * model stores `max_part_size_bytes` as `bigint` → `z.string()`.
  */
 export function createDownloadExport(): RequestHandler {
   return async (req, res) => {
@@ -106,12 +106,12 @@ export function createDownloadExport(): RequestHandler {
 
       const systemUserId = connection.systemUserId();
       const downloadId = req.params.downloadId;
-      const body = req.body as { chunk_size_bytes?: number };
+      const body = req.body as { max_part_size_bytes?: number };
 
       const exportService = new DownloadExportService(connection);
 
       const exportRecord = await exportService.createDownloadExport(downloadId, systemUserId, {
-        chunk_size_bytes: typeof body.chunk_size_bytes === 'number' ? String(body.chunk_size_bytes) : undefined
+        max_part_size_bytes: typeof body.max_part_size_bytes === 'number' ? String(body.max_part_size_bytes) : undefined
       });
 
       await publishProcessDownloadExportJob(connection, {

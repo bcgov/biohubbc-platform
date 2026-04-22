@@ -28,7 +28,7 @@ const createMockExportRecord = (overrides?: Partial<Record<string, unknown>>) =>
   format: 'csv',
   status: DownloadStatusEnum.PENDING,
   mode: 'per_feature_type' as const,
-  chunk_size_bytes: '524288000',
+  max_part_size_bytes: '524288000',
   started_at: null,
   completed_at: null,
   error_message: null,

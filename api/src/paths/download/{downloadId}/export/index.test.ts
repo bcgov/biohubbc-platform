@@ -18,7 +18,7 @@ const makeExportRecord = (overrides: Partial<DownloadExportRecord> = {}): Downlo
   download_id: 'aaaa0000-0000-0000-0000-000000000001',
   format: 'csv',
   status: 'pending',
-  chunk_size_bytes: '524288000',
+  max_part_size_bytes: '524288000',
   mode: 'per_feature_type',
   started_at: null,
   completed_at: null,
@@ -56,34 +56,34 @@ describe('paths/download/{downloadId}/export/index', () => {
       await createDownloadExport()(mockReq, mockRes, mockNext);
 
       expect(createStub).to.have.been.calledOnceWith(exportRecord.download_id, 42, {
-        chunk_size_bytes: undefined
+        max_part_size_bytes: undefined
       });
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql(exportRecord);
     });
 
-    it('should forward chunk_size_bytes from body to service as a string', async () => {
+    it('should forward max_part_size_bytes from body to service as a string', async () => {
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
       stubPgBossForTransactionalPublish();
 
-      const exportRecord = makeExportRecord({ chunk_size_bytes: '10485760' });
+      const exportRecord = makeExportRecord({ max_part_size_bytes: '10485760' });
       const createStub = sinon.stub(DownloadExportService.prototype, 'createDownloadExport').resolves(exportRecord);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.keycloak_token = 'token';
       mockReq.params = { downloadId: exportRecord.download_id };
-      mockReq.body = { chunk_size_bytes: 10485760 };
+      mockReq.body = { max_part_size_bytes: 10485760 };
 
       await createDownloadExport()(mockReq, mockRes, mockNext);
 
       expect(createStub).to.have.been.calledOnceWith(exportRecord.download_id, 42, {
-        chunk_size_bytes: '10485760'
+        max_part_size_bytes: '10485760'
       });
       expect(mockRes.statusValue).to.equal(200);
     });
 
-    it('should omit chunk_size_bytes when body is empty', async () => {
+    it('should omit max_part_size_bytes when body is empty', async () => {
       const dbConnectionObj = getMockDBConnection({ systemUserId: () => 42 });
       sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
       stubPgBossForTransactionalPublish();
@@ -99,7 +99,7 @@ describe('paths/download/{downloadId}/export/index', () => {
       await createDownloadExport()(mockReq, mockRes, mockNext);
 
       expect(createStub).to.have.been.calledOnceWith(exportRecord.download_id, 42, {
-        chunk_size_bytes: undefined
+        max_part_size_bytes: undefined
       });
     });
 

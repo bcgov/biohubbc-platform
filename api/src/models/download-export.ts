@@ -17,7 +17,7 @@ export const DownloadExportRecord = z.object({
   format: z.string(),
   status: DownloadStatusZod,
   // BIGINT → string via pg default INT8 parser (matches DownloadRecord.fragment_size_bytes).
-  chunk_size_bytes: z.string(),
+  max_part_size_bytes: z.string(),
   mode: DownloadExportMode,
   started_at: z.string().nullable(),
   completed_at: z.string().nullable(),
@@ -31,24 +31,24 @@ export type DownloadExportId = z.infer<typeof DownloadExportId>;
 /**
  * HTTP body shape for `POST /api/download/:downloadId/export`.
  *
- * Only `chunk_size_bytes` is accepted from the client (optional — defaulted at the
+ * Only `max_part_size_bytes` is accepted from the client (optional — defaulted at the
  * service layer). `mode` is deliberately NOT exposed; the service hard-codes
  * `per_feature_type` until a second shape ships.
  */
-export const CreateDownloadExportRequest = DownloadExportRecord.pick({ chunk_size_bytes: true }).partial();
+export const CreateDownloadExportRequest = DownloadExportRecord.pick({ max_part_size_bytes: true }).partial();
 export type CreateDownloadExportRequest = z.infer<typeof CreateDownloadExportRequest>;
 
 /**
  * Service-layer payload shape passed to `DownloadExportRepository.createDownloadExport`.
  *
- * Service applies the chunk-size default and hard-codes `format='csv'` + `mode='per_feature_type'`.
+ * Service applies the max-part-size default and hard-codes `format='csv'` + `mode='per_feature_type'`.
  * Literals pin the single-shape contract; a future change would widen `mode` to the full enum.
  */
 export const CreateDownloadExportPayload = z.object({
   download_id: z.string().uuid(),
   format: z.literal('csv'),
   mode: z.literal('per_feature_type'),
-  chunk_size_bytes: z.string()
+  max_part_size_bytes: z.string()
 });
 export type CreateDownloadExportPayload = z.infer<typeof CreateDownloadExportPayload>;
 

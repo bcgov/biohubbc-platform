@@ -13,7 +13,7 @@ describe('download-export model', () => {
         download_id: '00000000-0000-0000-0000-000000000001',
         format: 'csv',
         status: 'pending',
-        chunk_size_bytes: '524288000',
+        max_part_size_bytes: '524288000',
         mode: 'star',
         started_at: null,
         completed_at: null,
@@ -25,7 +25,7 @@ describe('download-export model', () => {
   });
 
   describe('CreateDownloadExportRequest', () => {
-    it('accepts an empty body (chunk_size_bytes is optional)', () => {
+    it('accepts an empty body (max_part_size_bytes is optional)', () => {
       const result = CreateDownloadExportRequest.safeParse({});
 
       expect(result.success).to.be.true;
@@ -51,19 +51,19 @@ describe('download-export model', () => {
         download_id: '00000000-0000-0000-0000-000000000001',
         format: 'parquet',
         mode: 'per_feature_type',
-        chunk_size_bytes: '524288000'
+        max_part_size_bytes: '524288000'
       });
       const wrongMode = CreateDownloadExportPayload.safeParse({
         download_id: '00000000-0000-0000-0000-000000000001',
         format: 'csv',
         mode: 'denormalized',
-        chunk_size_bytes: '524288000'
+        max_part_size_bytes: '524288000'
       });
       const correct = CreateDownloadExportPayload.safeParse({
         download_id: '00000000-0000-0000-0000-000000000001',
         format: 'csv',
         mode: 'per_feature_type',
-        chunk_size_bytes: '524288000'
+        max_part_size_bytes: '524288000'
       });
 
       expect(wrongFormat.success).to.be.false;

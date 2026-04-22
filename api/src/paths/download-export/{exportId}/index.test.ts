@@ -16,7 +16,7 @@ const makeExportRecord = (overrides: Partial<DownloadExportRecord> = {}): Downlo
   download_id: 'aaaa0000-0000-0000-0000-000000000001',
   format: 'csv',
   status: 'pending',
-  chunk_size_bytes: '524288000',
+  max_part_size_bytes: '524288000',
   mode: 'per_feature_type',
   started_at: null,
   completed_at: null,
