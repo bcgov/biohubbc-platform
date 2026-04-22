@@ -4,7 +4,10 @@ import { SYSTEM_ROLE } from '../../../../../constants/roles';
 import { getDBConnection } from '../../../../../database/db';
 import { UpdateTicketSystemUserStatusRequest } from '../../../../../models/ticket-system-user';
 import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
-import { TicketSystemUserSchema, UpdateTicketSystemUserStatusRequestSchema } from '../../../../../openapi/schemas/ticket-system-user';
+import {
+  TicketSystemUserSchema,
+  UpdateTicketSystemUserStatusRequestSchema
+} from '../../../../../openapi/schemas/ticket-system-user';
 import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
 import { TicketSystemUserService } from '../../../../../services/ticket-system-user-service';
 import { getLogger } from '../../../../../utils/logger';

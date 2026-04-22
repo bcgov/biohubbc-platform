@@ -5,7 +5,7 @@ import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks
 import * as db from '../../../../database/db';
 import { TicketSystemUser } from '../../../../models/ticket-system-user';
 import { TicketSystemUserService } from '../../../../services/ticket-system-user-service';
-import { createTicketSystemUser } from './index';
+import { createTicketSystemUsers } from './index';
 
 chai.use(sinonChai);
 
@@ -38,7 +38,7 @@ describe('paths/tickets/{ticketId}/system-user', () => {
     mockReq.body = [{ system_user_id: created.system_user_id, status: created.status }];
     mockReq.system_user = { system_user_id: 1, role_names: ['System Administrator'] } as never;
 
-    await createTicketSystemUser()(mockReq, mockRes, mockNext);
+    await createTicketSystemUsers()(mockReq, mockRes, mockNext);
 
     expect(createStub).to.have.been.calledWith(created.ticket_id, mockReq.body);
     expect(mockRes.statusValue).to.equal(201);

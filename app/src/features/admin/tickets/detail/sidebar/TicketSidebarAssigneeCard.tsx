@@ -1,11 +1,11 @@
-import { mdiCheck, mdiDotsVertical, mdiTrashCanOutline } from '@mdi/js';
+import { mdiDotsVertical, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import { ContextMenuButton, IContextMenuItem } from 'components/ContextMenuButton';
-import { TICKET_ASSIGNEE_STATUS_COLORS } from 'constants/ticket';
+import { TICKET_ASSIGNEE_STATUS_PRESENTATION } from 'constants/ticket';
 import { ITicketAssignee, TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
 
 interface ITicketSidebarAssigneeCardProps {
@@ -27,28 +27,15 @@ interface ITicketSidebarAssigneeCardProps {
 export const TicketSidebarAssigneeCard = (props: ITicketSidebarAssigneeCardProps) => {
   const { assignee, isSystemAdmin, isCurrentUserAssignment, onRemoveAssignee, onUpdateAssigneeStatus } = props;
 
-  const statusOptions: { value: TicketSystemUserStatus; label: string }[] = [
-    { value: 'requested', label: 'Requested' },
-    { value: 'started', label: 'Started' },
-    { value: 'blocked', label: 'Blocked' },
-    { value: 'resolved', label: 'Resolved' }
-  ];
-
-  const getAssigneeStatusColor = (status: TicketSystemUserStatus) => TICKET_ASSIGNEE_STATUS_COLORS[status];
-
-  const getAssigneeStatusLabel = (status: TicketSystemUserStatus): string => {
-    switch (status) {
-      case 'started':
-        return 'Started';
-      case 'blocked':
-        return 'Blocked';
-      case 'resolved':
-        return 'Resolved';
-      case 'requested':
-      default:
-        return 'Requested';
-    }
-  };
+  const statusOptions: { value: TicketSystemUserStatus; label: string; icon: string }[] = (
+    Object.entries(TICKET_ASSIGNEE_STATUS_PRESENTATION) as Array<
+      [TicketSystemUserStatus, (typeof TICKET_ASSIGNEE_STATUS_PRESENTATION)[TicketSystemUserStatus]]
+    >
+  ).map(([value, presentation]) => ({
+    value,
+    label: presentation.label,
+    icon: presentation.icon
+  }));
 
   const displayLabel = assignee.system_user.display_name ?? assignee.system_user.user_identifier;
   const canUpdateStatus = isSystemAdmin || isCurrentUserAssignment;
@@ -57,7 +44,7 @@ export const TicketSidebarAssigneeCard = (props: ITicketSidebarAssigneeCardProps
   const statusContextMenuItems: IContextMenuItem[] = canUpdateStatus
     ? statusOptions.map((statusOption) => ({
         label: statusOption.label,
-        icon: <Icon path={mdiCheck} size={0.7} />,
+        icon: <Icon path={statusOption.icon} size={0.7} />,
         onClick: () => onUpdateAssigneeStatus(assignee.ticket_system_user_id, statusOption.value),
         disabled: statusOption.value === assignee.status
       }))
@@ -89,8 +76,8 @@ export const TicketSidebarAssigneeCard = (props: ITicketSidebarAssigneeCardProps
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Chip
           size="small"
-          label={getAssigneeStatusLabel(assignee.status)}
-          color={getAssigneeStatusColor(assignee.status)}
+          label={TICKET_ASSIGNEE_STATUS_PRESENTATION[assignee.status].label}
+          color={TICKET_ASSIGNEE_STATUS_PRESENTATION[assignee.status].colour}
         />
 
         {statusContextMenuItems.length || deleteContextMenuItems.length ? (

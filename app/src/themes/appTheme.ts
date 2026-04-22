@@ -259,7 +259,14 @@ const appTheme = createTheme({
     },
     MuiListItemIcon: {
       styleOverrides: {
-        root: {}
+        root: {
+          minWidth: 34,
+          '& .MuiSvgIcon-root, & svg': {
+            width: '1.25rem !important',
+            height: '1.25rem !important',
+            fontSize: '1.25rem'
+          }
+        }
       }
     },
     MuiLink: {

@@ -1,9 +1,11 @@
 import Stack from '@mui/material/Stack';
 import { AlertBanner } from 'components/notifications/AlertBanner';
+import { TICKET_ASSIGNEE_STATUS_PRESENTATION } from 'constants/ticket';
 import { SearchAutocomplete } from 'features/search/result/sidebar/search/components/section/autocomplete/SearchAutocomplete';
 import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
 import { ArrayHelpers, FieldArray, getIn, useFormikContext } from 'formik';
 import { TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
+import { useMemo } from 'react';
 import { TicketAssigneeCard } from './TicketAssigneeCard';
 
 export interface ITicketAssigneeFormValues {
@@ -21,13 +23,6 @@ interface ITicketAssigneeFormProps {
   onSearchUsers: (search: string) => void;
 }
 
-const statusOptions: Array<{ value: TicketSystemUserStatus; label: string }> = [
-  { value: 'requested', label: 'Requested' },
-  { value: 'started', label: 'Started' },
-  { value: 'blocked', label: 'Blocked' },
-  { value: 'resolved', label: 'Resolved' }
-];
-
 /**
  * Form body for assigning one or more users to a ticket.
  *
@@ -37,6 +32,19 @@ const statusOptions: Array<{ value: TicketSystemUserStatus; label: string }> = [
 export const TicketAssigneeForm = (props: ITicketAssigneeFormProps) => {
   const { options, isLoadingUsers, isSubmitting, onSearchUsers } = props;
   const { values, errors, touched } = useFormikContext<ITicketAssigneeFormValues>();
+  const statusOptions = useMemo<Array<{ value: TicketSystemUserStatus; label: string; iconPath: string }>>(
+    () =>
+      (
+        Object.entries(TICKET_ASSIGNEE_STATUS_PRESENTATION) as Array<
+          [TicketSystemUserStatus, (typeof TICKET_ASSIGNEE_STATUS_PRESENTATION)[TicketSystemUserStatus]]
+        >
+      ).map(([value, presentation]) => ({
+        value,
+        label: presentation.label,
+        iconPath: presentation.icon
+      })),
+    []
+  );
 
   const handleSelectUser = (option: SidebarOption | null, arrayHelpers: ArrayHelpers) => {
     if (!option) {

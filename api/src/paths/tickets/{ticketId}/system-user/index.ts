@@ -23,7 +23,7 @@ export const POST: Operation = [
       }
     ]
   })),
-  createTicketSystemUser()
+  createTicketSystemUsers()
 ];
 
 POST.apiDoc = {
@@ -65,7 +65,7 @@ POST.apiDoc = {
   }
 };
 
-export function createTicketSystemUser(): RequestHandler {
+export function createTicketSystemUsers(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req.keycloak_token);
 
@@ -81,7 +81,7 @@ export function createTicketSystemUser(): RequestHandler {
 
       return res.status(201).json(ticketSystemUsers);
     } catch (error) {
-      defaultLog.error({ label: 'createTicketSystemUser', message: 'error', error });
+      defaultLog.error({ label: 'createTicketSystemUsers', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

@@ -37,7 +37,7 @@ export const TicketSidebarTeam = (props: ITicketSidebarTeamProps) => {
           </Stack>
         }
         hasNoData={!members.length}
-          hasNoDataFallback={
+        hasNoDataFallback={
           <Typography variant="body2" color="textSecondary">
             No participants
           </Typography>

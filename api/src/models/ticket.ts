@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { DataRequest } from './data-request';
-import { TicketSystemUserWithUser } from './ticket-system-user';
 import { TicketComment } from './ticket-comment';
 import { TicketReference } from './ticket-reference';
 import { TicketStatus as TicketStatusRecord } from './ticket-status';
+import { TicketSystemUserWithUser } from './ticket-system-user';
 
 export interface TicketFilters {
   team_ids?: string[];

@@ -20,8 +20,10 @@ export interface IDropdownButtonItemGroup {
   items: IDropdownButtonItem[];
 }
 
-export interface IDropdownButtonProps
-  extends Omit<ButtonProps, 'children' | 'onClick' | 'onSelect' | 'value' | 'className'> {
+export interface IDropdownButtonProps extends Omit<
+  ButtonProps,
+  'children' | 'onClick' | 'onSelect' | 'value' | 'className'
+> {
   value: string;
   itemGroups: IDropdownButtonItemGroup[];
   onSelect: (value: string) => void;

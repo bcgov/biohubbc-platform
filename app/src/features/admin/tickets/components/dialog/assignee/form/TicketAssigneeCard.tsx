@@ -1,4 +1,4 @@
-import { mdiCheck, mdiClose } from '@mdi/js';
+import { mdiClose } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
@@ -11,7 +11,7 @@ export interface ITicketAssigneeCardProps {
   systemUserId: number;
   userIdentifier: string;
   status: TicketSystemUserStatus;
-  statusOptions: Array<{ value: TicketSystemUserStatus; label: string }>;
+  statusOptions: Array<{ value: TicketSystemUserStatus; label: string; iconPath: string }>;
   isSubmitting: boolean;
   onChangeStatus: (systemUserId: number, status: TicketSystemUserStatus) => void;
   onRemoveAssignee: () => void;
@@ -24,15 +24,14 @@ export interface ITicketAssigneeCardProps {
  * @return {*}
  */
 export const TicketAssigneeCard = (props: ITicketAssigneeCardProps) => {
-  const { systemUserId, userIdentifier, status, statusOptions, isSubmitting, onChangeStatus, onRemoveAssignee } =
-    props;
+  const { systemUserId, userIdentifier, status, statusOptions, isSubmitting, onChangeStatus, onRemoveAssignee } = props;
   const statusOptionGroups: IDropdownButtonItemGroup[] = [
     {
       groupId: 'status-options',
       items: statusOptions.map((statusOption) => ({
         value: statusOption.value,
         label: statusOption.label,
-        iconPath: mdiCheck
+        iconPath: statusOption.iconPath
       }))
     }
   ];

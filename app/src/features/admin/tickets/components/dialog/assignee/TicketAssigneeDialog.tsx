@@ -50,22 +50,25 @@ export const TicketAssigneeDialog = (props: ITicketAssigneeDialogProps) => {
     []
   );
 
-  const buildOptimisticAssignees = useCallback((assignees: ITicketAssigneeFormValues['assignees']): ITicketAssignee[] => {
-    const nonce = Date.now();
+  const buildOptimisticAssignees = useCallback(
+    (assignees: ITicketAssigneeFormValues['assignees']): ITicketAssignee[] => {
+      const nonce = Date.now();
 
-    return assignees.map((assignee, index) => ({
-      ticket_system_user_id: `optimistic-${assignee.system_user_id}-${nonce}-${index}`,
-      ticket_id: ticketId,
-      system_user_id: assignee.system_user_id,
-      status: assignee.status,
-      system_user: {
+      return assignees.map((assignee, index) => ({
+        ticket_system_user_id: `optimistic-${assignee.system_user_id}-${nonce}-${index}`,
+        ticket_id: ticketId,
         system_user_id: assignee.system_user_id,
-        display_name: null,
-        user_identifier: assignee.user_identifier,
-        email: null
-      }
-    }));
-  }, [ticketId]);
+        status: assignee.status,
+        system_user: {
+          system_user_id: assignee.system_user_id,
+          display_name: null,
+          user_identifier: assignee.user_identifier,
+          email: null
+        }
+      }));
+    },
+    [ticketId]
+  );
 
   const reconcileAssignees = useCallback(
     (
