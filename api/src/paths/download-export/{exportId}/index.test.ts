@@ -72,7 +72,7 @@ describe('paths/download-export/{exportId}/index', () => {
 
       await getDownloadExportDetail()(mockReq, mockRes, mockNext);
 
-      expect(listPartsStub).to.have.been.calledOnceWith(exportRecord.download_export_id);
+      expect(listPartsStub).to.have.been.calledOnceWith(exportRecord.download_export_id, exportRecord.started_at);
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql({ ...exportRecord, parts });
     });

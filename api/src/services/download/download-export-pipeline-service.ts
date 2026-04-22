@@ -223,7 +223,7 @@ export class DownloadExportPipelineService extends DBService {
     pendingCursor?: Awaited<ReturnType<ParquetReader['getCursor']>>;
     pendingChunkIndex?: number;
   }> {
-    const { downloadId, featureTypeName, properties, maxPartSizeBytes, archiverByPart } = params;
+    const { exportId, downloadId, featureTypeName, properties, maxPartSizeBytes, archiverByPart } = params;
     let { currentPart } = params;
 
     // Reuse the reader + cursor across roll-overs so we don't re-fetch the
@@ -259,7 +259,7 @@ export class DownloadExportPipelineService extends DBService {
     // PassThrough; archiver reads from it and writes to its own output pipe.
     const openChunkEntry = (): PassThrough => {
       const bundle = currentBundle();
-      const entryName = `${featureTypeName}/chunk${chunkIndex}.csv`;
+      const entryName = `biohub-${exportId}-part-${currentPart}/${featureTypeName}/chunk${chunkIndex}.csv`;
       const entry = new PassThrough();
       bundle.archive.append(entry, { name: entryName });
       chunksWritten += 1;
@@ -593,7 +593,7 @@ export class DownloadExportPipelineService extends DBService {
         const refsForPart = allFileRefs.filter((ref) => ref.partIndex === partIndex);
         for (const ref of refsForPart) {
           const fileName = ref.filePath.split('/').pop() ?? 'file';
-          const entryName = `files${partIndex}/${ref.submissionFeatureId}_${fileName}`;
+          const entryName = `biohub-${exportId}-part-${partIndex}/files${partIndex}/${ref.submissionFeatureId}_${fileName}`;
           await this.appendBinaryToArchive(bundle.archive, objectStorageService, ref.filePath, entryName);
         }
       }

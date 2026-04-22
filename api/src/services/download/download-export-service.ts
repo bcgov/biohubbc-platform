@@ -133,17 +133,54 @@ export class DownloadExportService extends DBService {
    * One presigned URL per part-zip, signed at request time with the same TTL
    * as fragment URLs. The `byte_size → file_size_bytes` rename matches the
    * legacy fragment response shape the frontend already consumes.
+   *
+   * The presigned URL carries a `Content-Disposition` override so the browser
+   * saves each zip as `{YYYYMMDD-HHMMSS}-biohub-{exportId}-part-{N}.zip`. The
+   * timestamp is derived from `started_at` (not the S3 key) so zips from
+   * multiple exports under the same download sort chronologically in the
+   * user's Downloads folder — UUID-only filenames sort alphabetically by
+   * random hex, which is meaningless to a human scanning a file list.
    */
-  async listExportPartUrls(exportId: string): Promise<DownloadExportPart[]> {
+  async listExportPartUrls(exportId: string, startedAt: string | null): Promise<DownloadExportPart[]> {
     const artifacts = await this.downloadExportRepository.listDownloadExportArtifactsByExportId(exportId);
     const objectStorageService = new ObjectStorageService();
+    const timestampPrefix = formatDownloadTimestampPrefix(startedAt);
 
     return Promise.all(
-      artifacts.map(async (artifact) => ({
-        chunk_id: artifact.chunk_id,
-        file_size_bytes: artifact.byte_size,
-        url: await objectStorageService.getSignedUrl(BucketType.MAIN, artifact.object_key, SIGNED_URL_EXPIRY_FRAGMENT)
-      }))
+      artifacts.map(async (artifact) => {
+        const downloadFileName = `${timestampPrefix}-biohub-${exportId}-part-${artifact.chunk_id}.zip`;
+        return {
+          chunk_id: artifact.chunk_id,
+          file_size_bytes: artifact.byte_size,
+          url: await objectStorageService.getSignedUrl(
+            BucketType.MAIN,
+            artifact.object_key,
+            SIGNED_URL_EXPIRY_FRAGMENT,
+            `attachment; filename="${downloadFileName}"`
+          )
+        };
+      })
     );
   }
+}
+
+/**
+ * Format an ISO timestamp as `YYYYMMDD-HHMMSS` in UTC so filenames sort
+ * lexicographically = chronologically regardless of the user's locale. Falls
+ * back to "now" if `started_at` is null (a READY export always has it set,
+ * but the column is nullable and a defensive default beats a `null-null-null`
+ * prefix in the rare pathological case).
+ */
+function formatDownloadTimestampPrefix(isoTimestamp: string | null): string {
+  const date = isoTimestamp ? new Date(isoTimestamp) : new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return (
+    date.getUTCFullYear().toString() +
+    pad(date.getUTCMonth() + 1) +
+    pad(date.getUTCDate()) +
+    '-' +
+    pad(date.getUTCHours()) +
+    pad(date.getUTCMinutes()) +
+    pad(date.getUTCSeconds())
+  );
 }

@@ -1,6 +1,6 @@
 import { mdiAlertCircleOutline, mdiChevronDown, mdiChevronUp, mdiDownloadOutline, mdiRefresh } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Card, Chip, CircularProgress, Collapse, IconButton, Link, Stack, Tooltip, Typography } from '@mui/material';
+import { Card, Chip, Collapse, IconButton, Link, Stack, Tooltip, Typography } from '@mui/material';
 import { grey } from '@mui/material/colors';
 import { useState } from 'react';
 import { CustomMenuIconButton, IMenuToolbarItem } from 'components/toolbar/ActionToolbars';
@@ -123,7 +123,9 @@ interface ExportRowProps {
 
 /**
  * One sub-row per `download_export`. Body varies by status:
- *   - `pending` / `processing`: spinner only.
+ *   - `pending` / `processing`: no body — the status chip alone communicates in-flight state.
+ *     No spinner, because the list does not poll; an animating indicator would imply active
+ *     progress the UI cannot actually observe.
  *   - `failed`: error icon + tooltip showing `error_message`. No retry button — the user creates
  *     a fresh export via the menu and the failed row stays for audit.
  *   - `ready`: a download affordance sized to `part_count`:
@@ -154,12 +156,7 @@ const ExportRow = (props: ExportRowProps) => {
         <Chip size="small" color={exportChipProps.color} label={exportChipProps.label} />
       </Stack>
 
-      {/* Body varies by status */}
-      {status === 'pending' || status === 'processing' ? (
-        <Stack direction="row" justifyContent="flex-end" alignItems="center" sx={{ py: 0.25 }}>
-          <CircularProgress size={14} data-testid={`export-row-spinner-${exportId}`} />
-        </Stack>
-      ) : null}
+      {/* Body varies by status — pending/processing render header row only (chip communicates state). */}
 
       {/* Failed: error icon + tooltip. No retry button — user creates a fresh export via the menu; failed row stays for audit. */}
       {status === 'failed' && error_message ? (

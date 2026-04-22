@@ -164,12 +164,12 @@ describe('DownloadExportService', () => {
       sinon.stub(ObjectStorageService.prototype, 'getSignedUrl');
 
       const service = new DownloadExportService(getMockDBConnection());
-      const parts = await service.listExportPartUrls(EXPORT_ID);
+      const parts = await service.listExportPartUrls(EXPORT_ID, '2026-04-22T15:38:43.000Z');
 
       expect(parts).to.have.lengthOf(0);
     });
 
-    it('builds one presigned URL per artifact, preserving chunk_id ASC order from repo', async () => {
+    it('builds one presigned URL per artifact with a sortable timestamp-prefixed filename, preserving chunk_id ASC order', async () => {
       sinon.stub(DownloadExportRepository.prototype, 'listDownloadExportArtifactsByExportId').resolves([
         {
           download_export_artifact_id: 1,
@@ -196,7 +196,7 @@ describe('DownloadExportService', () => {
         .resolves('https://example.com/part-2');
 
       const service = new DownloadExportService(getMockDBConnection());
-      const parts = await service.listExportPartUrls(EXPORT_ID);
+      const parts = await service.listExportPartUrls(EXPORT_ID, '2026-04-22T15:38:43.000Z');
 
       expect(parts).to.deep.equal([
         { chunk_id: 1, file_size_bytes: '100', url: 'https://example.com/part-1' },
@@ -205,8 +205,34 @@ describe('DownloadExportService', () => {
       expect(urlStub.firstCall.args).to.deep.equal([
         BucketType.MAIN,
         'downloads/d/exports/e/biohub-e-part-1.zip',
-        SIGNED_URL_EXPIRY_FRAGMENT
+        SIGNED_URL_EXPIRY_FRAGMENT,
+        `attachment; filename="20260422-153843-biohub-${EXPORT_ID}-part-1.zip"`
       ]);
+      expect(urlStub.secondCall.args[3]).to.equal(
+        `attachment; filename="20260422-153843-biohub-${EXPORT_ID}-part-2.zip"`
+      );
+    });
+
+    it('falls back to now() when started_at is null', async () => {
+      sinon.stub(DownloadExportRepository.prototype, 'listDownloadExportArtifactsByExportId').resolves([
+        {
+          download_export_artifact_id: 1,
+          download_export_id: EXPORT_ID,
+          artifact_id: 'bbbb0000-0000-0000-0000-000000000001',
+          chunk_id: 1,
+          byte_size: '100',
+          object_key: 'downloads/d/exports/e/biohub-e-part-1.zip'
+        }
+      ]);
+      const urlStub = sinon.stub(ObjectStorageService.prototype, 'getSignedUrl').resolves('https://example.com/part-1');
+
+      const service = new DownloadExportService(getMockDBConnection());
+      await service.listExportPartUrls(EXPORT_ID, null);
+
+      // Disposition is built with a live timestamp — just assert shape, not exact value.
+      expect(urlStub.firstCall.args[3]).to.match(
+        new RegExp(`^attachment; filename="\\d{8}-\\d{6}-biohub-${EXPORT_ID}-part-1\\.zip"$`)
+      );
     });
   });
 });

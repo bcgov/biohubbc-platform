@@ -64,7 +64,9 @@ export function getDownloadExportDetail(): RequestHandler {
       const exportRecord = await exportService.getAuthorizedExport(exportId, systemUserId);
 
       const parts =
-        exportRecord.status === DownloadStatusEnum.READY ? await exportService.listExportPartUrls(exportId) : [];
+        exportRecord.status === DownloadStatusEnum.READY
+          ? await exportService.listExportPartUrls(exportId, exportRecord.started_at)
+          : [];
 
       await connection.commit();
 

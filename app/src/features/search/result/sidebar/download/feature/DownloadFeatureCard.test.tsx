@@ -90,23 +90,25 @@ describe('DownloadFeatureCard', () => {
       expect(rows.length).toBe(0);
     });
 
-    it('renders pending export rows with spinner and no download button', () => {
+    it('renders pending export rows with only the status chip — no spinner, no download button', () => {
       const props = makeProps({
         exports: [makeExport({ download_export_id: 'exp-1', status: 'pending', part_count: 0 })]
       });
       const { getByTestId, queryByTestId } = render(<DownloadFeatureCard {...props} />);
-      expect(getByTestId('export-row-spinner-exp-1')).toBeInTheDocument();
+      expect(getByTestId('export-row-exp-1')).toBeInTheDocument();
+      expect(queryByTestId('export-row-spinner-exp-1')).toBeNull();
       expect(queryByTestId('export-download-button-exp-1')).toBeNull();
       expect(queryByTestId('export-download-all-button-exp-1')).toBeNull();
       expect(queryByTestId('export-rebuild-button-exp-1')).toBeNull();
     });
 
-    it('renders processing export rows with spinner and no download button', () => {
+    it('renders processing export rows with only the status chip — no spinner, no download button', () => {
       const props = makeProps({
         exports: [makeExport({ download_export_id: 'exp-1', status: 'processing', part_count: 0 })]
       });
       const { getByTestId, queryByTestId } = render(<DownloadFeatureCard {...props} />);
-      expect(getByTestId('export-row-spinner-exp-1')).toBeInTheDocument();
+      expect(getByTestId('export-row-exp-1')).toBeInTheDocument();
+      expect(queryByTestId('export-row-spinner-exp-1')).toBeNull();
       expect(queryByTestId('export-download-button-exp-1')).toBeNull();
     });
 
