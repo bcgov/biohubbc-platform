@@ -32,6 +32,16 @@ export const JobQueues = {
    */
   PROCESS_DOWNLOAD_FAILED: 'process-download-failed',
   /**
+   * Process download export job queue for async CSV export packaging over an
+   * already-ready download's per-feature-type Parquet artifacts.
+   */
+  PROCESS_DOWNLOAD_EXPORT: 'process-download-export',
+  /**
+   * Dead letter queue for failed download export jobs.
+   * Jobs are moved here after all retries are exhausted.
+   */
+  PROCESS_DOWNLOAD_EXPORT_FAILED: 'process-download-export-failed',
+  /**
    * Index submission features job queue for async search indexing after validation.
    */
   INDEX_SUBMISSION_FEATURES: 'index-submission-features',

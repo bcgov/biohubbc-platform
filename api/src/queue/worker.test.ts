@@ -52,18 +52,20 @@ describe('worker', () => {
       await registerWorkers();
 
       // createQueue is called for all queues (including dead letter queues)
-      // 10 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, COMPUTE_SCOPE_ANCHORS + FAILED
-      expect(createQueueStub.callCount).to.equal(10);
+      // 12 queues: PROCESS_SUBMISSION_FEATURES + FAILED, MALWARE_SCAN + FAILED, PROCESS_DOWNLOAD + FAILED, PROCESS_DOWNLOAD_EXPORT + FAILED, INDEX_SUBMISSION_FEATURES + FAILED, COMPUTE_SCOPE_ANCHORS + FAILED
+      expect(createQueueStub.callCount).to.equal(12);
       expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES_FAILED);
       expect(createQueueStub.secondCall.args[0]).to.equal(JobQueues.PROCESS_SUBMISSION_FEATURES);
       expect(createQueueStub.thirdCall.args[0]).to.equal(JobQueues.MALWARE_SCAN_FAILED);
       expect(createQueueStub.getCall(3).args[0]).to.equal(JobQueues.MALWARE_SCAN);
       expect(createQueueStub.getCall(4).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_FAILED);
       expect(createQueueStub.getCall(5).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD);
-      expect(createQueueStub.getCall(6).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
-      expect(createQueueStub.getCall(7).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
-      expect(createQueueStub.getCall(8).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
-      expect(createQueueStub.getCall(9).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS);
+      expect(createQueueStub.getCall(6).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_EXPORT_FAILED);
+      expect(createQueueStub.getCall(7).args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_EXPORT);
+      expect(createQueueStub.getCall(8).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
+      expect(createQueueStub.getCall(9).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
+      expect(createQueueStub.getCall(10).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
+      expect(createQueueStub.getCall(11).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS);
     });
 
     it('configures dead letter queue for process-submission-features', async () => {
@@ -107,12 +109,12 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      // Index submission features handlers are registered after download handlers
-      expect(workStub.getCall(6).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
-      expect(workStub.getCall(6).args[1]).to.equal(indexSubmissionFeaturesJob.indexSubmissionFeaturesJobHandler);
+      // Index submission features handlers are registered after download + download-export handlers
+      expect(workStub.getCall(8).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES);
+      expect(workStub.getCall(8).args[1]).to.equal(indexSubmissionFeaturesJob.indexSubmissionFeaturesJobHandler);
 
-      expect(workStub.getCall(7).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
-      expect(workStub.getCall(7).args[1]).to.equal(indexSubmissionFeaturesJob.indexSubmissionFeaturesFailedHandler);
+      expect(workStub.getCall(9).args[0]).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
+      expect(workStub.getCall(9).args[1]).to.equal(indexSubmissionFeaturesJob.indexSubmissionFeaturesFailedHandler);
     });
 
     it('configures dead letter queue for index-submission-features', async () => {
@@ -124,11 +126,30 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      // 8th createQueue call (INDEX_SUBMISSION_FEATURES) should have DLQ config
-      const queueConfig = createQueueStub.getCall(7).args[1];
+      // 10th createQueue call (INDEX_SUBMISSION_FEATURES) should have DLQ config
+      const queueConfig = createQueueStub.getCall(9).args[1];
       expect(queueConfig.deadLetter).to.equal(JobQueues.INDEX_SUBMISSION_FEATURES_FAILED);
       expect(queueConfig.retryLimit).to.equal(3);
       expect(queueConfig.retryBackoff).to.equal(true);
+    });
+
+    it('configures dead letter queue + policy:short for process-download-export', async () => {
+      const workStub = sinon.stub().resolves();
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { work: workStub, createQueue: createQueueStub };
+
+      sinon.stub(workerDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      await registerWorkers();
+
+      // 8th createQueue call (PROCESS_DOWNLOAD_EXPORT) should have DLQ config
+      // policy: 'short' — without it pg-boss ignores singletonKey, so two
+      // concurrent POST /export calls for the same export would both run.
+      const queueConfig = createQueueStub.getCall(7).args[1];
+      expect(queueConfig.deadLetter).to.equal(JobQueues.PROCESS_DOWNLOAD_EXPORT_FAILED);
+      expect(queueConfig.retryLimit).to.equal(3);
+      expect(queueConfig.retryBackoff).to.equal(true);
+      expect(queueConfig.policy).to.equal('short');
     });
 
     it('registers the compute scope anchors job handler with pg-boss', async () => {
@@ -141,11 +162,11 @@ describe('worker', () => {
       await registerWorkers();
 
       // Compute scope anchors handlers are registered after index submission features handlers
-      expect(workStub.getCall(8).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS);
-      expect(workStub.getCall(8).args[1]).to.equal(computeScopeAnchorsJob.computeScopeAnchorsJobHandler);
+      expect(workStub.getCall(10).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS);
+      expect(workStub.getCall(10).args[1]).to.equal(computeScopeAnchorsJob.computeScopeAnchorsJobHandler);
 
-      expect(workStub.getCall(9).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
-      expect(workStub.getCall(9).args[1]).to.equal(computeScopeAnchorsJob.computeScopeAnchorsFailedHandler);
+      expect(workStub.getCall(11).args[0]).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
+      expect(workStub.getCall(11).args[1]).to.equal(computeScopeAnchorsJob.computeScopeAnchorsFailedHandler);
     });
 
     it('configures dead letter queue for compute-scope-anchors', async () => {
@@ -157,8 +178,8 @@ describe('worker', () => {
 
       await registerWorkers();
 
-      // 10th createQueue call (COMPUTE_SCOPE_ANCHORS) should have DLQ config
-      const queueConfig = createQueueStub.getCall(9).args[1];
+      // 12th createQueue call (COMPUTE_SCOPE_ANCHORS) should have DLQ config
+      const queueConfig = createQueueStub.getCall(11).args[1];
       expect(queueConfig.deadLetter).to.equal(JobQueues.COMPUTE_SCOPE_ANCHORS_FAILED);
       expect(queueConfig.retryLimit).to.equal(3);
       expect(queueConfig.retryBackoff).to.equal(true);

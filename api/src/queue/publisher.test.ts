@@ -13,6 +13,7 @@ import {
   publisherDependencies,
   publishIndexSubmissionFeaturesJob,
   publishMalwareScanJob,
+  publishProcessDownloadExportJob,
   publishProcessDownloadJob,
   publishProcessSubmissionFeaturesJob
 } from './publisher';
@@ -679,6 +680,114 @@ describe('publisher', () => {
       sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
 
       const result = await publishComputeScopeAnchorsJob(mockConnection, { securityScopeId: 'scope-uuid-1' });
+
+      expect(result.status).to.equal('error');
+      expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
+    });
+  });
+
+  describe('publishProcessDownloadExportJob', () => {
+    it('uses singletonKey based on downloadExportId to prevent duplicates', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('export-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      await publishProcessDownloadExportJob(mockConnection, {
+        downloadExportId: 'bbbb0000-0000-0000-0000-000000000456'
+      });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.singletonKey).to.equal('export-bbbb0000-0000-0000-0000-000000000456');
+    });
+
+    it('uses process download export options with 1 hour timeout', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('export-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      await publishProcessDownloadExportJob(mockConnection, {
+        downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+      });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.retryLimit).to.equal(3);
+      expect(options.retryDelay).to.equal(60);
+      expect(options.retryBackoff).to.equal(true);
+      expect(options.expireInSeconds).to.equal(60 * 60); // 1 hour
+    });
+
+    it('passes db option using caller connection for transactional job insert', async () => {
+      const queryStub = sinon.stub().resolves({ rows: [], rowCount: 0 });
+      const mockConnection = getMockDBConnection({ query: queryStub });
+      const sendStub = sinon.stub().resolves('export-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      await publishProcessDownloadExportJob(mockConnection, {
+        downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+      });
+
+      const options = sendStub.firstCall.args[2];
+      expect(options.db).to.exist;
+      expect(options.db.executeSql).to.be.a('function');
+
+      await options.db.executeSql('SELECT 1', [42]);
+      expect(queryStub).to.have.been.calledOnceWith('SELECT 1', [42]);
+    });
+
+    it('returns published status with jobId when boss.send returns a job ID', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves('export-job-id');
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      const result = await publishProcessDownloadExportJob(mockConnection, {
+        downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+      });
+
+      expect(createQueueStub.calledOnce).to.be.true;
+      expect(createQueueStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_EXPORT);
+      expect(sendStub.calledOnce).to.be.true;
+      expect(sendStub.firstCall.args[0]).to.equal(JobQueues.PROCESS_DOWNLOAD_EXPORT);
+      expect(result.status).to.equal('published');
+      expect((result as { status: 'published'; jobId: string }).jobId).to.equal('export-job-id');
+    });
+
+    it('returns duplicate status when boss.send returns null (singleton collision or throttled)', async () => {
+      const mockConnection = getMockDBConnection();
+      const sendStub = sinon.stub().resolves(null);
+      const createQueueStub = sinon.stub().resolves();
+      const mockBoss = { send: sendStub, createQueue: createQueueStub };
+
+      sinon.stub(publisherDependencies, 'getPgBoss').returns(mockBoss as any);
+
+      const result = await publishProcessDownloadExportJob(mockConnection, {
+        downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+      });
+
+      expect(result.status).to.equal('duplicate');
+      expect((result as { status: 'duplicate'; message: string }).message).to.equal(
+        'Job already exists for this download export'
+      );
+    });
+
+    it('returns error status when pg-boss throws', async () => {
+      const mockConnection = getMockDBConnection();
+      sinon.stub(publisherDependencies, 'getPgBoss').throws(new Error('pg-boss not initialized'));
+
+      const result = await publishProcessDownloadExportJob(mockConnection, {
+        downloadExportId: 'bbbb0000-0000-0000-0000-000000000001'
+      });
 
       expect(result.status).to.equal('error');
       expect((result as { status: 'error'; message: string }).message).to.equal('pg-boss not initialized');
