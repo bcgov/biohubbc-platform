@@ -16,7 +16,7 @@ describe('teams/{teamId}/member/{teamMemberId}', () => {
 
   it('should delete a team member', async () => {
     const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
     const deleteStub = sinon.stub(TeamMemberService.prototype, 'deleteTeamMember').resolves();
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();

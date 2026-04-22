@@ -1,5 +1,4 @@
 {
   "extension": ["ts"],
-  "spec": "src/{*.@(test|spec).ts,!(__mocks__|__integration__)/**/*.@(test|spec).ts}",
-  "require": "ts-node/register, mocha-fixtures.ts"
+  "spec": "src/{*.@(test|spec).ts,!(__mocks__|__integration__)/**/*.@(test|spec).ts}"
 }

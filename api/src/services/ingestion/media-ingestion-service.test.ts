@@ -3,7 +3,6 @@ import { describe } from 'mocha';
 import { Readable } from 'node:stream';
 import sinon from 'sinon';
 import { getMockDBConnection } from '../../__mocks__/db';
-import * as biohubTarParser from '../../utils/biohub-tar-parser';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArtifactService } from '../upload/upload-artifact-service';
@@ -33,7 +32,7 @@ describe('MediaIngestionService', () => {
         .stub(ArtifactService.prototype, 'updateArtifactsByIds')
         .resolves([{ artifact_id: 'artifact-1' }, { artifact_id: 'artifact-2' }]);
 
-      sinon.stub(biohubTarParser, 'streamMedia').callsFake(async (_stream, options) => {
+      sinon.stub(MediaIngestionService.dependencies, 'streamMedia').callsFake(async (_stream, options) => {
         await options.ingestMediaBatch([
           {
             fileName: 'key.pdf',
@@ -94,7 +93,9 @@ describe('MediaIngestionService', () => {
       const service = new MediaIngestionService(dbConnection);
 
       sinon.stub(ObjectStorageService.prototype, 'getFileStream').resolves(Readable.from(Buffer.alloc(0)));
-      sinon.stub(biohubTarParser, 'streamMedia').rejects(new Error('media stream extraction failed'));
+      sinon
+        .stub(MediaIngestionService.dependencies, 'streamMedia')
+        .rejects(new Error('media stream extraction failed'));
 
       try {
         await service.ingestMediaFiles('archive/key.tar', 123, 'submission-upload-1', 'upload-1', 'archive-1');
@@ -113,7 +114,7 @@ describe('MediaIngestionService', () => {
       sinon
         .stub(UploadArtifactService.prototype, 'insertUploadArtifacts')
         .rejects(new Error('insert upload_artifact failed'));
-      sinon.stub(biohubTarParser, 'streamMedia').callsFake(async (_stream, options) => {
+      sinon.stub(MediaIngestionService.dependencies, 'streamMedia').callsFake(async (_stream, options) => {
         await options.ingestMediaBatch([
           {
             fileName: 'photo-1.jpg',

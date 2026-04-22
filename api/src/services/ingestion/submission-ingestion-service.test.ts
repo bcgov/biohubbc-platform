@@ -6,7 +6,6 @@ import { getMockDBConnection } from '../../__mocks__/db';
 import { Artifact, ArtifactStatusEnum } from '../../models/artifact';
 import { IFlattenedBlock } from '../../models/submission-feature';
 import { UploadArchive } from '../../models/upload-archive';
-import * as biohubTarParser from '../../utils/biohub-tar-parser';
 import { ObjectStorageService } from '../object-storage/object-storage-service';
 import { ArtifactService } from '../upload/artifact-service';
 import { UploadArchiveService } from '../upload/upload-archive-service';
@@ -63,19 +62,21 @@ describe('SubmissionIngestionService', () => {
       const ingestMediaStub = sinon.stub(MediaIngestionService.prototype, 'ingestMediaFiles').resolves();
       const ingestCodesetsStub = sinon.stub(CodesetIngestionService.prototype, 'ingestCodesets').resolves();
 
-      sinon.stub(biohubTarParser, 'streamFeatures').callsFake(async (_stream, _batchSize, onBatch) => {
-        const featureBatch: IFlattenedBlock[] = [
-          {
-            id: 'feature-1',
-            type: 'observation',
-            properties: { title: 'test' },
-            content: [],
-            parent: null
-          }
-        ];
-        await onBatch(featureBatch);
-        return { featureCount: 1 };
-      });
+      sinon
+        .stub(SubmissionIngestionService.dependencies, 'streamFeatures')
+        .callsFake(async (_stream, _batchSize, onBatch) => {
+          const featureBatch: IFlattenedBlock[] = [
+            {
+              id: 'feature-1',
+              type: 'observation',
+              properties: { title: 'test' },
+              content: [],
+              parent: null
+            }
+          ];
+          await onBatch(featureBatch);
+          return { featureCount: 1 };
+        });
 
       const result = await service.ingestSubmissionUpload(mockSubmissionUpload);
 
@@ -116,7 +117,7 @@ describe('SubmissionIngestionService', () => {
       sinon.stub(MediaIngestionService.prototype, 'ingestMediaFiles').resolves();
       sinon.stub(CodesetIngestionService.prototype, 'ingestCodesets').resolves();
       sinon
-        .stub(biohubTarParser, 'streamFeatures')
+        .stub(SubmissionIngestionService.dependencies, 'streamFeatures')
         .rejects(new Error('Feature entry is missing required string field: id'));
 
       try {
@@ -168,7 +169,9 @@ describe('SubmissionIngestionService', () => {
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
       sinon.stub(MediaIngestionService.prototype, 'ingestMediaFiles').rejects(new Error('media upload failed'));
       const ingestCodesetsStub = sinon.stub(CodesetIngestionService.prototype, 'ingestCodesets').resolves();
-      const streamFeaturesStub = sinon.stub(biohubTarParser, 'streamFeatures').resolves({ featureCount: 0 });
+      const streamFeaturesStub = sinon
+        .stub(SubmissionIngestionService.dependencies, 'streamFeatures')
+        .resolves({ featureCount: 0 });
 
       try {
         await service.ingestSubmissionUpload(mockSubmissionUpload);
@@ -209,7 +212,9 @@ describe('SubmissionIngestionService', () => {
       sinon.stub(SubmissionFeatureIngestionService.prototype, 'deleteFeaturesBySubmissionUploadId').resolves();
       sinon.stub(MediaIngestionService.prototype, 'ingestMediaFiles').resolves();
       sinon.stub(CodesetIngestionService.prototype, 'ingestCodesets').rejects(new Error('codeset persist failed'));
-      const streamFeaturesStub = sinon.stub(biohubTarParser, 'streamFeatures').resolves({ featureCount: 0 });
+      const streamFeaturesStub = sinon
+        .stub(SubmissionIngestionService.dependencies, 'streamFeatures')
+        .resolves({ featureCount: 0 });
 
       try {
         await service.ingestSubmissionUpload(mockSubmissionUpload);
@@ -252,18 +257,20 @@ describe('SubmissionIngestionService', () => {
       sinon
         .stub(SubmissionFeatureIngestionService.prototype, 'ingestFeatureBatch')
         .rejects(new Error('insert feature batch failed'));
-      sinon.stub(biohubTarParser, 'streamFeatures').callsFake(async (_stream, _batchSize, onBatch) => {
-        await onBatch([
-          {
-            id: 'feature-1',
-            type: 'dataset',
-            properties: { name: 'x' },
-            content: [],
-            parent: null
-          }
-        ]);
-        return { featureCount: 1 };
-      });
+      sinon
+        .stub(SubmissionIngestionService.dependencies, 'streamFeatures')
+        .callsFake(async (_stream, _batchSize, onBatch) => {
+          await onBatch([
+            {
+              id: 'feature-1',
+              type: 'dataset',
+              properties: { name: 'x' },
+              content: [],
+              parent: null
+            }
+          ]);
+          return { featureCount: 1 };
+        });
 
       try {
         await service.ingestSubmissionUpload(mockSubmissionUpload);

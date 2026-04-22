@@ -21,7 +21,7 @@ describe('apply', () => {
         systemUserId: () => 1000
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const applySecurityRulesToArtifactsStub = sinon
         .stub(SecurityService.prototype, 'applySecurityRulesToArtifacts')
@@ -52,7 +52,7 @@ describe('apply', () => {
         release: sinon.stub()
       });
 
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 

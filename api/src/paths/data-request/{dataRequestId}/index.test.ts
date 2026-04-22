@@ -34,7 +34,7 @@ describe('data-request/{dataRequestId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
 
       const requestHandler = getDataRequestById();
@@ -57,7 +57,7 @@ describe('data-request/{dataRequestId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const stub = sinon.stub(DataRequestService.prototype, 'getDataRequestById').resolves(mockDataRequest);
 
@@ -80,7 +80,7 @@ describe('data-request/{dataRequestId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       sinon.stub(DataRequestService.prototype, 'getDataRequestById').rejects(new Error('Service error'));
 
@@ -106,7 +106,7 @@ describe('data-request/{dataRequestId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
 
       const requestHandler = updateDataRequest();
@@ -130,7 +130,7 @@ describe('data-request/{dataRequestId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const stub = sinon.stub(DataRequestService.prototype, 'updateDataRequest').resolves();
 
@@ -153,7 +153,7 @@ describe('data-request/{dataRequestId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       sinon.stub(DataRequestService.prototype, 'updateDataRequest').rejects(new Error('Data request not found'));
 
@@ -180,7 +180,7 @@ describe('data-request/{dataRequestId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
       sinon.stub(mockDBConnection, 'open').rejects(new Error('DB open failed'));
 
       const requestHandler = deleteDataRequest();
@@ -203,7 +203,7 @@ describe('data-request/{dataRequestId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       const stub = sinon.stub(DataRequestService.prototype, 'deleteDataRequest').resolves();
 
@@ -225,7 +225,7 @@ describe('data-request/{dataRequestId}', () => {
         rollback: sinon.stub(),
         release: sinon.stub()
       });
-      sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+      sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
 
       sinon.stub(DataRequestService.prototype, 'deleteDataRequest').rejects(new Error('Data request not found'));
 

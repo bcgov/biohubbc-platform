@@ -28,7 +28,7 @@ describe('searchSummary', () => {
       rollback: sinon.stub().resolves(),
       release: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: 'moose' };
@@ -53,7 +53,7 @@ describe('searchSummary', () => {
       rollback: sinon.stub().resolves(),
       release: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: 'fail' };
@@ -80,7 +80,7 @@ describe('searchSummary', () => {
       rollback: sinon.stub().resolves(),
       release: sinon.stub().resolves()
     });
-    sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.query = { keyword: 'anything' };

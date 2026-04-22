@@ -20,7 +20,7 @@ describe('completeUpload handler', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const completeArchiveUploadStub = sinon.stub(UploadIngestionService.prototype, 'completeArchiveUpload').resolves();
 
@@ -67,7 +67,7 @@ describe('completeUpload handler', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const error = new Error('Upload completion failed');
     sinon.stub(UploadIngestionService.prototype, 'completeArchiveUpload').rejects(error);
@@ -103,7 +103,7 @@ describe('completeUpload handler', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const requestHandler = completeUpload();
 
@@ -133,7 +133,7 @@ describe('completeUpload handler', () => {
       rollback: sinon.stub(),
       release: sinon.stub()
     });
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(db.dbDependencies, 'getDBConnection').returns(dbConnectionObj);
 
     const completeArchiveUploadStub = sinon.stub(UploadIngestionService.prototype, 'completeArchiveUpload').resolves();
 

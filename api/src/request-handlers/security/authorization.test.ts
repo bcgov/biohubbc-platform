@@ -22,7 +22,7 @@ describe('authorizeRequestHandler', function () {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    sinon.stub(authorization, 'authorizeRequest').resolves(false);
+    sinon.stub(authorization.authorizationDependencies, 'authorizeRequest').resolves(false);
 
     const mockAuthorizationSchemeCallback = () => {
       return { or: [] };
@@ -46,7 +46,7 @@ describe('authorizeRequestHandler', function () {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    sinon.stub(authorization, 'authorizeRequest').resolves(true);
+    sinon.stub(authorization.authorizationDependencies, 'authorizeRequest').resolves(true);
 
     const mockAuthorizationSchemeCallback = () => {
       return { or: [] };
