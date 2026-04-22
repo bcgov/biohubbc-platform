@@ -1,10 +1,7 @@
 import { IDBConnection } from '../database/db';
 import { FeatureTypeProperty } from '../models/feature-type-property';
 import { FeatureTypePropertyRepository } from '../repositories/feature-type-property-repository';
-import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
-
-const defaultLog = getLogger('services/feature-type-property');
 
 export class FeatureTypePropertyService extends DBService {
   featureTypePropertyRepository: FeatureTypePropertyRepository;
@@ -26,8 +23,6 @@ export class FeatureTypePropertyService extends DBService {
    * @return {Promise<FeatureTypeProperty>} Matched feature-type-property row.
    */
   async getFeaturePropertyByName(featurePropertyName: string): Promise<FeatureTypeProperty> {
-    defaultLog.debug({ message: 'getFeaturePropertyByName' });
-
     return this.featureTypePropertyRepository.getFeaturePropertyByName(featurePropertyName);
   }
 
@@ -38,8 +33,6 @@ export class FeatureTypePropertyService extends DBService {
    * @return {Promise<FeatureTypeProperty>} Matched feature-type-property row.
    */
   async getFeaturePropertyByFeatureTypePropertyId(featureTypePropertyId: number): Promise<FeatureTypeProperty> {
-    defaultLog.debug({ message: 'getFeaturePropertyByFeatureTypePropertyId' });
-
     return this.featureTypePropertyRepository.getFeaturePropertyByFeatureTypePropertyId(featureTypePropertyId);
   }
 }

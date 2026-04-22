@@ -86,6 +86,10 @@ export async function up(knex: Knex): Promise<void> {
       CONSTRAINT expression_pk PRIMARY KEY (expression_id)
     );
 
+    CREATE UNIQUE INDEX expression_nuk_hash
+      ON expression(expression_hash)
+      WHERE record_end_date IS NULL;
+
     --------------------------------------------------------------------------------
     -- PREDICATE
     --------------------------------------------------------------------------------
@@ -109,10 +113,6 @@ export async function up(knex: Knex): Promise<void> {
         FOREIGN KEY (feature_property_type_id)
         REFERENCES feature_property_type(feature_property_type_id)
     );
-
-    CREATE UNIQUE INDEX expression_nuk_hash
-      ON expression(expression_hash)
-      WHERE record_end_date IS NULL;
 
     CREATE INDEX predicate_idx1 ON predicate(feature_type_property_id);
     CREATE INDEX predicate_idx2
@@ -175,6 +175,9 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX expression_clause_idx7
       ON expression_clause(child_expression_id)
       WHERE record_end_date IS NULL;
+    CREATE INDEX expression_clause_idx8
+      ON expression_clause(expression_id, child_expression_id)
+      WHERE record_end_date IS NULL AND child_expression_id IS NOT NULL;
 
     CREATE UNIQUE INDEX expression_clause_nuk1
       ON expression_clause(expression_id, sequence)
@@ -454,10 +457,6 @@ export async function up(knex: Knex): Promise<void> {
       WHERE record_end_date IS NULL;
 
     --------------------------------------------------------------------------------
-    -- OWNER EXPRESSION TABLES
-    --------------------------------------------------------------------------------
-
-    --------------------------------------------------------------------------------
     -- DOWNLOAD_EXPRESSION
     --------------------------------------------------------------------------------
 
@@ -490,6 +489,9 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX download_expression_idx2 ON download_expression(expression_id);
     CREATE INDEX download_expression_idx3
       ON download_expression(expression_id)
+      WHERE record_end_date IS NULL;
+    CREATE INDEX download_expression_idx4
+      ON download_expression(download_id)
       WHERE record_end_date IS NULL;
 
     --------------------------------------------------------------------------------
@@ -526,6 +528,9 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX policy_statement_condition_expression_idx3
       ON policy_statement_condition_expression(expression_id)
       WHERE record_end_date IS NULL;
+    CREATE INDEX policy_statement_condition_expression_idx4
+      ON policy_statement_condition_expression(policy_statement_condition_id)
+      WHERE record_end_date IS NULL;
 
     --------------------------------------------------------------------------------
     -- POLICY_STATEMENT_EXPRESSION
@@ -561,6 +566,9 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX policy_statement_expression_idx3
       ON policy_statement_expression(expression_id)
       WHERE record_end_date IS NULL;
+    CREATE INDEX policy_statement_expression_idx4
+      ON policy_statement_expression(policy_statement_id)
+      WHERE record_end_date IS NULL;
 
     --------------------------------------------------------------------------------
     -- SECURITY_RULE_EXPRESSION
@@ -595,6 +603,9 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX security_rule_expression_idx2 ON security_rule_expression(expression_id);
     CREATE INDEX security_rule_expression_idx3
       ON security_rule_expression(expression_id)
+      WHERE record_end_date IS NULL;
+    CREATE INDEX security_rule_expression_idx4
+      ON security_rule_expression(security_rule_id)
       WHERE record_end_date IS NULL;
 
     --------------------------------------------------------------------------------
@@ -930,21 +941,25 @@ export async function down(knex: Knex): Promise<void> {
     DROP INDEX IF EXISTS security_rule_expression_idx3;
     DROP INDEX IF EXISTS security_rule_expression_idx2;
     DROP INDEX IF EXISTS security_rule_expression_idx1;
+    DROP INDEX IF EXISTS security_rule_expression_idx4;
 
     DROP INDEX IF EXISTS policy_statement_condition_expression_nuk1;
     DROP INDEX IF EXISTS policy_statement_condition_expression_idx3;
     DROP INDEX IF EXISTS policy_statement_condition_expression_idx2;
     DROP INDEX IF EXISTS policy_statement_condition_expression_idx1;
+    DROP INDEX IF EXISTS policy_statement_condition_expression_idx4;
 
     DROP INDEX IF EXISTS policy_statement_expression_nuk1;
     DROP INDEX IF EXISTS policy_statement_expression_idx3;
     DROP INDEX IF EXISTS policy_statement_expression_idx2;
     DROP INDEX IF EXISTS policy_statement_expression_idx1;
+    DROP INDEX IF EXISTS policy_statement_expression_idx4;
 
     DROP INDEX IF EXISTS download_expression_nuk1;
     DROP INDEX IF EXISTS download_expression_idx3;
     DROP INDEX IF EXISTS download_expression_idx2;
     DROP INDEX IF EXISTS download_expression_idx1;
+    DROP INDEX IF EXISTS download_expression_idx4;
 
     DROP INDEX IF EXISTS predicate_code_nuk1;
     DROP INDEX IF EXISTS predicate_code_idx4;
@@ -990,6 +1005,7 @@ export async function down(knex: Knex): Promise<void> {
     DROP INDEX IF EXISTS predicate_string_idx1;
 
     DROP INDEX IF EXISTS expression_clause_nuk1;
+    DROP INDEX IF EXISTS expression_clause_idx8;
     DROP INDEX IF EXISTS expression_clause_idx7;
     DROP INDEX IF EXISTS expression_clause_idx6;
     DROP INDEX IF EXISTS expression_clause_idx5;

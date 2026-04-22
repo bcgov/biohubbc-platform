@@ -102,8 +102,8 @@ export class SearchFeatureService extends DBService {
    * (submission_feature_id, feature_property_id). Upsert was rejected because it can't clean up
    * orphaned rows when properties are removed between runs.
    *
-   * @param {number} submissionId - Submission numeric identifier to (re)index.
-   * @return {Promise<void>} Resolves after all search rows for the submission are rebuilt.
+   * @param {number} submissionId
+   * @return {Promise<void>}
    */
   async indexFeaturesBySubmissionId(submissionId: number): Promise<void> {
     defaultLog.debug({ label: 'indexFeaturesBySubmissionId', message: 'start', submissionId });

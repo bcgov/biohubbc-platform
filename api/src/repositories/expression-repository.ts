@@ -1,24 +1,30 @@
 import SQL from 'sql-template-strings';
+import { z } from 'zod';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
-import { Expression, ExpressionHashRow } from '../models/expression';
+import { Expression } from '../models/expression';
 import { LogicalOperator } from '../models/logical-operator';
 import { BaseRepository } from './base-repository';
+
+const ResolvedExpressionAnchor = Expression.extend({
+  inserted: z.boolean()
+});
+
+export type ResolvedExpressionAnchor = z.infer<typeof ResolvedExpressionAnchor>;
 
 export class ExpressionRepository extends BaseRepository {
   /**
    * Insert an expression anchor row for a semantic expression hash.
    *
-   * Uses `ON CONFLICT DO NOTHING` on the active-hash uniqueness constraint,
-   * so callers can implement reuse-or-insert orchestration without transaction
-   * retries for common dedupe races.
+   * Uses an upsert on the active-hash uniqueness constraint so callers always
+   * receive a resolved anchor row.
    *
    * @param {LogicalOperator} operator - Expression logical operator.
    * @param {string} expressionHash - Deterministic semantic expression hash.
-   * @return {Promise<Expression | undefined>} Inserted row when created, otherwise `undefined`.
-   * @throws {ApiExecuteSQLError} If insert returns an unexpected row count.
+   * @return {Promise<ResolvedExpressionAnchor>} Resolved expression row with insert-state flag.
+   * @throws {ApiExecuteSQLError} If upsert returns an unexpected row count.
    */
-  async insertExpressionAnchor(operator: LogicalOperator, expressionHash: string): Promise<Expression | undefined> {
+  async insertExpressionAnchor(operator: LogicalOperator, expressionHash: string): Promise<ResolvedExpressionAnchor> {
     const insertSql = SQL`
       INSERT INTO expression (
         operator,
@@ -29,16 +35,17 @@ export class ExpressionRepository extends BaseRepository {
         ${expressionHash}
       )
       ON CONFLICT (expression_hash) WHERE record_end_date IS NULL
-      DO NOTHING
-      RETURNING expression_id, operator::text AS operator;
+      DO UPDATE SET
+        expression_hash = EXCLUDED.expression_hash
+      RETURNING expression_id, operator::text AS operator, expression_hash, (xmax = 0) AS inserted;
     `;
-    const response = await this.connection.sql(insertSql, Expression);
+    const response = await this.connection.sql(insertSql, ResolvedExpressionAnchor);
     const rowCount = response.rowCount ?? 0;
 
-    if (rowCount > 1) {
-      throw new ApiExecuteSQLError('Failed to insert expression anchor', [
+    if (rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to resolve expression anchor', [
         'ExpressionRepository->insertExpressionAnchor',
-        `rowCount was ${rowCount}, expected 0 or 1`
+        `rowCount was ${rowCount}, expected 1`
       ]);
     }
 
@@ -46,50 +53,50 @@ export class ExpressionRepository extends BaseRepository {
   }
 
   /**
-   * Fetch one active expression anchor row by semantic hash.
+   * Find one active expression anchor row by semantic hash.
    *
    * @param {string} expressionHash - Deterministic semantic expression hash.
-   * @return {Promise<ExpressionHashRow | undefined>} Matching active row, when present.
+   * @return {Promise<Expression | null>} Matching active row, when present.
    * @throws {ApiExecuteSQLError} If more than one active row is returned.
    */
-  async getExpressionByHash(expressionHash: string): Promise<ExpressionHashRow | undefined> {
+  async findExpressionByHash(expressionHash: string): Promise<Expression | null> {
     const knex = getKnex();
     const query = knex('expression')
-      .select(['expression_id', 'expression_hash'])
+      .select(['expression_id', knex.raw('operator::text AS operator'), 'expression_hash'])
       .where('expression_hash', expressionHash)
       .whereNull('record_end_date');
 
-    const response = await this.connection.knex(query, ExpressionHashRow);
+    const response = await this.connection.knex(query, Expression);
     const rowCount = response.rowCount ?? 0;
 
     if (rowCount > 1) {
       throw new ApiExecuteSQLError('Unexpected row count', [
-        'ExpressionRepository->getExpressionByHash',
+        'ExpressionRepository->findExpressionByHash',
         `expected rowCount=0|1, actual rowCount=${rowCount}`
       ]);
     }
 
-    return response.rows[0];
+    return response.rows[0] ?? null;
   }
 
   /**
    * Fetch active expression anchors by semantic hashes.
    *
    * @param {string[]} expressionHashes - Semantic expression hashes.
-   * @return {Promise<ExpressionHashRow[]>} Matching active rows.
+   * @return {Promise<Expression[]>} Matching active rows.
    */
-  async getExpressionsByHashes(expressionHashes: string[]): Promise<ExpressionHashRow[]> {
+  async getExpressionsByHashes(expressionHashes: string[]): Promise<Expression[]> {
     if (expressionHashes.length === 0) {
       return [];
     }
 
     const knex = getKnex();
     const query = knex('expression')
-      .select(['expression_id', 'expression_hash'])
+      .select(['expression_id', knex.raw('operator::text AS operator'), 'expression_hash'])
       .whereIn('expression_hash', [...new Set(expressionHashes)])
       .whereNull('record_end_date');
 
-    const response = await this.connection.knex(query, ExpressionHashRow);
+    const response = await this.connection.knex(query, Expression);
     return response.rows;
   }
 
@@ -104,7 +111,7 @@ export class ExpressionRepository extends BaseRepository {
   async getExpressionById(expressionId: string): Promise<Expression> {
     const knex = getKnex();
     const query = knex('expression')
-      .select(['expression_id', knex.raw('operator::text AS operator')])
+      .select(['expression_id', knex.raw('operator::text AS operator'), 'expression_hash'])
       .where('expression_id', expressionId)
       .whereNull('record_end_date');
 

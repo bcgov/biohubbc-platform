@@ -9,21 +9,11 @@ import { FEATURE_PROPERTY_TYPE } from './feature-property';
 export const Predicate = z.object({
   predicate_id: z.string().uuid(),
   feature_type_property_id: z.number().int(),
-  feature_property_type_id: z.number().int()
-});
-
-export type Predicate = z.infer<typeof Predicate>;
-
-/**
- * Predicate anchor row including its normalized semantic hash.
- *
- * Used by hash-based dedupe/lookup queries.
- */
-export const PredicateHashRow = Predicate.extend({
+  feature_property_type_id: z.number().int(),
   predicate_hash: z.string()
 });
 
-export type PredicateHashRow = z.infer<typeof PredicateHashRow>;
+export type Predicate = z.infer<typeof Predicate>;
 
 export type PredicateFeaturePropertyTypeName =
   | FEATURE_PROPERTY_TYPE.STRING

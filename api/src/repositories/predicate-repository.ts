@@ -1,10 +1,17 @@
 import type { Knex } from 'knex';
 import SQL from 'sql-template-strings';
+import { z } from 'zod';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { TypedPredicate } from '../models/expression-tree';
-import { PredicateHashRow, PredicateResolveInput, ReadPredicateNodeRow } from '../models/predicate';
+import { Predicate, PredicateResolveInput, ReadPredicateNodeRow } from '../models/predicate';
 import { BaseRepository } from './base-repository';
+
+const ResolvedPredicateAnchor = Predicate.extend({
+  inserted: z.boolean()
+});
+
+export type ResolvedPredicateAnchor = z.infer<typeof ResolvedPredicateAnchor>;
 
 /**
  * Query repository for predicate anchor rows, typed payload rows, and predicate read projections.
@@ -14,10 +21,10 @@ export class PredicateRepository extends BaseRepository {
    * Insert a predicate anchor by normalized predicate hash.
    *
    * @param {PredicateResolveInput} payload - Predicate attributes including normalized hash.
-   * @return {(Promise<PredicateHashRow | undefined>)} Inserted predicate row, or undefined on conflict.
-   * @throws {ApiExecuteSQLError} If insert returns an unexpected row count.
+   * @return {(Promise<ResolvedPredicateAnchor>)} Resolved predicate row with insert-state flag.
+   * @throws {ApiExecuteSQLError} If upsert returns an unexpected row count.
    */
-  async insertPredicateAnchor(payload: PredicateResolveInput): Promise<PredicateHashRow | undefined> {
+  async insertPredicateAnchor(payload: PredicateResolveInput): Promise<ResolvedPredicateAnchor> {
     const sql = SQL`
       INSERT INTO predicate (
         feature_type_property_id,
@@ -30,20 +37,22 @@ export class PredicateRepository extends BaseRepository {
         ${payload.predicate_hash}
       )
       ON CONFLICT (predicate_hash) WHERE record_end_date IS NULL
-      DO NOTHING
+      DO UPDATE SET
+        predicate_hash = EXCLUDED.predicate_hash
       RETURNING
         predicate_id,
         feature_type_property_id,
         feature_property_type_id,
-        predicate_hash;
+        predicate_hash,
+        (xmax = 0) AS inserted;
     `;
-    const response = await this.connection.sql(sql, PredicateHashRow);
+    const response = await this.connection.sql(sql, ResolvedPredicateAnchor);
     const rowCount = response.rowCount ?? 0;
 
-    if (rowCount > 1) {
-      throw new ApiExecuteSQLError('Failed to insert predicate anchor', [
+    if (rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to resolve predicate anchor', [
         'PredicateRepository->insertPredicateAnchor',
-        `rowCount was ${rowCount}, expected 0 or 1`
+        `rowCount was ${rowCount}, expected 1`
       ]);
     }
 
@@ -51,13 +60,13 @@ export class PredicateRepository extends BaseRepository {
   }
 
   /**
-   * Fetch one active predicate anchor by normalized hash.
+   * Find one active predicate anchor by normalized hash.
    *
    * @param {string} predicateHash - Normalized predicate hash.
-   * @return {(Promise<PredicateHashRow | undefined>)} Matching active predicate row, when present.
+   * @return {(Promise<Predicate | null>)} Matching active predicate row, when present.
    * @throws {ApiExecuteSQLError} If more than one active row is found.
    */
-  async getPredicateByHash(predicateHash: string): Promise<PredicateHashRow | undefined> {
+  async findPredicateByHash(predicateHash: string): Promise<Predicate | null> {
     const knex = getKnex();
     const query = knex('predicate')
       .select(['predicate_id', 'feature_type_property_id', 'feature_property_type_id', 'predicate_hash'])
@@ -65,17 +74,17 @@ export class PredicateRepository extends BaseRepository {
       .whereNull('record_end_date')
       .limit(1);
 
-    const response = await this.connection.knex(query, PredicateHashRow);
+    const response = await this.connection.knex(query, Predicate);
     const rowCount = response.rowCount ?? 0;
 
     if (rowCount > 1) {
       throw new ApiExecuteSQLError('Unexpected row count', [
-        'PredicateRepository->getPredicateByHash',
+        'PredicateRepository->findPredicateByHash',
         `expected rowCount=0|1, actual rowCount=${rowCount}`
       ]);
     }
 
-    return response.rows[0];
+    return response.rows[0] ?? null;
   }
 
   /**
@@ -85,9 +94,9 @@ export class PredicateRepository extends BaseRepository {
    * rows only (`record_end_date IS NULL`).
    *
    * @param {string[]} predicateHashes - Normalized predicate hashes.
-   * @return {Promise<PredicateHashRow[]>} Matched active predicate rows.
+   * @return {Promise<Predicate[]>} Matched active predicate rows.
    */
-  async getPredicatesByHashes(predicateHashes: string[]): Promise<PredicateHashRow[]> {
+  async getPredicatesByHashes(predicateHashes: string[]): Promise<Predicate[]> {
     if (predicateHashes.length === 0) {
       return [];
     }
@@ -98,7 +107,7 @@ export class PredicateRepository extends BaseRepository {
       .whereIn('predicate_hash', [...new Set(predicateHashes)])
       .whereNull('record_end_date');
 
-    const response = await this.connection.knex(query, PredicateHashRow);
+    const response = await this.connection.knex(query, Predicate);
     return response.rows;
   }
 
@@ -272,10 +281,12 @@ export class PredicateRepository extends BaseRepository {
     predicateId: string,
     predicate: Extract<TypedPredicate, { type: 'string' }>
   ): Knex.QueryBuilder {
+    const stringValue = predicate.operator === 'Exists' ? null : predicate.value ?? null;
+
     return knex('predicate_string').insert({
       predicate_id: predicateId,
       operator: predicate.operator,
-      value: predicate.operator === 'Exists' ? null : predicate.value ?? null
+      value: stringValue
     });
   }
 
@@ -294,10 +305,12 @@ export class PredicateRepository extends BaseRepository {
     predicateId: string,
     predicate: Extract<TypedPredicate, { type: 'number' }>
   ): Knex.QueryBuilder {
+    const numberValue = predicate.operator === 'Exists' ? null : predicate.value ?? null;
+
     return knex('predicate_number').insert({
       predicate_id: predicateId,
       operator: predicate.operator,
-      value: predicate.operator === 'Exists' ? null : predicate.value ?? null
+      value: numberValue
     });
   }
 
@@ -316,10 +329,12 @@ export class PredicateRepository extends BaseRepository {
     predicateId: string,
     predicate: Extract<TypedPredicate, { type: 'boolean' }>
   ): Knex.QueryBuilder {
+    const booleanValue = predicate.operator === 'Exists' ? null : predicate.value ?? null;
+
     return knex('predicate_boolean').insert({
       predicate_id: predicateId,
       operator: predicate.operator,
-      value: predicate.operator === 'Exists' ? null : predicate.value ?? null
+      value: booleanValue
     });
   }
 
@@ -339,11 +354,14 @@ export class PredicateRepository extends BaseRepository {
     predicateId: string,
     predicate: Extract<TypedPredicate, { type: 'timestamp' }>
   ): Knex.QueryBuilder {
+    const dateValue = predicate.operator === 'Exists' ? null : predicate.value?.date_value ?? null;
+    const timeValue = predicate.operator === 'Exists' ? null : predicate.value?.time_value ?? null;
+
     return knex('predicate_timestamp').insert({
       predicate_id: predicateId,
       operator: predicate.operator,
-      date_value: predicate.operator === 'Exists' ? null : predicate.value?.date_value ?? null,
-      time_value: predicate.operator === 'Exists' ? null : predicate.value?.time_value ?? null
+      date_value: dateValue,
+      time_value: timeValue
     });
   }
 
@@ -362,10 +380,12 @@ export class PredicateRepository extends BaseRepository {
     predicateId: string,
     predicate: Extract<TypedPredicate, { type: 'taxon' }>
   ): Knex.QueryBuilder {
+    const taxonId = predicate.operator === 'Exists' ? null : predicate.value ?? null;
+
     return knex('predicate_taxon').insert({
       predicate_id: predicateId,
       operator: predicate.operator,
-      taxon_id: predicate.operator === 'Exists' ? null : predicate.value ?? null
+      taxon_id: taxonId
     });
   }
 
@@ -408,10 +428,12 @@ export class PredicateRepository extends BaseRepository {
     predicateId: string,
     predicate: Extract<TypedPredicate, { type: 'code' }>
   ): Knex.QueryBuilder {
+    const contributorCodesetCodeId = predicate.operator === 'Exists' ? null : predicate.value ?? null;
+
     return knex('predicate_code').insert({
       predicate_id: predicateId,
       operator: predicate.operator,
-      contributor_codeset_code_id: predicate.operator === 'Exists' ? null : predicate.value ?? null
+      contributor_codeset_code_id: contributorCodesetCodeId
     });
   }
 

@@ -20,7 +20,7 @@ describe('PredicateRepository', () => {
 
   describe('insertPredicateAnchor', () => {
     it('returns inserted predicate row when a predicate anchor is created', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([predicateRow], 1));
+      const sqlStub = sinon.stub().resolves(mockQueryResult([{ ...predicateRow, inserted: true }], 1));
       const repository = new PredicateRepository(getMockDBConnection({ sql: sqlStub }));
 
       const result = await repository.insertPredicateAnchor({
@@ -29,12 +29,12 @@ describe('PredicateRepository', () => {
         predicate_hash: 'hash-1'
       });
 
-      expect(result).to.eql(predicateRow);
+      expect(result).to.eql({ ...predicateRow, inserted: true });
       expect(sqlStub.callCount).to.equal(1);
     });
 
-    it('returns undefined on conflict', async () => {
-      const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
+    it('returns resolved predicate row on conflict', async () => {
+      const sqlStub = sinon.stub().resolves(mockQueryResult([{ ...predicateRow, inserted: false }], 1));
       const repository = new PredicateRepository(getMockDBConnection({ sql: sqlStub }));
 
       const result = await repository.insertPredicateAnchor({
@@ -43,26 +43,26 @@ describe('PredicateRepository', () => {
         predicate_hash: 'hash-1'
       });
 
-      expect(result).to.equal(undefined);
+      expect(result).to.eql({ ...predicateRow, inserted: false });
       expect(sqlStub.callCount).to.equal(1);
     });
   });
 
-  describe('getPredicateByHash', () => {
+  describe('findPredicateByHash', () => {
     it('returns active predicate by hash', async () => {
       const knexStub = sinon.stub().resolves(mockQueryResult([predicateRow], 1));
       const repository = new PredicateRepository(getMockDBConnection({ knex: knexStub }));
 
-      const result = await repository.getPredicateByHash('hash-1');
+      const result = await repository.findPredicateByHash('hash-1');
       expect(result).to.eql(predicateRow);
     });
 
-    it('returns undefined when missing', async () => {
+    it('returns null when missing', async () => {
       const knexStub = sinon.stub().resolves(mockQueryResult([], 0));
       const repository = new PredicateRepository(getMockDBConnection({ knex: knexStub }));
 
-      const result = await repository.getPredicateByHash('hash-1');
-      expect(result).to.equal(undefined);
+      const result = await repository.findPredicateByHash('hash-1');
+      expect(result).to.equal(null);
     });
   });
 

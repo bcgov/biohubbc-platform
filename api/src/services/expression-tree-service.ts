@@ -1,6 +1,6 @@
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 import { IDBConnection } from '../database/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiGeneralError } from '../errors/api-error';
 import {
   ExpressionTree,
   ExpressionTreeClause,
@@ -114,7 +114,7 @@ export class ExpressionTreeService extends DBService {
     visitedExpressionIds: Set<string>
   ): Promise<ExpressionTreeExpression> {
     if (visitedExpressionIds.has(expressionId)) {
-      throw new ApiExecuteSQLError('Cycle detected in expression tree', [
+      throw new ApiGeneralError('Cycle detected in expression tree', [
         'ExpressionTreeService->reconstructExpressionTreeFromStorage',
         `expressionId=${expressionId}`
       ]);
@@ -130,7 +130,7 @@ export class ExpressionTreeService extends DBService {
     const links = await this.expressionClauseRepository.getExpressionClausesByExpressionId(expressionId);
 
     if (links.length === 0) {
-      throw new ApiExecuteSQLError('Expression has no active clauses', [
+      throw new ApiGeneralError('Expression has no active clauses', [
         'ExpressionTreeService->reconstructExpressionTreeFromStorage',
         `expressionId=${expressionId}`
       ]);
@@ -149,7 +149,7 @@ export class ExpressionTreeService extends DBService {
         const predicateRow = predicatesById.get(link.predicate_id);
 
         if (!predicateRow) {
-          throw new ApiExecuteSQLError('Missing predicate row while reconstructing expression tree', [
+          throw new ApiGeneralError('Missing predicate row while reconstructing expression tree', [
             'ExpressionTreeService->reconstructExpressionTreeFromStorage',
             `predicateId=${link.predicate_id}`,
             `expressionId=${expressionId}`
@@ -164,7 +164,7 @@ export class ExpressionTreeService extends DBService {
       }
 
       if (!link.child_expression_id) {
-        throw new ApiExecuteSQLError('Invalid expression clause target', [
+        throw new ApiGeneralError('Invalid expression clause target', [
           'ExpressionTreeService->reconstructExpressionTreeFromStorage',
           `expressionClauseId=${link.expression_clause_id}`
         ]);
@@ -181,7 +181,7 @@ export class ExpressionTreeService extends DBService {
       type: 'expression',
       operator: expression.operator,
       // Storage is expected to be ordered by sequence, but sort defensively.
-      clauses: readClauses.sort((a, b) => a.sequence - b.sequence).map((entry) => entry.clause)
+      clauses: readClauses.toSorted((a, b) => a.sequence - b.sequence).map((entry) => entry.clause)
     };
   }
 
@@ -207,7 +207,8 @@ export class ExpressionTreeService extends DBService {
 
     if (typeof value === 'object') {
       const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b));
-      return `{${entries.map(([key, val]) => `${JSON.stringify(key)}:${this.stableStringify(val)}`).join(',')}}`;
+      const serializedEntries = entries.map(([key, val]) => JSON.stringify(key) + ':' + this.stableStringify(val));
+      return '{' + serializedEntries.join(',') + '}';
     }
 
     return JSON.stringify(value);
@@ -253,6 +254,68 @@ export class ExpressionTreeService extends DBService {
   }
 
   /**
+   * Normalize a string predicate value for semantic hashing.
+   *
+   * @private
+   * @param {Extract<TypedPredicate, { type: 'string' }>} predicate - String predicate payload.
+   * @return {string} Normalized value, or empty string when value is absent.
+   * @memberof ExpressionTreeService
+   */
+  private normalizeStringPredicateValue(predicate: Extract<TypedPredicate, { type: 'string' }>): string {
+    if (predicate.value === undefined) {
+      return '';
+    }
+
+    if (this.isCaseInsensitiveStringOperator(predicate.operator)) {
+      return this.normalizeCaseInsensitiveText(predicate.value);
+    }
+
+    return predicate.value.normalize('NFKC');
+  }
+
+  /**
+   * Normalize a boolean predicate value for semantic hashing.
+   *
+   * @private
+   * @param {Extract<TypedPredicate, { type: 'boolean' }>} predicate - Boolean predicate payload.
+   * @return {string} Normalized value, or empty string when value is absent.
+   * @memberof ExpressionTreeService
+   */
+  private normalizeBooleanPredicateValue(predicate: Extract<TypedPredicate, { type: 'boolean' }>): string {
+    if (predicate.value === undefined) {
+      return '';
+    }
+
+    return predicate.value ? 'true' : 'false';
+  }
+
+  /**
+   * Build canonical predicate identity text from shared and type-specific parts.
+   *
+   * @private
+   * @param {TypedPredicate['type']} predicateType - Predicate type discriminator.
+   * @param {number} featureTypePropertyId - Feature type property identifier.
+   * @param {string} operator - Predicate operator.
+   * @param {Record<string, string | number>} fields - Additional canonical key/value fields.
+   * @return {string} Canonical identity string.
+   * @memberof ExpressionTreeService
+   */
+  private buildPredicateIdentity(
+    predicateType: TypedPredicate['type'],
+    featureTypePropertyId: number,
+    operator: string,
+    fields: Record<string, string | number>
+  ): string {
+    const parts = ['predicate', predicateType, `ftp=${featureTypePropertyId}`, `op=${operator}`];
+
+    for (const [field, value] of Object.entries(fields)) {
+      parts.push(`${field}=${String(value)}`);
+    }
+
+    return parts.join('|');
+  }
+
+  /**
    * Build canonical predicate identity text used for semantic hashing.
    *
    * Canonicalization is type-aware:
@@ -272,44 +335,38 @@ export class ExpressionTreeService extends DBService {
     const { feature_type_property_id, predicate } = clause;
 
     switch (predicate.type) {
-      case 'string': {
-        let normalizedStringValue = '';
-
-        if (predicate.value !== undefined) {
-          if (this.isCaseInsensitiveStringOperator(predicate.operator)) {
-            normalizedStringValue = this.normalizeCaseInsensitiveText(predicate.value);
-          } else {
-            normalizedStringValue = predicate.value.normalize('NFKC');
-          }
-        }
-
-        return `predicate|string|ftp=${feature_type_property_id}|op=${predicate.operator}|value=${normalizedStringValue}`;
-      }
+      case 'string':
+        return this.buildPredicateIdentity('string', feature_type_property_id, predicate.operator, {
+          value: this.normalizeStringPredicateValue(predicate)
+        });
       case 'number':
-        return `predicate|number|ftp=${feature_type_property_id}|op=${predicate.operator}|value=${
-          predicate.value === undefined ? '' : Number(predicate.value).toString()
-        }`;
+        return this.buildPredicateIdentity('number', feature_type_property_id, predicate.operator, {
+          value: predicate.value === undefined ? '' : Number(predicate.value).toString()
+        });
       case 'boolean':
-        return `predicate|boolean|ftp=${feature_type_property_id}|op=${predicate.operator}|value=${
-          predicate.value === undefined ? '' : predicate.value ? 'true' : 'false'
-        }`;
+        return this.buildPredicateIdentity('boolean', feature_type_property_id, predicate.operator, {
+          value: this.normalizeBooleanPredicateValue(predicate)
+        });
       case 'timestamp':
-        return `predicate|timestamp|ftp=${feature_type_property_id}|op=${predicate.operator}|date=${
-          predicate.value?.date_value ?? ''
-        }|time=${predicate.value?.time_value ?? ''}`;
+        return this.buildPredicateIdentity('timestamp', feature_type_property_id, predicate.operator, {
+          date: predicate.value?.date_value ?? '',
+          time: predicate.value?.time_value ?? ''
+        });
       case 'taxon':
-        return `predicate|taxon|ftp=${feature_type_property_id}|op=${predicate.operator}|value=${
-          predicate.value ?? ''
-        }`;
+        return this.buildPredicateIdentity('taxon', feature_type_property_id, predicate.operator, {
+          value: predicate.value ?? ''
+        });
       case 'geometry':
-        return `predicate|geometry|ftp=${feature_type_property_id}|op=${predicate.operator}|value=${
-          predicate.value === undefined ? '' : this.stableStringify(predicate.value)
-        }`;
+        return this.buildPredicateIdentity('geometry', feature_type_property_id, predicate.operator, {
+          value: predicate.value === undefined ? '' : this.stableStringify(predicate.value)
+        });
       case 'code':
-        return `predicate|code|ftp=${feature_type_property_id}|op=${predicate.operator}|value=${predicate.value ?? ''}`;
+        return this.buildPredicateIdentity('code', feature_type_property_id, predicate.operator, {
+          value: predicate.value ?? ''
+        });
       default: {
         const exhaustiveType: never = predicate;
-        throw new ApiExecuteSQLError('Unsupported predicate type for normalization', [
+        throw new ApiGeneralError('Unsupported predicate type for normalization', [
           'ExpressionTreeService->buildNormalizedPredicateIdentityForHash',
           { exhaustiveType }
         ]);
@@ -444,9 +501,8 @@ export class ExpressionTreeService extends DBService {
    *
    * Concurrency-safe flow:
    * 1. Reuse preloaded id when present.
-   * 2. Attempt insert anchor by hash.
-   * 3. If insert won, write typed payload row and return.
-   * 4. If insert lost race (conflict), read existing anchor by hash and return.
+   * 2. Upsert anchor by hash and return resolved id + insert-state.
+   * 3. Write typed payload row only when the anchor is newly inserted.
    *
    * @private
    * @param {ExpressionTreePredicateWithHash} clause - Hashed predicate clause.
@@ -463,29 +519,19 @@ export class ExpressionTreeService extends DBService {
       return existingPredicateId;
     }
 
-    const insertedPredicate = await this.predicateRepository.insertPredicateAnchor({
+    const resolvedPredicate = await this.predicateRepository.insertPredicateAnchor({
       feature_type_property_id: clause.feature_type_property_id,
       feature_property_type_name: predicateTypeMap[clause.predicate.type],
       predicate_hash: clause.hash
     });
 
-    if (insertedPredicate) {
+    if (resolvedPredicate.inserted) {
       // Payload write is only needed on first creation of the predicate anchor.
-      await this.predicateRepository.writePredicatePayload(insertedPredicate.predicate_id, clause.predicate);
-      predicateIdsByHash.set(clause.hash, insertedPredicate.predicate_id);
-      return insertedPredicate.predicate_id;
+      await this.predicateRepository.writePredicatePayload(resolvedPredicate.predicate_id, clause.predicate);
     }
 
-    const existingPredicate = await this.predicateRepository.getPredicateByHash(clause.hash);
-    if (!existingPredicate) {
-      throw new ApiExecuteSQLError('Failed to resolve predicate anchor', [
-        'ExpressionTreeService->resolvePredicateNode',
-        `predicateHash=${clause.hash}`
-      ]);
-    }
-
-    predicateIdsByHash.set(clause.hash, existingPredicate.predicate_id);
-    return existingPredicate.predicate_id;
+    predicateIdsByHash.set(clause.hash, resolvedPredicate.predicate_id);
+    return resolvedPredicate.predicate_id;
   }
 
   /**
@@ -494,8 +540,8 @@ export class ExpressionTreeService extends DBService {
    * Steps:
    * 1. Reuse existing anchor when hash is already known.
    * 2. Resolve child clauses (predicate ids / child expression ids).
-   * 3. Insert expression anchor by hash (or fetch on conflict).
-   * 4. Insert clause edges only when this call inserted a new anchor.
+   * 3. Upsert expression anchor by hash.
+   * 4. Insert clause edges only when the anchor is newly inserted.
    *
    * @private
    * @param {ExpressionTreeExpressionWithHash} expression - Hashed expression node.
@@ -536,23 +582,14 @@ export class ExpressionTreeService extends DBService {
       });
     }
 
-    const insertedExpression = await this.expressionRepository.insertExpressionAnchor(
+    const resolvedExpression = await this.expressionRepository.insertExpressionAnchor(
       expression.operator,
       expression.hash
     );
-    const resolvedExpression =
-      insertedExpression ?? (await this.expressionRepository.getExpressionByHash(expression.hash));
-
-    if (!resolvedExpression) {
-      throw new ApiExecuteSQLError('Failed to resolve expression anchor', [
-        'ExpressionTreeService->resolveExpressionNode',
-        `expressionHash=${expression.hash}`
-      ]);
-    }
 
     expressionIdsByHash.set(expression.hash, resolvedExpression.expression_id);
 
-    if (insertedExpression) {
+    if (resolvedExpression.inserted) {
       // Clauses are immutable for a given semantic hash; write only on first insert.
       await this.expressionClauseRepository.insertExpressionClauses(
         resolvedClauses.map((clause) => ({
@@ -580,7 +617,7 @@ export class ExpressionTreeService extends DBService {
    */
   private parseReadPredicateRow(row: ReadPredicateNodeRow, predicateId: string): ExpressionTreePredicate {
     if (row.payload_count !== 1 || !row.predicate_node) {
-      throw new ApiExecuteSQLError('Invalid predicate payload integrity', [
+      throw new ApiGeneralError('Invalid predicate payload integrity', [
         'ExpressionTreeService->parseReadPredicateRow',
         { predicateId, payload_count: row.payload_count }
       ]);
@@ -589,7 +626,7 @@ export class ExpressionTreeService extends DBService {
     try {
       return ExpressionTreePredicate.parse(row.predicate_node);
     } catch (error) {
-      throw new ApiExecuteSQLError('Invalid read predicate node shape', [
+      throw new ApiGeneralError('Invalid read predicate node shape', [
         'ExpressionTreeService->parseReadPredicateRow',
         {
           predicateId,

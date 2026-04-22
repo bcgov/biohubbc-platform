@@ -60,8 +60,6 @@ export type GeometryOperator = z.infer<typeof GeometryOperator>;
 export const CodeOperator = z.enum(['Equals', 'NotEquals', 'Exists']);
 export type CodeOperator = z.infer<typeof CodeOperator>;
 
-const EXISTS_VALUE_MESSAGE = 'Exists predicates must not include a value';
-
 const refineExistsValueRule = (
   predicate: { operator: string; value?: unknown },
   ctx: z.RefinementCtx,
@@ -72,7 +70,7 @@ const refineExistsValueRule = (
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['value'],
-        message: EXISTS_VALUE_MESSAGE
+        message: 'Exists predicates must not include a value'
       });
     }
 
