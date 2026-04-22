@@ -5,7 +5,7 @@ import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../../__mocks__/db';
 import { createMockDownloadRecord } from '../../__mocks__/download';
 import { SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
-import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
+import { HTTP403, HTTP409 } from '../../errors/http-error';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
@@ -16,6 +16,7 @@ chai.use(sinonChai);
 
 const EXPORT_ID = 'dddd0000-0000-0000-0000-000000000001';
 const DOWNLOAD_ID = 'aaaa0000-0000-0000-0000-000000000001';
+const SYSTEM_USER_ID = 42;
 
 const mockExportRecord = {
   download_export_id: EXPORT_ID,
@@ -35,30 +36,32 @@ describe('DownloadExportService', () => {
   });
 
   describe('createDownloadExport', () => {
-    it('throws HTTP404 when download not found', async () => {
-      sinon.stub(DownloadService.prototype, 'findDownloadById').resolves(null);
+    it('throws HTTP403 when systemUserId is null (exports are authenticated-only)', async () => {
+      const authStub = sinon.stub(DownloadService.prototype, 'getAuthorizedDownload');
 
       const service = new DownloadExportService(getMockDBConnection());
 
       try {
-        await service.createDownloadExport(DOWNLOAD_ID, {});
+        await service.createDownloadExport(DOWNLOAD_ID, null, {});
         expect.fail('Expected throw');
       } catch (err) {
-        expect(err).to.be.instanceOf(HTTP404);
+        expect(err).to.be.instanceOf(HTTP403);
       }
+
+      expect(authStub).to.not.have.been.called;
     });
 
     const notReadyStatuses = [DownloadStatusEnum.PENDING, DownloadStatusEnum.PROCESSING, DownloadStatusEnum.FAILED];
     notReadyStatuses.forEach((status) => {
       it(`throws HTTP409 when download_status is ${status}`, async () => {
         sinon
-          .stub(DownloadService.prototype, 'findDownloadById')
+          .stub(DownloadService.prototype, 'getAuthorizedDownload')
           .resolves(createMockDownloadRecord({ download_status: status }));
 
         const service = new DownloadExportService(getMockDBConnection());
 
         try {
-          await service.createDownloadExport(DOWNLOAD_ID, {});
+          await service.createDownloadExport(DOWNLOAD_ID, SYSTEM_USER_ID, {});
           expect.fail('Expected throw');
         } catch (err) {
           expect(err).to.be.instanceOf(HTTP409);
@@ -68,46 +71,58 @@ describe('DownloadExportService', () => {
 
     it('applies default chunk_size_bytes "524288000" when the request omits it', async () => {
       sinon
-        .stub(DownloadService.prototype, 'findDownloadById')
+        .stub(DownloadService.prototype, 'getAuthorizedDownload')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
       const repoStub = sinon
         .stub(DownloadExportRepository.prototype, 'createDownloadExport')
         .resolves(mockExportRecord);
 
       const service = new DownloadExportService(getMockDBConnection());
-      await service.createDownloadExport(DOWNLOAD_ID, {});
+      await service.createDownloadExport(DOWNLOAD_ID, SYSTEM_USER_ID, {});
 
       expect(repoStub.firstCall.args[0].chunk_size_bytes).to.equal('524288000');
     });
 
     it('forwards a user-supplied chunk_size_bytes verbatim', async () => {
       sinon
-        .stub(DownloadService.prototype, 'findDownloadById')
+        .stub(DownloadService.prototype, 'getAuthorizedDownload')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
       const repoStub = sinon
         .stub(DownloadExportRepository.prototype, 'createDownloadExport')
         .resolves(mockExportRecord);
 
       const service = new DownloadExportService(getMockDBConnection());
-      await service.createDownloadExport(DOWNLOAD_ID, { chunk_size_bytes: '10485760' });
+      await service.createDownloadExport(DOWNLOAD_ID, SYSTEM_USER_ID, { chunk_size_bytes: '10485760' });
 
       expect(repoStub.firstCall.args[0].chunk_size_bytes).to.equal('10485760');
     });
 
-    it('hard-codes format "csv" and mode "per_feature_type"', async () => {
+    it('hard-codes format "csv" and mode "per_feature_type"; forwards download_id', async () => {
       sinon
-        .stub(DownloadService.prototype, 'findDownloadById')
+        .stub(DownloadService.prototype, 'getAuthorizedDownload')
         .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
       const repoStub = sinon
         .stub(DownloadExportRepository.prototype, 'createDownloadExport')
         .resolves(mockExportRecord);
 
       const service = new DownloadExportService(getMockDBConnection());
-      await service.createDownloadExport(DOWNLOAD_ID, {});
+      await service.createDownloadExport(DOWNLOAD_ID, SYSTEM_USER_ID, {});
 
       expect(repoStub.firstCall.args[0].format).to.equal('csv');
       expect(repoStub.firstCall.args[0].mode).to.equal('per_feature_type');
       expect(repoStub.firstCall.args[0].download_id).to.equal(DOWNLOAD_ID);
+    });
+
+    it('delegates team-membership auth to DownloadService.getAuthorizedDownload', async () => {
+      const authStub = sinon
+        .stub(DownloadService.prototype, 'getAuthorizedDownload')
+        .resolves(createMockDownloadRecord({ download_status: DownloadStatusEnum.READY }));
+      sinon.stub(DownloadExportRepository.prototype, 'createDownloadExport').resolves(mockExportRecord);
+
+      const service = new DownloadExportService(getMockDBConnection());
+      await service.createDownloadExport(DOWNLOAD_ID, SYSTEM_USER_ID, {});
+
+      expect(authStub).to.have.been.calledOnceWith(DOWNLOAD_ID, SYSTEM_USER_ID);
     });
   });
 

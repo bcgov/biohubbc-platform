@@ -1,6 +1,6 @@
 import { SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
-import { HTTP403, HTTP404, HTTP409 } from '../../errors/http-error';
+import { HTTP403, HTTP409 } from '../../errors/http-error';
 import { CreateDownloadExportRequest, DownloadExportListRow, DownloadExportRecord } from '../../models/download-export';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadExportRepository } from '../../repositories/download/download-export-repository';
@@ -59,19 +59,27 @@ export class DownloadExportService extends DBService {
    * here because this ticket ships the single-shape contract; a future
    * denormalized-mode addition opens `mode` at the request layer.
    *
+   * Exports are authenticated-only (HTTP403 when `systemUserId` is null) and
+   * require team membership on the parent download — delegates to
+   * `DownloadService.getAuthorizedDownload` so the team-auth rule lives in
+   * exactly one place. Only `ready` downloads can export; `pending` /
+   * `processing` / `failed` parents surface 409 and the client retries after
+   * the parent finishes.
+   *
    * Does NOT publish the pg-boss job — route handlers publish inside the same
    * transaction as the insert so enqueue and row creation succeed together.
-   *
-   * Exports are only allowed for `ready` downloads because the pipeline reads
-   * the finalized Parquet artifacts; `pending` / `processing` / `failed`
-   * parents surface 409 and the client retries after the parent finishes.
    */
-  async createDownloadExport(downloadId: string, request: CreateDownloadExportRequest): Promise<DownloadExportRecord> {
-    const download = await this.downloadService.findDownloadById(downloadId);
-
-    if (!download) {
-      throw new HTTP404('Download not found');
+  async createDownloadExport(
+    downloadId: string,
+    systemUserId: number | null,
+    request: CreateDownloadExportRequest
+  ): Promise<DownloadExportRecord> {
+    if (systemUserId === null) {
+      throw new HTTP403('Access denied');
     }
+
+    // Throws HTTP403 / HTTP404 as appropriate.
+    const download = await this.downloadService.getAuthorizedDownload(downloadId, systemUserId);
 
     if (download.download_status !== DownloadStatusEnum.READY) {
       throw new HTTP409('Download is not ready — cannot export');
