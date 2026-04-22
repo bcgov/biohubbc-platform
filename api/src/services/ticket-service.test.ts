@@ -63,7 +63,7 @@ describe('TicketService', () => {
       expect(createTeamWithMembersStub).to.have.been.calledWith(
         sinon.match({
           name: sinon.match.string,
-          description: 'Auto-generated team for ticket assignees.',
+          description: 'Auto-generated team for ticket system users.',
           system_user_ids: []
         })
       );
@@ -101,7 +101,7 @@ describe('TicketService', () => {
       expect(createTeamStub).to.have.been.calledWith(
         sinon.match({
           name: sinon.match.string,
-          description: 'Auto-generated team for ticket assignees.',
+          description: 'Auto-generated team for ticket system users.',
           system_user_ids: systemUserIds
         })
       );
@@ -187,7 +187,9 @@ describe('TicketService', () => {
         .stub(TicketReferenceService.prototype, 'getTicketReferencesForTicket')
         .resolves(referenceLog);
       const getDataRequestLogStub = sinon.stub(DataRequestService.prototype, 'findDataRequestsByTicketId').resolves([]);
-      const getAssigneesStub = sinon.stub(TicketSystemUserService.prototype, 'getActiveTicketAssignees').resolves([]);
+      const getTicketSystemUsersStub = sinon
+        .stub(TicketSystemUserService.prototype, 'getActiveTicketSystemUsersByTicketId')
+        .resolves([]);
 
       const result = await service.getTicket(mockTicket.ticket_id);
 
@@ -196,14 +198,14 @@ describe('TicketService', () => {
       expect(getCommentLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getReferenceLogStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(getDataRequestLogStub).to.have.been.calledWith(mockTicket.ticket_id);
-      expect(getAssigneesStub).to.have.been.calledWith(mockTicket.ticket_id);
+      expect(getTicketSystemUsersStub).to.have.been.calledWith(mockTicket.ticket_id);
       expect(result).to.eql({
         ...mockTicket,
         statuses: statusLog,
         comments: commentLog,
         references: referenceLog,
         data_requests: [],
-        assignees: []
+        ticket_system_users: []
       });
     });
   });

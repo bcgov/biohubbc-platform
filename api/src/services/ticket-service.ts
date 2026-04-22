@@ -81,7 +81,7 @@ export class TicketService extends DBService {
     // Data-request flows intentionally do not backfill requester identifiers onto ticket teams.
     const team = await this.teamService.createTeam({
       name: `Ticket Team ${v4()}`,
-      description: 'Auto-generated team for ticket assignees.',
+      description: 'Auto-generated team for ticket system users.',
       system_user_ids: systemUserIds
     });
 
@@ -92,21 +92,28 @@ export class TicketService extends DBService {
    * Get a ticket by its UUID with related history and assignment collections.
    *
    * @param {string} ticketId - Ticket UUID.
-   * @return {Promise<TicketWithHistory>} Ticket core fields with status log, comments, references, data requests, and assignees.
+   * @return {Promise<TicketWithHistory>} Ticket core fields with status log, comments, references, data requests, and ticket system users.
    * @memberof TicketService
    */
   async getTicket(ticketId: string): Promise<TicketWithHistory> {
     // Read all timeline/relationship collections in parallel to keep detail view latency predictable.
-    const [ticket, statuses, comments, references, dataRequests, assignees] = await Promise.all([
+    const [ticket, statuses, comments, references, dataRequests, ticketSystemUsers] = await Promise.all([
       this.ticketRepository.getTicketById(ticketId),
       this.ticketStatusService.getTicketStatus(ticketId),
       this.ticketCommentService.getTicketComments(ticketId),
       this.ticketReferenceService.getTicketReferencesForTicket(ticketId),
       this.dataRequestService.findDataRequestsByTicketId(ticketId),
-      this.ticketSystemUserService.getActiveTicketAssignees(ticketId)
+      this.ticketSystemUserService.getActiveTicketSystemUsersByTicketId(ticketId)
     ]);
 
-    return { ...ticket, statuses, comments, references, data_requests: dataRequests, assignees };
+    return {
+      ...ticket,
+      statuses,
+      comments,
+      references,
+      data_requests: dataRequests,
+      ticket_system_users: ticketSystemUsers
+    };
   }
 
   /**

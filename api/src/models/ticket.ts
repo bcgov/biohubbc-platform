@@ -62,6 +62,6 @@ export const TicketWithHistory = Ticket.extend({
   comments: z.array(TicketComment),
   references: z.array(TicketReference),
   data_requests: z.array(DataRequest),
-  assignees: z.array(TicketSystemUserWithUser)
+  ticket_system_users: z.array(TicketSystemUserWithUser)
 });
 export type TicketWithHistory = z.infer<typeof TicketWithHistory>;

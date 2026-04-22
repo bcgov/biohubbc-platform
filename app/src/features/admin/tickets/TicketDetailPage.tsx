@@ -63,7 +63,7 @@ export const TicketDetailPageContent = (props: ITicketDetailPageContentProps) =>
                 <TicketSidebar
                   ticketId={ticket?.ticket_id}
                   teamId={ticket?.team_id}
-                  assignees={ticket?.assignees}
+                  ticketSystemUsers={ticket?.ticket_system_users}
                   references={ticket?.references}
                   dataRequests={ticket?.data_requests}
                 />

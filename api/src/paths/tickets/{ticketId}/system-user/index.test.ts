@@ -14,7 +14,7 @@ describe('paths/tickets/{ticketId}/system-user', () => {
     sinon.restore();
   });
 
-  it('POST creates ticket assignees in bulk', async () => {
+  it('POST creates ticket system users in bulk', async () => {
     const mockDBConnection = getMockDBConnection({
       systemUserId: () => 1,
       commit: sinon.stub(),
@@ -31,7 +31,7 @@ describe('paths/tickets/{ticketId}/system-user', () => {
       status: 'requested'
     };
 
-    const createStub = sinon.stub(TicketSystemUserService.prototype, 'createTicketAssignees').resolves([created]);
+    const createStub = sinon.stub(TicketSystemUserService.prototype, 'createTicketSystemUsers').resolves([created]);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { ticketId: created.ticket_id };

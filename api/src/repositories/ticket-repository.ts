@@ -129,9 +129,8 @@ export class TicketRepository extends BaseRepository {
    * Get a single active ticket by UUID.
    *
    * Behavior:
-   * - returns one active row (`record_end_date IS NULL`)
-   * - throws `ApiNotFoundError` when no active row exists
-   * - throws `ApiExecuteSQLError` when an unexpected row count is returned
+   * - resolves the current active ticket record for a ticket id
+   * - distinguishes "not found" from data-integrity anomalies
    *
    * @param {string} ticketId - Ticket UUID.
    * @return {Promise<Ticket>} Matching ticket record.

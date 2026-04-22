@@ -5,31 +5,37 @@ import Chip from '@mui/material/Chip';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import { ContextMenuButton, IContextMenuItem } from 'components/ContextMenuButton';
-import { TICKET_ASSIGNEE_STATUS_PRESENTATION } from 'constants/ticket';
-import { ITicketAssignee, TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
+import { TICKET_SYSTEM_USER_STATUS_PRESENTATION } from 'constants/ticket';
+import { ITicketSystemUser, TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
 
-interface ITicketSidebarAssigneeCardProps {
-  assignee: ITicketAssignee;
+interface ITicketSidebarSystemUserCardProps {
+  ticketSystemUser: ITicketSystemUser;
   isSystemAdmin: boolean;
   isCurrentUserAssignment: boolean;
-  onRemoveAssignee: (ticketSystemUserId: string) => Promise<void> | void;
-  onUpdateAssigneeStatus: (ticketSystemUserId: string, status: TicketSystemUserStatus) => Promise<void> | void;
+  onRemoveTicketSystemUser: (ticketSystemUserId: string) => Promise<void> | void;
+  onUpdateTicketSystemUserStatus: (ticketSystemUserId: string, status: TicketSystemUserStatus) => Promise<void> | void;
 }
 
 /**
- * Sidebar card row for a ticket assignee.
+ * Sidebar card row for a ticket system user.
  *
  * Includes current-user request handling and context menu delete action.
  *
- * @param {ITicketSidebarAssigneeCardProps} props
+ * @param {ITicketSidebarSystemUserCardProps} props
  * @return {*}
  */
-export const TicketSidebarAssigneeCard = (props: ITicketSidebarAssigneeCardProps) => {
-  const { assignee, isSystemAdmin, isCurrentUserAssignment, onRemoveAssignee, onUpdateAssigneeStatus } = props;
+export const TicketSidebarSystemUserCard = (props: ITicketSidebarSystemUserCardProps) => {
+  const {
+    ticketSystemUser,
+    isSystemAdmin,
+    isCurrentUserAssignment,
+    onRemoveTicketSystemUser,
+    onUpdateTicketSystemUserStatus
+  } = props;
 
   const statusOptions: { value: TicketSystemUserStatus; label: string; icon: string }[] = (
-    Object.entries(TICKET_ASSIGNEE_STATUS_PRESENTATION) as Array<
-      [TicketSystemUserStatus, (typeof TICKET_ASSIGNEE_STATUS_PRESENTATION)[TicketSystemUserStatus]]
+    Object.entries(TICKET_SYSTEM_USER_STATUS_PRESENTATION) as Array<
+      [TicketSystemUserStatus, (typeof TICKET_SYSTEM_USER_STATUS_PRESENTATION)[TicketSystemUserStatus]]
     >
   ).map(([value, presentation]) => ({
     value,
@@ -37,7 +43,7 @@ export const TicketSidebarAssigneeCard = (props: ITicketSidebarAssigneeCardProps
     icon: presentation.icon
   }));
 
-  const displayLabel = assignee.system_user.display_name ?? assignee.system_user.user_identifier;
+  const displayLabel = ticketSystemUser.system_user.display_name ?? ticketSystemUser.system_user.user_identifier;
   const canUpdateStatus = isSystemAdmin || isCurrentUserAssignment;
   const canDelete = isSystemAdmin;
 
@@ -45,8 +51,8 @@ export const TicketSidebarAssigneeCard = (props: ITicketSidebarAssigneeCardProps
     ? statusOptions.map((statusOption) => ({
         label: statusOption.label,
         icon: <Icon path={statusOption.icon} size={0.7} />,
-        onClick: () => onUpdateAssigneeStatus(assignee.ticket_system_user_id, statusOption.value),
-        disabled: statusOption.value === assignee.status
+        onClick: () => onUpdateTicketSystemUserStatus(ticketSystemUser.ticket_system_user_id, statusOption.value),
+        disabled: statusOption.value === ticketSystemUser.status
       }))
     : [];
   const deleteContextMenuItems: IContextMenuItem[] = canDelete
@@ -54,7 +60,7 @@ export const TicketSidebarAssigneeCard = (props: ITicketSidebarAssigneeCardProps
         {
           label: 'Delete',
           icon: <Icon path={mdiTrashCanOutline} size={0.7} />,
-          onClick: () => onRemoveAssignee(assignee.ticket_system_user_id)
+          onClick: () => onRemoveTicketSystemUser(ticketSystemUser.ticket_system_user_id)
         }
       ]
     : [];
@@ -76,13 +82,13 @@ export const TicketSidebarAssigneeCard = (props: ITicketSidebarAssigneeCardProps
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Chip
           size="small"
-          label={TICKET_ASSIGNEE_STATUS_PRESENTATION[assignee.status].label}
-          color={TICKET_ASSIGNEE_STATUS_PRESENTATION[assignee.status].colour}
+          label={TICKET_SYSTEM_USER_STATUS_PRESENTATION[ticketSystemUser.status].label}
+          color={TICKET_SYSTEM_USER_STATUS_PRESENTATION[ticketSystemUser.status].colour}
         />
 
         {statusContextMenuItems.length || deleteContextMenuItems.length ? (
           <ContextMenuButton
-            buttonTitle={`assignee-${assignee.ticket_system_user_id}-menu`}
+            buttonTitle={`ticket-system-user-${ticketSystemUser.ticket_system_user_id}-menu`}
             buttonIcon={<Icon path={mdiDotsVertical} size={0.75} />}
             itemGroups={[
               { groupId: 'status-options', items: statusContextMenuItems },

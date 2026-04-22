@@ -32,7 +32,7 @@ const baseTicket: ITicketExtended = {
   statuses: [],
   comments: [],
   references: [],
-  assignees: [],
+  ticket_system_users: [],
   data_requests: []
 };
 

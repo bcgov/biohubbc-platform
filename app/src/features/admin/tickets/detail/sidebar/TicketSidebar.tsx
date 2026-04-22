@@ -1,5 +1,5 @@
 import Stack from '@mui/material/Stack';
-import { TicketAssigneeDialog } from 'features/admin/tickets/components/dialog/assignee/TicketAssigneeDialog';
+import { TicketSystemUserDialog } from 'features/admin/tickets/components/dialog/system-user/TicketSystemUserDialog';
 import { TicketTeamDialog } from 'features/admin/tickets/components/dialog/team/TicketTeamDialog';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
@@ -8,9 +8,9 @@ import useDataLoader from 'hooks/useDataLoader';
 import { useOptimisticDataLoader } from 'hooks/useOptimisticDataLoader';
 import { DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
 import { ITeamMember } from 'interfaces/useTeamsApi.interface';
-import { ITicketAssignee, ITicketReference, TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
+import { ITicketSystemUser, ITicketReference, TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
 import { useEffect, useState } from 'react';
-import { TicketSidebarAssignees } from './TicketSidebarAssignees';
+import { TicketSidebarSystemUsers } from './TicketSidebarSystemUsers';
 import { TicketSidebarDataRequests } from './TicketSidebarDataRequests';
 import { TicketSidebarReferences } from './TicketSidebarReferences';
 import { TicketSidebarTeam } from './TicketSidebarTeam';
@@ -19,7 +19,7 @@ import { TicketSidebarUploads } from './TicketSidebarUploads';
 interface ITicketSidebarProps {
   ticketId?: string;
   teamId?: string;
-  assignees?: ITicketAssignee[];
+  ticketSystemUsers?: ITicketSystemUser[];
   references?: ITicketReference[];
   dataRequests?: DataRequestResponse[];
 }
@@ -31,12 +31,12 @@ interface ITicketSidebarProps {
  * @return {*}
  */
 export const TicketSidebar = (props: ITicketSidebarProps) => {
-  const { ticketId, teamId, assignees, references, dataRequests } = props;
+  const { ticketId, teamId, ticketSystemUsers, references, dataRequests } = props;
   const api = useApi();
   const dialogContext = useDialogContext();
   const { ticketDataLoader } = useTicketContext();
   const [isParticipantsDialogOpen, setIsParticipantsDialogOpen] = useState(false);
-  const [isAssigneeDialogOpen, setIsAssigneeDialogOpen] = useState(false);
+  const [isTicketSystemUserDialogOpen, setIsTicketSystemUserDialogOpen] = useState(false);
 
   const teamMembersLoader = useDataLoader((currentTeamId: string) => api.teams.getTeamMembers(currentTeamId));
   const optimisticTeamMembersLoader = useOptimisticDataLoader(teamMembersLoader);
@@ -107,16 +107,16 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
   };
 
   /**
-   * Updates a ticket assignee status without refetching ticket detail.
+   * Updates a ticket system user status without refetching ticket detail.
    *
    * Persists the status change through the API, then patches local ticket
-   * context state so assignees update immediately in the sidebar.
+   * context state so ticket system users update immediately in the sidebar.
    *
    * @param {string} ticketSystemUserId
    * @param {TicketSystemUserStatus} status
    * @return {Promise<void>}
    */
-  const handleUpdateAssigneeStatus = async (
+  const handleUpdateTicketSystemUserStatus = async (
     ticketSystemUserId: string,
     status: TicketSystemUserStatus
   ): Promise<void> => {
@@ -124,92 +124,104 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
       return;
     }
 
-    await optimisticTicketLoader.refresh((currentTicket) => ({
-      optimisticState: {
-        ...currentTicket,
-        assignees: currentTicket.assignees.map((assignee) =>
-          assignee.ticket_system_user_id === ticketSystemUserId ? { ...assignee, status } : assignee
-        )
-      },
-      mutation: () => api.tickets.updateTicketAssigneeStatus(ticketId, ticketSystemUserId, { status }),
-      onRollback: (error) => {
-        const apiError = error as APIError;
-        dialogContext.setSnackbar({
-          open: true,
-          snackbarMessage: apiError.message
-        });
-      }
-    }));
+    await optimisticTicketLoader.refresh((currentTicket) => {
+      const currentTicketSystemUsers = currentTicket.ticket_system_users ?? [];
+
+      return {
+        optimisticState: {
+          ...currentTicket,
+          ticket_system_users: currentTicketSystemUsers.map((ticketSystemUser) =>
+            ticketSystemUser.ticket_system_user_id === ticketSystemUserId
+              ? { ...ticketSystemUser, status }
+              : ticketSystemUser
+          )
+        },
+        mutation: () => api.tickets.updateTicketSystemUserStatus(ticketId, ticketSystemUserId, { status }),
+        onRollback: (error) => {
+          const apiError = error as APIError;
+          dialogContext.setSnackbar({
+            open: true,
+            snackbarMessage: apiError.message
+          });
+        }
+      };
+    });
   };
 
   /**
-   * Soft deletes a ticket assignee without refetching ticket detail.
+   * Soft deletes a ticket system user without refetching ticket detail.
    *
-   * Calls the delete endpoint, then removes the assignee from local ticket
+   * Calls the delete endpoint, then removes the ticket system user from local ticket
    * context state to keep UI in sync.
    *
    * @param {string} ticketSystemUserId
    * @return {Promise<void>}
    */
-  const handleRemoveAssignee = async (ticketSystemUserId: string): Promise<void> => {
+  const handleRemoveTicketSystemUser = async (ticketSystemUserId: string): Promise<void> => {
     if (!ticketId) {
       return;
     }
 
-    await optimisticTicketLoader.refresh((currentTicket) => ({
-      optimisticState: {
-        ...currentTicket,
-        assignees: currentTicket.assignees.filter((assignee) => assignee.ticket_system_user_id !== ticketSystemUserId)
-      },
-      mutation: () => api.tickets.deleteTicketAssignee(ticketId, ticketSystemUserId),
-      onRollback: (error) => {
-        const apiError = error as APIError;
-        dialogContext.setSnackbar({
-          open: true,
-          snackbarMessage: apiError.message
-        });
-      }
-    }));
+    await optimisticTicketLoader.refresh((currentTicket) => {
+      const currentTicketSystemUsers = currentTicket.ticket_system_users ?? [];
+
+      return {
+        optimisticState: {
+          ...currentTicket,
+          ticket_system_users: currentTicketSystemUsers.filter(
+            (ticketSystemUser) => ticketSystemUser.ticket_system_user_id !== ticketSystemUserId
+          )
+        },
+        mutation: () => api.tickets.deleteTicketSystemUser(ticketId, ticketSystemUserId),
+        onRollback: (error) => {
+          const apiError = error as APIError;
+          dialogContext.setSnackbar({
+            open: true,
+            snackbarMessage: apiError.message
+          });
+        }
+      };
+    });
   };
 
   /**
-   * Closes the assignee delete confirmation dialog.
+   * Closes the ticket system user delete confirmation dialog.
    *
    * @return {void}
    */
-  const closeAssigneeDeleteDialog = (): void => {
+  const closeTicketSystemUserDeleteDialog = (): void => {
     dialogContext.setYesNoDialog({ open: false });
   };
 
   /**
-   * Opens a confirmation dialog before deleting a ticket assignee.
+   * Opens a confirmation dialog before deleting a ticket system user.
    *
    * @param {string} ticketSystemUserId
    * @return {void}
    */
-  const handleConfirmRemoveAssignee = (ticketSystemUserId: string): void => {
+  const handleConfirmRemoveTicketSystemUser = (ticketSystemUserId: string): void => {
     dialogContext.setYesNoDialog({
       open: true,
-      dialogTitle: 'Remove Assignee',
-      dialogText: 'Are you sure you want to remove this assignee?',
+      dialogTitle: 'Remove User',
+      dialogText: 'Are you sure you want to remove this user?',
       yesButtonLabel: 'Remove',
       noButtonLabel: 'Cancel',
-      onClose: closeAssigneeDeleteDialog,
-      onNo: closeAssigneeDeleteDialog,
+      onClose: closeTicketSystemUserDeleteDialog,
+      onNo: closeTicketSystemUserDeleteDialog,
       onYes: async () => {
-        closeAssigneeDeleteDialog();
-        await handleRemoveAssignee(ticketSystemUserId);
+        closeTicketSystemUserDeleteDialog();
+        await handleRemoveTicketSystemUser(ticketSystemUserId);
       }
     });
   };
 
   return (
     <Stack spacing={5}>
-      <TicketSidebarAssignees
-        assignees={assignees ?? []}
-        onOpenDialog={() => setIsAssigneeDialogOpen(true)}
-        onUpdateAssigneeStatus={handleUpdateAssigneeStatus}
-        onRemoveAssignee={handleConfirmRemoveAssignee}
+      <TicketSidebarSystemUsers
+        ticketSystemUsers={ticketSystemUsers ?? []}
+        onOpenDialog={() => setIsTicketSystemUserDialogOpen(true)}
+        onUpdateTicketSystemUserStatus={handleUpdateTicketSystemUserStatus}
+        onRemoveTicketSystemUser={handleConfirmRemoveTicketSystemUser}
       />
       <TicketSidebarTeam
         members={members}
@@ -230,10 +242,10 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
         onMemberRemove={handleMemberRemove}
       />
       {ticketId ? (
-        <TicketAssigneeDialog
-          open={isAssigneeDialogOpen}
+        <TicketSystemUserDialog
+          open={isTicketSystemUserDialogOpen}
           ticketId={ticketId}
-          onClose={() => setIsAssigneeDialogOpen(false)}
+          onClose={() => setIsTicketSystemUserDialogOpen(false)}
         />
       ) : null}
     </Stack>

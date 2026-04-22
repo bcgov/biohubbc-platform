@@ -46,7 +46,7 @@ export const PortalTicketDetailPageContent = (props: IPortalTicketDetailPageCont
               </Stack>
 
               <Box sx={{ width: { xs: '100%', sm: 340 }, flex: { xs: '1 1 100%', sm: '0 0 340px' } }}>
-                <PortalTicketSidebar teamId={ticket?.team_id} assignees={ticket?.assignees} />
+                <PortalTicketSidebar teamId={ticket?.team_id} ticketSystemUsers={ticket?.ticket_system_users} />
               </Box>
             </Stack>
           </PageSection>

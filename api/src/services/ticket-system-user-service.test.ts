@@ -3,12 +3,11 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection } from '../__mocks__/db';
 import { IDBConnection } from '../database/db';
-import { HTTP404, HTTP409 } from '../errors/http-error';
+import { ApiConflictError } from '../errors/api-error';
+import { HTTP404 } from '../errors/http-error';
 import { TicketSystemUser } from '../models/ticket-system-user';
-import { TicketRepository } from '../repositories/ticket-repository';
 import { TicketSystemUserRepository } from '../repositories/ticket-system-user-repository';
 import { TicketSystemUserService } from './ticket-system-user-service';
-import { UserService } from './user-service';
 
 chai.use(sinonChai);
 
@@ -35,13 +34,11 @@ describe('TicketSystemUserService', () => {
     sinon.restore();
   });
 
-  it('createTicketAssignees creates assignments for system admin', async () => {
-    sinon.stub(TicketRepository.prototype, 'getTicketById').resolves({} as never);
-    sinon.stub(UserService.prototype, 'getUserById').resolves({} as never);
-    sinon.stub(TicketSystemUserRepository.prototype, 'getActiveTicketSystemUserByTicketAndSystemUser').resolves(null);
+  it('createTicketSystemUsers creates assignments for system admin', async () => {
+    sinon.stub(TicketSystemUserRepository.prototype, 'findTicketSystemUsers').resolves([]);
     const insertStub = sinon.stub(TicketSystemUserRepository.prototype, 'insertTicketSystemUser').resolves(assignment);
 
-    const result = await service.createTicketAssignees(ticketId, [
+    const result = await service.createTicketSystemUsers(ticketId, [
       {
         system_user_id: assignment.system_user_id,
         status: 'requested'
@@ -52,57 +49,89 @@ describe('TicketSystemUserService', () => {
     expect(result).to.eql([assignment]);
   });
 
-  it('createTicketAssignees rejects duplicate active assignment', async () => {
-    sinon.stub(TicketRepository.prototype, 'getTicketById').resolves({} as never);
-    sinon.stub(UserService.prototype, 'getUserById').resolves({} as never);
-    sinon
-      .stub(TicketSystemUserRepository.prototype, 'getActiveTicketSystemUserByTicketAndSystemUser')
-      .resolves(assignment);
+  it('createTicketSystemUsers inserts every payload item', async () => {
+    sinon.stub(TicketSystemUserRepository.prototype, 'findTicketSystemUsers').resolves([]);
+    const insertStub = sinon.stub(TicketSystemUserRepository.prototype, 'insertTicketSystemUser').resolves(assignment);
+
+    await service.createTicketSystemUsers(ticketId, [
+      {
+        system_user_id: 7,
+        status: 'requested'
+      },
+      {
+        system_user_id: 8,
+        status: 'started'
+      }
+    ]);
+
+    expect(insertStub).to.have.been.calledTwice;
+    expect(insertStub.firstCall).to.have.been.calledWith(ticketId, { system_user_id: 7, status: 'requested' });
+    expect(insertStub.secondCall).to.have.been.calledWith(ticketId, { system_user_id: 8, status: 'started' });
+  });
+
+  it('createTicketSystemUsers returns 409 when one or more users are already assigned', async () => {
+    sinon.stub(TicketSystemUserRepository.prototype, 'findTicketSystemUsers').resolves([assignment]);
+    const insertStub = sinon.stub(TicketSystemUserRepository.prototype, 'insertTicketSystemUser').resolves(assignment);
 
     try {
-      await service.createTicketAssignees(ticketId, [
+      await service.createTicketSystemUsers(ticketId, [
         {
-          system_user_id: assignment.system_user_id,
+          system_user_id: 7,
           status: 'requested'
         }
       ]);
       expect.fail('Expected create to throw');
     } catch (error) {
-      expect(error).to.be.instanceOf(HTTP409);
+      expect(error).to.be.instanceOf(ApiConflictError);
+      expect((error as ApiConflictError).message).to.equal('One or more users are already assigned to this ticket');
     }
+
+    expect(insertStub).to.not.have.been.called;
   });
 
-  it('updateTicketAssigneeStatus updates assignee status', async () => {
-    sinon.stub(TicketRepository.prototype, 'getTicketById').resolves({} as never);
-    sinon.stub(TicketSystemUserRepository.prototype, 'getActiveTicketSystemUserById').resolves(assignment);
+  it('updateTicketSystemUserStatus updates ticket system user status', async () => {
+    sinon.stub(TicketSystemUserRepository.prototype, 'getTicketSystemUserByTicketAndSystemUserId').resolves(assignment);
     const updateStub = sinon
       .stub(TicketSystemUserRepository.prototype, 'updateTicketSystemUserStatus')
       .resolves({ ...assignment, status: 'started' });
 
-    const result = await service.updateTicketAssigneeStatus(ticketId, ticketSystemUserId, { status: 'started' });
+    const result = await service.updateTicketSystemUserStatus(ticketId, ticketSystemUserId, { status: 'started' });
 
     expect(updateStub).to.have.been.calledWith(ticketId, ticketSystemUserId, { status: 'started' });
     expect(result.status).to.equal('started');
   });
 
-  it('updateTicketAssigneeStatus returns 404 when row not found', async () => {
-    sinon.stub(TicketRepository.prototype, 'getTicketById').resolves({} as never);
-    sinon.stub(TicketSystemUserRepository.prototype, 'getActiveTicketSystemUserById').resolves(null);
+  it('updateTicketSystemUserStatus returns 404 when row not found', async () => {
+    sinon.stub(TicketSystemUserRepository.prototype, 'getTicketSystemUserByTicketAndSystemUserId').resolves(null);
 
     try {
-      await service.updateTicketAssigneeStatus(ticketId, ticketSystemUserId, { status: 'started' });
+      await service.updateTicketSystemUserStatus(ticketId, ticketSystemUserId, { status: 'started' });
       expect.fail('Expected patch to throw');
     } catch (error) {
       expect(error).to.be.instanceOf(HTTP404);
     }
   });
 
-  it('deleteTicketAssignee soft deletes assignment for system admin', async () => {
-    sinon.stub(TicketRepository.prototype, 'getTicketById').resolves({} as never);
-    sinon.stub(TicketSystemUserRepository.prototype, 'getActiveTicketSystemUserById').resolves(assignment);
+  it('updateTicketSystemUserStatus returns 409 when status is unchanged', async () => {
+    sinon.stub(TicketSystemUserRepository.prototype, 'getTicketSystemUserByTicketAndSystemUserId').resolves(assignment);
+    const updateStub = sinon
+      .stub(TicketSystemUserRepository.prototype, 'updateTicketSystemUserStatus')
+      .resolves(assignment);
+
+    try {
+      await service.updateTicketSystemUserStatus(ticketId, ticketSystemUserId, { status: 'requested' });
+      expect.fail('Expected patch to throw');
+    } catch (error) {
+      expect(error).to.be.instanceOf(ApiConflictError);
+    }
+
+    expect(updateStub).to.not.have.been.called;
+  });
+
+  it('deleteTicketSystemUser soft deletes assignment for system admin', async () => {
     const deleteStub = sinon.stub(TicketSystemUserRepository.prototype, 'softDeleteTicketSystemUser').resolves();
 
-    await service.deleteTicketAssignee(ticketId, ticketSystemUserId);
+    await service.deleteTicketSystemUser(ticketId, ticketSystemUserId);
 
     expect(deleteStub).to.have.been.calledWith(ticketId, ticketSystemUserId);
   });

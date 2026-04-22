@@ -1,17 +1,17 @@
 import { AxiosInstance } from 'axios';
 import {
   ICreateTicketCommentRequest,
-  ICreateTicketAssignee,
+  ICreateTicketSystemUser,
   ICreateTicketReferenceRequest,
   ICreateTicketRequest,
   IGetTicketsResponse,
-  ITicketAssignee,
+  ITicketSystemUser,
   ITicket,
   ITicketCommentLog,
   ITicketReference,
   ITicketExtended,
   ITicketsQueryParams,
-  IUpdateTicketAssigneeStatusRequest,
+  IUpdateTicketSystemUserStatusRequest,
   IUpdateTicketRequest,
   TicketStatus
 } from 'interfaces/useTicketsApi.interface';
@@ -173,44 +173,44 @@ export const useTicketsApi = (axios: AxiosInstance) => {
    * Assign one or more system users to a ticket.
    *
    * @param {string} ticketId
-   * @param {ICreateTicketAssignee[]} payload
-   * @return {*} {Promise<ITicketAssignee[]>}
+   * @param {ICreateTicketSystemUser[]} payload
+   * @return {*} {Promise<ITicketSystemUser[]>}
    */
-  const createTicketAssignees = async (
+  const createTicketSystemUsers = async (
     ticketId: string,
-    payload: ICreateTicketAssignee[]
-  ): Promise<ITicketAssignee[]> => {
+    payload: ICreateTicketSystemUser[]
+  ): Promise<ITicketSystemUser[]> => {
     const { data } = await axios.post(`/api/tickets/${ticketId}/system-user`, payload);
 
     return data;
   };
 
   /**
-   * Update ticket assignee status.
+   * Update ticket system user status.
    *
    * @param {string} ticketId
    * @param {string} ticketSystemUserId
-   * @param {IUpdateTicketAssigneeStatusRequest} payload
-   * @return {*} {Promise<ITicketAssignee>}
+   * @param {IUpdateTicketSystemUserStatusRequest} payload
+   * @return {*} {Promise<ITicketSystemUser>}
    */
-  const updateTicketAssigneeStatus = async (
+  const updateTicketSystemUserStatus = async (
     ticketId: string,
     ticketSystemUserId: string,
-    payload: IUpdateTicketAssigneeStatusRequest
-  ): Promise<ITicketAssignee> => {
+    payload: IUpdateTicketSystemUserStatusRequest
+  ): Promise<ITicketSystemUser> => {
     const { data } = await axios.patch(`/api/tickets/${ticketId}/system-user/${ticketSystemUserId}`, payload);
 
     return data;
   };
 
   /**
-   * Remove a ticket assignee (soft delete).
+   * Remove a ticket system user (soft delete).
    *
    * @param {string} ticketId
    * @param {string} ticketSystemUserId
    * @return {*} {Promise<void>}
    */
-  const deleteTicketAssignee = async (ticketId: string, ticketSystemUserId: string): Promise<void> => {
+  const deleteTicketSystemUser = async (ticketId: string, ticketSystemUserId: string): Promise<void> => {
     await axios.delete(`/api/tickets/${ticketId}/system-user/${ticketSystemUserId}`);
   };
 
@@ -226,8 +226,8 @@ export const useTicketsApi = (axios: AxiosInstance) => {
     deleteTicketReference,
     getTicketsForUser,
     getTicketForUser,
-    createTicketAssignees,
-    updateTicketAssigneeStatus,
-    deleteTicketAssignee
+    createTicketSystemUsers,
+    updateTicketSystemUserStatus,
+    deleteTicketSystemUser
   };
 };

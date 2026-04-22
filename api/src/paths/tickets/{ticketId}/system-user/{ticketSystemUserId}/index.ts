@@ -39,7 +39,7 @@ export const DELETE: Operation = [
 ];
 
 PATCH.apiDoc = {
-  description: 'Update ticket assignee status',
+  description: 'Update ticket system user status',
   tags: ['tickets'],
   security: [{ Bearer: [] }],
   parameters: [
@@ -61,7 +61,7 @@ PATCH.apiDoc = {
         type: 'string',
         format: 'uuid'
       },
-      description: 'Ticket assignee UUID.'
+      description: 'Ticket system user UUID.'
     }
   ],
   requestBody: {
@@ -73,7 +73,7 @@ PATCH.apiDoc = {
   },
   responses: {
     200: {
-      description: 'Ticket assignee status updated successfully',
+      description: 'Ticket system user status updated successfully',
       content: {
         'application/json': {
           schema: TicketSystemUserSchema
@@ -85,7 +85,7 @@ PATCH.apiDoc = {
 };
 
 DELETE.apiDoc = {
-  description: 'Delete a ticket assignee',
+  description: 'Delete a ticket system user',
   tags: ['tickets'],
   security: [{ Bearer: [] }],
   parameters: [
@@ -107,28 +107,19 @@ DELETE.apiDoc = {
         type: 'string',
         format: 'uuid'
       },
-      description: 'Ticket assignee UUID.'
+      description: 'Ticket system user UUID.'
     }
   ],
   responses: {
     204: {
-      description: 'Ticket assignee deleted successfully'
+      description: 'Ticket system user deleted successfully'
     },
     ...defaultErrorResponses
   }
 };
 
 /**
- * Build the PATCH request handler for updating a ticket assignee status.
- *
- * Behavior:
- * - opens a request-scoped DB transaction
- * - delegates validation and update logic to `TicketSystemUserService`
- * - commits on success and returns the updated assignee row
- * - rolls back and rethrows on failure
- *
- * Authorization:
- * - enforced at route middleware level (SystemRole: SYSTEM_ADMIN)
+ * Build the PATCH request handler for updating a ticket system user status.
  *
  * @return {RequestHandler} Express handler for PATCH /tickets/{ticketId}/system-user/{ticketSystemUserId}
  */
@@ -142,7 +133,7 @@ export function patchTicketSystemUser(): RequestHandler {
       const ticketSystemUserService = new TicketSystemUserService(connection);
       const payload = req.body as UpdateTicketSystemUserStatusRequest;
 
-      const ticketSystemUser = await ticketSystemUserService.updateTicketAssigneeStatus(
+      const ticketSystemUser = await ticketSystemUserService.updateTicketSystemUserStatus(
         req.params.ticketId,
         req.params.ticketSystemUserId,
         payload
@@ -162,16 +153,7 @@ export function patchTicketSystemUser(): RequestHandler {
 }
 
 /**
- * Build the DELETE request handler for soft-deleting a ticket assignee row.
- *
- * Behavior:
- * - opens a request-scoped DB transaction
- * - delegates existence checks and soft-delete mutation to `TicketSystemUserService`
- * - commits on success and returns HTTP 204
- * - rolls back and rethrows on failure
- *
- * Authorization:
- * - enforced at route middleware level (SystemRole: SYSTEM_ADMIN)
+ * Build the DELETE request handler for soft-deleting a ticket system user row.
  *
  * @return {RequestHandler} Express handler for DELETE /tickets/{ticketId}/system-user/{ticketSystemUserId}
  */
@@ -184,7 +166,7 @@ export function deleteTicketSystemUser(): RequestHandler {
 
       const ticketSystemUserService = new TicketSystemUserService(connection);
 
-      await ticketSystemUserService.deleteTicketAssignee(req.params.ticketId, req.params.ticketSystemUserId);
+      await ticketSystemUserService.deleteTicketSystemUser(req.params.ticketId, req.params.ticketSystemUserId);
 
       await connection.commit();
 

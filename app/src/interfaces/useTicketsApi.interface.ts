@@ -54,7 +54,7 @@ export interface ITicketReference {
   create_date: string;
 }
 
-export interface ITicketAssignee {
+export interface ITicketSystemUser {
   ticket_system_user_id: string;
   ticket_id: string;
   system_user_id: number;
@@ -72,7 +72,7 @@ export interface ITicketExtended extends ITicket {
   comments: ITicketCommentLog[];
   references: ITicketReference[];
   data_requests: DataRequestResponse[];
-  assignees: ITicketAssignee[];
+  ticket_system_users: ITicketSystemUser[];
 }
 
 export interface ICreateTicketRequest {
@@ -102,12 +102,12 @@ export interface ICreateTicketReferenceRequest {
   references: ICreateTicketReference[];
 }
 
-export interface ICreateTicketAssignee {
+export interface ICreateTicketSystemUser {
   system_user_id: number;
   status: TicketSystemUserStatus;
 }
 
-export interface IUpdateTicketAssigneeStatusRequest {
+export interface IUpdateTicketSystemUserStatusRequest {
   status: TicketSystemUserStatus;
 }
 

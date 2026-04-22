@@ -1,22 +1,22 @@
 import Stack from '@mui/material/Stack';
 import { AlertBanner } from 'components/notifications/AlertBanner';
-import { TICKET_ASSIGNEE_STATUS_PRESENTATION } from 'constants/ticket';
+import { TICKET_SYSTEM_USER_STATUS_PRESENTATION } from 'constants/ticket';
 import { SearchAutocomplete } from 'features/search/result/sidebar/search/components/section/autocomplete/SearchAutocomplete';
 import { SidebarOption } from 'features/search/result/sidebar/search/components/section/option/SearchSidebarOption';
 import { ArrayHelpers, FieldArray, getIn, useFormikContext } from 'formik';
 import { TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
 import { useMemo } from 'react';
-import { TicketAssigneeCard } from './TicketAssigneeCard';
+import { TicketSystemUserCard } from './TicketSystemUserCard';
 
-export interface ITicketAssigneeFormValues {
-  assignees: {
+export interface ITicketSystemUserFormValues {
+  ticketSystemUsers: {
     system_user_id: number;
     user_identifier: string;
     status: TicketSystemUserStatus;
   }[];
 }
 
-interface ITicketAssigneeFormProps {
+interface ITicketSystemUserFormProps {
   options: SidebarOption[];
   isLoadingUsers: boolean;
   isSubmitting: boolean;
@@ -26,17 +26,17 @@ interface ITicketAssigneeFormProps {
 /**
  * Form body for assigning one or more users to a ticket.
  *
- * @param {ITicketAssigneeFormProps} props
+ * @param {ITicketSystemUserFormProps} props
  * @return {*}
  */
-export const TicketAssigneeForm = (props: ITicketAssigneeFormProps) => {
+export const TicketSystemUserForm = (props: ITicketSystemUserFormProps) => {
   const { options, isLoadingUsers, isSubmitting, onSearchUsers } = props;
-  const { values, errors, touched } = useFormikContext<ITicketAssigneeFormValues>();
+  const { values, errors, touched } = useFormikContext<ITicketSystemUserFormValues>();
   const statusOptions = useMemo<Array<{ value: TicketSystemUserStatus; label: string; iconPath: string }>>(
     () =>
       (
-        Object.entries(TICKET_ASSIGNEE_STATUS_PRESENTATION) as Array<
-          [TicketSystemUserStatus, (typeof TICKET_ASSIGNEE_STATUS_PRESENTATION)[TicketSystemUserStatus]]
+        Object.entries(TICKET_SYSTEM_USER_STATUS_PRESENTATION) as Array<
+          [TicketSystemUserStatus, (typeof TICKET_SYSTEM_USER_STATUS_PRESENTATION)[TicketSystemUserStatus]]
         >
       ).map(([value, presentation]) => ({
         value,
@@ -53,7 +53,7 @@ export const TicketAssigneeForm = (props: ITicketAssigneeFormProps) => {
 
     const selectedUserId = Number(option.value);
 
-    if (values.assignees.some((assignee) => assignee.system_user_id === selectedUserId)) {
+    if (values.ticketSystemUsers.some((ticketSystemUser) => ticketSystemUser.system_user_id === selectedUserId)) {
       return;
     }
 
@@ -64,25 +64,29 @@ export const TicketAssigneeForm = (props: ITicketAssigneeFormProps) => {
     });
   };
 
-  const handleChangeAssigneeStatus = (index: number, status: TicketSystemUserStatus, arrayHelpers: ArrayHelpers) => {
-    const assignee = values.assignees[index];
-    if (!assignee) {
+  const handleChangeTicketSystemUserStatus = (
+    index: number,
+    status: TicketSystemUserStatus,
+    arrayHelpers: ArrayHelpers
+  ) => {
+    const ticketSystemUser = values.ticketSystemUsers[index];
+    if (!ticketSystemUser) {
       return;
     }
 
     arrayHelpers.replace(index, {
-      ...assignee,
+      ...ticketSystemUser,
       status
     });
   };
 
-  const assigneesError = getIn(errors, 'assignees');
-  const assigneesTouched = getIn(touched, 'assignees');
+  const ticketSystemUsersError = getIn(errors, 'ticketSystemUsers');
+  const ticketSystemUsersTouched = getIn(touched, 'ticketSystemUsers');
 
   return (
     <Stack spacing={2.5} sx={{ mt: 1 }}>
       <FieldArray
-        name="assignees"
+        name="ticketSystemUsers"
         render={(arrayHelpers) => (
           <>
             <SearchAutocomplete
@@ -96,18 +100,18 @@ export const TicketAssigneeForm = (props: ITicketAssigneeFormProps) => {
               onChange={(option) => handleSelectUser(option, arrayHelpers)}
             />
 
-            {values.assignees.length ? (
+            {values.ticketSystemUsers.length ? (
               <Stack spacing={1}>
-                {values.assignees.map((assignee, index) => (
-                  <TicketAssigneeCard
-                    key={assignee.system_user_id}
-                    systemUserId={assignee.system_user_id}
-                    userIdentifier={assignee.user_identifier}
-                    status={assignee.status}
+                {values.ticketSystemUsers.map((ticketSystemUser, index) => (
+                  <TicketSystemUserCard
+                    key={ticketSystemUser.system_user_id}
+                    systemUserId={ticketSystemUser.system_user_id}
+                    userIdentifier={ticketSystemUser.user_identifier}
+                    status={ticketSystemUser.status}
                     statusOptions={statusOptions}
                     isSubmitting={isSubmitting}
-                    onChangeStatus={(_, status) => handleChangeAssigneeStatus(index, status, arrayHelpers)}
-                    onRemoveAssignee={() => arrayHelpers.remove(index)}
+                    onChangeStatus={(_, status) => handleChangeTicketSystemUserStatus(index, status, arrayHelpers)}
+                    onRemoveTicketSystemUser={() => arrayHelpers.remove(index)}
                   />
                 ))}
               </Stack>
@@ -116,8 +120,8 @@ export const TicketAssigneeForm = (props: ITicketAssigneeFormProps) => {
         )}
       />
 
-      {assigneesTouched && typeof assigneesError === 'string' ? (
-        <AlertBanner severity="error">{assigneesError}</AlertBanner>
+      {ticketSystemUsersTouched && typeof ticketSystemUsersError === 'string' ? (
+        <AlertBanner severity="error">{ticketSystemUsersError}</AlertBanner>
       ) : null}
     </Stack>
   );

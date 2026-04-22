@@ -126,7 +126,7 @@ const baseTicket: ITicketExtended = {
       create_date: '2026-02-25T00:00:00.000Z'
     }
   ],
-  assignees: [],
+  ticket_system_users: [],
   data_requests: [
     {
       data_request_id: 'dr-1',

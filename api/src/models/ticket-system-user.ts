@@ -29,3 +29,9 @@ export interface CreateTicketSystemUser {
 export interface UpdateTicketSystemUserStatusRequest {
   status: TicketSystemUserStatus;
 }
+
+export interface TicketSystemUsersFilters {
+  ticketId?: string;
+  ticketSystemUserId?: string;
+  systemUserIds?: number[];
+}

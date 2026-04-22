@@ -7,22 +7,22 @@ import { TicketSidebarSection } from 'features/admin/tickets/detail/sidebar/Tick
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { ITeamMember } from 'interfaces/useTeamsApi.interface';
-import { ITicketAssignee } from 'interfaces/useTicketsApi.interface';
+import { ITicketSystemUser } from 'interfaces/useTicketsApi.interface';
 import { useEffect } from 'react';
 
 interface IPortalTicketSidebarProps {
   teamId?: string;
-  assignees?: ITicketAssignee[];
+  ticketSystemUsers?: ITicketSystemUser[];
 }
 
 /**
- * Read-only ticket sidebar for portal users showing assignees.
+ * Read-only ticket sidebar for portal users showing ticket system users.
  *
  * @param {IPortalTicketSidebarProps} props
  * @return {*}
  */
 export const PortalTicketSidebar = (props: IPortalTicketSidebarProps) => {
-  const { teamId, assignees } = props;
+  const { teamId, ticketSystemUsers } = props;
   const api = useApi();
 
   const teamMembersLoader = useDataLoader((currentTeamId: string) => api.teams.getTeamMembers(currentTeamId));
@@ -36,22 +36,22 @@ export const PortalTicketSidebar = (props: IPortalTicketSidebarProps) => {
   }, [teamId, teamMembersLoader]);
 
   const members: ITeamMember[] = teamMembersLoader.data?.members ?? [];
-  const getAssigneeStatusLabel = (status: ITicketAssignee['status']) =>
+  const getTicketSystemUserStatusLabel = (status: ITicketSystemUser['status']) =>
     status.charAt(0).toUpperCase() + status.slice(1);
 
   return (
     <Stack spacing={5}>
-      <TicketSidebarSection label="Assignees">
+      <TicketSidebarSection label="System Users">
         <LoadingGuard
-          hasNoData={!(assignees ?? []).length}
-          hasNoDataFallback={<Typography variant="body2">No assignees</Typography>}>
+          hasNoData={!(ticketSystemUsers ?? []).length}
+          hasNoDataFallback={<Typography variant="body2">No users</Typography>}>
           <Stack spacing={0.75}>
-            {(assignees ?? []).map((assignee) => (
+            {(ticketSystemUsers ?? []).map((ticketSystemUser) => (
               <TicketSidebarItem
-                key={assignee.ticket_system_user_id}
-                label={`${assignee.system_user.display_name ?? assignee.system_user.user_identifier} (${getAssigneeStatusLabel(
-                  assignee.status
-                )})`}
+                key={ticketSystemUser.ticket_system_user_id}
+                label={`${
+                  ticketSystemUser.system_user.display_name ?? ticketSystemUser.system_user.user_identifier
+                } (${getTicketSystemUserStatusLabel(ticketSystemUser.status)})`}
               />
             ))}
           </Stack>

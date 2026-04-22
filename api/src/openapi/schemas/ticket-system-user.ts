@@ -1,10 +1,9 @@
 import { OpenAPIV3 } from 'openapi-types';
-
-export const TicketSystemUserStatusEnum = ['requested', 'started', 'blocked', 'resolved'];
+import { TicketSystemUserStatus } from '../../models/ticket-system-user';
 
 export const TicketSystemUserStatusSchema: OpenAPIV3.SchemaObject = {
   type: 'string',
-  enum: TicketSystemUserStatusEnum
+  enum: [...TicketSystemUserStatus.options]
 };
 
 export const CreateTicketSystemUserSchema: OpenAPIV3.SchemaObject = {

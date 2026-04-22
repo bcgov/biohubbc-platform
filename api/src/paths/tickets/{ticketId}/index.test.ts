@@ -31,7 +31,7 @@ describe('paths/tickets/{ticketId}', () => {
     comments: [],
     references: [],
     data_requests: [],
-    assignees: []
+    ticket_system_users: []
   };
 
   afterEach(() => {

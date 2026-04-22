@@ -1,29 +1,26 @@
 import { IDBConnection } from '../database/db';
-import { HTTP404, HTTP409 } from '../errors/http-error';
+import { ApiConflictError } from '../errors/api-error';
+import { HTTP404 } from '../errors/http-error';
 import {
   CreateTicketSystemUser,
   TicketSystemUser,
   TicketSystemUserWithUser,
   UpdateTicketSystemUserStatusRequest
 } from '../models/ticket-system-user';
-import { TicketRepository } from '../repositories/ticket-repository';
 import { TicketSystemUserRepository } from '../repositories/ticket-system-user-repository';
 import { DBService } from './db-service';
-import { UserService } from './user-service';
 
 /**
- * Domain service for ticket assignee lifecycle management.
+ * Domain service for ticket system user lifecycle management.
  *
  * This service encapsulates:
- * - assignment creation validation (ticket and user existence, duplicate prevention)
- * - status updates for existing assignee rows
- * - assignee removal for existing rows
- * - retrieval of active assignee payloads for ticket detail responses
+ * - assignment creation for explicit ticket system users
+ * - status updates for existing ticket system user rows
+ * - ticket system user removal for existing rows
+ * - retrieval of active ticket system user payloads for ticket detail responses
  */
 export class TicketSystemUserService extends DBService {
-  ticketRepository: TicketRepository;
   ticketSystemUserRepository: TicketSystemUserRepository;
-  userService: UserService;
 
   /**
    * Creates an instance of TicketSystemUserService.
@@ -33,95 +30,68 @@ export class TicketSystemUserService extends DBService {
    */
   constructor(connection: IDBConnection) {
     super(connection);
-    this.ticketRepository = new TicketRepository(connection);
     this.ticketSystemUserRepository = new TicketSystemUserRepository(connection);
-    this.userService = new UserService(connection);
   }
 
   /**
-   * Create one or more explicit assignee rows for a ticket.
+   * Create one or more explicit ticket system user rows for a ticket.
    *
    * Behavior:
-   * - verifies the ticket exists
-   * - verifies each target system user exists
-   * - rejects duplicate system user ids within the request payload
-   * - rejects duplicate active assignment for each ticket/user pair
-   * - inserts rows into `ticket_system_user`
-   *
-   * Note:
-   * - route-level authorization enforces admin-only access for this operation.
+   * - rejects the request when any incoming system user already has an active ticket_system_user row for the ticket
+   * - returns created ticket system users in request order
    *
    * @param {string} ticketId - Ticket UUID.
-   * @param {CreateTicketSystemUser[]} payload - Assignment payloads.
+   * @param {CreateTicketSystemUser[]} payload - Ticket system user payloads.
    * @return {Promise<TicketSystemUser[]>} Newly created assignment rows.
-   * @throws {HTTP404} When ticket or user does not exist.
-   * @throws {HTTP409} When duplicate users are provided or an active assignment already exists.
    * @memberof TicketSystemUserService
    */
-  async createTicketAssignees(ticketId: string, payload: CreateTicketSystemUser[]): Promise<TicketSystemUser[]> {
-    await this.ticketRepository.getTicketById(ticketId);
+  async createTicketSystemUsers(ticketId: string, payload: CreateTicketSystemUser[]): Promise<TicketSystemUser[]> {
+    const existingTicketSystemUsers = await this.ticketSystemUserRepository.findTicketSystemUsers({
+      ticketId,
+      systemUserIds: payload.map((ticketSystemUser) => ticketSystemUser.system_user_id)
+    });
 
-    const uniqueSystemUserIds = new Set(payload.map((assignee) => assignee.system_user_id));
-
-    if (uniqueSystemUserIds.size !== payload.length) {
-      throw new HTTP409('Duplicate system users provided in assignment payload');
+    if (existingTicketSystemUsers.length) {
+      throw new ApiConflictError('One or more users are already assigned to this ticket');
     }
 
-    await Promise.all(payload.map((assignee) => this.userService.getUserById(assignee.system_user_id)));
-
-    await Promise.all(
-      payload.map(async (assignee) => {
-        const existing = await this.ticketSystemUserRepository.getActiveTicketSystemUserByTicketAndSystemUser(
-          ticketId,
-          assignee.system_user_id
-        );
-
-        if (existing) {
-          throw new HTTP409('System user is already actively assigned to this ticket');
-        }
-      })
-    );
-
     return Promise.all(
-      payload.map((assignee) =>
-        this.ticketSystemUserRepository.insertTicketSystemUser({
-          ticket_id: ticketId,
-          system_user_id: assignee.system_user_id,
-          status: assignee.status
-        })
+      payload.map((ticketSystemUser) =>
+        this.ticketSystemUserRepository.insertTicketSystemUser(ticketId, ticketSystemUser)
       )
     );
   }
 
   /**
-   * Update assignee lifecycle status for an existing assignment.
+   * Update ticket system user lifecycle status for an existing assignment.
    *
    * Behavior:
-   * - verifies ticket exists
-   * - verifies active assignee row exists
-   * - applies status update on active row
-   *
-   * Note:
-   * - route-level authorization enforces admin-only access for this operation.
+   * - changes the lifecycle status for an existing active assignment
+   * - rejects updates when the ticket system user record does not exist
    *
    * @param {string} ticketId - Ticket UUID.
    * @param {string} ticketSystemUserId - ticket_system_user UUID.
    * @param {UpdateTicketSystemUserStatusRequest} payload - New status payload.
    * @return {Promise<TicketSystemUser>} Updated assignment row.
-   * @throws {HTTP404} When ticket or assignee row is not found.
+   * @throws {HTTP404} When the ticket system user row is not found.
    * @memberof TicketSystemUserService
    */
-  async updateTicketAssigneeStatus(
+  async updateTicketSystemUserStatus(
     ticketId: string,
     ticketSystemUserId: string,
     payload: UpdateTicketSystemUserStatusRequest
   ): Promise<TicketSystemUser> {
-    await this.ticketRepository.getTicketById(ticketId);
-
-    const existing = await this.ticketSystemUserRepository.getActiveTicketSystemUserById(ticketId, ticketSystemUserId);
+    const existing = await this.ticketSystemUserRepository.getTicketSystemUserByTicketAndSystemUserId(
+      ticketId,
+      ticketSystemUserId
+    );
 
     if (!existing) {
-      throw new HTTP404('Ticket assignee not found');
+      throw new HTTP404('Ticket system user not found');
+    }
+
+    if (existing.status === payload.status) {
+      throw new ApiConflictError('Ticket system user already has the requested status');
     }
 
     return this.ticketSystemUserRepository.updateTicketSystemUserStatus(ticketId, ticketSystemUserId, {
@@ -130,42 +100,28 @@ export class TicketSystemUserService extends DBService {
   }
 
   /**
-   * Soft delete an assignee row for a ticket.
+   * Soft delete a ticket system user row for a ticket.
    *
    * Behavior:
-   * - verifies ticket exists
-   * - verifies active assignee row exists
-   * - marks row ended via `record_end_date`
-   *
-   * Note:
-   * - route-level authorization enforces admin-only access for this operation.
+   * - ends an active assignment without removing historical auditability
    *
    * @param {string} ticketId - Ticket UUID.
    * @param {string} ticketSystemUserId - ticket_system_user UUID.
    * @return {Promise<void>}
-   * @throws {HTTP404} When ticket or assignee row is not found.
    * @memberof TicketSystemUserService
    */
-  async deleteTicketAssignee(ticketId: string, ticketSystemUserId: string): Promise<void> {
-    await this.ticketRepository.getTicketById(ticketId);
-
-    const existing = await this.ticketSystemUserRepository.getActiveTicketSystemUserById(ticketId, ticketSystemUserId);
-
-    if (!existing) {
-      throw new HTTP404('Ticket assignee not found');
-    }
-
+  async deleteTicketSystemUser(ticketId: string, ticketSystemUserId: string): Promise<void> {
     await this.ticketSystemUserRepository.softDeleteTicketSystemUser(ticketId, ticketSystemUserId);
   }
 
   /**
-   * Return active assignees for a ticket with nested system user details.
+   * Return active ticket system users for a ticket with nested system user details.
    *
    * @param {string} ticketId - Ticket UUID.
    * @return {Promise<TicketSystemUserWithUser[]>} Active assignment rows with user payload.
    * @memberof TicketSystemUserService
    */
-  async getActiveTicketAssignees(ticketId: string): Promise<TicketSystemUserWithUser[]> {
+  async getActiveTicketSystemUsersByTicketId(ticketId: string): Promise<TicketSystemUserWithUser[]> {
     return this.ticketSystemUserRepository.getActiveTicketSystemUsersByTicketId(ticketId);
   }
 }

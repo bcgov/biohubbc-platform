@@ -3,13 +3,16 @@ import { TicketPriority, TicketSystemUserStatus } from 'interfaces/useTicketsApi
 
 export const TICKET_PRIORITIES: TicketPriority[] = ['low', 'medium', 'high', 'critical'];
 
-type TicketAssigneeStatusPresentation = {
+type TicketSystemUserStatusPresentation = {
   label: string;
   colour: 'default' | 'info' | 'warning' | 'success';
   icon: string;
 };
 
-export const TICKET_ASSIGNEE_STATUS_PRESENTATION: Record<TicketSystemUserStatus, TicketAssigneeStatusPresentation> = {
+export const TICKET_SYSTEM_USER_STATUS_PRESENTATION: Record<
+  TicketSystemUserStatus,
+  TicketSystemUserStatusPresentation
+> = {
   requested: {
     label: 'Requested',
     colour: 'default',

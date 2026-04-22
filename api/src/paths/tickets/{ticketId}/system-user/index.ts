@@ -27,7 +27,7 @@ export const POST: Operation = [
 ];
 
 POST.apiDoc = {
-  description: 'Create ticket assignees in bulk',
+  description: 'Create ticket system users in bulk',
   tags: ['tickets'],
   security: [{ Bearer: [] }],
   parameters: [
@@ -51,7 +51,7 @@ POST.apiDoc = {
   },
   responses: {
     201: {
-      description: 'Ticket assignees created successfully',
+      description: 'Ticket system users created successfully',
       content: {
         'application/json': {
           schema: {
@@ -75,7 +75,7 @@ export function createTicketSystemUsers(): RequestHandler {
       const ticketSystemUserService = new TicketSystemUserService(connection);
       const payload = req.body as CreateTicketSystemUser[];
 
-      const ticketSystemUsers = await ticketSystemUserService.createTicketAssignees(req.params.ticketId, payload);
+      const ticketSystemUsers = await ticketSystemUserService.createTicketSystemUsers(req.params.ticketId, payload);
 
       await connection.commit();
 

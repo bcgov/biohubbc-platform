@@ -41,7 +41,7 @@ const mockTicket = {
   comments: [],
   references: [],
   data_requests: [],
-  assignees: []
+  ticket_system_users: []
 };
 
 type ProviderHarness = {

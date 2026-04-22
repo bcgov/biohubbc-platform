@@ -7,24 +7,32 @@ import Typography from '@mui/material/Typography';
 import { DropdownButton, IDropdownButtonItemGroup } from 'components/DropdownButton';
 import { TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
 
-export interface ITicketAssigneeCardProps {
+export interface ITicketSystemUserCardProps {
   systemUserId: number;
   userIdentifier: string;
   status: TicketSystemUserStatus;
   statusOptions: Array<{ value: TicketSystemUserStatus; label: string; iconPath: string }>;
   isSubmitting: boolean;
   onChangeStatus: (systemUserId: number, status: TicketSystemUserStatus) => void;
-  onRemoveAssignee: () => void;
+  onRemoveTicketSystemUser: () => void;
 }
 
 /**
- * Card row for a selected ticket assignee with editable status.
+ * Card row for a selected ticket system user with editable status.
  *
- * @param {ITicketAssigneeCardProps} props
+ * @param {ITicketSystemUserCardProps} props
  * @return {*}
  */
-export const TicketAssigneeCard = (props: ITicketAssigneeCardProps) => {
-  const { systemUserId, userIdentifier, status, statusOptions, isSubmitting, onChangeStatus, onRemoveAssignee } = props;
+export const TicketSystemUserCard = (props: ITicketSystemUserCardProps) => {
+  const {
+    systemUserId,
+    userIdentifier,
+    status,
+    statusOptions,
+    isSubmitting,
+    onChangeStatus,
+    onRemoveTicketSystemUser
+  } = props;
   const statusOptionGroups: IDropdownButtonItemGroup[] = [
     {
       groupId: 'status-options',
@@ -59,7 +67,7 @@ export const TicketAssigneeCard = (props: ITicketAssigneeCardProps) => {
         <IconButton
           size="small"
           aria-label={`remove ${userIdentifier}`}
-          onClick={onRemoveAssignee}
+          onClick={onRemoveTicketSystemUser}
           disabled={isSubmitting}>
           <Icon path={mdiClose} size={0.65} />
         </IconButton>

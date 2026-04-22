@@ -78,7 +78,7 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
     'comments',
     'references',
     'data_requests',
-    'assignees'
+    'ticket_system_users'
   ],
   properties: {
     ticket_id: { type: 'string', format: 'uuid' },
@@ -116,7 +116,7 @@ export const TicketWithHistorySchema: OpenAPIV3.SchemaObject = {
       type: 'array',
       items: DataRequestResponseSchema
     },
-    assignees: {
+    ticket_system_users: {
       type: 'array',
       items: TicketSystemUserWithUserSchema
     }

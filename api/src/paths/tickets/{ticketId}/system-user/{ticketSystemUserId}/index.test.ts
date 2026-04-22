@@ -14,7 +14,7 @@ describe('paths/tickets/{ticketId}/system-user/{ticketSystemUserId}', () => {
     sinon.restore();
   });
 
-  it('PATCH updates ticket assignee status', async () => {
+  it('PATCH updates ticket system user status', async () => {
     const mockDBConnection = getMockDBConnection({
       systemUserId: () => 7,
       commit: sinon.stub(),
@@ -31,7 +31,7 @@ describe('paths/tickets/{ticketId}/system-user/{ticketSystemUserId}', () => {
       status: 'started'
     };
 
-    const patchStub = sinon.stub(TicketSystemUserService.prototype, 'updateTicketAssigneeStatus').resolves(updated);
+    const patchStub = sinon.stub(TicketSystemUserService.prototype, 'updateTicketSystemUserStatus').resolves(updated);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = { ticketId: updated.ticket_id, ticketSystemUserId: updated.ticket_system_user_id };
@@ -45,7 +45,7 @@ describe('paths/tickets/{ticketId}/system-user/{ticketSystemUserId}', () => {
     expect(mockRes.jsonValue).to.eql(updated);
   });
 
-  it('DELETE soft deletes ticket assignee', async () => {
+  it('DELETE soft deletes ticket system user', async () => {
     const mockDBConnection = getMockDBConnection({
       systemUserId: () => 1,
       commit: sinon.stub(),
@@ -54,7 +54,7 @@ describe('paths/tickets/{ticketId}/system-user/{ticketSystemUserId}', () => {
     });
 
     sinon.stub(db.dbDependencies, 'getDBConnection').returns(mockDBConnection);
-    const deleteStub = sinon.stub(TicketSystemUserService.prototype, 'deleteTicketAssignee').resolves();
+    const deleteStub = sinon.stub(TicketSystemUserService.prototype, 'deleteTicketSystemUser').resolves();
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
     mockReq.params = {
