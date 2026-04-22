@@ -46,7 +46,9 @@ describe('DownloadService', () => {
       const listStub = sinon
         .stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership')
         .resolves({ downloads: [], count: 0 });
-      const exportsStub = sinon.stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds').resolves([]);
+      const exportsStub = sinon
+        .stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds')
+        .resolves([]);
 
       const result = await service.getDownloadsByTeamMembership(42);
 
@@ -115,7 +117,9 @@ describe('DownloadService', () => {
       sinon
         .stub(DownloadRepository.prototype, 'getDownloadsByTeamMembership')
         .resolves({ downloads: ids.map((id) => createMockDownloadRecord({ download_id: id })), count: 3 });
-      const exportsStub = sinon.stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds').resolves([]);
+      const exportsStub = sinon
+        .stub(DownloadExportRepository.prototype, 'listDownloadExportsByDownloadIds')
+        .resolves([]);
 
       await service.getDownloadsByTeamMembership(42);
 
