@@ -35,9 +35,7 @@ export const triggerIframeDownload = (url: string): void => {
   iframe.src = url;
   document.body.appendChild(iframe);
   setTimeout(() => {
-    if (iframe.parentNode) {
-      iframe.parentNode.removeChild(iframe);
-    }
+    iframe.remove();
   }, 30000);
 };
 

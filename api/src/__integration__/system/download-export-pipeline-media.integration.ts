@@ -38,6 +38,29 @@ async function downloadZipFromS3(storageService: ObjectStorageService, s3Key: st
   return new AdmZip(Buffer.concat(chunks));
 }
 
+/**
+ * Stub `ParquetReader.openS3` with an in-process reader whose cursor yields
+ * the given rows then null. Keeps these tests focused on the binary-copy
+ * path — we don't write a real Parquet fixture, which would be costly.
+ */
+function stubParquetReaderWithRows(rows: Record<string, unknown>[]): void {
+  sinon.stub(parquetjs.ParquetReader, 'openS3').callsFake(async () => {
+    let index = 0;
+    const cursor = {
+      next: async () => {
+        if (index >= rows.length) {
+          return null;
+        }
+        return rows[index++];
+      }
+    };
+    return {
+      getCursor: () => cursor,
+      close: async () => undefined
+    } as unknown as parquetjs.ParquetReader;
+  });
+}
+
 describe('Download Export pipeline — media (system)', function () {
   this.timeout(60000);
 
@@ -102,29 +125,6 @@ describe('Download Export pipeline — media (system)', function () {
   });
 
   // ── Helpers ──────────────────────────────────────────────────────────
-
-  /**
-   * Stub `ParquetReader.openS3` with an in-process reader whose cursor yields
-   * the given rows then null. Keeps these tests focused on the binary-copy
-   * path — we don't write a real Parquet fixture, which would be costly.
-   */
-  function stubParquetReaderWithRows(rows: Record<string, unknown>[]): void {
-    sinon.stub(parquetjs.ParquetReader, 'openS3').callsFake(async () => {
-      let index = 0;
-      const cursor = {
-        next: async () => {
-          if (index >= rows.length) {
-            return null;
-          }
-          return rows[index++];
-        }
-      };
-      return {
-        getCursor: () => cursor,
-        close: async () => undefined
-      } as unknown as parquetjs.ParquetReader;
-    });
-  }
 
   /**
    * Seed a READY download with one `file`-type submission feature whose

@@ -47,14 +47,7 @@ interface DownloadFeatureCardProps {
  * no `vi.mock('hooks/useApi')` is required for card tests.
  */
 export const DownloadFeatureCard = (props: DownloadFeatureCardProps) => {
-  const {
-    download,
-    exports,
-    onCreateExport,
-    onDownloadExportPart,
-    onDownloadExportAllParts,
-    onRebuildExport
-  } = props;
+  const { download, exports, onCreateExport, onDownloadExportPart, onDownloadExportAllParts, onRebuildExport } = props;
 
   const chipProps = DOWNLOAD_STATUS_CHIP_PROPS[download.download_status] ?? {
     color: 'default',

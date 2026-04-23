@@ -290,8 +290,10 @@ describe('DownloadExportRepository', () => {
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
       const repo = new DownloadExportRepository(mockDBConnection);
-      // Should resolve without throwing — ON CONFLICT DO NOTHING returns rowCount=0 on collision.
-      await repo.createDownloadExportArtifact(EXPORT_ID, ARTIFACT_ID, 1);
+      const result = await repo.createDownloadExportArtifact(EXPORT_ID, ARTIFACT_ID, 1);
+
+      expect(result).to.be.undefined;
+      expect(sqlStub).to.have.been.calledOnce;
     });
   });
 

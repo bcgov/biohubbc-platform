@@ -136,7 +136,7 @@ export class DownloadExportPipelineService extends DBService {
       timestamps.completed_at = now;
     }
 
-    const errorMessage = errorMetadata?.error !== undefined ? { error_message: errorMetadata.error } : {};
+    const errorMessage = errorMetadata?.error === undefined ? {} : { error_message: errorMetadata.error };
 
     await this.downloadExportRepository.updateDownloadExportStatus(exportId, nextStatus, {
       ...errorMessage,
@@ -612,27 +612,34 @@ export class DownloadExportPipelineService extends DBService {
         archiverByPart.delete(partIndex);
       }
     } catch (error) {
-      // Abort any still-open archivers so their S3 multipart uploads reject
-      // and release resources instead of hanging as orphaned promises.
-      // `archive.abort()` cascades to the passThrough via our error listener
-      // in `createPartArchiverBundle`, which in turn fails the upload. Status
-      // stays `processing` — pg-boss retries or the DLQ handler sets FAILED
-      // (retry-as-lifecycle).
-      for (const bundle of archiverByPart.values()) {
-        // Swallow upload rejection first so `archive.abort()`-induced errors
-        // don't surface as unhandled promise rejections.
-        bundle.uploadPromise.catch(() => undefined);
-        try {
-          bundle.archive.abort();
-        } catch {
-          // archive.abort() throws if already finalized; ignore.
-        }
-      }
-      archiverByPart.clear();
+      this.abortOpenArchivers(archiverByPart);
       throw error;
     }
 
     await this.transitionExportStatus(exportId, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
+  }
+
+  /**
+   * Abort any still-open archivers so their S3 multipart uploads reject and
+   * release resources instead of hanging as orphaned promises.
+   *
+   * `archive.abort()` cascades to the passThrough via our error listener in
+   * `createPartArchiverBundle`, which in turn fails the upload. Status stays
+   * `processing` — pg-boss retries or the DLQ handler sets FAILED
+   * (retry-as-lifecycle).
+   */
+  private abortOpenArchivers(archiverByPart: Map<number, PartArchiverBundle>): void {
+    for (const bundle of archiverByPart.values()) {
+      // Swallow upload rejection first so `archive.abort()`-induced errors
+      // don't surface as unhandled promise rejections.
+      bundle.uploadPromise.catch(() => undefined);
+      try {
+        bundle.archive.abort();
+      } catch {
+        // archive.abort() throws if already finalized; ignore.
+      }
+    }
+    archiverByPart.clear();
   }
 
   /**

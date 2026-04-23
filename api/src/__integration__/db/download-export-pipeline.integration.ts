@@ -30,6 +30,58 @@ import { ArtifactService } from '../../services/upload/artifact-service';
 import { createHashCountStream } from '../../utils/hash-stream';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
+/**
+ * Stub `ParquetReader.openS3` with an in-process reader whose cursor yields
+ * the given rows then null. `close()` resolves. The pipeline re-opens the
+ * reader once per feature type, so every call returns the same cursor shape.
+ */
+function stubParquetReaderWithRows(rows: Record<string, unknown>[]): sinon.SinonStub {
+  return sinon.stub(parquetjs.ParquetReader, 'openS3').callsFake(async () => {
+    let index = 0;
+    const cursor = {
+      next: async () => {
+        if (index >= rows.length) {
+          return null;
+        }
+        return rows[index++];
+      }
+    };
+    return {
+      getCursor: () => cursor,
+      close: async () => undefined
+    } as unknown as parquetjs.ParquetReader;
+  });
+}
+
+/**
+ * Stand up a fresh archiver bundle that mirrors `createPartArchiverBundle` —
+ * archiver → passthrough → hashCount. Callers stub
+ * `ObjectStorageService.uploadStream` at the test level so the bytes drain
+ * into a no-op S3 sink.
+ */
+function buildArchiverBundle(): {
+  archive: archiver.Archiver;
+  uploadPromise: Promise<void>;
+  hashCount: ReturnType<typeof createHashCountStream>;
+} {
+  const archive = archiver('zip', { zlib: { level: 5 } });
+  const passThrough = new PassThrough();
+  const hashCount = createHashCountStream();
+
+  archive.on('error', (err) => passThrough.destroy(err));
+  archive.pipe(passThrough);
+  passThrough.pipe(hashCount.transform);
+
+  // Drain hashCount to /dev/null so backpressure never stalls the pipe.
+  const uploadPromise: Promise<void> = new Promise((resolve, reject) => {
+    hashCount.transform.on('end', () => resolve());
+    hashCount.transform.on('error', (err) => reject(err));
+    hashCount.transform.resume();
+  });
+
+  return { archive, uploadPromise, hashCount };
+}
+
 describe('Download Export pipeline (integration)', function () {
   // OOM skeleton + multi-part runs need headroom; happy-path tests complete well under this.
   this.timeout(60000);
@@ -132,30 +184,6 @@ describe('Download Export pipeline (integration)', function () {
     return record.download_export_id;
   }
 
-  /**
-   * Stub `ParquetReader.openS3` with an in-process reader whose cursor yields
-   * the given rows then null. `close()` resolves. The pipeline re-opens the
-   * reader once per feature type, so every call returns the same cursor shape.
-   */
-  function stubParquetReaderWithRows(rows: Record<string, unknown>[]): sinon.SinonStub {
-    const openStub = sinon.stub(parquetjs.ParquetReader, 'openS3').callsFake(async () => {
-      let index = 0;
-      const cursor = {
-        next: async () => {
-          if (index >= rows.length) {
-            return null;
-          }
-          return rows[index++];
-        }
-      };
-      return {
-        getCursor: () => cursor,
-        close: async () => undefined
-      } as unknown as parquetjs.ParquetReader;
-    });
-    return openStub;
-  }
-
   // ── Tests ────────────────────────────────────────────────────────────
 
   describe('DownloadExportRepository.createDownloadExport', () => {
@@ -250,35 +278,6 @@ describe('Download Export pipeline (integration)', function () {
   });
 
   describe('writePartZip', () => {
-    /**
-     * Helper: stand up a fresh archiver bundle that mirrors
-     * `createPartArchiverBundle` — archiver → passthrough → hashCount.
-     * `ObjectStorageService.uploadStream` is stubbed at the test level so the
-     * bytes drain into a no-op S3 sink.
-     */
-    function buildArchiverBundle(): {
-      archive: archiver.Archiver;
-      uploadPromise: Promise<void>;
-      hashCount: ReturnType<typeof createHashCountStream>;
-    } {
-      const archive = archiver('zip', { zlib: { level: 5 } });
-      const passThrough = new PassThrough();
-      const hashCount = createHashCountStream();
-
-      archive.on('error', (err) => passThrough.destroy(err));
-      archive.pipe(passThrough);
-      passThrough.pipe(hashCount.transform);
-
-      // Drain hashCount to /dev/null so backpressure never stalls the pipe.
-      const uploadPromise: Promise<void> = new Promise((resolve, reject) => {
-        hashCount.transform.on('end', () => resolve());
-        hashCount.transform.on('error', (err) => reject(err));
-        hashCount.transform.resume();
-      });
-
-      return { archive, uploadPromise, hashCount };
-    }
-
     it('inserts one artifact + one download_export_artifact row with chunk_id = partIndex', async () => {
       const { downloadId } = await seedReadyDownloadWithParquetArtifact(['dataset']);
       const exportId = await seedPendingExport(downloadId);
@@ -401,16 +400,6 @@ describe('Download Export pipeline (integration)', function () {
         SELECT status FROM download_export WHERE download_export_id = ${exportId};
       `);
       expect(exportRow.rows[0].status).to.equal(DownloadStatusEnum.READY);
-    });
-  });
-
-  describe('OOM guard (skeleton)', () => {
-    it.skip('runExport holds peak heap bounded against a >heap-sized Parquet fixture', async () => {
-      // TODO(SIMSBIOHUB-954): Requires a fixture helper that seeds a ~512MB Parquet
-      // into MinIO + a corresponding download_artifact row. Once that helper lands
-      // (likely in __integration__/system/), this test should migrate there and
-      // assert download_export.status = 'ready' + process.memoryUsage().heapUsed
-      // stays bounded through the run.
     });
   });
 });
