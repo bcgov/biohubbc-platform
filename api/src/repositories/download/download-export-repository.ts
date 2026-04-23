@@ -1,5 +1,5 @@
 import SQL from 'sql-template-strings';
-import { ApiExecuteSQLError } from '../../errors/api-error';
+import { ApiExecuteSQLError, ApiNotFoundError } from '../../errors/api-error';
 import { CreateDownloadExportPayload, DownloadExportListRow, DownloadExportRecord } from '../../models/download-export';
 import { DownloadExportArtifactWithFile } from '../../models/download-export-artifact';
 import { DownloadStatusEnum } from '../../models/download-status';
@@ -84,13 +84,13 @@ export class DownloadExportRepository extends BaseRepository {
   /**
    * Get a download export record by ID, throwing if not found.
    *
-   * @throws {ApiExecuteSQLError} when no export matches the given ID.
+   * @throws {ApiNotFoundError} when no export matches the given ID.
    */
   async getDownloadExportById(exportId: string): Promise<DownloadExportRecord> {
     const record = await this.findDownloadExportById(exportId);
 
     if (!record) {
-      throw new ApiExecuteSQLError('Download export not found', [
+      throw new ApiNotFoundError('Download export not found', [
         'DownloadExportRepository->getDownloadExportById',
         `no download_export with id ${exportId}`
       ]);

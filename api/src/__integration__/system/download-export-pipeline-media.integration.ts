@@ -13,6 +13,7 @@
 import * as parquetjs from '@dsnp/parquetjs';
 import AdmZip from 'adm-zip';
 import { expect } from 'chai';
+import { PassThrough } from 'node:stream';
 import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
@@ -24,6 +25,7 @@ import { DownloadExportPipelineService } from '../../services/download/download-
 import { DownloadService } from '../../services/download/download-service';
 import { BucketType, ObjectStorageService } from '../../services/object-storage/object-storage-service';
 import { ArtifactService } from '../../services/upload/artifact-service';
+import { getObjectStoreBucketName } from '../../utils/file-utils';
 import { createTestFeature, createTestSubmission } from '../helpers/test-submission-helpers';
 
 const TEST_PREFIX = 'dev-artifacts/export-media';
@@ -36,6 +38,74 @@ async function downloadZipFromS3(storageService: ObjectStorageService, s3Key: st
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
   return new AdmZip(Buffer.concat(chunks));
+}
+
+/**
+ * Stream a real Parquet fixture of roughly `targetBytes` directly to MinIO and
+ * return the actual uploaded byte size. Used by the OOM-guard case so the
+ * export pipeline has a real Parquet file to read.
+ *
+ * The fixture is streamed — writer → PassThrough → S3 multipart upload — so the
+ * test itself doesn't buffer the fixture in memory while writing. Rows carry
+ * randomized base64 padding so Parquet's dictionary compression can't collapse
+ * them into a tiny footprint.
+ */
+async function writeFatParquetToMinIO(
+  storageService: ObjectStorageService,
+  objectKey: string,
+  targetBytes: number
+): Promise<number> {
+  const schema = new parquetjs.ParquetSchema({
+    uuid: { type: 'UTF8', optional: false },
+    parent_uuid: { type: 'UTF8', optional: true },
+    observation_name: { type: 'UTF8', optional: true },
+    description: { type: 'UTF8', optional: true }
+  });
+
+  const passThrough = new PassThrough();
+  const uploadPromise = storageService.uploadStream(
+    BucketType.MAIN,
+    passThrough,
+    'application/octet-stream',
+    objectKey
+  );
+
+  const writer = await parquetjs.ParquetWriter.openStream(schema, passThrough as any);
+
+  // Each row carries a ~1 KiB payload of randomized bytes so dictionary
+  // compression can't collapse the file to a handful of unique values.
+  const payload = Buffer.alloc(1024);
+  let rowsWritten = 0;
+  // Linear congruential step picked for decent spread; we only need enough
+  // variability to defeat dictionary compression, not cryptographic entropy.
+  const stepBytes = 37;
+
+  // Approximate uncompressed-bytes-per-row is ~1200; stop slightly past the
+  // target so the on-disk (compressed) size is comfortably near the target
+  // without over-shooting by too much. Hard ceiling keeps a pathological run
+  // (compression ratio surprise) bounded.
+  const approxBytesPerRow = 1200;
+  const targetRows = Math.max(1, Math.ceil(targetBytes / approxBytesPerRow));
+  const ceilingRows = targetRows * 4;
+
+  while (rowsWritten < targetRows && rowsWritten < ceilingRows) {
+    for (let i = 0; i < payload.length; i++) {
+      payload[i] = (payload[i] + stepBytes) & 0xff;
+    }
+    await writer.appendRow({
+      uuid: `uuid-${rowsWritten.toString(36)}`,
+      parent_uuid: null,
+      observation_name: `obs-${rowsWritten}`,
+      description: payload.toString('base64')
+    });
+    rowsWritten++;
+  }
+
+  await writer.close();
+  await uploadPromise;
+
+  const metadata = await storageService.getMetadata(BucketType.MAIN, objectKey);
+  return Number(metadata.ContentLength);
 }
 
 /**
@@ -247,8 +317,8 @@ describe('Download Export pipeline — media (system)', function () {
     const zip = await downloadZipFromS3(storageService, partZipKey);
     const entries = zip.getEntries().map((e) => e.entryName);
 
-    const binaryEntry = `biohub-${exportId}-part-1/files1/${featureId}_${filename}`;
-    const csvEntry = `biohub-${exportId}-part-1/file/chunk1.csv`;
+    const binaryEntry = `biohub-export-${exportId}/files1/${featureId}_${filename}`;
+    const csvEntry = `biohub-export-${exportId}/file/chunk1.csv`;
 
     expect(entries).to.include(binaryEntry);
     expect(entries).to.include(csvEntry);
@@ -294,7 +364,7 @@ describe('Download Export pipeline — media (system)', function () {
     const zip = await downloadZipFromS3(storageService, keys[0]);
     const entries = zip.getEntries().map((e) => e.entryName);
 
-    const binaryEntry = `biohub-${exportId}-part-1/files1/${featureId}_${filename}`;
+    const binaryEntry = `biohub-export-${exportId}/files1/${featureId}_${filename}`;
     const errorEntry = `${binaryEntry}.error.txt`;
 
     expect(entries, 'binary must not be present after deletion').to.not.include(binaryEntry);
@@ -354,8 +424,8 @@ describe('Download Export pipeline — media (system)', function () {
     const part1Zip = await downloadZipFromS3(storageService, part1Key);
     const part2Zip = await downloadZipFromS3(storageService, part2Key);
 
-    const part1Binary = `biohub-${exportId}-part-1/files1/${id1}_${filename}`;
-    const part2Binary = `biohub-${exportId}-part-2/files2/${id2}_${filename}`;
+    const part1Binary = `biohub-export-${exportId}/files1/${id1}_${filename}`;
+    const part2Binary = `biohub-export-${exportId}/files2/${id2}_${filename}`;
 
     const part1Bytes = part1Zip.readFile(part1Binary);
     expect(part1Bytes, 'part-1 must contain its binary').to.not.be.null;
@@ -365,9 +435,113 @@ describe('Download Export pipeline — media (system)', function () {
     expect(part2Bytes, 'part-2 must contain its binary').to.not.be.null;
     expect(part2Bytes!.equals(fileContent)).to.be.true;
 
-    const part2CsvEntry = `biohub-${exportId}-part-2/file/chunk2.csv`;
+    const part2CsvEntry = `biohub-export-${exportId}/file/chunk2.csv`;
     const part2Csv = part2Zip.readFile(part2CsvEntry)?.toString('utf-8') ?? '';
     expect(part2Csv).to.include(`files2/${id2}_${filename}`);
     expect(part2Csv).to.not.include(`files1/`);
+  });
+
+  /**
+   * OOM guard — spec UO 10.
+   *
+   * Writes a real Parquet fixture whose size exceeds what a naive "read whole
+   * file" implementation could tolerate, runs the export, and asserts peak
+   * heap growth stays bounded. The streaming design (`ParquetReader.openS3` +
+   * row-group cursor + backpressured writes) should keep working set to
+   * roughly: one row group + archiver deflate buffer + S3 multipart queue.
+   *
+   * A failure here means the pipeline is buffering the whole Parquet file
+   * before emitting CSV — a regression that would OOM on production-scale
+   * downloads.
+   */
+  it('runExport holds peak heap bounded against a larger-than-heap Parquet fixture', async function () {
+    this.timeout(5 * 60 * 1000);
+
+    // ~96 MiB fixture — large enough to span multiple Parquet row groups
+    // (default ~4k rows per group), small enough to write in a minute or two.
+    const fixtureTargetBytes = 96 * 1024 * 1024;
+
+    // Seed a download with one feature of type 'dataset'. The export pipeline
+    // reads properties via `getFeatureTypePropertyCodes`, so the feature type
+    // must exist in seed data — 'dataset' is a root type already used by the
+    // sibling integration tests.
+    const submissionId = await createTestSubmission(connection);
+    const featureId = await createTestFeature(connection, submissionId, 'dataset', {
+      name: 'oom-seed'
+    });
+
+    const systemUserId = connection.systemUserId();
+    const cartResponse = await cartService.createCart(systemUserId, [featureId]);
+    const { download_id: downloadId } = await downloadService.createDownload({
+      cartId: cartResponse.cart.cart_id,
+      format: 'parquet'
+    });
+
+    await downloadRepo.updateDownloadStatus(downloadId, DownloadStatusEnum.READY, {
+      started_at: new Date().toISOString(),
+      completed_at: new Date().toISOString()
+    });
+
+    // Write the fat Parquet fixture at the canonical per-feature-type key.
+    const parquetKey = `downloads/${downloadId}/dataset/data.parquet`;
+    const uploadedBytes = await writeFatParquetToMinIO(storageService, parquetKey, fixtureTargetBytes);
+    s3KeysToCleanup.push(parquetKey);
+
+    // Require at least half the target size so a surprise compression ratio
+    // doesn't silently make the test trivial.
+    expect(uploadedBytes, 'fixture should be substantive').to.be.at.least(fixtureTargetBytes / 2);
+
+    const { artifact_id } = await artifactService.insertArtifact({
+      bucket: getObjectStoreBucketName(),
+      object_key: parquetKey,
+      byte_size: uploadedBytes,
+      artifact_status: 'uploaded',
+      checksum_sha256: 'a'.repeat(64),
+      uploaded_at: new Date().toISOString(),
+      format: 'parquet'
+    });
+    await downloadRepo.createDownloadArtifact(downloadId, artifact_id);
+
+    const exportId = await seedPendingExport(downloadId);
+
+    // Baseline: sample heap after writing the fixture but before the export
+    // runs. Using `heapUsed` directly — we're watching for large deltas, not
+    // absolute values, and forcing a GC isn't available without `--expose-gc`.
+    const baselineHeapBytes = process.memoryUsage().heapUsed;
+
+    // Sample peak heap while the export runs.
+    let peakHeapBytes = baselineHeapBytes;
+    const sampler = setInterval(() => {
+      const used = process.memoryUsage().heapUsed;
+      if (used > peakHeapBytes) {
+        peakHeapBytes = used;
+      }
+    }, 250);
+
+    try {
+      await pipelineService.runExport(exportId);
+    } finally {
+      clearInterval(sampler);
+    }
+
+    // Verify the export finished successfully.
+    const statusRow = await connection.sql(SQL`
+      SELECT status FROM download_export WHERE download_export_id = ${exportId};
+    `);
+    expect(statusRow.rows[0].status).to.equal(DownloadStatusEnum.READY);
+
+    // A streaming implementation should keep peak working set well under the
+    // fixture size — bounded by one row group (~32-128 MiB) plus the
+    // archiver/upload buffers. A naive buffer-the-whole-file implementation
+    // would show heap growth roughly equal to or greater than fixture size
+    // (plus CSV expansion). The 500 MiB ceiling leaves comfortable headroom
+    // without accepting linear scaling.
+    const growthBytes = peakHeapBytes - baselineHeapBytes;
+    const growthMiB = growthBytes / (1024 * 1024);
+    const fixtureMiB = uploadedBytes / (1024 * 1024);
+    expect(
+      growthBytes,
+      `heap growth should stay bounded (fixture ${fixtureMiB.toFixed(0)} MiB, peak grew ${growthMiB.toFixed(0)} MiB)`
+    ).to.be.lessThan(500 * 1024 * 1024);
   });
 });

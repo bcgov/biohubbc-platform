@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { getMockDBConnection, mockQueryResult } from '../../__mocks__/db';
+import { ApiNotFoundError } from '../../errors/api-error';
 import { CreateDownloadExportPayload } from '../../models/download-export';
 import { DownloadStatusEnum } from '../../models/download-status';
 import { DownloadExportRepository } from './download-export-repository';
@@ -109,7 +110,7 @@ describe('DownloadExportRepository', () => {
       expect(result).to.equal(mockExportRow);
     });
 
-    it('throws ApiExecuteSQLError when missing', async () => {
+    it('throws ApiNotFoundError when missing', async () => {
       const sqlStub = sinon.stub().resolves(mockQueryResult([], 0));
       const mockDBConnection = getMockDBConnection({ sql: sqlStub });
 
@@ -119,6 +120,7 @@ describe('DownloadExportRepository', () => {
         await repo.getDownloadExportById(EXPORT_ID);
         expect.fail('Expected error');
       } catch (err: any) {
+        expect(err).to.be.instanceOf(ApiNotFoundError);
         expect(err.message).to.equal('Download export not found');
       }
     });

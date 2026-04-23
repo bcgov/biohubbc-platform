@@ -259,7 +259,7 @@ export class DownloadExportPipelineService extends DBService {
     // PassThrough; archiver reads from it and writes to its own output pipe.
     const openChunkEntry = (): PassThrough => {
       const bundle = currentBundle();
-      const entryName = `biohub-${exportId}-part-${currentPart}/${featureTypeName}/chunk${chunkIndex}.csv`;
+      const entryName = `biohub-export-${exportId}/${featureTypeName}/chunk${chunkIndex}.csv`;
       const entry = new PassThrough();
       bundle.archive.append(entry, { name: entryName });
       chunksWritten += 1;
@@ -275,18 +275,12 @@ export class DownloadExportPipelineService extends DBService {
       }
     };
 
+    // Open lazily on first row so a zero-row feature type (or a cursor that
+    // drains on a resumed call) produces no zip entry at all — avoids a
+    // header-only `chunk1.csv` in the output.
     let currentEntry: PassThrough | null = null;
 
     try {
-      currentEntry = openChunkEntry();
-      // Header rule: written only on chunk 1 of a feature type. Later chunks
-      // (within the same feature type, in later part-zips) start directly with
-      // data rows so `cat chunk1.csv chunk2.csv ...` reconstructs a valid CSV.
-      if (chunkIndex === 1) {
-        await writeLine(currentEntry, headerLine);
-        currentBundle().byteCount += BigInt(Buffer.byteLength(headerLine, 'utf8'));
-      }
-
       while (true) {
         const next = (await cursor.next()) as Record<string, unknown> | null;
         if (next === null) {
@@ -305,6 +299,19 @@ export class DownloadExportPipelineService extends DBService {
 
         const line = headers.map((h) => escapeCsvField(flattened[h] ?? '')).join(',') + '\n';
         const lineBytes = BigInt(Buffer.byteLength(line, 'utf8'));
+
+        // Lazy-open the chunk entry on the first row of this call. Header
+        // rule: written only on chunk 1 of a feature type. Later chunks
+        // (within the same feature type, in later part-zips) start directly
+        // with data rows so `cat chunk1.csv chunk2.csv ...` reconstructs a
+        // valid CSV.
+        if (currentEntry === null) {
+          currentEntry = openChunkEntry();
+          if (chunkIndex === 1) {
+            await writeLine(currentEntry, headerLine);
+            currentBundle().byteCount += BigInt(Buffer.byteLength(headerLine, 'utf8'));
+          }
+        }
 
         await writeLine(currentEntry, line);
         currentBundle().byteCount += lineBytes;
@@ -509,13 +516,14 @@ export class DownloadExportPipelineService extends DBService {
 
     archiverByPart.set(currentPart, this.createPartArchiverBundle(exportId, download.download_id, currentPart));
 
-    // Binary file references are collected as rows stream by, each tagged with
-    // the part index the referring row landed in. After CSV streaming is done
-    // for every feature type, we stream the binaries into the matching
-    // `files{N}/` folder on each part's archiver — still before any part
-    // finalize, so a single zip entry never holds more than one binary at a
-    // time.
+    // Binary file references are collected as rows stream by, each tagged
+    // with the part index the referring row landed in. Each part's binaries
+    // must stream into that part's archiver BEFORE the part is finalized —
+    // whether that finalize happens on roll-over (mid-stream, for memory
+    // bounds) or at the end. Otherwise a finalized part's CSV would reference
+    // `files{N}/...` entries that never land in the zip.
     const allFileRefs: FileFeatureRef[] = [];
+    const objectStorageService = new ObjectStorageService();
 
     try {
       for (const featureTypeName of featureTypes) {
@@ -554,11 +562,19 @@ export class DownloadExportPipelineService extends DBService {
             break;
           }
 
-          // Roll-over: finalize the just-closed part now so its S3 upload
-          // drains and its archiver buffer frees, then create the next part's
-          // bundle.
+          // Roll-over: stream this part's binaries in, then finalize so its
+          // S3 upload drains and its archiver buffer frees. Binaries go in
+          // BEFORE finalize — otherwise the part's CSV references files that
+          // never land in the zip.
           const oldPartIndex = currentPart;
           const oldBundle = archiverByPart.get(oldPartIndex)!;
+          await this.streamBinariesToPart(
+            oldBundle,
+            allFileRefs.filter((ref) => ref.partIndex === oldPartIndex),
+            exportId,
+            oldPartIndex,
+            objectStorageService
+          );
           await this.writePartZip({
             exportId,
             downloadId: download.download_id,
@@ -577,30 +593,19 @@ export class DownloadExportPipelineService extends DBService {
         }
       }
 
-      // Stream binaries into each still-open part's archiver under
-      // `files{N}/` — one file at a time, waiting for archiver to consume each
-      // entry before opening the next S3 stream. Without this serialization,
-      // a part referencing N binaries would open N S3 connections
-      // simultaneously and queue them all in archiver's buffer, defeating the
-      // bounded-memory guarantee. Per-file errors append a placeholder so the
-      // whole export doesn't fail when a single attachment is missing (e.g.
-      // an old binary expired past its S3 lifecycle). Mirrors the legacy
-      // `streamFilesToArchive` pattern in `DownloadPipelineService`.
-      const objectStorageService = new ObjectStorageService();
+      // Finalize any still-open parts in ascending index order. Stream each
+      // part's binaries in before its writePartZip — mirrors the roll-over
+      // path.
       const openPartIndexes = Array.from(archiverByPart.keys()).sort((a, b) => a - b);
       for (const partIndex of openPartIndexes) {
         const bundle = archiverByPart.get(partIndex)!;
-        const refsForPart = allFileRefs.filter((ref) => ref.partIndex === partIndex);
-        for (const ref of refsForPart) {
-          const fileName = ref.filePath.split('/').pop() ?? 'file';
-          const entryName = `biohub-${exportId}-part-${partIndex}/files${partIndex}/${ref.submissionFeatureId}_${fileName}`;
-          await this.appendBinaryToArchive(bundle.archive, objectStorageService, ref.filePath, entryName);
-        }
-      }
-
-      // Finalize any still-open parts in ascending index order.
-      for (const partIndex of openPartIndexes) {
-        const bundle = archiverByPart.get(partIndex)!;
+        await this.streamBinariesToPart(
+          bundle,
+          allFileRefs.filter((ref) => ref.partIndex === partIndex),
+          exportId,
+          partIndex,
+          objectStorageService
+        );
         await this.writePartZip({
           exportId,
           downloadId: download.download_id,
@@ -640,6 +645,29 @@ export class DownloadExportPipelineService extends DBService {
       }
     }
     archiverByPart.clear();
+  }
+
+  /**
+   * Stream a part's binary attachments into its archiver under
+   * `files{N}/` — one file at a time, waiting for archiver to consume each
+   * entry before opening the next S3 stream. Without this serialization, a
+   * part referencing N binaries would open N S3 connections simultaneously
+   * and queue them all in archiver's buffer, defeating the bounded-memory
+   * guarantee. Must be called BEFORE the part is finalized via `writePartZip`
+   * — the roll-over path and the trailing finalize path both depend on this.
+   */
+  private async streamBinariesToPart(
+    bundle: PartArchiverBundle,
+    fileRefs: FileFeatureRef[],
+    exportId: string,
+    partIndex: number,
+    objectStorageService: ObjectStorageService
+  ): Promise<void> {
+    for (const ref of fileRefs) {
+      const fileName = ref.filePath.split('/').pop() ?? 'file';
+      const entryName = `biohub-export-${exportId}/files${partIndex}/${ref.submissionFeatureId}_${fileName}`;
+      await this.appendBinaryToArchive(bundle.archive, objectStorageService, ref.filePath, entryName);
+    }
   }
 
   /**

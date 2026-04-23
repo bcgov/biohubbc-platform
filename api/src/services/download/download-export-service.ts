@@ -1,4 +1,4 @@
-import { SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
+import { DEFAULT_MAX_PART_SIZE_BYTES, SIGNED_URL_EXPIRY_FRAGMENT } from '../../constants/download';
 import { IDBConnection } from '../../database/db';
 import { HTTP403, HTTP409 } from '../../errors/http-error';
 import { CreateDownloadExportRequest, DownloadExportListRow, DownloadExportRecord } from '../../models/download-export';
@@ -7,14 +7,6 @@ import { DownloadExportRepository } from '../../repositories/download/download-e
 import { DBService } from '../db-service';
 import { BucketType, ObjectStorageService } from '../object-storage/object-storage-service';
 import { DownloadService } from './download-service';
-
-/**
- * Default max part size — matches `download.fragment_size_bytes` default (500 MB).
- * Changes here MUST coordinate with the DB column default in migration
- * `20260422133033_download_export_chunk_size_and_mode.ts` and with
- * `FRAGMENT_SIZE_THRESHOLD` in `constants/download`.
- */
-const DEFAULT_MAX_PART_SIZE_BYTES = '524288000';
 
 /**
  * Shape of a single entry in the detail endpoint's `parts[]` response.
