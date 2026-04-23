@@ -114,7 +114,7 @@ const insertRecord = async (knex: Knex) => {
       insertAnimalRecord(knex, {
         submission_id,
         submission_upload_id,
-        parent_submission_feature_id: parent_submission_feature_id2
+        parent_submission_feature_id: parent_submission_feature_id1
       })
     );
 
@@ -175,7 +175,20 @@ const insertRecord = async (knex: Knex) => {
   const ecologicalUnitResults = await Promise.all(ecologicalUnitPromises);
   ecologicalUnitIds.push(...ecologicalUnitResults);
 
-  await Promise.all([...sampleSitePromises, ...telemetryPromises, ...incidentalObservationPromises]);
+  const incidentalObservationIds = await Promise.all(incidentalObservationPromises);
+  await Promise.all([...sampleSitePromises, ...telemetryPromises]);
+
+  // Link each observation to the dataset such that one dataset can have many observations,
+  // and each observation has at most one dataset link.
+  const datasetObservationIds = sampleSiteObservations
+    .flatMap((entry) => entry.observationIds)
+    .concat(incidentalObservationIds);
+  for (const observationId of datasetObservationIds) {
+    await knex.raw(`
+      INSERT INTO submission_feature_feature (source_feature_id, target_feature_id)
+      VALUES (${parent_submission_feature_id1}, ${observationId})
+    `);
+  }
 
   // Seed submission_feature_feature table
   for (const deployment of deployments) {

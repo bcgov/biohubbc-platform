@@ -44,6 +44,7 @@ related_animals AS (
     SELECT
         rf.deployment_id,
         sf.submission_feature_id AS animal_feature_id,
+        sf.parent_submission_feature_id AS dataset_submission_feature_id,
         sf.data->>'taxon_id' AS taxon_id,
         COALESCE(ccc.label, sf.data->>'sex') AS sex,
         sf.data->>'animal_identifier' AS animal_identifier
@@ -58,10 +59,21 @@ related_animals AS (
       AND sf.record_end_date IS NULL
 ),
 
+datasets AS (
+    SELECT
+        sf.submission_feature_id AS dataset_id,
+        sf.data->>'name' AS dataset_name
+    FROM biohub.submission_feature sf
+    JOIN biohub.feature_type ft_dataset
+      ON sf.feature_type_id = ft_dataset.feature_type_id
+    WHERE ft_dataset.name = 'dataset'
+      AND sf.record_end_date IS NULL
+),
+
 related_ecological_units AS (
     SELECT
         deployment_id,
-        MIN(ecological_unit_value) AS ecological_unit_value
+        string_agg(DISTINCT ecological_unit_value, ';' ORDER BY ecological_unit_value) AS ecological_unit_value
     FROM (
         -- Ecological units linked to animals via submission_feature_feature
         SELECT
@@ -100,7 +112,7 @@ SELECT
     t.common_name AS common_name,
     t.itis_scientific_name AS scientific_name,
     d.animal_id,
-    ra.sex AS animal_sex,
+    ra.sex AS sex,
     reu.ecological_unit_value AS pop_unit,
     d.device_key,
     (sf.data->>'timestamp')::timestamptz AS DATETIME,
@@ -108,6 +120,8 @@ SELECT
     (sf.data->>'latitude')::numeric AS Latitude,
     (sf.data->>'longitude')::numeric AS Longitude,
     (sf.data->>'dop')::numeric AS dop,
+    ds.dataset_id,
+    ds.dataset_name,
     CASE
       WHEN EXISTS (
         SELECT 1
@@ -126,6 +140,9 @@ LEFT JOIN deployments d
 
 LEFT JOIN related_animals ra
   ON ra.deployment_id = d.submission_feature_id
+
+LEFT JOIN datasets ds
+  ON ds.dataset_id = ra.dataset_submission_feature_id
 
 LEFT JOIN related_ecological_units reu
   ON reu.deployment_id = d.submission_feature_id
@@ -146,8 +163,9 @@ WHERE ft.name = 'telemetry'
     COMMENT ON COLUMN bcgw.telemetry_all.YEAR IS 'The year that the GPS location was recorded';
     COMMENT ON COLUMN bcgw.telemetry_all.dop IS 'The dilution of precision';
     COMMENT ON COLUMN bcgw.telemetry_all.device_key IS 'The vendor and device serial';
+    COMMENT ON COLUMN bcgw.telemetry_all.dataset_id IS 'The feature id of the dataset that includes these data';
+    COMMENT ON COLUMN bcgw.telemetry_all.dataset_name IS 'The dataset name that includes these data';
     COMMENT ON COLUMN bcgw.telemetry_all.animal_id IS 'The identifier of the animal wearing the telemetry device';
-    COMMENT ON COLUMN bcgw.telemetry_all.animal_sex IS 'Sex loaded from the linked animal feature via submission_feature_feature relationships';
     COMMENT ON COLUMN bcgw.telemetry_all.scientific_name IS 'Scientific name from taxon table linked via ITIS TSN';
     COMMENT ON COLUMN bcgw.telemetry_all.common_name IS 'Common English name from taxon table linked via ITIS TSN';
     COMMENT ON COLUMN bcgw.telemetry_all.pop_unit IS 'Ecological unit value linked to the animal';
@@ -186,6 +204,7 @@ related_animals AS (
     SELECT
         rf.deployment_id,
         sf.submission_feature_id AS animal_feature_id,
+        sf.parent_submission_feature_id AS dataset_submission_feature_id,
         sf.data->>'taxon_id' AS taxon_id,
         COALESCE(ccc.label, sf.data->>'sex') AS sex,
         sf.data->>'animal_identifier' AS animal_identifier
@@ -200,10 +219,21 @@ related_animals AS (
       AND sf.record_end_date IS NULL
 ),
 
+datasets AS (
+    SELECT
+        sf.submission_feature_id AS dataset_id,
+        sf.data->>'name' AS dataset_name
+    FROM biohub.submission_feature sf
+    JOIN biohub.feature_type ft_dataset
+      ON sf.feature_type_id = ft_dataset.feature_type_id
+    WHERE ft_dataset.name = 'dataset'
+      AND sf.record_end_date IS NULL
+),
+
 related_ecological_units AS (
     SELECT
         deployment_id,
-        MIN(ecological_unit_value) AS ecological_unit_value
+        string_agg(DISTINCT ecological_unit_value, ';' ORDER BY ecological_unit_value) AS ecological_unit_value
     FROM (
         -- Ecological units linked to animals via submission_feature_feature
         SELECT
@@ -241,7 +271,7 @@ SELECT
     t.common_name AS common_name,
     t.itis_scientific_name AS scientific_name,
     d.animal_id,
-    ra.sex AS animal_sex,
+    ra.sex AS sex,
     reu.ecological_unit_value AS pop_unit,
     d.device_key,
     (sf.data->>'timestamp')::timestamptz AS DATETIME,
@@ -249,6 +279,8 @@ SELECT
     (sf.data->>'latitude')::numeric AS Latitude,
     (sf.data->>'longitude')::numeric AS Longitude,
     (sf.data->>'dop')::numeric AS dop,
+    ds.dataset_id,
+    ds.dataset_name,
     'N' AS SECURED
 FROM biohub.submission_feature sf
 JOIN biohub.feature_type ft
@@ -257,6 +289,8 @@ LEFT JOIN deployments d
   ON d.submission_feature_id = sf.parent_submission_feature_id
 LEFT JOIN related_animals ra
   ON ra.deployment_id = d.submission_feature_id
+LEFT JOIN datasets ds
+  ON ds.dataset_id = ra.dataset_submission_feature_id
 LEFT JOIN related_ecological_units reu
   ON reu.deployment_id = d.submission_feature_id
 LEFT JOIN biohub.taxon t
@@ -278,8 +312,9 @@ WHERE ft.name = 'telemetry'
     COMMENT ON COLUMN bcgw.telemetry_public.YEAR IS 'The year that the GPS location was recorded';
     COMMENT ON COLUMN bcgw.telemetry_public.dop IS 'The dilution of precision';
     COMMENT ON COLUMN bcgw.telemetry_public.device_key IS 'The vendor and device serial';
+    COMMENT ON COLUMN bcgw.telemetry_public.dataset_id IS 'The feature id of the dataset that includes these data';
+    COMMENT ON COLUMN bcgw.telemetry_public.dataset_name IS 'The dataset name that includes these data';
     COMMENT ON COLUMN bcgw.telemetry_public.animal_id IS 'The identifier of the animal wearing the telemetry device';
-    COMMENT ON COLUMN bcgw.telemetry_public.animal_sex IS 'Sex loaded from the linked animal feature via submission_feature_feature relationships';
     COMMENT ON COLUMN bcgw.telemetry_public.scientific_name IS 'Scientific name from taxon table linked via ITIS TSN';
     COMMENT ON COLUMN bcgw.telemetry_public.common_name IS 'Common English name from taxon table linked via ITIS TSN';
     COMMENT ON COLUMN bcgw.telemetry_public.pop_unit IS 'Ecological unit value linked to the animal';
@@ -289,7 +324,6 @@ WHERE ft.name = 'telemetry'
   await knex.raw(`
 CREATE MATERIALIZED VIEW bcgw.observations_public AS
 WITH site_linked_observations AS (
-  -- Observations with parent that is a sample_site
   SELECT DISTINCT sf.submission_feature_id
   FROM biohub.submission_feature sf
   WHERE sf.parent_submission_feature_id IS NOT NULL
@@ -301,8 +335,6 @@ WITH site_linked_observations AS (
     )
   
   UNION
-  
-  -- Observations linked to sample_sites via submission_feature_feature
   SELECT DISTINCT sf.submission_feature_id
   FROM biohub.submission_feature sf
   JOIN biohub.submission_feature_feature sff ON (
@@ -315,6 +347,24 @@ WITH site_linked_observations AS (
   )
   JOIN biohub.feature_type ft_site ON sf_site.feature_type_id = ft_site.feature_type_id
   WHERE ft_site.name = 'sample_site' AND sf_site.record_end_date IS NULL
+),
+observation_datasets AS (
+  SELECT DISTINCT
+    sf_obs.submission_feature_id AS observation_id,
+    sf_dataset.submission_feature_id AS dataset_id,
+    sf_dataset.data->>'name' AS dataset_name
+  FROM biohub.submission_feature sf_obs
+  JOIN biohub.submission_feature_feature sff ON (
+    sff.source_feature_id = sf_obs.submission_feature_id
+    OR sff.target_feature_id = sf_obs.submission_feature_id
+  )
+  JOIN biohub.submission_feature sf_dataset ON (
+    (sff.source_feature_id = sf_obs.submission_feature_id AND sff.target_feature_id = sf_dataset.submission_feature_id)
+    OR
+    (sff.target_feature_id = sf_obs.submission_feature_id AND sff.source_feature_id = sf_dataset.submission_feature_id)
+  )
+  JOIN biohub.feature_type ft_dataset ON sf_dataset.feature_type_id = ft_dataset.feature_type_id
+  WHERE ft_dataset.name = 'dataset'
 )
 SELECT
     sf.submission_feature_id AS Feature_ID,
@@ -327,10 +377,14 @@ SELECT
     (sf.data->>'taxon_id')::int AS taxon_id,
     t.itis_scientific_name AS scientific_name,
     t.common_name AS common_name,
+    od.dataset_id AS dataset_id,
+    od.dataset_name AS dataset_name,
     COALESCE(ccc_sex.label, (sf.data->>'sex')::text) AS sex,
     COALESCE(ccc_life_stage.label, (sf.data->>'life_stage')::text) AS life_stage,
     'N' AS SECURED
 FROM biohub.submission_feature sf
+LEFT JOIN observation_datasets od
+  ON sf.submission_feature_id = od.observation_id
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
 LEFT JOIN biohub.taxon t
@@ -359,6 +413,8 @@ WHERE ft.name = 'species_observation'
     COMMENT ON COLUMN bcgw.observations_public.taxon_id IS 'Taxonomic identifier extracted from the observation payload';
     COMMENT ON COLUMN bcgw.observations_public.scientific_name IS 'Scientific name from taxon table linked via ITIS TSN';
     COMMENT ON COLUMN bcgw.observations_public.common_name IS 'Common name from taxon table linked via ITIS TSN';
+    COMMENT ON COLUMN bcgw.observations_public.dataset_id IS 'Linked dataset submission_feature_id for the observation';
+    COMMENT ON COLUMN bcgw.observations_public.dataset_name IS 'Linked dataset name for the observation';
     COMMENT ON COLUMN bcgw.observations_public.sex IS 'Sex label from contributor codeset codes (male, female, unknown) matched by contributor_codeset_code_id';
     COMMENT ON COLUMN bcgw.observations_public.life_stage IS 'Life stage label from contributor codeset codes (adult, juvenile, etc.) matched by contributor_codeset_code_id';
     COMMENT ON COLUMN bcgw.observations_public.SECURED IS 'The indicator of whether the feature is secured (Y) or not (N)';
@@ -393,6 +449,24 @@ WITH site_linked_observations AS (
   )
   JOIN biohub.feature_type ft_site ON sf_site.feature_type_id = ft_site.feature_type_id
   WHERE ft_site.name = 'sample_site' AND sf_site.record_end_date IS NULL
+),
+observation_datasets AS (
+  SELECT DISTINCT
+    sf_obs.submission_feature_id AS observation_id,
+    sf_dataset.submission_feature_id AS dataset_id,
+    sf_dataset.data->>'name' AS dataset_name
+  FROM biohub.submission_feature sf_obs
+  JOIN biohub.submission_feature_feature sff ON (
+    sff.source_feature_id = sf_obs.submission_feature_id
+    OR sff.target_feature_id = sf_obs.submission_feature_id
+  )
+  JOIN biohub.submission_feature sf_dataset ON (
+    (sff.source_feature_id = sf_obs.submission_feature_id AND sff.target_feature_id = sf_dataset.submission_feature_id)
+    OR
+    (sff.target_feature_id = sf_obs.submission_feature_id AND sff.source_feature_id = sf_dataset.submission_feature_id)
+  )
+  JOIN biohub.feature_type ft_dataset ON sf_dataset.feature_type_id = ft_dataset.feature_type_id
+  WHERE ft_dataset.name = 'dataset'
 )
 SELECT
     sf.submission_feature_id AS Feature_ID,
@@ -405,6 +479,8 @@ SELECT
     (sf.data->>'taxon_id')::int AS taxon_id,
     t.itis_scientific_name AS scientific_name,
     t.common_name AS common_name,
+    od.dataset_id AS dataset_id,
+    od.dataset_name AS dataset_name,
     COALESCE(ccc_sex.label, (sf.data->>'sex')::text) AS sex,
     COALESCE(ccc_life_stage.label, (sf.data->>'life_stage')::text) AS life_stage,
     CASE
@@ -416,6 +492,8 @@ SELECT
       ELSE 'N'
     END AS SECURED
 FROM biohub.submission_feature sf
+LEFT JOIN observation_datasets od
+  ON sf.submission_feature_id = od.observation_id
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
 LEFT JOIN biohub.taxon t
@@ -440,6 +518,8 @@ WHERE ft.name = 'species_observation'
     COMMENT ON COLUMN bcgw.observations_all.taxon_id IS 'Taxonomic identifier extracted from the observation payload';
     COMMENT ON COLUMN bcgw.observations_all.scientific_name IS 'Scientific name from taxon table linked via ITIS TSN';
     COMMENT ON COLUMN bcgw.observations_all.common_name IS 'Common name from taxon table linked via ITIS TSN';
+    COMMENT ON COLUMN bcgw.observations_all.dataset_id IS 'Linked dataset submission_feature_id for the observation';
+    COMMENT ON COLUMN bcgw.observations_all.dataset_name IS 'Linked dataset name for the observation';
     COMMENT ON COLUMN bcgw.observations_all.sex IS 'Sex label from contributor codeset codes (male, female, unknown) matched by contributor_codeset_code_id';
     COMMENT ON COLUMN bcgw.observations_all.life_stage IS 'Life stage label from contributor codeset codes (adult, juvenile, etc.) matched by contributor_codeset_code_id';
     COMMENT ON COLUMN bcgw.observations_all.SECURED IS 'The indicator of whether the feature is secured (Y) or not (N)';
@@ -474,6 +554,24 @@ WITH site_linked_observations AS (
   )
   JOIN biohub.feature_type ft_site ON sf_site.feature_type_id = ft_site.feature_type_id
   WHERE ft_site.name = 'sample_site' AND sf_site.record_end_date IS NULL
+),
+observation_datasets AS (
+  SELECT DISTINCT
+    sf_obs.submission_feature_id AS observation_id,
+    sf_dataset.submission_feature_id AS dataset_id,
+    sf_dataset.data->>'name' AS dataset_name
+  FROM biohub.submission_feature sf_obs
+  JOIN biohub.submission_feature_feature sff ON (
+    sff.source_feature_id = sf_obs.submission_feature_id
+    OR sff.target_feature_id = sf_obs.submission_feature_id
+  )
+  JOIN biohub.submission_feature sf_dataset ON (
+    (sff.source_feature_id = sf_obs.submission_feature_id AND sff.target_feature_id = sf_dataset.submission_feature_id)
+    OR
+    (sff.target_feature_id = sf_obs.submission_feature_id AND sff.source_feature_id = sf_dataset.submission_feature_id)
+  )
+  JOIN biohub.feature_type ft_dataset ON sf_dataset.feature_type_id = ft_dataset.feature_type_id
+  WHERE ft_dataset.name = 'dataset'
 )
 SELECT
     sf.submission_feature_id AS Feature_ID,
@@ -486,10 +584,14 @@ SELECT
     (sf.data->>'taxon_id')::int AS taxon_id,
     t.itis_scientific_name AS scientific_name,
     t.common_name AS common_name,
+    od.dataset_id AS dataset_id,
+    od.dataset_name AS dataset_name,
     COALESCE(ccc_sex.label, (sf.data->>'sex')::text) AS sex,
     COALESCE(ccc_life_stage.label, (sf.data->>'life_stage')::text) AS life_stage,
     'N' AS SECURED
 FROM biohub.submission_feature sf
+LEFT JOIN observation_datasets od
+  ON sf.submission_feature_id = od.observation_id
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
 LEFT JOIN biohub.taxon t
@@ -518,6 +620,8 @@ WHERE ft.name = 'species_observation'
     COMMENT ON COLUMN bcgw.incidental_public.taxon_id IS 'Taxonomic identifier extracted from the observation payload';
     COMMENT ON COLUMN bcgw.incidental_public.scientific_name IS 'Scientific name from taxon table linked via ITIS TSN';
     COMMENT ON COLUMN bcgw.incidental_public.common_name IS 'Common name from taxon table linked via ITIS TSN';
+    COMMENT ON COLUMN bcgw.incidental_public.dataset_id IS 'Linked dataset submission_feature_id for the observation';
+    COMMENT ON COLUMN bcgw.incidental_public.dataset_name IS 'Linked dataset name for the observation';
     COMMENT ON COLUMN bcgw.incidental_public.sex IS 'Sex label from contributor codeset codes (male, female, unknown) matched by contributor_codeset_code_id';
     COMMENT ON COLUMN bcgw.incidental_public.life_stage IS 'Life stage label from contributor codeset codes (adult, juvenile, etc.) matched by contributor_codeset_code_id';
     COMMENT ON COLUMN bcgw.incidental_public.SECURED IS 'The indicator of whether the feature is secured (Y) or not (N)';
@@ -552,6 +656,24 @@ WITH site_linked_observations AS (
   )
   JOIN biohub.feature_type ft_site ON sf_site.feature_type_id = ft_site.feature_type_id
   WHERE ft_site.name = 'sample_site' AND sf_site.record_end_date IS NULL
+),
+observation_datasets AS (
+  SELECT DISTINCT
+    sf_obs.submission_feature_id AS observation_id,
+    sf_dataset.submission_feature_id AS dataset_id,
+    sf_dataset.data->>'name' AS dataset_name
+  FROM biohub.submission_feature sf_obs
+  JOIN biohub.submission_feature_feature sff ON (
+    sff.source_feature_id = sf_obs.submission_feature_id
+    OR sff.target_feature_id = sf_obs.submission_feature_id
+  )
+  JOIN biohub.submission_feature sf_dataset ON (
+    (sff.source_feature_id = sf_obs.submission_feature_id AND sff.target_feature_id = sf_dataset.submission_feature_id)
+    OR
+    (sff.target_feature_id = sf_obs.submission_feature_id AND sff.source_feature_id = sf_dataset.submission_feature_id)
+  )
+  JOIN biohub.feature_type ft_dataset ON sf_dataset.feature_type_id = ft_dataset.feature_type_id
+  WHERE ft_dataset.name = 'dataset'
 )
 SELECT
     sf.submission_feature_id AS Feature_ID,
@@ -564,6 +686,8 @@ SELECT
     (sf.data->>'taxon_id')::int AS taxon_id,
     t.itis_scientific_name AS scientific_name,
     t.common_name AS common_name,
+    od.dataset_id AS dataset_id,
+    od.dataset_name AS dataset_name,
     COALESCE(ccc_sex.label, (sf.data->>'sex')::text) AS sex,
     COALESCE(ccc_life_stage.label, (sf.data->>'life_stage')::text) AS life_stage,
     CASE
@@ -575,6 +699,8 @@ SELECT
       ELSE 'N'
     END AS SECURED
 FROM biohub.submission_feature sf
+LEFT JOIN observation_datasets od
+  ON sf.submission_feature_id = od.observation_id
 JOIN biohub.feature_type ft
   ON sf.feature_type_id = ft.feature_type_id
 LEFT JOIN biohub.taxon t
@@ -599,6 +725,8 @@ WHERE ft.name = 'species_observation'
     COMMENT ON COLUMN bcgw.incidental_all.taxon_id IS 'Taxonomic identifier extracted from the observation payload';
     COMMENT ON COLUMN bcgw.incidental_all.scientific_name IS 'Scientific name from taxon table linked via ITIS TSN';
     COMMENT ON COLUMN bcgw.incidental_all.common_name IS 'Common name from taxon table linked via ITIS TSN';
+    COMMENT ON COLUMN bcgw.incidental_all.dataset_id IS 'Linked dataset submission_feature_id for the observation';
+    COMMENT ON COLUMN bcgw.incidental_all.dataset_name IS 'Linked dataset name for the observation';
     COMMENT ON COLUMN bcgw.incidental_all.sex IS 'Sex label from contributor codeset codes (male, female, unknown) matched by contributor_codeset_code_id';
     COMMENT ON COLUMN bcgw.incidental_all.life_stage IS 'Life stage label from contributor codeset codes (adult, juvenile, etc.) matched by contributor_codeset_code_id';
     COMMENT ON COLUMN bcgw.incidental_all.SECURED IS 'The indicator of whether the feature is secured (Y) or not (N)';
