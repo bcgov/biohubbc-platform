@@ -83,7 +83,7 @@ describe('Download services (integration)', function () {
     return crudService.createDownload({
       cartId: cartResponse.cart.cart_id,
       fragmentSizeBytes,
-      format: 'csv'
+      format: 'parquet'
     });
   }
 
@@ -109,7 +109,7 @@ describe('Download services (integration)', function () {
 
     it('should create a filter-based download with filters set and cart_id null', async () => {
       const filters = { keyword: 'test-keyword' };
-      const result = await crudService.createDownload({ filters, format: 'csv' });
+      const result = await crudService.createDownload({ filters, format: 'parquet' });
 
       const row = await connection.sql(SQL`
         SELECT cart_id, filters FROM download WHERE download_id = ${result.download_id};
@@ -125,7 +125,7 @@ describe('Download services (integration)', function () {
       try {
         await connection.sql(SQL`
           INSERT INTO download (download_status, fragment_size_bytes, cart_id, filters, format, create_user)
-          VALUES ('pending', 524288000, NULL, NULL, 'csv', ${connection.systemUserId()});
+          VALUES ('pending', 524288000, NULL, NULL, 'parquet', ${connection.systemUserId()});
         `);
         expect.fail('Expected CHECK constraint violation');
       } catch (error: any) {
@@ -136,117 +136,13 @@ describe('Download services (integration)', function () {
     });
   });
 
-  describe('createDownload artifact integration', () => {
-    it('should create a pending artifact and download_artifact link for cart-based download', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Artifact Test' });
-
-      const { download_id } = await createCartDownload([featureId]);
-
-      // Verify download_artifact row exists linking download to an artifact
-      const daRows = await connection.sql(SQL`
-        SELECT da.download_id, da.artifact_id
-        FROM download_artifact da
-        WHERE da.download_id = ${download_id}
-          AND da.record_end_date IS NULL;
-      `);
-      expect(daRows.rowCount).to.equal(1);
-
-      // Verify format is on the download record, not the join table
-      const dlRows = await connection.sql(SQL`
-        SELECT format FROM download WHERE download_id = ${download_id};
-      `);
-      expect(dlRows.rows[0].format).to.equal('csv');
-
-      // Verify the linked artifact exists with correct status and key pattern
-      const artifactRows = await connection.sql(SQL`
-        SELECT a.artifact_status, a.object_key, a.bucket, a.format
-        FROM artifact a
-        JOIN download_artifact da ON da.artifact_id = a.artifact_id
-        WHERE da.download_id = ${download_id}
-          AND da.record_end_date IS NULL;
-      `);
-      expect(artifactRows.rowCount).to.equal(1);
-      expect(artifactRows.rows[0].artifact_status).to.equal('pending');
-      expect(artifactRows.rows[0].object_key).to.match(
-        new RegExp(`^downloads/${download_id}/download-\\d{4}-\\d{2}-\\d{2}T\\d{6}Z\\.csv$`)
-      );
-      expect(artifactRows.rows[0].bucket).to.not.be.empty;
-      expect(artifactRows.rows[0].format).to.equal('csv');
-
-      // download.format (requested) matches artifact.format (actual) for new downloads
-      expect(dlRows.rows[0].format).to.equal(artifactRows.rows[0].format);
-    });
-
-    it('should create a pending artifact for filter-based download', async () => {
-      const filters = { keyword: 'artifact-filter-test' };
-      const { download_id } = await crudService.createDownload({ filters, format: 'csv' });
-
-      const daRows = await connection.sql(SQL`
-        SELECT da.download_id, da.artifact_id
-        FROM download_artifact da
-        WHERE da.download_id = ${download_id}
-          AND da.record_end_date IS NULL;
-      `);
-      expect(daRows.rowCount).to.equal(1);
-
-      const artifactRows = await connection.sql(SQL`
-        SELECT a.artifact_status, a.object_key, a.format
-        FROM artifact a
-        WHERE a.artifact_id = ${daRows.rows[0].artifact_id};
-      `);
-      expect(artifactRows.rows[0].artifact_status).to.equal('pending');
-      expect(artifactRows.rows[0].object_key).to.match(
-        new RegExp(`^downloads/${download_id}/download-\\d{4}-\\d{2}-\\d{2}T\\d{6}Z\\.csv$`)
-      );
-      expect(artifactRows.rows[0].format).to.equal('csv');
-    });
-
-    it('should rollback artifact and download_artifact when transaction is rolled back', async () => {
-      const submissionId = await createTestSubmission(connection);
-      const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Rollback Test' });
-
-      const { download_id } = await createCartDownload([featureId]);
-
-      // Verify rows exist before rollback
-      const beforeRows = await connection.sql(SQL`
-        SELECT 1 FROM download_artifact WHERE download_id = ${download_id} AND record_end_date IS NULL;
-      `);
-      expect(beforeRows.rowCount).to.equal(1);
-
-      // Rollback and get a fresh connection
-      await connection.rollback();
-      connection.release();
-
-      connection = getAPIUserDBConnection();
-      await connection.open();
-      crudService = new DownloadService(connection);
-
-      // Verify rows are gone after rollback
-      const afterRows = await connection.sql(SQL`
-        SELECT 1 FROM download_artifact WHERE download_id = ${download_id} AND record_end_date IS NULL;
-      `);
-      expect(afterRows.rowCount).to.equal(0);
-
-      // Verify artifact is also rolled back — join through download_artifact
-      // to find the artifact by download_id (object_key includes a timestamp
-      // so we can't reconstruct it from here)
-      const afterArtifact = await connection.sql(SQL`
-        SELECT 1 FROM artifact a
-        JOIN download_artifact da ON da.artifact_id = a.artifact_id
-        WHERE da.download_id = ${download_id};
-      `);
-      expect(afterArtifact.rowCount).to.equal(0);
-    });
-  });
-
-  describe('updateDownloadStatus', () => {
+  describe('transitionDownloadStatus', () => {
     it('should set started_at only when transitioning to processing', async () => {
       const submissionId = await createTestSubmission(connection);
       const featureId = await createTestFeature(connection, submissionId, 'dataset', { name: 'Test' });
       const { download_id } = await createCartDownload([featureId]);
 
-      await service.updateDownloadStatus(download_id, DownloadStatusEnum.PROCESSING);
+      await service.transitionDownloadStatus(download_id, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
 
       const afterProcessing = await crudService.findDownloadById(download_id);
       expect(afterProcessing!.download_status).to.equal(DownloadStatusEnum.PROCESSING);
@@ -255,7 +151,7 @@ describe('Download services (integration)', function () {
 
       const firstStartedAt = afterProcessing!.started_at;
 
-      await service.updateDownloadStatus(download_id, DownloadStatusEnum.READY);
+      await service.transitionDownloadStatus(download_id, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
 
       const afterReady = await crudService.findDownloadById(download_id);
       expect(afterReady!.download_status).to.equal(DownloadStatusEnum.READY);
@@ -294,12 +190,12 @@ describe('Download services (integration)', function () {
       expect(initial!.completed_at).to.be.null;
       expect(initial!.downloaded_at).to.be.null;
 
-      await service.updateDownloadStatus(download_id, DownloadStatusEnum.PROCESSING);
+      await service.transitionDownloadStatus(download_id, DownloadStatusEnum.PROCESSING, [DownloadStatusEnum.PENDING]);
       const processing = await crudService.findDownloadById(download_id);
       expect(processing!.download_status).to.equal(DownloadStatusEnum.PROCESSING);
       expect(processing!.started_at).to.not.be.null;
 
-      await service.updateDownloadStatus(download_id, DownloadStatusEnum.READY);
+      await service.transitionDownloadStatus(download_id, DownloadStatusEnum.READY, [DownloadStatusEnum.PROCESSING]);
       const ready = await crudService.findDownloadById(download_id);
       expect(ready!.download_status).to.equal(DownloadStatusEnum.READY);
       expect(ready!.completed_at).to.not.be.null;
@@ -357,7 +253,7 @@ describe('Download services (integration)', function () {
         VALUES (${cartId}, ${openFeatureId}, ${systemUserId}), (${cartId}, ${securedFeatureId}, ${systemUserId});
       `);
 
-      const { download_id } = await crudService.createDownload({ cartId, format: 'csv' });
+      const { download_id } = await crudService.createDownload({ cartId, format: 'parquet' });
 
       const result = await crudService.getDownloadFeatures(download_id);
 
@@ -394,7 +290,7 @@ describe('Download services (integration)', function () {
       await createTestFeature(connection, submissionId, 'species_observation', { taxon_id: 1234, count: 1 });
 
       const filters = { feature_types: ['dataset'] };
-      const { download_id } = await crudService.createDownload({ filters, format: 'csv' });
+      const { download_id } = await crudService.createDownload({ filters, format: 'parquet' });
 
       const result = await crudService.getDownloadFeatures(download_id);
 
@@ -419,7 +315,7 @@ describe('Download services (integration)', function () {
       // Cart download includes only the observation
       const cartDl = await createCartDownload([cartFeat]);
       // Filter download matches only datasets
-      const filterDl = await crudService.createDownload({ filters: { feature_types: ['dataset'] }, format: 'csv' });
+      const filterDl = await crudService.createDownload({ filters: { feature_types: ['dataset'] }, format: 'parquet' });
 
       const cartResult = await crudService.getDownloadFeatures(cartDl.download_id);
       expect(cartResult).to.have.length(1);
@@ -439,7 +335,7 @@ describe('Download services (integration)', function () {
       const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'Size B' });
 
       const filters = { feature_types: ['dataset'] };
-      const { download_id } = await crudService.createDownload({ filters, format: 'csv' });
+      const { download_id } = await crudService.createDownload({ filters, format: 'parquet' });
 
       const totalBytes = await service.estimateDownloadSize(download_id);
 
@@ -486,7 +382,7 @@ describe('Download services (integration)', function () {
       const feat2 = await createTestFeature(connection, submissionId, 'dataset', { name: 'CursorFilter B' });
 
       const filters = { feature_types: ['dataset'] };
-      const { download_id } = await crudService.createDownload({ filters, format: 'csv' });
+      const { download_id } = await crudService.createDownload({ filters, format: 'parquet' });
 
       const downloadRepo = new DownloadRepository(connection);
       const searchService = new SearchFeatureService(connection);
