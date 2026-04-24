@@ -97,6 +97,7 @@ describe('MediaIngestionService', () => {
           format: 'jpg'
         }
       ] as any);
+      sinon.stub(ArtifactService.prototype, 'insertArtifact').resolves(undefined as any);
 
       try {
         await service.persistUploadedMediaBatch('upload-1', 'archive-1', 'submission-upload-1', [

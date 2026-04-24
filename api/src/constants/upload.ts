@@ -113,7 +113,7 @@ export const UPLOAD_PRESIGNED_URL_EXPIRY_SECONDS = Number(process.env.UPLOAD_PRE
  * Works together with `UPLOAD_FEATURE_BATCH_MAX_BYTES`; flush occurs when either
  * threshold is reached.
  */
-export const UPLOAD_FEATURE_BATCH_SIZE = Number(process.env.UPLOAD_FEATURE_BATCH_SIZE ?? 2000);
+export const UPLOAD_FEATURE_BATCH_SIZE = Number(process.env.UPLOAD_FEATURE_BATCH_SIZE ?? 10000);
 
 /**
  * Approximate in-memory byte threshold for pending feature batch flush.

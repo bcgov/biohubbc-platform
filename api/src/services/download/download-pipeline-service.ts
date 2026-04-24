@@ -369,7 +369,7 @@ export class DownloadPipelineService extends DBService {
    *
    * The S3 key is deterministic: `downloads/{downloadId}/{featureTypeName}/data.parquet`.
    * Retries overwrite the same key — S3 is idempotent on overwrites, and the
-   * artifact / download_artifact inserts use ON CONFLICT DO NOTHING. A retried
+   * artifact / download_artifact inserts are idempotent on unique keys. A retried
    * feature type converges to the same DB + S3 state as a first-time success.
    *
    * Pipeline: cursor → hydrateFeatureBatch → featureToRow → writer → passThrough →

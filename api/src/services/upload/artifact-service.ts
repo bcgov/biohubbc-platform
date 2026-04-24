@@ -43,10 +43,10 @@ export class ArtifactService extends DBService {
    * Inserts a new artifact record.
    *
    * @param {CreateArtifact} artifact The artifact data to insert
-   * @return {Promise<{ artifact_id: string }>} Newly created artifact ID
+   * @return {Promise<Artifact>} Persisted artifact row
    * @memberof ArtifactService
    */
-  async insertArtifact(artifact: CreateArtifact): Promise<{ artifact_id: string }> {
+  async insertArtifact(artifact: CreateArtifact): Promise<Artifact> {
     return this.artifactRepository.insertArtifact(artifact);
   }
 

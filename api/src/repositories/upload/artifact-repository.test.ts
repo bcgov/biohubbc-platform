@@ -18,12 +18,14 @@ describe('ArtifactRepository', () => {
 
     it('builds a direct upsert query without DISTINCT ON dedupe CTEs', async () => {
       const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
-        expect(sqlStatement.text).to.not.include('DISTINCT ON (bucket, object_key)');
-        expect(sqlStatement.text).to.not.include('WITH ORDINALITY');
-        expect(sqlStatement.text).to.not.include('distinct_input');
-        expect(sqlStatement.text).to.include('FROM UNNEST(');
-        expect(sqlStatement.text).to.include('ON CONFLICT (bucket, object_key) DO NOTHING');
-        expect(sqlStatement.text).to.not.include('DO UPDATE SET');
+        if (sqlStatement.text.includes('INSERT INTO artifact')) {
+          expect(sqlStatement.text).to.not.include('DISTINCT ON (bucket, object_key)');
+          expect(sqlStatement.text).to.not.include('WITH ORDINALITY');
+          expect(sqlStatement.text).to.not.include('distinct_input');
+          expect(sqlStatement.text).to.include('FROM UNNEST(');
+          expect(sqlStatement.text).to.include('ON CONFLICT (bucket, object_key) DO UPDATE');
+          expect(sqlStatement.text).to.include('SET');
+        }
 
         return Promise.resolve({
           rowCount: 3,
@@ -250,18 +252,23 @@ describe('ArtifactRepository', () => {
     });
 
     it('returns the existing artifact ID on conflict', async () => {
-      const existingRow = { artifact_id: 'existing-uuid' };
-      let callCount = 0;
+      const existingRow = {
+        artifact_id: 'existing-uuid',
+        artifact_status: ArtifactStatusEnum.UPLOADED,
+        bucket: 'bucket',
+        object_key: 'key.txt',
+        byte_size: '100',
+        checksum_sha256: 'a'.repeat(64),
+        uploaded_at: '2025-12-31T12:00:00Z',
+        format: 'csv'
+      };
+      const sqlStub = sinon.stub().callsFake((sqlStatement: { text: string }) => {
+        expect(sqlStatement.text).to.include('ON CONFLICT (bucket, object_key) DO UPDATE');
+        expect(sqlStatement.text).to.not.include('ON CONFLICT (bucket, object_key) DO NOTHING');
+        return Promise.resolve({ rowCount: 1, rows: [existingRow] } as any);
+      });
       const mockDBConnection = getMockDBConnection({
-        sql: () => {
-          callCount++;
-          if (callCount === 1) {
-            // INSERT with DO NOTHING — conflict, no rows returned
-            return { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
-          }
-          // Follow-up SELECT returns existing row
-          return { rowCount: 1, rows: [existingRow] } as any as Promise<QueryResult<any>>;
-        }
+        sql: sqlStub
       });
       const repo = new ArtifactRepository(mockDBConnection);
 
@@ -276,8 +283,7 @@ describe('ArtifactRepository', () => {
       };
 
       const result = await repo.insertArtifact(payload);
-      expect(result).to.eql(existingRow);
-      expect(callCount).to.equal(2);
+      expect(result.artifact_id).to.eql(existingRow.artifact_id);
     });
   });
 

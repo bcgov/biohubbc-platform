@@ -1694,7 +1694,7 @@ describe('SubmissionRepository', () => {
         const sql = query.toSQL().sql.toLowerCase();
         expect(sql).to.include('inner join "team" as "t"');
         expect(sql).to.include('"t"."record_end_date" is null');
-        return { rowCount: 0, rows: [] } as QueryResult<any>;
+        return { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
       });
       const mockDBConnection = getMockDBConnection({ knex: knexStub });
       const submissionRepository = new SubmissionRepository(mockDBConnection);
