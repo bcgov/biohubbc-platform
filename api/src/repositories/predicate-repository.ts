@@ -1,17 +1,10 @@
 import type { Knex } from 'knex';
 import SQL from 'sql-template-strings';
-import { z } from 'zod';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError, ApiNotFoundError } from '../errors/api-error';
 import { TypedPredicate } from '../models/expression-tree';
-import { Predicate, PredicateResolveInput, ReadPredicateNodeRow } from '../models/predicate';
+import { Predicate, PredicateResolveInput, ReadPredicateNodeRow, ResolvedPredicateAnchor } from '../models/predicate';
 import { BaseRepository } from './base-repository';
-
-const ResolvedPredicateAnchor = Predicate.extend({
-  inserted: z.boolean()
-});
-
-export type ResolvedPredicateAnchor = z.infer<typeof ResolvedPredicateAnchor>;
 
 /**
  * Query repository for predicate anchor rows, typed payload rows, and predicate read projections.
@@ -33,7 +26,7 @@ export class PredicateRepository extends BaseRepository {
       )
       VALUES (
         ${payload.feature_type_property_id},
-        (SELECT fpt.feature_property_type_id FROM feature_property_type fpt WHERE fpt.name = ${payload.feature_property_type_name} AND fpt.record_end_date IS NULL LIMIT 1),
+        (SELECT fpt.feature_property_type_id FROM feature_property_type fpt WHERE fpt.name = ${payload.feature_property_type_name} AND fpt.record_end_date IS NULL),
         ${payload.predicate_hash}
       )
       ON CONFLICT (predicate_hash) WHERE record_end_date IS NULL
@@ -64,15 +57,13 @@ export class PredicateRepository extends BaseRepository {
    *
    * @param {string} predicateHash - Normalized predicate hash.
    * @return {(Promise<Predicate | null>)} Matching active predicate row, when present.
-   * @throws {ApiExecuteSQLError} If more than one active row is found.
    */
   async findPredicateByHash(predicateHash: string): Promise<Predicate | null> {
     const knex = getKnex();
     const query = knex('predicate')
       .select(['predicate_id', 'feature_type_property_id', 'feature_property_type_id', 'predicate_hash'])
       .where('predicate_hash', predicateHash)
-      .whereNull('record_end_date')
-      .limit(1);
+      .whereNull('record_end_date');
 
     const response = await this.connection.knex(query, Predicate);
     const rowCount = response.rowCount ?? 0;

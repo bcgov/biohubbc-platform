@@ -35,8 +35,7 @@ export class FeatureTypePropertyRepository extends BaseRepository {
       fp.name = ${featurePropertyName}
       AND ftp.record_end_date IS NULL
     ORDER BY
-      ftp.feature_type_property_id
-    LIMIT 1;
+      ftp.feature_type_property_id;
   `;
 
     const response = await this.connection.sql(sqlStatement, FeatureTypeProperty);
@@ -87,8 +86,7 @@ export class FeatureTypePropertyRepository extends BaseRepository {
       AND fpt.record_end_date IS NULL
     WHERE
       ftp.feature_type_property_id = ${featureTypePropertyId}
-      AND ftp.record_end_date IS NULL
-    LIMIT 1;
+      AND ftp.record_end_date IS NULL;
   `;
 
     const response = await this.connection.sql(sqlStatement, FeatureTypeProperty);

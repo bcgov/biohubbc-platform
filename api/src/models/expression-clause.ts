@@ -8,11 +8,11 @@ export const ExpressionClause = z.object({
   child_expression_id: z.string().uuid().nullable()
 });
 
-export const CreateExpressionClause = z.object({
-  expression_id: z.string().uuid(),
-  sequence: z.number().int().positive(),
-  predicate_id: z.string().uuid().nullable(),
-  child_expression_id: z.string().uuid().nullable()
+export const CreateExpressionClause = ExpressionClause.pick({
+  expression_id: true,
+  sequence: true,
+  predicate_id: true,
+  child_expression_id: true
 });
 
 export type ExpressionClause = z.infer<typeof ExpressionClause>;

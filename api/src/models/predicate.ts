@@ -15,6 +15,12 @@ export const Predicate = z.object({
 
 export type Predicate = z.infer<typeof Predicate>;
 
+export const ResolvedPredicateAnchor = Predicate.extend({
+  inserted: z.boolean()
+});
+
+export type ResolvedPredicateAnchor = z.infer<typeof ResolvedPredicateAnchor>;
+
 export type PredicateFeaturePropertyTypeName =
   | FEATURE_PROPERTY_TYPE.STRING
   | FEATURE_PROPERTY_TYPE.NUMBER

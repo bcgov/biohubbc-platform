@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { GeoJSONGeometryZodSchema } from '../zod-schema/geoJsonZodSchema';
 import { LogicalOperator } from './logical-operator';
 
 /**
@@ -133,7 +134,7 @@ const TaxonPredicate = z.object({
 const GeometryPredicate = z.object({
   type: z.literal('geometry'),
   operator: GeometryOperator,
-  value: z.record(z.any()).optional()
+  value: GeoJSONGeometryZodSchema.optional()
 });
 
 const CodePredicate = z.object({
