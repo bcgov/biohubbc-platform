@@ -1,10 +1,11 @@
 import { z } from 'zod';
+import { GeoJSONGeometryZodSchema } from '../zod-schema/geoJsonZodSchema';
 
 export const SubmissionFeaturePropertyGeometrySchema = z.object({
   submission_feature_property_geometry_id: z.number().int(),
   submission_feature_id: z.number().int(),
   feature_type_property_id: z.number().int(),
-  value: z.record(z.string(), z.any())
+  value: GeoJSONGeometryZodSchema
 });
 
 export type SubmissionFeaturePropertyGeometry = z.infer<typeof SubmissionFeaturePropertyGeometrySchema>;
