@@ -1,9 +1,12 @@
 // Integration test for security scope pipeline — verifies scope creation, anchor computation,
 // team scope grants, orphan cleanup, and search access filtering against the real database.
 //
-// Tests use repository methods directly for scope setup (bypassing pg-boss which is not
-// running in the make test-db environment). SecurityScopeService.cleanupScopesForDeletedStatements
-// is safe to call directly as it only uses repository methods internally.
+// Tests use repository methods directly for scope setup. Service methods that internally
+// publish pg-boss jobs (e.g. cleanupScopesForDeletedStatements → publishComputeScopeAnchorsJob)
+// are called directly, but the publisher is stubbed in beforeEach because pg-boss is not
+// running in the make test-db environment. Anchor recomputation is simulated by calling
+// the phase methods (deleteStaleAnchorBatch / computeAnchorBatch) directly via
+// refreshAnchorsViaService.
 //
 // Uses a transaction that is ROLLED BACK after each test, so no data is persisted.
 //
@@ -11,6 +14,7 @@
 // Requires: make web (database must be running with seed data)
 
 import { expect } from 'chai';
+import sinon from 'sinon';
 import SQL from 'sql-template-strings';
 import { defaultPoolConfig, getAPIUserDBConnection, IDBConnection, initDBPool } from '../../database/db';
 import { SecurityScopeRepository } from '../../repositories/authorization/security-scope-repository';
@@ -48,11 +52,19 @@ describe('Security scope search (integration)', function () {
     scopeRepo = new SecurityScopeRepository(connection);
     scopeService = new SecurityScopeService(connection);
     searchRepo = new SearchFeatureRepository(connection);
+
+    // pg-boss is not running in the make test-db environment; stub the publisher so
+    // service methods that enqueue anchor-computation jobs can proceed. Anchor recomputation
+    // is simulated by calling phase methods directly via refreshAnchorsViaService.
+    sinon
+      .stub(SecurityScopeService.dependencies, 'publishComputeScopeAnchorsJob')
+      .resolves({ status: 'published', jobId: 'stub-job-id' });
   });
 
   afterEach(async () => {
     await connection.rollback();
     connection.release();
+    sinon.restore();
   });
 
   // ── Helpers ──────────────────────────────────────────────────────────
