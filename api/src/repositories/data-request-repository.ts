@@ -71,10 +71,12 @@ export class DataRequestRepository extends BaseRepository {
         'dr.create_date as create_date'
       )
       .join('policy as p', 'p.policy_id', 'dr.policy_id')
+      .join('team as t', 't.team_id', 'dr.team_id')
       .join('team_member as tm', 'tm.team_id', 'dr.team_id')
       .whereIn('tm.system_user_id', systemUserIds)
       .whereNull('dr.record_end_date')
       .whereNull('p.record_end_date')
+      .whereNull('t.record_end_date')
       .whereNull('tm.record_end_date');
 
     this.applyFilters(queryBuilder, filters);

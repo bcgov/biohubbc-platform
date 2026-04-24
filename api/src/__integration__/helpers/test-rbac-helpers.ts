@@ -43,8 +43,8 @@ export async function addTeamMember(connection: IDBConnection, teamId: string, s
 export async function createPolicy(connection: IDBConnection, name: string): Promise<string> {
   const systemUserId = connection.systemUserId();
   const result = await connection.sql(SQL`
-    INSERT INTO policy (name, create_user)
-    VALUES (${name}, ${systemUserId})
+    INSERT INTO policy (name, status, create_user)
+    VALUES (${name}, 'approved', ${systemUserId})
     RETURNING policy_id;
   `);
   return result.rows[0].policy_id;
