@@ -3,7 +3,7 @@ import Divider from '@mui/material/Divider';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
-import { ReactNode, useMemo, useState } from 'react';
+import { Fragment, ReactNode, useMemo, useState } from 'react';
 
 export interface IContextMenuItem {
   label: string;
@@ -20,8 +20,7 @@ export interface IContextMenuItemGroup {
 export interface IContextMenuButtonProps {
   buttonTitle: string;
   buttonIcon: ReactNode;
-  items?: IContextMenuItem[];
-  itemGroups?: IContextMenuItemGroup[];
+  itemGroups: IContextMenuItemGroup[];
 }
 
 /**
@@ -31,21 +30,16 @@ export interface IContextMenuButtonProps {
  * @return {*}
  */
 export const ContextMenuButton = (props: IContextMenuButtonProps) => {
-  const { buttonTitle, buttonIcon, items = [], itemGroups } = props;
+  const { buttonTitle, buttonIcon, itemGroups } = props;
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
   const open = Boolean(anchorEl);
-  const resolvedGroups = useMemo<IContextMenuItemGroup[]>(() => {
-    if (itemGroups?.length) {
-      return itemGroups.filter((group) => group.items.length > 0);
-    }
-
-    if (items.length) {
-      return [{ groupId: 'default', items }];
-    }
-
-    return [];
-  }, [itemGroups, items]);
+  const resolvedGroups = useMemo(() => itemGroups.filter((group) => group.items.length > 0), [itemGroups]);
+  const handleClose = () => setAnchorEl(null);
+  const handleItemClick = (onClick: () => void) => {
+    handleClose();
+    onClick();
+  };
 
   return (
     <>
@@ -58,22 +52,21 @@ export const ContextMenuButton = (props: IContextMenuButtonProps) => {
         {buttonIcon}
       </IconButton>
 
-      <Menu anchorEl={anchorEl} open={open} onClose={() => setAnchorEl(null)}>
-        {resolvedGroups.flatMap((group, groupIndex) => [
-          ...group.items.map((item) => (
-            <MenuItem
-              key={`${group.groupId}-${item.label}`}
-              disabled={item.disabled}
-              onClick={() => {
-                setAnchorEl(null);
-                item.onClick();
-              }}>
-              {item.icon ? <ListItemIcon>{item.icon}</ListItemIcon> : null}
-              {item.label}
-            </MenuItem>
-          )),
-          ...(groupIndex < resolvedGroups.length - 1 ? [<Divider key={`${group.groupId}-divider`} />] : [])
-        ])}
+      <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
+        {resolvedGroups.map((group, groupIndex) => (
+          <Fragment key={group.groupId}>
+            {group.items.map((item) => (
+              <MenuItem
+                key={`${group.groupId}-${item.label}`}
+                disabled={item.disabled}
+                onClick={() => handleItemClick(item.onClick)}>
+                {item.icon ? <ListItemIcon>{item.icon}</ListItemIcon> : null}
+                {item.label}
+              </MenuItem>
+            ))}
+            {groupIndex < resolvedGroups.length - 1 ? <Divider /> : null}
+          </Fragment>
+        ))}
       </Menu>
     </>
   );

@@ -11,8 +11,8 @@ import { ITicketSystemUser } from 'interfaces/useTicketsApi.interface';
 import { useEffect } from 'react';
 
 interface IPortalTicketSidebarProps {
-  teamId?: string;
-  ticketSystemUsers?: ITicketSystemUser[];
+  teamId: string;
+  ticketSystemUsers: ITicketSystemUser[];
 }
 
 /**
@@ -28,10 +28,6 @@ export const PortalTicketSidebar = (props: IPortalTicketSidebarProps) => {
   const teamMembersLoader = useDataLoader((currentTeamId: string) => api.teams.getTeamMembers(currentTeamId));
 
   useEffect(() => {
-    if (!teamId) {
-      return;
-    }
-
     teamMembersLoader.load(teamId);
   }, [teamId, teamMembersLoader]);
 
@@ -43,10 +39,10 @@ export const PortalTicketSidebar = (props: IPortalTicketSidebarProps) => {
     <Stack spacing={5}>
       <TicketSidebarSection label="System Users">
         <LoadingGuard
-          hasNoData={!(ticketSystemUsers ?? []).length}
+          hasNoData={!ticketSystemUsers.length}
           hasNoDataFallback={<Typography variant="body2">No users</Typography>}>
           <Stack spacing={0.75}>
-            {(ticketSystemUsers ?? []).map((ticketSystemUser) => (
+            {ticketSystemUsers.map((ticketSystemUser) => (
               <TicketSidebarItem
                 key={ticketSystemUser.ticket_system_user_id}
                 label={`${

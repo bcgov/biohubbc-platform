@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface ITicketTeamDialogProps {
   open: boolean;
-  teamId?: string;
+  teamId: string;
   members: ITeamMember[];
   onClose: () => void;
   onMemberAdd: (member: ITeamMember) => void;
@@ -41,10 +41,7 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
     [dialogContext]
   );
 
-  const availableUsersLoader = useDataLoader(
-    (search?: string) => api.teams.getAvailableUsers(search),
-    (error) => showApiError(error)
-  );
+  const availableUsersLoader = useDataLoader((search?: string) => api.teams.getAvailableUsers(search), showApiError);
 
   useEffect(() => {
     if (!open) {
@@ -58,27 +55,21 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
     availableUsersLoader.refresh(search);
   }, 300);
 
-  const handleAvailableUserSearch = useCallback(
-    (search: string) => {
-      debouncedAvailableUserRefresh(search);
-    },
-    [debouncedAvailableUserRefresh]
-  );
-
+  const availableUsers = useMemo(() => availableUsersLoader.data?.users ?? [], [availableUsersLoader.data?.users]);
   const userOptions = useMemo<SidebarOption[]>(
     () =>
-      (availableUsersLoader.data?.users ?? []).map((user) => ({
+      availableUsers.map((user) => ({
         value: user.system_user_id,
         label: user.user_identifier
       })),
-    [availableUsersLoader.data?.users]
+    [availableUsers]
   );
 
   const memberSystemUserIds = useMemo(() => new Set(members.map((member) => member.system_user_id)), [members]);
 
   const handleSelectUser = useCallback(
     async (option: SidebarOption | null) => {
-      if (!teamId || !option) {
+      if (!option) {
         return;
       }
 
@@ -116,10 +107,6 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
 
   const handleRemoveUser = useCallback(
     async (userId: string) => {
-      if (!teamId) {
-        return;
-      }
-
       const removedMember = members.find((member) => member.team_member_id === userId);
 
       try {
@@ -162,7 +149,7 @@ export const TicketTeamDialog = (props: ITicketTeamDialogProps) => {
           isLoading={availableUsersLoader.isLoading}
           users={users}
           isSubmitting={isSubmitting}
-          onSearch={handleAvailableUserSearch}
+          onSearch={debouncedAvailableUserRefresh}
           onSelectUser={handleSelectUser}
           onRemoveUser={handleRemoveUser}
         />

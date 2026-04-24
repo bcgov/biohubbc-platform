@@ -6,7 +6,7 @@ import { DataLoader } from 'hooks/useDataLoader';
 import { ITicketExtended } from 'interfaces/useTicketsApi.interface';
 import { render } from 'test-helpers/test-utils';
 import { Mock } from 'vitest';
-import { TicketDetailPage, TicketDetailPageContent } from './TicketDetailPage';
+import { TicketDetailPage } from './TicketDetailPage';
 import { useTicketComment } from './hooks/useTicketComment';
 
 vi.mock('hooks/useContext', () => ({
@@ -22,13 +22,13 @@ vi.mock('./detail/header/TicketHeader', () => ({
 }));
 
 vi.mock('./detail/timeline/TicketTimeline', () => ({
-  TicketTimeline: ({ ticket, isLoading }: { ticket: ITicketExtended | undefined; isLoading: boolean }) => (
+  TicketTimeline: ({ ticket, isLoading }: { ticket: ITicketExtended; isLoading: boolean }) => (
     <div
       data-testid="ticket-timeline"
       data-loading={String(isLoading)}
-      data-ticket-id={ticket?.ticket_id ?? ''}
+      data-ticket-id={ticket.ticket_id}
       data-events={JSON.stringify(
-        [...(ticket?.statuses ?? []), ...(ticket?.comments ?? []), ...(ticket?.data_requests ?? [])].sort(
+        [...ticket.statuses, ...ticket.comments, ...ticket.data_requests].sort(
           (a, b) => new Date(a.create_date ?? '').getTime() - new Date(b.create_date ?? '').getTime()
         )
       )}
@@ -144,18 +144,6 @@ const baseTicket: ITicketExtended = {
 const setComment = vi.fn();
 const onAddComment = vi.fn().mockResolvedValue(undefined);
 
-const renderContent = (ticket: ITicketExtended | undefined, isLoading = false) =>
-  render(
-    <TicketDetailPageContent
-      ticket={ticket}
-      isLoading={isLoading}
-      comment="Draft comment"
-      setComment={setComment}
-      isSavingComment={false}
-      onAddComment={onAddComment}
-    />
-  );
-
 const makeTicketContext = (ticket: ITicketExtended | undefined, isLoading = false): ITicketContext => {
   const ticketDataLoader: DataLoader<[string], ITicketExtended, unknown> = {
     data: ticket,
@@ -174,13 +162,20 @@ const makeTicketContext = (ticket: ITicketExtended | undefined, isLoading = fals
   };
 };
 
-describe('TicketDetailPageContent', () => {
+describe('TicketDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseTicketComment.mockReturnValue({
+      comment: 'Draft comment',
+      setComment,
+      isSavingComment: false,
+      handleAddComment: onAddComment
+    });
   });
 
   it('renders header, timeline, sidebar, and comment for open tickets', () => {
-    renderContent(baseTicket);
+    mockUseTicketContext.mockReturnValue(makeTicketContext(baseTicket, false));
+    render(<TicketDetailPage />);
 
     expect(screen.getByTestId('ticket-header')).toHaveTextContent('04900042');
     expect(screen.getByTestId('ticket-comment')).toHaveAttribute('data-comment', 'Draft comment');
@@ -190,7 +185,8 @@ describe('TicketDetailPageContent', () => {
   });
 
   it('passes ticket data to timeline', () => {
-    renderContent(baseTicket);
+    mockUseTicketContext.mockReturnValue(makeTicketContext(baseTicket, false));
+    render(<TicketDetailPage />);
 
     const timeline = screen.getByTestId('ticket-timeline');
     const events = JSON.parse(timeline.getAttribute('data-events') ?? '[]') as Array<{ create_date: string }>;
@@ -203,21 +199,20 @@ describe('TicketDetailPageContent', () => {
   });
 
   it('hides comment input for closed tickets', () => {
-    renderContent({ ...baseTicket, status: 'closed' });
+    mockUseTicketContext.mockReturnValue(makeTicketContext({ ...baseTicket, status: 'closed' }, false));
+    render(<TicketDetailPage />);
 
     expect(screen.queryByTestId('ticket-comment')).not.toBeInTheDocument();
   });
 
   it('shows the loading skeleton when loading and no ticket is available', () => {
-    renderContent(undefined, true);
+    mockUseTicketContext.mockReturnValue(makeTicketContext(undefined, true));
+    render(<TicketDetailPage />);
 
     expect(screen.getByTestId('ticket-skeleton')).toBeVisible();
   });
-});
 
-describe('TicketDetailPage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it('wires context and comment hook state into content rendering', () => {
     mockUseTicketContext.mockReturnValue(makeTicketContext(baseTicket, false));
     mockUseTicketComment.mockReturnValue({
       comment: 'Hook comment',
@@ -225,9 +220,6 @@ describe('TicketDetailPage', () => {
       isSavingComment: true,
       handleAddComment: onAddComment
     });
-  });
-
-  it('wires context and comment hook state into content rendering', () => {
     render(<TicketDetailPage />);
 
     expect(screen.getByTestId('ticket-header')).toHaveTextContent('04900042');

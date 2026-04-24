@@ -7,7 +7,7 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 
 export interface IDropdownButtonItem {
   value: string;
@@ -38,12 +38,18 @@ export interface IDropdownButtonProps extends Omit<
 export const DropdownButton = (props: IDropdownButtonProps) => {
   const { value, itemGroups, onSelect, size = 'medium', ...buttonProps } = props;
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const open = Boolean(anchorEl);
 
   const flattenedItems = useMemo(() => itemGroups.flatMap((group) => group.items), [itemGroups]);
   const selectedLabel = useMemo(
     () => flattenedItems.find((item) => item.value === value)?.label ?? value,
     [flattenedItems, value]
   );
+  const handleClose = () => setAnchorEl(null);
+  const handleSelect = (nextValue: string) => {
+    handleClose();
+    onSelect(nextValue);
+  };
 
   return (
     <>
@@ -70,24 +76,23 @@ export const DropdownButton = (props: IDropdownButtonProps) => {
         {selectedLabel}
       </Button>
 
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
-        {itemGroups.flatMap((group, groupIndex) => [
-          ...group.items.map((item) => (
-            <MenuItem
-              key={`${group.groupId}-${item.value}`}
-              selected={item.value === value}
-              onClick={() => {
-                setAnchorEl(null);
-                onSelect(item.value);
-              }}>
-              <ListItemIcon>
-                <Icon path={item.iconPath} size={0.75} />
-              </ListItemIcon>
-              <ListItemText>{item.label}</ListItemText>
-            </MenuItem>
-          )),
-          ...(groupIndex < itemGroups.length - 1 ? [<Divider key={`${group.groupId}-divider`} />] : [])
-        ])}
+      <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
+        {itemGroups.map((group, groupIndex) => (
+          <Fragment key={group.groupId}>
+            {group.items.map((item) => (
+              <MenuItem
+                key={`${group.groupId}-${item.value}`}
+                selected={item.value === value}
+                onClick={() => handleSelect(item.value)}>
+                <ListItemIcon>
+                  <Icon path={item.iconPath} size={0.75} />
+                </ListItemIcon>
+                <ListItemText>{item.label}</ListItemText>
+              </MenuItem>
+            ))}
+            {groupIndex < itemGroups.length - 1 ? <Divider /> : null}
+          </Fragment>
+        ))}
       </Menu>
     </>
   );

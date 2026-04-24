@@ -7,11 +7,10 @@ import Typography from '@mui/material/Typography';
 import { ContextMenuButton, IContextMenuItem } from 'components/ContextMenuButton';
 import { TICKET_SYSTEM_USER_STATUS_PRESENTATION } from 'constants/ticket';
 import { ITicketSystemUser, TicketSystemUserStatus } from 'interfaces/useTicketsApi.interface';
+import { useMemo } from 'react';
 
 interface ITicketSidebarSystemUserCardProps {
   ticketSystemUser: ITicketSystemUser;
-  isSystemAdmin: boolean;
-  isCurrentUserAssignment: boolean;
   onRemoveTicketSystemUser: (ticketSystemUserId: string) => Promise<void> | void;
   onUpdateTicketSystemUserStatus: (ticketSystemUserId: string, status: TicketSystemUserStatus) => Promise<void> | void;
 }
@@ -19,51 +18,40 @@ interface ITicketSidebarSystemUserCardProps {
 /**
  * Sidebar card row for a ticket system user.
  *
- * Includes current-user request handling and context menu delete action.
+ * Includes status and delete actions.
  *
  * @param {ITicketSidebarSystemUserCardProps} props
  * @return {*}
  */
 export const TicketSidebarSystemUserCard = (props: ITicketSidebarSystemUserCardProps) => {
-  const {
-    ticketSystemUser,
-    isSystemAdmin,
-    isCurrentUserAssignment,
-    onRemoveTicketSystemUser,
-    onUpdateTicketSystemUserStatus
-  } = props;
-
-  const statusOptions: { value: TicketSystemUserStatus; label: string; icon: string }[] = (
-    Object.entries(TICKET_SYSTEM_USER_STATUS_PRESENTATION) as Array<
-      [TicketSystemUserStatus, (typeof TICKET_SYSTEM_USER_STATUS_PRESENTATION)[TicketSystemUserStatus]]
-    >
-  ).map(([value, presentation]) => ({
-    value,
-    label: presentation.label,
-    icon: presentation.icon
-  }));
+  const { ticketSystemUser, onRemoveTicketSystemUser, onUpdateTicketSystemUserStatus } = props;
+  const statusOptions = useMemo(
+    () =>
+      (
+        Object.entries(TICKET_SYSTEM_USER_STATUS_PRESENTATION) as Array<
+          [TicketSystemUserStatus, (typeof TICKET_SYSTEM_USER_STATUS_PRESENTATION)[TicketSystemUserStatus]]
+        >
+      ).map(([value, presentation]) => ({
+        value,
+        label: presentation.label,
+        icon: presentation.icon
+      })),
+    []
+  );
 
   const displayLabel = ticketSystemUser.system_user.display_name ?? ticketSystemUser.system_user.user_identifier;
-  const canUpdateStatus = isSystemAdmin || isCurrentUserAssignment;
-  const canDelete = isSystemAdmin;
-
-  const statusContextMenuItems: IContextMenuItem[] = canUpdateStatus
-    ? statusOptions.map((statusOption) => ({
-        label: statusOption.label,
-        icon: <Icon path={statusOption.icon} size={0.7} />,
-        onClick: () => onUpdateTicketSystemUserStatus(ticketSystemUser.ticket_system_user_id, statusOption.value),
-        disabled: statusOption.value === ticketSystemUser.status
-      }))
-    : [];
-  const deleteContextMenuItems: IContextMenuItem[] = canDelete
-    ? [
-        {
-          label: 'Delete',
-          icon: <Icon path={mdiTrashCanOutline} size={0.7} />,
-          onClick: () => onRemoveTicketSystemUser(ticketSystemUser.ticket_system_user_id)
-        }
-      ]
-    : [];
+  const statusContextMenuItems: IContextMenuItem[] = statusOptions.map((statusOption) => ({
+    label: statusOption.label,
+    icon: <Icon path={statusOption.icon} size={0.7} />,
+    onClick: () => onUpdateTicketSystemUserStatus(ticketSystemUser.ticket_system_user_id, statusOption.value)
+  }));
+  const deleteContextMenuItems: IContextMenuItem[] = [
+    {
+      label: 'Delete',
+      icon: <Icon path={mdiTrashCanOutline} size={0.7} />,
+      onClick: () => onRemoveTicketSystemUser(ticketSystemUser.ticket_system_user_id)
+    }
+  ];
 
   return (
     <Paper
@@ -86,16 +74,14 @@ export const TicketSidebarSystemUserCard = (props: ITicketSidebarSystemUserCardP
           color={TICKET_SYSTEM_USER_STATUS_PRESENTATION[ticketSystemUser.status].colour}
         />
 
-        {statusContextMenuItems.length || deleteContextMenuItems.length ? (
-          <ContextMenuButton
-            buttonTitle={`ticket-system-user-${ticketSystemUser.ticket_system_user_id}-menu`}
-            buttonIcon={<Icon path={mdiDotsVertical} size={0.75} />}
-            itemGroups={[
-              { groupId: 'status-options', items: statusContextMenuItems },
-              { groupId: 'danger-actions', items: deleteContextMenuItems }
-            ]}
-          />
-        ) : null}
+        <ContextMenuButton
+          buttonTitle={`ticket-system-user-${ticketSystemUser.ticket_system_user_id}-menu`}
+          buttonIcon={<Icon path={mdiDotsVertical} size={0.75} />}
+          itemGroups={[
+            { groupId: 'status-options', items: statusContextMenuItems },
+            { groupId: 'danger-actions', items: deleteContextMenuItems }
+          ]}
+        />
       </Box>
     </Paper>
   );

@@ -34,6 +34,16 @@ export const TicketSystemUserDialog = (props: ITicketSystemUserDialogProps) => {
   const { ticketDataLoader } = useTicketContext();
   const optimisticTicketLoader = useOptimisticDataLoader(ticketDataLoader);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const showApiError = useCallback(
+    (error: unknown) => {
+      const apiError = error as APIError;
+      dialogContext.setSnackbar({
+        open: true,
+        snackbarMessage: apiError.message
+      });
+    },
+    [dialogContext]
+  );
 
   const availableUsersLoader = useDataLoader((search?: string) => api.teams.getAvailableUsers(search));
 
@@ -103,13 +113,6 @@ export const TicketSystemUserDialog = (props: ITicketSystemUserDialogProps) => {
     []
   );
 
-  const handleSearchUsers = useCallback(
-    (search: string) => {
-      debouncedAvailableUserRefresh(search);
-    },
-    [debouncedAvailableUserRefresh]
-  );
-
   useEffect(() => {
     if (!open) {
       return;
@@ -118,13 +121,14 @@ export const TicketSystemUserDialog = (props: ITicketSystemUserDialogProps) => {
     availableUsersLoader.load();
   }, [open, availableUsersLoader]);
 
+  const availableUsers = useMemo(() => availableUsersLoader.data?.users ?? [], [availableUsersLoader.data?.users]);
   const options = useMemo<SidebarOption[]>(
     () =>
-      (availableUsersLoader.data?.users ?? []).map((user) => ({
+      availableUsers.map((user) => ({
         value: user.system_user_id,
         label: user.user_identifier
       })),
-    [availableUsersLoader.data?.users]
+    [availableUsers]
   );
 
   const handleSubmit = useCallback(
@@ -146,7 +150,7 @@ export const TicketSystemUserDialog = (props: ITicketSystemUserDialogProps) => {
               ...currentTicket,
               ticket_system_users: [...currentTicketSystemUsers, ...optimisticTicketSystemUsers]
             },
-            mutation: async () => api.tickets.createTicketSystemUsers(ticketId, payload),
+            mutation: () => api.tickets.createTicketSystemUsers(ticketId, payload),
             onSuccess: (createdTicketSystemUsers, context) => {
               ticketDataLoader.setData({
                 ...context.optimisticState,
@@ -166,11 +170,7 @@ export const TicketSystemUserDialog = (props: ITicketSystemUserDialogProps) => {
 
         onClose();
       } catch (error) {
-        const apiError = error as APIError;
-        dialogContext.setSnackbar({
-          open: true,
-          snackbarMessage: apiError.message
-        });
+        showApiError(error);
       } finally {
         setIsSubmitting(false);
       }
@@ -179,10 +179,10 @@ export const TicketSystemUserDialog = (props: ITicketSystemUserDialogProps) => {
       api.tickets,
       buildCreatePayload,
       buildOptimisticTicketSystemUsers,
-      dialogContext,
       onClose,
       optimisticTicketLoader,
       reconcileTicketSystemUsers,
+      showApiError,
       ticketDataLoader,
       ticketId
     ]
@@ -201,7 +201,7 @@ export const TicketSystemUserDialog = (props: ITicketSystemUserDialogProps) => {
             options={options}
             isLoadingUsers={availableUsersLoader.isLoading}
             isSubmitting={isSubmitting}
-            onSearchUsers={handleSearchUsers}
+            onSearchUsers={debouncedAvailableUserRefresh}
           />
         ),
         initialValues: TicketSystemUserFormInitialValues,

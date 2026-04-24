@@ -2,7 +2,7 @@ import { DataRequestResponse } from 'interfaces/useDataRequestApi.interface';
 import { ITicketExtended, TicketStatus } from 'interfaces/useTicketsApi.interface';
 
 export interface ITicketTimelineProps {
-  ticket: ITicketExtended | undefined;
+  ticket: ITicketExtended;
   isLoading: boolean;
 }
 

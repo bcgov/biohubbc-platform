@@ -58,7 +58,7 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX ticket_system_user_ticket_idx ON ticket_system_user(ticket_id);
     CREATE INDEX ticket_system_user_system_user_idx ON ticket_system_user(system_user_id);
     CREATE UNIQUE INDEX ticket_system_user_nuk1
-      ON ticket_system_user(ticket_id, system_user_id, (record_end_date IS NULL))
+      ON ticket_system_user(ticket_id, system_user_id)
       WHERE record_end_date IS NULL;
 
     ----------------------------------------------------------------------------------------

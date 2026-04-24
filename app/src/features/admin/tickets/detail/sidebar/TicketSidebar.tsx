@@ -17,11 +17,11 @@ import { TicketSidebarTeam } from './TicketSidebarTeam';
 import { TicketSidebarUploads } from './TicketSidebarUploads';
 
 interface ITicketSidebarProps {
-  ticketId?: string;
-  teamId?: string;
-  ticketSystemUsers?: ITicketSystemUser[];
-  references?: ITicketReference[];
-  dataRequests?: DataRequestResponse[];
+  ticketId: string;
+  teamId: string;
+  ticketSystemUsers: ITicketSystemUser[];
+  references: ITicketReference[];
+  dataRequests: DataRequestResponse[];
 }
 
 /**
@@ -41,12 +41,15 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
   const teamMembersLoader = useDataLoader((currentTeamId: string) => api.teams.getTeamMembers(currentTeamId));
   const optimisticTeamMembersLoader = useOptimisticDataLoader(teamMembersLoader);
   const optimisticTicketLoader = useOptimisticDataLoader(ticketDataLoader);
+  const showApiErrorSnackbar = (error: unknown) => {
+    const apiError = error as APIError;
+    dialogContext.setSnackbar({
+      open: true,
+      snackbarMessage: apiError.message
+    });
+  };
 
   useEffect(() => {
-    if (!teamId) {
-      return;
-    }
-
     teamMembersLoader.load(teamId);
   }, [teamId, teamMembersLoader]);
 
@@ -54,12 +57,7 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
 
   // Optimistically insert a member into local state unless already present.
   const handleMemberAdd = (member: ITeamMember) => {
-    const currentData = teamMembersLoader.data;
-    if (!currentData) {
-      teamMembersLoader.setData({ members: [member] });
-      return;
-    }
-
+    const currentData = teamMembersLoader.data ?? { members: [] };
     const existingMembers = currentData.members;
     const existingMemberIds = new Set(existingMembers.map((existingMember) => existingMember.team_member_id));
     const nextMembers = existingMemberIds.has(member.team_member_id) ? existingMembers : [...existingMembers, member];
@@ -86,23 +84,13 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
 
   // Optimistically remove, persist deletion, and rollback if API delete fails.
   const handleRemoveUser = async (teamMemberId: string) => {
-    if (!teamId) {
-      return;
-    }
-
     await optimisticTeamMembersLoader.refresh((currentData) => ({
       optimisticState: {
         ...currentData,
         members: currentData.members.filter((member) => member.team_member_id !== teamMemberId)
       },
       mutation: () => api.teams.deleteTeamMember(teamId, teamMemberId),
-      onRollback: (error) => {
-        const apiError = error as APIError;
-        dialogContext.setSnackbar({
-          open: true,
-          snackbarMessage: apiError.message
-        });
-      }
+      onRollback: showApiErrorSnackbar
     }));
   };
 
@@ -120,10 +108,6 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
     ticketSystemUserId: string,
     status: TicketSystemUserStatus
   ): Promise<void> => {
-    if (!ticketId) {
-      return;
-    }
-
     await optimisticTicketLoader.refresh((currentTicket) => {
       const currentTicketSystemUsers = currentTicket.ticket_system_users ?? [];
 
@@ -137,13 +121,7 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
           )
         },
         mutation: () => api.tickets.updateTicketSystemUserStatus(ticketId, ticketSystemUserId, { status }),
-        onRollback: (error) => {
-          const apiError = error as APIError;
-          dialogContext.setSnackbar({
-            open: true,
-            snackbarMessage: apiError.message
-          });
-        }
+        onRollback: showApiErrorSnackbar
       };
     });
   };
@@ -158,10 +136,6 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
    * @return {Promise<void>}
    */
   const handleRemoveTicketSystemUser = async (ticketSystemUserId: string): Promise<void> => {
-    if (!ticketId) {
-      return;
-    }
-
     await optimisticTicketLoader.refresh((currentTicket) => {
       const currentTicketSystemUsers = currentTicket.ticket_system_users ?? [];
 
@@ -173,13 +147,7 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
           )
         },
         mutation: () => api.tickets.deleteTicketSystemUser(ticketId, ticketSystemUserId),
-        onRollback: (error) => {
-          const apiError = error as APIError;
-          dialogContext.setSnackbar({
-            open: true,
-            snackbarMessage: apiError.message
-          });
-        }
+        onRollback: showApiErrorSnackbar
       };
     });
   };
@@ -218,7 +186,7 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
   return (
     <Stack spacing={5}>
       <TicketSidebarSystemUsers
-        ticketSystemUsers={ticketSystemUsers ?? []}
+        ticketSystemUsers={ticketSystemUsers}
         onOpenDialog={() => setIsTicketSystemUserDialogOpen(true)}
         onUpdateTicketSystemUserStatus={handleUpdateTicketSystemUserStatus}
         onRemoveTicketSystemUser={handleConfirmRemoveTicketSystemUser}
@@ -229,9 +197,9 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
         onOpenDialog={() => setIsParticipantsDialogOpen(true)}
         onRemoveUser={handleRemoveUser}
       />
-      <TicketSidebarDataRequests dataRequests={dataRequests ?? []} />
+      <TicketSidebarDataRequests dataRequests={dataRequests} />
       <TicketSidebarUploads />
-      <TicketSidebarReferences references={references ?? []} />
+      <TicketSidebarReferences references={references} />
 
       <TicketTeamDialog
         open={isParticipantsDialogOpen}
@@ -241,13 +209,11 @@ export const TicketSidebar = (props: ITicketSidebarProps) => {
         onMemberAdd={handleMemberAdd}
         onMemberRemove={handleMemberRemove}
       />
-      {ticketId ? (
-        <TicketSystemUserDialog
-          open={isTicketSystemUserDialogOpen}
-          ticketId={ticketId}
-          onClose={() => setIsTicketSystemUserDialogOpen(false)}
-        />
-      ) : null}
+      <TicketSystemUserDialog
+        open={isTicketSystemUserDialogOpen}
+        ticketId={ticketId}
+        onClose={() => setIsTicketSystemUserDialogOpen(false)}
+      />
     </Stack>
   );
 };

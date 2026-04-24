@@ -112,19 +112,15 @@ describe('TicketSystemUserService', () => {
     }
   });
 
-  it('updateTicketSystemUserStatus returns 409 when status is unchanged', async () => {
+  it('updateTicketSystemUserStatus returns existing row when status is unchanged', async () => {
     sinon.stub(TicketSystemUserRepository.prototype, 'getTicketSystemUserByTicketAndSystemUserId').resolves(assignment);
     const updateStub = sinon
       .stub(TicketSystemUserRepository.prototype, 'updateTicketSystemUserStatus')
       .resolves(assignment);
 
-    try {
-      await service.updateTicketSystemUserStatus(ticketId, ticketSystemUserId, { status: 'requested' });
-      expect.fail('Expected patch to throw');
-    } catch (error) {
-      expect(error).to.be.instanceOf(ApiConflictError);
-    }
+    const result = await service.updateTicketSystemUserStatus(ticketId, ticketSystemUserId, { status: 'requested' });
 
+    expect(result).to.eql(assignment);
     expect(updateStub).to.not.have.been.called;
   });
 

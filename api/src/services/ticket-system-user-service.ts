@@ -68,6 +68,7 @@ export class TicketSystemUserService extends DBService {
    * Behavior:
    * - changes the lifecycle status for an existing active assignment
    * - rejects updates when the ticket system user record does not exist
+   * - returns the existing row when the requested status is unchanged
    *
    * @param {string} ticketId - Ticket UUID.
    * @param {string} ticketSystemUserId - ticket_system_user UUID.
@@ -91,7 +92,7 @@ export class TicketSystemUserService extends DBService {
     }
 
     if (existing.status === payload.status) {
-      throw new ApiConflictError('Ticket system user already has the requested status');
+      return existing;
     }
 
     return this.ticketSystemUserRepository.updateTicketSystemUserStatus(ticketId, ticketSystemUserId, {
