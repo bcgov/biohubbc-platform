@@ -4,6 +4,8 @@ export class BaseError extends Error {
   constructor(name: string, message: string, errors?: (string | object)[], stack?: string) {
     super(message);
 
+    Object.setPrototypeOf(this, new.target.prototype);
+
     this.name = name;
 
     for (const error of errors ?? []) {
@@ -19,7 +21,7 @@ export class BaseError extends Error {
     if (stack) {
       this.stack = stack;
     } else {
-      Error.captureStackTrace(this);
+      Error.captureStackTrace(this, new.target);
     }
   }
 }
