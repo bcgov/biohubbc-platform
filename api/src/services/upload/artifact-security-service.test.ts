@@ -561,5 +561,25 @@ describe('ArtifactSecurityService', () => {
         expect((err as Error).message).to.equal('Failed to get submission upload record');
       }
     });
+
+    it('throws when publishProcessSubmissionFeaturesJob throws', async () => {
+      sinon.stub(SubmissionUploadService.prototype, 'getSubmissionUploadByUploadId').resolves({
+        submission_upload_id: 'su-1',
+        submission_id: 999,
+        upload_id: 'upload-1',
+        status: 'pending',
+        ticket_id: '22222222-2222-2222-2222-222222222222'
+      });
+      sinon
+        .stub(ArtifactSecurityService.dependencies, 'publishProcessSubmissionFeaturesJob')
+        .rejects(new Error('pg-boss unavailable'));
+
+      try {
+        await service.publishNextPipelineStep(mockUploadArchive);
+        expect.fail('expected publishNextPipelineStep to throw');
+      } catch (error) {
+        expect((error as Error).message).to.equal('pg-boss unavailable');
+      }
+    });
   });
 });
