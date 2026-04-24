@@ -6,6 +6,73 @@ import { BaseRepository } from '../base-repository';
 
 export class ArtifactRepository extends BaseRepository {
   /**
+   * Insert artifact records in bulk without mutating existing rows and return
+   * the persisted records for all input keys.
+   *
+   * @param {CreateArtifact[]} artifacts
+   * @returns {Promise<Artifact[]>}
+   */
+  async insertArtifacts(artifacts: CreateArtifact[]): Promise<Artifact[]> {
+    if (!artifacts.length) {
+      return [];
+    }
+
+    const buckets = artifacts.map((artifact) => artifact.bucket);
+    const artifactStatuses = artifacts.map((artifact) => artifact.artifact_status);
+    const objectKeys = artifacts.map((artifact) => artifact.object_key);
+    const byteSizes = artifacts.map((artifact) => artifact.byte_size);
+    const checksums = artifacts.map((artifact) => artifact.checksum_sha256 ?? null);
+    const uploadedAts = artifacts.map((artifact) => artifact.uploaded_at ?? null);
+    const formats = artifacts.map((artifact) => artifact.format);
+
+    const sqlStatement = SQL`
+      INSERT INTO artifact (
+        bucket,
+        object_key,
+        byte_size,
+        artifact_status,
+        checksum_sha256,
+        uploaded_at,
+        format
+      )
+      SELECT *
+      FROM UNNEST(
+        ${buckets}::text[],
+        ${objectKeys}::text[],
+        ${byteSizes}::integer[],
+        ${artifactStatuses}::artifact_status[],
+        ${checksums}::text[],
+        ${uploadedAts}::timestamptz[],
+        ${formats}::text[]
+      ) AS t(
+        bucket,
+        object_key,
+        byte_size,
+        artifact_status,
+        checksum_sha256,
+        uploaded_at,
+        format
+      )
+      ON CONFLICT (bucket, object_key) DO UPDATE
+      SET
+        bucket = artifact.bucket
+      RETURNING
+        artifact_id,
+        artifact_status,
+        bucket,
+        object_key,
+        byte_size,
+        checksum_sha256,
+        uploaded_at,
+        format;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, Artifact);
+
+    return response.rows;
+  }
+
+  /**
    * Get a single artifact by ID.
    *
    * @param {string} artifactId - The ID of the artifact to retrieve.
@@ -73,13 +140,13 @@ export class ArtifactRepository extends BaseRepository {
   }
 
   /**
-   * Insert a new artifact record.
+   * Insert or resolve a single artifact by key and return the persisted row in
+   * one statement.
    *
-   * @param {CreateArtifact} artifact - The artifact data to insert.
-   * @returns {Promise<{ artifact_id: string }>} - The newly created artifact ID.
-   * @throws {ApiExecuteSQLError} - If the insert fails.
+   * @param {CreateArtifact} artifact
+   * @returns {Promise<Artifact>}
    */
-  async insertArtifact(artifact: CreateArtifact): Promise<{ artifact_id: string }> {
+  async insertArtifact(artifact: CreateArtifact): Promise<Artifact> {
     const sqlStatement = SQL`
       INSERT INTO artifact (
         bucket,
@@ -89,31 +156,40 @@ export class ArtifactRepository extends BaseRepository {
         checksum_sha256,
         uploaded_at,
         format
-      ) VALUES (
-        ${artifact.bucket},
-        ${artifact.object_key},
-        ${artifact.byte_size ?? null},
-        ${artifact.artifact_status},
-        ${artifact.checksum_sha256 ?? null},
-        ${artifact.uploaded_at ?? null},
-        ${artifact.format}
       )
-      ON CONFLICT (bucket, object_key) DO NOTHING
-      RETURNING artifact_id;
+      VALUES (
+        ${artifact.bucket}::text,
+        ${artifact.object_key}::text,
+        ${artifact.byte_size ?? null}::integer,
+        ${artifact.artifact_status}::artifact_status,
+        ${artifact.checksum_sha256 ?? null}::text,
+        ${artifact.uploaded_at ?? null}::timestamptz,
+        ${artifact.format}::text
+      )
+      ON CONFLICT (bucket, object_key) DO UPDATE
+      SET
+        bucket = artifact.bucket
+      RETURNING
+        artifact_id,
+        artifact_status,
+        bucket,
+        object_key,
+        byte_size,
+        checksum_sha256,
+        uploaded_at,
+        format;
     `;
 
-    const response = await this.connection.sql(sqlStatement, z.object({ artifact_id: z.string().uuid() }));
+    const response = await this.connection.sql(sqlStatement, Artifact);
 
-    if (response.rowCount === 1) {
-      return response.rows[0];
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert artifact record', [
+        'ArtifactRepository->insertArtifact',
+        `rowCount was ${response.rowCount}, expected 1`
+      ]);
     }
 
-    // Conflict: return existing artifact_id
-    const existing = await this.connection.sql(SQL`
-      SELECT artifact_id FROM artifact WHERE bucket = ${artifact.bucket} AND object_key = ${artifact.object_key};
-    `);
-
-    return existing.rows[0];
+    return response.rows[0];
   }
 
   /**
